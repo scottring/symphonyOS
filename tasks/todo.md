@@ -103,15 +103,42 @@ Weekly planning session with AI help. Requires notes system (Phase 3) to referen
 
 ---
 
-## Phase 5: Domains
+## Phase 5: Domains & People
 
-Multi-context support (Work, Personal, Family, etc.)
+Multi-context support (Work, Personal, Family, etc.) and contact management.
 
-- [ ] Domain data model
+### 5.1 Domains
+- [ ] Domain data model (Work, Personal, Family, etc.)
 - [ ] Domain CRUD UI
 - [ ] Filter/view by domain
 - [ ] Assign tasks/events/notes to domains
 - [ ] Domain-based calendar filtering
+
+### 5.2 People / Contacts
+People are first-class entities. Avoids re-entering phone numbers for recurring contacts like "Tony the painter."
+
+- [ ] People data model:
+  ```
+  Person {
+    id
+    user_id
+    name
+    phone
+    email
+    domain_id (which context: Work, Personal, Family)
+    google_contact_id (optional link to native contact)
+    notes[] (attached notes about this person)
+    created_at
+  }
+  ```
+- [ ] People CRUD UI (simple list + add/edit)
+- [ ] Link tasks to people (when creating "Text Tony", select from people)
+- [ ] Auto-populate phone/email from linked person
+- [ ] Google Contacts integration (optional):
+  - [ ] Search native contacts when adding a person
+  - [ ] Import contact details (name, phone, email)
+  - [ ] Keep link for future sync
+- [ ] People referenced in notes (AI extraction in Phase 3 can detect names)
 
 ---
 
