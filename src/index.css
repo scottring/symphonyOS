@@ -86,16 +86,17 @@
 
   /* ---------------------------------------------------------------------------
      SPACING - Generous Scandinavian Scale
+     Using numbered scale to avoid conflicts with Tailwind's size tokens (sm, md, lg, etc.)
      --------------------------------------------------------------------------- */
 
-  --spacing-xs: 0.25rem;   /* 4px */
-  --spacing-sm: 0.5rem;    /* 8px */
-  --spacing-md: 1rem;      /* 16px */
-  --spacing-lg: 1.5rem;    /* 24px */
-  --spacing-xl: 2rem;      /* 32px */
-  --spacing-2xl: 2.5rem;   /* 40px */
-  --spacing-3xl: 3rem;     /* 48px */
-  --spacing-4xl: 4rem;     /* 64px */
+  --spacing-1: 0.25rem;    /* 4px */
+  --spacing-2: 0.5rem;     /* 8px */
+  --spacing-4: 1rem;       /* 16px */
+  --spacing-6: 1.5rem;     /* 24px */
+  --spacing-8: 2rem;       /* 32px */
+  --spacing-10: 2.5rem;    /* 40px */
+  --spacing-12: 3rem;      /* 48px */
+  --spacing-16: 4rem;      /* 64px */
 
   /* ---------------------------------------------------------------------------
      BORDER RADIUS - Soft but defined
