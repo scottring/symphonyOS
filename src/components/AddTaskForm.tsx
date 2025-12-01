@@ -22,7 +22,7 @@ export function AddTaskForm({ onAdd }: AddTaskFormProps) {
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Add a task..."
-        className="flex-1 px-4 py-3 rounded-xl border border-neutral-200 bg-white
+        className="touch-target flex-1 px-4 py-3 rounded-xl border border-neutral-200 bg-white
                    text-neutral-800 placeholder:text-neutral-400
                    focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
                    transition-shadow shadow-sm focus:shadow-md"

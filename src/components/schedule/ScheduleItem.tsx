@@ -57,30 +57,36 @@ export function ScheduleItem({ item, selected, onSelect, onToggleComplete }: Sch
         )}
       </div>
 
-      {/* Checkbox for tasks, filled dot for events - same width container for alignment */}
-      <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center">
+      {/* Checkbox for tasks, filled dot for events - touch-friendly tap area */}
+      <div className="flex-shrink-0 flex items-center justify-center">
         {isTask ? (
           <button
             onClick={handleCheckboxClick}
-            className={`
-              w-5 h-5 rounded-md border-2
-              flex items-center justify-center
-              transition-colors
-              ${item.completed
-                ? 'bg-primary-500 border-primary-500 text-white'
-                : 'border-neutral-300 hover:border-primary-400'
-              }
-            `}
+            className="touch-target flex items-center justify-center -m-2"
             aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
           >
-            {item.completed && (
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-            )}
+            <span
+              className={`
+                w-5 h-5 rounded-md border-2
+                flex items-center justify-center
+                transition-colors
+                ${item.completed
+                  ? 'bg-primary-500 border-primary-500 text-white'
+                  : 'border-neutral-300 hover:border-primary-400'
+                }
+              `}
+            >
+              {item.completed && (
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              )}
+            </span>
           </button>
         ) : (
-          <div className="w-2.5 h-2.5 rounded-full bg-blue-400" />
+          <div className="w-12 h-12 flex items-center justify-center">
+            <div className="w-2.5 h-2.5 rounded-full bg-blue-400" />
+          </div>
         )}
       </div>
 

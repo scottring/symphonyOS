@@ -92,9 +92,9 @@ describe('App', () => {
     expect(screen.getByText('Your day is clear')).toBeInTheDocument()
   })
 
-  it('renders Today\'s Schedule header', () => {
+  it('renders Today header', () => {
     render(<App />)
-    expect(screen.getByText("Today's Schedule")).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Today' })).toBeInTheDocument()
   })
 
   it('can add a task', async () => {

@@ -9,6 +9,7 @@ import { DetailPanel } from '@/components/detail/DetailPanel'
 import { AddTaskForm } from '@/components/AddTaskForm'
 import { CalendarConnect } from '@/components/CalendarConnect'
 import { AuthForm } from '@/components/AuthForm'
+import { RecipeViewer } from '@/components/recipe/RecipeViewer'
 import { taskToTimelineItem, eventToTimelineItem } from '@/types/timeline'
 
 function App() {
@@ -24,6 +25,7 @@ function App() {
   })
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [viewedDate, setViewedDate] = useState(() => new Date())
+  const [recipeUrl, setRecipeUrl] = useState<string | null>(null)
 
   // Persist sidebar state
   useEffect(() => {
@@ -98,18 +100,26 @@ function App() {
     <AppShell
       sidebarCollapsed={sidebarCollapsed}
       onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-      panelOpen={selectedItemId !== null}
+      panelOpen={selectedItemId !== null || recipeUrl !== null}
       userEmail={user.email ?? undefined}
       onSignOut={signOut}
       panel={
-        <DetailPanel
-          item={selectedItem}
-          onClose={() => setSelectedItemId(null)}
-          onUpdate={updateTask}
-          onDelete={deleteTask}
-          onToggleComplete={toggleTask}
-          onUpdateEventNote={updateNote}
-        />
+        recipeUrl ? (
+          <RecipeViewer
+            url={recipeUrl}
+            onClose={() => setRecipeUrl(null)}
+          />
+        ) : (
+          <DetailPanel
+            item={selectedItem}
+            onClose={() => setSelectedItemId(null)}
+            onUpdate={updateTask}
+            onDelete={deleteTask}
+            onToggleComplete={toggleTask}
+            onUpdateEventNote={updateNote}
+            onOpenRecipe={setRecipeUrl}
+          />
+        )
       }
     >
       <div className="h-full overflow-auto">

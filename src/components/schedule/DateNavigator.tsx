@@ -66,7 +66,7 @@ export function DateNavigator({ date, onDateChange }: DateNavigatorProps) {
       {/* Previous day button */}
       <button
         onClick={goToPrevDay}
-        className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-500 hover:text-neutral-700 transition-colors"
+        className="touch-target flex items-center justify-center rounded-lg hover:bg-neutral-100 text-neutral-500 hover:text-neutral-700 transition-colors"
         aria-label="Previous day"
       >
         <svg
@@ -91,7 +91,7 @@ export function DateNavigator({ date, onDateChange }: DateNavigatorProps) {
       {/* Next day button */}
       <button
         onClick={goToNextDay}
-        className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-500 hover:text-neutral-700 transition-colors"
+        className="touch-target flex items-center justify-center rounded-lg hover:bg-neutral-100 text-neutral-500 hover:text-neutral-700 transition-colors"
         aria-label="Next day"
       >
         <svg
@@ -112,7 +112,7 @@ export function DateNavigator({ date, onDateChange }: DateNavigatorProps) {
       {!isToday() && (
         <button
           onClick={goToToday}
-          className="ml-2 px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 rounded transition-colors"
+          className="touch-target ml-2 px-3 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
         >
           Today
         </button>

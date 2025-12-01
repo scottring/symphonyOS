@@ -82,6 +82,8 @@ interface DetailPanelProps {
   onToggleComplete?: (taskId: string) => void
   // Event notes
   onUpdateEventNote?: (googleEventId: string, notes: string | null) => void
+  // Recipe viewer
+  onOpenRecipe?: (url: string) => void
 }
 
 // Icon components for actions
@@ -128,8 +130,14 @@ function ActionIcon({ type }: { type: DetectedAction['icon'] }) {
 }
 
 // Action button component
-function ActionButton({ action }: { action: DetectedAction }) {
+function ActionButton({ action, onOpenRecipe }: { action: DetectedAction; onOpenRecipe?: (url: string) => void }) {
   const handleClick = () => {
+    // For recipes, use the in-app viewer if available
+    if (action.type === 'recipe' && action.url && onOpenRecipe) {
+      onOpenRecipe(action.url)
+      return
+    }
+
     if (action.url) {
       window.open(action.url, '_blank', 'noopener,noreferrer')
     } else if (action.phoneNumber) {
@@ -161,7 +169,7 @@ function ActionButton({ action }: { action: DetectedAction }) {
   )
 }
 
-export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplete, onUpdateEventNote }: DetailPanelProps) {
+export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplete, onUpdateEventNote, onOpenRecipe }: DetailPanelProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [newLink, setNewLink] = useState('')
 
@@ -343,7 +351,7 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
             <h3 className="text-sm font-medium text-neutral-700 mb-3">Actions</h3>
             <div className="flex flex-wrap gap-2">
               {detectedActions.map((action, index) => (
-                <ActionButton key={`${action.type}-${index}`} action={action} />
+                <ActionButton key={`${action.type}-${index}`} action={action} onOpenRecipe={onOpenRecipe} />
               ))}
             </div>
           </div>
@@ -507,7 +515,7 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
               <input
                 id="scheduledFor"
                 type="datetime-local"
-                step="900"
+                step="300"
                 value={getScheduledForInputValue()}
                 onChange={handleScheduleChange}
                 className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200

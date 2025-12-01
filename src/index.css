@@ -188,13 +188,8 @@ body {
    UTILITY CLASSES
    ============================================================================= */
 
-/* Touch-friendly tap targets */
+/* Touch-friendly tap targets (48px minimum per WCAG/Material Design guidelines) */
 .touch-target {
-  min-height: 44px;
-  min-width: 44px;
-}
-
-.touch-target-lg {
   min-height: 48px;
   min-width: 48px;
 }
