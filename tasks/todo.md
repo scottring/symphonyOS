@@ -1,64 +1,138 @@
-# Task Scheduling - Week 5
+# Symphony OS - Project Plan
 
-Add date/time assignment to tasks so they appear in time-based sections alongside calendar events.
+*Last updated: December 1, 2025*
 
-## Plan
+---
 
-### What We're Building
+## Vision Summary
 
-**Scheduled Tasks** — Tasks can have an optional scheduled time:
-- `scheduledFor` field on Task (Date or null)
-- Tasks with times appear in Active Now/Coming Up/Later Today
-- Tasks without times stay in the Tasks (unscheduled) section
+A **user-first personal life OS**. You are the primary unit. Domains (Work, Personal, Family) are containers you create. Family is just one domain that happens to be shared.
 
-**UI for Scheduling** — In the ExecutionCard edit mode:
-- Date picker to set the scheduled date
-- Time picker to set the scheduled time (optional - can be date-only)
-- Clear button to unschedule
+---
 
-### Architecture
+## Phase 1: MVP (Weeks 1-5) ✅ COMPLETE
 
-1. **Update Task type** — Add `scheduledFor?: Date` field
-2. **Update useLocalTasks** — Handle scheduledFor in updates
-3. **Update taskToTimelineItem** — Use scheduledFor as startTime
-4. **Update ExecutionCard** — Add date/time picker in edit mode
-5. **Update time utilities** — Handle date-only scheduling (no specific time)
+Core task + calendar + execution UI.
 
-### Notes
+- [x] Task CRUD with Supabase persistence
+- [x] Context attachments (notes, links, phone numbers)
+- [x] Google Calendar sync (read events)
+- [x] Execution UI (time-based grouping: Active Now / Coming Up / Later Today)
+- [x] Date/time assignment for tasks
+- [x] Day navigation (prev/next day, back to today)
 
-- Date-only tasks (no time) should appear in "Later Today" or at a default time
-- Keep it simple: native HTML date/time inputs first, fancy picker later if needed
-- The dashboard grouping already works - we just need to pass the time through
+---
 
-## Todo
+## Phase 2: MVP Polish (Current)
 
-- [x] Add `scheduledFor` field to Task type
-- [x] Update taskToTimelineItem to use scheduledFor
-- [x] Add date/time picker UI to ExecutionCard edit mode
-- [x] Handle "clear schedule" to make task unscheduled again
-- [x] Write tests for scheduled task behavior
-- [x] Manual testing with real tasks
+Finish the execution experience before adding new major features.
 
-## Review
+### 2.1 Contextual One-Tap Actions
+Per VISION.md: "One-tap actions (call, navigate, mark done)"
 
-### What Changed
+- [ ] **Get Directions** — Events/tasks with location → open Google Maps
+- [ ] **Join Call** — Events with video links (Zoom/Meet/Teams) → extract and open
+- [ ] **Call/Text** — Already implemented for phone numbers ✅
 
-**Modified Files:**
-- `src/types/task.ts` — Added `scheduledFor?: Date` field
-- `src/types/timeline.ts` — Updated `taskToTimelineItem` to use `scheduledFor` as `startTime`
-- `src/components/ExecutionCard.tsx` — Added datetime-local picker with 15-min increments and Clear button in edit mode
-- `src/components/ExecutionCard.test.tsx` — Added 4 tests for scheduled task behavior
-- `src/hooks/useGoogleCalendar.ts` — Fixed CalendarEvent interface to support both snake_case and camelCase field names
+### 2.2 UI/UX Refinements
+- [ ] Empty states for non-today dates ("Nothing scheduled for Thursday")
+- [ ] Visual distinction between past/future when viewing other days
+- [ ] Swipe gestures (right = complete, left = defer) — per VISION.md
+- [ ] Pull-to-refresh for calendar events
 
-### Key Features
+### 2.3 Stability & Edge Cases
+- [ ] Handle Google Calendar token refresh
+- [ ] Offline support / error states
+- [ ] Loading skeletons for calendar fetch
 
-1. **Scheduled Tasks** — Tasks can now be assigned a date/time via the edit mode
-2. **Time-based Grouping** — Scheduled tasks appear in Active Now/Coming Up/Later Today alongside calendar events
-3. **15-minute Increments** — Time picker uses step="900" for 15-min intervals
-4. **Clear Schedule** — Button to unschedule a task and move it back to Tasks section
-5. **Calendar Event Fix** — Fixed Invalid Date issue by handling both snake_case and camelCase field names
+---
 
-### Test Coverage
+## Phase 3: Inbox & Capture
 
-- 56 tests total (all passing)
-- 4 new tests for scheduling behavior
+Quick capture on mobile, process during planning.
+
+- [ ] Inbox data model (unprocessed items)
+- [ ] Quick add UI (minimal friction capture)
+- [ ] Share sheet integration (iOS/Android)
+- [ ] Email forward to inbox (Supabase edge function)
+- [ ] Inbox processing UI (convert to task or attach to existing)
+
+---
+
+## Phase 4: AI-Assisted Planning
+
+Weekly planning session with AI help.
+
+- [ ] Brain dump UI (large text area, freeform input)
+- [ ] AI parsing (extract tasks, dates, commitments)
+- [ ] Review & adjust UI (structured output, drag to schedule)
+- [ ] Gap detection (neglected projects, upcoming deadlines)
+
+---
+
+## Phase 5: Domains
+
+Multi-context support.
+
+- [ ] Domain data model (Work, Personal, Family, etc.)
+- [ ] Domain CRUD UI
+- [ ] Filter/view by domain
+- [ ] Assign tasks/events to domains
+- [ ] Domain-based calendar filtering
+
+---
+
+## Phase 6: Collaborative Planning
+
+Family/shared domain features.
+
+- [ ] Invite users to shared domains
+- [ ] Shared task visibility
+- [ ] Assignment to domain members
+- [ ] Sunday sync UI (review family domain together)
+
+---
+
+## Phase 7: Meal Planning
+
+Prompt-driven meal planning with recipes.
+
+- [ ] Recipe storage (local, not just links)
+- [ ] Meal prompt UI ("What should we have for dinner?")
+- [ ] AI meal suggestions based on preferences, schedule, inventory
+- [ ] Grocery list generation
+- [ ] Recipe surfacing at cooking time
+
+---
+
+## Phase 8: Routines
+
+Recurring assignments with flexible ownership.
+
+- [ ] Routine data model (who does what, when)
+- [ ] Routine assignment rotation
+- [ ] Routine visibility in daily view
+
+---
+
+## Out of Scope (Explicit No)
+
+- Email client
+- Full budgeting/categorization
+- Voice input (future, not now)
+- Apple ecosystem integration
+- Multi-family / team features
+- Public sharing
+
+---
+
+## Current Focus
+
+**Phase 2.1: Contextual One-Tap Actions**
+
+Next steps:
+1. Add "Get Directions" button for items with location
+2. Add "Join Call" button for events with video links
+3. Test on mobile
+
+---
