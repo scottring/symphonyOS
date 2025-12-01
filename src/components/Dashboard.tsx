@@ -11,6 +11,7 @@ interface DashboardProps {
   onToggleTask: (id: string) => void
   onDeleteTask: (id: string) => void
   onUpdateTask: (id: string, updates: Partial<Task>) => void
+  loading?: boolean
 }
 
 interface TimeSectionProps {
@@ -28,14 +29,17 @@ function TimeSection({ title, items, onToggleTask, onDeleteTask, onUpdateTask, e
   }
 
   return (
-    <section className="mb-6">
-      <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">
+    <section className="mb-8 md:mb-10">
+      {/* Section header with subtle styling */}
+      <h2 className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-4 px-1">
         {title}
       </h2>
       {items.length === 0 ? (
-        <p className="text-neutral-400 text-sm py-4 text-center">{emptyMessage}</p>
+        <div className="card p-8 text-center">
+          <p className="text-neutral-500 text-base leading-relaxed">{emptyMessage}</p>
+        </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {items.map((item) => (
             <ExecutionCard
               key={item.id}
@@ -51,7 +55,25 @@ function TimeSection({ title, items, onToggleTask, onDeleteTask, onUpdateTask, e
   )
 }
 
-export function Dashboard({ tasks, events, onToggleTask, onDeleteTask, onUpdateTask }: DashboardProps) {
+function LoadingSkeleton() {
+  return (
+    <div className="space-y-4 animate-pulse">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="card p-5">
+          <div className="flex gap-4">
+            <div className="w-5 h-5 bg-neutral-200 rounded" />
+            <div className="flex-1 space-y-2">
+              <div className="h-5 bg-neutral-200 rounded w-3/4" />
+              <div className="h-4 bg-neutral-100 rounded w-1/2" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function Dashboard({ tasks, events, onToggleTask, onDeleteTask, onUpdateTask, loading }: DashboardProps) {
   const grouped = useMemo(() => {
     // Convert tasks and events to timeline items
     const taskItems = tasks.map(taskToTimelineItem)
@@ -64,8 +86,21 @@ export function Dashboard({ tasks, events, onToggleTask, onDeleteTask, onUpdateT
 
   const hasScheduledItems = grouped.now.length > 0 || grouped.soon.length > 0 || grouped.later.length > 0
 
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        <section className="mb-8 md:mb-10">
+          <h2 className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-4 px-1">
+            Loading...
+          </h2>
+          <LoadingSkeleton />
+        </section>
+      </div>
+    )
+  }
+
   return (
-    <div>
+    <div className="space-y-2">
       {/* Active Now */}
       <TimeSection
         title="Active Now"
@@ -73,7 +108,7 @@ export function Dashboard({ tasks, events, onToggleTask, onDeleteTask, onUpdateT
         onToggleTask={onToggleTask}
         onDeleteTask={onDeleteTask}
         onUpdateTask={onUpdateTask}
-        emptyMessage={hasScheduledItems ? undefined : "Nothing scheduled for now"}
+        emptyMessage={hasScheduledItems ? undefined : "Your day is clear. Add a task to get started."}
       />
 
       {/* Coming Up */}

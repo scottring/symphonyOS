@@ -16,17 +16,23 @@ export function AddTaskForm({ onAdd }: AddTaskFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex gap-2">
+    <form onSubmit={handleSubmit} className="flex gap-3">
       <input
         type="text"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Add a task..."
-        className="flex-1 px-4 py-2 rounded-lg border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+        className="flex-1 px-4 py-3 rounded-xl border border-neutral-200 bg-white
+                   text-neutral-800 placeholder:text-neutral-400
+                   focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
+                   transition-shadow shadow-sm focus:shadow-md"
       />
       <button
         type="submit"
-        className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+        className="touch-target px-5 py-3 bg-primary-500 text-white font-medium rounded-xl
+                   hover:bg-primary-600 active:bg-primary-700
+                   shadow-sm hover:shadow-md
+                   transition-all"
       >
         Add
       </button>

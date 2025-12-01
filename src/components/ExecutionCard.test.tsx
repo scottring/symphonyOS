@@ -247,4 +247,94 @@ describe('ExecutionCard', () => {
 
     expect(onUpdate).toHaveBeenCalledWith('1', { scheduledFor: undefined })
   })
+
+  it('allows inline editing of task title by clicking', async () => {
+    const onUpdate = vi.fn()
+    const taskWithOriginal: TimelineItem = {
+      ...baseTask,
+      originalTask: {
+        id: '1',
+        title: 'Test Task',
+        completed: false,
+        createdAt: new Date(),
+      },
+    }
+    const { user } = render(
+      <ExecutionCard item={taskWithOriginal} onUpdate={onUpdate} />
+    )
+
+    // Click on title to edit
+    await user.click(screen.getByText('Test Task'))
+
+    // Should show input field
+    const input = screen.getByRole('textbox', { name: 'Edit task title' })
+    expect(input).toBeInTheDocument()
+    expect(input).toHaveValue('Test Task')
+
+    // Edit the title
+    await user.clear(input)
+    await user.type(input, 'Updated Title')
+
+    // Blur to save
+    await user.tab()
+
+    expect(onUpdate).toHaveBeenCalledWith('1', { title: 'Updated Title' })
+  })
+
+  it('cancels title edit on Escape key', async () => {
+    const onUpdate = vi.fn()
+    const taskWithOriginal: TimelineItem = {
+      ...baseTask,
+      originalTask: {
+        id: '1',
+        title: 'Test Task',
+        completed: false,
+        createdAt: new Date(),
+      },
+    }
+    const { user } = render(
+      <ExecutionCard item={taskWithOriginal} onUpdate={onUpdate} />
+    )
+
+    // Click on title to edit
+    await user.click(screen.getByText('Test Task'))
+
+    // Edit the title
+    const input = screen.getByRole('textbox', { name: 'Edit task title' })
+    await user.clear(input)
+    await user.type(input, 'Changed Title')
+
+    // Press Escape to cancel
+    await user.keyboard('{Escape}')
+
+    // Should revert to original title and not call onUpdate
+    expect(screen.getByText('Test Task')).toBeInTheDocument()
+    expect(onUpdate).not.toHaveBeenCalled()
+  })
+
+  it('saves title edit on Enter key', async () => {
+    const onUpdate = vi.fn()
+    const taskWithOriginal: TimelineItem = {
+      ...baseTask,
+      originalTask: {
+        id: '1',
+        title: 'Test Task',
+        completed: false,
+        createdAt: new Date(),
+      },
+    }
+    const { user } = render(
+      <ExecutionCard item={taskWithOriginal} onUpdate={onUpdate} />
+    )
+
+    // Click on title to edit
+    await user.click(screen.getByText('Test Task'))
+
+    // Edit the title
+    const input = screen.getByRole('textbox', { name: 'Edit task title' })
+    await user.clear(input)
+    await user.type(input, 'New Title{Enter}')
+
+    expect(onUpdate).toHaveBeenCalledWith('1', { title: 'New Title' })
+  })
 })
