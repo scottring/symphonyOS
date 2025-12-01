@@ -98,57 +98,112 @@ serve(async (req) => {
       accessToken = await refreshAccessToken(supabaseAdmin, user.id, connection.refresh_token)
     }
 
-    // Fetch events from Google Calendar
-    const calendarId = connection.calendar_id || 'primary'
-    const eventsUrl = new URL(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`)
-    eventsUrl.searchParams.set('timeMin', new Date(startDate).toISOString())
-    eventsUrl.searchParams.set('timeMax', new Date(endDate).toISOString())
-    eventsUrl.searchParams.set('singleEvents', 'true')
-    eventsUrl.searchParams.set('orderBy', 'startTime')
-    eventsUrl.searchParams.set('maxResults', '250')
+    // First, get list of all calendars the user has access to
+    const calendarListResponse = await fetch(
+      'https://www.googleapis.com/calendar/v3/users/me/calendarList',
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    )
+    const calendarListData = await calendarListResponse.json()
 
-    const eventsResponse = await fetch(eventsUrl.toString(), {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-
-    const eventsData = await eventsResponse.json()
-
-    if (eventsData.error) {
-      return new Response(JSON.stringify({ error: eventsData.error.message }), {
-        status: eventsResponse.status,
+    if (calendarListData.error) {
+      return new Response(JSON.stringify({ error: calendarListData.error.message }), {
+        status: calendarListResponse.status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    // Transform and cache events
+    // Fetch events from all calendars
+    interface GoogleCalendar {
+      id: string
+      summary?: string
+      selected?: boolean
+    }
     interface GoogleCalendarEvent {
       id: string
       summary?: string
+      description?: string
+      location?: string
       start: { dateTime?: string; date?: string }
       end: { dateTime?: string; date?: string }
     }
-    const events = (eventsData.items || []).map((event: GoogleCalendarEvent) => {
-      const isAllDay = !event.start?.dateTime
-      const startTime = isAllDay
-        ? new Date(event.start.date + 'T12:00:00Z')
-        : new Date(event.start.dateTime)
-      const endTime = isAllDay
-        ? new Date(event.end.date + 'T12:00:00Z')
-        : new Date(event.end.dateTime)
 
-      return {
-        user_id: user.id,
-        google_event_id: event.id,
-        title: event.summary || '(No title)',
-        description: event.description || null,
-        start_time: startTime.toISOString(),
-        end_time: endTime.toISOString(),
-        all_day: isAllDay,
-        location: event.location || null,
-        calendar_id: calendarId,
-        updated_at: new Date().toISOString(),
+    const calendars: GoogleCalendar[] = calendarListData.items || []
+
+    // Log which calendars we're fetching from
+    console.log('Fetching events from calendars:', calendars.map(c => ({ id: c.id, summary: c.summary })))
+
+    const allEvents: Array<{
+      user_id: string
+      google_event_id: string
+      title: string
+      description: string | null
+      start_time: string
+      end_time: string
+      all_day: boolean
+      location: string | null
+      calendar_id: string
+      updated_at: string
+    }> = []
+
+    // Fetch events from each calendar in parallel
+    const eventPromises = calendars.map(async (calendar) => {
+      const eventsUrl = new URL(
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendar.id)}/events`
+      )
+      eventsUrl.searchParams.set('timeMin', new Date(startDate).toISOString())
+      eventsUrl.searchParams.set('timeMax', new Date(endDate).toISOString())
+      eventsUrl.searchParams.set('singleEvents', 'true')
+      eventsUrl.searchParams.set('orderBy', 'startTime')
+      eventsUrl.searchParams.set('maxResults', '100')
+
+      try {
+        const eventsResponse = await fetch(eventsUrl.toString(), {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        })
+        const eventsData = await eventsResponse.json()
+
+        if (eventsData.error) {
+          console.error(`Error fetching calendar ${calendar.id}:`, eventsData.error)
+          return []
+        }
+
+        const items = eventsData.items || []
+        console.log(`Calendar ${calendar.summary || calendar.id}: ${items.length} events found`)
+
+        return items.map((event: GoogleCalendarEvent) => {
+          const isAllDay = !event.start?.dateTime
+
+          // For all-day events, keep the date as noon UTC to avoid timezone issues
+          // This ensures the date doesn't shift when converted to/from ISO strings
+          const startTime = isAllDay
+            ? `${event.start.date}T12:00:00.000Z`
+            : new Date(event.start.dateTime!).toISOString()
+          const endTime = isAllDay
+            ? `${event.end.date}T12:00:00.000Z`
+            : new Date(event.end.dateTime!).toISOString()
+
+          return {
+            user_id: user.id,
+            google_event_id: event.id,
+            title: event.summary || '(No title)',
+            description: event.description || null,
+            start_time: startTime,
+            end_time: endTime,
+            all_day: isAllDay,
+            location: event.location || null,
+            calendar_id: calendar.id,
+            updated_at: new Date().toISOString(),
+          }
+        })
+      } catch (err) {
+        console.error(`Error fetching calendar ${calendar.id}:`, err)
+        return []
       }
     })
+
+    // Wait for all calendar fetches to complete and flatten results
+    const eventArrays = await Promise.all(eventPromises)
+    const events = eventArrays.flat()
 
     // Upsert events to cache
     if (events.length > 0) {

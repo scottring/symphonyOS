@@ -111,7 +111,13 @@ export function useGoogleCalendar() {
 
   // Fetch events for a date range
   const fetchEvents = useCallback(async (startDate: Date, endDate: Date) => {
-    if (!isConnected) return []
+    if (!isConnected) {
+      setEvents([])
+      return []
+    }
+
+    // Clear events immediately when fetching new date range
+    setEvents([])
 
     try {
       const { data, error } = await supabase.functions.invoke('google-calendar-events', {
@@ -127,6 +133,7 @@ export function useGoogleCalendar() {
       return data.events || []
     } catch (err) {
       console.error('Failed to fetch events:', err)
+      setEvents([])
       return []
     }
   }, [isConnected])

@@ -1,27 +1,68 @@
-import { useEffect } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useAuth } from '@/hooks/useAuth'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
+import { AppShell } from '@/components/layout/AppShell'
+import { TodaySchedule } from '@/components/schedule/TodaySchedule'
+import { DetailPanel } from '@/components/detail/DetailPanel'
 import { AddTaskForm } from '@/components/AddTaskForm'
 import { CalendarConnect } from '@/components/CalendarConnect'
-import { Dashboard } from '@/components/Dashboard'
 import { AuthForm } from '@/components/AuthForm'
+import { taskToTimelineItem, eventToTimelineItem } from '@/types/timeline'
 
 function App() {
   const { tasks, loading: tasksLoading, addTask, toggleTask, deleteTask, updateTask } = useSupabaseTasks()
   const { user, loading: authLoading, signOut } = useAuth()
-  const { isConnected, events, fetchTodayEvents } = useGoogleCalendar()
+  const { isConnected, events, fetchEvents } = useGoogleCalendar()
 
-  // Fetch calendar events when connected
+  // UI state
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    const stored = localStorage.getItem('symphony-sidebar-collapsed')
+    return stored === 'true'
+  })
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+  const [viewedDate, setViewedDate] = useState(() => new Date())
+
+  // Persist sidebar state
+  useEffect(() => {
+    localStorage.setItem('symphony-sidebar-collapsed', String(sidebarCollapsed))
+  }, [sidebarCollapsed])
+
+  // Fetch calendar events when connected or date changes
   useEffect(() => {
     if (isConnected) {
-      fetchTodayEvents()
+      const startOfDay = new Date(viewedDate)
+      startOfDay.setHours(0, 0, 0, 0)
+      const endOfDay = new Date(viewedDate)
+      endOfDay.setHours(23, 59, 59, 999)
+      fetchEvents(startOfDay, endOfDay)
     }
-  }, [isConnected, fetchTodayEvents])
+  }, [isConnected, viewedDate, fetchEvents])
+
+  // Find selected item from tasks or events
+  const selectedItem = useMemo(() => {
+    if (!selectedItemId) return null
+
+    // Check if it's a task
+    if (selectedItemId.startsWith('task-')) {
+      const taskId = selectedItemId.replace('task-', '')
+      const task = tasks.find((t) => t.id === taskId)
+      return task ? taskToTimelineItem(task) : null
+    }
+
+    // Check if it's an event
+    if (selectedItemId.startsWith('event-')) {
+      const eventId = selectedItemId.replace('event-', '')
+      const event = events.find((e) => (e.google_event_id || e.id) === eventId)
+      return event ? eventToTimelineItem(event) : null
+    }
+
+    return null
+  }, [selectedItemId, tasks, events])
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-bg-base flex items-center justify-center safe-top safe-bottom">
+      <div className="min-h-screen bg-bg-base flex items-center justify-center">
         <p className="text-neutral-500">Loading...</p>
       </div>
     )
@@ -29,49 +70,57 @@ function App() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-bg-base safe-top safe-bottom">
+      <div className="min-h-screen bg-bg-base">
         <AuthForm />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-bg-base safe-top safe-bottom">
-      {/* Header */}
-      <header className="px-5 pt-6 pb-4 md:px-8 md:pt-8 md:pb-6">
-        <div className="max-w-lg mx-auto flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-semibold text-primary-600">Symphony OS</h1>
-            <p className="text-neutral-500 mt-1 text-sm md:text-base">Your personal operating system</p>
+    <AppShell
+      sidebarCollapsed={sidebarCollapsed}
+      onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+      panelOpen={selectedItemId !== null}
+      userEmail={user.email ?? undefined}
+      onSignOut={signOut}
+      panel={
+        <DetailPanel
+          item={selectedItem}
+          onClose={() => setSelectedItemId(null)}
+          onUpdate={updateTask}
+          onDelete={deleteTask}
+          onToggleComplete={toggleTask}
+        />
+      }
+    >
+      <div className="h-full overflow-auto">
+        {/* Calendar connect banner if needed */}
+        {!isConnected && (
+          <div className="p-4 border-b border-neutral-100">
+            <CalendarConnect />
           </div>
-          <div className="text-right">
-            <p className="text-sm text-neutral-500 truncate max-w-[140px] md:max-w-none">{user.email}</p>
-            <button
-              onClick={() => signOut()}
-              className="text-sm text-primary-600 hover:text-primary-700 hover:underline touch-target"
-            >
-              Sign out
-            </button>
-          </div>
-        </div>
-      </header>
+        )}
 
-      {/* Main content */}
-      <main className="px-5 pb-8 md:px-8 md:pb-12">
-        <div className="max-w-lg mx-auto space-y-6">
-          <CalendarConnect />
-          <AddTaskForm onAdd={addTask} />
-          <Dashboard
-            tasks={tasks}
-            events={events}
-            onToggleTask={toggleTask}
-            onDeleteTask={deleteTask}
-            onUpdateTask={updateTask}
-            loading={tasksLoading}
-          />
+        {/* Add task form */}
+        <div className="p-4 border-b border-neutral-100">
+          <div className="max-w-xl">
+            <AddTaskForm onAdd={addTask} />
+          </div>
         </div>
-      </main>
-    </div>
+
+        {/* Today's schedule */}
+        <TodaySchedule
+          tasks={tasks}
+          events={events}
+          selectedItemId={selectedItemId}
+          onSelectItem={setSelectedItemId}
+          onToggleTask={toggleTask}
+          loading={tasksLoading}
+          viewedDate={viewedDate}
+          onDateChange={setViewedDate}
+        />
+      </div>
+    </AppShell>
   )
 }
 

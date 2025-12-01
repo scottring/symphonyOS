@@ -1,5 +1,8 @@
 import type { TimelineItem, TimeSection } from '@/types/timeline'
 
+export type TimeOfDay = 'morning' | 'afternoon' | 'evening'
+export type DaySection = TimeOfDay | 'unscheduled'
+
 /**
  * Get the current time. Exported for testing (can be mocked).
  */
@@ -135,4 +138,66 @@ export function formatTimeRange(start: Date, end: Date, allDay?: boolean): strin
   if (allDay) return 'All day'
   if (!isValidDate(start) || !isValidDate(end)) return ''
   return `${formatTime(start)} - ${formatTime(end)}`
+}
+
+/**
+ * Get the time of day for a given date.
+ * Morning: before 12pm
+ * Afternoon: 12pm - 5pm
+ * Evening: 5pm onwards
+ */
+export function getTimeOfDay(date: Date): TimeOfDay {
+  const hour = date.getHours()
+  if (hour < 12) return 'morning'
+  if (hour < 17) return 'afternoon'
+  return 'evening'
+}
+
+/**
+ * Get the day section for a timeline item.
+ */
+export function getDaySection(item: TimelineItem): DaySection {
+  if (!item.startTime) return 'unscheduled'
+  return getTimeOfDay(item.startTime)
+}
+
+/**
+ * Group timeline items by time of day (Morning/Afternoon/Evening).
+ */
+export function groupByDaySection(
+  items: TimelineItem[]
+): Record<DaySection, TimelineItem[]> {
+  const groups: Record<DaySection, TimelineItem[]> = {
+    morning: [],
+    afternoon: [],
+    evening: [],
+    unscheduled: [],
+  }
+
+  for (const item of items) {
+    const section = getDaySection(item)
+    groups[section].push(item)
+  }
+
+  // Sort each section by start time
+  const sortByTime = (a: TimelineItem, b: TimelineItem) =>
+    (a.startTime?.getTime() ?? 0) - (b.startTime?.getTime() ?? 0)
+
+  groups.morning.sort(sortByTime)
+  groups.afternoon.sort(sortByTime)
+  groups.evening.sort(sortByTime)
+
+  return groups
+}
+
+/**
+ * Get display label for a day section.
+ */
+export function getDaySectionLabel(section: DaySection): string {
+  switch (section) {
+    case 'morning': return 'Morning'
+    case 'afternoon': return 'Afternoon'
+    case 'evening': return 'Evening'
+    case 'unscheduled': return 'Unscheduled'
+  }
 }

@@ -14,8 +14,8 @@ function EventItem({ event }: { event: CalendarEvent }) {
       <div className="flex-1">
         <p className="text-neutral-800 font-medium">{event.title}</p>
         <p className="text-sm text-neutral-500">
-          {formatTime(event.start_time, event.all_day)}
-          {!event.all_day && ` - ${formatTime(event.end_time, event.all_day)}`}
+          {event.start_time && formatTime(event.start_time, event.all_day ?? false)}
+          {!event.all_day && event.end_time && ` - ${formatTime(event.end_time, event.all_day ?? false)}`}
         </p>
         {event.location && (
           <p className="text-sm text-neutral-400 mt-1">{event.location}</p>

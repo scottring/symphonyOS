@@ -44,6 +44,8 @@ export function useSupabaseTasks() {
     }
 
     async function fetchTasks() {
+      if (!user) return
+
       setLoading(true)
       setError(null)
 

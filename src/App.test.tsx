@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from './test/test-utils'
 import App from './App'
 import type { Task } from '@/types/task'
@@ -69,14 +69,19 @@ vi.mock('@/hooks/useGoogleCalendar', () => ({
 }))
 
 describe('App', () => {
-  it('renders the app title', () => {
+  it('renders the app name in sidebar', () => {
     render(<App />)
-    expect(screen.getByText('Symphony OS')).toBeInTheDocument()
+    expect(screen.getByText('Symphony')).toBeInTheDocument()
   })
 
   it('renders empty state when no tasks', () => {
     render(<App />)
-    expect(screen.getByText('No tasks yet. Add one above!')).toBeInTheDocument()
+    expect(screen.getByText('Your day is clear')).toBeInTheDocument()
+  })
+
+  it('renders Today\'s Schedule header', () => {
+    render(<App />)
+    expect(screen.getByText("Today's Schedule")).toBeInTheDocument()
   })
 
   it('can add a task', async () => {
@@ -87,24 +92,37 @@ describe('App', () => {
     expect(screen.getByText('My first task')).toBeInTheDocument()
   })
 
-  it('can complete a task', async () => {
+  it('can complete a task via checkbox', async () => {
     const { user } = render(<App />)
     const input = screen.getByPlaceholderText('Add a task...')
     await user.type(input, 'Task to complete')
     await user.click(screen.getByRole('button', { name: 'Add' }))
 
-    const checkbox = screen.getByRole('checkbox')
-    await user.click(checkbox)
-    expect(checkbox).toBeChecked()
+    // Find and click the checkbox button (not a native checkbox anymore)
+    const completeButton = screen.getByRole('button', { name: /mark complete/i })
+    await user.click(completeButton)
+
+    // The task title should now have line-through styling (completed)
+    const taskTitle = screen.getByText('Task to complete')
+    expect(taskTitle).toHaveClass('line-through')
   })
 
-  it('can delete a task', async () => {
+  it('can delete a task via detail panel', async () => {
     const { user } = render(<App />)
     const input = screen.getByPlaceholderText('Add a task...')
     await user.type(input, 'Task to delete')
     await user.click(screen.getByRole('button', { name: 'Add' }))
 
-    await user.click(screen.getByRole('button', { name: 'Delete task' }))
+    // Click the task to open detail panel
+    await user.click(screen.getByText('Task to delete'))
+
+    // Find delete button in detail panel - it's a button element with text "Delete"
+    const deleteButtons = screen.getAllByRole('button', { name: /delete/i })
+    // The actual delete button is the one with the visible "Delete" text span
+    const deleteButton = deleteButtons.find(btn => btn.querySelector('span')?.textContent === 'Delete')
+    expect(deleteButton).toBeTruthy()
+    await user.click(deleteButton!)
+
     expect(screen.queryByText('Task to delete')).not.toBeInTheDocument()
   })
 
@@ -114,22 +132,14 @@ describe('App', () => {
     await user.type(input, 'Unscheduled task')
     await user.click(screen.getByRole('button', { name: 'Add' }))
 
-    // Task appears in the Tasks section (unscheduled)
-    expect(screen.getByText('Tasks')).toBeInTheDocument()
-    expect(screen.getByText('Unscheduled task')).toBeInTheDocument()
+    // Task appears in the Unscheduled section
     expect(screen.getByText('Unscheduled')).toBeInTheDocument()
+    expect(screen.getByText('Unscheduled task')).toBeInTheDocument()
   })
 
-  it('shows Active Now section', () => {
-    render(<App />)
-    expect(screen.getByText('Active Now')).toBeInTheDocument()
-    expect(screen.getByText('Your day is clear. Add a task to get started.')).toBeInTheDocument()
-  })
-
-  it('displays user email and sign out button', () => {
+  it('displays user email', () => {
     render(<App />)
     expect(screen.getByText('test@example.com')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
   })
 
   it('shows calendar connect option when not connected', () => {
