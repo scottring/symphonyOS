@@ -45,12 +45,10 @@ export function DateNavigator({ date, onPrev, onNext, onToday }: DateNavigatorPr
     <div className="flex items-center justify-between mb-6">
       <button
         onClick={onPrev}
-        className="p-2 text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors touch-target"
+        className="w-10 h-10 flex items-center justify-center text-xl text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100 rounded-lg transition-colors"
         aria-label="Previous day"
       >
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-        </svg>
+        ‹
       </button>
 
       <div className="flex items-center gap-3">
@@ -67,12 +65,10 @@ export function DateNavigator({ date, onPrev, onNext, onToday }: DateNavigatorPr
 
       <button
         onClick={onNext}
-        className="p-2 text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors touch-target"
+        className="w-10 h-10 flex items-center justify-center text-xl text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100 rounded-lg transition-colors"
         aria-label="Next day"
       >
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-        </svg>
+        ›
       </button>
     </div>
   )
