@@ -1,6 +1,8 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from './test/test-utils'
 import App from './App'
+import type { Task } from '@/types/task'
+import { useState } from 'react'
 
 // Mock useAuth to return a logged-in user
 vi.mock('@/hooks/useAuth', () => ({
@@ -11,6 +13,45 @@ vi.mock('@/hooks/useAuth', () => ({
     signInWithEmail: vi.fn(),
     signUpWithEmail: vi.fn(),
   }),
+}))
+
+// Mock useSupabaseTasks to use local state (like useLocalTasks did)
+vi.mock('@/hooks/useSupabaseTasks', () => ({
+  useSupabaseTasks: () => {
+    const [tasks, setTasks] = useState<Task[]>([])
+
+    const addTask = (title: string) => {
+      const newTask: Task = {
+        id: crypto.randomUUID(),
+        title,
+        completed: false,
+        createdAt: new Date(),
+      }
+      setTasks((prev) => [newTask, ...prev])
+    }
+
+    const toggleTask = (id: string) => {
+      setTasks((prev) =>
+        prev.map((task) =>
+          task.id === id ? { ...task, completed: !task.completed } : task
+        )
+      )
+    }
+
+    const deleteTask = (id: string) => {
+      setTasks((prev) => prev.filter((task) => task.id !== id))
+    }
+
+    const updateTask = (id: string, updates: Partial<Task>) => {
+      setTasks((prev) =>
+        prev.map((task) =>
+          task.id === id ? { ...task, ...updates } : task
+        )
+      )
+    }
+
+    return { tasks, loading: false, error: null, addTask, toggleTask, deleteTask, updateTask }
+  },
 }))
 
 // Mock useGoogleCalendar to avoid Supabase calls
@@ -82,7 +123,7 @@ describe('App', () => {
   it('shows Active Now section', () => {
     render(<App />)
     expect(screen.getByText('Active Now')).toBeInTheDocument()
-    expect(screen.getByText('Nothing scheduled for now')).toBeInTheDocument()
+    expect(screen.getByText('Your day is clear. Add a task to get started.')).toBeInTheDocument()
   })
 
   it('displays user email and sign out button', () => {
