@@ -50,7 +50,7 @@ Light integration — not an email client, but ability to reference emails as ta
 
 - Share sheet integration
 - Email forwarding
-- Quick capture on mobile
+- [x] Quick capture on mobile (floating + button)
 - Processing workflow
 
 ### Phase 7: Meal Planning

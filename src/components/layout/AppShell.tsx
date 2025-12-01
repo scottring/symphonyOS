@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Sidebar } from './Sidebar'
+import { QuickCapture } from './QuickCapture'
 import { useMobile } from '@/hooks/useMobile'
 
 interface AppShellProps {
@@ -10,6 +11,7 @@ interface AppShellProps {
   panelOpen: boolean
   userEmail?: string
   onSignOut?: () => void
+  onQuickAdd?: (title: string) => void
 }
 
 export function AppShell({
@@ -20,6 +22,7 @@ export function AppShell({
   panelOpen,
   userEmail,
   onSignOut,
+  onQuickAdd,
 }: AppShellProps) {
   const isMobile = useMobile()
 
@@ -83,6 +86,11 @@ export function AppShell({
         )}
         {children}
       </main>
+
+      {/* Mobile Quick Capture FAB */}
+      {isMobile && onQuickAdd && !panelOpen && (
+        <QuickCapture onAdd={onQuickAdd} />
+      )}
 
       {/* Detail panel - full screen overlay on mobile */}
       {isMobile ? (

@@ -103,6 +103,7 @@ function App() {
       panelOpen={selectedItemId !== null || recipeUrl !== null}
       userEmail={user.email ?? undefined}
       onSignOut={signOut}
+      onQuickAdd={addTask}
       panel={
         recipeUrl ? (
           <RecipeViewer

@@ -46,23 +46,23 @@ export function ScheduleItem({ item, selected, onSelect, onToggleComplete }: Sch
         ${item.completed ? 'opacity-50' : ''}
       `}
     >
-      {/* Time column - left aligned, subtle */}
-      <div className="w-16 flex-shrink-0">
+      {/* Time column - fixed width, vertically centered */}
+      <div className="w-14 flex-shrink-0 flex items-center">
         {timeDisplay ? (
-          <div className="text-xs text-neutral-400 font-medium leading-tight">
+          <span className="text-xs text-neutral-400 font-medium leading-tight">
             {timeDisplay}
-          </div>
+          </span>
         ) : (
           <span className="text-xs text-neutral-300">—</span>
         )}
       </div>
 
-      {/* Checkbox for tasks, filled dot for events - touch-friendly tap area */}
-      <div className="flex-shrink-0 flex items-center justify-center">
+      {/* Checkbox/dot column - fixed width container, contents centered */}
+      <div className="w-5 flex-shrink-0 flex items-center justify-center">
         {isTask ? (
           <button
             onClick={handleCheckboxClick}
-            className="touch-target flex items-center justify-center -m-2"
+            className="touch-target flex items-center justify-center"
             aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
           >
             <span
@@ -84,13 +84,11 @@ export function ScheduleItem({ item, selected, onSelect, onToggleComplete }: Sch
             </span>
           </button>
         ) : (
-          <div className="w-12 h-12 flex items-center justify-center">
-            <div className="w-2.5 h-2.5 rounded-full bg-blue-400" />
-          </div>
+          <div className="w-2.5 h-2.5 rounded-full bg-blue-400" />
         )}
       </div>
 
-      {/* Title and type badge */}
+      {/* Title and type badge - left aligned */}
       <div className="flex-1 min-w-0 flex items-center gap-2">
         <span
           className={`
