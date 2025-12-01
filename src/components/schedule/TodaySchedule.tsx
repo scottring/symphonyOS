@@ -12,7 +12,7 @@ interface TodayScheduleProps {
   events: CalendarEvent[]
   selectedItemId: string | null
   onSelectItem: (id: string | null) => void
-  onToggleTask: (id: string) => void
+  onToggleTask: (taskId: string) => void
   loading?: boolean
   viewedDate: Date
   onDateChange: (date: Date) => void
@@ -20,15 +20,35 @@ interface TodayScheduleProps {
 
 function LoadingSkeleton() {
   return (
-    <div className="space-y-2 animate-pulse">
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-neutral-100">
-          <div className="w-4 h-4 bg-neutral-200 rounded" />
-          <div className="flex-1">
-            <div className="h-4 bg-neutral-200 rounded w-3/4" />
+    <div className="space-y-6 animate-pulse">
+      {/* Morning section skeleton */}
+      <div>
+        <div className="h-3 bg-neutral-100 rounded w-16 mb-3" />
+        <div className="space-y-2">
+          {[1, 2].map((i) => (
+            <div key={`m-${i}`} className="flex items-center gap-3 p-3 rounded-lg bg-neutral-50 border border-neutral-100">
+              <div className="w-4 h-4 bg-neutral-200 rounded-full flex-shrink-0" />
+              <div className="flex-1 flex items-center gap-3">
+                <div className="h-4 bg-neutral-100 rounded w-12 flex-shrink-0" />
+                <div className="h-4 bg-neutral-200 rounded flex-1 max-w-48" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* Afternoon section skeleton */}
+      <div>
+        <div className="h-3 bg-neutral-100 rounded w-20 mb-3" />
+        <div className="space-y-2">
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-neutral-50 border border-neutral-100">
+            <div className="w-4 h-4 bg-neutral-200 rounded-full flex-shrink-0" />
+            <div className="flex-1 flex items-center gap-3">
+              <div className="h-4 bg-neutral-100 rounded w-12 flex-shrink-0" />
+              <div className="h-4 bg-neutral-200 rounded flex-1 max-w-56" />
+            </div>
           </div>
         </div>
-      ))}
+      </div>
     </div>
   )
 }
@@ -66,13 +86,13 @@ export function TodaySchedule({
     })
   }, [tasks, viewedDate])
 
-  // Filter events for the viewed date
+  // Filter events for the viewed date and deduplicate by title + start time
   const filteredEvents = useMemo(() => {
     const viewedYear = viewedDate.getFullYear()
     const viewedMonth = viewedDate.getMonth()
     const viewedDay = viewedDate.getDate()
 
-    return events.filter((event) => {
+    const eventsForDay = events.filter((event) => {
       const startTimeStr = event.start_time || event.startTime
       if (!startTimeStr) return false
 
@@ -83,6 +103,16 @@ export function TodaySchedule({
         eventStart.getMonth() === viewedMonth &&
         eventStart.getDate() === viewedDay
       )
+    })
+
+    // Deduplicate by title + start time (same event on multiple calendars)
+    const seen = new Set<string>()
+    return eventsForDay.filter((event) => {
+      const startTimeStr = event.start_time || event.startTime
+      const key = `${event.title}|${startTimeStr}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
     })
   }, [events, viewedDate])
 
@@ -114,36 +144,32 @@ export function TodaySchedule({
 
   const totalItems = filteredTasks.length + filteredEvents.length
   const completedTasks = filteredTasks.filter((t) => t.completed).length
+  const progressPercent = totalItems > 0 ? (completedTasks / totalItems) * 100 : 0
 
   return (
     <div className="p-6 max-w-2xl mx-auto">
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-3">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-5 h-5 text-neutral-400"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
-                clipRule="evenodd"
-              />
-            </svg>
-            <h2 className="text-lg font-semibold text-neutral-800">
-              {isToday() ? "Today's Schedule" : 'Schedule'}
-            </h2>
-          </div>
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-neutral-800">
+            {isToday() ? 'Today' : formatDate()}
+          </h2>
           <DateNavigator date={viewedDate} onDateChange={onDateChange} />
         </div>
-        <p className="text-sm text-neutral-500">{formatDate()}</p>
+
+        {/* Progress bar */}
         {totalItems > 0 && (
-          <p className="text-xs text-neutral-400 mt-1">
-            {completedTasks} of {filteredTasks.length} tasks complete
-          </p>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-neutral-500">
+              {completedTasks} of {totalItems}
+            </span>
+            <div className="flex-1 h-1.5 bg-neutral-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary-500 rounded-full transition-all duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          </div>
         )}
       </div>
 
@@ -152,8 +178,16 @@ export function TodaySchedule({
         <LoadingSkeleton />
       ) : totalItems === 0 ? (
         <div className="text-center py-12">
-          <p className="text-neutral-500 mb-2">Your day is clear</p>
-          <p className="text-sm text-neutral-400">Add a task to get started</p>
+          {isToday() ? (
+            <>
+              <p className="text-neutral-500 mb-2">Your day is clear</p>
+              <p className="text-sm text-neutral-400">Add a task to get started</p>
+            </>
+          ) : (
+            <p className="text-neutral-500">
+              Nothing scheduled for {viewedDate.toLocaleDateString('en-US', { weekday: 'long' })}
+            </p>
+          )}
         </div>
       ) : (
         <div>
@@ -168,8 +202,10 @@ export function TodaySchedule({
                     selected={selectedItemId === item.id}
                     onSelect={() => onSelectItem(item.id)}
                     onToggleComplete={() => {
-                      if (item.type === 'task' && item.originalTask) {
-                        onToggleTask(item.originalTask.id)
+                      // Only toggle tasks, not events
+                      if (item.type === 'task' && item.id.startsWith('task-')) {
+                        const taskId = item.id.replace('task-', '')
+                        onToggleTask(taskId)
                       }
                     }}
                   />

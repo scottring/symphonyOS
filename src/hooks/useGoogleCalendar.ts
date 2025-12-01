@@ -22,6 +22,7 @@ export function useGoogleCalendar() {
   const [isConnected, setIsConnected] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [error, setError] = useState<string | null>(null)
 
   // Check connection status
   useEffect(() => {
@@ -116,23 +117,37 @@ export function useGoogleCalendar() {
       return []
     }
 
-    // Clear events immediately when fetching new date range
+    // Clear error and events immediately when fetching new date range
+    setError(null)
     setEvents([])
 
     try {
-      const { data, error } = await supabase.functions.invoke('google-calendar-events', {
+      const { data, error: fetchError } = await supabase.functions.invoke('google-calendar-events', {
         body: {
           startDate: startDate.toISOString(),
           endDate: endDate.toISOString(),
         },
       })
 
-      if (error) throw error
+      if (fetchError) throw fetchError
+
+      // Check for auth errors that might indicate token refresh failure
+      if (data?.error) {
+        // Common auth error patterns
+        if (data.error.includes('Unauthorized') || data.error.includes('invalid_grant') || data.error.includes('Token')) {
+          setError('Calendar connection expired. Please reconnect.')
+          setIsConnected(false)
+          return []
+        }
+        throw new Error(data.error)
+      }
 
       setEvents(data.events || [])
       return data.events || []
     } catch (err) {
       console.error('Failed to fetch events:', err)
+      const message = err instanceof Error ? err.message : 'Failed to fetch events'
+      setError(message)
       setEvents([])
       return []
     }
@@ -160,6 +175,7 @@ export function useGoogleCalendar() {
     isConnected,
     isLoading,
     events,
+    error,
     connect,
     disconnect,
     fetchEvents,

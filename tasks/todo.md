@@ -1,64 +1,96 @@
-# Task Scheduling - Week 5
+# Phase 2: MVP Polish
 
-Add date/time assignment to tasks so they appear in time-based sections alongside calendar events.
+Building on the core functionality from Phase 1 (auth, tasks, calendar, scheduling), this phase focuses on making the app more useful and polished.
 
-## Plan
+## 2.1 Contextual Actions ✓
 
-### What We're Building
+Added smart, context-aware action buttons based on event/task content.
 
-**Scheduled Tasks** — Tasks can have an optional scheduled time:
-- `scheduledFor` field on Task (Date or null)
-- Tasks with times appear in Active Now/Coming Up/Later Today
-- Tasks without times stay in the Tasks (unscheduled) section
+### What Was Built
 
-**UI for Scheduling** — In the ExecutionCard edit mode:
-- Date picker to set the scheduled date
-- Time picker to set the scheduled time (optional - can be date-only)
-- Clear button to unschedule
+**Smart Action Detection** — Analyze event/task content to surface relevant actions:
+- **Recipe links** → "View Recipe" button
+- **Video call links** (Zoom, Meet, Teams) → "Join Call" button
+- **Location set** → "Get Directions" button
+- **Phone number** → "Call" / "Text" buttons
 
-### Architecture
+**Action Extraction** — Parse event descriptions for:
+- URLs (especially recipe sites, video conferencing)
+- Addresses/locations
+- Phone numbers
 
-1. **Update Task type** — Add `scheduledFor?: Date` field
-2. **Update useLocalTasks** — Handle scheduledFor in updates
-3. **Update taskToTimelineItem** — Use scheduledFor as startTime
-4. **Update ExecutionCard** — Add date/time picker in edit mode
-5. **Update time utilities** — Handle date-only scheduling (no specific time)
+### Completed
+- [x] Create action detection utility (`detectActions` in `src/lib/actionDetection.ts`)
+- [x] Add "View Recipe" action for recipe links
+- [x] Add "Join Call" action for video conferencing links
+- [x] Add "Get Directions" action for locations
+- [x] Update DetailPanel to show detected actions prominently
+- [x] Add action buttons to ExecutionCard for primary actions
 
-### Notes
+---
 
-- Date-only tasks (no time) should appear in "Later Today" or at a default time
-- Keep it simple: native HTML date/time inputs first, fancy picker later if needed
-- The dashboard grouping already works - we just need to pass the time through
+## 2.2 UI Refinements ✓
 
-## Todo
+- [x] Swipe gestures for mobile (swipe right = complete, swipe left = defer)
+- [x] Better empty states (shows "Nothing scheduled for {day}" on non-today dates)
+- [x] Loading skeletons improved to match actual card structure
+- [ ] Animations/transitions (ongoing)
 
-- [x] Add `scheduledFor` field to Task type
-- [x] Update taskToTimelineItem to use scheduledFor
-- [x] Add date/time picker UI to ExecutionCard edit mode
-- [x] Handle "clear schedule" to make task unscheduled again
-- [x] Write tests for scheduled task behavior
-- [x] Manual testing with real tasks
+---
+
+## 2.3 Stability (Future)
+
+- Token refresh handling
+- Offline support
+- Error boundaries
+- Loading states consistency
+
+---
+
+## Phase 3: Notes & Capture (Next)
+
+See original plan for:
+- Data model for notes
+- UI for notes capture
+- AI-assisted related notes
+
+---
+
+## Completed
+
+### Phase 2 (Current)
+- [x] Contextual actions (2.1) - View Recipe, Join Call, Get Directions
+- [x] UI Refinements (2.2) - Swipe gestures, empty states, loading skeletons
+
+### Phase 1 (Weeks 1-5)
+- [x] Auth (Supabase)
+- [x] Task CRUD with persistence
+- [x] Google Calendar integration
+- [x] Desktop UI rebuild (AppShell, Sidebar, DetailPanel)
+- [x] Time-based grouping (Morning/Afternoon/Evening)
+- [x] Task scheduling
+- [x] Date navigation
+- [x] Multi-calendar support
+- [x] All-day event timezone handling
+- [x] Event deduplication
+- [x] Clickable links in event descriptions
+
+---
 
 ## Review
 
-### What Changed
+### Phase 2 Changes Summary
 
-**Modified Files:**
-- `src/types/task.ts` — Added `scheduledFor?: Date` field
-- `src/types/timeline.ts` — Updated `taskToTimelineItem` to use `scheduledFor` as `startTime`
-- `src/components/ExecutionCard.tsx` — Added datetime-local picker with 15-min increments and Clear button in edit mode
-- `src/components/ExecutionCard.test.tsx` — Added 4 tests for scheduled task behavior
-- `src/hooks/useGoogleCalendar.ts` — Fixed CalendarEvent interface to support both snake_case and camelCase field names
+**2.1 Contextual Actions**
+- Created `src/lib/actionDetection.ts` utility for detecting actionable content
+- Supports recipe sites, video conferencing (Zoom, Meet, Teams, Webex, etc.), locations, and phone numbers
+- Actions displayed prominently in both ExecutionCard and DetailPanel
+- Primary actions (Join Call, Get Directions, View Recipe) shown as prominent buttons
 
-### Key Features
-
-1. **Scheduled Tasks** — Tasks can now be assigned a date/time via the edit mode
-2. **Time-based Grouping** — Scheduled tasks appear in Active Now/Coming Up/Later Today alongside calendar events
-3. **15-minute Increments** — Time picker uses step="900" for 15-min intervals
-4. **Clear Schedule** — Button to unschedule a task and move it back to Tasks section
-5. **Calendar Event Fix** — Fixed Invalid Date issue by handling both snake_case and camelCase field names
-
-### Test Coverage
-
-- 56 tests total (all passing)
-- 4 new tests for scheduling behavior
+**2.2 UI Refinements**
+- ExecutionCard now supports swipe gestures on touch devices:
+  - Swipe right → Mark task complete
+  - Swipe left → Defer to tomorrow (9am)
+  - Visual feedback during swipe with icons and color changes
+- Empty state improved for non-today dates: "Nothing scheduled for {weekday}"
+- Loading skeletons match actual card structure with time indicator, checkbox, and title placeholders

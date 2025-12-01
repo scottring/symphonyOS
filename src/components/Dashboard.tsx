@@ -60,11 +60,17 @@ function LoadingSkeleton() {
     <div className="space-y-4 animate-pulse">
       {[1, 2, 3].map((i) => (
         <div key={i} className="card p-5">
-          <div className="flex gap-4">
-            <div className="w-5 h-5 bg-neutral-200 rounded" />
+          {/* Header row mimics time indicator */}
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-2.5 h-2.5 bg-neutral-200 rounded-full" />
+            <div className="h-4 bg-neutral-100 rounded w-16" />
+          </div>
+          {/* Title row with checkbox placeholder */}
+          <div className="flex items-start gap-4">
+            <div className="w-6 h-6 bg-neutral-200 rounded-lg flex-shrink-0" />
             <div className="flex-1 space-y-2">
-              <div className="h-5 bg-neutral-200 rounded w-3/4" />
-              <div className="h-4 bg-neutral-100 rounded w-1/2" />
+              <div className="h-5 bg-neutral-200 rounded w-4/5" />
+              <div className="h-4 bg-neutral-100 rounded w-2/5" />
             </div>
           </div>
         </div>
