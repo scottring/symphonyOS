@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useAuth } from '@/hooks/useAuth'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
@@ -6,18 +6,52 @@ import { AddTaskForm } from '@/components/AddTaskForm'
 import { CalendarConnect } from '@/components/CalendarConnect'
 import { Dashboard } from '@/components/Dashboard'
 import { AuthForm } from '@/components/AuthForm'
+import { DateNavigator } from '@/components/DateNavigator'
 
 function App() {
   const { tasks, loading: tasksLoading, addTask, toggleTask, deleteTask, updateTask } = useSupabaseTasks()
   const { user, loading: authLoading, signOut } = useAuth()
-  const { isConnected, events, fetchTodayEvents } = useGoogleCalendar()
+  const { isConnected, events, fetchEvents } = useGoogleCalendar()
 
-  // Fetch calendar events when connected
+  // Day navigation state
+  const [viewedDate, setViewedDate] = useState(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return today
+  })
+
+  const goToPrevDay = useCallback(() => {
+    setViewedDate((prev) => {
+      const newDate = new Date(prev)
+      newDate.setDate(newDate.getDate() - 1)
+      return newDate
+    })
+  }, [])
+
+  const goToNextDay = useCallback(() => {
+    setViewedDate((prev) => {
+      const newDate = new Date(prev)
+      newDate.setDate(newDate.getDate() + 1)
+      return newDate
+    })
+  }, [])
+
+  const goToToday = useCallback(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    setViewedDate(today)
+  }, [])
+
+  // Fetch calendar events when connected or viewedDate changes
   useEffect(() => {
     if (isConnected) {
-      fetchTodayEvents()
+      const startOfDay = new Date(viewedDate)
+      startOfDay.setHours(0, 0, 0, 0)
+      const endOfDay = new Date(viewedDate)
+      endOfDay.setHours(23, 59, 59, 999)
+      fetchEvents(startOfDay, endOfDay)
     }
-  }, [isConnected, fetchTodayEvents])
+  }, [isConnected, viewedDate, fetchEvents])
 
   if (authLoading) {
     return (
@@ -61,9 +95,16 @@ function App() {
         <div className="max-w-lg mx-auto space-y-6">
           <CalendarConnect />
           <AddTaskForm onAdd={addTask} />
+          <DateNavigator
+            date={viewedDate}
+            onPrev={goToPrevDay}
+            onNext={goToNextDay}
+            onToday={goToToday}
+          />
           <Dashboard
             tasks={tasks}
             events={events}
+            viewedDate={viewedDate}
             onToggleTask={toggleTask}
             onDeleteTask={deleteTask}
             onUpdateTask={updateTask}

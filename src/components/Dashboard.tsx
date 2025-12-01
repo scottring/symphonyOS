@@ -2,12 +2,14 @@ import { useMemo } from 'react'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { taskToTimelineItem, eventToTimelineItem, type TimelineItem } from '@/types/timeline'
-import { groupByTimeSection } from '@/lib/timeUtils'
+import { groupByTimeSectionForDate } from '@/lib/timeUtils'
 import { ExecutionCard } from './ExecutionCard'
+import { isSameDay } from './DateNavigator'
 
 interface DashboardProps {
   tasks: Task[]
   events: CalendarEvent[]
+  viewedDate: Date
   onToggleTask: (id: string) => void
   onDeleteTask: (id: string) => void
   onUpdateTask: (id: string, updates: Partial<Task>) => void
@@ -73,16 +75,30 @@ function LoadingSkeleton() {
   )
 }
 
-export function Dashboard({ tasks, events, onToggleTask, onDeleteTask, onUpdateTask, loading }: DashboardProps) {
+export function Dashboard({ tasks, events, viewedDate, onToggleTask, onDeleteTask, onUpdateTask, loading }: DashboardProps) {
+  const today = useMemo(() => new Date(), [])
+  const isViewingToday = isSameDay(viewedDate, today)
+
   const grouped = useMemo(() => {
+    // Filter tasks to those scheduled for the viewed date
+    const scheduledTasks = tasks.filter((task) => {
+      if (!task.scheduledFor) return false
+      return isSameDay(task.scheduledFor, viewedDate)
+    })
+
+    // Unscheduled tasks only show when viewing today
+    const unscheduledTasks = isViewingToday
+      ? tasks.filter((task) => !task.scheduledFor)
+      : []
+
     // Convert tasks and events to timeline items
-    const taskItems = tasks.map(taskToTimelineItem)
+    const taskItems = [...scheduledTasks, ...unscheduledTasks].map(taskToTimelineItem)
     const eventItems = events.map(eventToTimelineItem)
 
     // Combine and group by time section
     const allItems = [...taskItems, ...eventItems]
-    return groupByTimeSection(allItems)
-  }, [tasks, events])
+    return groupByTimeSectionForDate(allItems, viewedDate)
+  }, [tasks, events, viewedDate, isViewingToday])
 
   const hasScheduledItems = grouped.now.length > 0 || grouped.soon.length > 0 || grouped.later.length > 0
 

@@ -110,6 +110,56 @@ export function groupByTimeSection(
 }
 
 /**
+ * Check if two dates are on the same day.
+ */
+export function isSameDay(d1: Date, d2: Date): boolean {
+  return (
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate()
+  )
+}
+
+/**
+ * Group timeline items by time section for a specific viewed date.
+ * If viewing today, uses normal time-based grouping.
+ * If viewing another date, all scheduled items go into "later" (shows as chronological list).
+ */
+export function groupByTimeSectionForDate(
+  items: TimelineItem[],
+  viewedDate: Date,
+  now: Date = getCurrentTime()
+): Record<TimeSection, TimelineItem[]> {
+  const isViewingToday = isSameDay(viewedDate, now)
+
+  // If viewing today, use normal time-based grouping
+  if (isViewingToday) {
+    return groupByTimeSection(items, now)
+  }
+
+  // For other dates, put all scheduled items in "later" and unscheduled in "unscheduled"
+  const groups: Record<TimeSection, TimelineItem[]> = {
+    now: [],
+    soon: [],
+    later: [],
+    unscheduled: [],
+  }
+
+  for (const item of items) {
+    if (!item.startTime) {
+      groups.unscheduled.push(item)
+    } else {
+      groups.later.push(item)
+    }
+  }
+
+  // Sort by start time
+  groups.later.sort((a, b) => (a.startTime?.getTime() ?? 0) - (b.startTime?.getTime() ?? 0))
+
+  return groups
+}
+
+/**
  * Check if a Date object is valid.
  */
 export function isValidDate(date: Date): boolean {
