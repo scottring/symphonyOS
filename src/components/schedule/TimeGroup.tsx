@@ -11,8 +11,8 @@ interface TimeGroupProps {
 export function TimeGroup({ section, children, isEmpty }: TimeGroupProps) {
   const label = getDaySectionLabel(section)
 
-  if (isEmpty && section === 'unscheduled') {
-    return null // Don't show empty unscheduled section
+  if (isEmpty && (section === 'unscheduled' || section === 'allday')) {
+    return null // Don't show empty unscheduled or allday sections
   }
 
   return (

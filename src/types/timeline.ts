@@ -17,6 +17,7 @@ export interface TimelineItem {
   // Event-specific
   location?: string
   allDay?: boolean
+  googleDescription?: string // Read-only description from Google Calendar
   // Original data for actions
   originalTask?: Task
   originalEvent?: CalendarEvent
@@ -59,7 +60,8 @@ export function eventToTimelineItem(event: CalendarEvent): TimelineItem {
     startTime: parseDate(startTimeStr),
     endTime: parseDate(endTimeStr),
     completed: false, // Events don't have completion state
-    notes: event.description || undefined,
+    googleDescription: event.description || undefined, // Read-only from GCal
+    // notes will be populated separately from event_notes table
     location: event.location || undefined,
     allDay: allDay,
     originalEvent: event,

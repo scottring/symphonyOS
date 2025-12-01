@@ -123,7 +123,7 @@ export function TodaySchedule({
     return groupByDaySection(allItems)
   }, [filteredTasks, filteredEvents])
 
-  const sections: DaySection[] = ['morning', 'afternoon', 'evening', 'unscheduled']
+  const sections: DaySection[] = ['allday', 'morning', 'afternoon', 'evening', 'unscheduled']
 
   const formatDate = () => {
     return viewedDate.toLocaleDateString('en-US', {

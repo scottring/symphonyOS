@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useAuth } from '@/hooks/useAuth'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
+import { useEventNotes } from '@/hooks/useEventNotes'
 import { AppShell } from '@/components/layout/AppShell'
 import { TodaySchedule } from '@/components/schedule/TodaySchedule'
 import { DetailPanel } from '@/components/detail/DetailPanel'
@@ -14,6 +15,7 @@ function App() {
   const { tasks, loading: tasksLoading, addTask, toggleTask, deleteTask, updateTask } = useSupabaseTasks()
   const { user, loading: authLoading, signOut } = useAuth()
   const { isConnected, events, fetchEvents } = useGoogleCalendar()
+  const { fetchNote, updateNote, getNote } = useEventNotes()
 
   // UI state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -39,6 +41,14 @@ function App() {
     }
   }, [isConnected, viewedDate, fetchEvents])
 
+  // Fetch event notes when an event is selected
+  useEffect(() => {
+    if (selectedItemId?.startsWith('event-')) {
+      const eventId = selectedItemId.replace('event-', '')
+      fetchNote(eventId)
+    }
+  }, [selectedItemId, fetchNote])
+
   // Find selected item from tasks or events
   const selectedItem = useMemo(() => {
     if (!selectedItemId) return null
@@ -54,11 +64,19 @@ function App() {
     if (selectedItemId.startsWith('event-')) {
       const eventId = selectedItemId.replace('event-', '')
       const event = events.find((e) => (e.google_event_id || e.id) === eventId)
-      return event ? eventToTimelineItem(event) : null
+      if (!event) return null
+
+      const timelineItem = eventToTimelineItem(event)
+      // Add user's Symphony notes from event_notes table
+      const eventNote = getNote(eventId)
+      if (eventNote?.notes) {
+        timelineItem.notes = eventNote.notes
+      }
+      return timelineItem
     }
 
     return null
-  }, [selectedItemId, tasks, events])
+  }, [selectedItemId, tasks, events, getNote])
 
   if (authLoading) {
     return (
@@ -90,6 +108,7 @@ function App() {
           onUpdate={updateTask}
           onDelete={deleteTask}
           onToggleComplete={toggleTask}
+          onUpdateEventNote={updateNote}
         />
       }
     >

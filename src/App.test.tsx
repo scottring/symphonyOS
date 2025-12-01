@@ -68,6 +68,19 @@ vi.mock('@/hooks/useGoogleCalendar', () => ({
   }),
 }))
 
+// Mock useEventNotes to avoid Supabase calls
+vi.mock('@/hooks/useEventNotes', () => ({
+  useEventNotes: () => ({
+    notes: new Map(),
+    loading: false,
+    error: null,
+    fetchNote: vi.fn(),
+    updateNote: vi.fn(),
+    deleteNote: vi.fn(),
+    getNote: vi.fn(),
+  }),
+}))
+
 describe('App', () => {
   it('renders the app name in sidebar', () => {
     render(<App />)

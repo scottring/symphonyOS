@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import type { TimelineItem } from '@/types/timeline'
 import type { Task } from '@/types/task'
 import { formatTime, formatTimeRange } from '@/lib/timeUtils'
@@ -80,6 +80,8 @@ interface DetailPanelProps {
   onUpdate?: (taskId: string, updates: Partial<Task>) => void
   onDelete?: (taskId: string) => void
   onToggleComplete?: (taskId: string) => void
+  // Event notes
+  onUpdateEventNote?: (googleEventId: string, notes: string | null) => void
 }
 
 // Icon components for actions
@@ -159,16 +161,37 @@ function ActionButton({ action }: { action: DetectedAction }) {
   )
 }
 
-export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplete }: DetailPanelProps) {
+export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplete, onUpdateEventNote }: DetailPanelProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [newLink, setNewLink] = useState('')
+
+  // Local state for event notes (to allow fluid typing)
+  const [localEventNotes, setLocalEventNotes] = useState(item?.notes || '')
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Sync local state when item changes
+  useEffect(() => {
+    setLocalEventNotes(item?.notes || '')
+  }, [item?.id, item?.notes])
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current)
+      }
+    }
+  }, [])
 
   // Detect contextual actions
   const detectedActions = useMemo(() => {
     if (!item) return []
+    // For events, use googleDescription for action detection (links, video calls, etc.)
+    // For tasks, use notes
+    const descriptionForActions = item.type === 'event' ? item.googleDescription : item.notes
     return detectActions(
       item.title,
-      item.notes,
+      descriptionForActions,
       item.location,
       item.phoneNumber
     )
@@ -177,7 +200,8 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
   if (!item) return null
 
   const isTask = item.type === 'task'
-  const hasContext = item.notes || item.phoneNumber || item.links?.length || item.location
+  const isEvent = item.type === 'event'
+  const hasContext = item.notes || item.phoneNumber || item.links?.length || item.location || item.googleDescription
 
   const handleCall = () => {
     if (item.phoneNumber) {
@@ -208,6 +232,24 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
     if (isTask && item.originalTask && onUpdate) {
       onUpdate(item.originalTask.id, { notes: e.target.value || undefined })
     }
+  }
+
+  const handleEventNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value
+    // Update local state immediately for fluid typing
+    setLocalEventNotes(value)
+
+    // Debounce the actual save
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
+    }
+
+    debounceRef.current = setTimeout(() => {
+      if (isEvent && item.originalEvent && onUpdateEventNote) {
+        const googleEventId = item.originalEvent.google_event_id || item.originalEvent.id
+        onUpdateEventNote(googleEventId, value || null)
+      }
+    }, 500) // Save 500ms after user stops typing
   }
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -308,10 +350,10 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
         )}
 
         {/* Quick Actions */}
-        {isTask && (
-          <div>
-            <h3 className="text-sm font-medium text-neutral-700 mb-3">Quick Actions</h3>
-            <div className="grid grid-cols-2 gap-2">
+        <div>
+          <h3 className="text-sm font-medium text-neutral-700 mb-3">Quick Actions</h3>
+          <div className="grid grid-cols-2 gap-2">
+            {isTask && (
               <button
                 onClick={handleToggle}
                 className={`
@@ -329,43 +371,45 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
                   {item.completed ? 'Completed' : 'Complete'}
                 </span>
               </button>
-              <button
-                onClick={() => setIsEditing(!isEditing)}
-                className={`
-                  flex flex-col items-center gap-1.5 p-4 rounded-lg border transition-colors
-                  ${isEditing
-                    ? 'border-primary-200 bg-primary-50 text-primary-600'
-                    : 'border-neutral-200 hover:bg-neutral-50 text-neutral-600'
-                  }
-                `}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                </svg>
-                <span className="text-xs font-medium">Edit</span>
-              </button>
-              {item.phoneNumber && (
-                <>
-                  <button
-                    onClick={handleCall}
-                    className="flex flex-col items-center gap-1.5 p-4 rounded-lg border border-neutral-200 hover:bg-neutral-50 text-neutral-600 transition-colors"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
-                    </svg>
-                    <span className="text-xs font-medium">Call</span>
-                  </button>
-                  <button
-                    onClick={handleText}
-                    className="flex flex-col items-center gap-1.5 p-4 rounded-lg border border-neutral-200 hover:bg-neutral-50 text-neutral-600 transition-colors"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
-                    </svg>
-                    <span className="text-xs font-medium">Text</span>
-                  </button>
-                </>
-              )}
+            )}
+            <button
+              onClick={() => setIsEditing(!isEditing)}
+              className={`
+                flex flex-col items-center gap-1.5 p-4 rounded-lg border transition-colors
+                ${isEditing
+                  ? 'border-primary-200 bg-primary-50 text-primary-600'
+                  : 'border-neutral-200 hover:bg-neutral-50 text-neutral-600'
+                }
+              `}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+              </svg>
+              <span className="text-xs font-medium">{isEvent ? 'Add Notes' : 'Edit'}</span>
+            </button>
+            {item.phoneNumber && (
+              <>
+                <button
+                  onClick={handleCall}
+                  className="flex flex-col items-center gap-1.5 p-4 rounded-lg border border-neutral-200 hover:bg-neutral-50 text-neutral-600 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                  </svg>
+                  <span className="text-xs font-medium">Call</span>
+                </button>
+                <button
+                  onClick={handleText}
+                  className="flex flex-col items-center gap-1.5 p-4 rounded-lg border border-neutral-200 hover:bg-neutral-50 text-neutral-600 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-xs font-medium">Text</span>
+                </button>
+              </>
+            )}
+            {isTask && (
               <button
                 onClick={handleDelete}
                 className="flex flex-col items-center gap-1.5 p-4 rounded-lg border border-neutral-200 hover:bg-danger-50 hover:border-danger-200 text-neutral-600 hover:text-danger-600 transition-colors"
@@ -375,16 +419,34 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
                 </svg>
                 <span className="text-xs font-medium">Delete</span>
               </button>
-            </div>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Context display (read mode) */}
         {hasContext && !isEditing && (
           <div className="space-y-4">
+            {/* Google Calendar description (read-only, events only) */}
+            {isEvent && item.googleDescription && (
+              <div>
+                <h3 className="text-sm font-medium text-neutral-700 mb-2 flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                  </svg>
+                  From Google Calendar
+                </h3>
+                <div className="text-sm text-neutral-600 whitespace-pre-wrap bg-blue-50 rounded-lg p-3 border border-blue-100">
+                  <RichText text={item.googleDescription} />
+                </div>
+              </div>
+            )}
+
+            {/* Symphony notes (editable) */}
             {item.notes && (
               <div>
-                <h3 className="text-sm font-medium text-neutral-700 mb-2">Notes</h3>
+                <h3 className="text-sm font-medium text-neutral-700 mb-2">
+                  {isEvent ? 'My Notes' : 'Notes'}
+                </h3>
                 <div className="text-sm text-neutral-600 whitespace-pre-wrap bg-neutral-50 rounded-lg p-3">
                   <RichText text={item.notes} />
                 </div>
@@ -522,8 +584,42 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
           </div>
         )}
 
+        {/* Edit mode for events - just notes */}
+        {isEditing && isEvent && (
+          <div className="space-y-5">
+            {/* Show GCal description as read-only context */}
+            {item.googleDescription && (
+              <div>
+                <h3 className="text-sm font-medium text-neutral-700 mb-2 flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                  </svg>
+                  From Google Calendar
+                </h3>
+                <div className="text-sm text-neutral-600 whitespace-pre-wrap bg-blue-50 rounded-lg p-3 border border-blue-100">
+                  <RichText text={item.googleDescription} />
+                </div>
+              </div>
+            )}
+
+            {/* Editable Symphony notes */}
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-2">My Notes</label>
+              <textarea
+                value={localEventNotes}
+                onChange={handleEventNotesChange}
+                placeholder="Add your notes about this event..."
+                rows={4}
+                className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200
+                           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
+                           resize-none"
+              />
+            </div>
+          </div>
+        )}
+
         {/* Empty state for events */}
-        {!isTask && !hasContext && (
+        {!isTask && !hasContext && !isEditing && (
           <p className="text-sm text-neutral-400 text-center py-8">
             No additional details for this event
           </p>

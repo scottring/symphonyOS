@@ -1,7 +1,7 @@
 import type { TimelineItem, TimeSection } from '@/types/timeline'
 
 export type TimeOfDay = 'morning' | 'afternoon' | 'evening'
-export type DaySection = TimeOfDay | 'unscheduled'
+export type DaySection = 'allday' | TimeOfDay | 'unscheduled'
 
 /**
  * Get the current time. Exported for testing (can be mocked).
@@ -158,16 +158,18 @@ export function getTimeOfDay(date: Date): TimeOfDay {
  */
 export function getDaySection(item: TimelineItem): DaySection {
   if (!item.startTime) return 'unscheduled'
+  if (item.allDay) return 'allday'
   return getTimeOfDay(item.startTime)
 }
 
 /**
- * Group timeline items by time of day (Morning/Afternoon/Evening).
+ * Group timeline items by time of day (All Day/Morning/Afternoon/Evening).
  */
 export function groupByDaySection(
   items: TimelineItem[]
 ): Record<DaySection, TimelineItem[]> {
   const groups: Record<DaySection, TimelineItem[]> = {
+    allday: [],
     morning: [],
     afternoon: [],
     evening: [],
@@ -179,10 +181,12 @@ export function groupByDaySection(
     groups[section].push(item)
   }
 
-  // Sort each section by start time
+  // Sort each section by start time (except allday which has no meaningful time)
   const sortByTime = (a: TimelineItem, b: TimelineItem) =>
     (a.startTime?.getTime() ?? 0) - (b.startTime?.getTime() ?? 0)
 
+  // Sort allday events alphabetically by title
+  groups.allday.sort((a, b) => a.title.localeCompare(b.title))
   groups.morning.sort(sortByTime)
   groups.afternoon.sort(sortByTime)
   groups.evening.sort(sortByTime)
@@ -195,6 +199,7 @@ export function groupByDaySection(
  */
 export function getDaySectionLabel(section: DaySection): string {
   switch (section) {
+    case 'allday': return 'All Day'
     case 'morning': return 'Morning'
     case 'afternoon': return 'Afternoon'
     case 'evening': return 'Evening'

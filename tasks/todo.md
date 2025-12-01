@@ -1,96 +1,63 @@
-# Phase 2: MVP Polish
+# Event Notes Feature
 
-Building on the core functionality from Phase 1 (auth, tasks, calendar, scheduling), this phase focuses on making the app more useful and polished.
-
-## 2.1 Contextual Actions ✓
-
-Added smart, context-aware action buttons based on event/task content.
-
-### What Was Built
-
-**Smart Action Detection** — Analyze event/task content to surface relevant actions:
-- **Recipe links** → "View Recipe" button
-- **Video call links** (Zoom, Meet, Teams) → "Join Call" button
-- **Location set** → "Get Directions" button
-- **Phone number** → "Call" / "Text" buttons
-
-**Action Extraction** — Parse event descriptions for:
-- URLs (especially recipe sites, video conferencing)
-- Addresses/locations
-- Phone numbers
-
-### Completed
-- [x] Create action detection utility (`detectActions` in `src/lib/actionDetection.ts`)
-- [x] Add "View Recipe" action for recipe links
-- [x] Add "Join Call" action for video conferencing links
-- [x] Add "Get Directions" action for locations
-- [x] Update DetailPanel to show detected actions prominently
-- [x] Add action buttons to ExecutionCard for primary actions
-
----
-
-## 2.2 UI Refinements ✓
-
-- [x] Swipe gestures for mobile (swipe right = complete, swipe left = defer)
-- [x] Better empty states (shows "Nothing scheduled for {day}" on non-today dates)
-- [x] Loading skeletons improved to match actual card structure
-- [ ] Animations/transitions (ongoing)
-
----
-
-## 2.3 Stability (Future)
-
-- Token refresh handling
-- Offline support
-- Error boundaries
-- Loading states consistency
-
----
-
-## Phase 3: Notes & Capture (Next)
-
-See original plan for:
-- Data model for notes
-- UI for notes capture
-- AI-assisted related notes
-
----
+Add local notes for Google Calendar events, allowing Symphony users to annotate events with their own notes while preserving the read-only Google Calendar description.
 
 ## Completed
 
-### Phase 2 (Current)
-- [x] Contextual actions (2.1) - View Recipe, Join Call, Get Directions
-- [x] UI Refinements (2.2) - Swipe gestures, empty states, loading skeletons
+### 1. Database Migration
+- [x] Create `event_notes` table with `google_event_id`, `user_id`, `notes`, timestamps
+- [x] Add RLS policies for user isolation
+- [x] Add unique constraint on (user_id, google_event_id)
+- [x] Add updated_at trigger
 
-### Phase 1 (Weeks 1-5)
-- [x] Auth (Supabase)
-- [x] Task CRUD with persistence
-- [x] Google Calendar integration
-- [x] Desktop UI rebuild (AppShell, Sidebar, DetailPanel)
-- [x] Time-based grouping (Morning/Afternoon/Evening)
-- [x] Task scheduling
-- [x] Date navigation
-- [x] Multi-calendar support
-- [x] All-day event timezone handling
-- [x] Event deduplication
-- [x] Clickable links in event descriptions
+### 2. Types & Hook
+- [x] Create `useEventNotes` hook with CRUD operations (optimistic updates)
+- [x] Add `googleDescription` field to `TimelineItem` type
+
+### 3. DetailPanel Updates
+- [x] Show GCal description (read-only) in a "From Google Calendar" section with blue styling
+- [x] Show editable Symphony notes section labeled "My Notes"
+- [x] Use same edit UX as tasks (textarea, save on change)
+- [x] Add "Add Notes" button for events (opens edit mode)
+
+### 4. Integration
+- [x] Pass event notes hook to DetailPanel via App.tsx
+- [x] Load notes when selecting an event
+- [x] Wire up save functionality with optimistic updates
 
 ---
 
 ## Review
 
-### Phase 2 Changes Summary
+### Files Created
+- `supabase/migrations/003_event_notes.sql` - New database table with RLS policies
+- `src/hooks/useEventNotes.ts` - Hook for managing event notes with optimistic updates
 
-**2.1 Contextual Actions**
-- Created `src/lib/actionDetection.ts` utility for detecting actionable content
-- Supports recipe sites, video conferencing (Zoom, Meet, Teams, Webex, etc.), locations, and phone numbers
-- Actions displayed prominently in both ExecutionCard and DetailPanel
-- Primary actions (Join Call, Get Directions, View Recipe) shown as prominent buttons
+### Files Modified
+- `src/types/timeline.ts` - Added `googleDescription` field, updated `eventToTimelineItem`
+- `src/components/detail/DetailPanel.tsx` - Added event notes UI (read-only GCal + editable Symphony notes)
+- `src/App.tsx` - Integrated useEventNotes hook
+- `src/App.test.tsx` - Added mock for useEventNotes
 
-**2.2 UI Refinements**
-- ExecutionCard now supports swipe gestures on touch devices:
-  - Swipe right → Mark task complete
-  - Swipe left → Defer to tomorrow (9am)
-  - Visual feedback during swipe with icons and color changes
-- Empty state improved for non-today dates: "Nothing scheduled for {weekday}"
-- Loading skeletons match actual card structure with time indicator, checkbox, and title placeholders
+### Key Design Decisions
+1. **Separation of concerns**: GCal description stays read-only in `googleDescription`, user notes go in `notes`
+2. **Visual distinction**: GCal description shown with blue background/border, user notes with neutral gray
+3. **Same UX pattern**: Event note editing uses same textarea pattern as task notes
+4. **Optimistic updates**: Notes save immediately with rollback on error
+
+---
+
+## Previous Work
+
+### Phase 2 (Completed)
+- [x] Contextual actions (2.1) - View Recipe, Join Call, Get Directions
+- [x] UI Refinements (2.2) - Swipe gestures, empty states, loading skeletons
+
+### Phase 1 (Completed)
+- [x] Auth (Supabase)
+- [x] Task CRUD with persistence
+- [x] Google Calendar integration
+- [x] Desktop UI rebuild
+- [x] Time-based grouping
+- [x] Task scheduling
+- [x] Date navigation
