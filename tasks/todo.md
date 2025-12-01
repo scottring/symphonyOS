@@ -10,7 +10,7 @@ A **user-first personal life OS**. You are the primary unit. Domains (Work, Pers
 
 ---
 
-## Phase 1: MVP (Weeks 1-5) ✅ COMPLETE
+## Phase 1: MVP ✅ COMPLETE
 
 Core task + calendar + execution UI.
 
@@ -28,16 +28,14 @@ Core task + calendar + execution UI.
 Finish the execution experience before adding new major features.
 
 ### 2.1 Contextual One-Tap Actions
-Per VISION.md: "One-tap actions (call, navigate, mark done)"
-
 - [ ] **Get Directions** — Events/tasks with location → open Google Maps
 - [ ] **Join Call** — Events with video links (Zoom/Meet/Teams) → extract and open
-- [ ] **Call/Text** — Already implemented for phone numbers ✅
+- [x] **Call/Text** — Already implemented for phone numbers
 
 ### 2.2 UI/UX Refinements
 - [ ] Empty states for non-today dates ("Nothing scheduled for Thursday")
 - [ ] Visual distinction between past/future when viewing other days
-- [ ] Swipe gestures (right = complete, left = defer) — per VISION.md
+- [ ] Swipe gestures (right = complete, left = defer)
 - [ ] Pull-to-refresh for calendar events
 
 ### 2.3 Stability & Edge Cases
@@ -47,24 +45,59 @@ Per VISION.md: "One-tap actions (call, navigate, mark done)"
 
 ---
 
-## Phase 3: Inbox & Capture
+## Phase 3: Notes & Capture
 
-Quick capture on mobile, process during planning.
+Notes are a first-class feature, not just a text field. Any content can have notes attached. All notes flow into a chronological timeline.
 
-- [ ] Inbox data model (unprocessed items)
-- [ ] Quick add UI (minimal friction capture)
+### 3.1 Notes Data Model
+- [ ] Create `notes` table in Supabase:
+  ```
+  Note {
+    id
+    user_id
+    content (text/markdown)
+    created_at
+    updated_at
+    attached_to_type (task | event | project | standalone)
+    attached_to_id (nullable for standalone)
+    extracted_topics[] (AI-generated on save)
+  }
+  ```
+- [ ] Migrate existing `notes` field on tasks to note entities
+- [ ] Create `useNotes` hook for CRUD operations
+
+### 3.2 Notes UI
+- [ ] Add note button on ExecutionCard (tasks and events)
+- [ ] Note composer (text area, save/cancel)
+- [ ] Display attached notes on cards
+- [ ] Notes timeline view (chronological list of all notes)
+- [ ] Filter timeline by: date range, attached entity type
+
+### 3.3 Quick Capture
+- [ ] Floating "+" button for quick capture
+- [ ] Quick capture creates standalone note (goes to inbox)
+- [ ] Inbox view: unattached notes waiting to be processed
+- [ ] Processing UI: attach note to existing task/event or convert to task
+
+### 3.4 Related Notes (AI-assisted)
+- [ ] On note save: extract topics/entities via AI (lightweight, runs once)
+- [ ] Store extracted topics as metadata
+- [ ] "Related notes" section: other notes with overlapping topics
+- [ ] Later: semantic search with embeddings (Phase 4 prerequisite)
+
+### 3.5 External Capture (Future)
 - [ ] Share sheet integration (iOS/Android)
 - [ ] Email forward to inbox (Supabase edge function)
-- [ ] Inbox processing UI (convert to task or attach to existing)
 
 ---
 
 ## Phase 4: AI-Assisted Planning
 
-Weekly planning session with AI help.
+Weekly planning session with AI help. Requires notes system (Phase 3) to reference user's captured thoughts.
 
 - [ ] Brain dump UI (large text area, freeform input)
 - [ ] AI parsing (extract tasks, dates, commitments)
+- [ ] Surface relevant notes during planning
 - [ ] Review & adjust UI (structured output, drag to schedule)
 - [ ] Gap detection (neglected projects, upcoming deadlines)
 
@@ -72,12 +105,12 @@ Weekly planning session with AI help.
 
 ## Phase 5: Domains
 
-Multi-context support.
+Multi-context support (Work, Personal, Family, etc.)
 
-- [ ] Domain data model (Work, Personal, Family, etc.)
+- [ ] Domain data model
 - [ ] Domain CRUD UI
 - [ ] Filter/view by domain
-- [ ] Assign tasks/events to domains
+- [ ] Assign tasks/events/notes to domains
 - [ ] Domain-based calendar filtering
 
 ---
@@ -98,8 +131,8 @@ Family/shared domain features.
 Prompt-driven meal planning with recipes.
 
 - [ ] Recipe storage (local, not just links)
-- [ ] Meal prompt UI ("What should we have for dinner?")
-- [ ] AI meal suggestions based on preferences, schedule, inventory
+- [ ] Meal prompt UI
+- [ ] AI meal suggestions
 - [ ] Grocery list generation
 - [ ] Recipe surfacing at cooking time
 
@@ -109,7 +142,7 @@ Prompt-driven meal planning with recipes.
 
 Recurring assignments with flexible ownership.
 
-- [ ] Routine data model (who does what, when)
+- [ ] Routine data model
 - [ ] Routine assignment rotation
 - [ ] Routine visibility in daily view
 
@@ -128,11 +161,8 @@ Recurring assignments with flexible ownership.
 
 ## Current Focus
 
-**Phase 2.1: Contextual One-Tap Actions**
+**Phase 2: MVP Polish**
 
-Next steps:
-1. Add "Get Directions" button for items with location
-2. Add "Join Call" button for events with video links
-3. Test on mobile
+Complete Phase 2 before starting Phase 3 (Notes & Capture).
 
 ---
