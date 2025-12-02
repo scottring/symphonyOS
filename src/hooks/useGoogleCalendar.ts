@@ -21,6 +21,7 @@ export interface CalendarEvent {
 export function useGoogleCalendar() {
   const [isConnected, setIsConnected] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [isFetching, setIsFetching] = useState(false)
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [error, setError] = useState<string | null>(null)
 
@@ -117,9 +118,9 @@ export function useGoogleCalendar() {
       return []
     }
 
-    // Clear error and events immediately when fetching new date range
+    // Set fetching state and clear error
     setError(null)
-    setEvents([])
+    setIsFetching(true)
 
     try {
       const { data, error: fetchError } = await supabase.functions.invoke('google-calendar-events', {
@@ -150,6 +151,8 @@ export function useGoogleCalendar() {
       setError(message)
       setEvents([])
       return []
+    } finally {
+      setIsFetching(false)
     }
   }, [isConnected])
 
@@ -174,6 +177,7 @@ export function useGoogleCalendar() {
   return {
     isConnected,
     isLoading,
+    isFetching,
     events,
     error,
     connect,

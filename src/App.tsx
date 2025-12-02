@@ -14,7 +14,7 @@ import { taskToTimelineItem, eventToTimelineItem } from '@/types/timeline'
 function App() {
   const { tasks, loading: tasksLoading, addTask, toggleTask, deleteTask, updateTask } = useSupabaseTasks()
   const { user, loading: authLoading, signOut } = useAuth()
-  const { isConnected, events, fetchEvents } = useGoogleCalendar()
+  const { isConnected, events, fetchEvents, isFetching: eventsFetching } = useGoogleCalendar()
   const { fetchNote, updateNote, getNote } = useEventNotes()
 
   // UI state
@@ -157,7 +157,7 @@ function App() {
           selectedItemId={selectedItemId}
           onSelectItem={setSelectedItemId}
           onToggleTask={toggleTask}
-          loading={tasksLoading}
+          loading={tasksLoading || eventsFetching}
           viewedDate={viewedDate}
           onDateChange={setViewedDate}
         />
