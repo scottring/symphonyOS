@@ -23,11 +23,23 @@ export function ScheduleItem({ item, selected, onSelect, onToggleComplete }: Sch
     }
   }
 
-  const timeDisplay = item.startTime
-    ? item.endTime
-      ? formatTimeRange(item.startTime, item.endTime, item.allDay)
-      : formatTime(item.startTime)
-    : null
+  // Parse time display - could be single time, range (pipe-separated), or "All day"
+  const getTimeDisplay = () => {
+    if (!item.startTime) return null
+
+    if (item.endTime) {
+      const rangeStr = formatTimeRange(item.startTime, item.endTime, item.allDay)
+      if (rangeStr === 'All day') {
+        return { type: 'allday' as const }
+      }
+      const [start, end] = rangeStr.split('|')
+      return { type: 'range' as const, start, end }
+    }
+
+    return { type: 'single' as const, time: formatTime(item.startTime) }
+  }
+
+  const timeDisplay = getTimeDisplay()
 
   return (
     <div
@@ -46,12 +58,19 @@ export function ScheduleItem({ item, selected, onSelect, onToggleComplete }: Sch
         ${item.completed ? 'opacity-50' : ''}
       `}
     >
-      {/* Time column - fixed width, vertically centered */}
-      <div className="w-14 flex-shrink-0 flex items-center">
+      {/* Time column - fixed width */}
+      <div className="w-12 flex-shrink-0">
         {timeDisplay ? (
-          <span className="text-xs text-neutral-400 font-medium leading-tight">
-            {timeDisplay}
-          </span>
+          timeDisplay.type === 'allday' ? (
+            <span className="text-xs text-neutral-400 font-medium">All day</span>
+          ) : timeDisplay.type === 'range' ? (
+            <div className="flex flex-col text-xs text-neutral-400 font-medium leading-tight">
+              <span>{timeDisplay.start}</span>
+              <span>{timeDisplay.end}</span>
+            </div>
+          ) : (
+            <span className="text-xs text-neutral-400 font-medium">{timeDisplay.time}</span>
+          )
         ) : (
           <span className="text-xs text-neutral-300">—</span>
         )}
@@ -84,32 +103,19 @@ export function ScheduleItem({ item, selected, onSelect, onToggleComplete }: Sch
             </span>
           </button>
         ) : (
-          <div className="w-2.5 h-2.5 rounded-full bg-blue-400" />
+          <div className="w-2.5 h-2.5 rounded-full bg-primary-400" />
         )}
       </div>
 
-      {/* Title and type badge - left aligned */}
-      <div className="flex-1 min-w-0 flex items-center gap-2">
+      {/* Title */}
+      <div className="flex-1 min-w-0">
         <span
           className={`
-            text-sm font-medium truncate
+            text-base font-medium truncate block
             ${item.completed ? 'line-through text-neutral-400' : 'text-neutral-800'}
           `}
         >
           {item.title}
-        </span>
-
-        {/* Type badge - inline with title */}
-        <span
-          className={`
-            text-[10px] px-1.5 py-0.5 rounded font-medium flex-shrink-0
-            ${isTask
-              ? 'bg-primary-100 text-primary-600'
-              : 'bg-blue-100 text-blue-600'
-            }
-          `}
-        >
-          {isTask ? 'Task' : 'Event'}
         </span>
       </div>
 

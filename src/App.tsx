@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useAuth } from '@/hooks/useAuth'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
@@ -6,7 +6,6 @@ import { useEventNotes } from '@/hooks/useEventNotes'
 import { AppShell } from '@/components/layout/AppShell'
 import { TodaySchedule } from '@/components/schedule/TodaySchedule'
 import { DetailPanel } from '@/components/detail/DetailPanel'
-import { AddTaskForm } from '@/components/AddTaskForm'
 import { CalendarConnect } from '@/components/CalendarConnect'
 import { AuthForm } from '@/components/AuthForm'
 import { RecipeViewer } from '@/components/recipe/RecipeViewer'
@@ -26,11 +25,28 @@ function App() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [viewedDate, setViewedDate] = useState(() => new Date())
   const [recipeUrl, setRecipeUrl] = useState<string | null>(null)
+  const [quickAddOpen, setQuickAddOpen] = useState(false)
+
+  // Toggle quick add modal
+  const openQuickAdd = useCallback(() => setQuickAddOpen(true), [])
+  const closeQuickAdd = useCallback(() => setQuickAddOpen(false), [])
 
   // Persist sidebar state
   useEffect(() => {
     localStorage.setItem('symphony-sidebar-collapsed', String(sidebarCollapsed))
   }, [sidebarCollapsed])
+
+  // Cmd+K keyboard shortcut for quick add
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setQuickAddOpen(true)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   // Fetch calendar events when connected or date changes
   useEffect(() => {
@@ -104,6 +120,9 @@ function App() {
       userEmail={user.email ?? undefined}
       onSignOut={signOut}
       onQuickAdd={addTask}
+      quickAddOpen={quickAddOpen}
+      onOpenQuickAdd={openQuickAdd}
+      onCloseQuickAdd={closeQuickAdd}
       panel={
         recipeUrl ? (
           <RecipeViewer
@@ -130,13 +149,6 @@ function App() {
             <CalendarConnect />
           </div>
         )}
-
-        {/* Add task form */}
-        <div className="p-4 border-b border-neutral-100">
-          <div className="max-w-xl">
-            <AddTaskForm onAdd={addTask} />
-          </div>
-        </div>
 
         {/* Today's schedule */}
         <TodaySchedule

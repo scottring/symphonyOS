@@ -20,47 +20,6 @@ export function DateNavigator({ date, onDateChange }: DateNavigatorProps) {
     onDateChange(new Date())
   }
 
-  const isToday = () => {
-    const today = new Date()
-    return (
-      date.getFullYear() === today.getFullYear() &&
-      date.getMonth() === today.getMonth() &&
-      date.getDate() === today.getDate()
-    )
-  }
-
-  const formatDate = () => {
-    if (isToday()) {
-      return 'Today'
-    }
-
-    const yesterday = new Date()
-    yesterday.setDate(yesterday.getDate() - 1)
-    if (
-      date.getFullYear() === yesterday.getFullYear() &&
-      date.getMonth() === yesterday.getMonth() &&
-      date.getDate() === yesterday.getDate()
-    ) {
-      return 'Yesterday'
-    }
-
-    const tomorrow = new Date()
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    if (
-      date.getFullYear() === tomorrow.getFullYear() &&
-      date.getMonth() === tomorrow.getMonth() &&
-      date.getDate() === tomorrow.getDate()
-    ) {
-      return 'Tomorrow'
-    }
-
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-    })
-  }
-
   return (
     <div className="flex items-center gap-2">
       {/* Previous day button */}
@@ -83,10 +42,13 @@ export function DateNavigator({ date, onDateChange }: DateNavigatorProps) {
         </svg>
       </button>
 
-      {/* Date display */}
-      <span className="text-sm font-medium text-neutral-700 min-w-[100px] text-center">
-        {formatDate()}
-      </span>
+      {/* Today button - always shows "Today", clicking jumps to today */}
+      <button
+        onClick={goToToday}
+        className="text-sm font-medium text-neutral-700 hover:text-primary-600 transition-colors px-2"
+      >
+        Today
+      </button>
 
       {/* Next day button */}
       <button
@@ -107,16 +69,6 @@ export function DateNavigator({ date, onDateChange }: DateNavigatorProps) {
           />
         </svg>
       </button>
-
-      {/* Today button (only show when not viewing today) */}
-      {!isToday() && (
-        <button
-          onClick={goToToday}
-          className="touch-target ml-2 px-3 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-        >
-          Today
-        </button>
-      )}
     </div>
   )
 }

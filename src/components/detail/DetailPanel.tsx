@@ -172,6 +172,9 @@ function ActionButton({ action, onOpenRecipe }: { action: DetectedAction; onOpen
 export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplete, onUpdateEventNote, onOpenRecipe }: DetailPanelProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [newLink, setNewLink] = useState('')
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
+  const [editedTitle, setEditedTitle] = useState(item?.title || '')
+  const titleInputRef = useRef<HTMLInputElement>(null)
 
   // Local state for event notes (to allow fluid typing)
   const [localEventNotes, setLocalEventNotes] = useState(item?.notes || '')
@@ -181,6 +184,20 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
   useEffect(() => {
     setLocalEventNotes(item?.notes || '')
   }, [item?.id, item?.notes])
+
+  // Sync title when item changes
+  useEffect(() => {
+    setEditedTitle(item?.title || '')
+    setIsEditingTitle(false)
+  }, [item?.id, item?.title])
+
+  // Focus title input when editing starts
+  useEffect(() => {
+    if (isEditingTitle && titleInputRef.current) {
+      titleInputRef.current.focus()
+      titleInputRef.current.select()
+    }
+  }, [isEditingTitle])
 
   // Cleanup debounce on unmount
   useEffect(() => {
@@ -210,6 +227,23 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
   const isTask = item.type === 'task'
   const isEvent = item.type === 'event'
   const hasContext = item.notes || item.phoneNumber || item.links?.length || item.location || item.googleDescription
+
+  const handleTitleSave = () => {
+    const trimmed = editedTitle.trim()
+    if (trimmed && isTask && item.originalTask && onUpdate && trimmed !== item.title) {
+      onUpdate(item.originalTask.id, { title: trimmed })
+    }
+    setIsEditingTitle(false)
+  }
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleTitleSave()
+    } else if (e.key === 'Escape') {
+      setEditedTitle(item.title)
+      setIsEditingTitle(false)
+    }
+  }
 
   const handleCall = () => {
     if (item.phoneNumber) {
@@ -327,9 +361,28 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
               {isTask ? 'Task' : 'Event'}
             </span>
           </div>
-          <h2 className="text-lg font-semibold text-neutral-800 leading-tight">
-            {item.title}
-          </h2>
+          {isTask && isEditingTitle ? (
+            <input
+              ref={titleInputRef}
+              type="text"
+              value={editedTitle}
+              onChange={(e) => setEditedTitle(e.target.value)}
+              onBlur={handleTitleSave}
+              onKeyDown={handleTitleKeyDown}
+              className="w-full text-lg font-semibold text-neutral-800 leading-tight
+                         bg-transparent border-b-2 border-primary-500
+                         focus:outline-none py-0.5 -my-0.5"
+            />
+          ) : (
+            <h2
+              className={`text-lg font-semibold text-neutral-800 leading-tight ${
+                isTask ? 'cursor-pointer hover:text-primary-600 transition-colors' : ''
+              }`}
+              onClick={() => isTask && setIsEditingTitle(true)}
+            >
+              {item.title}
+            </h2>
+          )}
           <p className="text-sm text-neutral-500 mt-1">{timeDisplay}</p>
         </div>
         <button

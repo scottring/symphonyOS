@@ -120,24 +120,30 @@ export function isValidDate(date: Date): boolean {
 }
 
 /**
- * Format a time for display (e.g., "9:30 AM").
+ * Format a time for display in compact format (e.g., "9:30a", "7p").
+ * Omits minutes if they're :00.
  */
 export function formatTime(date: Date): string {
   if (!isValidDate(date)) return ''
-  return date.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  })
+  const hours = date.getHours()
+  const minutes = date.getMinutes()
+  const period = hours >= 12 ? 'p' : 'a'
+  const displayHour = hours % 12 || 12
+
+  if (minutes === 0) {
+    return `${displayHour}${period}`
+  }
+  return `${displayHour}:${minutes.toString().padStart(2, '0')}${period}`
 }
 
 /**
- * Format a time range for display (e.g., "9:30 AM - 10:30 AM").
+ * Format a time range for display.
+ * Returns { start, end } for stacked display, or { display } for single-line.
  */
 export function formatTimeRange(start: Date, end: Date, allDay?: boolean): string {
   if (allDay) return 'All day'
   if (!isValidDate(start) || !isValidDate(end)) return ''
-  return `${formatTime(start)} - ${formatTime(end)}`
+  return `${formatTime(start)}|${formatTime(end)}`
 }
 
 /**

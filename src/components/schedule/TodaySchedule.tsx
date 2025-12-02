@@ -152,7 +152,7 @@ export function TodaySchedule({
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-neutral-800">
-            {isToday() ? 'Today' : formatDate()}
+            {formatDate()}
           </h2>
           <DateNavigator date={viewedDate} onDateChange={onDateChange} />
         </div>

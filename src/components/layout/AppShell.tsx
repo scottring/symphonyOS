@@ -12,6 +12,9 @@ interface AppShellProps {
   userEmail?: string
   onSignOut?: () => void
   onQuickAdd?: (title: string) => void
+  quickAddOpen?: boolean
+  onOpenQuickAdd?: () => void
+  onCloseQuickAdd?: () => void
 }
 
 export function AppShell({
@@ -23,6 +26,9 @@ export function AppShell({
   userEmail,
   onSignOut,
   onQuickAdd,
+  quickAddOpen = false,
+  onOpenQuickAdd,
+  onCloseQuickAdd,
 }: AppShellProps) {
   const isMobile = useMobile()
 
@@ -87,9 +93,15 @@ export function AppShell({
         {children}
       </main>
 
-      {/* Mobile Quick Capture FAB */}
-      {isMobile && onQuickAdd && !panelOpen && (
-        <QuickCapture onAdd={onQuickAdd} />
+      {/* Quick Capture - FAB on mobile, modal triggered by Cmd+K on desktop */}
+      {onQuickAdd && !panelOpen && (
+        <QuickCapture
+          onAdd={onQuickAdd}
+          isOpen={quickAddOpen}
+          onOpen={onOpenQuickAdd}
+          onClose={onCloseQuickAdd}
+          showFab={isMobile}
+        />
       )}
 
       {/* Detail panel - full screen overlay on mobile */}
