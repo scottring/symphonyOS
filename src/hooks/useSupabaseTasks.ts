@@ -13,6 +13,7 @@ interface DbTask {
   links: (string | TaskLink)[] | null // Can be old string format or new object format
   phone_number: string | null
   contact_id: string | null
+  project_id: string | null
   created_at: string
   updated_at: string
 }
@@ -39,6 +40,7 @@ function dbTaskToTask(dbTask: DbTask): Task {
     links: normalizeLinks(dbTask.links),
     phoneNumber: dbTask.phone_number ?? undefined,
     contactId: dbTask.contact_id ?? undefined,
+    projectId: dbTask.project_id ?? undefined,
   }
 }
 
@@ -81,7 +83,7 @@ export function useSupabaseTasks() {
     fetchTasks()
   }, [user])
 
-  const addTask = useCallback(async (title: string, contactId?: string) => {
+  const addTask = useCallback(async (title: string, contactId?: string, projectId?: string) => {
     if (!user) return
 
     // Optimistic update
@@ -92,6 +94,7 @@ export function useSupabaseTasks() {
       completed: false,
       createdAt: new Date(),
       contactId,
+      projectId,
     }
     setTasks((prev) => [optimisticTask, ...prev])
 
@@ -102,6 +105,7 @@ export function useSupabaseTasks() {
         title,
         completed: false,
         contact_id: contactId ?? null,
+        project_id: projectId ?? null,
       })
       .select()
       .single()
@@ -183,6 +187,7 @@ export function useSupabaseTasks() {
     if (updates.links !== undefined) dbUpdates.links = updates.links ?? null
     if (updates.phoneNumber !== undefined) dbUpdates.phone_number = updates.phoneNumber ?? null
     if (updates.contactId !== undefined) dbUpdates.contact_id = updates.contactId ?? null
+    if (updates.projectId !== undefined) dbUpdates.project_id = updates.projectId ?? null
 
     const { error: updateError } = await supabase
       .from('tasks')

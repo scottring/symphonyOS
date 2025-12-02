@@ -11,6 +11,8 @@ interface ScheduleItemProps {
 
 export function ScheduleItem({ item, selected, onSelect, onToggleComplete, contactName }: ScheduleItemProps) {
   const isTask = item.type === 'task'
+  const isRoutine = item.type === 'routine'
+  const isActionable = isTask || isRoutine // Items with checkboxes
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -82,7 +84,7 @@ export function ScheduleItem({ item, selected, onSelect, onToggleComplete, conta
 
       {/* Checkbox/dot column */}
       <div className="w-5 shrink-0 flex items-center justify-center">
-        {isTask ? (
+        {isActionable ? (
           <button
             onClick={handleCheckboxClick}
             className="touch-target flex items-center justify-center"
@@ -90,9 +92,10 @@ export function ScheduleItem({ item, selected, onSelect, onToggleComplete, conta
           >
             <span
               className={`
-                w-5 h-5 rounded-md border-2
+                w-5 h-5 border-2
                 flex items-center justify-center
                 transition-colors
+                ${isRoutine ? 'rounded-full' : 'rounded-md'}
                 ${item.completed
                   ? 'bg-primary-500 border-primary-500 text-white'
                   : 'border-neutral-300 hover:border-primary-400'

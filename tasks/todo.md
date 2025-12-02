@@ -1,33 +1,67 @@
 # Symphony OS - Project Plan
 
+## Completed: DetailPanel Redesign (Progressive Disclosure)
+
+Optimized for quick task completion with rich context available on demand.
+
+### Changes Made
+- [x] **Header redesign**: Checkbox in header, inline title editing, single tappable time display
+- [x] **Notes section**: Always visible at top, click-to-edit, shows Google Calendar description for events
+- [x] **Collapsible sections**: Contact (with quick call/text), Project (with open button), Links (with count)
+- [x] **Removed redundancies**: Phone field removed (use contact's phone), duplicate time display removed
+- [x] **Footer actions**: Delete moved to bottom with confirmation dialog
+- [x] **Contextual actions**: Repositioned below notes section
+
+---
+
 ## Current: Projects MVP
 
-### Database
-- [ ] Migration 006: Create projects table (id, user_id, name, status default 'active', notes, parent_id nullable FK to self, timestamps)
-- [ ] Migration 007: Add project_id FK to tasks table
+### 1. Database Migrations
+- [ ] Create `supabase/migrations/007_projects.sql`: projects table with RLS
+- [ ] Create `supabase/migrations/008_add_project_to_tasks.sql`: add project_id to tasks
 
-### Hook
-- [ ] Create Project type (src/types/project.ts)
-- [ ] Create useProjects hook with CRUD + search by name
+### 2. Types
+- [ ] Create `src/types/project.ts`: Project and DbProject interfaces
+- [ ] Update `src/types/task.ts`: add projectId field
 
-### Quick Capture Integration
-- [ ] Add "#" trigger in QuickCapture to show project search dropdown
-- [ ] Project selection attaches project_id to task
-- [ ] "Create [name] as project" option when no match
+### 3. Hook: useProjects
+- [ ] Create `src/hooks/useProjects.ts`: CRUD + search (follow useContacts pattern)
 
-### Detail Panel Integration
-- [ ] Show project chip/card when task has linked project
-- [ ] Edit project button
-- [ ] Unlink project from task
+### 4. Quick Capture Integration
+- [ ] Add `#` trigger detection in QuickCapture
+- [ ] Project dropdown with search results
+- [ ] Project selection shows chip, attaches project_id to task
+- [ ] "Create [name] as project" option
+- [ ] Project creation form (simpler than contact - just name)
 
-### Project View
-- [ ] Create ProjectView component showing all tasks in project
-- [ ] Sort: incomplete first, then by scheduled date
-- [ ] Date-agnostic (shows all project tasks regardless of when scheduled)
+### 5. Detail Panel Integration
+- [ ] Create `src/components/detail/ProjectCard.tsx` (simpler than ContactCard)
+- [ ] Show ProjectCard in DetailPanel when task has projectId
+- [ ] Unlink project button
+- [ ] Edit project inline
 
-### Navigation
-- [ ] Desktop: Projects section in sidebar, list active projects, "+ New Project"
-- [ ] Mobile: Projects icon in header → full-screen project list
+### 6. Project View Component
+- [ ] Create `src/components/project/ProjectView.tsx`
+- [ ] Fetch tasks by project_id
+- [ ] Sort: incomplete first, then by scheduledDate (nulls last)
+- [ ] Show parent breadcrumb if project has parent
+- [ ] List sub-projects if project has children
+
+### 7. Navigation - Desktop Sidebar
+- [ ] Add "Projects" section to Sidebar
+- [ ] List active projects
+- [ ] Click project → open ProjectView
+
+### 8. Navigation - Mobile
+- [ ] Add projects icon to mobile header
+- [ ] Full-screen project list overlay
+- [ ] Full-screen ProjectView on project select
+
+### 9. Wire Everything Together
+- [ ] Add useProjects to App.tsx
+- [ ] Pass projects to QuickCapture
+- [ ] Pass project to DetailPanel
+- [ ] Create view state for showing ProjectView
 
 ---
 
@@ -56,7 +90,7 @@
 
 ### Phase 4: Gmail Integration
 
-Light integration — reference emails as task context, not an email client.
+Light integration - reference emails as task context, not an email client.
 
 **Scope:**
 - Add Gmail read scope to existing Google OAuth
@@ -66,7 +100,7 @@ Light integration — reference emails as task context, not an email client.
 
 ### Phase 5: AI-Assisted Planning
 
-- Brain dump → structured tasks
+- Brain dump -> structured tasks
 - Weekly planning session
 - Gap detection
 

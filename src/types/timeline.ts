@@ -1,7 +1,8 @@
 import type { Task, TaskLink } from './task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
+import type { Routine, RecurrencePattern } from './actionable'
 
-export type TimelineItemType = 'task' | 'event'
+export type TimelineItemType = 'task' | 'event' | 'routine'
 
 export interface TimelineItem {
   id: string
@@ -15,13 +16,17 @@ export interface TimelineItem {
   links?: TaskLink[]
   phoneNumber?: string
   contactId?: string // Linked contact
+  projectId?: string // Linked project
   // Event-specific
   location?: string
   allDay?: boolean
   googleDescription?: string // Read-only description from Google Calendar
+  // Routine-specific
+  recurrencePattern?: RecurrencePattern
   // Original data for actions
   originalTask?: Task
   originalEvent?: CalendarEvent
+  originalRoutine?: Routine
 }
 
 export type TimeSection = 'now' | 'soon' | 'later' | 'unscheduled'
@@ -38,6 +43,7 @@ export function taskToTimelineItem(task: Task): TimelineItem {
     links: task.links,
     phoneNumber: task.phoneNumber,
     contactId: task.contactId,
+    projectId: task.projectId,
     originalTask: task,
   }
 }
@@ -67,5 +73,27 @@ export function eventToTimelineItem(event: CalendarEvent): TimelineItem {
     location: event.location || undefined,
     allDay: allDay,
     originalEvent: event,
+  }
+}
+
+export function routineToTimelineItem(routine: Routine, date: Date): TimelineItem {
+  // Parse time_of_day if present (format: HH:MM:SS or HH:MM)
+  let startTime: Date | null = null
+  if (routine.time_of_day) {
+    const [hours, minutes] = routine.time_of_day.split(':').map(Number)
+    startTime = new Date(date)
+    startTime.setHours(hours, minutes, 0, 0)
+  }
+
+  return {
+    id: `routine-${routine.id}`,
+    type: 'routine',
+    title: routine.name,
+    startTime,
+    endTime: null, // Routines don't have duration
+    completed: false, // Will be set from actionable_instances
+    notes: routine.description || undefined,
+    recurrencePattern: routine.recurrence_pattern,
+    originalRoutine: routine,
   }
 }

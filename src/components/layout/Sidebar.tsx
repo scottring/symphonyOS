@@ -1,11 +1,15 @@
+export type ViewType = 'home' | 'projects' | 'routines'
+
 interface SidebarProps {
   collapsed: boolean
   onToggle: () => void
   userEmail?: string
   onSignOut?: () => void
+  activeView: ViewType
+  onViewChange: (view: ViewType) => void
 }
 
-export function Sidebar({ collapsed, onToggle, userEmail, onSignOut }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, userEmail, onSignOut, activeView, onViewChange }: SidebarProps) {
   return (
     <aside
       className={`
@@ -83,12 +87,15 @@ export function Sidebar({ collapsed, onToggle, userEmail, onSignOut }: SidebarPr
       )}
 
       {/* Navigation */}
-      <nav className="flex-1 p-2 mt-2">
-        <a
-          href="#"
+      <nav className="flex-1 p-2 mt-2 space-y-1">
+        <button
+          onClick={() => onViewChange('home')}
           className={`
-            flex items-center gap-3 px-3 py-2.5 rounded-lg
-            bg-primary-50 text-primary-600 font-medium
+            w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors
+            ${activeView === 'home'
+              ? 'bg-primary-50 text-primary-600 font-medium'
+              : 'text-neutral-600 hover:bg-neutral-100'
+            }
             ${collapsed ? 'justify-center' : ''}
           `}
         >
@@ -96,7 +103,41 @@ export function Sidebar({ collapsed, onToggle, userEmail, onSignOut }: SidebarPr
             <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
           </svg>
           {!collapsed && <span>Home</span>}
-        </a>
+        </button>
+
+        <button
+          onClick={() => onViewChange('projects')}
+          className={`
+            w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors
+            ${activeView === 'projects'
+              ? 'bg-blue-50 text-blue-600 font-medium'
+              : 'text-neutral-600 hover:bg-neutral-100'
+            }
+            ${collapsed ? 'justify-center' : ''}
+          `}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+          </svg>
+          {!collapsed && <span>Projects</span>}
+        </button>
+
+        <button
+          onClick={() => onViewChange('routines')}
+          className={`
+            w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors
+            ${activeView === 'routines'
+              ? 'bg-amber-50 text-amber-600 font-medium'
+              : 'text-neutral-600 hover:bg-neutral-100'
+            }
+            ${collapsed ? 'justify-center' : ''}
+          `}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+          </svg>
+          {!collapsed && <span>Routines</span>}
+        </button>
       </nav>
 
       {/* User section at bottom */}

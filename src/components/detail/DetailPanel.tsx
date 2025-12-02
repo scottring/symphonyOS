@@ -1,10 +1,15 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import type { TimelineItem } from '@/types/timeline'
 import type { Task, TaskLink } from '@/types/task'
 import type { Contact } from '@/types/contact'
+import type { Project } from '@/types/project'
+import type { ActionableInstance } from '@/types/actionable'
 import { formatTime, formatTimeRange } from '@/lib/timeUtils'
 import { detectActions, type DetectedAction } from '@/lib/actionDetection'
 import { ContactCard } from './ContactCard'
+import { ProjectCard } from './ProjectCard'
+import { ActionableActions } from './ActionableActions'
+import { useActionableInstances } from '@/hooks/useActionableInstances'
 
 // Component to render text with clickable links (handles HTML links and plain URLs)
 function RichText({ text }: { text: string }) {
@@ -91,6 +96,14 @@ interface DetailPanelProps {
   contacts?: Contact[]
   onSearchContacts?: (query: string) => Contact[]
   onUpdateContact?: (contactId: string, updates: Partial<Contact>) => void
+  // Project support
+  project?: Project | null
+  projects?: Project[]
+  onSearchProjects?: (query: string) => Project[]
+  onUpdateProject?: (projectId: string, updates: Partial<Project>) => void
+  onOpenProject?: (projectId: string) => void
+  // Actionable callback - called after skip/defer/done to refresh timeline
+  onActionComplete?: () => void
 }
 
 // Icon components for actions
@@ -176,25 +189,52 @@ function ActionButton({ action, onOpenRecipe }: { action: DetectedAction; onOpen
   )
 }
 
-export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplete, onUpdateEventNote, onOpenRecipe, contact, contacts = [], onSearchContacts, onUpdateContact }: DetailPanelProps) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [newLink, setNewLink] = useState('')
-  const [newLinkTitle, setNewLinkTitle] = useState('')
+export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplete, onUpdateEventNote, onOpenRecipe, contact, contacts = [], onSearchContacts, onUpdateContact, project, projects = [], onSearchProjects, onUpdateProject, onOpenProject, onActionComplete }: DetailPanelProps) {
+  // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [editedTitle, setEditedTitle] = useState(item?.title || '')
   const titleInputRef = useRef<HTMLInputElement>(null)
+
+  // Notes editing
+  const [isEditingNotes, setIsEditingNotes] = useState(false)
+  const [localNotes, setLocalNotes] = useState(item?.notes || '')
+  const notesInputRef = useRef<HTMLTextAreaElement>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Time picker state
+  const [showTimePicker, setShowTimePicker] = useState(false)
+  const [showHourPicker, setShowHourPicker] = useState(false)
+  const [showMinutePicker, setShowMinutePicker] = useState(false)
+
+  // Collapsible sections
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({})
 
   // Contact picker state
   const [showContactPicker, setShowContactPicker] = useState(false)
   const [contactSearchQuery, setContactSearchQuery] = useState('')
 
-  // Local state for event notes (to allow fluid typing)
-  const [localEventNotes, setLocalEventNotes] = useState(item?.notes || '')
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Project picker state
+  const [showProjectPicker, setShowProjectPicker] = useState(false)
+  const [projectSearchQuery, setProjectSearchQuery] = useState('')
+
+  // Links editing
+  const [newLink, setNewLink] = useState('')
+  const [newLinkTitle, setNewLinkTitle] = useState('')
+
+  // Delete confirmation
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  // Actionable instances (for events)
+  const [actionableInstance, setActionableInstance] = useState<ActionableInstance | null>(null)
+  const actionable = useActionableInstances()
 
   // Sync local state when item changes
   useEffect(() => {
-    setLocalEventNotes(item?.notes || '')
+    setLocalNotes(item?.notes || '')
+    setIsEditingNotes(false)
+    setExpandedSections({})
+    setShowDeleteConfirm(false)
+    setShowTimePicker(false)
   }, [item?.id, item?.notes])
 
   // Sync title when item changes
@@ -220,6 +260,32 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
     }
   }, [])
 
+  // Load actionable instance for events and routines
+  useEffect(() => {
+    if (!item) {
+      setActionableInstance(null)
+      return
+    }
+
+    const loadInstance = async () => {
+      if (item.type === 'event' && item.originalEvent) {
+        const eventId = item.originalEvent.google_event_id || item.originalEvent.id
+        if (!eventId || !item.startTime) return
+        const instance = await actionable.getInstance('calendar_event', eventId, item.startTime)
+        setActionableInstance(instance)
+      } else if (item.type === 'routine' && item.originalRoutine) {
+        // For routines, use startTime or today's date
+        const date = item.startTime || new Date()
+        const instance = await actionable.getInstance('routine', item.originalRoutine.id, date)
+        setActionableInstance(instance)
+      } else {
+        setActionableInstance(null)
+      }
+    }
+
+    loadInstance()
+  }, [item?.id, item?.type, item?.startTime, actionable.getInstance])
+
   // Detect contextual actions
   const detectedActions = useMemo(() => {
     if (!item) return []
@@ -242,11 +308,160 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
     return contacts.slice(0, 5)
   }, [contacts, contactSearchQuery, onSearchContacts])
 
+  // Filter projects for picker
+  const filteredProjects = useMemo(() => {
+    if (onSearchProjects && projectSearchQuery) {
+      return onSearchProjects(projectSearchQuery)
+    }
+    return projects.slice(0, 5)
+  }, [projects, projectSearchQuery, onSearchProjects])
+
+  // Get entity ID and date for actionable instance operations
+  // These must be defined before the early return to maintain hook order
+  const getEventEntityId = useCallback(() => {
+    if (!item?.originalEvent) return null
+    return item.originalEvent.google_event_id || item.originalEvent.id
+  }, [item?.originalEvent])
+
+  const getEventDate = useCallback(() => {
+    return item?.startTime || new Date()
+  }, [item?.startTime])
+
+  const getRoutineEntityId = useCallback(() => {
+    if (!item?.originalRoutine) return null
+    return item.originalRoutine.id
+  }, [item?.originalRoutine])
+
+  const getRoutineDate = useCallback(() => {
+    return item?.startTime || new Date()
+  }, [item?.startTime])
+
+  // Actionable action handlers for events
+  const handleEventMarkDone = useCallback(async () => {
+    const entityId = getEventEntityId()
+    if (!entityId) return false
+    const success = await actionable.markDone('calendar_event', entityId, getEventDate())
+    if (success) {
+      const instance = await actionable.getInstance('calendar_event', entityId, getEventDate())
+      setActionableInstance(instance)
+    }
+    return success
+  }, [actionable, getEventEntityId, getEventDate])
+
+  const handleEventUndoDone = useCallback(async () => {
+    const entityId = getEventEntityId()
+    if (!entityId) return false
+    const success = await actionable.undoDone('calendar_event', entityId, getEventDate())
+    if (success) {
+      setActionableInstance(null)
+    }
+    return success
+  }, [actionable, getEventEntityId, getEventDate])
+
+  const handleEventSkip = useCallback(async () => {
+    const entityId = getEventEntityId()
+    if (!entityId) return false
+    const success = await actionable.skip('calendar_event', entityId, getEventDate())
+    if (success) {
+      const instance = await actionable.getInstance('calendar_event', entityId, getEventDate())
+      setActionableInstance(instance)
+      onActionComplete?.() // Refresh timeline to remove skipped item
+    }
+    return success
+  }, [actionable, getEventEntityId, getEventDate, onActionComplete])
+
+  const handleEventDefer = useCallback(async (toDateTime: Date) => {
+    const entityId = getEventEntityId()
+    if (!entityId) return false
+    const success = await actionable.defer('calendar_event', entityId, getEventDate(), toDateTime)
+    if (success) {
+      const instance = await actionable.getInstance('calendar_event', entityId, getEventDate())
+      setActionableInstance(instance)
+      onActionComplete?.() // Refresh timeline to remove deferred item
+    }
+    return success
+  }, [actionable, getEventEntityId, getEventDate, onActionComplete])
+
+  const handleEventRequestCoverage = useCallback(async () => {
+    const entityId = getEventEntityId()
+    if (!entityId) return false
+    const result = await actionable.requestCoverage('calendar_event', entityId, getEventDate())
+    return !!result
+  }, [actionable, getEventEntityId, getEventDate])
+
+  const handleEventAddNote = useCallback(async (note: string) => {
+    const entityId = getEventEntityId()
+    if (!entityId) return false
+    const result = await actionable.addNote('calendar_event', entityId, getEventDate(), note)
+    return !!result
+  }, [actionable, getEventEntityId, getEventDate])
+
+  // Actionable action handlers for routines
+  const handleRoutineMarkDone = useCallback(async () => {
+    const entityId = getRoutineEntityId()
+    if (!entityId) return false
+    const success = await actionable.markDone('routine', entityId, getRoutineDate())
+    if (success) {
+      const instance = await actionable.getInstance('routine', entityId, getRoutineDate())
+      setActionableInstance(instance)
+    }
+    return success
+  }, [actionable, getRoutineEntityId, getRoutineDate])
+
+  const handleRoutineUndoDone = useCallback(async () => {
+    const entityId = getRoutineEntityId()
+    if (!entityId) return false
+    const success = await actionable.undoDone('routine', entityId, getRoutineDate())
+    if (success) {
+      setActionableInstance(null)
+    }
+    return success
+  }, [actionable, getRoutineEntityId, getRoutineDate])
+
+  const handleRoutineSkip = useCallback(async () => {
+    const entityId = getRoutineEntityId()
+    if (!entityId) return false
+    const success = await actionable.skip('routine', entityId, getRoutineDate())
+    if (success) {
+      const instance = await actionable.getInstance('routine', entityId, getRoutineDate())
+      setActionableInstance(instance)
+      onActionComplete?.() // Refresh timeline to remove skipped item
+    }
+    return success
+  }, [actionable, getRoutineEntityId, getRoutineDate, onActionComplete])
+
+  const handleRoutineDefer = useCallback(async (toDateTime: Date) => {
+    const entityId = getRoutineEntityId()
+    if (!entityId) return false
+    const success = await actionable.defer('routine', entityId, getRoutineDate(), toDateTime)
+    if (success) {
+      const instance = await actionable.getInstance('routine', entityId, getRoutineDate())
+      setActionableInstance(instance)
+      onActionComplete?.() // Refresh timeline to remove deferred item
+    }
+    return success
+  }, [actionable, getRoutineEntityId, getRoutineDate, onActionComplete])
+
+  const handleRoutineRequestCoverage = useCallback(async () => {
+    const entityId = getRoutineEntityId()
+    if (!entityId) return false
+    const result = await actionable.requestCoverage('routine', entityId, getRoutineDate())
+    return !!result
+  }, [actionable, getRoutineEntityId, getRoutineDate])
+
+  const handleRoutineAddNote = useCallback(async (note: string) => {
+    const entityId = getRoutineEntityId()
+    if (!entityId) return false
+    const result = await actionable.addNote('routine', entityId, getRoutineDate(), note)
+    return !!result
+  }, [actionable, getRoutineEntityId, getRoutineDate])
+
+  // Early return AFTER all hooks
   if (!item) return null
 
   const isTask = item.type === 'task'
   const isEvent = item.type === 'event'
-  const hasContext = item.notes || item.phoneNumber || item.links?.length || item.location || item.googleDescription || contact
+  const isRoutine = item.type === 'routine'
 
   const handleLinkContact = (selectedContact: Contact) => {
     if (isTask && item.originalTask && onUpdate) {
@@ -259,6 +474,20 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
   const handleUnlinkContact = () => {
     if (isTask && item.originalTask && onUpdate) {
       onUpdate(item.originalTask.id, { contactId: undefined })
+    }
+  }
+
+  const handleLinkProject = (selectedProject: Project) => {
+    if (isTask && item.originalTask && onUpdate) {
+      onUpdate(item.originalTask.id, { projectId: selectedProject.id })
+    }
+    setShowProjectPicker(false)
+    setProjectSearchQuery('')
+  }
+
+  const handleUnlinkProject = () => {
+    if (isTask && item.originalTask && onUpdate) {
+      onUpdate(item.originalTask.id, { projectId: undefined })
     }
   }
 
@@ -279,18 +508,6 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
     }
   }
 
-  const handleCall = () => {
-    if (item.phoneNumber) {
-      window.location.href = `tel:${item.phoneNumber}`
-    }
-  }
-
-  const handleText = () => {
-    if (item.phoneNumber) {
-      window.location.href = `sms:${item.phoneNumber}`
-    }
-  }
-
   const handleToggle = () => {
     if (isTask && item.originalTask && onToggleComplete) {
       onToggleComplete(item.originalTask.id)
@@ -305,15 +522,8 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
   }
 
   const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    if (isTask && item.originalTask && onUpdate) {
-      onUpdate(item.originalTask.id, { notes: e.target.value || undefined })
-    }
-  }
-
-  const handleEventNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value
-    // Update local state immediately for fluid typing
-    setLocalEventNotes(value)
+    setLocalNotes(value)
 
     // Debounce the actual save
     if (debounceRef.current) {
@@ -321,17 +531,17 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
     }
 
     debounceRef.current = setTimeout(() => {
-      if (isEvent && item.originalEvent && onUpdateEventNote) {
+      if (isTask && item.originalTask && onUpdate) {
+        onUpdate(item.originalTask.id, { notes: value || undefined })
+      } else if (isEvent && item.originalEvent && onUpdateEventNote) {
         const googleEventId = item.originalEvent.google_event_id || item.originalEvent.id
         onUpdateEventNote(googleEventId, value || null)
       }
-    }, 500) // Save 500ms after user stops typing
+    }, 500)
   }
 
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (isTask && item.originalTask && onUpdate) {
-      onUpdate(item.originalTask.id, { phoneNumber: e.target.value || undefined })
-    }
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }))
   }
 
   const handleAddLink = (e: React.FormEvent) => {
@@ -365,89 +575,342 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
     onUpdate(item.originalTask.id, { links: newLinks.length > 0 ? newLinks : undefined })
   }
 
-  const handleScheduleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!isTask || !item.originalTask || !onUpdate) return
-    const value = e.target.value
-    if (value) {
-      onUpdate(item.originalTask.id, { scheduledFor: new Date(value) })
-    } else {
-      onUpdate(item.originalTask.id, { scheduledFor: undefined })
-    }
-  }
-
-  const getScheduledForInputValue = (): string => {
-    if (!item.originalTask?.scheduledFor) return ''
-    const date = item.originalTask.scheduledFor
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    const hours = String(date.getHours()).padStart(2, '0')
-    const minutes = String(date.getMinutes()).padStart(2, '0')
-    return `${year}-${month}-${day}T${hours}:${minutes}`
-  }
-
   const timeDisplay = item.startTime
     ? item.endTime
       ? formatTimeRange(item.startTime, item.endTime, item.allDay)
       : formatTime(item.startTime)
     : 'Unscheduled'
 
+  // Get phone number from contact if available, otherwise from item
+  const phoneNumber = contact?.phone || item.phoneNumber
+
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="p-4 border-b border-neutral-100 flex items-start justify-between">
-        <div className="flex-1 min-w-0 pr-4">
-          <div className="flex items-center gap-2 mb-1">
-            <div
-              className={`w-2 h-2 rounded-full ${
-                isTask ? 'bg-primary-500' : 'bg-blue-500'
+      {/* Header - Checkbox + Title + Time */}
+      <div className="p-4 border-b border-neutral-100">
+        <div className="flex items-start gap-3">
+          {/* Checkbox for tasks, circular for routines, dot for events */}
+          {isTask ? (
+            <button
+              onClick={handleToggle}
+              className={`mt-1 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                item.completed
+                  ? 'bg-primary-500 border-primary-500 text-white'
+                  : 'border-neutral-300 hover:border-primary-400'
               }`}
-            />
-            <span className="text-xs text-neutral-400 uppercase">
-              {isTask ? 'Task' : 'Event'}
-            </span>
-          </div>
-          {isTask && isEditingTitle ? (
-            <input
-              ref={titleInputRef}
-              type="text"
-              value={editedTitle}
-              onChange={(e) => setEditedTitle(e.target.value)}
-              onBlur={handleTitleSave}
-              onKeyDown={handleTitleKeyDown}
-              className="w-full text-lg font-semibold text-neutral-800 leading-tight
-                         bg-transparent border-b-2 border-primary-500
-                         focus:outline-none py-0.5 -my-0.5"
-            />
-          ) : (
-            <h2
-              className={`text-lg font-semibold text-neutral-800 leading-tight ${
-                isTask ? 'cursor-pointer hover:text-primary-600 transition-colors' : ''
-              }`}
-              onClick={() => isTask && setIsEditingTitle(true)}
+              aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
             >
-              {item.title}
-            </h2>
+              {item.completed && (
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              )}
+            </button>
+          ) : isRoutine ? (
+            <div
+              className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                item.completed
+                  ? 'bg-primary-500 border-primary-500 text-white'
+                  : 'border-neutral-300'
+              }`}
+            >
+              {item.completed && (
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              )}
+            </div>
+          ) : (
+            <div className="mt-2 w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" />
           )}
-          <p className="text-sm text-neutral-500 mt-1">{timeDisplay}</p>
+
+          {/* Title + Time */}
+          <div className="flex-1 min-w-0">
+            {isEditingTitle ? (
+              <input
+                ref={titleInputRef}
+                type="text"
+                value={editedTitle}
+                onChange={(e) => setEditedTitle(e.target.value)}
+                onBlur={handleTitleSave}
+                onKeyDown={handleTitleKeyDown}
+                className="w-full text-lg font-semibold text-neutral-800 leading-tight
+                           bg-transparent border-b-2 border-primary-500
+                           focus:outline-none py-0.5 -my-0.5"
+              />
+            ) : (
+              <h2
+                className={`text-lg font-semibold leading-tight ${
+                  item.completed ? 'text-neutral-400 line-through' : 'text-neutral-800'
+                } ${isTask ? 'cursor-pointer hover:text-primary-600 transition-colors' : ''}`}
+                onClick={() => isTask && setIsEditingTitle(true)}
+              >
+                {item.title}
+              </h2>
+            )}
+
+            {/* Time display - tappable for tasks */}
+            {isTask && !showTimePicker ? (
+              <button
+                onClick={() => setShowTimePicker(true)}
+                className="text-sm text-neutral-500 mt-1 hover:text-primary-600 transition-colors flex items-center gap-1"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {timeDisplay}
+              </button>
+            ) : isTask && showTimePicker ? (
+              <div className="mt-2 flex gap-2 items-center">
+                <input
+                  type="date"
+                  value={item.originalTask?.scheduledFor
+                    ? item.originalTask.scheduledFor.toISOString().split('T')[0]
+                    : ''}
+                  onChange={(e) => {
+                    if (!item.originalTask || !onUpdate) return
+                    const dateValue = e.target.value
+                    if (dateValue) {
+                      const existing = item.originalTask.scheduledFor || new Date()
+                      const [year, month, day] = dateValue.split('-').map(Number)
+                      const newDate = new Date(existing)
+                      newDate.setFullYear(year, month - 1, day)
+                      onUpdate(item.originalTask.id, { scheduledFor: newDate })
+                    } else {
+                      onUpdate(item.originalTask.id, { scheduledFor: undefined })
+                    }
+                  }}
+                  className="flex-1 px-2 py-1 text-sm rounded border border-neutral-200
+                             focus:outline-none focus:ring-1 focus:ring-primary-500"
+                />
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowHourPicker(!showHourPicker)}
+                    className="w-16 px-2 py-1 text-sm rounded border border-neutral-200 bg-white
+                               flex items-center justify-between"
+                  >
+                    <span>
+                      {item.originalTask?.scheduledFor
+                        ? (() => {
+                            const h = item.originalTask.scheduledFor.getHours()
+                            return h === 0 ? '12a' : h < 12 ? `${h}a` : h === 12 ? '12p' : `${h - 12}p`
+                          })()
+                        : '--'}
+                    </span>
+                    <svg className="w-3 h-3 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {showHourPicker && (
+                    <div className="absolute top-full left-0 mt-1 w-20 max-h-48 overflow-auto bg-white border border-neutral-200 rounded-lg shadow-lg z-50">
+                      {Array.from({ length: 24 }, (_, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => {
+                            if (!item.originalTask || !onUpdate) return
+                            const existing = item.originalTask.scheduledFor || new Date()
+                            const newDate = new Date(existing)
+                            newDate.setHours(i)
+                            newDate.setSeconds(0)
+                            onUpdate(item.originalTask.id, { scheduledFor: newDate })
+                            setShowHourPicker(false)
+                          }}
+                          className={`w-full px-3 py-1.5 text-sm text-left hover:bg-neutral-100
+                            ${item.originalTask?.scheduledFor?.getHours() === i ? 'bg-primary-50 text-primary-700 font-medium' : ''}`}
+                        >
+                          {i === 0 ? '12 AM' : i < 12 ? `${i} AM` : i === 12 ? '12 PM' : `${i - 12} PM`}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowMinutePicker(!showMinutePicker)}
+                    className="w-14 px-2 py-1 text-sm rounded border border-neutral-200 bg-white
+                               flex items-center justify-between"
+                  >
+                    <span>
+                      {item.originalTask?.scheduledFor
+                        ? `:${(Math.round(item.originalTask.scheduledFor.getMinutes() / 5) * 5).toString().padStart(2, '0')}`
+                        : '--'}
+                    </span>
+                    <svg className="w-3 h-3 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {showMinutePicker && (
+                    <div className="absolute top-full left-0 mt-1 w-16 max-h-48 overflow-auto bg-white border border-neutral-200 rounded-lg shadow-lg z-50">
+                      {Array.from({ length: 12 }, (_, i) => i * 5).map((m) => {
+                        const currentMinute = item.originalTask?.scheduledFor
+                          ? Math.round(item.originalTask.scheduledFor.getMinutes() / 5) * 5
+                          : null
+                        return (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => {
+                              if (!item.originalTask || !onUpdate) return
+                              const existing = item.originalTask.scheduledFor || new Date()
+                              const newDate = new Date(existing)
+                              newDate.setMinutes(m)
+                              newDate.setSeconds(0)
+                              onUpdate(item.originalTask.id, { scheduledFor: newDate })
+                              setShowMinutePicker(false)
+                            }}
+                            className={`w-full px-3 py-1.5 text-sm text-left hover:bg-neutral-100
+                              ${currentMinute === m ? 'bg-primary-50 text-primary-700 font-medium' : ''}`}
+                          >
+                            :{m.toString().padStart(2, '0')}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => setShowTimePicker(false)}
+                  className="p-1 text-neutral-400 hover:text-neutral-600"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <p className="text-sm text-neutral-500 mt-1">{timeDisplay}</p>
+            )}
+          </div>
+
+          {/* Close button */}
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
+            aria-label="Close panel"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
         </div>
-        <button
-          onClick={onClose}
-          className="p-2 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
-          aria-label="Close panel"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-          </svg>
-        </button>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-4 space-y-6">
+      <div className="flex-1 overflow-auto">
+        {/* Actionable Actions (events and routines) */}
+        {isEvent && item.originalEvent && item.startTime && (
+          <ActionableActions
+            entityType="calendar_event"
+            entityId={item.originalEvent.google_event_id || item.originalEvent.id}
+            date={item.startTime}
+            instance={actionableInstance}
+            onMarkDone={handleEventMarkDone}
+            onUndoDone={handleEventUndoDone}
+            onSkip={handleEventSkip}
+            onDefer={handleEventDefer}
+            onRequestCoverage={handleEventRequestCoverage}
+            onAddNote={handleEventAddNote}
+            isLoading={actionable.isLoading}
+          />
+        )}
+        {isRoutine && item.originalRoutine && (
+          <ActionableActions
+            entityType="routine"
+            entityId={item.originalRoutine.id}
+            date={item.startTime || new Date()}
+            instance={actionableInstance}
+            recurrence={item.recurrencePattern}
+            onMarkDone={handleRoutineMarkDone}
+            onUndoDone={handleRoutineUndoDone}
+            onSkip={handleRoutineSkip}
+            onDefer={handleRoutineDefer}
+            onRequestCoverage={handleRoutineRequestCoverage}
+            onAddNote={handleRoutineAddNote}
+            isLoading={actionable.isLoading}
+          />
+        )}
+
+        {/* Notes Section - Always visible */}
+        <div className="p-4 border-b border-neutral-100">
+          {isEditingNotes ? (
+            <div>
+              {/* Google Calendar description (read-only, events only) */}
+              {isEvent && item.googleDescription && (
+                <div className="mb-3">
+                  <div className="text-xs text-blue-600 font-medium mb-1 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                    </svg>
+                    From Calendar
+                  </div>
+                  <div className="text-sm text-neutral-600 whitespace-pre-wrap bg-blue-50 rounded-lg p-2 border border-blue-100">
+                    <RichText text={item.googleDescription} />
+                  </div>
+                </div>
+              )}
+              <textarea
+                ref={notesInputRef}
+                value={localNotes}
+                onChange={handleNotesChange}
+                onBlur={() => setIsEditingNotes(false)}
+                placeholder={isEvent ? "Add your notes..." : "Add notes..."}
+                rows={4}
+                autoFocus
+                className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200
+                           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
+                           resize-none"
+              />
+            </div>
+          ) : (
+            <div>
+              {/* Google Calendar description (read-only, events only) */}
+              {isEvent && item.googleDescription && (
+                <div className="mb-3">
+                  <div className="text-xs text-blue-600 font-medium mb-1 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                    </svg>
+                    From Calendar
+                  </div>
+                  <div className="text-sm text-neutral-600 whitespace-pre-wrap bg-blue-50 rounded-lg p-2 border border-blue-100">
+                    <RichText text={item.googleDescription} />
+                  </div>
+                </div>
+              )}
+              <button
+                onClick={() => setIsEditingNotes(true)}
+                className="w-full text-left"
+              >
+                {localNotes ? (
+                  <div className="text-sm text-neutral-600 whitespace-pre-wrap">
+                    <RichText text={localNotes} />
+                  </div>
+                ) : (
+                  <span className="text-sm text-neutral-400 italic">
+                    {isEvent ? "Add your notes..." : "Add notes..."}
+                  </span>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Location (events only) */}
+        {item.location && (
+          <div className="px-4 py-3 border-b border-neutral-100 flex items-center gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-neutral-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+            </svg>
+            <span className="text-sm text-neutral-600 flex-1">{item.location}</span>
+          </div>
+        )}
+
         {/* Detected Contextual Actions */}
         {detectedActions.length > 0 && (
-          <div>
-            <h3 className="text-sm font-medium text-neutral-700 mb-3">Actions</h3>
+          <div className="p-4 border-b border-neutral-100">
             <div className="flex flex-wrap gap-2">
               {detectedActions.map((action, index) => (
                 <ActionButton key={`${action.type}-${index}`} action={action} onOpenRecipe={onOpenRecipe} />
@@ -456,387 +919,346 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
           </div>
         )}
 
-        {/* Quick Actions */}
-        <div>
-          <h3 className="text-sm font-medium text-neutral-700 mb-3">Quick Actions</h3>
-          <div className="grid grid-cols-2 gap-2">
-            {isTask && (
+        {/* Collapsible Sections */}
+        <div className="divide-y divide-neutral-100">
+          {/* Contact Section */}
+          {isTask && (
+            <div>
               <button
-                onClick={handleToggle}
-                className={`
-                  flex flex-col items-center gap-1.5 p-4 rounded-lg border transition-colors
-                  ${item.completed
-                    ? 'border-primary-200 bg-primary-50 text-primary-600'
-                    : 'border-neutral-200 hover:bg-neutral-50 text-neutral-600'
-                  }
-                `}
+                onClick={() => contact ? toggleSection('contact') : setShowContactPicker(true)}
+                className="w-full px-4 py-3 flex items-center gap-3 hover:bg-neutral-50 transition-colors"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-neutral-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                 </svg>
-                <span className="text-xs font-medium">
-                  {item.completed ? 'Completed' : 'Complete'}
+                <span className="flex-1 text-sm text-left">
+                  {contact ? (
+                    <span className="text-neutral-800 font-medium">{contact.name}</span>
+                  ) : (
+                    <span className="text-neutral-400">Add contact</span>
+                  )}
                 </span>
+                {contact && phoneNumber && (
+                  <div className="flex gap-1">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); window.location.href = `tel:${phoneNumber}` }}
+                      className="p-1.5 rounded-lg bg-primary-50 text-primary-600 hover:bg-primary-100"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); window.location.href = `sms:${phoneNumber}` }}
+                      className="p-1.5 rounded-lg bg-primary-50 text-primary-600 hover:bg-primary-100"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {contact && (
+                  <svg className={`w-4 h-4 text-neutral-400 transition-transform ${expandedSections.contact ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                )}
               </button>
-            )}
-            <button
-              onClick={() => setIsEditing(!isEditing)}
-              className={`
-                flex flex-col items-center gap-1.5 p-4 rounded-lg border transition-colors
-                ${isEditing
-                  ? 'border-primary-200 bg-primary-50 text-primary-600'
-                  : 'border-neutral-200 hover:bg-neutral-50 text-neutral-600'
-                }
-              `}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-              </svg>
-              <span className="text-xs font-medium">{isEvent ? 'Add Notes' : 'Edit'}</span>
-            </button>
-            {item.phoneNumber && (
-              <>
-                <button
-                  onClick={handleCall}
-                  className="flex flex-col items-center gap-1.5 p-4 rounded-lg border border-neutral-200 hover:bg-neutral-50 text-neutral-600 transition-colors"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
-                  </svg>
-                  <span className="text-xs font-medium">Call</span>
-                </button>
-                <button
-                  onClick={handleText}
-                  className="flex flex-col items-center gap-1.5 p-4 rounded-lg border border-neutral-200 hover:bg-neutral-50 text-neutral-600 transition-colors"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-xs font-medium">Text</span>
-                </button>
-              </>
-            )}
-            {isTask && (
+
+              {/* Expanded contact card */}
+              {contact && expandedSections.contact && (
+                <div className="px-4 pb-3">
+                  <ContactCard
+                    contact={contact}
+                    onUnlink={handleUnlinkContact}
+                    onUpdate={onUpdateContact}
+                  />
+                </div>
+              )}
+
+              {/* Contact picker */}
+              {showContactPicker && !contact && (
+                <div className="px-4 pb-3">
+                  <div className="rounded-xl border border-neutral-200 overflow-hidden">
+                    <div className="p-2 border-b border-neutral-100">
+                      <input
+                        type="text"
+                        value={contactSearchQuery}
+                        onChange={(e) => setContactSearchQuery(e.target.value)}
+                        placeholder="Search contacts..."
+                        className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50
+                                   focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="max-h-48 overflow-auto">
+                      {filteredContacts.length > 0 ? (
+                        filteredContacts.map((c) => (
+                          <button
+                            key={c.id}
+                            onClick={() => handleLinkContact(c)}
+                            className="w-full px-4 py-3 text-left flex items-center gap-3 hover:bg-neutral-50 transition-colors"
+                          >
+                            <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center text-neutral-600">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-neutral-800 truncate">{c.name}</div>
+                              {c.phone && <div className="text-sm text-neutral-500 truncate">{c.phone}</div>}
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-4 py-6 text-center text-sm text-neutral-400">
+                          No contacts found
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-2 border-t border-neutral-100">
+                      <button
+                        onClick={() => {
+                          setShowContactPicker(false)
+                          setContactSearchQuery('')
+                        }}
+                        className="w-full px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50 rounded-lg transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Project Section */}
+          {isTask && (
+            <div>
               <button
-                onClick={handleDelete}
-                className="flex flex-col items-center gap-1.5 p-4 rounded-lg border border-neutral-200 hover:bg-danger-50 hover:border-danger-200 text-neutral-600 hover:text-danger-600 transition-colors"
+                onClick={() => project ? toggleSection('project') : setShowProjectPicker(true)}
+                className="w-full px-4 py-3 flex items-center gap-3 hover:bg-neutral-50 transition-colors"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-neutral-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
                 </svg>
-                <span className="text-xs font-medium">Delete</span>
+                <span className="flex-1 text-sm text-left">
+                  {project ? (
+                    <span className="text-neutral-800 font-medium">{project.name}</span>
+                  ) : (
+                    <span className="text-neutral-400">Add project</span>
+                  )}
+                </span>
+                {project && onOpenProject && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onOpenProject(project.id) }}
+                    className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                )}
+                {project && (
+                  <svg className={`w-4 h-4 text-neutral-400 transition-transform ${expandedSections.project ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                )}
               </button>
-            )}
-          </div>
+
+              {/* Expanded project card */}
+              {project && expandedSections.project && (
+                <div className="px-4 pb-3">
+                  <ProjectCard
+                    project={project}
+                    onUnlink={handleUnlinkProject}
+                    onUpdate={onUpdateProject}
+                    onOpen={onOpenProject ? () => onOpenProject(project.id) : undefined}
+                  />
+                </div>
+              )}
+
+              {/* Project picker */}
+              {showProjectPicker && !project && (
+                <div className="px-4 pb-3">
+                  <div className="rounded-xl border border-neutral-200 overflow-hidden">
+                    <div className="p-2 border-b border-neutral-100">
+                      <input
+                        type="text"
+                        value={projectSearchQuery}
+                        onChange={(e) => setProjectSearchQuery(e.target.value)}
+                        placeholder="Search projects..."
+                        className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50
+                                   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="max-h-48 overflow-auto">
+                      {filteredProjects.length > 0 ? (
+                        filteredProjects.map((p) => (
+                          <button
+                            key={p.id}
+                            onClick={() => handleLinkProject(p)}
+                            className="w-full px-4 py-3 text-left flex items-center gap-3 hover:bg-neutral-50 transition-colors"
+                          >
+                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                              </svg>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-neutral-800 truncate">{p.name}</div>
+                              {p.notes && <div className="text-sm text-neutral-500 truncate">{p.notes}</div>}
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-4 py-6 text-center text-sm text-neutral-400">
+                          No projects found
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-2 border-t border-neutral-100">
+                      <button
+                        onClick={() => {
+                          setShowProjectPicker(false)
+                          setProjectSearchQuery('')
+                        }}
+                        className="w-full px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50 rounded-lg transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Links Section */}
+          {isTask && (
+            <div>
+              <button
+                onClick={() => toggleSection('links')}
+                className="w-full px-4 py-3 flex items-center gap-3 hover:bg-neutral-50 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-neutral-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd" />
+                </svg>
+                <span className="flex-1 text-sm text-left">
+                  {item.links && item.links.length > 0 ? (
+                    <span className="text-neutral-800 font-medium">Links ({item.links.length})</span>
+                  ) : (
+                    <span className="text-neutral-400">Add links</span>
+                  )}
+                </span>
+                <svg className={`w-4 h-4 text-neutral-400 transition-transform ${expandedSections.links ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {/* Expanded links */}
+              {expandedSections.links && (
+                <div className="px-4 pb-3 space-y-2">
+                  {item.links && item.links.length > 0 && (
+                    <ul className="space-y-2">
+                      {item.links.map((link) => {
+                        const url = link.url.startsWith('http') ? link.url : `https://${link.url}`
+                        const displayText = link.title || link.url.replace(/^https?:\/\//, '').split('/')[0]
+                        return (
+                          <li key={link.url} className="flex items-center gap-2 text-sm bg-neutral-50 rounded-lg px-3 py-2">
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1 truncate text-primary-600 hover:underline"
+                            >
+                              {displayText}
+                            </a>
+                            <button
+                              onClick={() => handleRemoveLink(link)}
+                              className="text-neutral-400 hover:text-danger-500 transition-colors flex-shrink-0"
+                              aria-label="Remove link"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                  <form onSubmit={handleAddLink} className="space-y-2">
+                    <input
+                      type="text"
+                      value={newLink}
+                      onChange={(e) => setNewLink(e.target.value)}
+                      placeholder="URL (e.g., https://example.com)"
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200
+                                 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newLinkTitle}
+                        onChange={(e) => setNewLinkTitle(e.target.value)}
+                        placeholder="Title (optional)"
+                        className="flex-1 px-3 py-2 text-sm rounded-lg border border-neutral-200
+                                   focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      />
+                      <button
+                        type="submit"
+                        className="px-4 py-2 text-sm font-medium bg-neutral-100 text-neutral-700
+                                   rounded-lg hover:bg-neutral-200 transition-colors"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Linked Contact Card (tasks only) */}
-        {isTask && contact && (
-          <div>
-            <h3 className="text-sm font-medium text-neutral-700 mb-3">Linked Contact</h3>
-            <ContactCard
-              contact={contact}
-              onUnlink={handleUnlinkContact}
-              onUpdate={onUpdateContact}
-            />
-          </div>
-        )}
-
-        {/* Link Contact (tasks only, when no contact linked) */}
-        {isTask && !contact && !isEditing && (
-          <div>
-            <h3 className="text-sm font-medium text-neutral-700 mb-3">Contact</h3>
-            {!showContactPicker ? (
-              <button
-                onClick={() => setShowContactPicker(true)}
-                className="w-full flex items-center gap-3 p-3 rounded-xl border border-dashed border-neutral-300 text-neutral-500 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z" />
-                </svg>
-                <span className="text-sm font-medium">Link a contact</span>
-              </button>
-            ) : (
-              <div className="rounded-xl border border-neutral-200 overflow-hidden">
-                <div className="p-2 border-b border-neutral-100">
-                  <input
-                    type="text"
-                    value={contactSearchQuery}
-                    onChange={(e) => setContactSearchQuery(e.target.value)}
-                    placeholder="Search contacts..."
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50
-                               focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    autoFocus
-                  />
-                </div>
-                <div className="max-h-48 overflow-auto">
-                  {filteredContacts.length > 0 ? (
-                    filteredContacts.map((c) => (
-                      <button
-                        key={c.id}
-                        onClick={() => handleLinkContact(c)}
-                        className="w-full px-4 py-3 text-left flex items-center gap-3 hover:bg-neutral-50 transition-colors"
-                      >
-                        <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center text-neutral-600">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                          </svg>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-neutral-800 truncate">{c.name}</div>
-                          {c.phone && <div className="text-sm text-neutral-500 truncate">{c.phone}</div>}
-                        </div>
-                      </button>
-                    ))
-                  ) : (
-                    <div className="px-4 py-6 text-center text-sm text-neutral-400">
-                      No contacts found
-                    </div>
-                  )}
-                </div>
-                <div className="p-2 border-t border-neutral-100">
-                  <button
-                    onClick={() => {
-                      setShowContactPicker(false)
-                      setContactSearchQuery('')
-                    }}
-                    className="w-full px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50 rounded-lg transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Context display (read mode) */}
-        {hasContext && !isEditing && (
-          <div className="space-y-4">
-            {/* Google Calendar description (read-only, events only) */}
-            {isEvent && item.googleDescription && (
-              <div>
-                <h3 className="text-sm font-medium text-neutral-700 mb-2 flex items-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                  </svg>
-                  From Google Calendar
-                </h3>
-                <div className="text-sm text-neutral-600 whitespace-pre-wrap bg-blue-50 rounded-lg p-3 border border-blue-100">
-                  <RichText text={item.googleDescription} />
-                </div>
-              </div>
-            )}
-
-            {/* Symphony notes (editable) */}
-            {item.notes && (
-              <div>
-                <h3 className="text-sm font-medium text-neutral-700 mb-2">
-                  {isEvent ? 'My Notes' : 'Notes'}
-                </h3>
-                <div className="text-sm text-neutral-600 whitespace-pre-wrap bg-neutral-50 rounded-lg p-3">
-                  <RichText text={item.notes} />
-                </div>
-              </div>
-            )}
-
-            {item.location && (
-              <div>
-                <h3 className="text-sm font-medium text-neutral-700 mb-2">Location</h3>
-                <p className="text-sm text-neutral-600 flex items-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-neutral-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                  </svg>
-                  {item.location}
-                </p>
-              </div>
-            )}
-
-            {item.phoneNumber && (
-              <div>
-                <h3 className="text-sm font-medium text-neutral-700 mb-2">Phone</h3>
-                <p className="text-sm text-neutral-600">{item.phoneNumber}</p>
-              </div>
-            )}
-
-            {item.links && item.links.length > 0 && (
-              <div>
-                <h3 className="text-sm font-medium text-neutral-700 mb-2">Links</h3>
-                <div className="space-y-2">
-                  {item.links.map((link) => {
-                    const url = link.url.startsWith('http') ? link.url : `https://${link.url}`
-                    const displayText = link.title || link.url.replace(/^https?:\/\//, '').split('/')[0]
-                    return (
-                      <a
-                        key={link.url}
-                        href={url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-sm text-primary-600 hover:underline"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd" />
-                        </svg>
-                        <span className="truncate">{displayText}</span>
-                      </a>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Edit mode */}
-        {isEditing && isTask && (
-          <div className="space-y-5">
-            {/* Schedule */}
-            <div>
-              <label htmlFor="scheduledFor" className="block text-sm font-medium text-neutral-700 mb-2">
-                Scheduled For
-              </label>
-              <input
-                id="scheduledFor"
-                type="datetime-local"
-                step="300"
-                value={getScheduledForInputValue()}
-                onChange={handleScheduleChange}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200
-                           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Notes */}
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-2">Notes</label>
-              <textarea
-                value={item.notes || ''}
-                onChange={handleNotesChange}
-                placeholder="Add notes..."
-                rows={4}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200
-                           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
-                           resize-none"
-              />
-            </div>
-
-            {/* Phone */}
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-2">Phone Number</label>
-              <input
-                type="tel"
-                value={item.phoneNumber || ''}
-                onChange={handlePhoneChange}
-                placeholder="Add phone number..."
-                className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200
-                           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Links */}
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-2">Links</label>
-              {item.links && item.links.length > 0 && (
-                <ul className="mb-3 space-y-2">
-                  {item.links.map((link) => {
-                    const url = link.url.startsWith('http') ? link.url : `https://${link.url}`
-                    const displayText = link.title || link.url.replace(/^https?:\/\//, '').split('/')[0]
-                    return (
-                      <li key={link.url} className="flex items-center gap-2 text-sm bg-neutral-50 rounded-lg px-3 py-2">
-                        <a
-                          href={url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 truncate text-primary-600 hover:underline"
-                        >
-                          {displayText}
-                        </a>
-                        <button
-                          onClick={() => handleRemoveLink(link)}
-                          className="text-neutral-400 hover:text-danger-500 transition-colors flex-shrink-0"
-                          aria-label="Remove link"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                          </svg>
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-              <form onSubmit={handleAddLink} className="space-y-2">
-                <input
-                  type="text"
-                  value={newLink}
-                  onChange={(e) => setNewLink(e.target.value)}
-                  placeholder="URL (e.g., https://example.com)"
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200
-                             focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newLinkTitle}
-                    onChange={(e) => setNewLinkTitle(e.target.value)}
-                    placeholder="Title (optional)"
-                    className="flex-1 px-3 py-2 text-sm rounded-lg border border-neutral-200
-                               focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                  <button
-                    type="submit"
-                    className="px-4 py-2 text-sm font-medium bg-neutral-100 text-neutral-700
-                               rounded-lg hover:bg-neutral-200 transition-colors"
-                  >
-                    Add
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Edit mode for events - just notes */}
-        {isEditing && isEvent && (
-          <div className="space-y-5">
-            {/* Show GCal description as read-only context */}
-            {item.googleDescription && (
-              <div>
-                <h3 className="text-sm font-medium text-neutral-700 mb-2 flex items-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                  </svg>
-                  From Google Calendar
-                </h3>
-                <div className="text-sm text-neutral-600 whitespace-pre-wrap bg-blue-50 rounded-lg p-3 border border-blue-100">
-                  <RichText text={item.googleDescription} />
-                </div>
-              </div>
-            )}
-
-            {/* Editable Symphony notes */}
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-2">My Notes</label>
-              <textarea
-                value={localEventNotes}
-                onChange={handleEventNotesChange}
-                placeholder="Add your notes about this event..."
-                rows={4}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200
-                           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
-                           resize-none"
-              />
-            </div>
-          </div>
-        )}
-
         {/* Empty state for events */}
-        {!isTask && !hasContext && !isEditing && (
+        {!isTask && !item.notes && !item.googleDescription && !item.location && detectedActions.length === 0 && (
           <p className="text-sm text-neutral-400 text-center py-8">
-            No additional details for this event
+            No additional details
           </p>
         )}
       </div>
+
+      {/* Footer - Delete button (tasks only) */}
+      {isTask && (
+        <div className="p-4 border-t border-neutral-100">
+          {showDeleteConfirm ? (
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 px-4 py-2 text-sm font-medium text-neutral-600 rounded-lg hover:bg-neutral-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-danger-500 rounded-lg hover:bg-danger-600 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="w-full px-4 py-2 text-sm text-neutral-500 hover:text-danger-600 transition-colors"
+            >
+              Delete task
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

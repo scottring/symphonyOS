@@ -2,7 +2,8 @@ import { useMemo } from 'react'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
-import { taskToTimelineItem, eventToTimelineItem } from '@/types/timeline'
+import type { Routine, ActionableInstance } from '@/types/actionable'
+import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import { groupByDaySection, type DaySection } from '@/lib/timeUtils'
 import { TimeGroup } from './TimeGroup'
 import { ScheduleItem } from './ScheduleItem'
@@ -11,6 +12,8 @@ import { DateNavigator } from './DateNavigator'
 interface TodayScheduleProps {
   tasks: Task[]
   events: CalendarEvent[]
+  routines?: Routine[]
+  dateInstances?: ActionableInstance[]
   selectedItemId: string | null
   onSelectItem: (id: string | null) => void
   onToggleTask: (taskId: string) => void
@@ -18,6 +21,7 @@ interface TodayScheduleProps {
   viewedDate: Date
   onDateChange: (date: Date) => void
   contactsMap?: Map<string, Contact>
+  onRefreshInstances?: () => void // Called after actionable actions to refresh filtered list
 }
 
 function LoadingSkeleton() {
@@ -58,6 +62,8 @@ function LoadingSkeleton() {
 export function TodaySchedule({
   tasks,
   events,
+  routines = [],
+  dateInstances = [],
   selectedItemId,
   onSelectItem,
   onToggleTask,
@@ -119,12 +125,34 @@ export function TodaySchedule({
     })
   }, [events, viewedDate])
 
+  // Build instance status map for routines
+  const routineStatusMap = useMemo(() => {
+    const map = new Map<string, ActionableInstance>()
+    for (const instance of dateInstances) {
+      if (instance.entity_type === 'routine') {
+        map.set(instance.entity_id, instance)
+      }
+    }
+    return map
+  }, [dateInstances])
+
   const grouped = useMemo(() => {
     const taskItems = filteredTasks.map(taskToTimelineItem)
     const eventItems = filteredEvents.map(eventToTimelineItem)
-    const allItems = [...taskItems, ...eventItems]
+
+    // Convert routines to timeline items with completion status
+    const routineItems = routines.map((routine) => {
+      const item = routineToTimelineItem(routine, viewedDate)
+      const instance = routineStatusMap.get(routine.id)
+      if (instance?.status === 'completed') {
+        item.completed = true
+      }
+      return item
+    })
+
+    const allItems = [...taskItems, ...eventItems, ...routineItems]
     return groupByDaySection(allItems)
-  }, [filteredTasks, filteredEvents])
+  }, [filteredTasks, filteredEvents, routines, viewedDate, routineStatusMap])
 
   const sections: DaySection[] = ['allday', 'morning', 'afternoon', 'evening', 'unscheduled']
 
@@ -145,9 +173,13 @@ export function TodaySchedule({
     )
   }
 
-  const totalItems = filteredTasks.length + filteredEvents.length
+  // Calculate completion stats (tasks + routines, not events)
   const completedTasks = filteredTasks.filter((t) => t.completed).length
-  const progressPercent = totalItems > 0 ? (completedTasks / totalItems) * 100 : 0
+  const completedRoutines = routines.filter((r) => routineStatusMap.get(r.id)?.status === 'completed').length
+  const completedCount = completedTasks + completedRoutines
+  const actionableCount = filteredTasks.length + routines.length // Only count tasks and routines for progress
+  const totalItems = filteredTasks.length + filteredEvents.length + routines.length
+  const progressPercent = actionableCount > 0 ? (completedCount / actionableCount) * 100 : 0
 
   return (
     <div className="p-6 max-w-2xl mx-auto">
@@ -161,10 +193,10 @@ export function TodaySchedule({
         </div>
 
         {/* Progress bar */}
-        {totalItems > 0 && (
+        {actionableCount > 0 && (
           <div className="flex items-center gap-3">
             <span className="text-sm text-neutral-500">
-              {completedTasks} of {totalItems}
+              {completedCount} of {actionableCount}
             </span>
             <div className="flex-1 h-1.5 bg-neutral-100 rounded-full overflow-hidden">
               <div

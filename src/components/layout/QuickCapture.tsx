@@ -1,9 +1,15 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import '@/types/speech.d.ts'
 import type { Contact } from '@/types/contact'
+import type { Project } from '@/types/project'
+import type { RecurrencePattern } from '@/types/actionable'
+import type { CreateRoutineInput } from '@/hooks/useRoutines'
+
+type CaptureMode = 'task' | 'routine'
 
 interface QuickCaptureProps {
-  onAdd: (title: string, contactId?: string) => void
+  onAdd: (title: string, contactId?: string, projectId?: string) => void
+  onAddRoutine?: (input: CreateRoutineInput) => Promise<unknown>
   isOpen?: boolean
   onOpen?: () => void
   onClose?: () => void
@@ -11,6 +17,9 @@ interface QuickCaptureProps {
   // Contact support
   contacts?: Contact[]
   onAddContact?: (contact: { name: string; phone?: string; email?: string }) => Promise<Contact | null>
+  // Project support
+  projects?: Project[]
+  onAddProject?: (project: { name: string }) => Promise<Project | null>
 }
 
 // Get the SpeechRecognition constructor
@@ -20,29 +29,54 @@ const SpeechRecognitionAPI = typeof window !== 'undefined'
 
 export function QuickCapture({
   onAdd,
+  onAddRoutine,
   isOpen: controlledIsOpen,
   onOpen,
   onClose,
   showFab = true,
   contacts = [],
   onAddContact,
+  projects = [],
+  onAddProject,
 }: QuickCaptureProps) {
   // Support both controlled and uncontrolled modes
   const [internalIsOpen, setInternalIsOpen] = useState(false)
   const isOpen = controlledIsOpen ?? internalIsOpen
 
+  // Capture mode: task or routine
+  const [mode, setMode] = useState<CaptureMode>('task')
+
   const [title, setTitle] = useState('')
   const [isListening, setIsListening] = useState(false)
+
+  // Routine-specific state
+  const [routineRecurrence, setRoutineRecurrence] = useState<RecurrencePattern['type']>('daily')
+  const [routineDays, setRoutineDays] = useState<string[]>([])
+  const [routineTime, setRoutineTime] = useState('')
+
+  // Contact state
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
   const [showContactDropdown, setShowContactDropdown] = useState(false)
   const [contactQuery, setContactQuery] = useState('')
+
+  // Project state
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false)
+  const [projectQuery, setProjectQuery] = useState('')
+
+  // Unified dropdown state for keyboard nav
   const [highlightedIndex, setHighlightedIndex] = useState(0)
+
   // Contact creation form state
   const [showContactForm, setShowContactForm] = useState(false)
   const [newContactName, setNewContactName] = useState('')
   const [newContactPhone, setNewContactPhone] = useState('')
   const [newContactEmail, setNewContactEmail] = useState('')
   const [isCreatingContact, setIsCreatingContact] = useState(false)
+
+  // Project creation state
+  const [isCreatingProject, setIsCreatingProject] = useState(false)
+
   const inputRef = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const phoneInputRef = useRef<HTMLInputElement>(null)
@@ -58,9 +92,20 @@ export function QuickCapture({
     return contacts.filter(c => c.name.toLowerCase().includes(query)).slice(0, 5)
   }, [contacts, contactQuery])
 
+  // Filter projects based on query
+  const filteredProjects = useMemo(() => {
+    if (!projectQuery.trim()) return projects.filter(p => p.status !== 'completed').slice(0, 5)
+    const query = projectQuery.toLowerCase()
+    return projects.filter(p => p.name.toLowerCase().includes(query) && p.status !== 'completed').slice(0, 5)
+  }, [projects, projectQuery])
+
   // Check if we should show "Create contact" option
-  const showCreateOption = contactQuery.trim().length > 0 &&
+  const showCreateContactOption = contactQuery.trim().length > 0 &&
     !filteredContacts.some(c => c.name.toLowerCase() === contactQuery.toLowerCase())
+
+  // Check if we should show "Create project" option
+  const showCreateProjectOption = projectQuery.trim().length > 0 &&
+    !filteredProjects.some(p => p.name.toLowerCase() === projectQuery.toLowerCase())
 
   const handleOpen = () => {
     if (onOpen) {
@@ -72,13 +117,21 @@ export function QuickCapture({
 
   const handleClose = () => {
     setTitle('')
+    setMode('task')
     setSelectedContact(null)
     setShowContactDropdown(false)
     setContactQuery('')
+    setSelectedProject(null)
+    setShowProjectDropdown(false)
+    setProjectQuery('')
     setShowContactForm(false)
     setNewContactName('')
     setNewContactPhone('')
     setNewContactEmail('')
+    // Reset routine state
+    setRoutineRecurrence('daily')
+    setRoutineDays([])
+    setRoutineTime('')
     if (onClose) {
       onClose()
     } else {
@@ -96,15 +149,32 @@ export function QuickCapture({
   // Reset highlighted index when filtered results change
   useEffect(() => {
     setHighlightedIndex(0)
-  }, [filteredContacts.length, showCreateOption])
+  }, [filteredContacts.length, showCreateContactOption, filteredProjects.length, showCreateProjectOption])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const trimmed = title.trim()
     if (!trimmed) return
-    onAdd(trimmed, selectedContact?.id)
+
+    if (mode === 'routine' && onAddRoutine) {
+      // Build recurrence pattern
+      const recurrence_pattern: RecurrencePattern = { type: routineRecurrence }
+      if (routineRecurrence === 'weekly' && routineDays.length > 0) {
+        recurrence_pattern.days = routineDays
+      }
+
+      await onAddRoutine({
+        name: trimmed,
+        recurrence_pattern,
+        time_of_day: routineTime || undefined,
+      })
+    } else {
+      onAdd(trimmed, selectedContact?.id, selectedProject?.id)
+    }
+
     setTitle('')
     setSelectedContact(null)
+    setSelectedProject(null)
     handleClose()
   }
 
@@ -112,21 +182,49 @@ export function QuickCapture({
     const value = e.target.value
     setTitle(value)
 
-    // Check for @ trigger
+    // In routine mode, don't trigger contact/project dropdowns
+    if (mode === 'routine') return
+
+    // Check for @ trigger (contacts)
     const lastAtIndex = value.lastIndexOf('@')
-    if (lastAtIndex !== -1) {
-      // Check if @ is at start or preceded by space
+    if (lastAtIndex !== -1 && !showProjectDropdown) {
       const charBefore = lastAtIndex > 0 ? value[lastAtIndex - 1] : ' '
       if (charBefore === ' ' || lastAtIndex === 0) {
         const query = value.slice(lastAtIndex + 1)
-        // Allow spaces in contact names - dropdown stays open until contact is selected
-        setContactQuery(query)
-        setShowContactDropdown(true)
-        return
+        // Don't include text after a space that contains #
+        const spaceAfterAt = query.indexOf(' ')
+        const hashInQuery = query.indexOf('#')
+        if (hashInQuery === -1 || (spaceAfterAt !== -1 && hashInQuery > spaceAfterAt)) {
+          setContactQuery(query.split('#')[0]) // Stop at # if present
+          setShowContactDropdown(true)
+          setShowProjectDropdown(false)
+          return
+        }
       }
     }
+
+    // Check for # trigger (projects)
+    const lastHashIndex = value.lastIndexOf('#')
+    if (lastHashIndex !== -1 && !showContactDropdown) {
+      const charBefore = lastHashIndex > 0 ? value[lastHashIndex - 1] : ' '
+      if (charBefore === ' ' || lastHashIndex === 0) {
+        const query = value.slice(lastHashIndex + 1)
+        // Don't include text after a space that contains @
+        const spaceAfterHash = query.indexOf(' ')
+        const atInQuery = query.indexOf('@')
+        if (atInQuery === -1 || (spaceAfterHash !== -1 && atInQuery > spaceAfterHash)) {
+          setProjectQuery(query.split('@')[0]) // Stop at @ if present
+          setShowProjectDropdown(true)
+          setShowContactDropdown(false)
+          return
+        }
+      }
+    }
+
     setShowContactDropdown(false)
     setContactQuery('')
+    setShowProjectDropdown(false)
+    setProjectQuery('')
   }
 
   const handleSelectContact = (contact: Contact) => {
@@ -140,6 +238,17 @@ export function QuickCapture({
     inputRef.current?.focus()
   }
 
+  const handleSelectProject = (project: Project) => {
+    // Replace #query with just the task text (remove the #mention)
+    const lastHashIndex = title.lastIndexOf('#')
+    const newTitle = lastHashIndex > 0 ? title.slice(0, lastHashIndex).trim() : ''
+    setTitle(newTitle)
+    setSelectedProject(project)
+    setShowProjectDropdown(false)
+    setProjectQuery('')
+    inputRef.current?.focus()
+  }
+
   const handleCreateContact = () => {
     if (!contactQuery.trim()) return
     // Show the contact creation form
@@ -148,6 +257,27 @@ export function QuickCapture({
     setShowContactDropdown(false)
     // Focus phone input after render
     setTimeout(() => phoneInputRef.current?.focus(), 50)
+  }
+
+  const handleCreateProject = async () => {
+    if (!onAddProject || !projectQuery.trim()) return
+
+    setIsCreatingProject(true)
+    const newProject = await onAddProject({
+      name: projectQuery.trim(),
+    })
+    setIsCreatingProject(false)
+
+    if (newProject) {
+      // Remove #query from title and select new project
+      const lastHashIndex = title.lastIndexOf('#')
+      const newTitle = lastHashIndex > 0 ? title.slice(0, lastHashIndex).trim() : ''
+      setTitle(newTitle)
+      setSelectedProject(newProject)
+      setShowProjectDropdown(false)
+      setProjectQuery('')
+      inputRef.current?.focus()
+    }
   }
 
   const handleSaveNewContact = async () => {
@@ -186,28 +316,59 @@ export function QuickCapture({
     inputRef.current?.focus()
   }
 
+  const handleRemoveProject = () => {
+    setSelectedProject(null)
+    inputRef.current?.focus()
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!showContactDropdown) return
+    // Handle contact dropdown
+    if (showContactDropdown) {
+      const totalItems = filteredContacts.length + (showCreateContactOption ? 1 : 0)
+      if (totalItems === 0) return
 
-    const totalItems = filteredContacts.length + (showCreateOption ? 1 : 0)
-    if (totalItems === 0) return
-
-    if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      setHighlightedIndex(prev => (prev + 1) % totalItems)
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      setHighlightedIndex(prev => (prev - 1 + totalItems) % totalItems)
-    } else if (e.key === 'Enter' && showContactDropdown) {
-      e.preventDefault()
-      if (highlightedIndex < filteredContacts.length) {
-        handleSelectContact(filteredContacts[highlightedIndex])
-      } else if (showCreateOption) {
-        handleCreateContact()
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setHighlightedIndex(prev => (prev + 1) % totalItems)
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setHighlightedIndex(prev => (prev - 1 + totalItems) % totalItems)
+      } else if (e.key === 'Enter') {
+        e.preventDefault()
+        if (highlightedIndex < filteredContacts.length) {
+          handleSelectContact(filteredContacts[highlightedIndex])
+        } else if (showCreateContactOption) {
+          handleCreateContact()
+        }
+      } else if (e.key === 'Escape') {
+        setShowContactDropdown(false)
+        setContactQuery('')
       }
-    } else if (e.key === 'Escape') {
-      setShowContactDropdown(false)
-      setContactQuery('')
+      return
+    }
+
+    // Handle project dropdown
+    if (showProjectDropdown) {
+      const totalItems = filteredProjects.length + (showCreateProjectOption ? 1 : 0)
+      if (totalItems === 0) return
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setHighlightedIndex(prev => (prev + 1) % totalItems)
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setHighlightedIndex(prev => (prev - 1 + totalItems) % totalItems)
+      } else if (e.key === 'Enter') {
+        e.preventDefault()
+        if (highlightedIndex < filteredProjects.length) {
+          handleSelectProject(filteredProjects[highlightedIndex])
+        } else if (showCreateProjectOption) {
+          handleCreateProject()
+        }
+      } else if (e.key === 'Escape') {
+        setShowProjectDropdown(false)
+        setProjectQuery('')
+      }
     }
   }
 
@@ -239,16 +400,25 @@ export function QuickCapture({
     }
   }
 
+  // Build placeholder text based on what's selected
+  const getPlaceholder = () => {
+    if (mode === 'routine') return "Name this routine..."
+    if (selectedContact && selectedProject) return "What needs to be done?"
+    if (selectedContact) return "What needs to be done? Type # to add project"
+    if (selectedProject) return "What needs to be done? Type @ to add contact"
+    return "What needs to be done? @ contact, # project"
+  }
+
   return (
     <>
-      {/* Floating Action Button - only on mobile */}
+      {/* Floating Action Button - only on mobile, positioned above bottom nav */}
       {showFab && (
         <button
           onClick={handleOpen}
-          className="fixed bottom-6 right-6 safe-bottom w-14 h-14 bg-primary-500 text-white rounded-full shadow-lg
+          className="fixed bottom-20 right-4 safe-bottom w-14 h-14 bg-primary-500 text-white rounded-full shadow-lg
                      flex items-center justify-center
                      hover:bg-primary-600 active:bg-primary-700 active:scale-95
-                     transition-all z-40"
+                     transition-all z-50"
           aria-label="Quick add task"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -268,10 +438,39 @@ export function QuickCapture({
             className={`bg-white p-4 ${showFab ? 'w-full rounded-t-2xl safe-bottom animate-slide-up' : 'w-full max-w-lg mx-4 rounded-2xl shadow-xl'}`}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Mode toggle - Task vs Routine */}
+            {onAddRoutine && !showContactForm && (
+              <div className="flex items-center gap-2 mb-4">
+                <button
+                  type="button"
+                  onClick={() => setMode('task')}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                    mode === 'task'
+                      ? 'bg-primary-100 text-primary-700'
+                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                  }`}
+                >
+                  Task
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode('routine')}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                    mode === 'routine'
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                  }`}
+                >
+                  Routine
+                </button>
+              </div>
+            )}
             {/* Desktop header with keyboard hint */}
             {!showFab && (
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-neutral-800">Quick Add Task</h2>
+                <h2 className="text-lg font-semibold text-neutral-800">
+                  Quick Add {mode === 'routine' ? 'Routine' : 'Task'}
+                </h2>
                 <kbd className="px-2 py-1 text-xs font-mono bg-neutral-100 text-neutral-500 rounded">
                   ⌘K
                 </kbd>
@@ -356,25 +555,45 @@ export function QuickCapture({
               </div>
             ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Selected contact chip */}
-              {selectedContact && (
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 text-primary-700 rounded-full text-sm font-medium">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                    </svg>
-                    @{selectedContact.name}
-                    <button
-                      type="button"
-                      onClick={handleRemoveContact}
-                      className="ml-1 hover:text-primary-900"
-                      aria-label="Remove contact"
-                    >
+              {/* Selected chips (task mode only) */}
+              {mode === 'task' && (selectedContact || selectedProject) && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {selectedContact && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 text-primary-700 rounded-full text-sm font-medium">
                       <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                       </svg>
-                    </button>
-                  </span>
+                      @{selectedContact.name}
+                      <button
+                        type="button"
+                        onClick={handleRemoveContact}
+                        className="ml-1 hover:text-primary-900"
+                        aria-label="Remove contact"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </span>
+                  )}
+                  {selectedProject && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-sm font-medium">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                      </svg>
+                      #{selectedProject.name}
+                      <button
+                        type="button"
+                        onClick={handleRemoveProject}
+                        className="ml-1 hover:text-blue-900"
+                        aria-label="Remove project"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </span>
+                  )}
                 </div>
               )}
 
@@ -386,7 +605,7 @@ export function QuickCapture({
                     value={title}
                     onChange={handleInputChange}
                     onKeyDown={handleKeyDown}
-                    placeholder={selectedContact ? "What needs to be done?" : "What needs to be done? Type @ to add contact"}
+                    placeholder={getPlaceholder()}
                     className="flex-1 px-4 py-3 rounded-xl border border-neutral-200 bg-neutral-50
                                text-neutral-800 placeholder:text-neutral-400 text-lg
                                focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -415,7 +634,6 @@ export function QuickCapture({
                     className="absolute left-0 right-0 mt-2 bg-white rounded-xl border border-neutral-200 shadow-lg overflow-hidden z-10"
                   >
                     {filteredContacts.length === 0 && !contactQuery.trim() ? (
-                      // Empty state when just @ is typed with no contacts
                       <div className="px-4 py-3 text-sm text-neutral-500">
                         Type a name to search or create a contact
                       </div>
@@ -442,7 +660,7 @@ export function QuickCapture({
                             </div>
                           </button>
                         ))}
-                        {showCreateOption && onAddContact && (
+                        {showCreateContactOption && onAddContact && (
                           <button
                             type="button"
                             onClick={handleCreateContact}
@@ -464,7 +682,139 @@ export function QuickCapture({
                     )}
                   </div>
                 )}
+
+                {/* Project dropdown */}
+                {showProjectDropdown && (
+                  <div
+                    className="absolute left-0 right-0 mt-2 bg-white rounded-xl border border-neutral-200 shadow-lg overflow-hidden z-10"
+                  >
+                    {filteredProjects.length === 0 && !projectQuery.trim() ? (
+                      <div className="px-4 py-3 text-sm text-neutral-500">
+                        Type a name to search or create a project
+                      </div>
+                    ) : (
+                      <>
+                        {filteredProjects.map((project, index) => (
+                          <button
+                            key={project.id}
+                            type="button"
+                            onClick={() => handleSelectProject(project)}
+                            className={`w-full px-4 py-3 text-left flex items-center gap-3 transition-colors
+                                       ${index === highlightedIndex ? 'bg-blue-50' : 'hover:bg-neutral-50'}`}
+                          >
+                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                              </svg>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-neutral-800 truncate">{project.name}</div>
+                              <div className="text-sm text-neutral-500 truncate capitalize">{project.status.replace('_', ' ')}</div>
+                            </div>
+                          </button>
+                        ))}
+                        {showCreateProjectOption && onAddProject && (
+                          <button
+                            type="button"
+                            onClick={handleCreateProject}
+                            disabled={isCreatingProject}
+                            className={`w-full px-4 py-3 text-left flex items-center gap-3 ${filteredProjects.length > 0 ? 'border-t border-neutral-100' : ''} transition-colors
+                                       ${highlightedIndex === filteredProjects.length ? 'bg-blue-50' : 'hover:bg-neutral-50'}
+                                       disabled:opacity-50`}
+                          >
+                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-blue-700">
+                                {isCreatingProject ? 'Creating...' : `Create "${projectQuery}"`}
+                              </div>
+                              <div className="text-sm text-neutral-500">Add as new project</div>
+                            </div>
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
+
+              {/* Routine-specific fields */}
+              {mode === 'routine' && (
+                <div className="space-y-3 pt-2">
+                  {/* Recurrence type */}
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-2">Repeats</label>
+                    <div className="flex flex-wrap gap-2">
+                      {(['daily', 'weekly'] as const).map((type) => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setRoutineRecurrence(type)}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                            routineRecurrence === type
+                              ? 'bg-amber-100 text-amber-700'
+                              : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                          }`}
+                        >
+                          {type.charAt(0).toUpperCase() + type.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Day selector for weekly */}
+                  {routineRecurrence === 'weekly' && (
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-2">On days</label>
+                      <div className="flex gap-1">
+                        {[
+                          { key: 'sun', label: 'S' },
+                          { key: 'mon', label: 'M' },
+                          { key: 'tue', label: 'T' },
+                          { key: 'wed', label: 'W' },
+                          { key: 'thu', label: 'T' },
+                          { key: 'fri', label: 'F' },
+                          { key: 'sat', label: 'S' },
+                        ].map(({ key, label }) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => {
+                              setRoutineDays(prev =>
+                                prev.includes(key) ? prev.filter(d => d !== key) : [...prev, key]
+                              )
+                            }}
+                            className={`w-9 h-9 rounded-full text-sm font-medium transition-colors ${
+                              routineDays.includes(key)
+                                ? 'bg-amber-500 text-white'
+                                : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Time of day (optional) */}
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">
+                      Time <span className="text-neutral-400 font-normal">(optional)</span>
+                    </label>
+                    <input
+                      type="time"
+                      value={routineTime}
+                      onChange={(e) => setRoutineTime(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 bg-neutral-50
+                                 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-3">
                 <button
@@ -477,11 +827,14 @@ export function QuickCapture({
                 </button>
                 <button
                   type="submit"
-                  disabled={!title.trim()}
-                  className="flex-1 touch-target py-3 rounded-xl bg-primary-500 text-white font-medium
-                             hover:bg-primary-600 active:bg-primary-700
+                  disabled={!title.trim() || (mode === 'routine' && routineRecurrence === 'weekly' && routineDays.length === 0)}
+                  className={`flex-1 touch-target py-3 rounded-xl text-white font-medium
                              disabled:opacity-50 disabled:cursor-not-allowed
-                             transition-colors"
+                             transition-colors ${
+                               mode === 'routine'
+                                 ? 'bg-amber-500 hover:bg-amber-600 active:bg-amber-700'
+                                 : 'bg-primary-500 hover:bg-primary-600 active:bg-primary-700'
+                             }`}
                 >
                   Save
                 </button>

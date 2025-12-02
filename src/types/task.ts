@@ -13,4 +13,5 @@ export interface Task {
   links?: TaskLink[]
   phoneNumber?: string
   contactId?: string // Linked contact
+  projectId?: string // Linked project
 }
