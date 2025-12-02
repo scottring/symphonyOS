@@ -38,7 +38,7 @@ function App() {
     deleteRoutine,
     toggleVisibility: toggleRoutineVisibility,
   } = useRoutines()
-  const actionable = useActionableInstances()
+  const { getInstancesForDate } = useActionableInstances()
 
   // Actionable instances for the viewed date (to filter skipped/completed events)
   const [dateInstances, setDateInstances] = useState<ActionableInstance[]>([])
@@ -90,9 +90,9 @@ function App() {
 
   // Fetch actionable instances for the viewed date
   const refreshDateInstances = useCallback(async () => {
-    const instances = await actionable.getInstancesForDate(viewedDate)
+    const instances = await getInstancesForDate(viewedDate)
     setDateInstances(instances)
-  }, [viewedDate, actionable])
+  }, [viewedDate, getInstancesForDate])
 
   useEffect(() => {
     refreshDateInstances()
