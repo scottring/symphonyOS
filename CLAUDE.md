@@ -56,6 +56,28 @@ import { Component } from '@/components/Component'
 - Primary color: Forest green (#3d8b6e)
 - Style: Scandinavian-inspired warm neutrals, generous spacing, soft shadows, rounded corners
 
+## Mobile Schedule Item Layout
+
+The home page schedule items (tasks and events) use a compact horizontal layout:
+
+```
+[Time] [Dot/Checkbox] [Title] [Contact chip] [Info icon]
+```
+
+**Spacing specifications:**
+- Container: `pl-2 pr-4 py-3` with `gap-2` between elements
+- Time column: `w-6` (24px), left-aligned
+  - Single time: e.g., "9a"
+  - Time range: stacked on two lines (e.g., "7p" / "8p")
+  - All day: stacked as "All" / "day"
+  - Unscheduled: em-dash "—"
+- Checkbox/dot column: `w-5` (20px), centered
+  - Tasks: 20x20px rounded checkbox
+  - Events: 10x10px solid dot
+- Title: flexible width, truncates with ellipsis
+- Contact chip: optional, shows linked contact name
+- Info icon: optional, shows if task has notes/links/phone
+
 ## Workflow
 
 1. **Think through the problem** — Read the codebase for relevant files

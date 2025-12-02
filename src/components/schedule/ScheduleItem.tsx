@@ -50,7 +50,7 @@ export function ScheduleItem({ item, selected, onSelect, onToggleComplete, conta
       role="button"
       aria-pressed={selected}
       className={`
-        flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer
+        flex items-center gap-2 pl-2 pr-4 py-3 rounded-xl cursor-pointer
         transition-all duration-150 border
         ${selected
           ? 'bg-primary-50/50 border-primary-200 shadow-sm'
@@ -59,11 +59,14 @@ export function ScheduleItem({ item, selected, onSelect, onToggleComplete, conta
         ${item.completed ? 'opacity-50' : ''}
       `}
     >
-      {/* Time column - fixed width */}
-      <div className="w-12 flex-shrink-0">
+      {/* Time column - compact, left-aligned */}
+      <div className="w-6 shrink-0 text-left">
         {timeDisplay ? (
           timeDisplay.type === 'allday' ? (
-            <span className="text-xs text-neutral-400 font-medium">All day</span>
+            <div className="flex flex-col text-xs text-neutral-400 font-medium leading-tight">
+              <span>All</span>
+              <span>day</span>
+            </div>
           ) : timeDisplay.type === 'range' ? (
             <div className="flex flex-col text-xs text-neutral-400 font-medium leading-tight">
               <span>{timeDisplay.start}</span>
@@ -77,8 +80,8 @@ export function ScheduleItem({ item, selected, onSelect, onToggleComplete, conta
         )}
       </div>
 
-      {/* Checkbox/dot column - fixed width container, contents centered */}
-      <div className="w-5 flex-shrink-0 flex items-center justify-center">
+      {/* Checkbox/dot column */}
+      <div className="w-5 shrink-0 flex items-center justify-center">
         {isTask ? (
           <button
             onClick={handleCheckboxClick}
