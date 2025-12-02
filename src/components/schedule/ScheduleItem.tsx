@@ -50,7 +50,7 @@ export function ScheduleItem({ item, selected, onSelect, onToggleComplete, conta
       role="button"
       aria-pressed={selected}
       className={`
-        flex items-center gap-2 pl-2 pr-4 py-3 rounded-xl cursor-pointer
+        flex items-center gap-3 pl-2 pr-4 py-3 rounded-xl cursor-pointer
         transition-all duration-150 border
         ${selected
           ? 'bg-primary-50/50 border-primary-200 shadow-sm'
@@ -60,7 +60,7 @@ export function ScheduleItem({ item, selected, onSelect, onToggleComplete, conta
       `}
     >
       {/* Time column - compact, left-aligned */}
-      <div className="w-6 shrink-0 text-left">
+      <div className="w-8 shrink-0 text-left">
         {timeDisplay ? (
           timeDisplay.type === 'allday' ? (
             <div className="flex flex-col text-xs text-neutral-400 font-medium leading-tight">

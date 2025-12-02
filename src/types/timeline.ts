@@ -1,4 +1,4 @@
-import type { Task } from './task'
+import type { Task, TaskLink } from './task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 
 export type TimelineItemType = 'task' | 'event'
@@ -12,7 +12,7 @@ export interface TimelineItem {
   completed: boolean
   // Context (from tasks)
   notes?: string
-  links?: string[]
+  links?: TaskLink[]
   phoneNumber?: string
   contactId?: string // Linked contact
   // Event-specific

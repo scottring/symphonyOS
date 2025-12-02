@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
-import type { Task } from '@/types/task'
+import type { Task, TaskLink } from '@/types/task'
 
 interface DbTask {
   id: string
@@ -10,11 +10,22 @@ interface DbTask {
   completed: boolean
   scheduled_for: string | null
   notes: string | null
-  links: string[] | null
+  links: (string | TaskLink)[] | null // Can be old string format or new object format
   phone_number: string | null
   contact_id: string | null
   created_at: string
   updated_at: string
+}
+
+// Convert old string links to new TaskLink format
+function normalizeLinks(links: (string | TaskLink)[] | null): TaskLink[] | undefined {
+  if (!links || links.length === 0) return undefined
+  return links.map((link) => {
+    if (typeof link === 'string') {
+      return { url: link }
+    }
+    return link
+  })
 }
 
 function dbTaskToTask(dbTask: DbTask): Task {
@@ -25,7 +36,7 @@ function dbTaskToTask(dbTask: DbTask): Task {
     createdAt: new Date(dbTask.created_at),
     scheduledFor: dbTask.scheduled_for ? new Date(dbTask.scheduled_for) : undefined,
     notes: dbTask.notes ?? undefined,
-    links: dbTask.links ?? undefined,
+    links: normalizeLinks(dbTask.links),
     phoneNumber: dbTask.phone_number ?? undefined,
     contactId: dbTask.contact_id ?? undefined,
   }

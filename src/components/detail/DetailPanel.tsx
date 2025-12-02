@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import type { TimelineItem } from '@/types/timeline'
-import type { Task } from '@/types/task'
+import type { Task, TaskLink } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import { formatTime, formatTimeRange } from '@/lib/timeUtils'
 import { detectActions, type DetectedAction } from '@/lib/actionDetection'
+import { ContactCard } from './ContactCard'
 
 // Component to render text with clickable links (handles HTML links and plain URLs)
 function RichText({ text }: { text: string }) {
@@ -178,6 +179,7 @@ function ActionButton({ action, onOpenRecipe }: { action: DetectedAction; onOpen
 export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplete, onUpdateEventNote, onOpenRecipe, contact, contacts = [], onSearchContacts, onUpdateContact }: DetailPanelProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [newLink, setNewLink] = useState('')
+  const [newLinkTitle, setNewLinkTitle] = useState('')
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [editedTitle, setEditedTitle] = useState(item?.title || '')
   const titleInputRef = useRef<HTMLInputElement>(null)
@@ -185,12 +187,6 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
   // Contact picker state
   const [showContactPicker, setShowContactPicker] = useState(false)
   const [contactSearchQuery, setContactSearchQuery] = useState('')
-
-  // Contact editing state
-  const [isEditingContact, setIsEditingContact] = useState(false)
-  const [editContactName, setEditContactName] = useState('')
-  const [editContactPhone, setEditContactPhone] = useState('')
-  const [editContactEmail, setEditContactEmail] = useState('')
 
   // Local state for event notes (to allow fluid typing)
   const [localEventNotes, setLocalEventNotes] = useState(item?.notes || '')
@@ -264,45 +260,6 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
     if (isTask && item.originalTask && onUpdate) {
       onUpdate(item.originalTask.id, { contactId: undefined })
     }
-  }
-
-  const handleContactCall = () => {
-    if (contact?.phone) {
-      window.location.href = `tel:${contact.phone}`
-    }
-  }
-
-  const handleContactText = () => {
-    if (contact?.phone) {
-      window.location.href = `sms:${contact.phone}`
-    }
-  }
-
-  const handleEditContact = () => {
-    if (contact) {
-      setEditContactName(contact.name)
-      setEditContactPhone(contact.phone || '')
-      setEditContactEmail(contact.email || '')
-      setIsEditingContact(true)
-    }
-  }
-
-  const handleSaveContact = () => {
-    if (contact && onUpdateContact) {
-      onUpdateContact(contact.id, {
-        name: editContactName.trim(),
-        phone: editContactPhone.trim() || undefined,
-        email: editContactEmail.trim() || undefined,
-      })
-    }
-    setIsEditingContact(false)
-  }
-
-  const handleCancelEditContact = () => {
-    setIsEditingContact(false)
-    setEditContactName('')
-    setEditContactPhone('')
-    setEditContactEmail('')
   }
 
   const handleTitleSave = () => {
@@ -379,20 +336,32 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
 
   const handleAddLink = (e: React.FormEvent) => {
     e.preventDefault()
-    const trimmed = newLink.trim()
-    if (!trimmed || !isTask || !item.originalTask || !onUpdate) return
+    const trimmedUrl = newLink.trim()
+    const trimmedTitle = newLinkTitle.trim()
+    if (!trimmedUrl || !isTask || !item.originalTask || !onUpdate) return
 
     const currentLinks = item.links || []
-    if (!currentLinks.includes(trimmed)) {
-      onUpdate(item.originalTask.id, { links: [...currentLinks, trimmed] })
+    // Check if URL already exists
+    if (currentLinks.some((link) => link.url === trimmedUrl)) {
+      setNewLink('')
+      setNewLinkTitle('')
+      return
     }
+
+    // Add link with URL and optional title
+    const newLinkObj: TaskLink = { url: trimmedUrl }
+    if (trimmedTitle) {
+      newLinkObj.title = trimmedTitle
+    }
+    onUpdate(item.originalTask.id, { links: [...currentLinks, newLinkObj] })
     setNewLink('')
+    setNewLinkTitle('')
   }
 
-  const handleRemoveLink = (linkToRemove: string) => {
+  const handleRemoveLink = (linkToRemove: TaskLink) => {
     if (!isTask || !item.originalTask || !onUpdate) return
     const currentLinks = item.links || []
-    const newLinks = currentLinks.filter((link) => link !== linkToRemove)
+    const newLinks = currentLinks.filter((link) => link.url !== linkToRemove.url)
     onUpdate(item.originalTask.id, { links: newLinks.length > 0 ? newLinks : undefined })
   }
 
@@ -565,126 +534,11 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
         {isTask && contact && (
           <div>
             <h3 className="text-sm font-medium text-neutral-700 mb-3">Linked Contact</h3>
-            <div className="bg-primary-50 rounded-xl p-4 border border-primary-100">
-              {isEditingContact ? (
-                // Edit contact form
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-neutral-600 mb-1">Name</label>
-                    <input
-                      type="text"
-                      value={editContactName}
-                      onChange={(e) => setEditContactName(e.target.value)}
-                      className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-white
-                                 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                      autoFocus
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-neutral-600 mb-1">Phone (optional)</label>
-                    <input
-                      type="tel"
-                      value={editContactPhone}
-                      onChange={(e) => setEditContactPhone(e.target.value)}
-                      placeholder="555-123-4567"
-                      className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-white
-                                 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-neutral-600 mb-1">Email (optional)</label>
-                    <input
-                      type="email"
-                      value={editContactEmail}
-                      onChange={(e) => setEditContactEmail(e.target.value)}
-                      placeholder="email@example.com"
-                      className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-white
-                                 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div className="flex gap-2 pt-2">
-                    <button
-                      onClick={handleCancelEditContact}
-                      className="flex-1 py-2 px-3 text-sm font-medium text-neutral-600 bg-white rounded-lg hover:bg-neutral-50 transition-colors border border-neutral-200"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleSaveContact}
-                      disabled={!editContactName.trim()}
-                      className="flex-1 py-2 px-3 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Save
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                // Contact display card
-                <>
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary-200 flex items-center justify-center text-primary-700 flex-shrink-0">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-neutral-800">{contact.name}</div>
-                      {contact.phone && (
-                        <div className="text-sm text-neutral-600">{contact.phone}</div>
-                      )}
-                      {contact.email && (
-                        <div className="text-sm text-neutral-500">{contact.email}</div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {onUpdateContact && (
-                        <button
-                          onClick={handleEditContact}
-                          className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-white rounded-lg transition-colors"
-                          aria-label="Edit contact"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                          </svg>
-                        </button>
-                      )}
-                      <button
-                        onClick={handleUnlinkContact}
-                        className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-white rounded-lg transition-colors"
-                        aria-label="Unlink contact"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                  {/* Contact actions */}
-                  {contact.phone && (
-                    <div className="flex gap-2 mt-3 pt-3 border-t border-primary-100">
-                      <button
-                        onClick={handleContactCall}
-                        className="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-white text-neutral-700 rounded-lg hover:bg-neutral-50 transition-colors text-sm font-medium"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                          <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
-                        </svg>
-                        Call
-                      </button>
-                      <button
-                        onClick={handleContactText}
-                        className="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-white text-neutral-700 rounded-lg hover:bg-neutral-50 transition-colors text-sm font-medium"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
-                        </svg>
-                        Text
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+            <ContactCard
+              contact={contact}
+              onUnlink={handleUnlinkContact}
+              onUpdate={onUpdateContact}
+            />
           </div>
         )}
 
@@ -809,20 +663,24 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
               <div>
                 <h3 className="text-sm font-medium text-neutral-700 mb-2">Links</h3>
                 <div className="space-y-2">
-                  {item.links.map((link) => (
-                    <a
-                      key={link}
-                      href={link.startsWith('http') ? link : `https://${link}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-sm text-primary-600 hover:underline"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd" />
-                      </svg>
-                      <span className="truncate">{link.replace(/^https?:\/\//, '').split('/')[0]}</span>
-                    </a>
-                  ))}
+                  {item.links.map((link) => {
+                    const url = link.url.startsWith('http') ? link.url : `https://${link.url}`
+                    const displayText = link.title || link.url.replace(/^https?:\/\//, '').split('/')[0]
+                    return (
+                      <a
+                        key={link.url}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-sm text-primary-600 hover:underline"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd" />
+                        </svg>
+                        <span className="truncate">{displayText}</span>
+                      </a>
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -880,38 +738,59 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
               <label className="block text-sm font-medium text-neutral-700 mb-2">Links</label>
               {item.links && item.links.length > 0 && (
                 <ul className="mb-3 space-y-2">
-                  {item.links.map((link) => (
-                    <li key={link} className="flex items-center gap-2 text-sm bg-neutral-50 rounded-lg px-3 py-2">
-                      <span className="flex-1 truncate text-neutral-600">{link}</span>
-                      <button
-                        onClick={() => handleRemoveLink(link)}
-                        className="text-neutral-400 hover:text-danger-500 transition-colors"
-                        aria-label="Remove link"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                      </button>
-                    </li>
-                  ))}
+                  {item.links.map((link) => {
+                    const url = link.url.startsWith('http') ? link.url : `https://${link.url}`
+                    const displayText = link.title || link.url.replace(/^https?:\/\//, '').split('/')[0]
+                    return (
+                      <li key={link.url} className="flex items-center gap-2 text-sm bg-neutral-50 rounded-lg px-3 py-2">
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 truncate text-primary-600 hover:underline"
+                        >
+                          {displayText}
+                        </a>
+                        <button
+                          onClick={() => handleRemoveLink(link)}
+                          className="text-neutral-400 hover:text-danger-500 transition-colors flex-shrink-0"
+                          aria-label="Remove link"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
-              <form onSubmit={handleAddLink} className="flex gap-2">
+              <form onSubmit={handleAddLink} className="space-y-2">
                 <input
                   type="text"
                   value={newLink}
                   onChange={(e) => setNewLink(e.target.value)}
-                  placeholder="Add a link..."
-                  className="flex-1 px-3 py-2 text-sm rounded-lg border border-neutral-200
+                  placeholder="URL (e.g., https://example.com)"
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200
                              focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
-                <button
-                  type="submit"
-                  className="px-4 py-2 text-sm font-medium bg-neutral-100 text-neutral-700
-                             rounded-lg hover:bg-neutral-200 transition-colors"
-                >
-                  Add
-                </button>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newLinkTitle}
+                    onChange={(e) => setNewLinkTitle(e.target.value)}
+                    placeholder="Title (optional)"
+                    className="flex-1 px-3 py-2 text-sm rounded-lg border border-neutral-200
+                               focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-2 text-sm font-medium bg-neutral-100 text-neutral-700
+                               rounded-lg hover:bg-neutral-200 transition-colors"
+                  >
+                    Add
+                  </button>
+                </div>
               </form>
             </div>
           </div>

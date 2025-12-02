@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Task } from '@/types/task'
+import type { Task, TaskLink } from '@/types/task'
 
 interface TaskDetailProps {
   task: Task
@@ -8,6 +8,7 @@ interface TaskDetailProps {
 
 export function TaskDetail({ task, onUpdate }: TaskDetailProps) {
   const [newLink, setNewLink] = useState('')
+  const [newLinkTitle, setNewLinkTitle] = useState('')
 
   const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     onUpdate(task.id, { notes: e.target.value || undefined })
@@ -19,19 +20,29 @@ export function TaskDetail({ task, onUpdate }: TaskDetailProps) {
 
   const handleAddLink = (e: React.FormEvent) => {
     e.preventDefault()
-    const trimmed = newLink.trim()
-    if (!trimmed) return
+    const trimmedUrl = newLink.trim()
+    const trimmedTitle = newLinkTitle.trim()
+    if (!trimmedUrl) return
 
     const currentLinks = task.links || []
-    if (!currentLinks.includes(trimmed)) {
-      onUpdate(task.id, { links: [...currentLinks, trimmed] })
+    if (currentLinks.some((link) => link.url === trimmedUrl)) {
+      setNewLink('')
+      setNewLinkTitle('')
+      return
     }
+
+    const newLinkObj: TaskLink = { url: trimmedUrl }
+    if (trimmedTitle) {
+      newLinkObj.title = trimmedTitle
+    }
+    onUpdate(task.id, { links: [...currentLinks, newLinkObj] })
     setNewLink('')
+    setNewLinkTitle('')
   }
 
-  const handleRemoveLink = (linkToRemove: string) => {
+  const handleRemoveLink = (linkToRemove: TaskLink) => {
     const currentLinks = task.links || []
-    const newLinks = currentLinks.filter((link) => link !== linkToRemove)
+    const newLinks = currentLinks.filter((link) => link.url !== linkToRemove.url)
     onUpdate(task.id, { links: newLinks.length > 0 ? newLinks : undefined })
   }
 
@@ -72,43 +83,56 @@ export function TaskDetail({ task, onUpdate }: TaskDetailProps) {
         </label>
         {task.links && task.links.length > 0 && (
           <ul className="mb-2 space-y-1">
-            {task.links.map((link) => (
-              <li key={link} className="flex items-center gap-2 text-sm">
-                <a
-                  href={link.startsWith('http') ? link : `https://${link}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary-600 hover:underline truncate flex-1"
-                >
-                  {link}
-                </a>
-                <button
-                  onClick={() => handleRemoveLink(link)}
-                  className="text-neutral-400 hover:text-red-500"
-                  aria-label="Remove link"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                </button>
-              </li>
-            ))}
+            {task.links.map((link) => {
+              const url = link.url.startsWith('http') ? link.url : `https://${link.url}`
+              const displayText = link.title || link.url.replace(/^https?:\/\//, '').split('/')[0]
+              return (
+                <li key={link.url} className="flex items-center gap-2 text-sm">
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary-600 hover:underline truncate flex-1"
+                  >
+                    {displayText}
+                  </a>
+                  <button
+                    onClick={() => handleRemoveLink(link)}
+                    className="text-neutral-400 hover:text-red-500"
+                    aria-label="Remove link"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </li>
+              )
+            })}
           </ul>
         )}
-        <form onSubmit={handleAddLink} className="flex gap-2">
+        <form onSubmit={handleAddLink} className="space-y-2">
           <input
             type="text"
             value={newLink}
             onChange={(e) => setNewLink(e.target.value)}
-            placeholder="Add a link..."
-            className="flex-1 px-3 py-1.5 text-sm rounded-md border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            placeholder="URL (e.g., https://example.com)"
+            className="w-full px-3 py-1.5 text-sm rounded-md border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           />
-          <button
-            type="submit"
-            className="px-3 py-1.5 text-sm bg-neutral-100 text-neutral-700 rounded-md hover:bg-neutral-200 transition-colors"
-          >
-            Add
-          </button>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newLinkTitle}
+              onChange={(e) => setNewLinkTitle(e.target.value)}
+              placeholder="Title (optional)"
+              className="flex-1 px-3 py-1.5 text-sm rounded-md border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+            <button
+              type="submit"
+              className="px-3 py-1.5 text-sm bg-neutral-100 text-neutral-700 rounded-md hover:bg-neutral-200 transition-colors"
+            >
+              Add
+            </button>
+          </div>
         </form>
       </div>
     </div>
