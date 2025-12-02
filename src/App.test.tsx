@@ -81,6 +81,21 @@ vi.mock('@/hooks/useEventNotes', () => ({
   }),
 }))
 
+// Mock useContacts to avoid Supabase calls
+vi.mock('@/hooks/useContacts', () => ({
+  useContacts: () => ({
+    contacts: [],
+    contactsMap: new Map(),
+    loading: false,
+    error: null,
+    addContact: vi.fn().mockResolvedValue({ id: 'new-contact', name: 'Test Contact', createdAt: new Date(), updatedAt: new Date() }),
+    updateContact: vi.fn(),
+    deleteContact: vi.fn(),
+    searchContacts: vi.fn().mockReturnValue([]),
+    getContactById: vi.fn(),
+  }),
+}))
+
 describe('App', () => {
   it('renders the app name in sidebar', () => {
     render(<App />)

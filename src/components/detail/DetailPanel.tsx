@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import type { TimelineItem } from '@/types/timeline'
 import type { Task } from '@/types/task'
+import type { Contact } from '@/types/contact'
 import { formatTime, formatTimeRange } from '@/lib/timeUtils'
 import { detectActions, type DetectedAction } from '@/lib/actionDetection'
 
@@ -84,6 +85,11 @@ interface DetailPanelProps {
   onUpdateEventNote?: (googleEventId: string, notes: string | null) => void
   // Recipe viewer
   onOpenRecipe?: (url: string) => void
+  // Contact support
+  contact?: Contact | null
+  contacts?: Contact[]
+  onSearchContacts?: (query: string) => Contact[]
+  onUpdateContact?: (contactId: string, updates: Partial<Contact>) => void
 }
 
 // Icon components for actions
@@ -169,12 +175,22 @@ function ActionButton({ action, onOpenRecipe }: { action: DetectedAction; onOpen
   )
 }
 
-export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplete, onUpdateEventNote, onOpenRecipe }: DetailPanelProps) {
+export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplete, onUpdateEventNote, onOpenRecipe, contact, contacts = [], onSearchContacts, onUpdateContact }: DetailPanelProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [newLink, setNewLink] = useState('')
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [editedTitle, setEditedTitle] = useState(item?.title || '')
   const titleInputRef = useRef<HTMLInputElement>(null)
+
+  // Contact picker state
+  const [showContactPicker, setShowContactPicker] = useState(false)
+  const [contactSearchQuery, setContactSearchQuery] = useState('')
+
+  // Contact editing state
+  const [isEditingContact, setIsEditingContact] = useState(false)
+  const [editContactName, setEditContactName] = useState('')
+  const [editContactPhone, setEditContactPhone] = useState('')
+  const [editContactEmail, setEditContactEmail] = useState('')
 
   // Local state for event notes (to allow fluid typing)
   const [localEventNotes, setLocalEventNotes] = useState(item?.notes || '')
@@ -222,11 +238,72 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
     )
   }, [item])
 
+  // Filter contacts for picker
+  const filteredContacts = useMemo(() => {
+    if (onSearchContacts && contactSearchQuery) {
+      return onSearchContacts(contactSearchQuery)
+    }
+    return contacts.slice(0, 5)
+  }, [contacts, contactSearchQuery, onSearchContacts])
+
   if (!item) return null
 
   const isTask = item.type === 'task'
   const isEvent = item.type === 'event'
-  const hasContext = item.notes || item.phoneNumber || item.links?.length || item.location || item.googleDescription
+  const hasContext = item.notes || item.phoneNumber || item.links?.length || item.location || item.googleDescription || contact
+
+  const handleLinkContact = (selectedContact: Contact) => {
+    if (isTask && item.originalTask && onUpdate) {
+      onUpdate(item.originalTask.id, { contactId: selectedContact.id })
+    }
+    setShowContactPicker(false)
+    setContactSearchQuery('')
+  }
+
+  const handleUnlinkContact = () => {
+    if (isTask && item.originalTask && onUpdate) {
+      onUpdate(item.originalTask.id, { contactId: undefined })
+    }
+  }
+
+  const handleContactCall = () => {
+    if (contact?.phone) {
+      window.location.href = `tel:${contact.phone}`
+    }
+  }
+
+  const handleContactText = () => {
+    if (contact?.phone) {
+      window.location.href = `sms:${contact.phone}`
+    }
+  }
+
+  const handleEditContact = () => {
+    if (contact) {
+      setEditContactName(contact.name)
+      setEditContactPhone(contact.phone || '')
+      setEditContactEmail(contact.email || '')
+      setIsEditingContact(true)
+    }
+  }
+
+  const handleSaveContact = () => {
+    if (contact && onUpdateContact) {
+      onUpdateContact(contact.id, {
+        name: editContactName.trim(),
+        phone: editContactPhone.trim() || undefined,
+        email: editContactEmail.trim() || undefined,
+      })
+    }
+    setIsEditingContact(false)
+  }
+
+  const handleCancelEditContact = () => {
+    setIsEditingContact(false)
+    setEditContactName('')
+    setEditContactPhone('')
+    setEditContactEmail('')
+  }
 
   const handleTitleSave = () => {
     const trimmed = editedTitle.trim()
@@ -483,6 +560,201 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
             )}
           </div>
         </div>
+
+        {/* Linked Contact Card (tasks only) */}
+        {isTask && contact && (
+          <div>
+            <h3 className="text-sm font-medium text-neutral-700 mb-3">Linked Contact</h3>
+            <div className="bg-primary-50 rounded-xl p-4 border border-primary-100">
+              {isEditingContact ? (
+                // Edit contact form
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-neutral-600 mb-1">Name</label>
+                    <input
+                      type="text"
+                      value={editContactName}
+                      onChange={(e) => setEditContactName(e.target.value)}
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-white
+                                 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-neutral-600 mb-1">Phone (optional)</label>
+                    <input
+                      type="tel"
+                      value={editContactPhone}
+                      onChange={(e) => setEditContactPhone(e.target.value)}
+                      placeholder="555-123-4567"
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-white
+                                 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-neutral-600 mb-1">Email (optional)</label>
+                    <input
+                      type="email"
+                      value={editContactEmail}
+                      onChange={(e) => setEditContactEmail(e.target.value)}
+                      placeholder="email@example.com"
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-white
+                                 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      onClick={handleCancelEditContact}
+                      className="flex-1 py-2 px-3 text-sm font-medium text-neutral-600 bg-white rounded-lg hover:bg-neutral-50 transition-colors border border-neutral-200"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveContact}
+                      disabled={!editContactName.trim()}
+                      className="flex-1 py-2 px-3 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                // Contact display card
+                <>
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary-200 flex items-center justify-center text-primary-700 flex-shrink-0">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-neutral-800">{contact.name}</div>
+                      {contact.phone && (
+                        <div className="text-sm text-neutral-600">{contact.phone}</div>
+                      )}
+                      {contact.email && (
+                        <div className="text-sm text-neutral-500">{contact.email}</div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {onUpdateContact && (
+                        <button
+                          onClick={handleEditContact}
+                          className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-white rounded-lg transition-colors"
+                          aria-label="Edit contact"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                          </svg>
+                        </button>
+                      )}
+                      <button
+                        onClick={handleUnlinkContact}
+                        className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-white rounded-lg transition-colors"
+                        aria-label="Unlink contact"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  {/* Contact actions */}
+                  {contact.phone && (
+                    <div className="flex gap-2 mt-3 pt-3 border-t border-primary-100">
+                      <button
+                        onClick={handleContactCall}
+                        className="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-white text-neutral-700 rounded-lg hover:bg-neutral-50 transition-colors text-sm font-medium"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                        </svg>
+                        Call
+                      </button>
+                      <button
+                        onClick={handleContactText}
+                        className="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-white text-neutral-700 rounded-lg hover:bg-neutral-50 transition-colors text-sm font-medium"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+                        </svg>
+                        Text
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Link Contact (tasks only, when no contact linked) */}
+        {isTask && !contact && !isEditing && (
+          <div>
+            <h3 className="text-sm font-medium text-neutral-700 mb-3">Contact</h3>
+            {!showContactPicker ? (
+              <button
+                onClick={() => setShowContactPicker(true)}
+                className="w-full flex items-center gap-3 p-3 rounded-xl border border-dashed border-neutral-300 text-neutral-500 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z" />
+                </svg>
+                <span className="text-sm font-medium">Link a contact</span>
+              </button>
+            ) : (
+              <div className="rounded-xl border border-neutral-200 overflow-hidden">
+                <div className="p-2 border-b border-neutral-100">
+                  <input
+                    type="text"
+                    value={contactSearchQuery}
+                    onChange={(e) => setContactSearchQuery(e.target.value)}
+                    placeholder="Search contacts..."
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50
+                               focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    autoFocus
+                  />
+                </div>
+                <div className="max-h-48 overflow-auto">
+                  {filteredContacts.length > 0 ? (
+                    filteredContacts.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => handleLinkContact(c)}
+                        className="w-full px-4 py-3 text-left flex items-center gap-3 hover:bg-neutral-50 transition-colors"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center text-neutral-600">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-neutral-800 truncate">{c.name}</div>
+                          {c.phone && <div className="text-sm text-neutral-500 truncate">{c.phone}</div>}
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-4 py-6 text-center text-sm text-neutral-400">
+                      No contacts found
+                    </div>
+                  )}
+                </div>
+                <div className="p-2 border-t border-neutral-100">
+                  <button
+                    onClick={() => {
+                      setShowContactPicker(false)
+                      setContactSearchQuery('')
+                    }}
+                    className="w-full px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Context display (read mode) */}
         {hasContext && !isEditing && (

@@ -14,6 +14,7 @@ export interface TimelineItem {
   notes?: string
   links?: string[]
   phoneNumber?: string
+  contactId?: string // Linked contact
   // Event-specific
   location?: string
   allDay?: boolean
@@ -36,6 +37,7 @@ export function taskToTimelineItem(task: Task): TimelineItem {
     notes: task.notes,
     links: task.links,
     phoneNumber: task.phoneNumber,
+    contactId: task.contactId,
     originalTask: task,
   }
 }

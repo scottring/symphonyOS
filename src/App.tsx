@@ -3,6 +3,7 @@ import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useAuth } from '@/hooks/useAuth'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import { useEventNotes } from '@/hooks/useEventNotes'
+import { useContacts } from '@/hooks/useContacts'
 import { AppShell } from '@/components/layout/AppShell'
 import { TodaySchedule } from '@/components/schedule/TodaySchedule'
 import { DetailPanel } from '@/components/detail/DetailPanel'
@@ -16,6 +17,7 @@ function App() {
   const { user, loading: authLoading, signOut } = useAuth()
   const { isConnected, events, fetchEvents, isFetching: eventsFetching } = useGoogleCalendar()
   const { fetchNote, updateNote, getNote } = useEventNotes()
+  const { contacts, contactsMap, addContact, updateContact, searchContacts } = useContacts()
 
   // UI state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -96,6 +98,12 @@ function App() {
     return null
   }, [selectedItemId, tasks, events, getNote])
 
+  // Get contact for selected item (must be before early returns to follow Rules of Hooks)
+  const selectedContact = useMemo(() => {
+    if (!selectedItem?.contactId) return null
+    return contactsMap.get(selectedItem.contactId) ?? null
+  }, [selectedItem, contactsMap])
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-bg-base flex items-center justify-center">
@@ -123,6 +131,8 @@ function App() {
       quickAddOpen={quickAddOpen}
       onOpenQuickAdd={openQuickAdd}
       onCloseQuickAdd={closeQuickAdd}
+      contacts={contacts}
+      onAddContact={addContact}
       panel={
         recipeUrl ? (
           <RecipeViewer
@@ -138,6 +148,10 @@ function App() {
             onToggleComplete={toggleTask}
             onUpdateEventNote={updateNote}
             onOpenRecipe={setRecipeUrl}
+            contact={selectedContact}
+            contacts={contacts}
+            onSearchContacts={searchContacts}
+            onUpdateContact={updateContact}
           />
         )
       }
@@ -160,6 +174,7 @@ function App() {
           loading={tasksLoading || eventsFetching}
           viewedDate={viewedDate}
           onDateChange={setViewedDate}
+          contactsMap={contactsMap}
         />
       </div>
     </AppShell>

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Sidebar } from './Sidebar'
 import { QuickCapture } from './QuickCapture'
 import { useMobile } from '@/hooks/useMobile'
+import type { Contact } from '@/types/contact'
 
 interface AppShellProps {
   children: ReactNode
@@ -11,10 +12,13 @@ interface AppShellProps {
   panelOpen: boolean
   userEmail?: string
   onSignOut?: () => void
-  onQuickAdd?: (title: string) => void
+  onQuickAdd?: (title: string, contactId?: string) => void
   quickAddOpen?: boolean
   onOpenQuickAdd?: () => void
   onCloseQuickAdd?: () => void
+  // Contact support for quick capture
+  contacts?: Contact[]
+  onAddContact?: (contact: { name: string }) => Promise<Contact | null>
 }
 
 export function AppShell({
@@ -29,6 +33,8 @@ export function AppShell({
   quickAddOpen = false,
   onOpenQuickAdd,
   onCloseQuickAdd,
+  contacts,
+  onAddContact,
 }: AppShellProps) {
   const isMobile = useMobile()
 
@@ -101,6 +107,8 @@ export function AppShell({
           onOpen={onOpenQuickAdd}
           onClose={onCloseQuickAdd}
           showFab={isMobile}
+          contacts={contacts}
+          onAddContact={onAddContact}
         />
       )}
 

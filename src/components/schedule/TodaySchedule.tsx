@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import type { Task } from '@/types/task'
+import type { Contact } from '@/types/contact'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { taskToTimelineItem, eventToTimelineItem } from '@/types/timeline'
 import { groupByDaySection, type DaySection } from '@/lib/timeUtils'
@@ -16,6 +17,7 @@ interface TodayScheduleProps {
   loading?: boolean
   viewedDate: Date
   onDateChange: (date: Date) => void
+  contactsMap?: Map<string, Contact>
 }
 
 function LoadingSkeleton() {
@@ -62,6 +64,7 @@ export function TodaySchedule({
   loading,
   viewedDate,
   onDateChange,
+  contactsMap,
 }: TodayScheduleProps) {
   // Filter tasks for the viewed date
   const filteredTasks = useMemo(() => {
@@ -195,21 +198,25 @@ export function TodaySchedule({
             const items = grouped[section]
             return (
               <TimeGroup key={section} section={section} isEmpty={items.length === 0}>
-                {items.map((item) => (
-                  <ScheduleItem
-                    key={item.id}
-                    item={item}
-                    selected={selectedItemId === item.id}
-                    onSelect={() => onSelectItem(item.id)}
-                    onToggleComplete={() => {
-                      // Only toggle tasks, not events
-                      if (item.type === 'task' && item.id.startsWith('task-')) {
-                        const taskId = item.id.replace('task-', '')
-                        onToggleTask(taskId)
-                      }
-                    }}
-                  />
-                ))}
+                {items.map((item) => {
+                  const contactName = item.contactId && contactsMap?.get(item.contactId)?.name
+                  return (
+                    <ScheduleItem
+                      key={item.id}
+                      item={item}
+                      selected={selectedItemId === item.id}
+                      onSelect={() => onSelectItem(item.id)}
+                      onToggleComplete={() => {
+                        // Only toggle tasks, not events
+                        if (item.type === 'task' && item.id.startsWith('task-')) {
+                          const taskId = item.id.replace('task-', '')
+                          onToggleTask(taskId)
+                        }
+                      }}
+                      contactName={contactName || undefined}
+                    />
+                  )
+                })}
               </TimeGroup>
             )
           })}

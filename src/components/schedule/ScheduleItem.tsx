@@ -6,9 +6,10 @@ interface ScheduleItemProps {
   selected?: boolean
   onSelect: () => void
   onToggleComplete: () => void
+  contactName?: string
 }
 
-export function ScheduleItem({ item, selected, onSelect, onToggleComplete }: ScheduleItemProps) {
+export function ScheduleItem({ item, selected, onSelect, onToggleComplete, contactName }: ScheduleItemProps) {
   const isTask = item.type === 'task'
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
@@ -107,16 +108,24 @@ export function ScheduleItem({ item, selected, onSelect, onToggleComplete }: Sch
         )}
       </div>
 
-      {/* Title */}
-      <div className="flex-1 min-w-0">
+      {/* Title and contact chip */}
+      <div className="flex-1 min-w-0 flex items-center gap-2">
         <span
           className={`
-            text-base font-medium truncate block
+            text-base font-medium truncate
             ${item.completed ? 'line-through text-neutral-400' : 'text-neutral-800'}
           `}
         >
           {item.title}
         </span>
+        {contactName && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-xs font-medium flex-shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+            </svg>
+            {contactName}
+          </span>
+        )}
       </div>
 
       {/* Context indicator - shows if there's extra info */}

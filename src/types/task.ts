@@ -7,4 +7,5 @@ export interface Task {
   notes?: string
   links?: string[]
   phoneNumber?: string
+  contactId?: string // Linked contact
 }

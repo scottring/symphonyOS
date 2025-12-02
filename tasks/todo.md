@@ -1,5 +1,27 @@
 # Symphony OS - Project Plan
 
+## Current: Contacts MVP
+
+### Database
+- [ ] Migration 004: Create contacts table (id, user_id, name, phone, email, notes, timestamps)
+- [ ] Migration 005: Add contact_id FK to tasks table
+
+### Hook
+- [ ] Create Contact type (src/types/contact.ts)
+- [ ] Create useContacts hook with CRUD + search by name
+
+### Quick Capture Integration
+- [ ] Add "@" trigger in QuickCapture to show contact search dropdown
+- [ ] Contact selection attaches contact_id to task
+- [ ] "Create [name] as contact" option when no match
+
+### Detail Panel Integration
+- [ ] Show contact card when task has linked contact (name, phone, email)
+- [ ] Phone tap → call/text actions
+- [ ] Link/unlink contact from task
+
+---
+
 ## Up Next: Mobile & Deploy (V1 Finish Line)
 
 ### Mobile Responsive Layout
