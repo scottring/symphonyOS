@@ -139,9 +139,26 @@ export function QuickCapture({
     }
   }
 
+  // Reset all state when modal opens to ensure clean slate
   useEffect(() => {
-    if (isOpen && inputRef.current) {
-      // Small delay to ensure modal is rendered
+    if (isOpen) {
+      // Reset form state when opening
+      setTitle('')
+      setMode('task')
+      setSelectedContact(null)
+      setShowContactDropdown(false)
+      setContactQuery('')
+      setSelectedProject(null)
+      setShowProjectDropdown(false)
+      setProjectQuery('')
+      setShowContactForm(false)
+      setNewContactName('')
+      setNewContactPhone('')
+      setNewContactEmail('')
+      setRoutineRecurrence('daily')
+      setRoutineDays([])
+      setRoutineTime('')
+      // Focus input after state reset
       setTimeout(() => inputRef.current?.focus(), 50)
     }
   }, [isOpen])
