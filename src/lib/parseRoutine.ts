@@ -32,9 +32,6 @@ const DAY_NAMES: Record<string, number> = {
   saturday: 6, sat: 6,
 }
 
-const WEEKDAYS = [1, 2, 3, 4, 5] // Mon-Fri
-const WEEKENDS = [0, 6] // Sun, Sat
-
 // Time of day keywords
 const TIME_OF_DAY_KEYWORDS = ['morning', 'afternoon', 'evening']
 
@@ -54,13 +51,7 @@ export function parseRoutine(input: string, contacts: Contact[] = []): ParsedRou
   const tokens: SemanticToken[] = []
 
   // Track what we've extracted to build the action string
-  let workingText = raw
   const extractedRanges: Array<{ start: number; end: number; type: SemanticToken['type']; text: string }> = []
-
-  // Helper to find case-insensitive match position
-  const findMatch = (text: string, pattern: string): number => {
-    return text.toLowerCase().indexOf(pattern.toLowerCase())
-  }
 
   // 1. Extract time (e.g., "at 7", "at 7am", "at 7:30pm", "at noon")
   const timePatterns = [
@@ -101,7 +92,6 @@ export function parseRoutine(input: string, contacts: Contact[] = []): ParsedRou
     const match = normalized.match(regex)
     if (match && match.index !== undefined) {
       time = parse(match)
-      const originalMatch = raw.slice(match.index, match.index + match[0].length)
       extractedRanges.push({
         start: match.index,
         end: match.index + match[0].length,
@@ -136,7 +126,6 @@ export function parseRoutine(input: string, contacts: Contact[] = []): ParsedRou
     const match = normalized.match(regex)
     if (match && match.index !== undefined) {
       recurrence = result
-      const originalMatch = raw.slice(match.index, match.index + match[0].length)
       extractedRanges.push({
         start: match.index,
         end: match.index + match[0].length,
@@ -168,7 +157,6 @@ export function parseRoutine(input: string, contacts: Contact[] = []): ParsedRou
       if (days.length > 0) {
         days.sort((a, b) => a - b)
         recurrence = { type: 'weekly', days }
-        const originalMatch = raw.slice(match.index, match.index + match[0].length)
         extractedRanges.push({
           start: match.index,
           end: match.index + match[0].length,

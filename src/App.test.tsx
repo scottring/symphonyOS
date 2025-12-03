@@ -20,15 +20,17 @@ vi.mock('@/hooks/useSupabaseTasks', () => ({
   useSupabaseTasks: () => {
     const [tasks, setTasks] = useState<Task[]>([])
 
-    const addTask = (title: string) => {
+    const addTask = async (title: string): Promise<string | undefined> => {
+      const id = crypto.randomUUID()
       const newTask: Task = {
-        id: crypto.randomUUID(),
+        id,
         title,
         completed: false,
         createdAt: new Date(),
         // Optional fields default to undefined (inbox task)
       }
       setTasks((prev) => [newTask, ...prev])
+      return id
     }
 
     const toggleTask = (id: string) => {
@@ -51,7 +53,17 @@ vi.mock('@/hooks/useSupabaseTasks', () => ({
       )
     }
 
-    return { tasks, loading: false, error: null, addTask, toggleTask, deleteTask, updateTask }
+    const deferTask = (id: string, date: Date) => {
+      setTasks((prev) =>
+        prev.map((task) =>
+          task.id === id
+            ? { ...task, deferredUntil: date, deferCount: (task.deferCount ?? 0) + 1 }
+            : task
+        )
+      )
+    }
+
+    return { tasks, loading: false, error: null, addTask, toggleTask, deleteTask, updateTask, deferTask }
   },
 }))
 

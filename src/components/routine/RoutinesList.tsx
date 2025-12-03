@@ -1,6 +1,6 @@
 import type { Routine } from '@/types/actionable'
 import { parseRoutine } from '@/lib/parseRoutine'
-import { SemanticRoutine, formatLegacyRoutine } from './SemanticRoutine'
+import { SemanticRoutine } from './SemanticRoutine'
 import type { Contact } from '@/types/contact'
 
 interface RoutinesListProps {

@@ -44,6 +44,7 @@ function createMockRoutine(overrides: Partial<Routine> = {}): Routine {
     default_assignee: null,
     recurrence_pattern: { type: 'daily' },
     time_of_day: '08:00',
+    raw_input: null,
     visibility: 'active',
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
