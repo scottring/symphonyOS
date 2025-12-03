@@ -13,7 +13,7 @@ interface ScheduleItemProps {
 export function ScheduleItem({ item, selected, onSelect, onToggleComplete, contactName, projectName }: ScheduleItemProps) {
   const isTask = item.type === 'task'
   const isRoutine = item.type === 'routine'
-  const isActionable = isTask || isRoutine // Items with checkboxes
+  const isActionable = isTask || isRoutine
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -27,7 +27,7 @@ export function ScheduleItem({ item, selected, onSelect, onToggleComplete, conta
     }
   }
 
-  // Parse time display - could be single time, range (pipe-separated), or "All day"
+  // Parse time display
   const getTimeDisplay = () => {
     if (!item.startTime) return null
 
@@ -53,88 +53,87 @@ export function ScheduleItem({ item, selected, onSelect, onToggleComplete, conta
       role="button"
       aria-pressed={selected}
       className={`
-        flex items-center gap-3 pl-2 pr-4 py-3 rounded-xl cursor-pointer
-        transition-all duration-150 border
+        group flex items-center gap-4 px-4 py-4 rounded-2xl cursor-pointer
+        transition-all duration-200 border
         ${selected
-          ? 'bg-primary-50/50 border-primary-200 shadow-sm'
-          : 'bg-white border-neutral-100 hover:border-neutral-200 hover:shadow-sm'
+          ? 'bg-primary-50 border-primary-200 shadow-md ring-1 ring-primary-200'
+          : 'bg-bg-elevated border-transparent hover:border-neutral-200 hover:shadow-md'
         }
-        ${item.completed ? 'opacity-50' : ''}
+        ${item.completed ? 'opacity-60' : ''}
       `}
     >
-      {/* Time column - compact, left-aligned */}
-      <div className="w-8 shrink-0 text-left">
+      {/* Time column - refined typography */}
+      <div className="w-12 shrink-0 text-left">
         {timeDisplay ? (
           timeDisplay.type === 'allday' ? (
-            <div className="flex flex-col text-xs text-neutral-400 font-medium leading-tight">
+            <div className="flex flex-col text-xs text-neutral-400 font-medium leading-tight tracking-wide">
               <span>All</span>
               <span>day</span>
             </div>
           ) : timeDisplay.type === 'range' ? (
-            <div className="flex flex-col text-xs text-neutral-400 font-medium leading-tight">
+            <div className="flex flex-col text-xs text-neutral-400 font-medium leading-tight tracking-wide">
               <span>{timeDisplay.start}</span>
-              <span>{timeDisplay.end}</span>
+              <span className="text-neutral-300">{timeDisplay.end}</span>
             </div>
           ) : (
-            <span className="text-xs text-neutral-400 font-medium">{timeDisplay.time}</span>
+            <span className="text-sm text-neutral-500 font-medium tabular-nums">{timeDisplay.time}</span>
           )
         ) : (
-          <span className="text-xs text-neutral-300">—</span>
+          <span className="text-sm text-neutral-300 font-light">—</span>
         )}
       </div>
 
-      {/* Checkbox/dot column */}
-      <div className="w-5 shrink-0 flex items-center justify-center">
+      {/* Checkbox/dot column with enhanced styling */}
+      <div className="shrink-0 flex items-center justify-center">
         {isActionable ? (
           <button
             onClick={handleCheckboxClick}
-            className="touch-target flex items-center justify-center"
+            className="touch-target flex items-center justify-center -m-2 p-2"
             aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
           >
             <span
               className={`
-                w-5 h-5 border-2
-                flex items-center justify-center
-                transition-colors
-                ${isRoutine ? 'rounded-full' : 'rounded-md'}
-                ${item.completed
-                  ? 'bg-primary-500 border-primary-500 text-white'
-                  : 'border-neutral-300 hover:border-primary-400'
-                }
+                checkbox-custom
+                ${isRoutine ? 'routine' : ''}
+                ${item.completed ? 'checked' : ''}
               `}
             >
               {item.completed && (
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-white" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
               )}
             </span>
           </button>
         ) : (
-          <div className="w-2.5 h-2.5 rounded-full bg-primary-400" />
+          <div className="w-3 h-3 rounded-full bg-gradient-to-br from-primary-400 to-primary-500 shadow-sm" />
         )}
       </div>
 
-      {/* Title and contact chip */}
-      <div className="flex-1 min-w-0 flex items-center gap-2">
+      {/* Title and chips */}
+      <div className="flex-1 min-w-0 flex items-center gap-3">
         <span
           className={`
-            text-base font-medium truncate
-            ${item.completed ? 'line-through text-neutral-400' : 'text-neutral-800'}
+            text-base font-medium truncate transition-colors
+            ${item.completed ? 'line-through text-neutral-400' : 'text-neutral-800 group-hover:text-neutral-900'}
           `}
         >
           {item.title}
         </span>
+
+        {/* Contact chip */}
         {contactName && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-xs font-medium shrink-0">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary-50 text-primary-700 rounded-full text-xs font-medium shrink-0 border border-primary-100">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
             </svg>
             {contactName}
           </span>
         )}
+
+        {/* Project chip */}
         {projectName && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs font-medium shrink-0">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium shrink-0 border border-blue-100">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
               <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
             </svg>
@@ -143,12 +142,12 @@ export function ScheduleItem({ item, selected, onSelect, onToggleComplete, conta
         )}
       </div>
 
-      {/* Context indicator - shows if there's extra info */}
+      {/* Context indicator - refined */}
       {(item.notes || item.links?.length || item.phoneNumber || item.location) && (
-        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-neutral-100 flex items-center justify-center">
+        <div className="flex-shrink-0 w-7 h-7 rounded-full bg-neutral-100 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            className="w-3.5 h-3.5 text-neutral-400"
+            className="w-4 h-4 text-neutral-500"
             viewBox="0 0 20 20"
             fill="currentColor"
           >

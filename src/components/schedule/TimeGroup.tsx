@@ -16,11 +16,11 @@ export function TimeGroup({ section, children, isEmpty }: TimeGroupProps) {
   }
 
   return (
-    <div className="mb-8">
-      <h3 className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider mb-3">
+    <div className="mb-10">
+      <h3 className="time-group-header mb-4">
         {label}
       </h3>
-      <div className="space-y-2">
+      <div className="space-y-3 stagger-in">
         {children}
       </div>
     </div>

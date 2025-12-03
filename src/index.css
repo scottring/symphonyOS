@@ -1,66 +1,78 @@
 @import "tailwindcss";
 
 /* =============================================================================
-   SYMPHONY OS - SCANDINAVIAN DESIGN SYSTEM
-   Warm, inviting, minimal design with generous spacing
+   SYMPHONY OS - NORDIC JOURNAL DESIGN SYSTEM
+   Refined minimalism with editorial sophistication
    ============================================================================= */
+
+/* Google Fonts - Fraunces (elegant serif) + DM Sans (warm geometric) */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
 
 @theme {
   /* ---------------------------------------------------------------------------
-     COLORS - Warm Neutral Palette
-     HSL-based for consistency, warm undertones (not cold grays)
+     COLORS - Warm Nordic Palette
+     Rich creams, deep forest greens, organic warmth
      --------------------------------------------------------------------------- */
 
-  /* Warm Neutrals (30° hue for warmth) */
-  --color-neutral-50: hsl(40 22% 97%);
-  --color-neutral-100: hsl(38 20% 94%);
-  --color-neutral-200: hsl(35 18% 88%);
-  --color-neutral-300: hsl(35 15% 82%);
-  --color-neutral-400: hsl(35 10% 70%);
-  --color-neutral-500: hsl(35 8% 56%);
-  --color-neutral-600: hsl(30 6% 44%);
-  --color-neutral-700: hsl(30 7% 34%);
-  --color-neutral-800: hsl(30 8% 24%);
-  --color-neutral-900: hsl(30 10% 16%);
-  --color-neutral-950: hsl(30 12% 10%);
+  /* Warm Cream Neutrals (warmer than before, paper-like) */
+  --color-neutral-50: hsl(42 45% 97%);
+  --color-neutral-100: hsl(40 38% 94%);
+  --color-neutral-200: hsl(38 30% 88%);
+  --color-neutral-300: hsl(36 22% 78%);
+  --color-neutral-400: hsl(34 14% 60%);
+  --color-neutral-500: hsl(32 10% 46%);
+  --color-neutral-600: hsl(30 10% 36%);
+  --color-neutral-700: hsl(28 12% 28%);
+  --color-neutral-800: hsl(26 14% 20%);
+  --color-neutral-900: hsl(24 16% 14%);
+  --color-neutral-950: hsl(22 18% 8%);
 
-  /* Primary - Forest Green */
-  --color-primary-50: hsl(150 30% 96%);
-  --color-primary-100: hsl(150 28% 90%);
-  --color-primary-200: hsl(150 26% 80%);
-  --color-primary-300: hsl(150 30% 65%);
-  --color-primary-400: hsl(150 38% 50%);
-  --color-primary-500: hsl(150 45% 34%);  /* #3d8b6e - main brand color */
-  --color-primary-600: hsl(150 50% 28%);
-  --color-primary-700: hsl(150 52% 24%);
-  --color-primary-800: hsl(150 50% 20%);
-  --color-primary-900: hsl(150 48% 16%);
-  --color-primary-950: hsl(150 50% 10%);
+  /* Primary - Deep Forest Green with more richness */
+  --color-primary-50: hsl(152 35% 96%);
+  --color-primary-100: hsl(152 32% 90%);
+  --color-primary-200: hsl(152 30% 78%);
+  --color-primary-300: hsl(152 34% 62%);
+  --color-primary-400: hsl(152 42% 46%);
+  --color-primary-500: hsl(152 50% 32%);  /* Deeper, richer forest green */
+  --color-primary-600: hsl(152 55% 26%);
+  --color-primary-700: hsl(152 58% 22%);
+  --color-primary-800: hsl(152 55% 18%);
+  --color-primary-900: hsl(152 52% 14%);
+  --color-primary-950: hsl(152 55% 8%);
 
-  /* State Colors (muted, not alarming) */
-  --color-success-50: hsl(145 30% 96%);
-  --color-success-500: hsl(145 45% 38%);
-  --color-success-600: hsl(145 50% 32%);
+  /* Accent - Sage (secondary organic tone) */
+  --color-sage-50: hsl(140 25% 96%);
+  --color-sage-100: hsl(140 22% 90%);
+  --color-sage-200: hsl(140 20% 82%);
+  --color-sage-300: hsl(140 22% 68%);
+  --color-sage-400: hsl(140 24% 52%);
+  --color-sage-500: hsl(140 28% 40%);
 
-  --color-warning-50: hsl(35 85% 96%);
-  --color-warning-500: hsl(30 85% 52%);
-  --color-warning-600: hsl(28 85% 46%);
+  /* State Colors (organic, muted) */
+  --color-success-50: hsl(150 35% 96%);
+  --color-success-500: hsl(150 50% 34%);
+  --color-success-600: hsl(150 55% 28%);
 
-  --color-danger-50: hsl(0 60% 96%);
-  --color-danger-500: hsl(0 65% 50%);
-  --color-danger-600: hsl(0 70% 44%);
+  --color-warning-50: hsl(38 75% 96%);
+  --color-warning-500: hsl(35 80% 50%);
+  --color-warning-600: hsl(32 80% 44%);
 
-  /* Background Tiers */
-  --color-bg-base: hsl(38 35% 95%);      /* Warm off-white base */
-  --color-bg-elevated: hsl(0 0% 100%);   /* Pure white for cards */
-  --color-bg-overlay: hsl(0 0% 100%);    /* Modals */
+  --color-danger-50: hsl(4 55% 96%);
+  --color-danger-500: hsl(4 60% 52%);
+  --color-danger-600: hsl(4 65% 45%);
+
+  /* Background Tiers - Warm cream base */
+  --color-bg-base: hsl(42 40% 95%);        /* Warm cream base */
+  --color-bg-elevated: hsl(44 50% 98%);    /* Soft off-white for cards */
+  --color-bg-overlay: hsl(0 0% 100%);      /* Pure white for modals */
 
   /* ---------------------------------------------------------------------------
      TYPOGRAPHY
-     Softer weights, generous line-heights
+     Fraunces for display, DM Sans for body
      --------------------------------------------------------------------------- */
 
-  --font-family-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-family-display: 'Fraunces', Georgia, serif;
+  --font-family-sans: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
   /* Font Sizes */
   --font-size-xs: 0.75rem;    /* 12px */
@@ -69,29 +81,30 @@
   --font-size-lg: 1.125rem;   /* 18px */
   --font-size-xl: 1.25rem;    /* 20px */
   --font-size-2xl: 1.5rem;    /* 24px */
-  --font-size-3xl: 1.875rem;  /* 30px */
-  --font-size-4xl: 2.25rem;   /* 36px */
+  --font-size-3xl: 2rem;      /* 32px */
+  --font-size-4xl: 2.5rem;    /* 40px */
 
-  /* Line Heights (generous, Scandinavian breathing) */
-  --line-height-tight: 1.3;
-  --line-height-normal: 1.6;
-  --line-height-relaxed: 1.8;
+  /* Line Heights */
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.55;
+  --line-height-relaxed: 1.75;
 
-  /* Font Weights (softer than typical) */
+  /* Font Weights */
   --font-weight-light: 300;
   --font-weight-normal: 400;
-  --font-weight-medium: 450;
-  --font-weight-semibold: 550;
-  --font-weight-bold: 650;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
 
   /* ---------------------------------------------------------------------------
-     SPACING - Generous Scandinavian Scale
-     Using numbered scale to avoid conflicts with Tailwind's size tokens (sm, md, lg, etc.)
+     SPACING - Generous breathing room
      --------------------------------------------------------------------------- */
 
   --spacing-1: 0.25rem;    /* 4px */
   --spacing-2: 0.5rem;     /* 8px */
+  --spacing-3: 0.75rem;    /* 12px */
   --spacing-4: 1rem;       /* 16px */
+  --spacing-5: 1.25rem;    /* 20px */
   --spacing-6: 1.5rem;     /* 24px */
   --spacing-8: 2rem;       /* 32px */
   --spacing-10: 2.5rem;    /* 40px */
@@ -99,34 +112,39 @@
   --spacing-16: 4rem;      /* 64px */
 
   /* ---------------------------------------------------------------------------
-     BORDER RADIUS - Soft but defined
+     BORDER RADIUS - Soft organic curves
      --------------------------------------------------------------------------- */
 
-  --radius-sm: 0.375rem;   /* 6px */
-  --radius-md: 0.5rem;     /* 8px */
-  --radius-lg: 0.75rem;    /* 12px */
-  --radius-xl: 1rem;       /* 16px */
+  --radius-sm: 0.5rem;     /* 8px */
+  --radius-md: 0.75rem;    /* 12px */
+  --radius-lg: 1rem;       /* 16px */
+  --radius-xl: 1.25rem;    /* 20px */
   --radius-2xl: 1.5rem;    /* 24px */
+  --radius-3xl: 2rem;      /* 32px */
   --radius-full: 9999px;
 
   /* ---------------------------------------------------------------------------
-     SHADOWS - Soft, diffused, minimal
-     Very low opacity for that Scandinavian subtlety
+     SHADOWS - Warm, colored shadows for depth
      --------------------------------------------------------------------------- */
 
-  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.03);
-  --shadow-md: 0 2px 8px 0 rgb(0 0 0 / 0.04);
-  --shadow-lg: 0 4px 12px 0 rgb(0 0 0 / 0.06);
-  --shadow-xl: 0 8px 20px 0 rgb(0 0 0 / 0.08);
-  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.03), 0 2px 8px 0 rgb(0 0 0 / 0.04);
+  --shadow-sm: 0 1px 2px 0 hsl(32 20% 20% / 0.03), 0 1px 3px 0 hsl(32 20% 20% / 0.04);
+  --shadow-md: 0 2px 4px -1px hsl(32 20% 20% / 0.04), 0 4px 8px 0 hsl(32 20% 20% / 0.05);
+  --shadow-lg: 0 4px 6px -2px hsl(32 20% 20% / 0.04), 0 10px 20px -2px hsl(32 20% 20% / 0.08);
+  --shadow-xl: 0 8px 10px -3px hsl(32 20% 20% / 0.05), 0 20px 40px -4px hsl(32 20% 20% / 0.1);
+  --shadow-card: 0 1px 2px 0 hsl(32 20% 20% / 0.02), 0 2px 8px 0 hsl(32 20% 20% / 0.04), 0 0 0 1px hsl(32 20% 20% / 0.04);
+
+  /* Colored shadows for interactive elements */
+  --shadow-primary: 0 4px 14px -3px hsl(152 50% 32% / 0.25);
+  --shadow-success: 0 4px 14px -3px hsl(150 50% 34% / 0.25);
 
   /* ---------------------------------------------------------------------------
-     TRANSITIONS
+     TRANSITIONS - Smooth, satisfying motion
      --------------------------------------------------------------------------- */
 
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* =============================================================================
@@ -141,6 +159,7 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'kern' 1, 'liga' 1;
 }
 
 body {
@@ -150,9 +169,42 @@ body {
   color: var(--color-neutral-800);
 }
 
+/* Display font utility */
+.font-display {
+  font-family: var(--font-family-display);
+  font-feature-settings: 'ss01' 1, 'ss02' 1;
+}
+
+/* =============================================================================
+   TEXTURE & BACKGROUND EFFECTS
+   ============================================================================= */
+
+/* Subtle paper texture overlay */
+.paper-texture {
+  position: relative;
+}
+
+.paper-texture::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  opacity: 0.015;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+
+/* Gradient mesh background for auth page */
+.gradient-mesh {
+  background:
+    radial-gradient(ellipse at 20% 30%, hsl(152 40% 92% / 0.6) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 70%, hsl(42 50% 94% / 0.8) 0%, transparent 50%),
+    radial-gradient(ellipse at 60% 20%, hsl(140 30% 94% / 0.4) 0%, transparent 40%),
+    var(--color-bg-base);
+}
+
 /* =============================================================================
    MOBILE SUPPORT
-   Safe area insets for iOS devices
    ============================================================================= */
 
 @supports (padding: env(safe-area-inset-top)) {
@@ -162,12 +214,10 @@ body {
   .safe-right { padding-right: env(safe-area-inset-right); }
 }
 
-/* Prevent iOS tap highlight */
 * {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Smooth scrolling with momentum on iOS */
 .scroll-container {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
@@ -175,7 +225,6 @@ body {
 
 /* =============================================================================
    FOCUS STYLES
-   Accessible green focus ring
    ============================================================================= */
 
 :focus-visible {
@@ -188,46 +237,157 @@ body {
    UTILITY CLASSES
    ============================================================================= */
 
-/* Touch-friendly tap targets (48px minimum per WCAG/Material Design guidelines) */
 .touch-target {
-  min-height: 48px;
-  min-width: 48px;
+  min-height: 44px;
+  min-width: 44px;
 }
 
-/* Card base style */
+/* Card with refined styling */
 .card {
   background-color: var(--color-bg-elevated);
-  border: 1px solid var(--color-neutral-200);
-  border-radius: var(--radius-lg);
+  border: 1px solid hsl(38 25% 88%);
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-card);
 }
 
-/* Transition utilities */
-.transition-colors {
-  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast);
+/* Elevated card on hover */
+.card-interactive {
+  transition: transform var(--transition-base), box-shadow var(--transition-base);
 }
 
-.transition-shadow {
-  transition: box-shadow var(--transition-fast);
+.card-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
 }
 
-.transition-all {
-  transition: all var(--transition-base);
+/* Glass effect for overlays */
+.glass {
+  background: hsl(44 50% 98% / 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 /* =============================================================================
-   ANIMATIONS
-   Subtle, purposeful motion
+   CUSTOM CHECKBOX - Organic, satisfying interaction
    ============================================================================= */
 
-@keyframes fade-in {
+.checkbox-custom {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--color-neutral-300);
+  border-radius: 6px;
+  background: var(--color-bg-elevated);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkbox-custom:hover {
+  border-color: var(--color-primary-400);
+  transform: scale(1.05);
+}
+
+.checkbox-custom.checked {
+  background: var(--color-primary-500);
+  border-color: var(--color-primary-500);
+  box-shadow: var(--shadow-primary);
+}
+
+.checkbox-custom.checked svg {
+  animation: checkbox-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.checkbox-custom.routine {
+  border-radius: 50%;
+}
+
+/* Checkbox checkmark animation */
+@keyframes checkbox-pop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* =============================================================================
+   PROGRESS BAR - Organic, animated
+   ============================================================================= */
+
+.progress-bar {
+  height: 6px;
+  background: hsl(38 25% 90%);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-bar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg,
+    var(--color-primary-500) 0%,
+    var(--color-primary-400) 50%,
+    var(--color-primary-500) 100%
+  );
+  background-size: 200% 100%;
+  border-radius: inherit;
+  transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.progress-bar.animated::before {
+  animation: progress-shimmer 2s ease-in-out infinite;
+}
+
+@keyframes progress-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* =============================================================================
+   ANIMATIONS - Orchestrated entrance
+   ============================================================================= */
+
+@keyframes fade-in-up {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(16px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes fade-in-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 
@@ -240,26 +400,186 @@ body {
   }
 }
 
-.animate-slide-up {
-  animation: slide-up 250ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes fade-out {
-  from {
-    opacity: 1;
+@keyframes float {
+  0%, 100% {
     transform: translateY(0);
   }
-  to {
-    opacity: 0;
-    transform: translateY(8px);
+  50% {
+    transform: translateY(-8px);
   }
 }
 
-.animate-fade-in {
-  animation: fade-in var(--transition-base) ease-out;
+@keyframes pulse-soft {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 
-/* Respect reduced motion preferences */
+/* Staggered entrance for list items */
+.stagger-in > * {
+  animation: fade-in-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.stagger-in > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-in > *:nth-child(2) { animation-delay: 50ms; }
+.stagger-in > *:nth-child(3) { animation-delay: 100ms; }
+.stagger-in > *:nth-child(4) { animation-delay: 150ms; }
+.stagger-in > *:nth-child(5) { animation-delay: 200ms; }
+.stagger-in > *:nth-child(6) { animation-delay: 250ms; }
+.stagger-in > *:nth-child(7) { animation-delay: 300ms; }
+.stagger-in > *:nth-child(8) { animation-delay: 350ms; }
+.stagger-in > *:nth-child(9) { animation-delay: 400ms; }
+.stagger-in > *:nth-child(10) { animation-delay: 450ms; }
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-fade-in-scale {
+  animation: fade-in-scale 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+/* =============================================================================
+   BUTTON STYLES
+   ============================================================================= */
+
+.btn-primary {
+  background: linear-gradient(180deg, var(--color-primary-500) 0%, var(--color-primary-600) 100%);
+  color: white;
+  font-weight: 500;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-lg);
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  box-shadow: 0 1px 2px hsl(152 50% 20% / 0.2), 0 4px 12px hsl(152 50% 20% / 0.15);
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px hsl(152 50% 20% / 0.2), 0 8px 20px hsl(152 50% 20% / 0.2);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  background: var(--color-bg-elevated);
+  color: var(--color-neutral-700);
+  font-weight: 500;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-neutral-200);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.btn-secondary:hover {
+  background: var(--color-neutral-50);
+  border-color: var(--color-neutral-300);
+}
+
+/* =============================================================================
+   TIME GROUP HEADERS - Editorial typography
+   ============================================================================= */
+
+.time-group-header {
+  font-family: var(--font-family-display);
+  font-weight: 500;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-neutral-500);
+  position: relative;
+  padding-left: 1rem;
+}
+
+.time-group-header::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 4px;
+  background: var(--color-primary-400);
+  border-radius: 50%;
+}
+
+/* =============================================================================
+   INPUT STYLES
+   ============================================================================= */
+
+.input-base {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  background: var(--color-bg-elevated);
+  border: 1.5px solid var(--color-neutral-200);
+  border-radius: var(--radius-lg);
+  font-size: 1rem;
+  color: var(--color-neutral-800);
+  transition: all var(--transition-base);
+}
+
+.input-base::placeholder {
+  color: var(--color-neutral-400);
+}
+
+.input-base:focus {
+  outline: none;
+  border-color: var(--color-primary-400);
+  box-shadow: 0 0 0 3px hsl(152 50% 32% / 0.1);
+}
+
+/* =============================================================================
+   SKELETON LOADING - Warm shimmer
+   ============================================================================= */
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-neutral-100) 0%,
+    var(--color-neutral-50) 50%,
+    var(--color-neutral-100) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-md);
+}
+
+/* =============================================================================
+   REDUCED MOTION
+   ============================================================================= */
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -269,4 +589,51 @@ body {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+
+  .stagger-in > * {
+    animation: none;
+  }
+}
+
+/* =============================================================================
+   SCROLLBAR STYLING
+   ============================================================================= */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-neutral-300);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-neutral-400);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-neutral-300) transparent;
+}
+
+/* =============================================================================
+   DECORATIVE ELEMENTS
+   ============================================================================= */
+
+/* Decorative dot pattern */
+.dot-pattern {
+  background-image: radial-gradient(var(--color-neutral-200) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Organic blob shape */
+.blob {
+  border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
 }

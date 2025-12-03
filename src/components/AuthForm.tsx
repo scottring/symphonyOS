@@ -28,88 +28,130 @@ export function AuthForm() {
   }
 
   return (
-    <div className="max-w-sm mx-auto px-6 py-8">
-      {/* Header */}
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-semibold text-primary-600 mb-2">Symphony OS</h1>
-        <p className="text-neutral-500">Your personal operating system</p>
+    <div className="min-h-screen gradient-mesh flex flex-col items-center justify-center px-6 py-12">
+      {/* Decorative elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-20 left-10 w-64 h-64 bg-primary-200/20 blob animate-float" style={{ animationDelay: '0s' }} />
+        <div className="absolute bottom-32 right-16 w-48 h-48 bg-primary-300/15 blob animate-float" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-1/3 right-1/4 w-32 h-32 bg-neutral-200/30 blob animate-float" style={{ animationDelay: '2s' }} />
       </div>
 
-      {/* Form card */}
-      <div className="card p-6">
-        <h2 className="text-xl font-medium text-neutral-800 mb-6 text-center">
-          {isSignUp ? 'Create Account' : 'Welcome Back'}
-        </h2>
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-neutral-700 mb-2">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 border border-neutral-200 rounded-xl bg-white
-                         text-neutral-800 placeholder:text-neutral-400
-                         focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
-                         transition-shadow"
-              placeholder="you@example.com"
-              required
-            />
+      {/* Content */}
+      <div className="relative z-10 w-full max-w-md animate-fade-in-up">
+        {/* Header */}
+        <div className="text-center mb-10">
+          {/* Logo mark */}
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary-500 shadow-primary mb-6 animate-fade-in-scale">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="white"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="w-8 h-8"
+            >
+              <path d="M12 2L2 7l10 5 10-5-10-5z" />
+              <path d="M2 17l10 5 10-5" />
+              <path d="M2 12l10 5 10-5" />
+            </svg>
           </div>
 
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-neutral-700 mb-2">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-neutral-200 rounded-xl bg-white
-                         text-neutral-800 placeholder:text-neutral-400
-                         focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
-                         transition-shadow"
-              placeholder="At least 6 characters"
-              required
-              minLength={6}
-            />
-          </div>
+          <h1 className="font-display text-4xl font-semibold text-neutral-900 mb-3 tracking-tight">
+            Symphony
+          </h1>
+          <p className="text-neutral-500 text-lg">
+            Your personal operating system
+          </p>
+        </div>
 
-          {error && (
-            <div className={`p-3 rounded-lg text-sm ${
-              error.includes('Check your email')
-                ? 'bg-success-50 text-success-600'
-                : 'bg-danger-50 text-danger-600'
-            }`}>
-              {error}
+        {/* Form card */}
+        <div className="card p-8 paper-texture">
+          <h2 className="font-display text-2xl font-medium text-neutral-800 mb-8 text-center">
+            {isSignUp ? 'Create Account' : 'Welcome Back'}
+          </h2>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <label htmlFor="email" className="block text-sm font-medium text-neutral-600">
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="input-base"
+                placeholder="you@example.com"
+                required
+              />
             </div>
-          )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 px-4 bg-primary-500 text-white font-medium rounded-xl
-                       hover:bg-primary-600 active:bg-primary-700
-                       disabled:opacity-50 disabled:cursor-not-allowed
-                       shadow-sm hover:shadow-md transition-all touch-target"
-          >
-            {loading ? 'Loading...' : isSignUp ? 'Create Account' : 'Sign In'}
-          </button>
-        </form>
+            <div className="space-y-2">
+              <label htmlFor="password" className="block text-sm font-medium text-neutral-600">
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="input-base"
+                placeholder="At least 6 characters"
+                required
+                minLength={6}
+              />
+            </div>
 
-        <p className="mt-6 text-center text-sm text-neutral-500">
-          {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
-          <button
-            type="button"
-            onClick={() => setIsSignUp(!isSignUp)}
-            className="text-primary-600 font-medium hover:underline"
-          >
-            {isSignUp ? 'Sign In' : 'Sign Up'}
-          </button>
+            {error && (
+              <div className={`p-4 rounded-xl text-sm font-medium animate-fade-in-scale ${
+                error.includes('Check your email')
+                  ? 'bg-success-50 text-success-600 border border-success-500/20'
+                  : 'bg-danger-50 text-danger-600 border border-danger-500/20'
+              }`}>
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full btn-primary py-4 text-base font-medium rounded-xl
+                         disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none
+                         touch-target"
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span>Signing in...</span>
+                </span>
+              ) : (
+                isSignUp ? 'Create Account' : 'Sign In'
+              )}
+            </button>
+          </form>
+
+          <div className="mt-8 pt-6 border-t border-neutral-100">
+            <p className="text-center text-sm text-neutral-500">
+              {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
+              <button
+                type="button"
+                onClick={() => setIsSignUp(!isSignUp)}
+                className="text-primary-600 font-semibold hover:text-primary-700 transition-colors"
+              >
+                {isSignUp ? 'Sign In' : 'Sign Up'}
+              </button>
+            </p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <p className="mt-8 text-center text-sm text-neutral-400">
+          Organize your life with clarity and purpose
         </p>
       </div>
     </div>

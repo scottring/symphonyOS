@@ -25,37 +25,33 @@ interface TodayScheduleProps {
   contactsMap?: Map<string, Contact>
   projectsMap?: Map<string, Project>
   eventNotesMap?: Map<string, EventNote>
-  onRefreshInstances?: () => void // Called after actionable actions to refresh filtered list
+  onRefreshInstances?: () => void
 }
 
 function LoadingSkeleton() {
   return (
-    <div className="space-y-6 animate-pulse">
+    <div className="space-y-8">
       {/* Morning section skeleton */}
       <div>
-        <div className="h-3 bg-neutral-100 rounded w-16 mb-3" />
-        <div className="space-y-2">
+        <div className="h-4 skeleton w-20 mb-4" />
+        <div className="space-y-3">
           {[1, 2].map((i) => (
-            <div key={`m-${i}`} className="flex items-center gap-3 p-3 rounded-lg bg-neutral-50 border border-neutral-100">
-              <div className="w-4 h-4 bg-neutral-200 rounded-full flex-shrink-0" />
-              <div className="flex-1 flex items-center gap-3">
-                <div className="h-4 bg-neutral-100 rounded w-12 flex-shrink-0" />
-                <div className="h-4 bg-neutral-200 rounded flex-1 max-w-48" />
-              </div>
+            <div key={`m-${i}`} className="flex items-center gap-4 p-4 rounded-2xl bg-bg-elevated border border-neutral-100">
+              <div className="w-10 h-6 skeleton" />
+              <div className="w-6 h-6 skeleton rounded-lg" />
+              <div className="flex-1 h-5 skeleton max-w-xs" />
             </div>
           ))}
         </div>
       </div>
       {/* Afternoon section skeleton */}
       <div>
-        <div className="h-3 bg-neutral-100 rounded w-20 mb-3" />
-        <div className="space-y-2">
-          <div className="flex items-center gap-3 p-3 rounded-lg bg-neutral-50 border border-neutral-100">
-            <div className="w-4 h-4 bg-neutral-200 rounded-full flex-shrink-0" />
-            <div className="flex-1 flex items-center gap-3">
-              <div className="h-4 bg-neutral-100 rounded w-12 flex-shrink-0" />
-              <div className="h-4 bg-neutral-200 rounded flex-1 max-w-56" />
-            </div>
+        <div className="h-4 skeleton w-24 mb-4" />
+        <div className="space-y-3">
+          <div className="flex items-center gap-4 p-4 rounded-2xl bg-bg-elevated border border-neutral-100">
+            <div className="w-10 h-6 skeleton" />
+            <div className="w-6 h-6 skeleton rounded-lg" />
+            <div className="flex-1 h-5 skeleton max-w-sm" />
           </div>
         </div>
       </div>
@@ -86,12 +82,10 @@ export function TodaySchedule({
     endOfDay.setHours(23, 59, 59, 999)
 
     return tasks.filter((task) => {
-      // If task has a scheduled time, check if it falls on viewed date
       if (task.scheduledFor) {
         const taskDate = new Date(task.scheduledFor)
         return taskDate >= startOfDay && taskDate <= endOfDay
       }
-      // Unscheduled tasks only show on today's view
       const today = new Date()
       return (
         viewedDate.getFullYear() === today.getFullYear() &&
@@ -112,7 +106,6 @@ export function TodaySchedule({
       if (!startTimeStr) return false
 
       const eventStart = new Date(startTimeStr)
-      // Check if event starts on the viewed date
       return (
         eventStart.getFullYear() === viewedYear &&
         eventStart.getMonth() === viewedMonth &&
@@ -120,7 +113,6 @@ export function TodaySchedule({
       )
     })
 
-    // Deduplicate by title + start time (same event on multiple calendars)
     const seen = new Set<string>()
     return eventsForDay.filter((event) => {
       const startTimeStr = event.start_time || event.startTime
@@ -145,10 +137,8 @@ export function TodaySchedule({
   const grouped = useMemo(() => {
     const taskItems = filteredTasks.map(taskToTimelineItem)
 
-    // Convert events to timeline items and merge Symphony notes
     const eventItems = filteredEvents.map((event) => {
       const item = eventToTimelineItem(event)
-      // Check if there's a Symphony note for this event
       const eventId = event.google_event_id || event.id
       const eventNote = eventNotesMap?.get(eventId)
       if (eventNote?.notes) {
@@ -157,7 +147,6 @@ export function TodaySchedule({
       return item
     })
 
-    // Convert routines to timeline items with completion status
     const routineItems = routines.map((routine) => {
       const item = routineToTimelineItem(routine, viewedDate)
       const instance = routineStatusMap.get(routine.id)
@@ -190,37 +179,44 @@ export function TodaySchedule({
     )
   }
 
-  // Calculate completion stats (tasks + routines, not events)
+  // Calculate completion stats
   const completedTasks = filteredTasks.filter((t) => t.completed).length
   const completedRoutines = routines.filter((r) => routineStatusMap.get(r.id)?.status === 'completed').length
   const completedCount = completedTasks + completedRoutines
-  const actionableCount = filteredTasks.length + routines.length // Only count tasks and routines for progress
+  const actionableCount = filteredTasks.length + routines.length
   const totalItems = filteredTasks.length + filteredEvents.length + routines.length
   const progressPercent = actionableCount > 0 ? (completedCount / actionableCount) * 100 : 0
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
+    <div className="p-6 md:p-8 max-w-2xl mx-auto">
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-neutral-800">
-            {formatDate()}
-          </h2>
+      <div className="mb-8 animate-fade-in-up">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="font-display text-2xl md:text-3xl font-semibold text-neutral-900 mb-1">
+              {isToday() ? 'Today' : formatDate().split(',')[0]}
+            </h2>
+            <p className="text-neutral-500 text-sm">
+              {formatDate()}
+            </p>
+          </div>
           <DateNavigator date={viewedDate} onDateChange={onDateChange} />
         </div>
 
         {/* Progress bar */}
         {actionableCount > 0 && (
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-neutral-500">
-              {completedCount} of {actionableCount}
-            </span>
-            <div className="flex-1 h-1.5 bg-neutral-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-primary-500 rounded-full transition-all duration-300"
-                style={{ width: `${progressPercent}%` }}
-              />
+          <div className="flex items-center gap-4">
+            <div className="flex-1">
+              <div className="progress-bar" style={{ '--progress-width': `${progressPercent}%` } as React.CSSProperties}>
+                <div
+                  className="absolute inset-0 bg-gradient-to-r from-primary-500 to-primary-400 rounded-full transition-all duration-500"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
             </div>
+            <span className="text-sm font-medium text-neutral-600 tabular-nums min-w-[4rem] text-right">
+              {completedCount} / {actionableCount}
+            </span>
           </div>
         )}
       </div>
@@ -229,14 +225,26 @@ export function TodaySchedule({
       {loading ? (
         <LoadingSkeleton />
       ) : totalItems === 0 ? (
-        <div className="text-center py-12">
+        <div className="text-center py-16 animate-fade-in-up">
+          <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-neutral-100 flex items-center justify-center">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-8 h-8 text-neutral-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.5}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+            </svg>
+          </div>
           {isToday() ? (
             <>
-              <p className="text-neutral-500 mb-2">Your day is clear</p>
-              <p className="text-sm text-neutral-400">Add a task to get started</p>
+              <p className="font-display text-xl text-neutral-700 mb-2">Your day is clear</p>
+              <p className="text-neutral-500">Press <kbd className="px-2 py-1 bg-neutral-100 rounded-md text-xs font-mono">Cmd+K</kbd> to add a task</p>
             </>
           ) : (
-            <p className="text-neutral-500">
+            <p className="font-display text-xl text-neutral-600">
               Nothing scheduled for {viewedDate.toLocaleDateString('en-US', { weekday: 'long' })}
             </p>
           )}
@@ -257,7 +265,6 @@ export function TodaySchedule({
                       selected={selectedItemId === item.id}
                       onSelect={() => onSelectItem(item.id)}
                       onToggleComplete={() => {
-                        // Only toggle tasks, not events
                         if (item.type === 'task' && item.id.startsWith('task-')) {
                           const taskId = item.id.replace('task-', '')
                           onToggleTask(taskId)

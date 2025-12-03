@@ -176,10 +176,10 @@ function ActionButton({ action, onOpenRecipe }: { action: DetectedAction; onOpen
     <button
       onClick={handleClick}
       className={`
-        flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-colors
+        flex items-center gap-2.5 px-4 py-3 rounded-xl font-medium text-sm transition-all
         ${isPrimary
-          ? 'bg-primary-500 text-white hover:bg-primary-600'
-          : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+          ? 'btn-primary'
+          : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 hover:shadow-sm'
         }
       `}
     >
@@ -585,43 +585,35 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
   const phoneNumber = contact?.phone || item.phoneNumber
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col animate-slide-in-right">
       {/* Header - Checkbox + Title + Time */}
-      <div className="p-4 border-b border-neutral-100">
-        <div className="flex items-start gap-3">
+      <div className="p-5 border-b border-neutral-100">
+        <div className="flex items-start gap-4">
           {/* Checkbox for tasks, circular for routines, dot for events */}
           {isTask ? (
             <button
               onClick={handleToggle}
-              className={`mt-1 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                item.completed
-                  ? 'bg-primary-500 border-primary-500 text-white'
-                  : 'border-neutral-300 hover:border-primary-400'
-              }`}
+              className={`mt-1 checkbox-custom flex-shrink-0 ${item.completed ? 'checked' : ''}`}
               aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
             >
               {item.completed && (
-                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
               )}
             </button>
           ) : isRoutine ? (
             <div
-              className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                item.completed
-                  ? 'bg-primary-500 border-primary-500 text-white'
-                  : 'border-neutral-300'
-              }`}
+              className={`mt-1 checkbox-custom routine flex-shrink-0 ${item.completed ? 'checked' : ''}`}
             >
               {item.completed && (
-                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
               )}
             </div>
           ) : (
-            <div className="mt-2 w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" />
+            <div className="mt-2 w-3.5 h-3.5 rounded-full bg-gradient-to-br from-primary-400 to-primary-500 flex-shrink-0 shadow-sm" />
           )}
 
           {/* Title + Time */}
@@ -634,14 +626,14 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
                 onChange={(e) => setEditedTitle(e.target.value)}
                 onBlur={handleTitleSave}
                 onKeyDown={handleTitleKeyDown}
-                className="w-full text-lg font-semibold text-neutral-800 leading-tight
+                className="w-full font-display text-xl font-semibold text-neutral-800 leading-tight
                            bg-transparent border-b-2 border-primary-500
                            focus:outline-none py-0.5 -my-0.5"
               />
             ) : (
               <h2
-                className={`text-lg font-semibold leading-tight ${
-                  item.completed ? 'text-neutral-400 line-through' : 'text-neutral-800'
+                className={`font-display text-xl font-semibold leading-tight ${
+                  item.completed ? 'text-neutral-400 line-through' : 'text-neutral-900'
                 } ${isTask ? 'cursor-pointer hover:text-primary-600 transition-colors' : ''}`}
                 onClick={() => isTask && setIsEditingTitle(true)}
               >
@@ -788,7 +780,7 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
           {/* Close button */}
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
+            className="p-2 rounded-xl text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-all"
             aria-label="Close panel"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
@@ -834,7 +826,7 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
         )}
 
         {/* Notes Section - Always visible */}
-        <div className="p-4 border-b border-neutral-100">
+        <div className="p-5 border-b border-neutral-100">
           {isEditingNotes ? (
             <div>
               {/* Google Calendar description (read-only, events only) */}
@@ -1233,18 +1225,18 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
 
       {/* Footer - Delete button (tasks only) */}
       {isTask && (
-        <div className="p-4 border-t border-neutral-100">
+        <div className="p-5 border-t border-neutral-100">
           {showDeleteConfirm ? (
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 px-4 py-2 text-sm font-medium text-neutral-600 rounded-lg hover:bg-neutral-100 transition-colors"
+                className="flex-1 btn-secondary"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDelete}
-                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-danger-500 rounded-lg hover:bg-danger-600 transition-colors"
+                className="flex-1 px-4 py-3 text-sm font-medium text-white bg-danger-500 rounded-xl hover:bg-danger-600 transition-all shadow-sm"
               >
                 Delete
               </button>
@@ -1252,7 +1244,7 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
           ) : (
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="w-full px-4 py-2 text-sm text-neutral-500 hover:text-danger-600 transition-colors"
+              className="w-full px-4 py-3 text-sm font-medium text-neutral-500 hover:text-danger-600 hover:bg-danger-50 rounded-xl transition-all"
             >
               Delete task
             </button>
