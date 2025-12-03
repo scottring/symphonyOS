@@ -1,16 +1,18 @@
 import type { TimelineItem } from '@/types/timeline'
 import { formatTime, formatTimeRange } from '@/lib/timeUtils'
+import { DeferDropdown } from '@/components/triage'
 
 interface ScheduleItemProps {
   item: TimelineItem
   selected?: boolean
   onSelect: () => void
   onToggleComplete: () => void
+  onDefer?: (date: Date) => void
   contactName?: string
   projectName?: string
 }
 
-export function ScheduleItem({ item, selected, onSelect, onToggleComplete, contactName, projectName }: ScheduleItemProps) {
+export function ScheduleItem({ item, selected, onSelect, onToggleComplete, onDefer, contactName, projectName }: ScheduleItemProps) {
   const isTask = item.type === 'task'
   const isRoutine = item.type === 'routine'
   const isActionable = isTask || isRoutine
@@ -141,6 +143,18 @@ export function ScheduleItem({ item, selected, onSelect, onToggleComplete, conta
           </span>
         )}
       </div>
+
+      {/* Defer button - tasks only */}
+      {isTask && onDefer && (
+        <div
+          className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <span title="Defer">
+            <DeferDropdown onDefer={onDefer} size="sm" />
+          </span>
+        </div>
+      )}
 
       {/* Context indicator - refined */}
       {(item.notes || item.links?.length || item.phoneNumber || item.location) && (

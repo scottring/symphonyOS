@@ -326,6 +326,13 @@ export function TodaySchedule({
                           onToggleTask(taskId)
                         }
                       }}
+                      onDefer={item.type === 'task' && item.id.startsWith('task-') && onDeferTask
+                        ? (date: Date) => {
+                            const taskId = item.id.replace('task-', '')
+                            onDeferTask(taskId, date)
+                          }
+                        : undefined
+                      }
                       contactName={contactName || undefined}
                       projectName={projectName || undefined}
                     />

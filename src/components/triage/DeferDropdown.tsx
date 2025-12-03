@@ -2,9 +2,10 @@ import { useState, useRef, useEffect } from 'react'
 
 interface DeferDropdownProps {
   onDefer: (date: Date) => void
+  size?: 'sm' | 'md'
 }
 
-export function DeferDropdown({ onDefer }: DeferDropdownProps) {
+export function DeferDropdown({ onDefer, size = 'md' }: DeferDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [showDatePicker, setShowDatePicker] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -51,14 +52,19 @@ export function DeferDropdown({ onDefer }: DeferDropdownProps) {
     }
   }
 
+  const buttonClasses = size === 'sm'
+    ? 'p-1 rounded transition-colors text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100'
+    : 'p-1.5 rounded-lg transition-colors text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100'
+  const iconClasses = size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'
+
   return (
     <div ref={containerRef} className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="p-1.5 rounded-lg transition-colors text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100"
+        className={buttonClasses}
         aria-label="Defer task"
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className={iconClasses} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
         </svg>
       </button>

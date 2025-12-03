@@ -1283,8 +1283,10 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
                       />
                       <button
                         type="submit"
+                        disabled={!newLink.trim()}
                         className="px-4 py-2 text-sm font-medium bg-neutral-100 text-neutral-700
-                                   rounded-lg hover:bg-neutral-200 transition-colors"
+                                   rounded-lg hover:bg-neutral-200 transition-colors
+                                   disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Add
                       </button>

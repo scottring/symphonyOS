@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
-import type { Task, TaskContext } from '@/types/task'
+import type { Task, TaskContext, TaskLink } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
+import { DeferDropdown } from '@/components/triage'
 
 const CONTEXTS: { value: TaskContext; label: string; color: string }[] = [
   { value: 'work', label: 'Work', color: 'bg-blue-500' },
@@ -15,6 +16,7 @@ interface TaskViewProps {
   onUpdate: (id: string, updates: Partial<Task>) => void
   onDelete: (id: string) => void
   onToggleComplete: (id: string) => void
+  onDefer?: (id: string, date: Date) => void
   // Contact support
   contact?: Contact | null
   contacts?: Contact[]
@@ -34,6 +36,7 @@ export function TaskView({
   onUpdate,
   onDelete,
   onToggleComplete,
+  onDefer,
   contact,
   contacts = [],
   onSearchContacts,
@@ -70,6 +73,10 @@ export function TaskView({
 
   // Delete confirmation
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  // Links editing
+  const [newLink, setNewLink] = useState('')
+  const [newLinkTitle, setNewLinkTitle] = useState('')
 
   // Sync state when task changes
   useEffect(() => {
@@ -180,6 +187,36 @@ export function TaskView({
     }
   }
 
+  const handleAddLink = (e: React.FormEvent) => {
+    e.preventDefault()
+    const trimmedUrl = newLink.trim()
+    const trimmedTitle = newLinkTitle.trim()
+    if (!trimmedUrl) return
+
+    const currentLinks = task.links || []
+    // Check if URL already exists
+    if (currentLinks.some((link) => link.url === trimmedUrl)) {
+      setNewLink('')
+      setNewLinkTitle('')
+      return
+    }
+
+    // Add link with URL and optional title
+    const newLinkObj: TaskLink = { url: trimmedUrl }
+    if (trimmedTitle) {
+      newLinkObj.title = trimmedTitle
+    }
+    onUpdate(task.id, { links: [...currentLinks, newLinkObj] })
+    setNewLink('')
+    setNewLinkTitle('')
+  }
+
+  const handleRemoveLink = (linkToRemove: TaskLink) => {
+    const currentLinks = task.links || []
+    const newLinks = currentLinks.filter((link) => link.url !== linkToRemove.url)
+    onUpdate(task.id, { links: newLinks.length > 0 ? newLinks : undefined })
+  }
+
   const formatDate = (date: Date | undefined) => {
     if (!date) return null
     return date.toLocaleDateString('en-US', {
@@ -268,16 +305,26 @@ export function TaskView({
               )}
             </div>
 
-            {/* Delete button */}
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-              aria-label="Delete task"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-            </button>
+            {/* Action buttons */}
+            <div className="flex items-center gap-1">
+              {/* Defer button */}
+              {onDefer && (
+                <span title="Defer task">
+                  <DeferDropdown onDefer={(date) => onDefer(task.id, date)} />
+                </span>
+              )}
+
+              {/* Delete button */}
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                aria-label="Delete task"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           {/* Delete confirmation */}
@@ -735,6 +782,77 @@ export function TaskView({
                 <span className="text-neutral-400">Add project</span>
               </button>
             )}
+          </div>
+
+          {/* Links Section */}
+          <div className="bg-white rounded-xl border border-neutral-100 p-4">
+            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">
+              Links {task.links && task.links.length > 0 && `(${task.links.length})`}
+            </h2>
+
+            {/* Existing links */}
+            {task.links && task.links.length > 0 && (
+              <ul className="space-y-2 mb-3">
+                {task.links.map((link) => {
+                  const url = link.url.startsWith('http') ? link.url : `https://${link.url}`
+                  const displayText = link.title || link.url.replace(/^https?:\/\//, '').split('/')[0]
+                  return (
+                    <li key={link.url} className="flex items-center gap-2 text-sm bg-neutral-50 rounded-lg px-3 py-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-neutral-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd" />
+                      </svg>
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 truncate text-primary-600 hover:underline"
+                      >
+                        {displayText}
+                      </a>
+                      <button
+                        onClick={() => handleRemoveLink(link)}
+                        className="text-neutral-400 hover:text-red-500 transition-colors flex-shrink-0"
+                        aria-label="Remove link"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+
+            {/* Add new link form */}
+            <form onSubmit={handleAddLink} className="space-y-2">
+              <input
+                type="text"
+                value={newLink}
+                onChange={(e) => setNewLink(e.target.value)}
+                placeholder="URL (e.g., https://example.com)"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200
+                           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newLinkTitle}
+                  onChange={(e) => setNewLinkTitle(e.target.value)}
+                  placeholder="Title (optional)"
+                  className="flex-1 px-3 py-2 text-sm rounded-lg border border-neutral-200
+                             focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+                <button
+                  type="submit"
+                  disabled={!newLink.trim()}
+                  className="px-4 py-2 text-sm font-medium bg-neutral-100 text-neutral-700
+                             rounded-lg hover:bg-neutral-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Add
+                </button>
+              </div>
+            </form>
           </div>
 
           {/* Notes Section */}

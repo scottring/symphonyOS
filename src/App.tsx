@@ -426,6 +426,7 @@ function App() {
             setActiveView('home')
           }}
           onToggleComplete={toggleTask}
+          onDefer={deferTask}
           contact={selectedTaskContact}
           contacts={contacts}
           onSearchContacts={searchContacts}

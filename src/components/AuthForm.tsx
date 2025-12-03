@@ -41,21 +41,12 @@ export function AuthForm() {
         {/* Header */}
         <div className="text-center mb-10">
           {/* Logo mark */}
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary-500 shadow-primary mb-6 animate-fade-in-scale">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="white"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="w-8 h-8"
-            >
-              <path d="M12 2L2 7l10 5 10-5-10-5z" />
-              <path d="M2 17l10 5 10-5" />
-              <path d="M2 12l10 5 10-5" />
-            </svg>
+          <div className="mb-6 animate-fade-in-scale">
+            <img
+              src="/symphony-logo.jpg"
+              alt="Symphony Logo"
+              className="w-24 h-24 rounded-full object-cover shadow-lg"
+            />
           </div>
 
           <h1 className="font-display text-4xl font-semibold text-neutral-900 mb-3 tracking-tight">
