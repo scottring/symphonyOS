@@ -11,6 +11,7 @@ export interface Task {
   completed: boolean
   createdAt: Date
   scheduledFor?: Date // When this task is scheduled to be done
+  isAllDay?: boolean // True = all day task, false/undefined = specific time
   context?: TaskContext // Context: work, family, personal
   notes?: string
   links?: TaskLink[]

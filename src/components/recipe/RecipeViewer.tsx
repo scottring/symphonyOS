@@ -167,7 +167,7 @@ function toNarrativeStep(step: string, ingredients: string[]): string {
   // Bold ingredient names when they appear in instructions
   for (const ing of ingredients) {
     // Extract just the ingredient name (remove amounts like "1 cup", "2 tablespoons")
-    const nameMatch = ing.match(/(?:\d+[\d\/\s]*(?:cup|tablespoon|teaspoon|pound|ounce|gram|ml|g|oz|lb|tsp|tbsp|c\.)?\s*)?(.+)/i)
+    const nameMatch = ing.match(/(?:\d+[\d/\s]*(?:cup|tablespoon|teaspoon|pound|ounce|gram|ml|g|oz|lb|tsp|tbsp|c\.)?\s*)?(.+)/i)
     if (nameMatch) {
       const name = nameMatch[1].trim()
       if (name.length > 2) {
@@ -184,7 +184,7 @@ function toNarrativeStep(step: string, ingredients: string[]): string {
 // Format ingredient with amount inline in prose style
 function formatIngredientNarrative(ingredient: string): { amount: string; name: string; full: string } {
   // Match patterns like "1 cup flour" or "2 large eggs" or "1/2 teaspoon salt"
-  const match = ingredient.match(/^([\d\/\s]+(?:\s*(?:cup|tablespoon|teaspoon|pound|ounce|gram|ml|g|oz|lb|tsp|tbsp|c\.|large|medium|small|cloves?|heads?|bunch|can|package|stick)s?\s*(?:of)?)?)\s*(.+)$/i)
+  const match = ingredient.match(/^([\d/\s]+(?:\s*(?:cup|tablespoon|teaspoon|pound|ounce|gram|ml|g|oz|lb|tsp|tbsp|c\.|large|medium|small|cloves?|heads?|bunch|can|package|stick)s?\s*(?:of)?)?)\s*(.+)$/i)
 
   if (match) {
     return {

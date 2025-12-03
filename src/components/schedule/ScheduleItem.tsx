@@ -83,8 +83,8 @@ export function ScheduleItem({ item, selected, onSelect, onToggleComplete, conta
         )}
       </div>
 
-      {/* Checkbox/dot column with enhanced styling */}
-      <div className="shrink-0 flex items-center justify-center">
+      {/* Checkbox/dot column - fixed width, centered */}
+      <div className="w-6 shrink-0 flex items-center justify-center">
         {isActionable ? (
           <button
             onClick={handleCheckboxClick}

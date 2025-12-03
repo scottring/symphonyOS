@@ -8,7 +8,6 @@ const mockSupabaseData: Routine[] = []
 
 // Create mock functions outside the factory
 const mockSelect = vi.fn()
-const mockEq = vi.fn()
 const mockOrder = vi.fn()
 const mockInsert = vi.fn()
 const mockUpdate = vi.fn()
@@ -42,6 +41,7 @@ function createMockRoutine(overrides: Partial<Routine> = {}): Routine {
     user_id: 'test-user-id',
     name: 'Morning Routine',
     description: null,
+    default_assignee: null,
     recurrence_pattern: { type: 'daily' },
     time_of_day: '08:00',
     visibility: 'active',
@@ -239,7 +239,7 @@ describe('useRoutines', () => {
       })
 
       expect(createdRoutine).not.toBeNull()
-      expect(createdRoutine?.name).toBe('New Routine')
+      expect(createdRoutine!.name).toBe('New Routine')
     })
 
     it('trims whitespace from name', async () => {

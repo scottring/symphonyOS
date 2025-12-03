@@ -245,22 +245,22 @@ describe('groupByTimeSection', () => {
 describe('formatTime', () => {
   it('formats morning time correctly', () => {
     const time = new Date('2024-01-15T09:30:00')
-    expect(formatTime(time)).toBe('9:30 AM')
+    expect(formatTime(time)).toBe('9:30a')
   })
 
   it('formats afternoon time correctly', () => {
     const time = new Date('2024-01-15T14:00:00')
-    expect(formatTime(time)).toBe('2:00 PM')
+    expect(formatTime(time)).toBe('2p') // omits :00 in compact format
   })
 
   it('formats midnight correctly', () => {
     const time = new Date('2024-01-15T00:00:00')
-    expect(formatTime(time)).toBe('12:00 AM')
+    expect(formatTime(time)).toBe('12a')
   })
 
   it('formats noon correctly', () => {
     const time = new Date('2024-01-15T12:00:00')
-    expect(formatTime(time)).toBe('12:00 PM')
+    expect(formatTime(time)).toBe('12p')
   })
 })
 
@@ -268,7 +268,7 @@ describe('formatTimeRange', () => {
   it('formats time range correctly', () => {
     const start = new Date('2024-01-15T09:30:00')
     const end = new Date('2024-01-15T10:30:00')
-    expect(formatTimeRange(start, end)).toBe('9:30 AM - 10:30 AM')
+    expect(formatTimeRange(start, end)).toBe('9:30a|10:30a') // pipe separator for stacked display
   })
 
   it('returns All day for all-day events', () => {

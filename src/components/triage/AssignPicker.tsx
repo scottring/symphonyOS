@@ -45,7 +45,6 @@ export function AssignPicker({ value, contacts, onSearchContacts, onChange }: As
     ? onSearchContacts(searchQuery)
     : contacts.slice(0, 5)
 
-  const assignedContact = contacts.find(c => c.id === value)
   const hasValue = value !== undefined
 
   return (

@@ -187,8 +187,8 @@ export function parseNaturalDate(input: string): ParseResult | null {
   // Clean up extra whitespace and trailing/leading punctuation
   cleanedTitle = cleanedTitle
     .replace(/\s+/g, ' ')
-    .replace(/^\s*[,\-]\s*/, '')
-    .replace(/\s*[,\-]\s*$/, '')
+    .replace(/^\s*[,-]\s*/, '')
+    .replace(/\s*[,-]\s*$/, '')
     .trim()
 
   if (!scheduledFor) return null

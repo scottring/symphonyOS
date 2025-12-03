@@ -35,6 +35,7 @@ export function useContacts() {
   // Fetch contacts on mount and when user changes
   useEffect(() => {
     if (!user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing on auth change is valid
       setContacts([])
       setLoading(false)
       return

@@ -106,6 +106,7 @@ function App() {
   }, [viewedDate, getInstancesForDate])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetch is valid
     refreshDateInstances()
   }, [refreshDateInstances])
 

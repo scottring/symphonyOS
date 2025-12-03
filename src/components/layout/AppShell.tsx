@@ -91,14 +91,14 @@ export function AppShell({
         {children}
       </main>
 
-      {/* Quick Capture */}
+      {/* Quick Capture - FAB shown on all pages when panel is closed */}
       {onQuickAdd && (
         <QuickCapture
           onAdd={onQuickAdd}
           isOpen={quickAddOpen}
           onOpen={onOpenQuickAdd}
           onClose={onCloseQuickAdd}
-          showFab={isMobile && !panelOpen}
+          showFab={!panelOpen}
         />
       )}
 

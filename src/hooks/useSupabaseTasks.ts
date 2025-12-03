@@ -9,6 +9,7 @@ interface DbTask {
   title: string
   completed: boolean
   scheduled_for: string | null
+  is_all_day: boolean | null
   context: TaskContext | null
   notes: string | null
   links: (string | TaskLink)[] | null // Can be old string format or new object format
@@ -38,6 +39,7 @@ function dbTaskToTask(dbTask: DbTask): Task {
     completed: dbTask.completed,
     createdAt: new Date(dbTask.created_at),
     scheduledFor: dbTask.scheduled_for ? new Date(dbTask.scheduled_for) : undefined,
+    isAllDay: dbTask.is_all_day ?? undefined,
     context: dbTask.context ?? undefined,
     notes: dbTask.notes ?? undefined,
     links: normalizeLinks(dbTask.links),
@@ -57,6 +59,7 @@ export function useSupabaseTasks() {
   // Fetch tasks on mount and when user changes
   useEffect(() => {
     if (!user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing on auth change is valid
       setTasks([])
       setLoading(false)
       return
@@ -183,19 +186,21 @@ export function useSupabaseTasks() {
     )
 
     // Convert Task updates to DB format
+    // Use 'key in updates' to detect when a field is explicitly set (even to undefined)
     const dbUpdates: Record<string, unknown> = {}
-    if (updates.title !== undefined) dbUpdates.title = updates.title
-    if (updates.completed !== undefined) dbUpdates.completed = updates.completed
-    if (updates.scheduledFor !== undefined) {
+    if ('title' in updates) dbUpdates.title = updates.title
+    if ('completed' in updates) dbUpdates.completed = updates.completed
+    if ('scheduledFor' in updates) {
       dbUpdates.scheduled_for = updates.scheduledFor?.toISOString() ?? null
     }
-    if (updates.context !== undefined) dbUpdates.context = updates.context ?? null
-    if (updates.notes !== undefined) dbUpdates.notes = updates.notes ?? null
-    if (updates.links !== undefined) dbUpdates.links = updates.links ?? null
-    if (updates.phoneNumber !== undefined) dbUpdates.phone_number = updates.phoneNumber ?? null
-    if (updates.contactId !== undefined) dbUpdates.contact_id = updates.contactId ?? null
-    if (updates.assignedTo !== undefined) dbUpdates.assigned_to = updates.assignedTo ?? null
-    if (updates.projectId !== undefined) dbUpdates.project_id = updates.projectId ?? null
+    if ('isAllDay' in updates) dbUpdates.is_all_day = updates.isAllDay ?? null
+    if ('context' in updates) dbUpdates.context = updates.context ?? null
+    if ('notes' in updates) dbUpdates.notes = updates.notes ?? null
+    if ('links' in updates) dbUpdates.links = updates.links ?? null
+    if ('phoneNumber' in updates) dbUpdates.phone_number = updates.phoneNumber ?? null
+    if ('contactId' in updates) dbUpdates.contact_id = updates.contactId ?? null
+    if ('assignedTo' in updates) dbUpdates.assigned_to = updates.assignedTo ?? null
+    if ('projectId' in updates) dbUpdates.project_id = updates.projectId ?? null
 
     const { error: updateError } = await supabase
       .from('tasks')
@@ -203,6 +208,7 @@ export function useSupabaseTasks() {
       .eq('id', id)
 
     if (updateError) {
+      console.error('Task update failed:', updateError.message, 'Updates attempted:', dbUpdates)
       // Rollback on error
       setTasks((prev) =>
         prev.map((t) => (t.id === id ? task : t))

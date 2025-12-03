@@ -8,13 +8,14 @@ const mockTask: TimelineItem = {
   id: 'task-1',
   type: 'task',
   title: 'Test task',
+  startTime: null,
+  endTime: null,
   completed: false,
   originalTask: {
     id: '1',
     title: 'Test task',
     completed: false,
     createdAt: new Date(),
-    updatedAt: new Date(),
   },
 }
 

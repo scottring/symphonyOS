@@ -15,9 +15,6 @@ export function useMobile() {
       setIsMobile(e.matches)
     }
 
-    // Set initial value
-    setIsMobile(mediaQuery.matches)
-
     // Listen for changes
     mediaQuery.addEventListener('change', handleChange)
 

@@ -73,6 +73,7 @@ export function TaskView({
 
   // Sync state when task changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing state on task change is valid
     setEditedTitle(task.title)
     setLocalNotes(task.notes || '')
     setIsEditingTitle(false)

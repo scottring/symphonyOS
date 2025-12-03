@@ -24,6 +24,7 @@ export function useCompletedEvents() {
             cleaned[id] = timestamp
           }
         }
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- initializing from localStorage
         setCompletedEvents(cleaned)
         // Save cleaned version back
         if (Object.keys(cleaned).length !== Object.keys(parsed).length) {

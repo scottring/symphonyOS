@@ -42,6 +42,7 @@ export function QuickCapture({
   // Focus input when modal opens
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting on modal open is valid
       setTitle('')
       setTimeout(() => inputRef.current?.focus(), 50)
     }
@@ -83,25 +84,23 @@ export function QuickCapture({
       {/* Modal Overlay */}
       {isOpen && (
         <div
-          className={`fixed inset-0 z-50 bg-black/40 flex ${showFab ? 'items-end' : 'items-center justify-center'}`}
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
           onClick={handleClose}
         >
           {/* Modal Content */}
           <div
-            className={`bg-white p-6 ${showFab ? 'w-full rounded-t-2xl safe-bottom animate-slide-up' : 'w-full max-w-lg mx-4 rounded-2xl shadow-xl'}`}
+            className="bg-white p-6 w-[90%] md:w-1/2 rounded-2xl shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Desktop header with keyboard hint */}
-            {!showFab && (
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-neutral-800">
-                  Quick Add
-                </h2>
-                <kbd className="px-2 py-1 text-xs font-mono bg-neutral-100 text-neutral-500 rounded">
-                  ⌘K
-                </kbd>
-              </div>
-            )}
+            {/* Header with keyboard hint */}
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-neutral-800">
+                Quick Add
+              </h2>
+              <kbd className="px-2 py-1 text-xs font-mono bg-neutral-100 text-neutral-500 rounded">
+                ⌘K
+              </kbd>
+            </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>

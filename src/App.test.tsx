@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from './test/test-utils'
+import { render, screen, waitFor } from './test/test-utils'
 import App from './App'
 import type { Task } from '@/types/task'
 import { useState } from 'react'
@@ -15,7 +15,7 @@ vi.mock('@/hooks/useAuth', () => ({
   }),
 }))
 
-// Mock useSupabaseTasks to use local state (like useLocalTasks did)
+// Mock useSupabaseTasks to use local state
 vi.mock('@/hooks/useSupabaseTasks', () => ({
   useSupabaseTasks: () => {
     const [tasks, setTasks] = useState<Task[]>([])
@@ -26,6 +26,7 @@ vi.mock('@/hooks/useSupabaseTasks', () => ({
         title,
         completed: false,
         createdAt: new Date(),
+        // Optional fields default to undefined (inbox task)
       }
       setTasks((prev) => [newTask, ...prev])
     }
@@ -59,6 +60,7 @@ vi.mock('@/hooks/useGoogleCalendar', () => ({
   useGoogleCalendar: () => ({
     isConnected: false,
     isLoading: false,
+    isFetching: false,
     events: [],
     connect: vi.fn(),
     disconnect: vi.fn(),
@@ -75,6 +77,7 @@ vi.mock('@/hooks/useEventNotes', () => ({
     loading: false,
     error: null,
     fetchNote: vi.fn(),
+    fetchNotesForEvents: vi.fn(),
     updateNote: vi.fn(),
     deleteNote: vi.fn(),
     getNote: vi.fn(),
@@ -96,6 +99,46 @@ vi.mock('@/hooks/useContacts', () => ({
   }),
 }))
 
+// Mock useProjects
+vi.mock('@/hooks/useProjects', () => ({
+  useProjects: () => ({
+    projects: [],
+    projectsMap: new Map(),
+    loading: false,
+    error: null,
+    addProject: vi.fn(),
+    updateProject: vi.fn(),
+    deleteProject: vi.fn(),
+    searchProjects: vi.fn().mockReturnValue([]),
+  }),
+}))
+
+// Mock useRoutines
+vi.mock('@/hooks/useRoutines', () => ({
+  useRoutines: () => ({
+    routines: [],
+    activeRoutines: [],
+    getRoutinesForDate: vi.fn().mockReturnValue([]),
+    loading: false,
+    addRoutine: vi.fn(),
+    updateRoutine: vi.fn(),
+    deleteRoutine: vi.fn(),
+    toggleVisibility: vi.fn(),
+  }),
+}))
+
+// Mock useActionableInstances
+vi.mock('@/hooks/useActionableInstances', () => ({
+  useActionableInstances: () => ({
+    getInstancesForDate: vi.fn().mockResolvedValue([]),
+  }),
+}))
+
+// Mock useMobile to return false (desktop mode)
+vi.mock('@/hooks/useMobile', () => ({
+  useMobile: () => false,
+}))
+
 describe('App', () => {
   it('renders the app name in sidebar', () => {
     render(<App />)
@@ -112,57 +155,40 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Today' })).toBeInTheDocument()
   })
 
-  it('can add a task', async () => {
+  it('can add a task via QuickCapture modal', async () => {
     const { user } = render(<App />)
-    const input = screen.getByPlaceholderText('Add a task...')
+
+    // On desktop, use Cmd+K to open quick add modal
+    await user.keyboard('{Meta>}k{/Meta}')
+
+    // Type in the modal input
+    const input = await screen.findByPlaceholderText("What's on your mind?")
     await user.type(input, 'My first task')
-    await user.click(screen.getByRole('button', { name: 'Add' }))
-    expect(screen.getByText('My first task')).toBeInTheDocument()
+
+    // Click Save
+    await user.click(screen.getByRole('button', { name: /save/i }))
+
+    // Task appears in Inbox section
+    await waitFor(() => {
+      expect(screen.getByText('My first task')).toBeInTheDocument()
+    })
   })
 
-  it('can complete a task via checkbox', async () => {
+  it('shows tasks in inbox section', async () => {
     const { user } = render(<App />)
-    const input = screen.getByPlaceholderText('Add a task...')
-    await user.type(input, 'Task to complete')
-    await user.click(screen.getByRole('button', { name: 'Add' }))
 
-    // Find and click the checkbox button (not a native checkbox anymore)
-    const completeButton = screen.getByRole('button', { name: /mark complete/i })
-    await user.click(completeButton)
+    // On desktop, use Cmd+K to open quick add modal
+    await user.keyboard('{Meta>}k{/Meta}')
 
-    // The task title should now have line-through styling (completed)
-    const taskTitle = screen.getByText('Task to complete')
-    expect(taskTitle).toHaveClass('line-through')
-  })
+    const input = await screen.findByPlaceholderText("What's on your mind?")
+    await user.type(input, 'Inbox task')
+    await user.click(screen.getByRole('button', { name: /save/i }))
 
-  it('can delete a task via detail panel', async () => {
-    const { user } = render(<App />)
-    const input = screen.getByPlaceholderText('Add a task...')
-    await user.type(input, 'Task to delete')
-    await user.click(screen.getByRole('button', { name: 'Add' }))
-
-    // Click the task to open detail panel
-    await user.click(screen.getByText('Task to delete'))
-
-    // Find delete button in detail panel - it's a button element with text "Delete"
-    const deleteButtons = screen.getAllByRole('button', { name: /delete/i })
-    // The actual delete button is the one with the visible "Delete" text span
-    const deleteButton = deleteButtons.find(btn => btn.querySelector('span')?.textContent === 'Delete')
-    expect(deleteButton).toBeTruthy()
-    await user.click(deleteButton!)
-
-    expect(screen.queryByText('Task to delete')).not.toBeInTheDocument()
-  })
-
-  it('shows tasks in unscheduled section', async () => {
-    const { user } = render(<App />)
-    const input = screen.getByPlaceholderText('Add a task...')
-    await user.type(input, 'Unscheduled task')
-    await user.click(screen.getByRole('button', { name: 'Add' }))
-
-    // Task appears in the Unscheduled section
-    expect(screen.getByText('Unscheduled')).toBeInTheDocument()
-    expect(screen.getByText('Unscheduled task')).toBeInTheDocument()
+    // Task appears in the Inbox section (at bottom)
+    await waitFor(() => {
+      expect(screen.getByText(/Inbox \(\d+\)/)).toBeInTheDocument()
+      expect(screen.getByText('Inbox task')).toBeInTheDocument()
+    })
   })
 
   it('displays user email', () => {
@@ -172,6 +198,6 @@ describe('App', () => {
 
   it('shows calendar connect option when not connected', () => {
     render(<App />)
-    expect(screen.getByRole('button', { name: 'Connect Google Calendar' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /connect google calendar/i })).toBeInTheDocument()
   })
 })

@@ -24,35 +24,40 @@ export function InboxTaskCard({
   const assignee = contacts.find(c => c.id === task.assignedTo)
 
   return (
-    <div className="bg-white rounded-xl border border-neutral-100 p-3 shadow-sm">
-      {/* Main row: checkbox, title, triage icons */}
-      <div className="flex items-center gap-3">
-        {/* Checkbox */}
-        <button
-          onClick={() => onUpdate({ completed: !task.completed })}
-          className="flex-shrink-0"
-        >
-          <span
-            className={`
-              w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors
-              ${task.completed
-                ? 'bg-primary-500 border-primary-500 text-white'
-                : 'border-neutral-300 hover:border-primary-400'
-              }
-            `}
+    <div className="bg-white rounded-xl border border-neutral-100 px-4 py-3 shadow-sm">
+      {/* Main row: time placeholder, checkbox, title, triage icons */}
+      <div className="flex items-center gap-4">
+        {/* Time placeholder - matches ScheduleItem w-12, centered */}
+        <div className="w-12 shrink-0 flex items-center justify-center" />
+
+        {/* Checkbox - fixed width, centered */}
+        <div className="w-6 shrink-0 flex items-center justify-center">
+          <button
+            onClick={() => onUpdate({ completed: !task.completed })}
+            className="touch-target flex items-center justify-center -m-2 p-2"
           >
-            {task.completed && (
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-              </svg>
-            )}
-          </span>
-        </button>
+            <span
+              className={`
+                w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors
+                ${task.completed
+                  ? 'bg-primary-500 border-primary-500 text-white'
+                  : 'border-neutral-300 hover:border-primary-400'
+                }
+              `}
+            >
+              {task.completed && (
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </span>
+          </button>
+        </div>
 
         {/* Title - clickable to open detail */}
         <button
           onClick={onSelect}
-          className={`flex-1 text-left min-w-0 ${
+          className={`flex-1 text-left min-w-0 text-base font-medium ${
             task.completed ? 'text-neutral-400 line-through' : 'text-neutral-800'
           } hover:text-primary-600 transition-colors truncate`}
         >
@@ -63,7 +68,8 @@ export function InboxTaskCard({
         <div className="flex items-center gap-1 flex-shrink-0">
           <WhenPicker
             value={task.scheduledFor}
-            onChange={(date) => onUpdate({ scheduledFor: date })}
+            isAllDay={task.isAllDay}
+            onChange={(date, isAllDay) => onUpdate({ scheduledFor: date, isAllDay })}
           />
           <ContextPicker
             value={task.context}
@@ -78,9 +84,9 @@ export function InboxTaskCard({
         </div>
       </div>
 
-      {/* Chips row: project, assignee */}
+      {/* Chips row: project, assignee - aligned with title (w-12 + gap-4 + w-6 + gap-4 = 6.5rem) */}
       {(project || assignee) && (
-        <div className="flex items-center gap-2 mt-2 ml-8 flex-wrap">
+        <div className="flex items-center gap-2 mt-2 ml-[6.5rem] flex-wrap">
           {project && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs">
               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">

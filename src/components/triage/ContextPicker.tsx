@@ -34,7 +34,6 @@ export function ContextPicker({ value, onChange }: ContextPickerProps) {
     setIsOpen(false)
   }
 
-  const selectedContext = CONTEXTS.find(c => c.value === value)
   const hasValue = value !== undefined
 
   return (

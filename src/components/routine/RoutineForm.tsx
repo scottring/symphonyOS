@@ -31,6 +31,7 @@ export function RoutineForm({ routine, onBack, onUpdate, onDelete, onToggleVisib
 
   // Reset form when routine changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing form state on routine change is valid
     setName(routine.name)
     setDescription(routine.description || '')
     setRecurrenceType(routine.recurrence_pattern.type)

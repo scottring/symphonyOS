@@ -132,19 +132,6 @@ serve(async (req) => {
     // Log which calendars we're fetching from
     console.log('Fetching events from calendars:', calendars.map(c => ({ id: c.id, summary: c.summary })))
 
-    const allEvents: Array<{
-      user_id: string
-      google_event_id: string
-      title: string
-      description: string | null
-      start_time: string
-      end_time: string
-      all_day: boolean
-      location: string | null
-      calendar_id: string
-      updated_at: string
-    }> = []
-
     // Fetch events from each calendar in parallel
     const eventPromises = calendars.map(async (calendar) => {
       const eventsUrl = new URL(

@@ -239,6 +239,7 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
     setExpandedSections({})
     setShowDeleteConfirm(false)
     setShowTimePicker(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally only run on item ID change
   }, [item?.id])
 
   // Sync title when item changes
@@ -288,6 +289,7 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
     }
 
     loadInstance()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally using specific properties
   }, [item?.id, item?.type, item?.startTime, actionable.getInstance])
 
   // Detect contextual actions
@@ -325,7 +327,7 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
   const getEventEntityId = useCallback(() => {
     if (!item?.originalEvent) return null
     return item.originalEvent.google_event_id || item.originalEvent.id
-  }, [item?.originalEvent])
+  }, [item])
 
   const getEventDate = useCallback(() => {
     return item?.startTime || new Date()
@@ -334,7 +336,7 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
   const getRoutineEntityId = useCallback(() => {
     if (!item?.originalRoutine) return null
     return item.originalRoutine.id
-  }, [item?.originalRoutine])
+  }, [item])
 
   const getRoutineDate = useCallback(() => {
     return item?.startTime || new Date()

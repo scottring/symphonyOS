@@ -2,12 +2,17 @@ import { useState, useRef, useEffect } from 'react'
 
 interface WhenPickerProps {
   value?: Date
-  onChange: (date: Date | undefined) => void
+  isAllDay?: boolean
+  onChange: (date: Date | undefined, isAllDay: boolean) => void
 }
 
-export function WhenPicker({ value, onChange }: WhenPickerProps) {
+type Step = 'day' | 'time' | 'date-input' | 'time-input'
+
+export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerProps) {
+  void _isAllDay // Reserved for future visual indicator
   const [isOpen, setIsOpen] = useState(false)
-  const [showDateInput, setShowDateInput] = useState(false)
+  const [step, setStep] = useState<Step>('day')
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   // Close on outside click
@@ -15,7 +20,8 @@ export function WhenPicker({ value, onChange }: WhenPickerProps) {
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false)
-        setShowDateInput(false)
+        setStep('day')
+        setSelectedDate(null)
       }
     }
     if (isOpen) {
@@ -24,30 +30,83 @@ export function WhenPicker({ value, onChange }: WhenPickerProps) {
     }
   }, [isOpen])
 
-  const today = new Date()
-  today.setHours(9, 0, 0, 0)
+  // Reset step when opening
+  useEffect(() => {
+    if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting on popover open is valid
+      setStep('day')
+      setSelectedDate(null)
+    }
+  }, [isOpen])
 
-  const tomorrow = new Date(today)
-  tomorrow.setDate(tomorrow.getDate() + 1)
-
-  const nextWeek = new Date(today)
-  nextWeek.setDate(nextWeek.getDate() + 7)
-
-  const handleSelect = (date: Date | undefined) => {
-    onChange(date)
-    setIsOpen(false)
-    setShowDateInput(false)
+  const getBaseDate = (daysFromNow: number) => {
+    const date = new Date()
+    date.setDate(date.getDate() + daysFromNow)
+    date.setHours(0, 0, 0, 0)
+    return date
   }
 
-  const handleDateChange = (dateString: string) => {
+  const handleDaySelect = (date: Date) => {
+    setSelectedDate(date)
+    setStep('time')
+  }
+
+  const handleDateInputChange = (dateString: string) => {
     if (dateString) {
       const [year, month, day] = dateString.split('-').map(Number)
-      const newDate = new Date(year, month - 1, day, 9, 0, 0)
-      handleSelect(newDate)
+      const newDate = new Date(year, month - 1, day, 0, 0, 0)
+      setSelectedDate(newDate)
+      setStep('time')
     }
   }
 
+  const handleTimeSelect = (hour: number | 'all-day') => {
+    if (!selectedDate) return
+
+    const finalDate = new Date(selectedDate)
+    if (hour === 'all-day') {
+      finalDate.setHours(0, 0, 0, 0)
+      onChange(finalDate, true)
+    } else {
+      finalDate.setHours(hour, 0, 0, 0)
+      onChange(finalDate, false)
+    }
+    setIsOpen(false)
+    setStep('day')
+    setSelectedDate(null)
+  }
+
+  const handleTimeInputChange = (timeString: string) => {
+    if (!selectedDate || !timeString) return
+    const [hours, minutes] = timeString.split(':').map(Number)
+    const finalDate = new Date(selectedDate)
+    finalDate.setHours(hours, minutes, 0, 0)
+    onChange(finalDate, false)
+    setIsOpen(false)
+    setStep('day')
+    setSelectedDate(null)
+  }
+
+  const handleClear = () => {
+    onChange(undefined, false)
+    setIsOpen(false)
+    setStep('day')
+    setSelectedDate(null)
+  }
+
   const hasValue = value !== undefined
+
+  const formatSelectedDateLabel = () => {
+    if (!selectedDate) return ''
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+
+    if (selectedDate.getTime() === today.getTime()) return 'Today'
+    if (selectedDate.getTime() === tomorrow.getTime()) return 'Tomorrow'
+    return selectedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+  }
 
   return (
     <div ref={containerRef} className="relative">
@@ -66,53 +125,136 @@ export function WhenPicker({ value, onChange }: WhenPickerProps) {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-1 z-50 bg-white rounded-xl border border-neutral-200 shadow-lg p-2 min-w-[140px]">
-          {showDateInput ? (
-            <input
-              type="date"
-              autoFocus
-              onChange={(e) => handleDateChange(e.target.value)}
-              className="w-full px-2 py-1.5 text-sm rounded-lg border border-neutral-200
-                         focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
-          ) : (
+        <div className="absolute right-0 top-full mt-1 z-50 bg-white rounded-xl border border-neutral-200 shadow-lg p-2 min-w-[160px]">
+          {/* Step 1: Pick the day */}
+          {step === 'day' && (
             <div className="space-y-1">
               <button
-                onClick={() => handleSelect(today)}
+                onClick={() => handleDaySelect(getBaseDate(0))}
                 className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
               >
                 Today
               </button>
               <button
-                onClick={() => handleSelect(tomorrow)}
+                onClick={() => handleDaySelect(getBaseDate(1))}
                 className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
               >
                 Tomorrow
               </button>
               <button
-                onClick={() => handleSelect(nextWeek)}
+                onClick={() => handleDaySelect(getBaseDate(7))}
                 className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
               >
                 Next Week
               </button>
               <div className="border-t border-neutral-100 my-1" />
               <button
-                onClick={() => setShowDateInput(true)}
+                onClick={() => setStep('date-input')}
                 className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
               >
-                + Pick Date
+                Pick date...
               </button>
               {hasValue && (
                 <>
                   <div className="border-t border-neutral-100 my-1" />
                   <button
-                    onClick={() => handleSelect(undefined)}
+                    onClick={handleClear}
                     className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-red-50 text-red-600"
                   >
                     Clear
                   </button>
                 </>
               )}
+            </div>
+          )}
+
+          {/* Date input */}
+          {step === 'date-input' && (
+            <div className="space-y-2">
+              <button
+                onClick={() => setStep('day')}
+                className="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-700"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                Back
+              </button>
+              <input
+                type="date"
+                autoFocus
+                onChange={(e) => handleDateInputChange(e.target.value)}
+                className="w-full px-2 py-1.5 text-sm rounded-lg border border-neutral-200
+                           focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+          )}
+
+          {/* Step 2: Pick the time */}
+          {step === 'time' && (
+            <div className="space-y-1">
+              <button
+                onClick={() => setStep('day')}
+                className="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-700 mb-2"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                {formatSelectedDateLabel()}
+              </button>
+              <button
+                onClick={() => handleTimeSelect('all-day')}
+                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+              >
+                All Day
+              </button>
+              <button
+                onClick={() => handleTimeSelect(9)}
+                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+              >
+                Morning <span className="text-neutral-400">(9a)</span>
+              </button>
+              <button
+                onClick={() => handleTimeSelect(13)}
+                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+              >
+                Afternoon <span className="text-neutral-400">(1p)</span>
+              </button>
+              <button
+                onClick={() => handleTimeSelect(18)}
+                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+              >
+                Evening <span className="text-neutral-400">(6p)</span>
+              </button>
+              <div className="border-t border-neutral-100 my-1" />
+              <button
+                onClick={() => setStep('time-input')}
+                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+              >
+                Pick time...
+              </button>
+            </div>
+          )}
+
+          {/* Time input */}
+          {step === 'time-input' && (
+            <div className="space-y-2">
+              <button
+                onClick={() => setStep('time')}
+                className="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-700"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                {formatSelectedDateLabel()}
+              </button>
+              <input
+                type="time"
+                autoFocus
+                onChange={(e) => handleTimeInputChange(e.target.value)}
+                className="w-full px-2 py-1.5 text-sm rounded-lg border border-neutral-200
+                           focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
             </div>
           )}
         </div>
