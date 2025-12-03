@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
-import { WhenPicker, ContextPicker, AssignPicker, DeferDropdown } from '@/components/triage'
+import { WhenPicker, ContextPicker, AssignPicker, PushDropdown } from '@/components/triage'
 
 interface WeeklyReviewProps {
   tasks: Task[]
@@ -10,7 +10,7 @@ interface WeeklyReviewProps {
   contacts: Contact[]
   onSearchContacts: (query: string) => Contact[]
   onUpdateTask: (id: string, updates: Partial<Task>) => void
-  onDeferTask: (id: string, date: Date) => void
+  onPushTask: (id: string, date: Date) => void
   onDeleteTask: (id: string) => void
   onClose: () => void
 }
@@ -21,7 +21,7 @@ export function WeeklyReview({
   contacts,
   onSearchContacts,
   onUpdateTask,
-  onDeferTask,
+  onPushTask,
   onDeleteTask,
   onClose,
 }: WeeklyReviewProps) {
@@ -134,8 +134,8 @@ export function WeeklyReview({
                           }
                         />
                       </span>
-                      <span title="Defer">
-                        <DeferDropdown onDefer={(date) => onDeferTask(task.id, date)} />
+                      <span title="Push">
+                        <PushDropdown onPush={(date) => onPushTask(task.id, date)} />
                       </span>
                       <span title="Context">
                         <ContextPicker

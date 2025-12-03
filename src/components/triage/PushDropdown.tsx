@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 
-interface DeferDropdownProps {
-  onDefer: (date: Date) => void
+interface PushDropdownProps {
+  onPush: (date: Date) => void
   size?: 'sm' | 'md'
 }
 
-export function DeferDropdown({ onDefer, size = 'md' }: DeferDropdownProps) {
+export function PushDropdown({ onPush, size = 'md' }: PushDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [showDatePicker, setShowDatePicker] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -38,8 +38,8 @@ export function DeferDropdown({ onDefer, size = 'md' }: DeferDropdownProps) {
     return date
   }
 
-  const handleDefer = (date: Date) => {
-    onDefer(date)
+  const handlePush = (date: Date) => {
+    onPush(date)
     setIsOpen(false)
     setShowDatePicker(false)
   }
@@ -48,7 +48,7 @@ export function DeferDropdown({ onDefer, size = 'md' }: DeferDropdownProps) {
     if (dateString) {
       const [year, month, day] = dateString.split('-').map(Number)
       const newDate = new Date(year, month - 1, day, 0, 0, 0)
-      handleDefer(newDate)
+      handlePush(newDate)
     }
   }
 
@@ -62,10 +62,10 @@ export function DeferDropdown({ onDefer, size = 'md' }: DeferDropdownProps) {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={buttonClasses}
-        aria-label="Defer task"
+        aria-label="Push task"
       >
         <svg className={iconClasses} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
         </svg>
       </button>
 
@@ -74,16 +74,16 @@ export function DeferDropdown({ onDefer, size = 'md' }: DeferDropdownProps) {
           {!showDatePicker ? (
             <div className="space-y-1">
               <div className="px-3 py-1 text-xs font-medium text-neutral-500 uppercase tracking-wide">
-                Defer until
+                Push until
               </div>
               <button
-                onClick={() => handleDefer(getTomorrow())}
+                onClick={() => handlePush(getTomorrow())}
                 className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
               >
                 Tomorrow
               </button>
               <button
-                onClick={() => handleDefer(getNextWeek())}
+                onClick={() => handlePush(getNextWeek())}
                 className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
               >
                 Next Week

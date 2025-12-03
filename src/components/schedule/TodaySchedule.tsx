@@ -22,7 +22,7 @@ interface TodayScheduleProps {
   onSelectItem: (id: string | null) => void
   onToggleTask: (taskId: string) => void
   onUpdateTask?: (id: string, updates: Partial<Task>) => void
-  onDeferTask?: (id: string, date: Date) => void
+  onPushTask?: (id: string, date: Date) => void
   onDeleteTask?: (id: string) => void
   loading?: boolean
   viewedDate: Date
@@ -78,7 +78,7 @@ export function TodaySchedule({
   onSelectItem,
   onToggleTask,
   onUpdateTask,
-  onDeferTask,
+  onPushTask,
   onDeleteTask,
   loading,
   viewedDate,
@@ -326,10 +326,10 @@ export function TodaySchedule({
                           onToggleTask(taskId)
                         }
                       }}
-                      onDefer={item.type === 'task' && item.id.startsWith('task-') && onDeferTask
+                      onPush={item.type === 'task' && item.id.startsWith('task-') && onPushTask
                         ? (date: Date) => {
                             const taskId = item.id.replace('task-', '')
-                            onDeferTask(taskId, date)
+                            onPushTask(taskId, date)
                           }
                         : undefined
                       }
@@ -343,11 +343,11 @@ export function TodaySchedule({
           })}
 
           {/* Inbox Section - at bottom, only on today's view */}
-          {onUpdateTask && onDeferTask && (
+          {onUpdateTask && onPushTask && (
             <InboxSection
               tasks={inboxTasks}
               onUpdateTask={onUpdateTask}
-              onDeferTask={onDeferTask}
+              onPushTask={onPushTask}
               onSelectTask={(taskId) => onSelectItem(`task-${taskId}`)}
               projects={projects}
               contacts={contacts}
@@ -360,14 +360,14 @@ export function TodaySchedule({
       )}
 
       {/* Weekly Review Modal */}
-      {showWeeklyReview && onUpdateTask && onDeferTask && onDeleteTask && (
+      {showWeeklyReview && onUpdateTask && onPushTask && onDeleteTask && (
         <WeeklyReview
           tasks={inboxTasks}
           projects={projects}
           contacts={contacts}
           onSearchContacts={onSearchContacts ?? (() => [])}
           onUpdateTask={onUpdateTask}
-          onDeferTask={onDeferTask}
+          onPushTask={onPushTask}
           onDeleteTask={onDeleteTask}
           onClose={() => setShowWeeklyReview(false)}
         />

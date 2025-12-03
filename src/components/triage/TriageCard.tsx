@@ -2,12 +2,12 @@ import { useState, useEffect, useRef } from 'react'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
-import { WhenPicker, ContextPicker, AssignPicker, DeferDropdown } from '@/components/triage'
+import { WhenPicker, ContextPicker, AssignPicker, PushDropdown } from '@/components/triage'
 
 interface TriageCardProps {
   task: Task
   onUpdate: (updates: Partial<Task>) => void
-  onDefer: (date: Date) => void
+  onPush: (date: Date) => void
   onCollapse: () => void
   projects?: Project[]
   contacts?: Contact[]
@@ -18,7 +18,7 @@ interface TriageCardProps {
 export function TriageCard({
   task,
   onUpdate,
-  onDefer,
+  onPush,
   onCollapse,
   projects = [],
   contacts = [],
@@ -92,11 +92,11 @@ export function TriageCard({
             }}
           />
         </span>
-        <span title="Defer">
-          <DeferDropdown
-            onDefer={(date) => {
-              onDefer(date)
-              // Collapse after deferring
+        <span title="Push">
+          <PushDropdown
+            onPush={(date) => {
+              onPush(date)
+              // Collapse after pushing
               setTimeout(onCollapse, 200)
             }}
           />

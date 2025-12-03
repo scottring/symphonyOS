@@ -7,7 +7,7 @@ import { TriageCard } from '@/components/triage'
 interface InboxSectionProps {
   tasks: Task[]
   onUpdateTask: (id: string, updates: Partial<Task>) => void
-  onDeferTask: (id: string, date: Date) => void
+  onPushTask: (id: string, date: Date) => void
   onSelectTask: (taskId: string) => void
   projects?: Project[]
   contacts?: Contact[]
@@ -19,7 +19,7 @@ interface InboxSectionProps {
 export function InboxSection({
   tasks,
   onUpdateTask,
-  onDeferTask,
+  onPushTask,
   onSelectTask,
   projects = [],
   contacts = [],
@@ -54,7 +54,7 @@ export function InboxSection({
           <TriageCard
             task={recentlyCreatedTask}
             onUpdate={(updates) => onUpdateTask(recentlyCreatedTask.id, updates)}
-            onDefer={(date) => onDeferTask(recentlyCreatedTask.id, date)}
+            onPush={(date) => onPushTask(recentlyCreatedTask.id, date)}
             onCollapse={onTriageCardCollapse}
             projects={projects}
             contacts={contacts}
@@ -68,7 +68,7 @@ export function InboxSection({
             key={task.id}
             task={task}
             onUpdate={(updates) => onUpdateTask(task.id, updates)}
-            onDefer={(date) => onDeferTask(task.id, date)}
+            onPush={(date) => onPushTask(task.id, date)}
             onSelect={() => onSelectTask(task.id)}
             projects={projects}
             contacts={contacts}

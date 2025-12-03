@@ -53,7 +53,7 @@ vi.mock('@/hooks/useSupabaseTasks', () => ({
       )
     }
 
-    const deferTask = (id: string, date: Date) => {
+    const pushTask = (id: string, date: Date) => {
       setTasks((prev) =>
         prev.map((task) =>
           task.id === id
@@ -63,7 +63,7 @@ vi.mock('@/hooks/useSupabaseTasks', () => ({
       )
     }
 
-    return { tasks, loading: false, error: null, addTask, toggleTask, deleteTask, updateTask, deferTask }
+    return { tasks, loading: false, error: null, addTask, toggleTask, deleteTask, updateTask, pushTask }
   },
 }))
 

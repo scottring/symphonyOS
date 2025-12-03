@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import type { Task, TaskContext, TaskLink } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
-import { DeferDropdown } from '@/components/triage'
+import { PushDropdown } from '@/components/triage'
 
 const CONTEXTS: { value: TaskContext; label: string; color: string }[] = [
   { value: 'work', label: 'Work', color: 'bg-blue-500' },
@@ -16,7 +16,7 @@ interface TaskViewProps {
   onUpdate: (id: string, updates: Partial<Task>) => void
   onDelete: (id: string) => void
   onToggleComplete: (id: string) => void
-  onDefer?: (id: string, date: Date) => void
+  onPush?: (id: string, date: Date) => void
   // Contact support
   contact?: Contact | null
   contacts?: Contact[]
@@ -36,7 +36,7 @@ export function TaskView({
   onUpdate,
   onDelete,
   onToggleComplete,
-  onDefer,
+  onPush,
   contact,
   contacts = [],
   onSearchContacts,
@@ -307,10 +307,10 @@ export function TaskView({
 
             {/* Action buttons */}
             <div className="flex items-center gap-1">
-              {/* Defer button */}
-              {onDefer && (
-                <span title="Defer task">
-                  <DeferDropdown onDefer={(date) => onDefer(task.id, date)} />
+              {/* Push button */}
+              {onPush && (
+                <span title="Push task">
+                  <PushDropdown onPush={(date) => onPush(task.id, date)} />
                 </span>
               )}
 

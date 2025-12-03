@@ -223,7 +223,7 @@ export function useSupabaseTasks() {
       .eq('id', id)
 
     if (updateError) {
-      console.error('Task update failed:', updateError.message, 'Updates attempted:', dbUpdates)
+      console.error('Task update failed:', updateError.message)
       // Rollback on error
       setTasks((prev) =>
         prev.map((t) => (t.id === id ? task : t))
@@ -241,15 +241,34 @@ export function useSupabaseTasks() {
     })
   }, [updateTask])
 
-  // Defer a task - sets deferredUntil, increments deferCount
-  const deferTask = useCallback(async (id: string, date: Date) => {
+  // Push a task - moves it to a future date
+  // For scheduled tasks: updates scheduledFor to the new date
+  // For inbox tasks: sets deferredUntil to hide until that date
+  const pushTask = useCallback(async (id: string, date: Date) => {
     const task = tasks.find((t) => t.id === id)
+    if (!task) return
+
     const currentCount = task?.deferCount ?? 0
-    await updateTask(id, {
-      deferredUntil: date,
-      deferCount: currentCount + 1,
-    })
+
+    if (task.scheduledFor) {
+      // Scheduled task: move to new date (preserve time if set, otherwise all-day)
+      const newScheduledFor = new Date(date)
+      if (!task.isAllDay && task.scheduledFor) {
+        // Preserve the original time
+        newScheduledFor.setHours(task.scheduledFor.getHours(), task.scheduledFor.getMinutes(), 0, 0)
+      }
+      await updateTask(id, {
+        scheduledFor: newScheduledFor,
+        deferCount: currentCount + 1,
+      })
+    } else {
+      // Inbox task: set deferredUntil to hide until that date
+      await updateTask(id, {
+        deferredUntil: date,
+        deferCount: currentCount + 1,
+      })
+    }
   }, [tasks, updateTask])
 
-  return { tasks, loading, error, addTask, toggleTask, deleteTask, updateTask, scheduleTask, deferTask }
+  return { tasks, loading, error, addTask, toggleTask, deleteTask, updateTask, scheduleTask, pushTask }
 }

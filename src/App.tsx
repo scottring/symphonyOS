@@ -25,7 +25,7 @@ import type { ViewType } from '@/components/layout/Sidebar'
 import type { ActionableInstance } from '@/types/actionable'
 
 function App() {
-  const { tasks, loading: tasksLoading, addTask, toggleTask, deleteTask, updateTask, deferTask } = useSupabaseTasks()
+  const { tasks, loading: tasksLoading, addTask, toggleTask, deleteTask, updateTask, pushTask } = useSupabaseTasks()
   const { user, loading: authLoading, signOut } = useAuth()
   const { isConnected, events, fetchEvents, isFetching: eventsFetching } = useGoogleCalendar()
   const { fetchNote, fetchNotesForEvents, updateNote, getNote, notes: eventNotesMap } = useEventNotes()
@@ -394,7 +394,7 @@ function App() {
             onSelectItem={handleSelectItem}
             onToggleTask={toggleTask}
             onUpdateTask={updateTask}
-            onDeferTask={deferTask}
+            onPushTask={pushTask}
             onDeleteTask={deleteTask}
             loading={tasksLoading || eventsFetching || routinesLoading}
             viewedDate={viewedDate}
@@ -426,7 +426,7 @@ function App() {
             setActiveView('home')
           }}
           onToggleComplete={toggleTask}
-          onDefer={deferTask}
+          onPush={pushTask}
           contact={selectedTaskContact}
           contacts={contacts}
           onSearchContacts={searchContacts}

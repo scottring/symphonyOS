@@ -1,12 +1,12 @@
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
-import { WhenPicker, ContextPicker, AssignPicker, DeferDropdown } from '@/components/triage'
+import { WhenPicker, ContextPicker, AssignPicker, PushDropdown } from '@/components/triage'
 
 interface InboxTaskCardProps {
   task: Task
   onUpdate: (updates: Partial<Task>) => void
-  onDefer: (date: Date) => void
+  onPush: (date: Date) => void
   onSelect: () => void
   projects?: Project[]
   contacts?: Contact[]
@@ -16,7 +16,7 @@ interface InboxTaskCardProps {
 export function InboxTaskCard({
   task,
   onUpdate,
-  onDefer,
+  onPush,
   onSelect,
   projects = [],
   contacts = [],
@@ -81,8 +81,8 @@ export function InboxTaskCard({
               onChange={(date, isAllDay) => onUpdate({ scheduledFor: date, isAllDay, deferredUntil: undefined })}
             />
           </span>
-          <span title="Defer">
-            <DeferDropdown onDefer={onDefer} />
+          <span title="Push">
+            <PushDropdown onPush={onPush} />
           </span>
           <span title="Context">
             <ContextPicker

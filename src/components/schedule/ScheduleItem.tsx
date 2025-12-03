@@ -1,18 +1,18 @@
 import type { TimelineItem } from '@/types/timeline'
 import { formatTime, formatTimeRange } from '@/lib/timeUtils'
-import { DeferDropdown } from '@/components/triage'
+import { PushDropdown } from '@/components/triage'
 
 interface ScheduleItemProps {
   item: TimelineItem
   selected?: boolean
   onSelect: () => void
   onToggleComplete: () => void
-  onDefer?: (date: Date) => void
+  onPush?: (date: Date) => void
   contactName?: string
   projectName?: string
 }
 
-export function ScheduleItem({ item, selected, onSelect, onToggleComplete, onDefer, contactName, projectName }: ScheduleItemProps) {
+export function ScheduleItem({ item, selected, onSelect, onToggleComplete, onPush, contactName, projectName }: ScheduleItemProps) {
   const isTask = item.type === 'task'
   const isRoutine = item.type === 'routine'
   const isActionable = isTask || isRoutine
@@ -144,14 +144,14 @@ export function ScheduleItem({ item, selected, onSelect, onToggleComplete, onDef
         )}
       </div>
 
-      {/* Defer button - tasks only */}
-      {isTask && onDefer && (
+      {/* Push button - tasks only */}
+      {isTask && onPush && (
         <div
           className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
           onClick={(e) => e.stopPropagation()}
         >
-          <span title="Defer">
-            <DeferDropdown onDefer={onDefer} size="sm" />
+          <span title="Push">
+            <PushDropdown onPush={onPush} size="sm" />
           </span>
         </div>
       )}
