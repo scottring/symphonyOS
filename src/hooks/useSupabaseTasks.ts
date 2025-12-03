@@ -83,7 +83,7 @@ export function useSupabaseTasks() {
     fetchTasks()
   }, [user])
 
-  const addTask = useCallback(async (title: string, contactId?: string, projectId?: string) => {
+  const addTask = useCallback(async (title: string, contactId?: string, projectId?: string, scheduledFor?: Date) => {
     if (!user) return
 
     // Optimistic update
@@ -95,6 +95,7 @@ export function useSupabaseTasks() {
       createdAt: new Date(),
       contactId,
       projectId,
+      scheduledFor,
     }
     setTasks((prev) => [optimisticTask, ...prev])
 
@@ -106,6 +107,7 @@ export function useSupabaseTasks() {
         completed: false,
         contact_id: contactId ?? null,
         project_id: projectId ?? null,
+        scheduled_for: scheduledFor?.toISOString() ?? null,
       })
       .select()
       .single()

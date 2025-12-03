@@ -43,7 +43,7 @@ describe('QuickCapture', () => {
     await user.type(input, 'My new task')
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
-    expect(onAdd).toHaveBeenCalledWith('My new task', undefined)
+    expect(onAdd).toHaveBeenCalledWith('My new task', undefined, undefined, undefined)
   })
 
   it('does not submit when title is empty', async () => {
@@ -153,7 +153,7 @@ describe('QuickCapture', () => {
       await user.type(input, 'Call about project')
       await user.click(screen.getByRole('button', { name: 'Save' }))
 
-      expect(onAdd).toHaveBeenCalledWith('Call about project', 'contact-1')
+      expect(onAdd).toHaveBeenCalledWith('Call about project', 'contact-1', undefined, undefined)
     })
 
     it('can remove selected contact', async () => {

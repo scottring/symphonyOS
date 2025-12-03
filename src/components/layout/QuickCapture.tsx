@@ -4,11 +4,12 @@ import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
 import type { RecurrencePattern } from '@/types/actionable'
 import type { CreateRoutineInput } from '@/hooks/useRoutines'
+import { parseNaturalDate, formatDatePreview } from '@/utils/parseNaturalDate'
 
 type CaptureMode = 'task' | 'routine'
 
 interface QuickCaptureProps {
-  onAdd: (title: string, contactId?: string, projectId?: string) => void
+  onAdd: (title: string, contactId?: string, projectId?: string, scheduledFor?: Date) => void
   onAddRoutine?: (input: CreateRoutineInput) => Promise<unknown>
   isOpen?: boolean
   onOpen?: () => void
@@ -63,6 +64,9 @@ export function QuickCapture({
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [showProjectDropdown, setShowProjectDropdown] = useState(false)
   const [projectQuery, setProjectQuery] = useState('')
+
+  // Parsed date from natural language
+  const [parsedDate, setParsedDate] = useState<Date | null>(null)
 
   // Unified dropdown state for keyboard nav
   const [highlightedIndex, setHighlightedIndex] = useState(0)
@@ -124,6 +128,7 @@ export function QuickCapture({
     setSelectedProject(null)
     setShowProjectDropdown(false)
     setProjectQuery('')
+    setParsedDate(null)
     setShowContactForm(false)
     setNewContactName('')
     setNewContactPhone('')
@@ -151,6 +156,7 @@ export function QuickCapture({
       setSelectedProject(null)
       setShowProjectDropdown(false)
       setProjectQuery('')
+      setParsedDate(null)
       setShowContactForm(false)
       setNewContactName('')
       setNewContactPhone('')
@@ -186,12 +192,17 @@ export function QuickCapture({
         time_of_day: routineTime || undefined,
       })
     } else {
-      onAdd(trimmed, selectedContact?.id, selectedProject?.id)
+      // Use cleaned title if we parsed a date, otherwise use original
+      const parseResult = parseNaturalDate(trimmed)
+      const finalTitle = parseResult ? parseResult.cleanedTitle : trimmed
+      const scheduledFor = parseResult?.scheduledFor || undefined
+      onAdd(finalTitle, selectedContact?.id, selectedProject?.id, scheduledFor)
     }
 
     setTitle('')
     setSelectedContact(null)
     setSelectedProject(null)
+    setParsedDate(null)
     handleClose()
   }
 
@@ -199,8 +210,12 @@ export function QuickCapture({
     const value = e.target.value
     setTitle(value)
 
-    // In routine mode, don't trigger contact/project dropdowns
+    // In routine mode, don't trigger contact/project dropdowns or date parsing
     if (mode === 'routine') return
+
+    // Parse natural language date from input (for preview)
+    const parseResult = parseNaturalDate(value)
+    setParsedDate(parseResult?.scheduledFor || null)
 
     // Check for @ trigger (contacts)
     const lastAtIndex = value.lastIndexOf('@')
@@ -579,8 +594,16 @@ export function QuickCapture({
             ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Selected chips (task mode only) */}
-              {mode === 'task' && (selectedContact || selectedProject) && (
+              {mode === 'task' && (selectedContact || selectedProject || parsedDate) && (
                 <div className="flex items-center gap-2 flex-wrap">
+                  {parsedDate && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full text-sm font-medium">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                      </svg>
+                      {formatDatePreview(parsedDate)}
+                    </span>
+                  )}
                   {selectedContact && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 text-primary-700 rounded-full text-sm font-medium">
                       <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">

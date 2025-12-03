@@ -15,7 +15,7 @@ interface AppShellProps {
   onPanelClose?: () => void
   userEmail?: string
   onSignOut?: () => void
-  onQuickAdd?: (title: string, contactId?: string, projectId?: string) => void
+  onQuickAdd?: (title: string, contactId?: string, projectId?: string, scheduledFor?: Date) => void
   onAddRoutine?: (input: CreateRoutineInput) => Promise<unknown>
   quickAddOpen?: boolean
   onOpenQuickAdd?: () => void

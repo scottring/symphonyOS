@@ -348,6 +348,7 @@ function App() {
         <ProjectsList
           projects={projects}
           onSelectProject={setSelectedProjectId}
+          onAddProject={addProject}
         />
       )}
 

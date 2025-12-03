@@ -14,7 +14,47 @@ Optimized for quick task completion with rich context available on demand.
 
 ---
 
-## Current: Projects MVP
+## Completed: Batch 2 Enhancements
+
+### #7: Quick Add Time/Date Picker ✓
+
+**Problem:** Quick add creates unscheduled tasks; users must open detail panel to set date/time.
+
+**Solution:** Added natural language date/time parsing to quick add (e.g., "Call mom tomorrow 3pm")
+
+**Changes Made:**
+- [x] Created `src/utils/parseNaturalDate.ts` - Parses natural language dates
+  - Today/tomorrow/yesterday
+  - Days of week (Monday, next Tuesday)
+  - Relative (in 2 days, next week)
+  - Time parsing (3pm, 3:00, at 3)
+  - Combined (tomorrow at 3pm, Monday 9am)
+- [x] Created `src/utils/parseNaturalDate.test.ts` - 22 unit tests
+- [x] Updated `QuickCapture.tsx`:
+  - Parses title on input change
+  - Shows amber date preview chip when date detected
+  - Passes `scheduledFor` to onAdd callback
+  - Cleans date text from title on submit
+- [x] Updated `onAdd` signature in QuickCapture and AppShell props
+- [x] Updated `useSupabaseTasks.addTask` to accept and persist `scheduledFor`
+
+### #8: Create Project Button in Projects View ✓
+
+**Problem:** Can only create projects via #mention in quick add.
+
+**Solution:** Added "+ New" button with inline creation form in projects view.
+
+**Changes Made:**
+- [x] Updated `ProjectsList.tsx`:
+  - Added inline creation form (shows when "New" clicked)
+  - Form has project name input with Enter/Escape support
+  - Create/Cancel buttons
+  - Optimistic update via existing `addProject` hook
+- [x] Wired up `onAddProject` prop in App.tsx
+
+---
+
+## Completed: Projects MVP
 
 ### 1. Database Migrations
 - [ ] Create `supabase/migrations/007_projects.sql`: projects table with RLS
