@@ -10,6 +10,7 @@ import { groupByDaySection, type DaySection } from '@/lib/timeUtils'
 import { TimeGroup } from './TimeGroup'
 import { ScheduleItem } from './ScheduleItem'
 import { DateNavigator } from './DateNavigator'
+import { InboxSection } from './InboxSection'
 
 interface TodayScheduleProps {
   tasks: Task[]
@@ -19,11 +20,15 @@ interface TodayScheduleProps {
   selectedItemId: string | null
   onSelectItem: (id: string | null) => void
   onToggleTask: (taskId: string) => void
+  onUpdateTask?: (id: string, updates: Partial<Task>) => void
   loading?: boolean
   viewedDate: Date
   onDateChange: (date: Date) => void
   contactsMap?: Map<string, Contact>
   projectsMap?: Map<string, Project>
+  projects?: Project[]
+  contacts?: Contact[]
+  onSearchContacts?: (query: string) => Contact[]
   eventNotesMap?: Map<string, EventNote>
   onRefreshInstances?: () => void
 }
@@ -67,14 +72,34 @@ export function TodaySchedule({
   selectedItemId,
   onSelectItem,
   onToggleTask,
+  onUpdateTask,
   loading,
   viewedDate,
   onDateChange,
   contactsMap,
   projectsMap,
+  projects = [],
+  contacts = [],
+  onSearchContacts,
   eventNotesMap,
 }: TodayScheduleProps) {
-  // Filter tasks for the viewed date
+  // Check if we're viewing today
+  const isToday = useMemo(() => {
+    const today = new Date()
+    return (
+      viewedDate.getFullYear() === today.getFullYear() &&
+      viewedDate.getMonth() === today.getMonth() &&
+      viewedDate.getDate() === today.getDate()
+    )
+  }, [viewedDate])
+
+  // Inbox tasks: no scheduledFor, not completed - only shown on today's view
+  const inboxTasks = useMemo(() => {
+    if (!isToday) return []
+    return tasks.filter((task) => !task.scheduledFor && !task.completed)
+  }, [tasks, isToday])
+
+  // Filter tasks for the viewed date (only tasks with scheduledFor)
   const filteredTasks = useMemo(() => {
     const startOfDay = new Date(viewedDate)
     startOfDay.setHours(0, 0, 0, 0)
@@ -86,12 +111,7 @@ export function TodaySchedule({
         const taskDate = new Date(task.scheduledFor)
         return taskDate >= startOfDay && taskDate <= endOfDay
       }
-      const today = new Date()
-      return (
-        viewedDate.getFullYear() === today.getFullYear() &&
-        viewedDate.getMonth() === today.getMonth() &&
-        viewedDate.getDate() === today.getDate()
-      )
+      return false // Unscheduled tasks go to inbox, not here
     })
   }, [tasks, viewedDate])
 
@@ -170,21 +190,12 @@ export function TodaySchedule({
     })
   }
 
-  const isToday = () => {
-    const today = new Date()
-    return (
-      viewedDate.getFullYear() === today.getFullYear() &&
-      viewedDate.getMonth() === today.getMonth() &&
-      viewedDate.getDate() === today.getDate()
-    )
-  }
-
-  // Calculate completion stats
+  // Calculate completion stats (only scheduled tasks, not inbox)
   const completedTasks = filteredTasks.filter((t) => t.completed).length
   const completedRoutines = routines.filter((r) => routineStatusMap.get(r.id)?.status === 'completed').length
   const completedCount = completedTasks + completedRoutines
   const actionableCount = filteredTasks.length + routines.length
-  const totalItems = filteredTasks.length + filteredEvents.length + routines.length
+  const totalItems = filteredTasks.length + filteredEvents.length + routines.length + inboxTasks.length
   const progressPercent = actionableCount > 0 ? (completedCount / actionableCount) * 100 : 0
 
   return (
@@ -194,7 +205,7 @@ export function TodaySchedule({
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="font-display text-2xl md:text-3xl font-semibold text-neutral-900 mb-1">
-              {isToday() ? 'Today' : formatDate().split(',')[0]}
+              {isToday ? 'Today' : formatDate().split(',')[0]}
             </h2>
             <p className="text-neutral-500 text-sm">
               {formatDate()}
@@ -238,7 +249,7 @@ export function TodaySchedule({
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
             </svg>
           </div>
-          {isToday() ? (
+          {isToday ? (
             <>
               <p className="font-display text-xl text-neutral-700 mb-2">Your day is clear</p>
               <p className="text-neutral-500">Press <kbd className="px-2 py-1 bg-neutral-100 rounded-md text-xs font-mono">Cmd+K</kbd> to add a task</p>
@@ -278,6 +289,18 @@ export function TodaySchedule({
               </TimeGroup>
             )
           })}
+
+          {/* Inbox Section - at bottom, only on today's view */}
+          {onUpdateTask && (
+            <InboxSection
+              tasks={inboxTasks}
+              onUpdateTask={onUpdateTask}
+              onSelectTask={(taskId) => onSelectItem(`task-${taskId}`)}
+              projects={projects}
+              contacts={contacts}
+              onSearchContacts={onSearchContacts}
+            />
+          )}
         </div>
       )}
     </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
-import type { Task, TaskLink } from '@/types/task'
+import type { Task, TaskLink, TaskContext } from '@/types/task'
 
 interface DbTask {
   id: string
@@ -9,10 +9,12 @@ interface DbTask {
   title: string
   completed: boolean
   scheduled_for: string | null
+  context: TaskContext | null
   notes: string | null
   links: (string | TaskLink)[] | null // Can be old string format or new object format
   phone_number: string | null
   contact_id: string | null
+  assigned_to: string | null
   project_id: string | null
   created_at: string
   updated_at: string
@@ -36,10 +38,12 @@ function dbTaskToTask(dbTask: DbTask): Task {
     completed: dbTask.completed,
     createdAt: new Date(dbTask.created_at),
     scheduledFor: dbTask.scheduled_for ? new Date(dbTask.scheduled_for) : undefined,
+    context: dbTask.context ?? undefined,
     notes: dbTask.notes ?? undefined,
     links: normalizeLinks(dbTask.links),
     phoneNumber: dbTask.phone_number ?? undefined,
     contactId: dbTask.contact_id ?? undefined,
+    assignedTo: dbTask.assigned_to ?? undefined,
     projectId: dbTask.project_id ?? undefined,
   }
 }
@@ -185,10 +189,12 @@ export function useSupabaseTasks() {
     if (updates.scheduledFor !== undefined) {
       dbUpdates.scheduled_for = updates.scheduledFor?.toISOString() ?? null
     }
+    if (updates.context !== undefined) dbUpdates.context = updates.context ?? null
     if (updates.notes !== undefined) dbUpdates.notes = updates.notes ?? null
     if (updates.links !== undefined) dbUpdates.links = updates.links ?? null
     if (updates.phoneNumber !== undefined) dbUpdates.phone_number = updates.phoneNumber ?? null
     if (updates.contactId !== undefined) dbUpdates.contact_id = updates.contactId ?? null
+    if (updates.assignedTo !== undefined) dbUpdates.assigned_to = updates.assignedTo ?? null
     if (updates.projectId !== undefined) dbUpdates.project_id = updates.projectId ?? null
 
     const { error: updateError } = await supabase

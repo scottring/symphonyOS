@@ -2,9 +2,7 @@ import type { ReactNode } from 'react'
 import { Sidebar, type ViewType } from './Sidebar'
 import { QuickCapture } from './QuickCapture'
 import { useMobile } from '@/hooks/useMobile'
-import type { Contact } from '@/types/contact'
-import type { Project } from '@/types/project'
-import type { CreateRoutineInput } from '@/hooks/useRoutines'
+import symphonyLogo from '@/assets/symphony-logo.jpg'
 
 interface AppShellProps {
   children: ReactNode
@@ -15,15 +13,10 @@ interface AppShellProps {
   onPanelClose?: () => void
   userEmail?: string
   onSignOut?: () => void
-  onQuickAdd?: (title: string, contactId?: string, projectId?: string, scheduledFor?: Date) => void
-  onAddRoutine?: (input: CreateRoutineInput) => Promise<unknown>
+  onQuickAdd?: (title: string) => void
   quickAddOpen?: boolean
   onOpenQuickAdd?: () => void
   onCloseQuickAdd?: () => void
-  contacts?: Contact[]
-  onAddContact?: (contact: { name: string }) => Promise<Contact | null>
-  projects?: Project[]
-  onAddProject?: (project: { name: string }) => Promise<Project | null>
   activeView: ViewType
   onViewChange: (view: ViewType) => void
 }
@@ -38,14 +31,9 @@ export function AppShell({
   userEmail,
   onSignOut,
   onQuickAdd,
-  onAddRoutine,
   quickAddOpen = false,
   onOpenQuickAdd,
   onCloseQuickAdd,
-  contacts,
-  onAddContact,
-  projects,
-  onAddProject,
   activeView,
   onViewChange,
 }: AppShellProps) {
@@ -78,22 +66,11 @@ export function AppShell({
           <header className="sticky top-0 z-10 glass border-b border-neutral-200/50 px-5 py-4 safe-top">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow-primary">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="white"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="w-4.5 h-4.5"
-                  >
-                    <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                    <path d="M2 17l10 5 10-5" />
-                    <path d="M2 12l10 5 10-5" />
-                  </svg>
-                </div>
+                <img
+                  src={symphonyLogo}
+                  alt="Symphony"
+                  className="w-9 h-9 rounded-xl object-cover"
+                />
                 <span className="font-display text-lg font-semibold text-neutral-900">Symphony</span>
               </div>
               {onSignOut && (
@@ -118,15 +95,10 @@ export function AppShell({
       {onQuickAdd && (
         <QuickCapture
           onAdd={onQuickAdd}
-          onAddRoutine={onAddRoutine}
           isOpen={quickAddOpen}
           onOpen={onOpenQuickAdd}
           onClose={onCloseQuickAdd}
           showFab={isMobile && !panelOpen}
-          contacts={contacts}
-          onAddContact={onAddContact}
-          projects={projects}
-          onAddProject={onAddProject}
         />
       )}
 

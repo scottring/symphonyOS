@@ -7,6 +7,7 @@ import { useContacts } from '@/hooks/useContacts'
 import { useProjects } from '@/hooks/useProjects'
 import { useRoutines } from '@/hooks/useRoutines'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
+import { useMobile } from '@/hooks/useMobile'
 import { AppShell } from '@/components/layout/AppShell'
 import { TodaySchedule } from '@/components/schedule/TodaySchedule'
 import { DetailPanel } from '@/components/detail/DetailPanel'
@@ -17,6 +18,7 @@ import { ProjectsList } from '@/components/project/ProjectsList'
 import { ProjectView } from '@/components/project/ProjectView'
 import { RoutinesList } from '@/components/routine/RoutinesList'
 import { RoutineForm } from '@/components/routine/RoutineForm'
+import { TaskView } from '@/components/task/TaskView'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import type { ViewType } from '@/components/layout/Sidebar'
 import type { ActionableInstance } from '@/types/actionable'
@@ -26,19 +28,22 @@ function App() {
   const { user, loading: authLoading, signOut } = useAuth()
   const { isConnected, events, fetchEvents, isFetching: eventsFetching } = useGoogleCalendar()
   const { fetchNote, fetchNotesForEvents, updateNote, getNote, notes: eventNotesMap } = useEventNotes()
-  const { contacts, contactsMap, addContact, updateContact, searchContacts } = useContacts()
-  const { projects, projectsMap, addProject, updateProject, searchProjects } = useProjects()
+  const { contacts, contactsMap, addContact: _addContact, updateContact, searchContacts } = useContacts()
+  void _addContact // Will be used when inline contact creation is re-added
+  const { projects, projectsMap, addProject, updateProject, deleteProject, searchProjects } = useProjects()
   const {
     routines: allRoutines,
     activeRoutines,
     getRoutinesForDate,
     loading: routinesLoading,
-    addRoutine,
+    addRoutine: _addRoutine,
     updateRoutine,
     deleteRoutine,
     toggleVisibility: toggleRoutineVisibility,
   } = useRoutines()
+  void _addRoutine // Will be used when routine creation UI is re-added
   const { getInstancesForDate } = useActionableInstances()
+  const isMobile = useMobile()
 
   // Actionable instances for the viewed date (to filter skipped/completed events)
   const [dateInstances, setDateInstances] = useState<ActionableInstance[]>([])
@@ -49,6 +54,7 @@ function App() {
     return stored === 'true'
   })
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [viewedDate, setViewedDate] = useState(() => new Date())
   const [recipeUrl, setRecipeUrl] = useState<string | null>(null)
   const [quickAddOpen, setQuickAddOpen] = useState(false)
@@ -235,6 +241,7 @@ function App() {
   const handleViewChange = useCallback((view: ViewType) => {
     setActiveView(view)
     setSelectedItemId(null)
+    setSelectedTaskId(null)
     setSelectedProjectId(null)
     setSelectedRoutineId(null)
     setRecipeUrl(null)
@@ -245,8 +252,56 @@ function App() {
     setSelectedProjectId(projectId)
     setActiveView('projects')
     setSelectedItemId(null)
+    setSelectedTaskId(null)
     setRecipeUrl(null)
   }, [])
+
+  // Handle selecting an item - routes tasks differently on desktop vs mobile
+  const handleSelectItem = useCallback((itemId: string | null) => {
+    if (!itemId) {
+      setSelectedItemId(null)
+      setSelectedTaskId(null)
+      return
+    }
+
+    // Check if it's a task
+    if (itemId.startsWith('task-')) {
+      const taskId = itemId.replace('task-', '')
+      if (isMobile) {
+        // Mobile: open DetailPanel as bottom sheet
+        setSelectedItemId(itemId)
+        setSelectedTaskId(null)
+      } else {
+        // Desktop: navigate to TaskView page
+        setSelectedTaskId(taskId)
+        setActiveView('task-detail')
+        setSelectedItemId(null)
+      }
+    } else {
+      // Events and routines: always use DetailPanel
+      setSelectedItemId(itemId)
+      setSelectedTaskId(null)
+    }
+    setRecipeUrl(null)
+  }, [isMobile])
+
+  // Get selected task for TaskView (desktop)
+  const selectedTask = useMemo(() => {
+    if (!selectedTaskId) return null
+    return tasks.find(t => t.id === selectedTaskId) ?? null
+  }, [selectedTaskId, tasks])
+
+  // Get contact for selected task (TaskView)
+  const selectedTaskContact = useMemo(() => {
+    if (!selectedTask?.contactId) return null
+    return contactsMap.get(selectedTask.contactId) ?? null
+  }, [selectedTask, contactsMap])
+
+  // Get project for selected task (TaskView)
+  const selectedTaskProject = useMemo(() => {
+    if (!selectedTask?.projectId) return null
+    return projectsMap.get(selectedTask.projectId) ?? null
+  }, [selectedTask, projectsMap])
 
   if (authLoading) {
     return (
@@ -275,15 +330,10 @@ function App() {
       }}
       userEmail={user.email ?? undefined}
       onSignOut={signOut}
-      onQuickAdd={addTask}
-      onAddRoutine={addRoutine}
+      onQuickAdd={(title) => addTask(title)}
       quickAddOpen={quickAddOpen}
       onOpenQuickAdd={openQuickAdd}
       onCloseQuickAdd={closeQuickAdd}
-      contacts={contacts}
-      onAddContact={addContact}
-      projects={projects}
-      onAddProject={addProject}
       activeView={activeView}
       onViewChange={handleViewChange}
       panel={
@@ -310,6 +360,7 @@ function App() {
             onSearchProjects={searchProjects}
             onUpdateProject={updateProject}
             onOpenProject={handleOpenProject}
+            onAddProject={addProject}
             onActionComplete={refreshDateInstances}
           />
         )
@@ -331,17 +382,46 @@ function App() {
             routines={filteredRoutines}
             dateInstances={dateInstances}
             selectedItemId={selectedItemId}
-            onSelectItem={setSelectedItemId}
+            onSelectItem={handleSelectItem}
             onToggleTask={toggleTask}
+            onUpdateTask={updateTask}
             loading={tasksLoading || eventsFetching || routinesLoading}
             viewedDate={viewedDate}
             onDateChange={setViewedDate}
             contactsMap={contactsMap}
             projectsMap={projectsMap}
+            projects={projects}
+            contacts={contacts}
+            onSearchContacts={searchContacts}
             eventNotesMap={eventNotesMap}
             onRefreshInstances={refreshDateInstances}
           />
         </div>
+      )}
+
+      {activeView === 'task-detail' && selectedTask && (
+        <TaskView
+          task={selectedTask}
+          onBack={() => {
+            setSelectedTaskId(null)
+            setActiveView('home')
+          }}
+          onUpdate={updateTask}
+          onDelete={(id) => {
+            deleteTask(id)
+            setSelectedTaskId(null)
+            setActiveView('home')
+          }}
+          onToggleComplete={toggleTask}
+          contact={selectedTaskContact}
+          contacts={contacts}
+          onSearchContacts={searchContacts}
+          project={selectedTaskProject}
+          projects={projects}
+          onSearchProjects={searchProjects}
+          onOpenProject={handleOpenProject}
+          onAddProject={addProject}
+        />
       )}
 
       {activeView === 'projects' && !selectedProjectId && (
@@ -359,7 +439,9 @@ function App() {
           contactsMap={contactsMap}
           onBack={() => setSelectedProjectId(null)}
           onUpdateProject={updateProject}
-          onSelectTask={setSelectedItemId}
+          onDeleteProject={deleteProject}
+          onAddTask={(title, projectId) => addTask(title, undefined, projectId)}
+          onSelectTask={handleSelectItem}
           onToggleTask={toggleTask}
           selectedTaskId={selectedItemId}
         />

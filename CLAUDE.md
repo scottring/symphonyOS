@@ -4,7 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Symphony OS is a personal operating system for organizing life tasks, calendar, and contextual information. This is a ground-up rebuild focused on reliability. See VISION.md for full product context.
+Symphony OS is a personal/family operating system for organizing life — tasks, calendar, routines, and contextual information. The philosophy is **"plan on desktop, execute on mobile"**: full-page views for planning on desktop, quick modals for execution on mobile.
+
+See `VISION.md` for full product context.
+
+---
 
 ## Commands
 
@@ -21,19 +25,22 @@ npm run test:e2e:ui  # Playwright with UI
 
 Run a single test file:
 ```bash
-npx vitest src/App.test.tsx
+npx vitest src/components/detail/DetailPanel.test.tsx
 ```
 
 Run a single E2E test:
 ```bash
-npx playwright test e2e/example.spec.ts
+npx playwright test e2e/app.spec.ts
 ```
+
+---
 
 ## Tech Stack
 
 - React 19 + TypeScript (strict mode)
 - Vite 7 for bundling
-- Tailwind CSS v4
+- Tailwind CSS v4 with **Nordic Journal** design system
+- Supabase for backend (auth, database, realtime)
 - Vitest + React Testing Library for unit tests
 - Playwright for E2E (Desktop Chrome + Mobile Chrome)
 
@@ -44,53 +51,244 @@ Use `@/` to import from `src/`:
 import { Component } from '@/components/Component'
 ```
 
+---
+
+## Architecture Overview
+
+### Core Philosophy
+
+**Capture → Triage separation:**
+- **Capture:** Zero friction brain dump. QuickCapture = title only.
+- **Triage:** Review and categorize later. Happens in Inbox section via inline icons.
+
+**Planning rhythm:**
+| When | What |
+|------|------|
+| Continuous | Quick triage from inbox |
+| Daily review | Process remaining inbox items |
+| Weekly planning | Review deferred items, plan ahead |
+
+**Desktop/Mobile split:**
+| Platform | Task interaction |
+|----------|------------------|
+| Desktop (≥768px) | Full-page TaskView |
+| Mobile (<768px) | Bottom sheet DetailPanel |
+
+### Key Data Models
+
+**Task:**
+```typescript
+interface Task {
+  id: string
+  title: string
+  completed: boolean
+  scheduled_for: Date | null      // null = inbox
+  context: 'work' | 'family' | 'personal' | null
+  project_id: string | null
+  contact_id: string | null       // Who task is ABOUT
+  assigned_to: string | null      // Who should DO it
+  created_at: Date
+  updated_at: Date
+}
+```
+
+**Important:** `contact_id` ≠ `assigned_to`
+- `contact_id`: Related person (e.g., "Call Dr. Smith" → Dr. Smith)
+- `assigned_to`: Owner/assignee (e.g., "Iris should handle this")
+
+**Project:**
+```typescript
+interface Project {
+  id: string
+  name: string
+  status: 'active' | 'on_hold' | 'completed'
+  // Tasks link to projects via project_id
+}
+```
+
+**Routine:**
+```typescript
+interface Routine {
+  id: string
+  name: string
+  recurrence_pattern: { type: 'daily' | 'weekly', days?: string[] }
+  time_of_day?: string
+  is_active: boolean
+}
+```
+
+### Component Structure
+
+```
+src/
+├── components/
+│   ├── layout/
+│   │   ├── AppShell.tsx        # Main layout wrapper
+│   │   ├── Sidebar.tsx         # Navigation
+│   │   └── QuickCapture.tsx    # Brain dump input (title only)
+│   ├── schedule/
+│   │   ├── TodaySchedule.tsx   # Main day view
+│   │   ├── TaskCard.tsx        # Universal task card with triage icons
+│   │   └── InboxSection.tsx    # Unscheduled tasks (bottom of page)
+│   ├── triage/
+│   │   ├── WhenPicker.tsx      # 📅 Date selection popover
+│   │   ├── ContextPicker.tsx   # 🏷️ Work/Family/Personal picker
+│   │   └── AssignPicker.tsx    # 👤 Contact assignment picker
+│   ├── task/
+│   │   └── TaskView.tsx        # Full-page task editor (desktop)
+│   ├── detail/
+│   │   └── DetailPanel.tsx     # Slide-over panel (mobile)
+│   ├── project/
+│   │   ├── ProjectsList.tsx    # Project list view
+│   │   └── ProjectView.tsx     # Full-page project view
+│   └── routine/
+│       ├── RoutinesList.tsx    # Routine list view
+│       └── RoutineForm.tsx     # Routine editor
+├── hooks/
+│   ├── useSupabaseTasks.ts     # Task CRUD
+│   ├── useProjects.ts          # Project CRUD
+│   ├── useRoutines.ts          # Routine CRUD
+│   ├── useContacts.ts          # Contact CRUD
+│   ├── useAuth.ts              # Supabase auth
+│   ├── useGoogleCalendar.ts    # Calendar integration
+│   └── useIsMobile.ts          # Responsive breakpoint hook
+└── types/
+    ├── task.ts
+    ├── project.ts
+    ├── routine.ts
+    └── contact.ts
+```
+
+---
+
+## Design System: Nordic Journal
+
+**Theme file:** `src/index.css`
+
+**Fonts:**
+- Display: `font-display` → Fraunces (elegant serif)
+- Body: Default → DM Sans (warm geometric)
+
+**Key classes:**
+- `.card` — Elevated card with warm shadow
+- `.btn-primary` — Forest green gradient button
+- `.input-base` — Styled input field
+- `.font-display` — Fraunces serif for headlines
+
+**Entity creation inputs use large serif font:**
+```tsx
+<input className="text-2xl font-display ..." />
+```
+
+**Colors:**
+- Primary: Forest green (`--color-primary-500`)
+- Background: Warm cream (`--color-bg-base`)
+- Cards: Soft off-white (`--color-bg-elevated`)
+
+---
+
+## UI Patterns
+
+### Task Card Anatomy
+
+```
+┌─────────────────────────────────────────────────┐
+│ ○ Task title here                    📅  🏷️  👤 │
+│   #Project Name ×                               │
+│   @Assigned Person ×                            │
+└─────────────────────────────────────────────────┘
+```
+
+- Icons right-aligned, expand to popovers on tap
+- Project/assignee chips below title
+- Checkbox left, title flexible width
+
+### Triage Icons
+
+| Icon | Action | Options |
+|------|--------|---------|
+| 📅 Calendar | When | Today, Tomorrow, Next Week, Someday, +Date |
+| 🏷️ Tag | Context | Work, Family, Personal |
+| 👤 Person | Assign | Contact picker |
+
+### Page vs Panel
+
+- **Full page** (desktop): TaskView, ProjectView, RoutineForm
+- **Panel/Modal** (mobile): DetailPanel as bottom sheet
+
+---
+
 ## Testing
 
 - Unit tests: `src/**/*.{test,spec}.tsx`
 - E2E tests: `e2e/` directory
-- Test utilities: `src/test/test-utils.tsx` provides a custom `render()` with providers and `userEvent` setup
-- Vitest globals enabled (`describe`, `it`, `expect` available without imports)
+- Test utilities: `src/test/test-utils.tsx` provides custom `render()` with providers
 
-## Design Tokens (from VISION.md)
+**Key test files:**
+- `DetailPanel.test.tsx` — 10 tests
+- `ProjectView.test.tsx` — 13 tests
+- `useRoutines.test.ts` — 17 tests
+- `QuickCapture.test.tsx` — 12 tests
 
-- Primary color: Forest green (#3d8b6e)
-- Style: Scandinavian-inspired warm neutrals, generous spacing, soft shadows, rounded corners
+---
 
-## Mobile Schedule Item Layout
+## Current Work
 
-The home page schedule items (tasks and events) use a compact horizontal layout:
+Active spec: `tasks/v1.5-desktop-mobile-split.md`
 
-```
-[Time] [Dot/Checkbox] [Title] [Contact chip] [Info icon]
-```
+**In progress:**
+1. Simplified QuickCapture (title only)
+2. Inbox section at bottom of Today view
+3. Triage icons on task cards (📅 🏷️ 👤)
+4. Desktop/mobile responsive routing
+5. TaskView full-page component
 
-**Spacing specifications:**
-- Container: `pl-2 pr-4 py-3` with `gap-2` between elements
-- Time column: `w-6` (24px), left-aligned
-  - Single time: e.g., "9a"
-  - Time range: stacked on two lines (e.g., "7p" / "8p")
-  - All day: stacked as "All" / "day"
-  - Unscheduled: em-dash "—"
-- Checkbox/dot column: `w-5` (20px), centered
-  - Tasks: 20x20px rounded checkbox
-  - Events: 10x10px solid dot
-- Title: flexible width, truncates with ellipsis
-- Contact chip: optional, shows linked contact name
-- Info icon: optional, shows if task has notes/links/phone
+---
 
-## Workflow
+## Future Plans
 
-1. **Think through the problem** — Read the codebase for relevant files
-2. **Write a plan** — Create a todo list in `tasks/todo.md` with checkable items
-3. **Get approval** — Check in before starting work so the user can verify the plan
-4. **Execute** — Work through todo items, marking them complete as you go
-5. **Summarize** — Provide high-level explanations of each change
-6. **Review** — Add a review section to `tasks/todo.md` summarizing changes
+### Near-term (V1.5-V1.6)
+- [ ] "Next Week" triage bucket → surfaces in weekly planning
+- [ ] "Someday" list → no timeline, review periodically
+- [ ] Daily review prompt → if inbox not empty at day end
+- [ ] Notes on tasks (V1.6)
 
-## Code Change Principles
+### Medium-term
+- [ ] Weekly planning view
+- [ ] Subtasks
+- [ ] File attachments
+- [ ] Activity history on tasks
 
-- **Simplicity above all** — Every change should be as simple as possible
-- **Minimal impact** — Only touch code directly relevant to the task
+### Long-term
+- [ ] True multi-user → Iris has her own view, shared family tasks
+- [ ] Context-aware surfacing → Work items at work time, family in evening
+- [ ] Calendar event assignment/context
+- [ ] Routine assignment ("Iris handles trash on Tuesdays")
+
+---
+
+## Workflow for Claude Code
+
+1. **Read the codebase** — Find relevant files before changing anything
+2. **Write a plan** — Create todo list in `tasks/todo.md`
+3. **Get approval** — Check in before starting work
+4. **Execute** — Work through items, marking complete
+5. **Summarize** — High-level explanation of changes
+6. **Review** — Add review section to todo file
+
+## Code Principles
+
+- **Simplicity above all** — Every change as simple as possible
+- **Minimal impact** — Only touch code directly relevant to task
 - **No laziness** — Find root causes, no temporary fixes
 - **Senior-level rigor** — You are a senior developer, act like one
-- **Avoid bugs** — Simple changes = fewer bugs introduced
+- **Avoid bugs** — Simple changes = fewer bugs
+
+---
+
+## Useful References
+
+- `VISION.md` — Product vision and philosophy
+- `tasks/v1.5-desktop-mobile-split.md` — Current implementation spec
+- `src/index.css` — Full Nordic Journal design system
+- `src/App.tsx` — Main app routing and state

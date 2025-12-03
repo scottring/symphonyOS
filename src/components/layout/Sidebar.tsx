@@ -1,4 +1,6 @@
-export type ViewType = 'home' | 'projects' | 'routines'
+import symphonyLogo from '@/assets/symphony-logo.jpg'
+
+export type ViewType = 'home' | 'projects' | 'routines' | 'task-detail'
 
 interface SidebarProps {
   collapsed: boolean
@@ -22,22 +24,11 @@ export function Sidebar({ collapsed, onToggle, userEmail, onSignOut, activeView,
       {/* Header with logo */}
       <div className="p-4 flex items-center justify-between">
         <div className={`flex items-center gap-3 ${collapsed ? 'justify-center w-full' : ''}`}>
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow-primary">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="white"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="w-5 h-5"
-            >
-              <path d="M12 2L2 7l10 5 10-5-10-5z" />
-              <path d="M2 17l10 5 10-5" />
-              <path d="M2 12l10 5 10-5" />
-            </svg>
-          </div>
+          <img
+            src={symphonyLogo}
+            alt="Symphony"
+            className="w-10 h-10 rounded-xl object-cover"
+          />
           {!collapsed && (
             <span className="font-display text-lg font-semibold text-neutral-900">Symphony</span>
           )}

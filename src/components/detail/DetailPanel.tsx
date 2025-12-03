@@ -102,6 +102,7 @@ interface DetailPanelProps {
   onSearchProjects?: (query: string) => Project[]
   onUpdateProject?: (projectId: string, updates: Partial<Project>) => void
   onOpenProject?: (projectId: string) => void
+  onAddProject?: (project: { name: string }) => Promise<Project | null>
   // Actionable callback - called after skip/defer/done to refresh timeline
   onActionComplete?: () => void
 }
@@ -189,7 +190,7 @@ function ActionButton({ action, onOpenRecipe }: { action: DetectedAction; onOpen
   )
 }
 
-export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplete, onUpdateEventNote, onOpenRecipe, contact, contacts = [], onSearchContacts, onUpdateContact, project, projects = [], onSearchProjects, onUpdateProject, onOpenProject, onActionComplete }: DetailPanelProps) {
+export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplete, onUpdateEventNote, onOpenRecipe, contact, contacts = [], onSearchContacts, onUpdateContact, project, projects = [], onSearchProjects, onUpdateProject, onOpenProject, onAddProject, onActionComplete }: DetailPanelProps) {
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [editedTitle, setEditedTitle] = useState(item?.title || '')
@@ -216,6 +217,9 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
   // Project picker state
   const [showProjectPicker, setShowProjectPicker] = useState(false)
   const [projectSearchQuery, setProjectSearchQuery] = useState('')
+  const [isCreatingProject, setIsCreatingProject] = useState(false)
+  const [newProjectName, setNewProjectName] = useState('')
+  const [isCreatingProjectLoading, setIsCreatingProjectLoading] = useState(false)
 
   // Links editing
   const [newLink, setNewLink] = useState('')
@@ -488,6 +492,22 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
   const handleUnlinkProject = () => {
     if (isTask && item.originalTask && onUpdate) {
       onUpdate(item.originalTask.id, { projectId: undefined })
+    }
+  }
+
+  const handleCreateAndLinkProject = async () => {
+    if (!onAddProject || !newProjectName.trim() || !isTask || !item.originalTask || !onUpdate) return
+
+    setIsCreatingProjectLoading(true)
+    const createdProject = await onAddProject({ name: newProjectName.trim() })
+    setIsCreatingProjectLoading(false)
+
+    if (createdProject) {
+      onUpdate(item.originalTask.id, { projectId: createdProject.id })
+      setIsCreatingProject(false)
+      setNewProjectName('')
+      setShowProjectPicker(false)
+      setProjectSearchQuery('')
     }
   }
 
@@ -1075,53 +1095,112 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
               {showProjectPicker && !project && (
                 <div className="px-4 pb-3">
                   <div className="rounded-xl border border-neutral-200 overflow-hidden">
-                    <div className="p-2 border-b border-neutral-100">
-                      <input
-                        type="text"
-                        value={projectSearchQuery}
-                        onChange={(e) => setProjectSearchQuery(e.target.value)}
-                        placeholder="Search projects..."
-                        className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50
-                                   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        autoFocus
-                      />
-                    </div>
-                    <div className="max-h-48 overflow-auto">
-                      {filteredProjects.length > 0 ? (
-                        filteredProjects.map((p) => (
-                          <button
-                            key={p.id}
-                            onClick={() => handleLinkProject(p)}
-                            className="w-full px-4 py-3 text-left flex items-center gap-3 hover:bg-neutral-50 transition-colors"
-                          >
-                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-                              </svg>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-neutral-800 truncate">{p.name}</div>
-                              {p.notes && <div className="text-sm text-neutral-500 truncate">{p.notes}</div>}
-                            </div>
-                          </button>
-                        ))
-                      ) : (
-                        <div className="px-4 py-6 text-center text-sm text-neutral-400">
-                          No projects found
+                    {!isCreatingProject ? (
+                      <>
+                        <div className="p-2 border-b border-neutral-100">
+                          <input
+                            type="text"
+                            value={projectSearchQuery}
+                            onChange={(e) => setProjectSearchQuery(e.target.value)}
+                            placeholder="Search projects..."
+                            className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50
+                                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            autoFocus
+                          />
                         </div>
-                      )}
-                    </div>
-                    <div className="p-2 border-t border-neutral-100">
-                      <button
-                        onClick={() => {
-                          setShowProjectPicker(false)
-                          setProjectSearchQuery('')
-                        }}
-                        className="w-full px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50 rounded-lg transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
+                        <div className="max-h-48 overflow-auto">
+                          {filteredProjects.length > 0 ? (
+                            filteredProjects.map((p) => (
+                              <button
+                                key={p.id}
+                                onClick={() => handleLinkProject(p)}
+                                className="w-full px-4 py-3 text-left flex items-center gap-3 hover:bg-neutral-50 transition-colors"
+                              >
+                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                                  </svg>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-neutral-800 truncate">{p.name}</div>
+                                  {p.notes && <div className="text-sm text-neutral-500 truncate">{p.notes}</div>}
+                                </div>
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-4 py-6 text-center text-sm text-neutral-400">
+                              No projects found
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-2 border-t border-neutral-100 flex gap-2">
+                          <button
+                            onClick={() => {
+                              setShowProjectPicker(false)
+                              setProjectSearchQuery('')
+                            }}
+                            className="flex-1 px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50 rounded-lg transition-colors"
+                          >
+                            Cancel
+                          </button>
+                          {onAddProject && (
+                            <button
+                              onClick={() => {
+                                setIsCreatingProject(true)
+                                setNewProjectName(projectSearchQuery)
+                              }}
+                              className="flex-1 px-3 py-2 text-sm text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors flex items-center justify-center gap-1"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                              </svg>
+                              New
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="p-3">
+                        <div className="text-sm font-medium text-neutral-700 mb-2">Create new project</div>
+                        <input
+                          type="text"
+                          value={newProjectName}
+                          onChange={(e) => setNewProjectName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && newProjectName.trim()) {
+                              handleCreateAndLinkProject()
+                            } else if (e.key === 'Escape') {
+                              setIsCreatingProject(false)
+                              setNewProjectName('')
+                            }
+                          }}
+                          placeholder="Project name..."
+                          className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50
+                                     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3"
+                          autoFocus
+                          disabled={isCreatingProjectLoading}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setIsCreatingProject(false)
+                              setNewProjectName('')
+                            }}
+                            className="flex-1 px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50 rounded-lg transition-colors"
+                            disabled={isCreatingProjectLoading}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleCreateAndLinkProject}
+                            disabled={!newProjectName.trim() || isCreatingProjectLoading}
+                            className="flex-1 px-3 py-2 text-sm text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isCreatingProjectLoading ? 'Creating...' : 'Create'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

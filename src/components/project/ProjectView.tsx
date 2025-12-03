@@ -9,6 +9,8 @@ interface ProjectViewProps {
   contactsMap: Map<string, Contact>
   onBack: () => void
   onUpdateProject: (projectId: string, updates: Partial<Project>) => void
+  onDeleteProject?: (projectId: string) => void
+  onAddTask?: (title: string, projectId: string) => void
   onSelectTask: (taskId: string) => void
   onToggleTask: (taskId: string) => void
   selectedTaskId?: string | null
@@ -20,6 +22,8 @@ export function ProjectView({
   contactsMap,
   onBack,
   onUpdateProject,
+  onDeleteProject,
+  onAddTask,
   onSelectTask,
   onToggleTask,
   selectedTaskId,
@@ -28,6 +32,8 @@ export function ProjectView({
   const [editName, setEditName] = useState('')
   const [editStatus, setEditStatus] = useState<ProjectStatus>('not_started')
   const [editNotes, setEditNotes] = useState('')
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [newTaskTitle, setNewTaskTitle] = useState('')
 
   // Filter tasks for this project
   const projectTasks = useMemo(() => {
@@ -98,6 +104,22 @@ export function ProjectView({
     setEditName('')
     setEditStatus('not_started')
     setEditNotes('')
+  }
+
+  const handleDelete = () => {
+    if (onDeleteProject) {
+      onDeleteProject(project.id)
+      onBack()
+    }
+  }
+
+  const handleAddTask = (e: React.FormEvent) => {
+    e.preventDefault()
+    const trimmed = newTaskTitle.trim()
+    if (trimmed && onAddTask) {
+      onAddTask(trimmed, project.id)
+      setNewTaskTitle('')
+    }
   }
 
   const formatDate = (date: Date | undefined) => {
@@ -229,15 +251,51 @@ export function ProjectView({
                   )}
                 </div>
               </div>
-              <button
-                onClick={handleEdit}
-                className="p-2 text-neutral-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                aria-label="Edit project"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                </svg>
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={handleEdit}
+                  className="p-2 text-neutral-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  aria-label="Edit project"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                  </svg>
+                </button>
+                {onDeleteProject && (
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    aria-label="Delete project"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Delete confirmation */}
+          {showDeleteConfirm && (
+            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl">
+              <p className="text-sm text-red-800 mb-3">
+                Are you sure you want to delete this project? Tasks linked to this project will not be deleted.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 py-2 px-3 text-sm font-medium text-neutral-600 bg-white rounded-lg hover:bg-neutral-50 transition-colors border border-neutral-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="flex-1 py-2 px-3 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
+                >
+                  Delete Project
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -261,10 +319,38 @@ export function ProjectView({
         <div>
           <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">Tasks</h2>
 
+          {/* Add task input */}
+          {onAddTask && (
+            <form onSubmit={handleAddTask} className="mb-4">
+              <div className="flex items-center gap-2 pl-2 pr-4 py-2 rounded-xl border border-dashed border-neutral-200 bg-neutral-50/50 hover:border-neutral-300 focus-within:border-primary-300 focus-within:bg-white transition-colors">
+                <div className="w-5 h-5 rounded-md border-2 border-neutral-200 flex items-center justify-center shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 text-neutral-300" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  value={newTaskTitle}
+                  onChange={(e) => setNewTaskTitle(e.target.value)}
+                  placeholder="Add a task..."
+                  className="flex-1 bg-transparent text-xl text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
+                />
+                {newTaskTitle.trim() && (
+                  <button
+                    type="submit"
+                    className="px-3 py-1 text-xs font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-600 transition-colors"
+                  >
+                    Add
+                  </button>
+                )}
+              </div>
+            </form>
+          )}
+
           {sortedTasks.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-neutral-500 mb-2">No tasks linked to this project</p>
-              <p className="text-sm text-neutral-400">Create a task and link it using #</p>
+              <p className="text-neutral-500 mb-2">No tasks yet</p>
+              <p className="text-sm text-neutral-400">Add a task above to get started</p>
             </div>
           ) : (
             <div className="space-y-2">
