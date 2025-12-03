@@ -2,26 +2,43 @@ import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import { InboxTaskCard } from './InboxTaskCard'
+import { TriageCard } from '@/components/triage'
 
 interface InboxSectionProps {
   tasks: Task[]
   onUpdateTask: (id: string, updates: Partial<Task>) => void
+  onDeferTask: (id: string, date: Date) => void
   onSelectTask: (taskId: string) => void
   projects?: Project[]
   contacts?: Contact[]
   onSearchContacts?: (query: string) => Contact[]
+  recentlyCreatedTaskId?: string | null
+  onTriageCardCollapse?: () => void
 }
 
 export function InboxSection({
   tasks,
   onUpdateTask,
+  onDeferTask,
   onSelectTask,
   projects = [],
   contacts = [],
   onSearchContacts,
+  recentlyCreatedTaskId,
+  onTriageCardCollapse,
 }: InboxSectionProps) {
   // Don't render if no inbox tasks
   if (tasks.length === 0) return null
+
+  // Find the recently created task for the triage card
+  const recentlyCreatedTask = recentlyCreatedTaskId
+    ? tasks.find(t => t.id === recentlyCreatedTaskId)
+    : null
+
+  // Other tasks (excluding the recently created one if it exists)
+  const otherTasks = recentlyCreatedTask
+    ? tasks.filter(t => t.id !== recentlyCreatedTaskId)
+    : tasks
 
   return (
     <div className="mb-8">
@@ -32,11 +49,26 @@ export function InboxSection({
         Inbox ({tasks.length})
       </h2>
       <div className="space-y-3">
-        {tasks.map((task) => (
+        {/* Show TriageCard for recently created task at the top */}
+        {recentlyCreatedTask && onTriageCardCollapse && (
+          <TriageCard
+            task={recentlyCreatedTask}
+            onUpdate={(updates) => onUpdateTask(recentlyCreatedTask.id, updates)}
+            onDefer={(date) => onDeferTask(recentlyCreatedTask.id, date)}
+            onCollapse={onTriageCardCollapse}
+            projects={projects}
+            contacts={contacts}
+            onSearchContacts={onSearchContacts}
+          />
+        )}
+
+        {/* Show regular cards for other tasks */}
+        {otherTasks.map((task) => (
           <InboxTaskCard
             key={task.id}
             task={task}
             onUpdate={(updates) => onUpdateTask(task.id, updates)}
+            onDefer={(date) => onDeferTask(task.id, date)}
             onSelect={() => onSelectTask(task.id)}
             projects={projects}
             contacts={contacts}

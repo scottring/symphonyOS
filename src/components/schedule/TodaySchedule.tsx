@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
@@ -11,6 +11,7 @@ import { TimeGroup } from './TimeGroup'
 import { ScheduleItem } from './ScheduleItem'
 import { DateNavigator } from './DateNavigator'
 import { InboxSection } from './InboxSection'
+import { WeeklyReview } from '@/components/review/WeeklyReview'
 
 interface TodayScheduleProps {
   tasks: Task[]
@@ -21,6 +22,8 @@ interface TodayScheduleProps {
   onSelectItem: (id: string | null) => void
   onToggleTask: (taskId: string) => void
   onUpdateTask?: (id: string, updates: Partial<Task>) => void
+  onDeferTask?: (id: string, date: Date) => void
+  onDeleteTask?: (id: string) => void
   loading?: boolean
   viewedDate: Date
   onDateChange: (date: Date) => void
@@ -31,6 +34,8 @@ interface TodayScheduleProps {
   onSearchContacts?: (query: string) => Contact[]
   eventNotesMap?: Map<string, EventNote>
   onRefreshInstances?: () => void
+  recentlyCreatedTaskId?: string | null
+  onTriageCardCollapse?: () => void
 }
 
 function LoadingSkeleton() {
@@ -73,6 +78,8 @@ export function TodaySchedule({
   onSelectItem,
   onToggleTask,
   onUpdateTask,
+  onDeferTask,
+  onDeleteTask,
   loading,
   viewedDate,
   onDateChange,
@@ -82,7 +89,11 @@ export function TodaySchedule({
   contacts = [],
   onSearchContacts,
   eventNotesMap,
+  recentlyCreatedTaskId,
+  onTriageCardCollapse,
 }: TodayScheduleProps) {
+  // Weekly review modal state
+  const [showWeeklyReview, setShowWeeklyReview] = useState(false)
   // Check if we're viewing today
   const isToday = useMemo(() => {
     const today = new Date()
@@ -93,10 +104,27 @@ export function TodaySchedule({
     )
   }, [viewedDate])
 
-  // Inbox tasks: no scheduledFor, not completed - only shown on today's view
+  // Inbox tasks: needs triage - only shown on today's view
+  // Includes: no scheduledFor, OR deferredUntil <= today
   const inboxTasks = useMemo(() => {
     if (!isToday) return []
-    return tasks.filter((task) => !task.scheduledFor && !task.completed)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    return tasks.filter((task) => {
+      if (task.completed) return false
+      // No scheduled date = inbox item
+      if (!task.scheduledFor) {
+        // If deferred to a future date, don't show yet
+        if (task.deferredUntil) {
+          const deferredDate = new Date(task.deferredUntil)
+          deferredDate.setHours(0, 0, 0, 0)
+          return deferredDate <= today
+        }
+        return true
+      }
+      return false
+    })
   }, [tasks, isToday])
 
   // Filter tasks for the viewed date (only tasks with scheduledFor)
@@ -211,7 +239,24 @@ export function TodaySchedule({
               {formatDate()}
             </p>
           </div>
-          <DateNavigator date={viewedDate} onDateChange={onDateChange} />
+          <div className="flex items-center gap-2">
+            {/* Weekly Review button */}
+            <button
+              onClick={() => setShowWeeklyReview(true)}
+              className="relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+              <span className="hidden sm:inline">Review</span>
+              {inboxTasks.length > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-amber-500 text-white text-xs font-semibold">
+                  {inboxTasks.length}
+                </span>
+              )}
+            </button>
+            <DateNavigator date={viewedDate} onDateChange={onDateChange} />
+          </div>
         </div>
 
         {/* Progress bar */}
@@ -291,17 +336,34 @@ export function TodaySchedule({
           })}
 
           {/* Inbox Section - at bottom, only on today's view */}
-          {onUpdateTask && (
+          {onUpdateTask && onDeferTask && (
             <InboxSection
               tasks={inboxTasks}
               onUpdateTask={onUpdateTask}
+              onDeferTask={onDeferTask}
               onSelectTask={(taskId) => onSelectItem(`task-${taskId}`)}
               projects={projects}
               contacts={contacts}
               onSearchContacts={onSearchContacts}
+              recentlyCreatedTaskId={recentlyCreatedTaskId}
+              onTriageCardCollapse={onTriageCardCollapse}
             />
           )}
         </div>
+      )}
+
+      {/* Weekly Review Modal */}
+      {showWeeklyReview && onUpdateTask && onDeferTask && onDeleteTask && (
+        <WeeklyReview
+          tasks={inboxTasks}
+          projects={projects}
+          contacts={contacts}
+          onSearchContacts={onSearchContacts ?? (() => [])}
+          onUpdateTask={onUpdateTask}
+          onDeferTask={onDeferTask}
+          onDeleteTask={onDeleteTask}
+          onClose={() => setShowWeeklyReview(false)}
+        />
       )}
     </div>
   )

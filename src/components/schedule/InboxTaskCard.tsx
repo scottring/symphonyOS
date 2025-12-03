@@ -1,11 +1,12 @@
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
-import { WhenPicker, ContextPicker, AssignPicker } from '@/components/triage'
+import { WhenPicker, ContextPicker, AssignPicker, DeferDropdown } from '@/components/triage'
 
 interface InboxTaskCardProps {
   task: Task
   onUpdate: (updates: Partial<Task>) => void
+  onDefer: (date: Date) => void
   onSelect: () => void
   projects?: Project[]
   contacts?: Contact[]
@@ -15,6 +16,7 @@ interface InboxTaskCardProps {
 export function InboxTaskCard({
   task,
   onUpdate,
+  onDefer,
   onSelect,
   projects = [],
   contacts = [],
@@ -22,6 +24,7 @@ export function InboxTaskCard({
 }: InboxTaskCardProps) {
   const project = projects.find(p => p.id === task.projectId)
   const assignee = contacts.find(c => c.id === task.assignedTo)
+  const showDeferBadge = (task.deferCount ?? 0) >= 2
 
   return (
     <div className="bg-white rounded-xl border border-neutral-100 px-4 py-3 shadow-sm">
@@ -57,30 +60,44 @@ export function InboxTaskCard({
         {/* Title - clickable to open detail */}
         <button
           onClick={onSelect}
-          className={`flex-1 text-left min-w-0 text-base font-medium ${
+          className={`flex-1 text-left min-w-0 flex items-center gap-2 ${
             task.completed ? 'text-neutral-400 line-through' : 'text-neutral-800'
-          } hover:text-primary-600 transition-colors truncate`}
+          } hover:text-primary-600 transition-colors`}
         >
-          {task.title}
+          <span className="text-base font-medium truncate">{task.title}</span>
+          {showDeferBadge && (
+            <span className="flex-shrink-0 text-xs text-amber-600 font-medium">
+              ↻{task.deferCount}
+            </span>
+          )}
         </button>
 
         {/* Triage icons */}
         <div className="flex items-center gap-1 flex-shrink-0">
-          <WhenPicker
-            value={task.scheduledFor}
-            isAllDay={task.isAllDay}
-            onChange={(date, isAllDay) => onUpdate({ scheduledFor: date, isAllDay })}
-          />
-          <ContextPicker
-            value={task.context}
-            onChange={(context) => onUpdate({ context })}
-          />
-          <AssignPicker
-            value={task.assignedTo}
-            contacts={contacts}
-            onSearchContacts={onSearchContacts}
-            onChange={(assignedTo) => onUpdate({ assignedTo })}
-          />
+          <span title="Schedule">
+            <WhenPicker
+              value={task.scheduledFor}
+              isAllDay={task.isAllDay}
+              onChange={(date, isAllDay) => onUpdate({ scheduledFor: date, isAllDay, deferredUntil: undefined })}
+            />
+          </span>
+          <span title="Defer">
+            <DeferDropdown onDefer={onDefer} />
+          </span>
+          <span title="Context">
+            <ContextPicker
+              value={task.context}
+              onChange={(context) => onUpdate({ context })}
+            />
+          </span>
+          <span title="Assign">
+            <AssignPicker
+              value={task.assignedTo}
+              contacts={contacts}
+              onSearchContacts={onSearchContacts}
+              onChange={(assignedTo) => onUpdate({ assignedTo })}
+            />
+          </span>
         </div>
       </div>
 

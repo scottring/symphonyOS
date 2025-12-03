@@ -9,6 +9,8 @@ interface DbTask {
   title: string
   completed: boolean
   scheduled_for: string | null
+  deferred_until: string | null
+  defer_count: number | null
   is_all_day: boolean | null
   context: TaskContext | null
   notes: string | null
@@ -39,6 +41,8 @@ function dbTaskToTask(dbTask: DbTask): Task {
     completed: dbTask.completed,
     createdAt: new Date(dbTask.created_at),
     scheduledFor: dbTask.scheduled_for ? new Date(dbTask.scheduled_for) : undefined,
+    deferredUntil: dbTask.deferred_until ? new Date(dbTask.deferred_until) : undefined,
+    deferCount: dbTask.defer_count ?? undefined,
     isAllDay: dbTask.is_all_day ?? undefined,
     context: dbTask.context ?? undefined,
     notes: dbTask.notes ?? undefined,
@@ -90,8 +94,8 @@ export function useSupabaseTasks() {
     fetchTasks()
   }, [user])
 
-  const addTask = useCallback(async (title: string, contactId?: string, projectId?: string, scheduledFor?: Date) => {
-    if (!user) return
+  const addTask = useCallback(async (title: string, contactId?: string, projectId?: string, scheduledFor?: Date): Promise<string | undefined> => {
+    if (!user) return undefined
 
     // Optimistic update
     const tempId = crypto.randomUUID()
@@ -123,13 +127,17 @@ export function useSupabaseTasks() {
       // Rollback on error
       setTasks((prev) => prev.filter((t) => t.id !== tempId))
       setError(insertError.message)
-      return
+      return undefined
     }
+
+    const createdTask = dbTaskToTask(data as DbTask)
 
     // Replace optimistic task with real one
     setTasks((prev) =>
-      prev.map((t) => (t.id === tempId ? dbTaskToTask(data as DbTask) : t))
+      prev.map((t) => (t.id === tempId ? createdTask : t))
     )
+
+    return createdTask.id
   }, [user])
 
   const toggleTask = useCallback(async (id: string) => {
@@ -193,6 +201,13 @@ export function useSupabaseTasks() {
     if ('scheduledFor' in updates) {
       dbUpdates.scheduled_for = updates.scheduledFor?.toISOString() ?? null
     }
+    if ('deferredUntil' in updates) {
+      // Convert Date to YYYY-MM-DD string for DATE column
+      dbUpdates.deferred_until = updates.deferredUntil
+        ? updates.deferredUntil.toISOString().split('T')[0]
+        : null
+    }
+    if ('deferCount' in updates) dbUpdates.defer_count = updates.deferCount ?? 0
     if ('isAllDay' in updates) dbUpdates.is_all_day = updates.isAllDay ?? null
     if ('context' in updates) dbUpdates.context = updates.context ?? null
     if ('notes' in updates) dbUpdates.notes = updates.notes ?? null
@@ -217,5 +232,24 @@ export function useSupabaseTasks() {
     }
   }, [tasks])
 
-  return { tasks, loading, error, addTask, toggleTask, deleteTask, updateTask }
+  // Schedule a task - sets scheduledFor, clears deferredUntil
+  const scheduleTask = useCallback(async (id: string, date: Date, isAllDay?: boolean) => {
+    await updateTask(id, {
+      scheduledFor: date,
+      isAllDay: isAllDay ?? true,
+      deferredUntil: undefined, // Clear deferral when scheduling
+    })
+  }, [updateTask])
+
+  // Defer a task - sets deferredUntil, increments deferCount
+  const deferTask = useCallback(async (id: string, date: Date) => {
+    const task = tasks.find((t) => t.id === id)
+    const currentCount = task?.deferCount ?? 0
+    await updateTask(id, {
+      deferredUntil: date,
+      deferCount: currentCount + 1,
+    })
+  }, [tasks, updateTask])
+
+  return { tasks, loading, error, addTask, toggleTask, deleteTask, updateTask, scheduleTask, deferTask }
 }

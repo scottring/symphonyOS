@@ -25,7 +25,7 @@ import type { ViewType } from '@/components/layout/Sidebar'
 import type { ActionableInstance } from '@/types/actionable'
 
 function App() {
-  const { tasks, loading: tasksLoading, addTask, toggleTask, deleteTask, updateTask } = useSupabaseTasks()
+  const { tasks, loading: tasksLoading, addTask, toggleTask, deleteTask, updateTask, deferTask } = useSupabaseTasks()
   const { user, loading: authLoading, signOut } = useAuth()
   const { isConnected, events, fetchEvents, isFetching: eventsFetching } = useGoogleCalendar()
   const { fetchNote, fetchNotesForEvents, updateNote, getNote, notes: eventNotesMap } = useEventNotes()
@@ -62,6 +62,7 @@ function App() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [selectedRoutineId, setSelectedRoutineId] = useState<string | null>(null)
   const [creatingRoutine, setCreatingRoutine] = useState(false)
+  const [recentlyCreatedTaskId, setRecentlyCreatedTaskId] = useState<string | null>(null)
 
   // Toggle quick add modal
   const openQuickAdd = useCallback(() => setQuickAddOpen(true), [])
@@ -333,7 +334,12 @@ function App() {
       }}
       userEmail={user.email ?? undefined}
       onSignOut={signOut}
-      onQuickAdd={(title) => addTask(title)}
+      onQuickAdd={async (title) => {
+        const taskId = await addTask(title)
+        if (taskId) {
+          setRecentlyCreatedTaskId(taskId)
+        }
+      }}
       quickAddOpen={quickAddOpen}
       onOpenQuickAdd={openQuickAdd}
       onCloseQuickAdd={closeQuickAdd}
@@ -388,6 +394,8 @@ function App() {
             onSelectItem={handleSelectItem}
             onToggleTask={toggleTask}
             onUpdateTask={updateTask}
+            onDeferTask={deferTask}
+            onDeleteTask={deleteTask}
             loading={tasksLoading || eventsFetching || routinesLoading}
             viewedDate={viewedDate}
             onDateChange={setViewedDate}
@@ -398,6 +406,8 @@ function App() {
             onSearchContacts={searchContacts}
             eventNotesMap={eventNotesMap}
             onRefreshInstances={refreshDateInstances}
+            recentlyCreatedTaskId={recentlyCreatedTaskId}
+            onTriageCardCollapse={() => setRecentlyCreatedTaskId(null)}
           />
         </div>
       )}
