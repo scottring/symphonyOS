@@ -1,8 +1,10 @@
 import { useMemo } from 'react'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
+import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
+import type { EventNote } from '@/hooks/useEventNotes'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import { groupByDaySection, type DaySection } from '@/lib/timeUtils'
 import { TimeGroup } from './TimeGroup'
@@ -21,6 +23,8 @@ interface TodayScheduleProps {
   viewedDate: Date
   onDateChange: (date: Date) => void
   contactsMap?: Map<string, Contact>
+  projectsMap?: Map<string, Project>
+  eventNotesMap?: Map<string, EventNote>
   onRefreshInstances?: () => void // Called after actionable actions to refresh filtered list
 }
 
@@ -71,6 +75,8 @@ export function TodaySchedule({
   viewedDate,
   onDateChange,
   contactsMap,
+  projectsMap,
+  eventNotesMap,
 }: TodayScheduleProps) {
   // Filter tasks for the viewed date
   const filteredTasks = useMemo(() => {
@@ -138,7 +144,18 @@ export function TodaySchedule({
 
   const grouped = useMemo(() => {
     const taskItems = filteredTasks.map(taskToTimelineItem)
-    const eventItems = filteredEvents.map(eventToTimelineItem)
+
+    // Convert events to timeline items and merge Symphony notes
+    const eventItems = filteredEvents.map((event) => {
+      const item = eventToTimelineItem(event)
+      // Check if there's a Symphony note for this event
+      const eventId = event.google_event_id || event.id
+      const eventNote = eventNotesMap?.get(eventId)
+      if (eventNote?.notes) {
+        item.notes = eventNote.notes
+      }
+      return item
+    })
 
     // Convert routines to timeline items with completion status
     const routineItems = routines.map((routine) => {
@@ -152,7 +169,7 @@ export function TodaySchedule({
 
     const allItems = [...taskItems, ...eventItems, ...routineItems]
     return groupByDaySection(allItems)
-  }, [filteredTasks, filteredEvents, routines, viewedDate, routineStatusMap])
+  }, [filteredTasks, filteredEvents, routines, viewedDate, routineStatusMap, eventNotesMap])
 
   const sections: DaySection[] = ['allday', 'morning', 'afternoon', 'evening', 'unscheduled']
 
@@ -232,6 +249,7 @@ export function TodaySchedule({
               <TimeGroup key={section} section={section} isEmpty={items.length === 0}>
                 {items.map((item) => {
                   const contactName = item.contactId && contactsMap?.get(item.contactId)?.name
+                  const projectName = item.projectId && projectsMap?.get(item.projectId)?.name
                   return (
                     <ScheduleItem
                       key={item.id}
@@ -246,6 +264,7 @@ export function TodaySchedule({
                         }
                       }}
                       contactName={contactName || undefined}
+                      projectName={projectName || undefined}
                     />
                   )
                 })}

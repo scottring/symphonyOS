@@ -159,11 +159,43 @@ export function useEventNotes() {
     return notes.get(googleEventId)
   }, [notes])
 
+  // Batch fetch notes for multiple events (for list view info icons)
+  const fetchNotesForEvents = useCallback(async (googleEventIds: string[]) => {
+    if (!user || googleEventIds.length === 0) return
+
+    // Filter out already cached IDs
+    const uncachedIds = googleEventIds.filter(id => !notes.has(id))
+    if (uncachedIds.length === 0) return
+
+    const { data, error: fetchError } = await supabase
+      .from('event_notes')
+      .select('*')
+      .eq('user_id', user.id)
+      .in('google_event_id', uncachedIds)
+
+    if (fetchError) {
+      setError(fetchError.message)
+      return
+    }
+
+    if (data && data.length > 0) {
+      setNotes((prev) => {
+        const newMap = new Map(prev)
+        for (const row of data) {
+          const eventNote = dbNoteToEventNote(row as DbEventNote)
+          newMap.set(eventNote.googleEventId, eventNote)
+        }
+        return newMap
+      })
+    }
+  }, [user, notes])
+
   return {
     notes,
     loading,
     error,
     fetchNote,
+    fetchNotesForEvents,
     updateNote,
     deleteNote,
     getNote,

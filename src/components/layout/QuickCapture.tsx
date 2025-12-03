@@ -386,6 +386,12 @@ export function QuickCapture({
         setShowProjectDropdown(false)
         setProjectQuery('')
       }
+      return
+    }
+
+    // Close modal on Escape when no dropdown is open
+    if (e.key === 'Escape') {
+      onClose?.()
     }
   }
 

@@ -12,6 +12,7 @@ interface AppShellProps {
   sidebarCollapsed: boolean
   onSidebarToggle: () => void
   panelOpen: boolean
+  onPanelClose?: () => void
   userEmail?: string
   onSignOut?: () => void
   onQuickAdd?: (title: string, contactId?: string, projectId?: string) => void
@@ -36,6 +37,7 @@ export function AppShell({
   sidebarCollapsed,
   onSidebarToggle,
   panelOpen,
+  onPanelClose,
   userEmail,
   onSignOut,
   onQuickAdd,
@@ -115,15 +117,15 @@ export function AppShell({
         {children}
       </main>
 
-      {/* Quick Capture - FAB on mobile, modal triggered by Cmd+K on desktop */}
-      {onQuickAdd && !panelOpen && (
+      {/* Quick Capture - FAB on mobile (hidden when panel open), modal triggered by Cmd+K on desktop */}
+      {onQuickAdd && (
         <QuickCapture
           onAdd={onQuickAdd}
           onAddRoutine={onAddRoutine}
           isOpen={quickAddOpen}
           onOpen={onOpenQuickAdd}
           onClose={onCloseQuickAdd}
-          showFab={isMobile}
+          showFab={isMobile && !panelOpen}
           contacts={contacts}
           onAddContact={onAddContact}
           projects={projects}
@@ -145,18 +147,28 @@ export function AppShell({
           {panel}
         </div>
       ) : (
-        // Desktop: Side panel
-        <aside
-          className={`
-            fixed top-0 right-0 h-full w-[400px]
-            bg-bg-elevated border-l border-neutral-200
-            transform transition-transform duration-300 ease-in-out
-            ${panelOpen ? 'translate-x-0' : 'translate-x-full'}
-            shadow-xl z-20
-          `}
-        >
-          {panel}
-        </aside>
+        // Desktop: Side panel with click-outside backdrop
+        <>
+          {/* Backdrop for click-outside-to-close */}
+          {panelOpen && onPanelClose && (
+            <div
+              className="fixed inset-0 z-10"
+              onClick={onPanelClose}
+              aria-hidden="true"
+            />
+          )}
+          <aside
+            className={`
+              fixed top-0 right-0 h-full w-[400px]
+              bg-bg-elevated border-l border-neutral-200
+              transform transition-transform duration-300 ease-in-out
+              ${panelOpen ? 'translate-x-0' : 'translate-x-full'}
+              shadow-xl z-20
+            `}
+          >
+            {panel}
+          </aside>
+        </>
       )}
 
       {/* Mobile bottom navigation */}

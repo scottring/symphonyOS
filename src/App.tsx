@@ -25,7 +25,7 @@ function App() {
   const { tasks, loading: tasksLoading, addTask, toggleTask, deleteTask, updateTask } = useSupabaseTasks()
   const { user, loading: authLoading, signOut } = useAuth()
   const { isConnected, events, fetchEvents, isFetching: eventsFetching } = useGoogleCalendar()
-  const { fetchNote, updateNote, getNote } = useEventNotes()
+  const { fetchNote, fetchNotesForEvents, updateNote, getNote, notes: eventNotesMap } = useEventNotes()
   const { contacts, contactsMap, addContact, updateContact, searchContacts } = useContacts()
   const { projects, projectsMap, addProject, updateProject, searchProjects } = useProjects()
   const {
@@ -65,17 +65,22 @@ function App() {
     localStorage.setItem('symphony-sidebar-collapsed', String(sidebarCollapsed))
   }, [sidebarCollapsed])
 
-  // Cmd+K keyboard shortcut for quick add
+  // Global keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd+K for quick add
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
         setQuickAddOpen(true)
       }
+      // Escape to close panel
+      if (e.key === 'Escape' && selectedItemId) {
+        setSelectedItemId(null)
+      }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [selectedItemId])
 
   // Fetch calendar events when connected or date changes
   useEffect(() => {
@@ -144,6 +149,14 @@ function App() {
       fetchNote(eventId)
     }
   }, [selectedItemId, fetchNote])
+
+  // Batch fetch event notes for all visible events (for info icon display)
+  useEffect(() => {
+    if (filteredEvents.length > 0) {
+      const eventIds = filteredEvents.map((e) => e.google_event_id || e.id)
+      fetchNotesForEvents(eventIds)
+    }
+  }, [filteredEvents, fetchNotesForEvents])
 
   // Find selected item from tasks, events, or routines
   const selectedItem = useMemo(() => {
@@ -256,6 +269,10 @@ function App() {
       sidebarCollapsed={sidebarCollapsed}
       onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
       panelOpen={selectedItemId !== null || recipeUrl !== null}
+      onPanelClose={() => {
+        if (recipeUrl) setRecipeUrl(null)
+        else setSelectedItemId(null)
+      }}
       userEmail={user.email ?? undefined}
       onSignOut={signOut}
       onQuickAdd={addTask}
@@ -320,6 +337,8 @@ function App() {
             viewedDate={viewedDate}
             onDateChange={setViewedDate}
             contactsMap={contactsMap}
+            projectsMap={projectsMap}
+            eventNotesMap={eventNotesMap}
             onRefreshInstances={refreshDateInstances}
           />
         </div>

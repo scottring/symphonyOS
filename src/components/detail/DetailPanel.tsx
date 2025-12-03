@@ -228,14 +228,14 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
   const [actionableInstance, setActionableInstance] = useState<ActionableInstance | null>(null)
   const actionable = useActionableInstances()
 
-  // Sync local state when item changes
+  // Sync local state when item changes (only on item ID change, not notes changes)
   useEffect(() => {
     setLocalNotes(item?.notes || '')
     setIsEditingNotes(false)
     setExpandedSections({})
     setShowDeleteConfirm(false)
     setShowTimePicker(false)
-  }, [item?.id, item?.notes])
+  }, [item?.id])
 
   // Sync title when item changes
   useEffect(() => {

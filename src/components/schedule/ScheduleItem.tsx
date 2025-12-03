@@ -7,9 +7,10 @@ interface ScheduleItemProps {
   onSelect: () => void
   onToggleComplete: () => void
   contactName?: string
+  projectName?: string
 }
 
-export function ScheduleItem({ item, selected, onSelect, onToggleComplete, contactName }: ScheduleItemProps) {
+export function ScheduleItem({ item, selected, onSelect, onToggleComplete, contactName, projectName }: ScheduleItemProps) {
   const isTask = item.type === 'task'
   const isRoutine = item.type === 'routine'
   const isActionable = isTask || isRoutine // Items with checkboxes
@@ -125,11 +126,19 @@ export function ScheduleItem({ item, selected, onSelect, onToggleComplete, conta
           {item.title}
         </span>
         {contactName && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-xs font-medium flex-shrink-0">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-xs font-medium shrink-0">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
             </svg>
             {contactName}
+          </span>
+        )}
+        {projectName && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs font-medium shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+            </svg>
+            {projectName}
           </span>
         )}
       </div>
