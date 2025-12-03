@@ -1,7 +1,11 @@
 import type { Routine } from '@/types/actionable'
+import { parseRoutine } from '@/lib/parseRoutine'
+import { SemanticRoutine, formatLegacyRoutine } from './SemanticRoutine'
+import type { Contact } from '@/types/contact'
 
 interface RoutinesListProps {
   routines: Routine[]
+  contacts?: Contact[]
   onSelectRoutine: (routine: Routine) => void
   onCreateRoutine: () => void
 }
@@ -42,9 +46,34 @@ function formatTime(timeStr: string | null): string | null {
   return `${hour12}:${minutes.toString().padStart(2, '0')} ${ampm}`
 }
 
-export function RoutinesList({ routines, onSelectRoutine, onCreateRoutine }: RoutinesListProps) {
+export function RoutinesList({ routines, contacts = [], onSelectRoutine, onCreateRoutine }: RoutinesListProps) {
   const activeRoutines = routines.filter(r => r.visibility === 'active')
   const referenceRoutines = routines.filter(r => r.visibility === 'reference')
+
+  // Helper to render routine content
+  const renderRoutineContent = (routine: Routine) => {
+    if (routine.raw_input) {
+      // New NL routine - show semantic tokens
+      const parsed = parseRoutine(routine.raw_input, contacts)
+      return <SemanticRoutine tokens={parsed.tokens} size="sm" />
+    } else {
+      // Legacy routine - show traditional format
+      return (
+        <>
+          <div className="font-medium text-neutral-800 truncate">{routine.name}</div>
+          <div className="flex items-center gap-2 text-sm text-neutral-500">
+            <span>{formatRecurrence(routine)}</span>
+            {routine.time_of_day && (
+              <>
+                <span className="text-neutral-300">•</span>
+                <span>{formatTime(routine.time_of_day)}</span>
+              </>
+            )}
+          </div>
+        </>
+      )
+    }
+  }
 
   return (
     <div className="h-full overflow-auto">
@@ -109,16 +138,7 @@ export function RoutinesList({ routines, onSelectRoutine, onCreateRoutine }: Rou
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-neutral-800 truncate">{routine.name}</div>
-                    <div className="flex items-center gap-2 text-sm text-neutral-500">
-                      <span>{formatRecurrence(routine)}</span>
-                      {routine.time_of_day && (
-                        <>
-                          <span className="text-neutral-300">•</span>
-                          <span>{formatTime(routine.time_of_day)}</span>
-                        </>
-                      )}
-                    </div>
+                    {renderRoutineContent(routine)}
                   </div>
 
                   {/* Chevron */}
@@ -154,10 +174,7 @@ export function RoutinesList({ routines, onSelectRoutine, onCreateRoutine }: Rou
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-neutral-600 truncate">{routine.name}</div>
-                    <div className="text-sm text-neutral-400">
-                      {formatRecurrence(routine)}
-                    </div>
+                    {renderRoutineContent(routine)}
                   </div>
 
                   {/* Chevron */}

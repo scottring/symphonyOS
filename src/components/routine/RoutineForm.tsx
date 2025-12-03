@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react'
 import type { Routine, RecurrencePattern } from '@/types/actionable'
 import type { UpdateRoutineInput } from '@/hooks/useRoutines'
+import type { Contact } from '@/types/contact'
+import { parseRoutine, parsedRoutineToDb, isValidParsedRoutine } from '@/lib/parseRoutine'
+import { SemanticRoutine } from './SemanticRoutine'
 
 interface RoutineFormProps {
   routine: Routine
+  contacts?: Contact[]
   onBack: () => void
   onUpdate: (id: string, input: UpdateRoutineInput) => Promise<boolean>
   onDelete: (id: string) => Promise<boolean>
@@ -20,18 +24,30 @@ const DAYS = [
   { key: 'sat', label: 'Sat' },
 ]
 
-export function RoutineForm({ routine, onBack, onUpdate, onDelete, onToggleVisibility }: RoutineFormProps) {
+export function RoutineForm({ routine, contacts = [], onBack, onUpdate, onDelete, onToggleVisibility }: RoutineFormProps) {
+  // Determine if this is a NL routine
+  const isNLRoutine = !!routine.raw_input
+
+  // State for NL mode
+  const [nlInput, setNlInput] = useState(routine.raw_input || '')
+
+  // State for legacy mode
   const [name, setName] = useState(routine.name)
   const [description, setDescription] = useState(routine.description || '')
   const [recurrenceType, setRecurrenceType] = useState<RecurrencePattern['type']>(routine.recurrence_pattern.type)
   const [selectedDays, setSelectedDays] = useState<string[]>(routine.recurrence_pattern.days || [])
   const [timeOfDay, setTimeOfDay] = useState(routine.time_of_day || '')
+
   const [isSaving, setIsSaving] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
+  // Parse NL input for live preview
+  const parsed = isNLRoutine ? parseRoutine(nlInput, contacts) : null
+  const nlIsValid = parsed ? isValidParsedRoutine(parsed) : false
+
   // Reset form when routine changes
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing form state on routine change is valid
+    setNlInput(routine.raw_input || '')
     setName(routine.name)
     setDescription(routine.description || '')
     setRecurrenceType(routine.recurrence_pattern.type)
@@ -40,6 +56,9 @@ export function RoutineForm({ routine, onBack, onUpdate, onDelete, onToggleVisib
   }, [routine])
 
   const hasChanges = () => {
+    if (isNLRoutine) {
+      return nlInput !== routine.raw_input
+    }
     if (name !== routine.name) return true
     if (description !== (routine.description || '')) return true
     if (recurrenceType !== routine.recurrence_pattern.type) return true
@@ -53,21 +72,36 @@ export function RoutineForm({ routine, onBack, onUpdate, onDelete, onToggleVisib
   }
 
   const handleSave = async () => {
-    if (!name.trim()) return
+    if (isNLRoutine) {
+      if (!nlIsValid || !parsed) return
 
-    setIsSaving(true)
-    const recurrence_pattern: RecurrencePattern = { type: recurrenceType }
-    if (recurrenceType === 'weekly') {
-      recurrence_pattern.days = selectedDays
+      setIsSaving(true)
+      const dbData = parsedRoutineToDb(parsed)
+      await onUpdate(routine.id, {
+        name: dbData.name,
+        recurrence_pattern: dbData.recurrence_pattern as UpdateRoutineInput['recurrence_pattern'],
+        time_of_day: dbData.time_of_day ?? null,
+        default_assignee: dbData.default_assignee ?? null,
+        raw_input: dbData.raw_input,
+      })
+      setIsSaving(false)
+    } else {
+      if (!name.trim()) return
+
+      setIsSaving(true)
+      const recurrence_pattern: RecurrencePattern = { type: recurrenceType }
+      if (recurrenceType === 'weekly') {
+        recurrence_pattern.days = selectedDays
+      }
+
+      await onUpdate(routine.id, {
+        name: name.trim(),
+        description: description.trim() || null,
+        recurrence_pattern,
+        time_of_day: timeOfDay || null,
+      })
+      setIsSaving(false)
     }
-
-    await onUpdate(routine.id, {
-      name: name.trim(),
-      description: description.trim() || null,
-      recurrence_pattern,
-      time_of_day: timeOfDay || null,
-    })
-    setIsSaving(false)
   }
 
   const handleDelete = async () => {
@@ -128,113 +162,152 @@ export function RoutineForm({ routine, onBack, onUpdate, onDelete, onToggleVisib
           </button>
         </div>
 
-        {/* Form */}
+        {/* Form - NL mode vs Legacy mode */}
         <div className="space-y-6">
-          {/* Name */}
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">Name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Routine name"
-              className="w-full px-4 py-3 rounded-xl border border-neutral-200 bg-white
-                         text-neutral-800 placeholder:text-neutral-400
-                         focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-            />
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">
-              Description <span className="text-neutral-400 font-normal">(optional)</span>
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Add notes about this routine..."
-              rows={3}
-              className="w-full px-4 py-3 rounded-xl border border-neutral-200 bg-white
-                         text-neutral-800 placeholder:text-neutral-400 resize-none
-                         focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-            />
-          </div>
-
-          {/* Recurrence Type */}
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">Repeats</label>
-            <div className="flex gap-2">
-              {(['daily', 'weekly'] as const).map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => setRecurrenceType(type)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    recurrenceType === type
-                      ? 'bg-amber-100 text-amber-700'
-                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                  }`}
-                >
-                  {type.charAt(0).toUpperCase() + type.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Day selector for weekly */}
-          {recurrenceType === 'weekly' && (
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-2">On days</label>
-              <div className="flex gap-2">
-                {DAYS.map(({ key, label }) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => toggleDay(key)}
-                    className={`w-12 h-12 rounded-full text-sm font-medium transition-colors ${
-                      selectedDays.includes(key)
-                        ? 'bg-amber-500 text-white'
-                        : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
+          {isNLRoutine ? (
+            /* Natural Language Mode */
+            <>
+              <div>
+                <input
+                  type="text"
+                  value={nlInput}
+                  onChange={(e) => setNlInput(e.target.value)}
+                  placeholder="iris walks jax every weekday at 7am"
+                  className="w-full px-4 py-3 rounded-xl border border-neutral-200 bg-neutral-50
+                             text-neutral-800 placeholder:text-neutral-400 text-2xl font-display
+                             focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                />
               </div>
-              {recurrenceType === 'weekly' && selectedDays.length === 0 && (
-                <p className="text-sm text-red-500 mt-2">Select at least one day</p>
-              )}
-            </div>
-          )}
 
-          {/* Time of day */}
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">
-              Time <span className="text-neutral-400 font-normal">(optional)</span>
-            </label>
-            <input
-              type="time"
-              value={timeOfDay}
-              onChange={(e) => setTimeOfDay(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-neutral-200 bg-white
-                         text-neutral-800 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-            />
-            {timeOfDay && (
-              <button
-                type="button"
-                onClick={() => setTimeOfDay('')}
-                className="mt-2 text-sm text-neutral-500 hover:text-neutral-700"
-              >
-                Clear time
-              </button>
-            )}
-          </div>
+              {/* Live Preview */}
+              {nlInput.trim() && parsed && (
+                <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-100">
+                  <div className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">
+                    Preview
+                  </div>
+                  {nlIsValid ? (
+                    <SemanticRoutine tokens={parsed.tokens} size="md" />
+                  ) : (
+                    <p className="text-neutral-500 text-sm">
+                      Type a routine like "walk the dog every morning at 7am"
+                    </p>
+                  )}
+                </div>
+              )}
+            </>
+          ) : (
+            /* Legacy Form Mode */
+            <>
+              {/* Name */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-2">Name</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Routine name"
+                  className="w-full px-4 py-3 rounded-xl border border-neutral-200 bg-white
+                             text-neutral-800 placeholder:text-neutral-400
+                             focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-2">
+                  Description <span className="text-neutral-400 font-normal">(optional)</span>
+                </label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Add notes about this routine..."
+                  rows={3}
+                  className="w-full px-4 py-3 rounded-xl border border-neutral-200 bg-white
+                             text-neutral-800 placeholder:text-neutral-400 resize-none
+                             focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Recurrence Type */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-2">Repeats</label>
+                <div className="flex gap-2">
+                  {(['daily', 'weekly'] as const).map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setRecurrenceType(type)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        recurrenceType === type
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                      }`}
+                    >
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Day selector for weekly */}
+              {recurrenceType === 'weekly' && (
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">On days</label>
+                  <div className="flex gap-2">
+                    {DAYS.map(({ key, label }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => toggleDay(key)}
+                        className={`w-12 h-12 rounded-full text-sm font-medium transition-colors ${
+                          selectedDays.includes(key)
+                            ? 'bg-amber-500 text-white'
+                            : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {recurrenceType === 'weekly' && selectedDays.length === 0 && (
+                    <p className="text-sm text-red-500 mt-2">Select at least one day</p>
+                  )}
+                </div>
+              )}
+
+              {/* Time of day */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-2">
+                  Time <span className="text-neutral-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  type="time"
+                  value={timeOfDay}
+                  onChange={(e) => setTimeOfDay(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-neutral-200 bg-white
+                             text-neutral-800 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                />
+                {timeOfDay && (
+                  <button
+                    type="button"
+                    onClick={() => setTimeOfDay('')}
+                    className="mt-2 text-sm text-neutral-500 hover:text-neutral-700"
+                  >
+                    Clear time
+                  </button>
+                )}
+              </div>
+            </>
+          )}
 
           {/* Save button */}
           {hasChanges() && (
             <button
               onClick={handleSave}
-              disabled={!name.trim() || isSaving || (recurrenceType === 'weekly' && selectedDays.length === 0)}
+              disabled={
+                isSaving ||
+                (isNLRoutine ? !nlIsValid : (!name.trim() || (recurrenceType === 'weekly' && selectedDays.length === 0)))
+              }
               className="w-full py-3 rounded-xl bg-amber-500 text-white font-medium
                          hover:bg-amber-600 active:bg-amber-700
                          disabled:opacity-50 disabled:cursor-not-allowed

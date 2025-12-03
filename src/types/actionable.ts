@@ -58,6 +58,7 @@ export interface Routine {
   visibility: RoutineVisibility
   recurrence_pattern: RecurrencePattern
   time_of_day: string | null // HH:MM:SS format
+  raw_input: string | null // Original natural language input
   created_at: string
   updated_at: string
 }

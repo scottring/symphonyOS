@@ -8,6 +8,8 @@ export interface CreateRoutineInput {
   recurrence_pattern?: RecurrencePattern
   time_of_day?: string // HH:MM format
   visibility?: RoutineVisibility
+  default_assignee?: string | null
+  raw_input?: string | null
 }
 
 export interface UpdateRoutineInput {
@@ -16,6 +18,8 @@ export interface UpdateRoutineInput {
   recurrence_pattern?: RecurrencePattern
   time_of_day?: string | null
   visibility?: RoutineVisibility
+  default_assignee?: string | null
+  raw_input?: string | null
 }
 
 export function useRoutines() {
@@ -72,6 +76,8 @@ export function useRoutines() {
           recurrence_pattern: input.recurrence_pattern || { type: 'daily' },
           time_of_day: input.time_of_day || null,
           visibility: input.visibility || 'active',
+          default_assignee: input.default_assignee || null,
+          raw_input: input.raw_input || null,
         })
         .select()
         .single()
@@ -100,6 +106,8 @@ export function useRoutines() {
       if (input.recurrence_pattern !== undefined) updates.recurrence_pattern = input.recurrence_pattern
       if (input.time_of_day !== undefined) updates.time_of_day = input.time_of_day
       if (input.visibility !== undefined) updates.visibility = input.visibility
+      if (input.default_assignee !== undefined) updates.default_assignee = input.default_assignee
+      if (input.raw_input !== undefined) updates.raw_input = input.raw_input
 
       const { error: updateError } = await supabase
         .from('routines')

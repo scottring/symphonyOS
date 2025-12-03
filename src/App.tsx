@@ -18,6 +18,7 @@ import { ProjectsList } from '@/components/project/ProjectsList'
 import { ProjectView } from '@/components/project/ProjectView'
 import { RoutinesList } from '@/components/routine/RoutinesList'
 import { RoutineForm } from '@/components/routine/RoutineForm'
+import { RoutineInput } from '@/components/routine/RoutineInput'
 import { TaskView } from '@/components/task/TaskView'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import type { ViewType } from '@/components/layout/Sidebar'
@@ -36,12 +37,11 @@ function App() {
     activeRoutines,
     getRoutinesForDate,
     loading: routinesLoading,
-    addRoutine: _addRoutine,
+    addRoutine,
     updateRoutine,
     deleteRoutine,
     toggleVisibility: toggleRoutineVisibility,
   } = useRoutines()
-  void _addRoutine // Will be used when routine creation UI is re-added
   const { getInstancesForDate } = useActionableInstances()
   const isMobile = useMobile()
 
@@ -61,6 +61,7 @@ function App() {
   const [activeView, setActiveView] = useState<ViewType>('home')
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [selectedRoutineId, setSelectedRoutineId] = useState<string | null>(null)
+  const [creatingRoutine, setCreatingRoutine] = useState(false)
 
   // Toggle quick add modal
   const openQuickAdd = useCallback(() => setQuickAddOpen(true), [])
@@ -245,6 +246,7 @@ function App() {
     setSelectedTaskId(null)
     setSelectedProjectId(null)
     setSelectedRoutineId(null)
+    setCreatingRoutine(false)
     setRecipeUrl(null)
   }, [])
 
@@ -448,20 +450,46 @@ function App() {
         />
       )}
 
-      {activeView === 'routines' && !selectedRoutineId && (
+      {activeView === 'routines' && !selectedRoutineId && !creatingRoutine && (
         <RoutinesList
           routines={allRoutines}
+          contacts={contacts}
           onSelectRoutine={(routine) => setSelectedRoutineId(routine.id)}
-          onCreateRoutine={() => {
-            // Open quick add in routine mode
-            openQuickAdd()
-          }}
+          onCreateRoutine={() => setCreatingRoutine(true)}
         />
+      )}
+
+      {activeView === 'routines' && creatingRoutine && (
+        <div className="h-full overflow-auto">
+          <div className="max-w-2xl mx-auto">
+            {/* Header */}
+            <div className="flex items-center gap-3 p-6 pb-0">
+              <button
+                onClick={() => setCreatingRoutine(false)}
+                className="p-2 -ml-2 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+              <h1 className="text-xl font-semibold text-neutral-800">New Routine</h1>
+            </div>
+            <RoutineInput
+              contacts={contacts}
+              onSave={async (input) => {
+                await addRoutine(input)
+                setCreatingRoutine(false)
+              }}
+              onCancel={() => setCreatingRoutine(false)}
+            />
+          </div>
+        </div>
       )}
 
       {activeView === 'routines' && selectedRoutine && (
         <RoutineForm
           routine={selectedRoutine}
+          contacts={contacts}
           onBack={() => setSelectedRoutineId(null)}
           onUpdate={updateRoutine}
           onDelete={deleteRoutine}
