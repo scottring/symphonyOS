@@ -38,3 +38,8 @@ export const AuthForm = lazy(() =>
 export const CalendarConnect = lazy(() =>
   import('./CalendarConnect').then(m => ({ default: m.CalendarConnect }))
 )
+
+// Onboarding
+export const OnboardingWizard = lazy(() =>
+  import('./onboarding').then(m => ({ default: m.OnboardingWizard }))
+)

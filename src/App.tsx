@@ -9,6 +9,7 @@ import { useRoutines } from '@/hooks/useRoutines'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useMobile } from '@/hooks/useMobile'
+import { supabase } from '@/lib/supabase'
 import { AppShell } from '@/components/layout/AppShell'
 import { TodaySchedule } from '@/components/schedule/TodaySchedule'
 import { DetailPanel } from '@/components/detail/DetailPanel'
@@ -23,6 +24,7 @@ import {
   RecipeViewer,
   AuthForm,
   CalendarConnect,
+  OnboardingWizard,
 } from '@/components/lazy'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import type { ViewType } from '@/components/layout/Sidebar'
@@ -32,6 +34,10 @@ function App() {
   const { tasks, loading: tasksLoading, addTask, toggleTask, deleteTask, updateTask, pushTask } = useSupabaseTasks()
   const { user, loading: authLoading, signOut } = useAuth()
   const { isConnected, events, fetchEvents, isFetching: eventsFetching } = useGoogleCalendar()
+
+  // Onboarding state
+  const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null)
+  const [onboardingLoading, setOnboardingLoading] = useState(true)
   const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, getNote, notes: eventNotesMap } = useEventNotes()
   const { contacts, contactsMap, addContact: _addContact, updateContact, searchContacts } = useContacts()
   void _addContact // Will be used when inline contact creation is re-added
@@ -77,6 +83,43 @@ function App() {
   useEffect(() => {
     localStorage.setItem('symphony-sidebar-collapsed', String(sidebarCollapsed))
   }, [sidebarCollapsed])
+
+  // Check onboarding status
+  useEffect(() => {
+    async function checkOnboarding() {
+      if (!user) {
+        setOnboardingLoading(false)
+        return
+      }
+
+      try {
+        const { data: profile, error } = await supabase
+          .from('user_profiles')
+          .select('onboarding_completed_at')
+          .eq('user_id', user.id)
+          .single()
+
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error checking onboarding:', error)
+          // Assume complete on error to not block the app
+          setOnboardingComplete(true)
+        } else if (profile?.onboarding_completed_at) {
+          setOnboardingComplete(true)
+        } else {
+          setOnboardingComplete(false)
+        }
+      } catch (err) {
+        console.error('Error in checkOnboarding:', err)
+        setOnboardingComplete(true) // Fail open
+      } finally {
+        setOnboardingLoading(false)
+      }
+    }
+
+    if (!authLoading) {
+      checkOnboarding()
+    }
+  }, [user, authLoading])
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -312,7 +355,7 @@ function App() {
     return projectsMap.get(selectedTask.projectId) ?? null
   }, [selectedTask, projectsMap])
 
-  if (authLoading) {
+  if (authLoading || onboardingLoading) {
     return (
       <div className="min-h-screen bg-bg-base flex items-center justify-center">
         <p className="text-neutral-500">Loading...</p>
@@ -325,6 +368,17 @@ function App() {
       <div className="min-h-screen bg-bg-base">
         <Suspense fallback={<LoadingFallback />}>
           <AuthForm />
+        </Suspense>
+      </div>
+    )
+  }
+
+  // Show onboarding for new users
+  if (onboardingComplete === false) {
+    return (
+      <div className="min-h-screen bg-bg-base">
+        <Suspense fallback={<LoadingFallback />}>
+          <OnboardingWizard onComplete={() => setOnboardingComplete(true)} />
         </Suspense>
       </div>
     )

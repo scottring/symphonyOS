@@ -4,6 +4,27 @@ import App from './App'
 import type { Task } from '@/types/task'
 import { useState } from 'react'
 
+// Mock supabase to return completed onboarding
+vi.mock('@/lib/supabase', () => ({
+  supabase: {
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          single: () => Promise.resolve({
+            data: { onboarding_completed_at: new Date().toISOString() },
+            error: null,
+          }),
+        }),
+      }),
+    }),
+    auth: {
+      getUser: () => Promise.resolve({ data: { user: { id: 'test-user-id' } }, error: null }),
+      getSession: () => Promise.resolve({ data: { session: { user: { id: 'test-user-id', email: 'test@example.com' } } }, error: null }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: vi.fn() } } }),
+    },
+  },
+}))
+
 // Mock useAuth to return a logged-in user
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({
@@ -146,29 +167,47 @@ vi.mock('@/hooks/useActionableInstances', () => ({
   }),
 }))
 
+// Mock useFamilyMembers
+vi.mock('@/hooks/useFamilyMembers', () => ({
+  useFamilyMembers: () => ({
+    members: [],
+    loading: false,
+    error: null,
+    addMember: vi.fn(),
+    updateMember: vi.fn(),
+    deleteMember: vi.fn(),
+    getMember: vi.fn(),
+    getCurrentUserMember: vi.fn(),
+    refetch: vi.fn(),
+  }),
+}))
+
 // Mock useMobile to return false (desktop mode)
 vi.mock('@/hooks/useMobile', () => ({
   useMobile: () => false,
 }))
 
 describe('App', () => {
-  it('renders the app name in sidebar', () => {
+  it('renders the app name in sidebar', async () => {
     render(<App />)
-    expect(screen.getByText('Symphony')).toBeInTheDocument()
+    expect(await screen.findByText('Symphony')).toBeInTheDocument()
   })
 
-  it('renders empty state when no tasks', () => {
+  it('renders empty state when no tasks', async () => {
     render(<App />)
-    expect(screen.getByText('Your day is clear')).toBeInTheDocument()
+    expect(await screen.findByText('Your day is clear')).toBeInTheDocument()
   })
 
-  it('renders Today header', () => {
+  it('renders Today header', async () => {
     render(<App />)
-    expect(screen.getByRole('heading', { name: 'Today' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Today' })).toBeInTheDocument()
   })
 
   it('can add a task via QuickCapture modal', async () => {
     const { user } = render(<App />)
+
+    // Wait for app to load
+    await screen.findByText('Symphony')
 
     // On desktop, use Cmd+K to open quick add modal
     await user.keyboard('{Meta>}k{/Meta}')
@@ -189,6 +228,9 @@ describe('App', () => {
   it('shows tasks in inbox section', async () => {
     const { user } = render(<App />)
 
+    // Wait for app to load
+    await screen.findByText('Symphony')
+
     // On desktop, use Cmd+K to open quick add modal
     await user.keyboard('{Meta>}k{/Meta}')
 
@@ -203,13 +245,13 @@ describe('App', () => {
     })
   })
 
-  it('displays user email', () => {
+  it('displays user email', async () => {
     render(<App />)
-    expect(screen.getByText('test@example.com')).toBeInTheDocument()
+    expect(await screen.findByText('test@example.com')).toBeInTheDocument()
   })
 
-  it('shows calendar connect option when not connected', () => {
+  it('shows calendar connect option when not connected', async () => {
     render(<App />)
-    expect(screen.getByRole('button', { name: /connect google calendar/i })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /connect google calendar/i })).toBeInTheDocument()
   })
 })

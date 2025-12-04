@@ -94,7 +94,7 @@ export function ScheduleItem({
       `}
     >
       {/* Main row: time | checkbox/circle | title */}
-      <div className="flex items-center gap-3">
+      <div className="relative flex items-center gap-3">
         {/* Time column - fixed width for alignment */}
         <div className="w-12 shrink-0 text-xs text-neutral-400 font-medium">
           {timeDisplay ? (
@@ -168,10 +168,10 @@ export function ScheduleItem({
           </div>
         )}
 
-        {/* Push button - desktop only, on hover */}
+        {/* Push button - desktop only, on hover, absolutely positioned to not affect layout */}
         {isTask && onPush && (
           <div
-            className="hidden md:block shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            className="hidden md:block absolute right-8 opacity-0 group-hover:opacity-100 transition-opacity"
             onClick={(e) => e.stopPropagation()}
           >
             <PushDropdown onPush={onPush} size="sm" />
