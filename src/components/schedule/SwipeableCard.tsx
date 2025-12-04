@@ -2,6 +2,7 @@ import { useRef, useState, useCallback, useMemo, type TouchEvent } from 'react'
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
 import { formatTime } from '@/lib/timeUtils'
+import { TypeIcon } from './TypeIcon'
 import { AssigneeDropdown } from '@/components/family'
 
 interface SwipeableCardProps {
@@ -11,7 +12,7 @@ interface SwipeableCardProps {
   onComplete: () => void
   onDefer?: (date: Date) => void
   onSkip?: () => void
-  // Family member assignment
+  onOpenDetail?: () => void
   familyMembers?: FamilyMember[]
   assignedTo?: string | null
   onAssign?: (memberId: string | null) => void
@@ -25,10 +26,10 @@ const RESISTANCE = 0.4
 export function SwipeableCard({
   item,
   selected,
-  onSelect,
   onComplete,
   onDefer,
   onSkip,
+  onOpenDetail,
   familyMembers = [],
   assignedTo,
   onAssign,
@@ -45,14 +46,21 @@ export function SwipeableCard({
   const isRoutine = item.type === 'routine'
   const isActionable = isTask || isRoutine
 
-  // Memoize time display to prevent recalculation
+  // Memoize time display
   const timeText = useMemo(() => {
     if (item.allDay) return 'All day'
     if (!item.startTime) return null
     return formatTime(item.startTime)
   }, [item.allDay, item.startTime])
 
-  // Touch handlers - stable references
+  // Get assigned family member
+  const assignedMember = useMemo(() => {
+    if (!assignedTo || familyMembers.length === 0) return undefined
+    return familyMembers.find(m => m.id === assignedTo)
+  }, [assignedTo, familyMembers])
+  void assignedMember // Will be used for avatar display
+
+  // Touch handlers
   const handleTouchStart = useCallback((e: TouchEvent) => {
     if (showActions) return
     startX.current = e.touches[0].clientX
@@ -81,10 +89,14 @@ export function SwipeableCard({
     e.preventDefault()
 
     let newTranslate = diffX
-    if (diffX > COMPLETE_THRESHOLD) {
-      newTranslate = COMPLETE_THRESHOLD + (diffX - COMPLETE_THRESHOLD) * RESISTANCE
-    } else if (diffX < -ACTION_THRESHOLD * 2) {
-      newTranslate = -ACTION_THRESHOLD * 2 + (diffX + ACTION_THRESHOLD * 2) * RESISTANCE
+
+    // LEFT swipe (negative) - for completion
+    if (diffX < -COMPLETE_THRESHOLD) {
+      newTranslate = -COMPLETE_THRESHOLD + (diffX + COMPLETE_THRESHOLD) * RESISTANCE
+    }
+    // RIGHT swipe (positive) - for action buttons
+    else if (diffX > ACTION_THRESHOLD * 2) {
+      newTranslate = ACTION_THRESHOLD * 2 + (diffX - ACTION_THRESHOLD * 2) * RESISTANCE
     }
 
     setTranslateX(newTranslate)
@@ -94,13 +106,17 @@ export function SwipeableCard({
     if (!isDragging) return
     setIsDragging(false)
 
-    if (translateX > COMPLETE_THRESHOLD && isActionable) {
+    // LEFT swipe past threshold - complete (only for actionable items)
+    if (translateX < -COMPLETE_THRESHOLD && isActionable) {
       onComplete()
       setTranslateX(0)
-    } else if (translateX < -ACTION_THRESHOLD) {
+    }
+    // RIGHT swipe past threshold - show action buttons
+    else if (translateX > ACTION_THRESHOLD) {
       setShowActions(true)
-      setTranslateX(-140)
-    } else {
+      setTranslateX(180) // Width of 3 buttons
+    }
+    else {
       setTranslateX(0)
     }
   }, [isDragging, translateX, isActionable, onComplete])
@@ -110,34 +126,32 @@ export function SwipeableCard({
     setTranslateX(0)
   }, [])
 
-  const handleAction = useCallback((action: 'tomorrow' | 'skip' | 'nextWeek') => {
+  const handleAction = useCallback((action: 'tomorrow' | 'skip' | 'more') => {
     if (action === 'tomorrow' && onDefer) {
       const tomorrow = new Date()
       tomorrow.setDate(tomorrow.getDate() + 1)
       tomorrow.setHours(9, 0, 0, 0)
       onDefer(tomorrow)
-    } else if (action === 'nextWeek' && onDefer) {
-      const nextWeek = new Date()
-      nextWeek.setDate(nextWeek.getDate() + 7)
-      nextWeek.setHours(9, 0, 0, 0)
-      onDefer(nextWeek)
     } else if (action === 'skip' && onSkip) {
       onSkip()
+    } else if (action === 'more' && onOpenDetail) {
+      onOpenDetail()
     }
     closeActions()
-  }, [onDefer, onSkip, closeActions])
+  }, [onDefer, onSkip, onOpenDetail, closeActions])
 
   // Visual state calculations
-  const completeProgress = Math.min(Math.max(translateX, 0) / COMPLETE_THRESHOLD, 1)
-  const showCompleteIndicator = translateX > 20 && isActionable
+  // For LEFT swipe (negative translateX), show completion indicator on RIGHT
+  const completeProgress = Math.min(Math.max(-translateX, 0) / COMPLETE_THRESHOLD, 1)
+  const showCompleteIndicator = translateX < -20 && isActionable
 
   return (
     <div className="relative overflow-hidden rounded-2xl">
-      {/* Complete indicator (green background on right swipe) */}
+      {/* Complete indicator - appears on RIGHT when swiping LEFT */}
       <div
-        className="absolute inset-y-0 left-0 flex items-center justify-start pl-4"
+        className="absolute inset-y-0 right-0 flex items-center justify-end pr-4"
         style={{
-          width: Math.max(translateX, 0),
+          width: Math.max(-translateX, 0),
           backgroundColor: completeProgress > 0.8
             ? 'hsl(152 50% 32%)'
             : `hsl(152 50% ${32 + (1 - completeProgress) * 30}%)`,
@@ -159,11 +173,11 @@ export function SwipeableCard({
         )}
       </div>
 
-      {/* Action buttons (revealed on left swipe) */}
-      <div className="absolute inset-y-0 right-0 flex items-stretch">
+      {/* Action buttons - appear on LEFT when swiping RIGHT */}
+      <div className="absolute inset-y-0 left-0 flex items-stretch">
         <button
           onClick={() => handleAction('tomorrow')}
-          className="w-[70px] flex flex-col items-center justify-center gap-1 bg-amber-500 text-white text-xs font-medium active:bg-amber-600"
+          className="w-[60px] flex flex-col items-center justify-center gap-1 bg-amber-500 text-white text-xs font-medium active:bg-amber-600"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
@@ -172,12 +186,21 @@ export function SwipeableCard({
         </button>
         <button
           onClick={() => handleAction('skip')}
-          className="w-[70px] flex flex-col items-center justify-center gap-1 bg-neutral-500 text-white text-xs font-medium active:bg-neutral-600"
+          className="w-[60px] flex flex-col items-center justify-center gap-1 bg-neutral-500 text-white text-xs font-medium active:bg-neutral-600"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
           </svg>
           <span>Skip</span>
+        </button>
+        <button
+          onClick={() => handleAction('more')}
+          className="w-[60px] flex flex-col items-center justify-center gap-1 bg-blue-500 text-white text-xs font-medium active:bg-blue-600"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
+          </svg>
+          <span>More</span>
         </button>
       </div>
 
@@ -187,9 +210,9 @@ export function SwipeableCard({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        onClick={showActions ? closeActions : onSelect}
+        onClick={showActions ? closeActions : undefined}
         className={`
-          relative z-10 px-3 py-2.5 bg-bg-elevated border cursor-pointer
+          relative z-10 px-3 py-2.5 bg-bg-elevated border
           ${!isDragging ? 'transition-transform duration-200 ease-out' : ''}
           ${selected
             ? 'border-primary-200 shadow-md ring-1 ring-primary-200'
@@ -200,42 +223,14 @@ export function SwipeableCard({
         style={{ transform: `translateX(${translateX}px)` }}
       >
         <div className="flex items-center gap-3">
-          {/* Time - compact, LEFT side like desktop */}
+          {/* Time - compact, left side */}
           <div className="w-10 shrink-0 text-xs text-neutral-400 font-medium tabular-nums">
             {timeText || '—'}
           </div>
 
-          {/* Checkbox/Event indicator - fixed width for alignment */}
+          {/* Type icon - non-interactive indicator */}
           <div className="w-5 shrink-0 flex items-center justify-center">
-            {isActionable ? (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onComplete()
-                }}
-                className="touch-manipulation"
-                aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
-              >
-                <span
-                  className={`
-                    flex items-center justify-center w-5 h-5 rounded-md border-2 transition-colors
-                    ${isRoutine ? 'rounded-full' : ''}
-                    ${item.completed
-                      ? 'bg-primary-500 border-primary-500 text-white'
-                      : 'border-neutral-300'
-                    }
-                  `}
-                >
-                  {item.completed && (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </span>
-              </button>
-            ) : (
-              <div className="w-2.5 h-2.5 rounded-full bg-primary-500" />
-            )}
+            <TypeIcon type={item.type} completed={item.completed} />
           </div>
 
           {/* Title */}
@@ -249,7 +244,7 @@ export function SwipeableCard({
           </span>
 
           {/* Assignee avatar */}
-          {familyMembers.length > 0 && onAssign && (
+          {familyMembers.length > 0 && (
             <div
               className="shrink-0"
               onClick={(e) => e.stopPropagation()}
@@ -258,13 +253,12 @@ export function SwipeableCard({
               <AssigneeDropdown
                 members={familyMembers}
                 selectedId={assignedTo}
-                onSelect={onAssign}
+                onSelect={onAssign || (() => {})}
                 size="sm"
               />
             </div>
           )}
         </div>
-
       </div>
     </div>
   )

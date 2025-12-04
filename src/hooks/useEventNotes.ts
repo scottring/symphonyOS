@@ -6,6 +6,7 @@ export interface EventNote {
   id: string
   googleEventId: string
   notes: string | null
+  assignedTo?: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -15,6 +16,7 @@ interface DbEventNote {
   user_id: string
   google_event_id: string
   notes: string | null
+  assigned_to: string | null
   created_at: string
   updated_at: string
 }
@@ -24,6 +26,7 @@ function dbNoteToEventNote(dbNote: DbEventNote): EventNote {
     id: dbNote.id,
     googleEventId: dbNote.google_event_id,
     notes: dbNote.notes,
+    assignedTo: dbNote.assigned_to,
     createdAt: new Date(dbNote.created_at),
     updatedAt: new Date(dbNote.updated_at),
   }
@@ -190,6 +193,64 @@ export function useEventNotes() {
     }
   }, [user, notes])
 
+  // Update assignment for an event (upsert)
+  const updateEventAssignment = useCallback(async (googleEventId: string, memberId: string | null) => {
+    if (!user) return
+
+    const existingNote = notes.get(googleEventId)
+
+    // Optimistic update
+    const optimisticNote: EventNote = existingNote
+      ? { ...existingNote, assignedTo: memberId, updatedAt: new Date() }
+      : {
+          id: crypto.randomUUID(),
+          googleEventId,
+          notes: null,
+          assignedTo: memberId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }
+
+    setNotes((prev) => new Map(prev).set(googleEventId, optimisticNote))
+
+    // Upsert to database
+    const { data, error: upsertError } = await supabase
+      .from('event_notes')
+      .upsert(
+        {
+          user_id: user.id,
+          google_event_id: googleEventId,
+          assigned_to: memberId,
+        },
+        {
+          onConflict: 'user_id,google_event_id',
+        }
+      )
+      .select()
+      .single()
+
+    if (upsertError) {
+      // Rollback on error
+      if (existingNote) {
+        setNotes((prev) => new Map(prev).set(googleEventId, existingNote))
+      } else {
+        setNotes((prev) => {
+          const newMap = new Map(prev)
+          newMap.delete(googleEventId)
+          return newMap
+        })
+      }
+      setError(upsertError.message)
+      return
+    }
+
+    // Update with real data from DB
+    if (data) {
+      const realNote = dbNoteToEventNote(data as DbEventNote)
+      setNotes((prev) => new Map(prev).set(googleEventId, realNote))
+    }
+  }, [user, notes])
+
   return {
     notes,
     loading,
@@ -197,6 +258,7 @@ export function useEventNotes() {
     fetchNote,
     fetchNotesForEvents,
     updateNote,
+    updateEventAssignment,
     deleteNote,
     getNote,
   }

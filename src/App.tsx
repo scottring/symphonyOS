@@ -32,7 +32,7 @@ function App() {
   const { tasks, loading: tasksLoading, addTask, toggleTask, deleteTask, updateTask, pushTask } = useSupabaseTasks()
   const { user, loading: authLoading, signOut } = useAuth()
   const { isConnected, events, fetchEvents, isFetching: eventsFetching } = useGoogleCalendar()
-  const { fetchNote, fetchNotesForEvents, updateNote, getNote, notes: eventNotesMap } = useEventNotes()
+  const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, getNote, notes: eventNotesMap } = useEventNotes()
   const { contacts, contactsMap, addContact: _addContact, updateContact, searchContacts } = useContacts()
   void _addContact // Will be used when inline contact creation is re-added
   const { projects, projectsMap, addProject, updateProject, deleteProject, searchProjects } = useProjects()
@@ -46,7 +46,7 @@ function App() {
     deleteRoutine,
     toggleVisibility: toggleRoutineVisibility,
   } = useRoutines()
-  const { getInstancesForDate } = useActionableInstances()
+  const { getInstancesForDate, markDone, undoDone } = useActionableInstances()
   const { members: familyMembers } = useFamilyMembers()
   const isMobile = useMobile()
 
@@ -423,6 +423,17 @@ function App() {
             familyMembers={familyMembers}
             onAssignTask={(taskId, memberId) => {
               updateTask(taskId, { assignedTo: memberId ?? undefined })
+            }}
+            onAssignEvent={(eventId, memberId) => {
+              updateEventAssignment(eventId, memberId)
+            }}
+            onCompleteRoutine={async (routineId, completed) => {
+              if (completed) {
+                await markDone('routine', routineId, viewedDate)
+              } else {
+                await undoDone('routine', routineId, viewedDate)
+              }
+              refreshDateInstances()
             }}
           />
         </div>

@@ -43,6 +43,9 @@ interface TodayScheduleProps {
   // Family member assignment
   familyMembers?: FamilyMember[]
   onAssignTask?: (taskId: string, memberId: string | null) => void
+  onAssignEvent?: (eventId: string, memberId: string | null) => void
+  // Routine completion
+  onCompleteRoutine?: (routineId: string, completed: boolean) => void
 }
 
 function LoadingSkeleton() {
@@ -101,6 +104,8 @@ export function TodaySchedule({
   onOpenProject,
   familyMembers = [],
   onAssignTask,
+  onAssignEvent,
+  onCompleteRoutine,
 }: TodayScheduleProps) {
   const isMobile = useMobile()
   // Weekly review modal state
@@ -202,6 +207,9 @@ export function TodaySchedule({
       const eventNote = eventNotesMap?.get(eventId)
       if (eventNote?.notes) {
         item.notes = eventNote.notes
+      }
+      if (eventNote?.assignedTo) {
+        item.assignedTo = eventNote.assignedTo
       }
       return item
     })
@@ -334,21 +342,28 @@ export function TodaySchedule({
                         key={item.id}
                         item={item}
                         selected={selectedItemId === item.id}
-                        onSelect={() => onSelectItem(item.id)}
+                        onSelect={() => {}} // Disabled - no action on tap
                         onComplete={() => {
                           if (item.type === 'task' && taskId) {
                             onToggleTask(taskId)
+                          } else if (item.type === 'routine' && onCompleteRoutine) {
+                            const routineId = item.id.replace('routine-', '')
+                            onCompleteRoutine(routineId, !item.completed)
                           }
                         }}
                         onDefer={item.type === 'task' && taskId && onPushTask
                           ? (date: Date) => onPushTask(taskId, date)
                           : undefined
                         }
+                        onOpenDetail={() => onSelectItem(item.id)}
                         familyMembers={familyMembers}
                         assignedTo={item.assignedTo}
-                        onAssign={item.type === 'task' && taskId && onAssignTask
-                          ? (memberId) => onAssignTask(taskId, memberId)
-                          : undefined
+                        onAssign={
+                          item.type === 'task' && taskId && onAssignTask
+                            ? (memberId) => onAssignTask(taskId, memberId)
+                            : item.type === 'event' && onAssignEvent
+                            ? (memberId) => onAssignEvent(item.id.replace('event-', ''), memberId)
+                            : undefined
                         }
                       />
                     )
@@ -363,6 +378,9 @@ export function TodaySchedule({
                       onToggleComplete={() => {
                         if (item.type === 'task' && taskId) {
                           onToggleTask(taskId)
+                        } else if (item.type === 'routine' && onCompleteRoutine) {
+                          const routineId = item.id.replace('routine-', '')
+                          onCompleteRoutine(routineId, !item.completed)
                         }
                       }}
                       onPush={item.type === 'task' && taskId && onPushTask
@@ -375,9 +393,12 @@ export function TodaySchedule({
                       onOpenProject={onOpenProject}
                       familyMembers={familyMembers}
                       assignedTo={item.assignedTo}
-                      onAssign={item.type === 'task' && taskId && onAssignTask
-                        ? (memberId) => onAssignTask(taskId, memberId)
-                        : undefined
+                      onAssign={
+                        item.type === 'task' && taskId && onAssignTask
+                          ? (memberId) => onAssignTask(taskId, memberId)
+                          : item.type === 'event' && onAssignEvent
+                          ? (memberId) => onAssignEvent(item.id.replace('event-', ''), memberId)
+                          : undefined
                       }
                     />
                   )
