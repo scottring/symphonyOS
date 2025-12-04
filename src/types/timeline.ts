@@ -97,6 +97,7 @@ export function routineToTimelineItem(routine: Routine, date: Date): TimelineIte
     completed: false, // Will be set from actionable_instances
     notes: routine.description || undefined,
     recurrencePattern: routine.recurrence_pattern,
+    assignedTo: routine.assigned_to,
     originalRoutine: routine,
   }
 }
