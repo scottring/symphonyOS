@@ -44,7 +44,8 @@ export function SwipeableCard({
 
   const isTask = item.type === 'task'
   const isRoutine = item.type === 'routine'
-  const isActionable = isTask || isRoutine
+  const isEvent = item.type === 'event'
+  const isActionable = isTask || isRoutine || isEvent
 
   // Memoize time display
   const timeText = useMemo(() => {

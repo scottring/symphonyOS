@@ -290,6 +290,24 @@ export function RoutineForm({ routine, contacts = [], onBack, onUpdate, onDelete
             </>
           )}
 
+          {/* Timeline visibility toggle */}
+          <div className="pt-4 border-t border-neutral-100">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={routine.show_on_timeline !== false}
+                onChange={(e) => onUpdate(routine.id, { show_on_timeline: e.target.checked })}
+                className="w-5 h-5 rounded border-neutral-300 text-amber-500 focus:ring-amber-500"
+              />
+              <div>
+                <span className="text-sm font-medium text-neutral-700">Show on Today timeline</span>
+                <p className="text-xs text-neutral-500">
+                  Turn off for muscle-memory routines that don't need tracking
+                </p>
+              </div>
+            </label>
+          </div>
+
           {/* Save button */}
           {hasChanges() && (
             <button

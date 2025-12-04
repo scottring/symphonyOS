@@ -46,7 +46,7 @@ function App() {
     deleteRoutine,
     toggleVisibility: toggleRoutineVisibility,
   } = useRoutines()
-  const { getInstancesForDate, markDone, undoDone } = useActionableInstances()
+  const { getInstancesForDate, markDone, undoDone, skip } = useActionableInstances()
   const { members: familyMembers } = useFamilyMembers()
   const isMobile = useMobile()
 
@@ -436,6 +436,22 @@ function App() {
               } else {
                 await undoDone('routine', routineId, viewedDate)
               }
+              refreshDateInstances()
+            }}
+            onSkipRoutine={async (routineId) => {
+              await skip('routine', routineId, viewedDate)
+              refreshDateInstances()
+            }}
+            onCompleteEvent={async (eventId, completed) => {
+              if (completed) {
+                await markDone('calendar_event', eventId, viewedDate)
+              } else {
+                await undoDone('calendar_event', eventId, viewedDate)
+              }
+              refreshDateInstances()
+            }}
+            onSkipEvent={async (eventId) => {
+              await skip('calendar_event', eventId, viewedDate)
               refreshDateInstances()
             }}
           />

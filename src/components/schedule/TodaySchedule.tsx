@@ -47,6 +47,10 @@ interface TodayScheduleProps {
   onAssignRoutine?: (routineId: string, memberId: string | null) => void
   // Routine completion
   onCompleteRoutine?: (routineId: string, completed: boolean) => void
+  onSkipRoutine?: (routineId: string) => void
+  // Event completion/skip
+  onCompleteEvent?: (eventId: string, completed: boolean) => void
+  onSkipEvent?: (eventId: string) => void
 }
 
 function LoadingSkeleton() {
@@ -108,6 +112,9 @@ export function TodaySchedule({
   onAssignEvent,
   onAssignRoutine,
   onCompleteRoutine,
+  onSkipRoutine,
+  onCompleteEvent,
+  onSkipEvent,
 }: TodayScheduleProps) {
   const isMobile = useMobile()
   // Weekly review modal state
@@ -200,6 +207,23 @@ export function TodaySchedule({
     return map
   }, [dateInstances])
 
+  // Filter to only routines that should show on timeline (default true for backwards compat)
+  const visibleRoutines = useMemo(() =>
+    routines.filter(r => r.show_on_timeline !== false),
+    [routines]
+  )
+
+  // Build instance status map for events
+  const eventStatusMap = useMemo(() => {
+    const map = new Map<string, ActionableInstance>()
+    for (const instance of dateInstances) {
+      if (instance.entity_type === 'calendar_event') {
+        map.set(instance.entity_id, instance)
+      }
+    }
+    return map
+  }, [dateInstances])
+
   const grouped = useMemo(() => {
     const taskItems = filteredTasks.map(taskToTimelineItem)
 
@@ -213,10 +237,15 @@ export function TodaySchedule({
       if (eventNote?.assignedTo) {
         item.assignedTo = eventNote.assignedTo
       }
+      // Check if event is completed via actionable_instances
+      const instance = eventStatusMap.get(eventId)
+      if (instance?.status === 'completed') {
+        item.completed = true
+      }
       return item
     })
 
-    const routineItems = routines.map((routine) => {
+    const routineItems = visibleRoutines.map((routine) => {
       const item = routineToTimelineItem(routine, viewedDate)
       const instance = routineStatusMap.get(routine.id)
       if (instance?.status === 'completed') {
@@ -227,7 +256,7 @@ export function TodaySchedule({
 
     const allItems = [...taskItems, ...eventItems, ...routineItems]
     return groupByDaySection(allItems)
-  }, [filteredTasks, filteredEvents, routines, viewedDate, routineStatusMap, eventNotesMap])
+  }, [filteredTasks, filteredEvents, visibleRoutines, viewedDate, routineStatusMap, eventStatusMap, eventNotesMap])
 
   const sections: DaySection[] = ['allday', 'morning', 'afternoon', 'evening', 'unscheduled']
 
@@ -241,10 +270,10 @@ export function TodaySchedule({
 
   // Calculate completion stats (only scheduled tasks, not inbox)
   const completedTasks = filteredTasks.filter((t) => t.completed).length
-  const completedRoutines = routines.filter((r) => routineStatusMap.get(r.id)?.status === 'completed').length
+  const completedRoutines = visibleRoutines.filter((r) => routineStatusMap.get(r.id)?.status === 'completed').length
   const completedCount = completedTasks + completedRoutines
-  const actionableCount = filteredTasks.length + routines.length
-  const totalItems = filteredTasks.length + filteredEvents.length + routines.length + inboxTasks.length
+  const actionableCount = filteredTasks.length + visibleRoutines.length
+  const totalItems = filteredTasks.length + filteredEvents.length + visibleRoutines.length + inboxTasks.length
   const progressPercent = actionableCount > 0 ? (completedCount / actionableCount) * 100 : 0
 
   return (
@@ -351,11 +380,21 @@ export function TodaySchedule({
                           } else if (item.type === 'routine' && onCompleteRoutine) {
                             const routineId = item.id.replace('routine-', '')
                             onCompleteRoutine(routineId, !item.completed)
+                          } else if (item.type === 'event' && onCompleteEvent) {
+                            const eventId = item.id.replace('event-', '')
+                            onCompleteEvent(eventId, !item.completed)
                           }
                         }}
                         onDefer={item.type === 'task' && taskId && onPushTask
                           ? (date: Date) => onPushTask(taskId, date)
                           : undefined
+                        }
+                        onSkip={
+                          item.type === 'routine' && onSkipRoutine
+                            ? () => onSkipRoutine(item.id.replace('routine-', ''))
+                            : item.type === 'event' && onSkipEvent
+                            ? () => onSkipEvent(item.id.replace('event-', ''))
+                            : undefined
                         }
                         onOpenDetail={() => onSelectItem(item.id)}
                         familyMembers={familyMembers}
