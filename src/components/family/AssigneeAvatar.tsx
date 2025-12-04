@@ -16,7 +16,7 @@ const sizeClasses = {
 export function AssigneeAvatar({ member, size = 'md', onClick, className = '' }: AssigneeAvatarProps) {
   const colors = member
     ? FAMILY_COLORS[member.color as FamilyMemberColor] || FAMILY_COLORS.blue
-    : { bg: 'bg-neutral-100', text: 'text-neutral-400', ring: 'ring-neutral-200' }
+    : { bg: 'bg-neutral-50', text: 'text-neutral-300', ring: 'ring-neutral-100' }
 
   const initials = member?.initials || null
   const name = member?.name || 'Unassigned'

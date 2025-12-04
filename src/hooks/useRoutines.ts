@@ -19,6 +19,7 @@ export interface UpdateRoutineInput {
   time_of_day?: string | null
   visibility?: RoutineVisibility
   default_assignee?: string | null
+  assigned_to?: string | null
   raw_input?: string | null
 }
 
@@ -107,6 +108,7 @@ export function useRoutines() {
       if (input.time_of_day !== undefined) updates.time_of_day = input.time_of_day
       if (input.visibility !== undefined) updates.visibility = input.visibility
       if (input.default_assignee !== undefined) updates.default_assignee = input.default_assignee
+      if (input.assigned_to !== undefined) updates.assigned_to = input.assigned_to
       if (input.raw_input !== undefined) updates.raw_input = input.raw_input
 
       const { error: updateError } = await supabase

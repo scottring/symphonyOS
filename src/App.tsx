@@ -427,6 +427,9 @@ function App() {
             onAssignEvent={(eventId, memberId) => {
               updateEventAssignment(eventId, memberId)
             }}
+            onAssignRoutine={(routineId, memberId) => {
+              updateRoutine(routineId, { assigned_to: memberId })
+            }}
             onCompleteRoutine={async (routineId, completed) => {
               if (completed) {
                 await markDone('routine', routineId, viewedDate)

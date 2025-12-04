@@ -44,6 +44,7 @@ interface TodayScheduleProps {
   familyMembers?: FamilyMember[]
   onAssignTask?: (taskId: string, memberId: string | null) => void
   onAssignEvent?: (eventId: string, memberId: string | null) => void
+  onAssignRoutine?: (routineId: string, memberId: string | null) => void
   // Routine completion
   onCompleteRoutine?: (routineId: string, completed: boolean) => void
 }
@@ -105,6 +106,7 @@ export function TodaySchedule({
   familyMembers = [],
   onAssignTask,
   onAssignEvent,
+  onAssignRoutine,
   onCompleteRoutine,
 }: TodayScheduleProps) {
   const isMobile = useMobile()
@@ -363,6 +365,8 @@ export function TodaySchedule({
                             ? (memberId) => onAssignTask(taskId, memberId)
                             : item.type === 'event' && onAssignEvent
                             ? (memberId) => onAssignEvent(item.id.replace('event-', ''), memberId)
+                            : item.type === 'routine' && onAssignRoutine
+                            ? (memberId) => onAssignRoutine(item.id.replace('routine-', ''), memberId)
                             : undefined
                         }
                       />
@@ -398,6 +402,8 @@ export function TodaySchedule({
                           ? (memberId) => onAssignTask(taskId, memberId)
                           : item.type === 'event' && onAssignEvent
                           ? (memberId) => onAssignEvent(item.id.replace('event-', ''), memberId)
+                          : item.type === 'routine' && onAssignRoutine
+                          ? (memberId) => onAssignRoutine(item.id.replace('routine-', ''), memberId)
                           : undefined
                       }
                     />

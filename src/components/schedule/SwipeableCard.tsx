@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useMemo, type TouchEvent } from 'react'
+import { useRef, useState, useCallback, useMemo, useEffect, type TouchEvent } from 'react'
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
 import { formatTime } from '@/lib/timeUtils'
@@ -69,38 +69,53 @@ export function SwipeableCard({
     setIsDragging(true)
   }, [showActions])
 
-  const handleTouchMove = useCallback((e: TouchEvent) => {
-    if (!isDragging) return
-
-    const currentX = e.touches[0].clientX
-    const currentY = e.touches[0].clientY
-    const diffX = currentX - startX.current
-    const diffY = currentY - startY.current
-
-    // Determine swipe direction on first significant movement
-    if (isHorizontalSwipe.current === null) {
-      if (Math.abs(diffX) > 10 || Math.abs(diffY) > 10) {
-        isHorizontalSwipe.current = Math.abs(diffX) > Math.abs(diffY)
-      }
-    }
-
-    if (!isHorizontalSwipe.current) return
-
-    e.preventDefault()
-
-    let newTranslate = diffX
-
-    // LEFT swipe (negative) - for completion
-    if (diffX < -COMPLETE_THRESHOLD) {
-      newTranslate = -COMPLETE_THRESHOLD + (diffX + COMPLETE_THRESHOLD) * RESISTANCE
-    }
-    // RIGHT swipe (positive) - for action buttons
-    else if (diffX > ACTION_THRESHOLD * 2) {
-      newTranslate = ACTION_THRESHOLD * 2 + (diffX - ACTION_THRESHOLD * 2) * RESISTANCE
-    }
-
-    setTranslateX(newTranslate)
+  // Use a ref for the touch move handler to access latest state
+  const isDraggingRef = useRef(false)
+  useEffect(() => {
+    isDraggingRef.current = isDragging
   }, [isDragging])
+
+  // Attach touchmove with { passive: false } to allow preventDefault
+  useEffect(() => {
+    const card = cardRef.current
+    if (!card) return
+
+    const handleTouchMove = (e: globalThis.TouchEvent) => {
+      if (!isDraggingRef.current) return
+
+      const currentX = e.touches[0].clientX
+      const currentY = e.touches[0].clientY
+      const diffX = currentX - startX.current
+      const diffY = currentY - startY.current
+
+      // Determine swipe direction on first significant movement
+      if (isHorizontalSwipe.current === null) {
+        if (Math.abs(diffX) > 10 || Math.abs(diffY) > 10) {
+          isHorizontalSwipe.current = Math.abs(diffX) > Math.abs(diffY)
+        }
+      }
+
+      if (!isHorizontalSwipe.current) return
+
+      e.preventDefault()
+
+      let newTranslate = diffX
+
+      // LEFT swipe (negative) - for completion
+      if (diffX < -COMPLETE_THRESHOLD) {
+        newTranslate = -COMPLETE_THRESHOLD + (diffX + COMPLETE_THRESHOLD) * RESISTANCE
+      }
+      // RIGHT swipe (positive) - for action buttons
+      else if (diffX > ACTION_THRESHOLD * 2) {
+        newTranslate = ACTION_THRESHOLD * 2 + (diffX - ACTION_THRESHOLD * 2) * RESISTANCE
+      }
+
+      setTranslateX(newTranslate)
+    }
+
+    card.addEventListener('touchmove', handleTouchMove, { passive: false })
+    return () => card.removeEventListener('touchmove', handleTouchMove)
+  }, [])
 
   const handleTouchEnd = useCallback(() => {
     if (!isDragging) return
@@ -146,35 +161,38 @@ export function SwipeableCard({
   const showCompleteIndicator = translateX < -20 && isActionable
 
   return (
-    <div className="relative overflow-hidden rounded-2xl">
+    <div className="relative rounded-2xl">
       {/* Complete indicator - appears on RIGHT when swiping LEFT */}
-      <div
-        className="absolute inset-y-0 right-0 flex items-center justify-end pr-4"
-        style={{
-          width: Math.max(-translateX, 0),
-          backgroundColor: completeProgress > 0.8
-            ? 'hsl(152 50% 32%)'
-            : `hsl(152 50% ${32 + (1 - completeProgress) * 30}%)`,
-        }}
-      >
-        {showCompleteIndicator && (
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="w-6 h-6 text-white"
-            style={{
-              transform: `scale(${0.5 + completeProgress * 0.5})`,
-              opacity: completeProgress,
-            }}
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-          </svg>
-        )}
-      </div>
+      {translateX < 0 && (
+        <div
+          className="absolute inset-y-0 right-0 flex items-center justify-end pr-4 rounded-r-2xl"
+          style={{
+            width: Math.max(-translateX, 0),
+            backgroundColor: completeProgress > 0.8
+              ? 'hsl(152 50% 32%)'
+              : `hsl(152 50% ${32 + (1 - completeProgress) * 30}%)`,
+          }}
+        >
+          {showCompleteIndicator && (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-6 h-6 text-white"
+              style={{
+                transform: `scale(${0.5 + completeProgress * 0.5})`,
+                opacity: completeProgress,
+              }}
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+          )}
+        </div>
+      )}
 
       {/* Action buttons - appear on LEFT when swiping RIGHT */}
-      <div className="absolute inset-y-0 left-0 flex items-stretch">
+      {(translateX > 0 || showActions) && (
+      <div className="absolute inset-y-0 left-0 flex items-stretch overflow-hidden rounded-l-2xl">
         <button
           onClick={() => handleAction('tomorrow')}
           className="w-[60px] flex flex-col items-center justify-center gap-1 bg-amber-500 text-white text-xs font-medium active:bg-amber-600"
@@ -203,16 +221,16 @@ export function SwipeableCard({
           <span>More</span>
         </button>
       </div>
+      )}
 
       {/* Main card content */}
       <div
         ref={cardRef}
         onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onClick={showActions ? closeActions : undefined}
         className={`
-          relative z-10 px-3 py-2.5 bg-bg-elevated border
+          relative z-10 px-3 py-2.5 bg-bg-elevated border rounded-2xl
           ${!isDragging ? 'transition-transform duration-200 ease-out' : ''}
           ${selected
             ? 'border-primary-200 shadow-md ring-1 ring-primary-200'
@@ -248,7 +266,13 @@ export function SwipeableCard({
             <div
               className="shrink-0"
               onClick={(e) => e.stopPropagation()}
-              onTouchStart={(e) => e.stopPropagation()}
+              onTouchStart={(e) => {
+                e.stopPropagation()
+                // Prevent card from starting drag
+                setIsDragging(false)
+              }}
+              onTouchEnd={(e) => e.stopPropagation()}
+              onTouchMove={(e) => e.stopPropagation()}
             >
               <AssigneeDropdown
                 members={familyMembers}
