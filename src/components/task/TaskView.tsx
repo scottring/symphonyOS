@@ -243,15 +243,20 @@ export function TaskView({
       <div className="p-6 max-w-2xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-1 text-sm text-neutral-500 hover:text-neutral-700 mb-4 transition-colors"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-            </svg>
-            Back
-          </button>
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-2 mb-4">
+            <button
+              onClick={onBack}
+              className="flex items-center gap-1 text-sm text-neutral-500 hover:text-neutral-700 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+              Back
+            </button>
+            <span className="text-neutral-300">/</span>
+            <span className="text-sm font-medium text-neutral-600">Task</span>
+          </div>
 
           <div className="flex items-start gap-4">
             {/* Large checkbox */}
@@ -368,7 +373,7 @@ export function TaskView({
                 <span className="flex-1">
                   {task.scheduledFor ? (
                     <span className="text-neutral-800">
-                      {formatDate(task.scheduledFor)} at {formatTime(task.scheduledFor)}
+                      {formatDate(task.scheduledFor)}{task.isAllDay ? ' (All Day)' : ` at ${formatTime(task.scheduledFor)}`}
                     </span>
                   ) : (
                     <span className="text-neutral-400">Add date & time</span>
@@ -377,6 +382,7 @@ export function TaskView({
               </button>
             ) : (
               <div className="space-y-3">
+                {/* Date picker row */}
                 <div className="flex gap-2 items-center">
                   <input
                     type="date"
@@ -388,105 +394,136 @@ export function TaskView({
                         const [year, month, day] = dateValue.split('-').map(Number)
                         const newDate = new Date(existing)
                         newDate.setFullYear(year, month - 1, day)
-                        onUpdate(task.id, { scheduledFor: newDate })
+                        // If no existing time and not already all-day, default to all-day
+                        const shouldBeAllDay = !task.scheduledFor ? true : task.isAllDay
+                        onUpdate(task.id, { scheduledFor: newDate, isAllDay: shouldBeAllDay })
                       } else {
-                        onUpdate(task.id, { scheduledFor: undefined })
+                        onUpdate(task.id, { scheduledFor: undefined, isAllDay: undefined })
                       }
                     }}
                     className="flex-1 px-3 py-2 text-sm rounded-lg border border-neutral-200
                                focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setShowHourPicker(!showHourPicker)}
-                      className="w-16 px-2 py-2 text-sm rounded-lg border border-neutral-200 bg-white
-                                 flex items-center justify-between"
-                    >
-                      <span>
-                        {task.scheduledFor
-                          ? (() => {
-                              const h = task.scheduledFor.getHours()
-                              return h === 0 ? '12a' : h < 12 ? `${h}a` : h === 12 ? '12p' : `${h - 12}p`
-                            })()
-                          : '--'}
-                      </span>
-                      <svg className="w-3 h-3 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
-                    {showHourPicker && (
-                      <div className="absolute top-full left-0 mt-1 w-20 max-h-48 overflow-auto bg-white border border-neutral-200 rounded-lg shadow-lg z-50">
-                        {Array.from({ length: 24 }, (_, i) => (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => {
-                              const existing = task.scheduledFor || new Date()
-                              const newDate = new Date(existing)
-                              newDate.setHours(i)
-                              newDate.setSeconds(0)
-                              onUpdate(task.id, { scheduledFor: newDate })
-                              setShowHourPicker(false)
-                            }}
-                            className={`w-full px-3 py-1.5 text-sm text-left hover:bg-neutral-100
-                              ${task.scheduledFor?.getHours() === i ? 'bg-primary-50 text-primary-700 font-medium' : ''}`}
-                          >
-                            {i === 0 ? '12 AM' : i < 12 ? `${i} AM` : i === 12 ? '12 PM' : `${i - 12} PM`}
-                          </button>
-                        ))}
+                  {/* Time pickers - only show if not all day */}
+                  {task.scheduledFor && !task.isAllDay && (
+                    <>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setShowHourPicker(!showHourPicker)}
+                          className="w-16 px-2 py-2 text-sm rounded-lg border border-neutral-200 bg-white
+                                     flex items-center justify-between"
+                        >
+                          <span>
+                            {task.scheduledFor
+                              ? (() => {
+                                  const h = task.scheduledFor.getHours()
+                                  return h === 0 ? '12a' : h < 12 ? `${h}a` : h === 12 ? '12p' : `${h - 12}p`
+                                })()
+                              : '--'}
+                          </span>
+                          <svg className="w-3 h-3 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        {showHourPicker && (
+                          <div className="absolute top-full left-0 mt-1 w-20 max-h-48 overflow-auto bg-white border border-neutral-200 rounded-lg shadow-lg z-50">
+                            {Array.from({ length: 24 }, (_, i) => (
+                              <button
+                                key={i}
+                                type="button"
+                                onClick={() => {
+                                  const existing = task.scheduledFor || new Date()
+                                  const newDate = new Date(existing)
+                                  newDate.setHours(i)
+                                  newDate.setSeconds(0)
+                                  onUpdate(task.id, { scheduledFor: newDate })
+                                  setShowHourPicker(false)
+                                }}
+                                className={`w-full px-3 py-1.5 text-sm text-left hover:bg-neutral-100
+                                  ${task.scheduledFor?.getHours() === i ? 'bg-primary-50 text-primary-700 font-medium' : ''}`}
+                              >
+                                {i === 0 ? '12 AM' : i < 12 ? `${i} AM` : i === 12 ? '12 PM' : `${i - 12} PM`}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setShowMinutePicker(!showMinutePicker)}
-                      className="w-14 px-2 py-2 text-sm rounded-lg border border-neutral-200 bg-white
-                                 flex items-center justify-between"
-                    >
-                      <span>
-                        {task.scheduledFor
-                          ? `:${(Math.round(task.scheduledFor.getMinutes() / 5) * 5).toString().padStart(2, '0')}`
-                          : '--'}
-                      </span>
-                      <svg className="w-3 h-3 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
-                    {showMinutePicker && (
-                      <div className="absolute top-full left-0 mt-1 w-16 max-h-48 overflow-auto bg-white border border-neutral-200 rounded-lg shadow-lg z-50">
-                        {Array.from({ length: 12 }, (_, i) => i * 5).map((m) => {
-                          const currentMinute = task.scheduledFor
-                            ? Math.round(task.scheduledFor.getMinutes() / 5) * 5
-                            : null
-                          return (
-                            <button
-                              key={m}
-                              type="button"
-                              onClick={() => {
-                                const existing = task.scheduledFor || new Date()
-                                const newDate = new Date(existing)
-                                newDate.setMinutes(m)
-                                newDate.setSeconds(0)
-                                onUpdate(task.id, { scheduledFor: newDate })
-                                setShowMinutePicker(false)
-                              }}
-                              className={`w-full px-3 py-1.5 text-sm text-left hover:bg-neutral-100
-                                ${currentMinute === m ? 'bg-primary-50 text-primary-700 font-medium' : ''}`}
-                            >
-                              :{m.toString().padStart(2, '0')}
-                            </button>
-                          )
-                        })}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setShowMinutePicker(!showMinutePicker)}
+                          className="w-14 px-2 py-2 text-sm rounded-lg border border-neutral-200 bg-white
+                                     flex items-center justify-between"
+                        >
+                          <span>
+                            {task.scheduledFor
+                              ? `:${(Math.round(task.scheduledFor.getMinutes() / 5) * 5).toString().padStart(2, '0')}`
+                              : '--'}
+                          </span>
+                          <svg className="w-3 h-3 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        {showMinutePicker && (
+                          <div className="absolute top-full left-0 mt-1 w-16 max-h-48 overflow-auto bg-white border border-neutral-200 rounded-lg shadow-lg z-50">
+                            {Array.from({ length: 12 }, (_, i) => i * 5).map((m) => {
+                              const currentMinute = task.scheduledFor
+                                ? Math.round(task.scheduledFor.getMinutes() / 5) * 5
+                                : null
+                              return (
+                                <button
+                                  key={m}
+                                  type="button"
+                                  onClick={() => {
+                                    const existing = task.scheduledFor || new Date()
+                                    const newDate = new Date(existing)
+                                    newDate.setMinutes(m)
+                                    newDate.setSeconds(0)
+                                    onUpdate(task.id, { scheduledFor: newDate })
+                                    setShowMinutePicker(false)
+                                  }}
+                                  className={`w-full px-3 py-1.5 text-sm text-left hover:bg-neutral-100
+                                    ${currentMinute === m ? 'bg-primary-50 text-primary-700 font-medium' : ''}`}
+                                >
+                                  :{m.toString().padStart(2, '0')}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    </>
+                  )}
                 </div>
+
+                {/* All Day toggle - only show when date is set */}
+                {task.scheduledFor && (
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        checked={task.isAllDay || false}
+                        onChange={(e) => {
+                          onUpdate(task.id, { isAllDay: e.target.checked })
+                          // Close time pickers when toggling
+                          setShowHourPicker(false)
+                          setShowMinutePicker(false)
+                        }}
+                        className="sr-only"
+                      />
+                      <div className={`w-10 h-6 rounded-full transition-colors ${task.isAllDay ? 'bg-primary-500' : 'bg-neutral-200'}`}>
+                        <div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform mt-1 ${task.isAllDay ? 'translate-x-5' : 'translate-x-1'}`} />
+                      </div>
+                    </div>
+                    <span className="text-sm text-neutral-600">All Day</span>
+                  </label>
+                )}
+
                 <div className="flex gap-2">
                   {task.scheduledFor && (
                     <button
-                      onClick={() => onUpdate(task.id, { scheduledFor: undefined })}
+                      onClick={() => onUpdate(task.id, { scheduledFor: undefined, isAllDay: undefined })}
                       className="text-sm text-neutral-500 hover:text-red-600 transition-colors"
                     >
                       Clear

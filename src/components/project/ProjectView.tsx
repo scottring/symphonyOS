@@ -135,15 +135,20 @@ export function ProjectView({
       <div className="p-6 max-w-2xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-1 text-sm text-neutral-500 hover:text-neutral-700 mb-4 transition-colors"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-            </svg>
-            Back
-          </button>
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-2 mb-4">
+            <button
+              onClick={onBack}
+              className="flex items-center gap-1 text-sm text-neutral-500 hover:text-neutral-700 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+              Back
+            </button>
+            <span className="text-neutral-300">/</span>
+            <span className="text-sm font-medium text-neutral-600">Project</span>
+          </div>
 
           {isEditing ? (
             <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
