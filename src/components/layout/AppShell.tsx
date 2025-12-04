@@ -59,11 +59,14 @@ export function AppShell({
           flex-1 overflow-auto
           transition-all duration-300 ease-in-out
           ${!isMobile && panelOpen ? 'mr-[420px]' : ''}
+          ${isMobile ? 'pb-24' : ''}
         `}
+        style={isMobile ? { paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' } : undefined}
       >
         {/* Mobile header */}
         {isMobile && (
-          <header className="sticky top-0 z-10 glass border-b border-neutral-200/50 px-5 py-4 safe-top">
+          <header className="sticky top-0 z-10 bg-bg-elevated/95 backdrop-blur-lg border-b border-neutral-200/50 px-5 py-3"
+                  style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <img
@@ -140,8 +143,9 @@ export function AppShell({
 
       {/* Mobile bottom navigation */}
       {isMobile && !panelOpen && (
-        <nav className="fixed bottom-0 left-0 right-0 z-40 glass border-t border-neutral-200/50 safe-bottom">
-          <div className="flex items-center justify-around px-6 py-3">
+        <nav className="fixed bottom-0 left-0 right-0 z-40 bg-bg-elevated/95 backdrop-blur-lg border-t border-neutral-200/50"
+             style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+          <div className="flex items-center justify-around px-6 py-2">
             <button
               onClick={() => onViewChange('home')}
               className={`

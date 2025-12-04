@@ -204,14 +204,31 @@ body {
 }
 
 /* =============================================================================
-   MOBILE SUPPORT
+   MOBILE SUPPORT & PWA
    ============================================================================= */
 
+/* Safe area insets for edge-to-edge display */
 @supports (padding: env(safe-area-inset-top)) {
   .safe-top { padding-top: env(safe-area-inset-top); }
   .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
   .safe-left { padding-left: env(safe-area-inset-left); }
   .safe-right { padding-right: env(safe-area-inset-right); }
+
+  /* Combined safe area padding */
+  .safe-area-inset {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* PWA standalone mode - stretch to edges */
+@media (display-mode: standalone) {
+  body {
+    /* Ensure content respects notch/home indicator */
+    padding-top: env(safe-area-inset-top);
+  }
 }
 
 * {
@@ -221,6 +238,27 @@ body {
 .scroll-container {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
+}
+
+/* =============================================================================
+   MOBILE TEXT SIZES - Larger for better readability
+   ============================================================================= */
+
+@media (max-width: 768px) {
+  /* Base text size bump */
+  html {
+    font-size: 17px; /* Up from 16px default */
+  }
+
+  /* Task titles larger */
+  .text-base {
+    font-size: 1.0625rem; /* ~18px at 17px base */
+  }
+
+  /* Section headers */
+  .time-group-header {
+    font-size: 0.8125rem;
+  }
 }
 
 /* =============================================================================

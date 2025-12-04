@@ -41,7 +41,7 @@ export function AuthForm() {
         {/* Header */}
         <div className="text-center mb-10">
           {/* Logo mark */}
-          <div className="mb-6 animate-fade-in-scale">
+          <div className="mb-6 animate-fade-in-scale flex justify-center">
             <img
               src="/symphony-logo.jpg"
               alt="Symphony Logo"
