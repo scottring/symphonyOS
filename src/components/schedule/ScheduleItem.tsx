@@ -31,6 +31,11 @@ export function ScheduleItem({ item, selected, onSelect, onToggleComplete, onPus
 
   // Parse time display
   const getTimeDisplay = () => {
+    // All-day items (tasks or events) show "All day"
+    if (item.allDay) {
+      return { type: 'allday' as const }
+    }
+
     if (!item.startTime) return null
 
     if (item.endTime) {

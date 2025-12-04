@@ -44,6 +44,7 @@ export function taskToTimelineItem(task: Task): TimelineItem {
     phoneNumber: task.phoneNumber,
     contactId: task.contactId,
     projectId: task.projectId,
+    allDay: task.isAllDay,
     originalTask: task,
   }
 }
