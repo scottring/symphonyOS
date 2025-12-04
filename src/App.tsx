@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useEffect, useState, useMemo, useCallback, Suspense } from 'react'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useAuth } from '@/hooks/useAuth'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
@@ -7,19 +7,23 @@ import { useContacts } from '@/hooks/useContacts'
 import { useProjects } from '@/hooks/useProjects'
 import { useRoutines } from '@/hooks/useRoutines'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
+import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useMobile } from '@/hooks/useMobile'
 import { AppShell } from '@/components/layout/AppShell'
 import { TodaySchedule } from '@/components/schedule/TodaySchedule'
 import { DetailPanel } from '@/components/detail/DetailPanel'
-import { CalendarConnect } from '@/components/CalendarConnect'
-import { AuthForm } from '@/components/AuthForm'
-import { RecipeViewer } from '@/components/recipe/RecipeViewer'
-import { ProjectsList } from '@/components/project/ProjectsList'
-import { ProjectView } from '@/components/project/ProjectView'
-import { RoutinesList } from '@/components/routine/RoutinesList'
-import { RoutineForm } from '@/components/routine/RoutineForm'
-import { RoutineInput } from '@/components/routine/RoutineInput'
-import { TaskView } from '@/components/task/TaskView'
+import { LoadingFallback } from '@/components/layout/LoadingFallback'
+import {
+  ProjectsList,
+  ProjectView,
+  RoutinesList,
+  RoutineForm,
+  RoutineInput,
+  TaskView,
+  RecipeViewer,
+  AuthForm,
+  CalendarConnect,
+} from '@/components/lazy'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import type { ViewType } from '@/components/layout/Sidebar'
 import type { ActionableInstance } from '@/types/actionable'
@@ -43,6 +47,7 @@ function App() {
     toggleVisibility: toggleRoutineVisibility,
   } = useRoutines()
   const { getInstancesForDate } = useActionableInstances()
+  const { members: familyMembers } = useFamilyMembers()
   const isMobile = useMobile()
 
   // Actionable instances for the viewed date (to filter skipped/completed events)
@@ -318,7 +323,9 @@ function App() {
   if (!user) {
     return (
       <div className="min-h-screen bg-bg-base">
-        <AuthForm />
+        <Suspense fallback={<LoadingFallback />}>
+          <AuthForm />
+        </Suspense>
       </div>
     )
   }
@@ -347,10 +354,12 @@ function App() {
       onViewChange={handleViewChange}
       panel={
         recipeUrl ? (
-          <RecipeViewer
-            url={recipeUrl}
-            onClose={() => setRecipeUrl(null)}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <RecipeViewer
+              url={recipeUrl}
+              onClose={() => setRecipeUrl(null)}
+            />
+          </Suspense>
         ) : (
           <DetailPanel
             item={selectedItem}
@@ -380,7 +389,9 @@ function App() {
           {/* Calendar connect banner if needed */}
           {!isConnected && (
             <div className="p-4 border-b border-neutral-100">
-              <CalendarConnect />
+              <Suspense fallback={<LoadingFallback />}>
+                <CalendarConnect />
+              </Suspense>
             </div>
           )}
 
@@ -408,66 +419,79 @@ function App() {
             onRefreshInstances={refreshDateInstances}
             recentlyCreatedTaskId={recentlyCreatedTaskId}
             onTriageCardCollapse={() => setRecentlyCreatedTaskId(null)}
+            onOpenProject={handleOpenProject}
+            familyMembers={familyMembers}
+            onAssignTask={(taskId, memberId) => {
+              updateTask(taskId, { assignedTo: memberId ?? undefined })
+            }}
           />
         </div>
       )}
 
       {activeView === 'task-detail' && selectedTask && (
-        <TaskView
-          task={selectedTask}
-          onBack={() => {
-            setSelectedTaskId(null)
-            setActiveView('home')
-          }}
-          onUpdate={updateTask}
-          onDelete={(id) => {
-            deleteTask(id)
-            setSelectedTaskId(null)
-            setActiveView('home')
-          }}
-          onToggleComplete={toggleTask}
-          onPush={pushTask}
-          contact={selectedTaskContact}
-          contacts={contacts}
-          onSearchContacts={searchContacts}
-          project={selectedTaskProject}
-          projects={projects}
-          onSearchProjects={searchProjects}
-          onOpenProject={handleOpenProject}
-          onAddProject={addProject}
-        />
+        <Suspense fallback={<LoadingFallback />}>
+          <TaskView
+            task={selectedTask}
+            onBack={() => {
+              setSelectedTaskId(null)
+              setActiveView('home')
+            }}
+            onUpdate={updateTask}
+            onDelete={(id) => {
+              deleteTask(id)
+              setSelectedTaskId(null)
+              setActiveView('home')
+            }}
+            onToggleComplete={toggleTask}
+            onPush={pushTask}
+            contact={selectedTaskContact}
+            contacts={contacts}
+            onSearchContacts={searchContacts}
+            project={selectedTaskProject}
+            projects={projects}
+            onSearchProjects={searchProjects}
+            onOpenProject={handleOpenProject}
+            onAddProject={addProject}
+          />
+        </Suspense>
       )}
 
       {activeView === 'projects' && !selectedProjectId && (
-        <ProjectsList
-          projects={projects}
-          onSelectProject={setSelectedProjectId}
-          onAddProject={addProject}
-        />
+        <Suspense fallback={<LoadingFallback />}>
+          <ProjectsList
+            projects={projects}
+            onSelectProject={setSelectedProjectId}
+            onAddProject={addProject}
+          />
+        </Suspense>
       )}
 
       {activeView === 'projects' && selectedProject && (
-        <ProjectView
-          project={selectedProject}
-          tasks={tasks}
-          contactsMap={contactsMap}
-          onBack={() => setSelectedProjectId(null)}
-          onUpdateProject={updateProject}
-          onDeleteProject={deleteProject}
-          onAddTask={(title, projectId) => addTask(title, undefined, projectId)}
-          onSelectTask={handleSelectItem}
-          onToggleTask={toggleTask}
-          selectedTaskId={selectedItemId}
-        />
+        <Suspense fallback={<LoadingFallback />}>
+          <ProjectView
+            project={selectedProject}
+            tasks={tasks}
+            contactsMap={contactsMap}
+            onBack={() => setSelectedProjectId(null)}
+            onUpdateProject={updateProject}
+            onDeleteProject={deleteProject}
+            onAddTask={(title, projectId) => addTask(title, undefined, projectId)}
+            onSelectTask={handleSelectItem}
+            onToggleTask={toggleTask}
+            selectedTaskId={selectedItemId}
+          />
+        </Suspense>
       )}
 
       {activeView === 'routines' && !selectedRoutineId && !creatingRoutine && (
-        <RoutinesList
-          routines={allRoutines}
-          contacts={contacts}
-          onSelectRoutine={(routine) => setSelectedRoutineId(routine.id)}
-          onCreateRoutine={() => setCreatingRoutine(true)}
-        />
+        <Suspense fallback={<LoadingFallback />}>
+          <RoutinesList
+            routines={allRoutines}
+            contacts={contacts}
+            onSelectRoutine={(routine) => setSelectedRoutineId(routine.id)}
+            onCreateRoutine={() => setCreatingRoutine(true)}
+          />
+        </Suspense>
       )}
 
       {activeView === 'routines' && creatingRoutine && (
@@ -485,27 +509,32 @@ function App() {
               </button>
               <h1 className="text-xl font-semibold text-neutral-800">New Routine</h1>
             </div>
-            <RoutineInput
-              contacts={contacts}
-              onSave={async (input) => {
-                await addRoutine(input)
-                setCreatingRoutine(false)
-              }}
-              onCancel={() => setCreatingRoutine(false)}
-            />
+            <Suspense fallback={<LoadingFallback />}>
+              <RoutineInput
+                contacts={contacts}
+                onSave={async (input) => {
+                  await addRoutine(input)
+                  setCreatingRoutine(false)
+                }}
+                onCancel={() => setCreatingRoutine(false)}
+              />
+            </Suspense>
           </div>
         </div>
       )}
 
       {activeView === 'routines' && selectedRoutine && (
-        <RoutineForm
-          routine={selectedRoutine}
-          contacts={contacts}
-          onBack={() => setSelectedRoutineId(null)}
-          onUpdate={updateRoutine}
-          onDelete={deleteRoutine}
-          onToggleVisibility={toggleRoutineVisibility}
-        />
+        <Suspense fallback={<LoadingFallback />}>
+          <RoutineForm
+            key={selectedRoutine.id}
+            routine={selectedRoutine}
+            contacts={contacts}
+            onBack={() => setSelectedRoutineId(null)}
+            onUpdate={updateRoutine}
+            onDelete={deleteRoutine}
+            onToggleVisibility={toggleRoutineVisibility}
+          />
+        </Suspense>
       )}
     </AppShell>
   )

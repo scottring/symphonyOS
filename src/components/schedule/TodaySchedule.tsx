@@ -2,13 +2,16 @@ import { useMemo, useState } from 'react'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
+import type { FamilyMember } from '@/types/family'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import { groupByDaySection, type DaySection } from '@/lib/timeUtils'
+import { useMobile } from '@/hooks/useMobile'
 import { TimeGroup } from './TimeGroup'
 import { ScheduleItem } from './ScheduleItem'
+import { SwipeableCard } from './SwipeableCard'
 import { DateNavigator } from './DateNavigator'
 import { InboxSection } from './InboxSection'
 import { WeeklyReview } from '@/components/review/WeeklyReview'
@@ -36,6 +39,10 @@ interface TodayScheduleProps {
   onRefreshInstances?: () => void
   recentlyCreatedTaskId?: string | null
   onTriageCardCollapse?: () => void
+  onOpenProject?: (projectId: string) => void
+  // Family member assignment
+  familyMembers?: FamilyMember[]
+  onAssignTask?: (taskId: string, memberId: string | null) => void
 }
 
 function LoadingSkeleton() {
@@ -91,7 +98,11 @@ export function TodaySchedule({
   eventNotesMap,
   recentlyCreatedTaskId,
   onTriageCardCollapse,
+  onOpenProject,
+  familyMembers = [],
+  onAssignTask,
 }: TodayScheduleProps) {
+  const isMobile = useMobile()
   // Weekly review modal state
   const [showWeeklyReview, setShowWeeklyReview] = useState(false)
   // Check if we're viewing today
@@ -314,6 +325,35 @@ export function TodaySchedule({
                 {items.map((item) => {
                   const contactName = item.contactId && contactsMap?.get(item.contactId)?.name
                   const projectName = item.projectId && projectsMap?.get(item.projectId)?.name
+                  const taskId = item.id.startsWith('task-') ? item.id.replace('task-', '') : null
+
+                  // Use SwipeableCard on mobile for better touch interactions
+                  if (isMobile) {
+                    return (
+                      <SwipeableCard
+                        key={item.id}
+                        item={item}
+                        selected={selectedItemId === item.id}
+                        onSelect={() => onSelectItem(item.id)}
+                        onComplete={() => {
+                          if (item.type === 'task' && taskId) {
+                            onToggleTask(taskId)
+                          }
+                        }}
+                        onDefer={item.type === 'task' && taskId && onPushTask
+                          ? (date: Date) => onPushTask(taskId, date)
+                          : undefined
+                        }
+                        familyMembers={familyMembers}
+                        assignedTo={item.assignedTo}
+                        onAssign={item.type === 'task' && taskId && onAssignTask
+                          ? (memberId) => onAssignTask(taskId, memberId)
+                          : undefined
+                        }
+                      />
+                    )
+                  }
+
                   return (
                     <ScheduleItem
                       key={item.id}
@@ -321,20 +361,24 @@ export function TodaySchedule({
                       selected={selectedItemId === item.id}
                       onSelect={() => onSelectItem(item.id)}
                       onToggleComplete={() => {
-                        if (item.type === 'task' && item.id.startsWith('task-')) {
-                          const taskId = item.id.replace('task-', '')
+                        if (item.type === 'task' && taskId) {
                           onToggleTask(taskId)
                         }
                       }}
-                      onPush={item.type === 'task' && item.id.startsWith('task-') && onPushTask
-                        ? (date: Date) => {
-                            const taskId = item.id.replace('task-', '')
-                            onPushTask(taskId, date)
-                          }
+                      onPush={item.type === 'task' && taskId && onPushTask
+                        ? (date: Date) => onPushTask(taskId, date)
                         : undefined
                       }
                       contactName={contactName || undefined}
                       projectName={projectName || undefined}
+                      projectId={item.projectId || undefined}
+                      onOpenProject={onOpenProject}
+                      familyMembers={familyMembers}
+                      assignedTo={item.assignedTo}
+                      onAssign={item.type === 'task' && taskId && onAssignTask
+                        ? (memberId) => onAssignTask(taskId, memberId)
+                        : undefined
+                      }
                     />
                   )
                 })}
@@ -354,6 +398,9 @@ export function TodaySchedule({
               onSearchContacts={onSearchContacts}
               recentlyCreatedTaskId={recentlyCreatedTaskId}
               onTriageCardCollapse={onTriageCardCollapse}
+              onOpenProject={onOpenProject}
+              familyMembers={familyMembers}
+              onAssignTask={onAssignTask}
             />
           )}
         </div>

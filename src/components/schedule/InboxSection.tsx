@@ -1,6 +1,7 @@
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
+import type { FamilyMember } from '@/types/family'
 import { InboxTaskCard } from './InboxTaskCard'
 import { TriageCard } from '@/components/triage'
 
@@ -14,6 +15,10 @@ interface InboxSectionProps {
   onSearchContacts?: (query: string) => Contact[]
   recentlyCreatedTaskId?: string | null
   onTriageCardCollapse?: () => void
+  onOpenProject?: (projectId: string) => void
+  // Family member assignment
+  familyMembers?: FamilyMember[]
+  onAssignTask?: (taskId: string, memberId: string | null) => void
 }
 
 export function InboxSection({
@@ -26,6 +31,9 @@ export function InboxSection({
   onSearchContacts,
   recentlyCreatedTaskId,
   onTriageCardCollapse,
+  onOpenProject,
+  familyMembers = [],
+  onAssignTask,
 }: InboxSectionProps) {
   // Don't render if no inbox tasks
   if (tasks.length === 0) return null
@@ -73,6 +81,12 @@ export function InboxSection({
             projects={projects}
             contacts={contacts}
             onSearchContacts={onSearchContacts}
+            onOpenProject={onOpenProject}
+            familyMembers={familyMembers}
+            onAssign={onAssignTask
+              ? (memberId) => onAssignTask(task.id, memberId)
+              : undefined
+            }
           />
         ))}
       </div>

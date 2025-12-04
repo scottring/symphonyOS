@@ -1,6 +1,8 @@
 import type { TimelineItem } from '@/types/timeline'
+import type { FamilyMember } from '@/types/family'
 import { formatTime, formatTimeRange } from '@/lib/timeUtils'
 import { PushDropdown } from '@/components/triage'
+import { AssigneeDropdown } from '@/components/family'
 
 interface ScheduleItemProps {
   item: TimelineItem
@@ -10,9 +12,28 @@ interface ScheduleItemProps {
   onPush?: (date: Date) => void
   contactName?: string
   projectName?: string
+  projectId?: string
+  onOpenProject?: (projectId: string) => void
+  // Family member assignment
+  familyMembers?: FamilyMember[]
+  assignedTo?: string | null
+  onAssign?: (memberId: string | null) => void
 }
 
-export function ScheduleItem({ item, selected, onSelect, onToggleComplete, onPush, contactName, projectName }: ScheduleItemProps) {
+export function ScheduleItem({
+  item,
+  selected,
+  onSelect,
+  onToggleComplete,
+  onPush,
+  contactName,
+  projectName,
+  projectId,
+  onOpenProject,
+  familyMembers = [],
+  assignedTo,
+  onAssign,
+}: ScheduleItemProps) {
   const isTask = item.type === 'task'
   const isRoutine = item.type === 'routine'
   const isActionable = isTask || isRoutine
@@ -132,6 +153,21 @@ export function ScheduleItem({ item, selected, onSelect, onToggleComplete, onPus
           {item.title}
         </span>
 
+        {/* Assignee avatar */}
+        {familyMembers.length > 0 && onAssign && (
+          <div
+            className="shrink-0"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <AssigneeDropdown
+              members={familyMembers}
+              selectedId={assignedTo}
+              onSelect={onAssign}
+              size="sm"
+            />
+          </div>
+        )}
+
         {/* Push button - desktop only, on hover */}
         {isTask && onPush && (
           <div
@@ -143,10 +179,23 @@ export function ScheduleItem({ item, selected, onSelect, onToggleComplete, onPus
         )}
       </div>
 
-      {/* Chips row - desktop only */}
+      {/* Chips row - desktop only, aligned with title */}
       {hasChips && (
-        <div className="hidden md:flex items-center gap-2 mt-1.5 ml-[4.25rem]">
-          {projectName && (
+        <div className="hidden md:flex items-center gap-2 mt-1.5 ml-[5.75rem]">
+          {projectName && projectId && onOpenProject ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onOpenProject(projectId)
+              }}
+              className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs font-medium border border-blue-100 max-w-[140px] hover:bg-blue-100 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+              </svg>
+              <span className="truncate">{projectName}</span>
+            </button>
+          ) : projectName && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs font-medium border border-blue-100 max-w-[140px]">
               <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />

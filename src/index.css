@@ -223,12 +223,9 @@ body {
   }
 }
 
-/* PWA standalone mode - stretch to edges */
+/* PWA standalone mode - handled by individual components, not body */
 @media (display-mode: standalone) {
-  body {
-    /* Ensure content respects notch/home indicator */
-    padding-top: env(safe-area-inset-top);
-  }
+  /* Safe areas handled by AppShell header/nav, not body padding */
 }
 
 * {

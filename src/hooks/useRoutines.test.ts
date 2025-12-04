@@ -42,6 +42,7 @@ function createMockRoutine(overrides: Partial<Routine> = {}): Routine {
     name: 'Morning Routine',
     description: null,
     default_assignee: null,
+    assigned_to: null,
     recurrence_pattern: { type: 'daily' },
     time_of_day: '08:00',
     raw_input: null,

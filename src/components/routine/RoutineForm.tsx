@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import type { Routine, RecurrencePattern } from '@/types/actionable'
 import type { UpdateRoutineInput } from '@/hooks/useRoutines'
 import type { Contact } from '@/types/contact'
@@ -44,16 +44,6 @@ export function RoutineForm({ routine, contacts = [], onBack, onUpdate, onDelete
   // Parse NL input for live preview
   const parsed = isNLRoutine ? parseRoutine(nlInput, contacts) : null
   const nlIsValid = parsed ? isValidParsedRoutine(parsed) : false
-
-  // Reset form when routine changes
-  useEffect(() => {
-    setNlInput(routine.raw_input || '')
-    setName(routine.name)
-    setDescription(routine.description || '')
-    setRecurrenceType(routine.recurrence_pattern.type)
-    setSelectedDays(routine.recurrence_pattern.days || [])
-    setTimeOfDay(routine.time_of_day || '')
-  }, [routine])
 
   const hasChanges = () => {
     if (isNLRoutine) {

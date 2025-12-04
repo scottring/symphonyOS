@@ -216,7 +216,7 @@ export function parseRoutine(input: string, contacts: Contact[] = []): ParsedRou
   // Sort ranges by start position
   extractedRanges.sort((a, b) => a.start - b.start)
 
-  let actionParts: string[] = []
+  const actionParts: string[] = []
   let lastEnd = 0
 
   for (const range of extractedRanges) {

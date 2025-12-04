@@ -69,14 +69,15 @@ export function QuickCapture({
       {showFab && (
         <button
           onClick={handleOpen}
-          className="fixed bottom-20 right-4 safe-bottom w-14 h-14 bg-primary-500 text-white rounded-full shadow-lg
+          className="fixed right-5 w-14 h-14 bg-primary-500 text-white rounded-full shadow-lg shadow-primary-500/30
                      flex items-center justify-center
                      hover:bg-primary-600 active:bg-primary-700 active:scale-95
                      transition-all z-50"
+          style={{ bottom: 'calc(5.5rem + env(safe-area-inset-bottom, 0px))' }}
           aria-label="Quick add task"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M11 13H5v-2h6V5h2v6h6v2h-6v6h-2v-6z" />
           </svg>
         </button>
       )}

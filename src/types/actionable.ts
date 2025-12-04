@@ -24,6 +24,7 @@ export interface ActionableInstance {
   date: string // ISO date string (YYYY-MM-DD)
   status: ActionableStatus
   assignee: string | null
+  assigned_to_override: string | null // Family member override for this instance
   deferred_to: string | null // ISO timestamp
   completed_at: string | null
   skipped_at: string | null
@@ -55,6 +56,7 @@ export interface Routine {
   name: string
   description: string | null
   default_assignee: string | null
+  assigned_to: string | null // Family member assignment
   visibility: RoutineVisibility
   recurrence_pattern: RecurrencePattern
   time_of_day: string | null // HH:MM:SS format

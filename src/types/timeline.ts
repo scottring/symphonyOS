@@ -17,6 +17,7 @@ export interface TimelineItem {
   phoneNumber?: string
   contactId?: string // Linked contact
   projectId?: string // Linked project
+  assignedTo?: string | null // Family member assignment
   // Event-specific
   location?: string
   allDay?: boolean
@@ -44,6 +45,7 @@ export function taskToTimelineItem(task: Task): TimelineItem {
     phoneNumber: task.phoneNumber,
     contactId: task.contactId,
     projectId: task.projectId,
+    assignedTo: task.assignedTo,
     allDay: task.isAllDay,
     originalTask: task,
   }
