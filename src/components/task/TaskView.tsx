@@ -1,14 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
-import type { Task, TaskContext, TaskLink } from '@/types/task'
+import type { Task, TaskLink } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
 import { PushDropdown } from '@/components/triage'
-
-const CONTEXTS: { value: TaskContext; label: string; color: string }[] = [
-  { value: 'work', label: 'Work', color: 'bg-blue-500' },
-  { value: 'family', label: 'Family', color: 'bg-amber-500' },
-  { value: 'personal', label: 'Personal', color: 'bg-purple-500' },
-]
 
 interface TaskViewProps {
   task: Task
@@ -538,26 +532,6 @@ export function TaskView({
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Context Section */}
-          <div className="bg-white rounded-xl border border-neutral-100 p-4">
-            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">Context</h2>
-            <div className="flex items-center gap-2">
-              {CONTEXTS.map(({ value, label, color }) => (
-                <button
-                  key={value}
-                  onClick={() => onUpdate(task.id, { context: task.context === value ? undefined : value })}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    task.context === value
-                      ? `${color} text-white`
-                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* Contact Section */}

@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
-import { WhenPicker, ContextPicker, AssignPicker, PushDropdown } from '@/components/triage'
+import { WhenPicker, AssignPicker, PushDropdown } from '@/components/triage'
 
 interface WeeklyReviewProps {
   tasks: Task[]
@@ -136,12 +136,6 @@ export function WeeklyReview({
                       </span>
                       <span title="Push">
                         <PushDropdown onPush={(date) => onPushTask(task.id, date)} />
-                      </span>
-                      <span title="Context">
-                        <ContextPicker
-                          value={task.context}
-                          onChange={(context) => onUpdateTask(task.id, { context })}
-                        />
                       </span>
                       <span title="Assign">
                         <AssignPicker

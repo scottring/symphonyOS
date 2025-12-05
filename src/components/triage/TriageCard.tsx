@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
-import { WhenPicker, ContextPicker, AssignPicker, PushDropdown } from '@/components/triage'
+import { WhenPicker, AssignPicker, PushDropdown } from '@/components/triage'
 
 interface TriageCardProps {
   task: Task
@@ -99,12 +99,6 @@ export function TriageCard({
               // Collapse after pushing
               setTimeout(onCollapse, 200)
             }}
-          />
-        </span>
-        <span title="Context">
-          <ContextPicker
-            value={task.context}
-            onChange={(context) => onUpdate({ context })}
           />
         </span>
         <span title="Assign">

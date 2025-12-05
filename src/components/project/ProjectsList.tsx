@@ -97,30 +97,23 @@ export function ProjectsList({ projects, onSelectProject, onAddProject }: Projec
 
         {/* Inline project creation form */}
         {isCreating && (
-          <div className="mb-4 p-4 rounded-xl bg-white border border-blue-200 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-                </svg>
-              </div>
-              <input
-                ref={inputRef}
-                type="text"
-                value={newProjectName}
-                onChange={(e) => setNewProjectName(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Project name..."
-                className="flex-1 px-3 py-2 rounded-lg border border-neutral-200 bg-neutral-50
-                           text-neutral-800 placeholder:text-neutral-400
-                           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            <div className="flex justify-end gap-2 mt-3">
+          <div className="mb-6 p-6 rounded-xl bg-white border border-blue-200 shadow-sm space-y-4">
+            <input
+              ref={inputRef}
+              type="text"
+              value={newProjectName}
+              onChange={(e) => setNewProjectName(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="What's the project?"
+              className="w-full px-4 py-3 rounded-xl border border-neutral-200 bg-neutral-50
+                         text-neutral-800 placeholder:text-neutral-400 text-2xl font-display
+                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <div className="flex justify-end gap-3">
               <button
                 type="button"
                 onClick={handleCancel}
-                className="px-3 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
               >
                 Cancel
               </button>
@@ -128,9 +121,9 @@ export function ProjectsList({ projects, onSelectProject, onAddProject }: Projec
                 type="button"
                 onClick={handleCreateProject}
                 disabled={!newProjectName.trim() || isSaving}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSaving ? 'Creating...' : 'Create'}
+                {isSaving ? 'Creating...' : 'Create Project'}
               </button>
             </div>
           </div>

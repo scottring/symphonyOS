@@ -2,7 +2,7 @@ import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
-import { WhenPicker, ContextPicker, AssignPicker, PushDropdown } from '@/components/triage'
+import { WhenPicker, AssignPicker, PushDropdown } from '@/components/triage'
 import { AssigneeDropdown } from '@/components/family'
 
 interface InboxTaskCardProps {
@@ -82,10 +82,6 @@ export function InboxTaskCard({
             onChange={(date, isAllDay) => onUpdate({ scheduledFor: date, isAllDay, deferredUntil: undefined })}
           />
           <PushDropdown onPush={onPush} />
-          <ContextPicker
-            value={task.context}
-            onChange={(context) => onUpdate({ context })}
-          />
           <AssignPicker
             value={task.contactId}
             contacts={contacts}
