@@ -613,6 +613,7 @@ function App() {
             key={selectedRoutine.id}
             routine={selectedRoutine}
             contacts={contacts}
+            familyMembers={familyMembers}
             onBack={() => setSelectedRoutineId(null)}
             onUpdate={updateRoutine}
             onDelete={deleteRoutine}

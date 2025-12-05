@@ -2,12 +2,15 @@ import { useState } from 'react'
 import type { Routine, RecurrencePattern } from '@/types/actionable'
 import type { UpdateRoutineInput } from '@/hooks/useRoutines'
 import type { Contact } from '@/types/contact'
+import type { FamilyMember } from '@/types/family'
+import { FAMILY_COLORS, type FamilyMemberColor } from '@/types/family'
 import { parseRoutine, parsedRoutineToDb, isValidParsedRoutine } from '@/lib/parseRoutine'
 import { SemanticRoutine } from './SemanticRoutine'
 
 interface RoutineFormProps {
   routine: Routine
   contacts?: Contact[]
+  familyMembers?: FamilyMember[]
   onBack: () => void
   onUpdate: (id: string, input: UpdateRoutineInput) => Promise<boolean>
   onDelete: (id: string) => Promise<boolean>
@@ -24,7 +27,7 @@ const DAYS = [
   { key: 'sat', label: 'Sat' },
 ]
 
-export function RoutineForm({ routine, contacts = [], onBack, onUpdate, onDelete, onToggleVisibility }: RoutineFormProps) {
+export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack, onUpdate, onDelete, onToggleVisibility }: RoutineFormProps) {
   // Determine if this is a NL routine
   const isNLRoutine = !!routine.raw_input
 
@@ -307,6 +310,74 @@ export function RoutineForm({ routine, contacts = [], onBack, onUpdate, onDelete
               </div>
             </label>
           </div>
+
+          {/* Assignment */}
+          {familyMembers.length > 0 && (
+            <div className="pt-4 border-t border-neutral-100">
+              <label className="block text-sm font-medium text-neutral-700 mb-3">
+                Assigned to
+              </label>
+              <div className="flex items-center gap-2">
+                {/* Unassigned option */}
+                <button
+                  type="button"
+                  onClick={() => onUpdate(routine.id, { assigned_to: null })}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                    !routine.assigned_to
+                      ? 'ring-2 ring-offset-2 ring-amber-500 bg-neutral-100 text-neutral-500'
+                      : 'bg-neutral-50 text-neutral-300 hover:bg-neutral-100'
+                  }`}
+                  title="Unassigned"
+                  aria-label="Unassigned"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    className="w-5 h-5"
+                  >
+                    <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clipRule="evenodd" />
+                  </svg>
+                </button>
+
+                {/* Family member avatars */}
+                {familyMembers.map((member) => {
+                  const isSelected = routine.assigned_to === member.id
+                  const colors = FAMILY_COLORS[member.color as FamilyMemberColor] || FAMILY_COLORS.blue
+
+                  return (
+                    <button
+                      key={member.id}
+                      type="button"
+                      onClick={() => onUpdate(routine.id, { assigned_to: member.id })}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all ${
+                        colors.bg
+                      } ${colors.text} ${
+                        isSelected
+                          ? `ring-2 ring-offset-2 ring-amber-500`
+                          : 'hover:ring-2 hover:ring-offset-1 ' + colors.ring
+                      }`}
+                      title={member.name}
+                      aria-label={`Assign to ${member.name}`}
+                    >
+                      {member.avatar_url ? (
+                        <img
+                          src={member.avatar_url}
+                          alt={member.name}
+                          className="w-full h-full rounded-full object-cover"
+                        />
+                      ) : (
+                        member.initials
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-xs text-neutral-500 mt-2">
+                Who is responsible for this routine by default
+              </p>
+            </div>
+          )}
 
           {/* Save button */}
           {hasChanges() && (

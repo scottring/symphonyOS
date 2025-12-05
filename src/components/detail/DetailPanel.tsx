@@ -350,9 +350,10 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
     if (success) {
       const instance = await actionable.getInstance('calendar_event', entityId, getEventDate())
       setActionableInstance(instance)
+      onActionComplete?.() // Refresh timeline to show completed state
     }
     return success
-  }, [actionable, getEventEntityId, getEventDate])
+  }, [actionable, getEventEntityId, getEventDate, onActionComplete])
 
   const handleEventUndoDone = useCallback(async () => {
     const entityId = getEventEntityId()
@@ -360,9 +361,10 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
     const success = await actionable.undoDone('calendar_event', entityId, getEventDate())
     if (success) {
       setActionableInstance(null)
+      onActionComplete?.() // Refresh timeline to show uncompleted state
     }
     return success
-  }, [actionable, getEventEntityId, getEventDate])
+  }, [actionable, getEventEntityId, getEventDate, onActionComplete])
 
   const handleEventSkip = useCallback(async () => {
     const entityId = getEventEntityId()
@@ -410,9 +412,10 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
     if (success) {
       const instance = await actionable.getInstance('routine', entityId, getRoutineDate())
       setActionableInstance(instance)
+      onActionComplete?.() // Refresh timeline to show completed state
     }
     return success
-  }, [actionable, getRoutineEntityId, getRoutineDate])
+  }, [actionable, getRoutineEntityId, getRoutineDate, onActionComplete])
 
   const handleRoutineUndoDone = useCallback(async () => {
     const entityId = getRoutineEntityId()
@@ -420,9 +423,10 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
     const success = await actionable.undoDone('routine', entityId, getRoutineDate())
     if (success) {
       setActionableInstance(null)
+      onActionComplete?.() // Refresh timeline to show uncompleted state
     }
     return success
-  }, [actionable, getRoutineEntityId, getRoutineDate])
+  }, [actionable, getRoutineEntityId, getRoutineDate, onActionComplete])
 
   const handleRoutineSkip = useCallback(async () => {
     const entityId = getRoutineEntityId()
