@@ -5,6 +5,11 @@ export const ProjectsList = lazy(() =>
   import('./project/ProjectsList').then(m => ({ default: m.ProjectsList }))
 )
 export const ProjectView = lazy(() =>
+  import('./project/ProjectViewRedesign').then(m => ({ default: m.ProjectViewRedesign }))
+)
+
+// Original ProjectView (for rollback)
+export const ProjectViewOriginal = lazy(() =>
   import('./project/ProjectView').then(m => ({ default: m.ProjectView }))
 )
 
@@ -19,13 +24,23 @@ export const RoutineInput = lazy(() =>
   import('./routine/RoutineInput').then(m => ({ default: m.RoutineInput }))
 )
 
-// Task view (desktop)
+// Task view (desktop) - Switch to TaskViewRedesign to test new layout
 export const TaskView = lazy(() =>
+  import('./task/TaskViewRedesign').then(m => ({ default: m.TaskViewRedesign }))
+)
+
+// Original TaskView (for rollback)
+export const TaskViewOriginal = lazy(() =>
   import('./task/TaskView').then(m => ({ default: m.TaskView }))
 )
 
 // Contact view (desktop)
 export const ContactView = lazy(() =>
+  import('./contact/ContactViewRedesign').then(m => ({ default: m.ContactViewRedesign }))
+)
+
+// Original ContactView (for rollback)
+export const ContactViewOriginal = lazy(() =>
   import('./contact/ContactView').then(m => ({ default: m.ContactView }))
 )
 

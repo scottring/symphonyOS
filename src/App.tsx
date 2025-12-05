@@ -13,7 +13,7 @@ import { useSearch, type SearchResult } from '@/hooks/useSearch'
 import { supabase } from '@/lib/supabase'
 import { AppShell } from '@/components/layout/AppShell'
 import { TodaySchedule } from '@/components/schedule/TodaySchedule'
-import { DetailPanel } from '@/components/detail/DetailPanel'
+import { DetailPanelRedesign as DetailPanel } from '@/components/detail/DetailPanelRedesign'
 import { SearchModal } from '@/components/search/SearchModal'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 import {
