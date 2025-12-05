@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">2.66% </span>
+                <span class="strong">18.66% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>2/75</span>
+                <span class='fraction'>14/75</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/0</span>
+                <span class='fraction'>1/1</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">50% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/2</span>
+                <span class='fraction'>1/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">2.66% </span>
+                <span class="strong">18.66% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>2/75</span>
+                <span class='fraction'>14/75</span>
             </div>
         
             
@@ -401,20 +401,20 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// Actionable Items System Types
 &nbsp;
 export type EntityType = 'calendar_event' | 'routine'
@@ -576,21 +576,21 @@ export <span class="fstat-no" title="function not covered" >function getDeferOpt
 <span class="cstat-no" title="statement not covered" >}</span>
 &nbsp;
 // For calendar events without RRULE parsing, use simplified options
-export <span class="fstat-no" title="function not covered" >function getCalendarEventDeferOptions(): DeferOption[] {</span>
-<span class="cstat-no" title="statement not covered" >  const tomorrow = new Date()</span>
-<span class="cstat-no" title="statement not covered" >  tomorrow.setDate(tomorrow.getDate() + 1)</span>
-<span class="cstat-no" title="statement not covered" >  tomorrow.setHours(9, 0, 0, 0)</span>
+export function getCalendarEventDeferOptions(): DeferOption[] {
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  tomorrow.setHours(9, 0, 0, 0)
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  const nextWeek = new Date()</span>
-<span class="cstat-no" title="statement not covered" >  nextWeek.setDate(nextWeek.getDate() + 7)</span>
-<span class="cstat-no" title="statement not covered" >  nextWeek.setHours(9, 0, 0, 0)</span>
+  const nextWeek = new Date()
+  nextWeek.setDate(nextWeek.getDate() + 7)
+  nextWeek.setHours(9, 0, 0, 0)
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  return [</span>
-<span class="cstat-no" title="statement not covered" >    { label: 'Tomorrow', value: 'tomorrow', targetDate: tomorrow },</span>
-<span class="cstat-no" title="statement not covered" >    { label: 'Next week', value: 'next_week', targetDate: nextWeek },</span>
-<span class="cstat-no" title="statement not covered" >    { label: 'Custom...', value: 'custom' },</span>
-<span class="cstat-no" title="statement not covered" >  ]</span>
-<span class="cstat-no" title="statement not covered" >}</span>
+  return [
+    { label: 'Tomorrow', value: 'tomorrow', targetDate: tomorrow },
+    { label: 'Next week', value: 'next_week', targetDate: nextWeek },
+    { label: 'Custom...', value: 'custom' },
+  ]
+}
 &nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
@@ -598,7 +598,7 @@ export <span class="fstat-no" title="function not covered" >function getCalendar
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-12-05T14:21:18.963Z
+                at 2025-12-05T15:31:11.136Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

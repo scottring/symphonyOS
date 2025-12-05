@@ -943,9 +943,12 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
           {/* Contact Section */}
           {isTask && (
             <div>
-              <button
+              <div
+                role="button"
+                tabIndex={0}
                 onClick={() => contact ? toggleSection('contact') : setShowContactPicker(true)}
-                className="w-full px-4 py-3 flex items-center gap-3 hover:bg-neutral-50 transition-colors"
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); contact ? toggleSection('contact') : setShowContactPicker(true) } }}
+                className="w-full px-4 py-3 flex items-center gap-3 hover:bg-neutral-50 transition-colors cursor-pointer"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-neutral-400" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
@@ -982,7 +985,7 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 )}
-              </button>
+              </div>
 
               {/* Expanded contact card */}
               {contact && expandedSections.contact && (

@@ -1,8 +1,23 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, waitFor } from '@/test/test-utils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, waitFor, fireEvent } from '@/test/test-utils'
 import { DetailPanel } from './DetailPanel'
 import type { TimelineItem } from '@/types/timeline'
 import type { Project } from '@/types/project'
+import type { Contact } from '@/types/contact'
+
+// Mock useActionableInstances hook
+vi.mock('@/hooks/useActionableInstances', () => ({
+  useActionableInstances: () => ({
+    isLoading: false,
+    getInstance: vi.fn().mockResolvedValue(null),
+    markDone: vi.fn().mockResolvedValue(true),
+    undoDone: vi.fn().mockResolvedValue(true),
+    skip: vi.fn().mockResolvedValue(true),
+    defer: vi.fn().mockResolvedValue(true),
+    requestCoverage: vi.fn().mockResolvedValue(null),
+    addNote: vi.fn().mockResolvedValue(null),
+  }),
+}))
 
 const mockTask: TimelineItem = {
   id: 'task-1',
@@ -11,11 +26,48 @@ const mockTask: TimelineItem = {
   startTime: null,
   endTime: null,
   completed: false,
+  notes: '',
   originalTask: {
     id: '1',
     title: 'Test task',
     completed: false,
     createdAt: new Date(),
+  },
+}
+
+const mockCompletedTask: TimelineItem = {
+  id: 'task-2',
+  type: 'task',
+  title: 'Completed task',
+  startTime: null,
+  endTime: null,
+  completed: true,
+  originalTask: {
+    id: '2',
+    title: 'Completed task',
+    completed: true,
+    createdAt: new Date(),
+  },
+}
+
+const mockEvent: TimelineItem = {
+  id: 'event-1',
+  type: 'event',
+  title: 'Test event',
+  startTime: new Date('2024-01-01T10:00:00Z'),
+  endTime: new Date('2024-01-01T11:00:00Z'),
+  completed: false,
+  location: '123 Main St',
+  googleDescription: 'Event description from calendar',
+  originalEvent: {
+    id: 'google-event-1',
+    google_event_id: 'google-event-1',
+    title: 'Test event',
+    start_time: '2024-01-01T10:00:00Z',
+    end_time: '2024-01-01T11:00:00Z',
+    user_id: 'test-user',
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
   },
 }
 
@@ -29,7 +81,607 @@ const mockProjects: Project[] = [
   },
 ]
 
+const mockContacts: Contact[] = [
+  {
+    id: 'contact-1',
+    name: 'John Doe',
+    phone: '555-123-4567',
+    email: 'john@example.com',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+]
+
 describe('DetailPanel', () => {
+  describe('rendering', () => {
+    it('renders task title', () => {
+      render(
+        <DetailPanel
+          item={mockTask}
+          onClose={vi.fn()}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      expect(screen.getByText('Test task')).toBeInTheDocument()
+    })
+
+    it('renders null when item is null', () => {
+      const { container } = render(
+        <DetailPanel
+          item={null}
+          onClose={vi.fn()}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      expect(container.firstChild).toBeNull()
+    })
+
+    it('renders close button', () => {
+      render(
+        <DetailPanel
+          item={mockTask}
+          onClose={vi.fn()}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      expect(screen.getByLabelText('Close panel')).toBeInTheDocument()
+    })
+
+    it('renders checkbox for tasks', () => {
+      render(
+        <DetailPanel
+          item={mockTask}
+          onClose={vi.fn()}
+          onToggleComplete={vi.fn()}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      expect(screen.getByLabelText('Mark complete')).toBeInTheDocument()
+    })
+
+    it('renders unscheduled time display for task without time', () => {
+      render(
+        <DetailPanel
+          item={mockTask}
+          onClose={vi.fn()}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      expect(screen.getByText('Unscheduled')).toBeInTheDocument()
+    })
+
+    it('renders strikethrough for completed tasks', () => {
+      render(
+        <DetailPanel
+          item={mockCompletedTask}
+          onClose={vi.fn()}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      const title = screen.getByText('Completed task')
+      expect(title).toHaveClass('line-through')
+    })
+  })
+
+  describe('close button', () => {
+    it('calls onClose when clicked', () => {
+      const onClose = vi.fn()
+      render(
+        <DetailPanel
+          item={mockTask}
+          onClose={onClose}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      fireEvent.click(screen.getByLabelText('Close panel'))
+
+      expect(onClose).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('task completion', () => {
+    it('calls onToggleComplete when checkbox clicked', () => {
+      const onToggleComplete = vi.fn()
+      render(
+        <DetailPanel
+          item={mockTask}
+          onClose={vi.fn()}
+          onToggleComplete={onToggleComplete}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      fireEvent.click(screen.getByLabelText('Mark complete'))
+
+      expect(onToggleComplete).toHaveBeenCalledWith('1')
+    })
+
+    it('shows Mark incomplete label for completed tasks', () => {
+      render(
+        <DetailPanel
+          item={mockCompletedTask}
+          onClose={vi.fn()}
+          onToggleComplete={vi.fn()}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      expect(screen.getByLabelText('Mark incomplete')).toBeInTheDocument()
+    })
+  })
+
+  describe('title editing', () => {
+    it('shows input when clicking title', () => {
+      render(
+        <DetailPanel
+          item={mockTask}
+          onClose={vi.fn()}
+          onUpdate={vi.fn()}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      fireEvent.click(screen.getByText('Test task'))
+
+      expect(screen.getByDisplayValue('Test task')).toBeInTheDocument()
+    })
+
+    it('saves title on blur with changed value', () => {
+      const onUpdate = vi.fn()
+      render(
+        <DetailPanel
+          item={mockTask}
+          onClose={vi.fn()}
+          onUpdate={onUpdate}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      fireEvent.click(screen.getByText('Test task'))
+      const input = screen.getByDisplayValue('Test task')
+      fireEvent.change(input, { target: { value: 'New title' } })
+      fireEvent.blur(input)
+
+      expect(onUpdate).toHaveBeenCalledWith('1', { title: 'New title' })
+    })
+
+    it('saves title on Enter key', () => {
+      const onUpdate = vi.fn()
+      render(
+        <DetailPanel
+          item={mockTask}
+          onClose={vi.fn()}
+          onUpdate={onUpdate}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      fireEvent.click(screen.getByText('Test task'))
+      const input = screen.getByDisplayValue('Test task')
+      fireEvent.change(input, { target: { value: 'New title' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      expect(onUpdate).toHaveBeenCalledWith('1', { title: 'New title' })
+    })
+
+    it('cancels edit on Escape key', () => {
+      const onUpdate = vi.fn()
+      render(
+        <DetailPanel
+          item={mockTask}
+          onClose={vi.fn()}
+          onUpdate={onUpdate}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      fireEvent.click(screen.getByText('Test task'))
+      const input = screen.getByDisplayValue('Test task')
+      fireEvent.change(input, { target: { value: 'New title' } })
+      fireEvent.keyDown(input, { key: 'Escape' })
+
+      expect(onUpdate).not.toHaveBeenCalled()
+      expect(screen.getByText('Test task')).toBeInTheDocument()
+    })
+
+    it('does not update when title unchanged', () => {
+      const onUpdate = vi.fn()
+      render(
+        <DetailPanel
+          item={mockTask}
+          onClose={vi.fn()}
+          onUpdate={onUpdate}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      fireEvent.click(screen.getByText('Test task'))
+      const input = screen.getByDisplayValue('Test task')
+      fireEvent.blur(input)
+
+      expect(onUpdate).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('notes editing', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.runOnlyPendingTimers()
+      vi.useRealTimers()
+    })
+
+    it('shows notes placeholder when empty', () => {
+      render(
+        <DetailPanel
+          item={mockTask}
+          onClose={vi.fn()}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      expect(screen.getByText('Add notes...')).toBeInTheDocument()
+    })
+
+    it('shows textarea when clicking notes area', () => {
+      render(
+        <DetailPanel
+          item={mockTask}
+          onClose={vi.fn()}
+          onUpdate={vi.fn()}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      fireEvent.click(screen.getByText('Add notes...'))
+
+      expect(screen.getByPlaceholderText('Add notes...')).toBeInTheDocument()
+    })
+
+    it('updates notes with debounce', () => {
+      const onUpdate = vi.fn()
+      render(
+        <DetailPanel
+          item={mockTask}
+          onClose={vi.fn()}
+          onUpdate={onUpdate}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      fireEvent.click(screen.getByText('Add notes...'))
+      const textarea = screen.getByPlaceholderText('Add notes...')
+      fireEvent.change(textarea, { target: { value: 'New notes' } })
+
+      // Not called yet
+      expect(onUpdate).not.toHaveBeenCalled()
+
+      // After debounce
+      vi.advanceTimersByTime(500)
+
+      expect(onUpdate).toHaveBeenCalledWith('1', { notes: 'New notes' })
+    })
+  })
+
+  describe('delete functionality', () => {
+    it('shows delete button for tasks', () => {
+      render(
+        <DetailPanel
+          item={mockTask}
+          onClose={vi.fn()}
+          onDelete={vi.fn()}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      expect(screen.getByText('Delete task')).toBeInTheDocument()
+    })
+
+    it('shows confirmation when delete clicked', () => {
+      render(
+        <DetailPanel
+          item={mockTask}
+          onClose={vi.fn()}
+          onDelete={vi.fn()}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      fireEvent.click(screen.getByText('Delete task'))
+
+      expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+    })
+
+    it('cancels delete when Cancel clicked', () => {
+      render(
+        <DetailPanel
+          item={mockTask}
+          onClose={vi.fn()}
+          onDelete={vi.fn()}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      fireEvent.click(screen.getByText('Delete task'))
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+      expect(screen.getByText('Delete task')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+    })
+
+    it('calls onDelete and onClose when delete confirmed', () => {
+      const onDelete = vi.fn()
+      const onClose = vi.fn()
+      render(
+        <DetailPanel
+          item={mockTask}
+          onClose={onClose}
+          onDelete={onDelete}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      fireEvent.click(screen.getByText('Delete task'))
+      fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+
+      expect(onDelete).toHaveBeenCalledWith('1')
+      expect(onClose).toHaveBeenCalled()
+    })
+  })
+
+  describe('contact section', () => {
+    it('shows Add contact button when no contact', () => {
+      render(
+        <DetailPanel
+          item={mockTask}
+          onClose={vi.fn()}
+          contacts={mockContacts}
+          onSearchContacts={() => mockContacts}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      expect(screen.getByText('Add contact')).toBeInTheDocument()
+    })
+
+    it('opens contact picker when Add contact clicked', () => {
+      render(
+        <DetailPanel
+          item={mockTask}
+          onClose={vi.fn()}
+          contacts={mockContacts}
+          onSearchContacts={() => mockContacts}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      fireEvent.click(screen.getByText('Add contact'))
+
+      expect(screen.getByPlaceholderText('Search contacts...')).toBeInTheDocument()
+    })
+
+    it('links contact when selected from picker', () => {
+      const onUpdate = vi.fn()
+      render(
+        <DetailPanel
+          item={mockTask}
+          onClose={vi.fn()}
+          onUpdate={onUpdate}
+          contacts={mockContacts}
+          onSearchContacts={() => mockContacts}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      fireEvent.click(screen.getByText('Add contact'))
+      fireEvent.click(screen.getByText('John Doe'))
+
+      expect(onUpdate).toHaveBeenCalledWith('1', { contactId: 'contact-1' })
+    })
+
+    it('shows contact name when linked', () => {
+      render(
+        <DetailPanel
+          item={mockTask}
+          onClose={vi.fn()}
+          contact={mockContacts[0]}
+          contacts={mockContacts}
+          onSearchContacts={() => mockContacts}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      expect(screen.getByText('John Doe')).toBeInTheDocument()
+    })
+  })
+
+  describe('links section', () => {
+    it('shows Add links when no links', () => {
+      render(
+        <DetailPanel
+          item={mockTask}
+          onClose={vi.fn()}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      expect(screen.getByText('Add links')).toBeInTheDocument()
+    })
+
+    it('expands links section when clicked', () => {
+      render(
+        <DetailPanel
+          item={mockTask}
+          onClose={vi.fn()}
+          onUpdate={vi.fn()}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      fireEvent.click(screen.getByText('Add links'))
+
+      expect(screen.getByPlaceholderText('URL (e.g., https://example.com)')).toBeInTheDocument()
+    })
+
+    it('adds link when form submitted', () => {
+      const onUpdate = vi.fn()
+      render(
+        <DetailPanel
+          item={mockTask}
+          onClose={vi.fn()}
+          onUpdate={onUpdate}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      fireEvent.click(screen.getByText('Add links'))
+      const urlInput = screen.getByPlaceholderText('URL (e.g., https://example.com)')
+      fireEvent.change(urlInput, { target: { value: 'https://example.com' } })
+      fireEvent.click(screen.getByText('Add'))
+
+      expect(onUpdate).toHaveBeenCalledWith('1', {
+        links: [{ url: 'https://example.com' }]
+      })
+    })
+
+    it('shows link count when links exist', () => {
+      const taskWithLinks: TimelineItem = {
+        ...mockTask,
+        links: [
+          { url: 'https://example.com' },
+          { url: 'https://test.com' },
+        ],
+      }
+      render(
+        <DetailPanel
+          item={taskWithLinks}
+          onClose={vi.fn()}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      expect(screen.getByText('Links (2)')).toBeInTheDocument()
+    })
+  })
+
+  describe('events', () => {
+    it('renders event location', async () => {
+      render(
+        <DetailPanel
+          item={mockEvent}
+          onClose={vi.fn()}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      expect(screen.getByText('123 Main St')).toBeInTheDocument()
+      // Wait for async actionable instance loading to complete
+      await waitFor(() => {})
+    })
+
+    it('renders google calendar description', async () => {
+      render(
+        <DetailPanel
+          item={mockEvent}
+          onClose={vi.fn()}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      expect(screen.getByText('Event description from calendar')).toBeInTheDocument()
+      // Wait for async actionable instance loading to complete
+      await waitFor(() => {})
+    })
+
+    it('shows different notes placeholder for events', async () => {
+      render(
+        <DetailPanel
+          item={mockEvent}
+          onClose={vi.fn()}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      expect(screen.getByText('Add your notes...')).toBeInTheDocument()
+      // Wait for async actionable instance loading to complete
+      await waitFor(() => {})
+    })
+
+    it('does not show delete button for events', async () => {
+      render(
+        <DetailPanel
+          item={mockEvent}
+          onClose={vi.fn()}
+          onDelete={vi.fn()}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      expect(screen.queryByText('Delete task')).not.toBeInTheDocument()
+      // Wait for async actionable instance loading to complete
+      await waitFor(() => {})
+    })
+
+    it('does not show contact section for events', async () => {
+      render(
+        <DetailPanel
+          item={mockEvent}
+          onClose={vi.fn()}
+          contacts={mockContacts}
+          onSearchContacts={() => mockContacts}
+          projects={[]}
+          onSearchProjects={() => []}
+        />
+      )
+
+      expect(screen.queryByText('Add contact')).not.toBeInTheDocument()
+      // Wait for async actionable instance loading to complete
+      await waitFor(() => {})
+    })
+  })
   describe('Project creation flow', () => {
     it('opens project picker when clicking Add project', async () => {
       const { user } = render(
@@ -162,12 +814,13 @@ describe('DetailPanel', () => {
           resolveCreate = resolve
         })
       })
+      const onUpdate = vi.fn()
 
       const { user } = render(
         <DetailPanel
           item={mockTask}
           onClose={vi.fn()}
-          onUpdate={vi.fn()}
+          onUpdate={onUpdate}
           projects={[]}
           onSearchProjects={() => []}
           onAddProject={onAddProject}
@@ -188,13 +841,18 @@ describe('DetailPanel', () => {
       // Input should be disabled
       expect(nameInput).toBeDisabled()
 
-      // Resolve the promise
+      // Resolve the promise and wait for the state update to complete
       resolveCreate!({
         id: 'new-project-1',
         name: 'New Project',
         status: 'not_started',
         createdAt: new Date(),
         updatedAt: new Date(),
+      })
+
+      // Wait for the async operation to complete and state to update
+      await waitFor(() => {
+        expect(onUpdate).toHaveBeenCalledWith('1', { projectId: 'new-project-1' })
       })
     })
 
