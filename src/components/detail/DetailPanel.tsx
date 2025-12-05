@@ -96,6 +96,7 @@ interface DetailPanelProps {
   contacts?: Contact[]
   onSearchContacts?: (query: string) => Contact[]
   onUpdateContact?: (contactId: string, updates: Partial<Contact>) => void
+  onOpenContact?: (contactId: string) => void
   // Project support
   project?: Project | null
   projects?: Project[]
@@ -190,7 +191,7 @@ function ActionButton({ action, onOpenRecipe }: { action: DetectedAction; onOpen
   )
 }
 
-export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplete, onUpdateEventNote, onOpenRecipe, contact, contacts = [], onSearchContacts, onUpdateContact, project, projects = [], onSearchProjects, onUpdateProject, onOpenProject, onAddProject, onActionComplete }: DetailPanelProps) {
+export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplete, onUpdateEventNote, onOpenRecipe, contact, contacts = [], onSearchContacts, onUpdateContact, onOpenContact, project, projects = [], onSearchProjects, onUpdateProject, onOpenProject, onAddProject, onActionComplete }: DetailPanelProps) {
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [editedTitle, setEditedTitle] = useState(item?.title || '')
@@ -990,6 +991,7 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
                     contact={contact}
                     onUnlink={handleUnlinkContact}
                     onUpdate={onUpdateContact}
+                    onOpenContact={onOpenContact}
                   />
                 </div>
               )}

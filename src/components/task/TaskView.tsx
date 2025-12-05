@@ -17,6 +17,7 @@ interface TaskViewProps {
   onSearchContacts?: (query: string) => Contact[]
   onUpdateContact?: (id: string, updates: Partial<Contact>) => Promise<void>
   onAddContact?: (contact: { name: string; phone?: string; email?: string }) => Promise<Contact | null>
+  onOpenContact?: (contactId: string) => void
   // Project support
   project?: Project | null
   projects?: Project[]
@@ -36,6 +37,7 @@ export function TaskView({
   contacts = [],
   onSearchContacts,
   onAddContact,
+  onOpenContact,
   project,
   projects = [],
   onSearchProjects,
@@ -571,15 +573,23 @@ export function TaskView({
 
             {contact ? (
               <div className="flex items-center gap-3 p-3 rounded-lg bg-neutral-50">
-                <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600">
+                <button
+                  onClick={() => onOpenContact?.(contact.id)}
+                  className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 hover:bg-primary-200 transition-colors"
+                  disabled={!onOpenContact}
+                >
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                   </svg>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-neutral-800">{contact.name}</div>
+                </button>
+                <button
+                  onClick={() => onOpenContact?.(contact.id)}
+                  className="flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
+                  disabled={!onOpenContact}
+                >
+                  <div className={`font-medium ${onOpenContact ? 'text-primary-600 hover:underline' : 'text-neutral-800'}`}>{contact.name}</div>
                   {phoneNumber && <div className="text-sm text-neutral-500">{phoneNumber}</div>}
-                </div>
+                </button>
                 {phoneNumber && (
                   <div className="flex gap-1">
                     <button

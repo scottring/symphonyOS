@@ -5,9 +5,10 @@ interface ContactCardProps {
   contact: Contact
   onUnlink?: () => void
   onUpdate?: (contactId: string, updates: Partial<Contact>) => void
+  onOpenContact?: (contactId: string) => void
 }
 
-export function ContactCard({ contact, onUnlink, onUpdate }: ContactCardProps) {
+export function ContactCard({ contact, onUnlink, onUpdate, onOpenContact }: ContactCardProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState('')
   const [editPhone, setEditPhone] = useState('')
@@ -110,20 +111,28 @@ export function ContactCard({ contact, onUnlink, onUpdate }: ContactCardProps) {
   return (
     <div className="bg-primary-50 rounded-xl p-4 border border-primary-100">
       <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-full bg-primary-200 flex items-center justify-center text-primary-700 flex-shrink-0">
+        <button
+          onClick={() => onOpenContact?.(contact.id)}
+          className="w-10 h-10 rounded-full bg-primary-200 flex items-center justify-center text-primary-700 flex-shrink-0 hover:bg-primary-300 transition-colors"
+          disabled={!onOpenContact}
+        >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
           </svg>
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="font-medium text-neutral-800">{contact.name}</div>
+        </button>
+        <button
+          onClick={() => onOpenContact?.(contact.id)}
+          className="flex-1 min-w-0 text-left"
+          disabled={!onOpenContact}
+        >
+          <div className={`font-medium ${onOpenContact ? 'text-primary-600 hover:underline' : 'text-neutral-800'}`}>{contact.name}</div>
           {contact.phone && (
             <div className="text-sm text-neutral-600">{contact.phone}</div>
           )}
           {contact.email && (
             <div className="text-sm text-neutral-500">{contact.email}</div>
           )}
-        </div>
+        </button>
         <div className="flex items-center gap-1">
           {onUpdate && (
             <button

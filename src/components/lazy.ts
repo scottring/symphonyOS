@@ -24,6 +24,11 @@ export const TaskView = lazy(() =>
   import('./task/TaskView').then(m => ({ default: m.TaskView }))
 )
 
+// Contact view (desktop)
+export const ContactView = lazy(() =>
+  import('./contact/ContactView').then(m => ({ default: m.ContactView }))
+)
+
 // Recipe viewer
 export const RecipeViewer = lazy(() =>
   import('./recipe/RecipeViewer').then(m => ({ default: m.RecipeViewer }))

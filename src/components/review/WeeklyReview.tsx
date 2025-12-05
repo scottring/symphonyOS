@@ -57,7 +57,7 @@ export function WeeklyReview({
     <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4">
       <div
         ref={modalRef}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-visible"
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-neutral-100">
@@ -73,7 +73,7 @@ export function WeeklyReview({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-auto p-4">
+        <div className="flex-1 overflow-visible p-4 pb-6">
           {isEmpty ? (
             <div className="text-center py-12">
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary-100 flex items-center justify-center">

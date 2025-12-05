@@ -21,6 +21,7 @@ import {
   RoutineForm,
   RoutineInput,
   TaskView,
+  ContactView,
   RecipeViewer,
   AuthForm,
   CalendarConnect,
@@ -39,7 +40,7 @@ function App() {
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null)
   const [onboardingLoading, setOnboardingLoading] = useState(true)
   const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, getNote, notes: eventNotesMap } = useEventNotes()
-  const { contacts, contactsMap, addContact, updateContact, searchContacts } = useContacts()
+  const { contacts, contactsMap, addContact, updateContact, deleteContact, searchContacts } = useContacts()
   const { projects, projectsMap, addProject, updateProject, deleteProject, searchProjects } = useProjects()
   const {
     routines: allRoutines,
@@ -71,6 +72,7 @@ function App() {
   const [activeView, setActiveView] = useState<ViewType>('home')
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [selectedRoutineId, setSelectedRoutineId] = useState<string | null>(null)
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null)
   const [creatingRoutine, setCreatingRoutine] = useState(false)
   const [recentlyCreatedTaskId, setRecentlyCreatedTaskId] = useState<string | null>(null)
 
@@ -294,6 +296,7 @@ function App() {
     setSelectedTaskId(null)
     setSelectedProjectId(null)
     setSelectedRoutineId(null)
+    setSelectedContactId(null)
     setCreatingRoutine(false)
     setRecipeUrl(null)
   }, [])
@@ -304,8 +307,25 @@ function App() {
     setActiveView('projects')
     setSelectedItemId(null)
     setSelectedTaskId(null)
+    setSelectedContactId(null)
     setRecipeUrl(null)
   }, [])
+
+  // Handle opening a contact (from TaskView, DetailPanel, etc.)
+  const handleOpenContact = useCallback((contactId: string) => {
+    setSelectedContactId(contactId)
+    setActiveView('contact-detail')
+    setSelectedItemId(null)
+    setSelectedTaskId(null)
+    setSelectedProjectId(null)
+    setRecipeUrl(null)
+  }, [])
+
+  // Get contact for contact view
+  const selectedContactForView = useMemo(() => {
+    if (!selectedContactId) return null
+    return contactsMap.get(selectedContactId) ?? null
+  }, [selectedContactId, contactsMap])
 
   // Handle selecting an item - routes tasks differently on desktop vs mobile
   const handleSelectItem = useCallback((itemId: string | null) => {
@@ -426,6 +446,7 @@ function App() {
             contacts={contacts}
             onSearchContacts={searchContacts}
             onUpdateContact={updateContact}
+            onOpenContact={handleOpenContact}
             project={selectedItemProject}
             projects={projects}
             onSearchProjects={searchProjects}
@@ -532,11 +553,36 @@ function App() {
             contacts={contacts}
             onSearchContacts={searchContacts}
             onAddContact={addContact}
+            onOpenContact={handleOpenContact}
             project={selectedTaskProject}
             projects={projects}
             onSearchProjects={searchProjects}
             onOpenProject={handleOpenProject}
             onAddProject={addProject}
+          />
+        </Suspense>
+      )}
+
+      {activeView === 'contact-detail' && selectedContactForView && (
+        <Suspense fallback={<LoadingFallback />}>
+          <ContactView
+            contact={selectedContactForView}
+            onBack={() => {
+              setSelectedContactId(null)
+              setActiveView('home')
+            }}
+            onUpdate={updateContact}
+            onDelete={async (id) => {
+              await deleteContact(id)
+              setSelectedContactId(null)
+              setActiveView('home')
+            }}
+            tasks={tasks}
+            onSelectTask={(taskId) => {
+              setSelectedTaskId(taskId)
+              setActiveView('task-detail')
+              setSelectedContactId(null)
+            }}
           />
         </Suspense>
       )}

@@ -1,6 +1,6 @@
 import symphonyLogo from '@/assets/symphony-logo.jpg'
 
-export type ViewType = 'home' | 'projects' | 'routines' | 'task-detail'
+export type ViewType = 'home' | 'projects' | 'routines' | 'task-detail' | 'contact-detail'
 
 interface SidebarProps {
   collapsed: boolean
