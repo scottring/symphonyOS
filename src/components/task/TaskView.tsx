@@ -16,6 +16,7 @@ interface TaskViewProps {
   contacts?: Contact[]
   onSearchContacts?: (query: string) => Contact[]
   onUpdateContact?: (id: string, updates: Partial<Contact>) => Promise<void>
+  onAddContact?: (contact: { name: string; phone?: string; email?: string }) => Promise<Contact | null>
   // Project support
   project?: Project | null
   projects?: Project[]
@@ -34,6 +35,7 @@ export function TaskView({
   contact,
   contacts = [],
   onSearchContacts,
+  onAddContact,
   project,
   projects = [],
   onSearchProjects,
@@ -57,6 +59,13 @@ export function TaskView({
   // Contact picker state
   const [showContactPicker, setShowContactPicker] = useState(false)
   const [contactSearchQuery, setContactSearchQuery] = useState('')
+
+  // Contact creation state
+  const [isCreatingContact, setIsCreatingContact] = useState(false)
+  const [newContactName, setNewContactName] = useState('')
+  const [newContactPhone, setNewContactPhone] = useState('')
+  const [newContactEmail, setNewContactEmail] = useState('')
+  const [isCreatingContactLoading, setIsCreatingContactLoading] = useState(false)
 
   // Project picker state
   const [showProjectPicker, setShowProjectPicker] = useState(false)
@@ -153,6 +162,28 @@ export function TaskView({
 
   const handleUnlinkContact = () => {
     onUpdate(task.id, { contactId: undefined })
+  }
+
+  const handleCreateAndLinkContact = async () => {
+    if (!onAddContact || !newContactName.trim()) return
+
+    setIsCreatingContactLoading(true)
+    const createdContact = await onAddContact({
+      name: newContactName.trim(),
+      phone: newContactPhone.trim() || undefined,
+      email: newContactEmail.trim() || undefined,
+    })
+    setIsCreatingContactLoading(false)
+
+    if (createdContact) {
+      onUpdate(task.id, { contactId: createdContact.id })
+      setIsCreatingContact(false)
+      setNewContactName('')
+      setNewContactPhone('')
+      setNewContactEmail('')
+      setShowContactPicker(false)
+      setContactSearchQuery('')
+    }
   }
 
   const handleLinkProject = (selectedProject: Project) => {
@@ -580,53 +611,152 @@ export function TaskView({
               </div>
             ) : showContactPicker ? (
               <div className="rounded-xl border border-neutral-200 overflow-hidden">
-                <div className="p-2 border-b border-neutral-100">
-                  <input
-                    type="text"
-                    value={contactSearchQuery}
-                    onChange={(e) => setContactSearchQuery(e.target.value)}
-                    placeholder="Search contacts..."
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50
-                               focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    autoFocus
-                  />
-                </div>
-                <div className="max-h-48 overflow-auto">
-                  {filteredContacts.length > 0 ? (
-                    filteredContacts.map((c) => (
-                      <button
-                        key={c.id}
-                        onClick={() => handleLinkContact(c)}
-                        className="w-full px-4 py-3 text-left flex items-center gap-3 hover:bg-neutral-50 transition-colors"
-                      >
-                        <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center text-neutral-600">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                          </svg>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-neutral-800 truncate">{c.name}</div>
-                          {c.phone && <div className="text-sm text-neutral-500 truncate">{c.phone}</div>}
-                        </div>
-                      </button>
-                    ))
-                  ) : (
-                    <div className="px-4 py-6 text-center text-sm text-neutral-400">
-                      No contacts found
+                {!isCreatingContact ? (
+                  <>
+                    <div className="p-2 border-b border-neutral-100">
+                      <input
+                        type="text"
+                        value={contactSearchQuery}
+                        onChange={(e) => setContactSearchQuery(e.target.value)}
+                        placeholder="Search contacts..."
+                        className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50
+                                   focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        autoFocus
+                      />
                     </div>
-                  )}
-                </div>
-                <div className="p-2 border-t border-neutral-100">
-                  <button
-                    onClick={() => {
-                      setShowContactPicker(false)
-                      setContactSearchQuery('')
-                    }}
-                    className="w-full px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50 rounded-lg transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
+                    <div className="max-h-48 overflow-auto">
+                      {filteredContacts.length > 0 ? (
+                        filteredContacts.map((c) => (
+                          <button
+                            key={c.id}
+                            onClick={() => handleLinkContact(c)}
+                            className="w-full px-4 py-3 text-left flex items-center gap-3 hover:bg-neutral-50 transition-colors"
+                          >
+                            <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center text-neutral-600">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-neutral-800 truncate">{c.name}</div>
+                              {c.phone && <div className="text-sm text-neutral-500 truncate">{c.phone}</div>}
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-4 py-6 text-center text-sm text-neutral-400">
+                          No contacts found
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-2 border-t border-neutral-100 flex gap-2">
+                      <button
+                        onClick={() => {
+                          setShowContactPicker(false)
+                          setContactSearchQuery('')
+                        }}
+                        className="flex-1 px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50 rounded-lg transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      {onAddContact && (
+                        <button
+                          onClick={() => {
+                            setIsCreatingContact(true)
+                            setNewContactName(contactSearchQuery)
+                          }}
+                          className="flex-1 px-3 py-2 text-sm text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors flex items-center justify-center gap-1"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                          </svg>
+                          New
+                        </button>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="p-3">
+                    <div className="text-sm font-medium text-neutral-700 mb-2">Create new contact</div>
+                    <div className="space-y-2 mb-3">
+                      <input
+                        type="text"
+                        value={newContactName}
+                        onChange={(e) => setNewContactName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            setIsCreatingContact(false)
+                            setNewContactName('')
+                            setNewContactPhone('')
+                            setNewContactEmail('')
+                          }
+                        }}
+                        placeholder="Name *"
+                        className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50
+                                   focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        autoFocus
+                        disabled={isCreatingContactLoading}
+                      />
+                      <input
+                        type="tel"
+                        value={newContactPhone}
+                        onChange={(e) => setNewContactPhone(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            setIsCreatingContact(false)
+                            setNewContactName('')
+                            setNewContactPhone('')
+                            setNewContactEmail('')
+                          }
+                        }}
+                        placeholder="Phone (optional)"
+                        className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50
+                                   focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        disabled={isCreatingContactLoading}
+                      />
+                      <input
+                        type="email"
+                        value={newContactEmail}
+                        onChange={(e) => setNewContactEmail(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && newContactName.trim()) {
+                            handleCreateAndLinkContact()
+                          } else if (e.key === 'Escape') {
+                            setIsCreatingContact(false)
+                            setNewContactName('')
+                            setNewContactPhone('')
+                            setNewContactEmail('')
+                          }
+                        }}
+                        placeholder="Email (optional)"
+                        className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50
+                                   focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        disabled={isCreatingContactLoading}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setIsCreatingContact(false)
+                          setNewContactName('')
+                          setNewContactPhone('')
+                          setNewContactEmail('')
+                        }}
+                        className="flex-1 px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50 rounded-lg transition-colors"
+                        disabled={isCreatingContactLoading}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleCreateAndLinkContact}
+                        disabled={!newContactName.trim() || isCreatingContactLoading}
+                        className="flex-1 px-3 py-2 text-sm text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isCreatingContactLoading ? 'Creating...' : 'Create'}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <button

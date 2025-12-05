@@ -35,6 +35,7 @@ interface TodayScheduleProps {
   projects?: Project[]
   contacts?: Contact[]
   onSearchContacts?: (query: string) => Contact[]
+  onAddContact?: (name: string) => Promise<Contact | null>
   eventNotesMap?: Map<string, EventNote>
   onRefreshInstances?: () => void
   recentlyCreatedTaskId?: string | null
@@ -103,6 +104,7 @@ export function TodaySchedule({
   projects = [],
   contacts = [],
   onSearchContacts,
+  onAddContact,
   eventNotesMap,
   recentlyCreatedTaskId,
   onTriageCardCollapse,
@@ -462,6 +464,7 @@ export function TodaySchedule({
               projects={projects}
               contacts={contacts}
               onSearchContacts={onSearchContacts}
+              onAddContact={onAddContact}
               recentlyCreatedTaskId={recentlyCreatedTaskId}
               onTriageCardCollapse={onTriageCardCollapse}
               onOpenProject={onOpenProject}
@@ -479,6 +482,7 @@ export function TodaySchedule({
           projects={projects}
           contacts={contacts}
           onSearchContacts={onSearchContacts ?? (() => [])}
+          onAddContact={onAddContact}
           onUpdateTask={onUpdateTask}
           onPushTask={onPushTask}
           onDeleteTask={onDeleteTask}

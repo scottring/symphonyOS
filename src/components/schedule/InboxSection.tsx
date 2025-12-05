@@ -13,6 +13,7 @@ interface InboxSectionProps {
   projects?: Project[]
   contacts?: Contact[]
   onSearchContacts?: (query: string) => Contact[]
+  onAddContact?: (name: string) => Promise<Contact | null>
   recentlyCreatedTaskId?: string | null
   onTriageCardCollapse?: () => void
   onOpenProject?: (projectId: string) => void
@@ -29,6 +30,7 @@ export function InboxSection({
   projects = [],
   contacts = [],
   onSearchContacts,
+  onAddContact,
   recentlyCreatedTaskId,
   onTriageCardCollapse,
   onOpenProject,
@@ -67,6 +69,7 @@ export function InboxSection({
             projects={projects}
             contacts={contacts}
             onSearchContacts={onSearchContacts}
+            onAddContact={onAddContact}
           />
         )}
 
@@ -81,6 +84,7 @@ export function InboxSection({
             projects={projects}
             contacts={contacts}
             onSearchContacts={onSearchContacts}
+            onAddContact={onAddContact}
             onOpenProject={onOpenProject}
             familyMembers={familyMembers}
             onAssign={onAssignTask

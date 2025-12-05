@@ -13,6 +13,7 @@ interface InboxTaskCardProps {
   projects?: Project[]
   contacts?: Contact[]
   onSearchContacts?: (query: string) => Contact[]
+  onAddContact?: (name: string) => Promise<Contact | null>
   onOpenProject?: (projectId: string) => void
   // Family member assignment
   familyMembers?: FamilyMember[]
@@ -27,6 +28,7 @@ export function InboxTaskCard({
   projects = [],
   contacts = [],
   onSearchContacts,
+  onAddContact,
   onOpenProject,
   familyMembers = [],
   onAssign,
@@ -86,6 +88,7 @@ export function InboxTaskCard({
             value={task.contactId}
             contacts={contacts}
             onSearchContacts={onSearchContacts}
+            onAddContact={onAddContact}
             onChange={(contactId) => onUpdate({ contactId })}
           />
           {/* Family member assignment */}

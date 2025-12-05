@@ -9,6 +9,7 @@ interface WeeklyReviewProps {
   projects: Project[]
   contacts: Contact[]
   onSearchContacts: (query: string) => Contact[]
+  onAddContact?: (name: string) => Promise<Contact | null>
   onUpdateTask: (id: string, updates: Partial<Task>) => void
   onPushTask: (id: string, date: Date) => void
   onDeleteTask: (id: string) => void
@@ -20,6 +21,7 @@ export function WeeklyReview({
   projects,
   contacts,
   onSearchContacts,
+  onAddContact,
   onUpdateTask,
   onPushTask,
   onDeleteTask,
@@ -142,6 +144,7 @@ export function WeeklyReview({
                           value={task.assignedTo}
                           contacts={contacts}
                           onSearchContacts={onSearchContacts}
+                          onAddContact={onAddContact}
                           onChange={(assignedTo) => onUpdateTask(task.id, { assignedTo })}
                         />
                       </span>

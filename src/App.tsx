@@ -39,8 +39,7 @@ function App() {
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null)
   const [onboardingLoading, setOnboardingLoading] = useState(true)
   const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, getNote, notes: eventNotesMap } = useEventNotes()
-  const { contacts, contactsMap, addContact: _addContact, updateContact, searchContacts } = useContacts()
-  void _addContact // Will be used when inline contact creation is re-added
+  const { contacts, contactsMap, addContact, updateContact, searchContacts } = useContacts()
   const { projects, projectsMap, addProject, updateProject, deleteProject, searchProjects } = useProjects()
   const {
     routines: allRoutines,
@@ -469,6 +468,7 @@ function App() {
             projects={projects}
             contacts={contacts}
             onSearchContacts={searchContacts}
+            onAddContact={(name) => addContact({ name })}
             eventNotesMap={eventNotesMap}
             onRefreshInstances={refreshDateInstances}
             recentlyCreatedTaskId={recentlyCreatedTaskId}
@@ -531,6 +531,7 @@ function App() {
             contact={selectedTaskContact}
             contacts={contacts}
             onSearchContacts={searchContacts}
+            onAddContact={addContact}
             project={selectedTaskProject}
             projects={projects}
             onSearchProjects={searchProjects}

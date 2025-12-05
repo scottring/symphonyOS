@@ -12,6 +12,7 @@ interface TriageCardProps {
   projects?: Project[]
   contacts?: Contact[]
   onSearchContacts?: (query: string) => Contact[]
+  onAddContact?: (name: string) => Promise<Contact | null>
   autoCollapseMs?: number
 }
 
@@ -23,6 +24,7 @@ export function TriageCard({
   projects = [],
   contacts = [],
   onSearchContacts,
+  onAddContact,
   autoCollapseMs = 4000,
 }: TriageCardProps) {
   const [isInteracting, setIsInteracting] = useState(false)
@@ -106,6 +108,7 @@ export function TriageCard({
             value={task.assignedTo}
             contacts={contacts}
             onSearchContacts={onSearchContacts}
+            onAddContact={onAddContact}
             onChange={(assignedTo) => onUpdate({ assignedTo })}
           />
         </span>
