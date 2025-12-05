@@ -19,6 +19,7 @@ interface AppShellProps {
   onCloseQuickAdd?: () => void
   activeView: ViewType
   onViewChange: (view: ViewType) => void
+  onOpenSearch?: () => void
 }
 
 export function AppShell({
@@ -36,6 +37,7 @@ export function AppShell({
   onCloseQuickAdd,
   activeView,
   onViewChange,
+  onOpenSearch,
 }: AppShellProps) {
   const isMobile = useMobile()
 
@@ -50,6 +52,7 @@ export function AppShell({
           onSignOut={onSignOut}
           activeView={activeView}
           onViewChange={onViewChange}
+          onOpenSearch={onOpenSearch}
         />
       )}
 
@@ -76,18 +79,31 @@ export function AppShell({
                 />
                 <span className="font-display text-lg font-semibold text-neutral-900">Symphony</span>
               </div>
-              {onSignOut && (
-                <button
-                  onClick={onSignOut}
-                  className="p-2.5 rounded-xl text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-all"
-                  aria-label="Sign out"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V4a1 1 0 00-1-1H3zm11 4a1 1 0 10-2 0v4a1 1 0 102 0V7z" clipRule="evenodd" />
-                    <path d="M7 10a1 1 0 011-1h2a1 1 0 110 2H8a1 1 0 01-1-1z" />
-                  </svg>
-                </button>
-              )}
+              <div className="flex items-center gap-1">
+                {onOpenSearch && (
+                  <button
+                    onClick={onOpenSearch}
+                    className="p-2.5 rounded-xl text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-all"
+                    aria-label="Search"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                )}
+                {onSignOut && (
+                  <button
+                    onClick={onSignOut}
+                    className="p-2.5 rounded-xl text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-all"
+                    aria-label="Sign out"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V4a1 1 0 00-1-1H3zm11 4a1 1 0 10-2 0v4a1 1 0 102 0V7z" clipRule="evenodd" />
+                      <path d="M7 10a1 1 0 011-1h2a1 1 0 110 2H8a1 1 0 01-1-1z" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
           </header>
         )}

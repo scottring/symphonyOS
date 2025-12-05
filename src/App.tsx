@@ -9,10 +9,12 @@ import { useRoutines } from '@/hooks/useRoutines'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useMobile } from '@/hooks/useMobile'
+import { useSearch, type SearchResult } from '@/hooks/useSearch'
 import { supabase } from '@/lib/supabase'
 import { AppShell } from '@/components/layout/AppShell'
 import { TodaySchedule } from '@/components/schedule/TodaySchedule'
 import { DetailPanel } from '@/components/detail/DetailPanel'
+import { SearchModal } from '@/components/search/SearchModal'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 import {
   ProjectsList,
@@ -55,6 +57,22 @@ function App() {
   const { getInstancesForDate, markDone, undoDone, skip } = useActionableInstances()
   const { members: familyMembers } = useFamilyMembers()
   const isMobile = useMobile()
+
+  // Search state
+  const [searchOpen, setSearchOpen] = useState(false)
+  const {
+    query: searchQuery,
+    setQuery: setSearchQuery,
+    results: searchResults,
+    totalResults: searchTotalResults,
+    isSearching,
+    clearSearch,
+  } = useSearch({
+    tasks,
+    projects,
+    contacts,
+    routines: allRoutines,
+  })
 
   // Actionable instances for the viewed date (to filter skipped/completed events)
   const [dateInstances, setDateInstances] = useState<ActionableInstance[]>([])
@@ -125,19 +143,24 @@ function App() {
   // Global keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd+K for quick add
+      // Cmd+K for quick capture
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
         setQuickAddOpen(true)
       }
-      // Escape to close panel
-      if (e.key === 'Escape' && selectedItemId) {
+      // Cmd+J for search
+      if ((e.metaKey || e.ctrlKey) && e.key === 'j') {
+        e.preventDefault()
+        setSearchOpen(true)
+      }
+      // Escape to close panel (search modal handles its own escape)
+      if (e.key === 'Escape' && selectedItemId && !searchOpen) {
         setSelectedItemId(null)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedItemId])
+  }, [selectedItemId, searchOpen])
 
   // Fetch calendar events when connected or date changes
   useEffect(() => {
@@ -374,6 +397,34 @@ function App() {
     return projectsMap.get(selectedTask.projectId) ?? null
   }, [selectedTask, projectsMap])
 
+  // Handle search result selection
+  const handleSearchSelect = useCallback((result: SearchResult) => {
+    setSearchOpen(false)
+    clearSearch()
+
+    switch (result.type) {
+      case 'task':
+        handleSelectItem(`task-${result.id}`)
+        break
+      case 'project':
+        handleOpenProject(result.id)
+        break
+      case 'contact':
+        handleOpenContact(result.id)
+        break
+      case 'routine':
+        setSelectedRoutineId(result.id)
+        setActiveView('routines')
+        break
+    }
+  }, [clearSearch, handleSelectItem, handleOpenProject, handleOpenContact])
+
+  // Close search modal
+  const handleSearchClose = useCallback(() => {
+    setSearchOpen(false)
+    clearSearch()
+  }, [clearSearch])
+
   if (authLoading || onboardingLoading) {
     return (
       <div className="min-h-screen bg-bg-base flex items-center justify-center">
@@ -425,6 +476,7 @@ function App() {
       onCloseQuickAdd={closeQuickAdd}
       activeView={activeView}
       onViewChange={handleViewChange}
+      onOpenSearch={() => setSearchOpen(true)}
       panel={
         recipeUrl ? (
           <Suspense fallback={<LoadingFallback />}>
@@ -671,6 +723,18 @@ function App() {
           />
         </Suspense>
       )}
+
+      {/* Search Modal */}
+      <SearchModal
+        isOpen={searchOpen}
+        onClose={handleSearchClose}
+        query={searchQuery}
+        onQueryChange={setSearchQuery}
+        results={searchResults}
+        totalResults={searchTotalResults}
+        isSearching={isSearching}
+        onSelectResult={handleSearchSelect}
+      />
     </AppShell>
   )
 }

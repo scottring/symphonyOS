@@ -9,9 +9,10 @@ interface SidebarProps {
   onSignOut?: () => void
   activeView: ViewType
   onViewChange: (view: ViewType) => void
+  onOpenSearch?: () => void
 }
 
-export function Sidebar({ collapsed, onToggle, userEmail, onSignOut, activeView, onViewChange }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, userEmail, onSignOut, activeView, onViewChange, onOpenSearch }: SidebarProps) {
   return (
     <aside
       className={`
@@ -57,6 +58,33 @@ export function Sidebar({ collapsed, onToggle, userEmail, onSignOut, activeView,
             <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
           </svg>
         </button>
+      )}
+
+      {/* Search button */}
+      {onOpenSearch && (
+        <div className="px-3 mt-4">
+          <button
+            onClick={onOpenSearch}
+            className={`
+              w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
+              bg-neutral-100 text-neutral-500 hover:text-neutral-700 hover:bg-neutral-200
+              transition-all duration-200
+              ${collapsed ? 'justify-center' : ''}
+            `}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+            </svg>
+            {!collapsed && (
+              <>
+                <span className="flex-1 text-left text-sm">Search...</span>
+                <kbd className="hidden lg:inline-flex items-center px-1.5 py-0.5 text-xs font-medium text-neutral-400 bg-neutral-200/50 rounded">
+                  ⌘J
+                </kbd>
+              </>
+            )}
+          </button>
+        </div>
       )}
 
       {/* Navigation */}
