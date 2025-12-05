@@ -12,7 +12,7 @@ import { useMobile } from '@/hooks/useMobile'
 import { useSearch, type SearchResult } from '@/hooks/useSearch'
 import { supabase } from '@/lib/supabase'
 import { AppShell } from '@/components/layout/AppShell'
-import { TodaySchedule } from '@/components/schedule/TodaySchedule'
+import { HomeView } from '@/components/home'
 import { DetailPanelRedesign as DetailPanel } from '@/components/detail/DetailPanelRedesign'
 import { SearchModal } from '@/components/search/SearchModal'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
@@ -512,18 +512,18 @@ function App() {
       }
     >
       {activeView === 'home' && (
-        <div className="h-full overflow-auto">
+        <div className="h-full flex flex-col overflow-hidden">
           {/* Calendar connect banner if needed */}
           {!isConnected && (
-            <div className="p-4 border-b border-neutral-100">
+            <div className="p-4 border-b border-neutral-100 shrink-0">
               <Suspense fallback={<LoadingFallback />}>
                 <CalendarConnect />
               </Suspense>
             </div>
           )}
 
-          {/* Today's schedule */}
-          <TodaySchedule
+          {/* Home view with Today/Today+Context/Week */}
+          <HomeView
             tasks={tasks}
             events={filteredEvents}
             routines={filteredRoutines}
