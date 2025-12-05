@@ -104,6 +104,8 @@ interface DetailPanelProps {
   onUpdateProject?: (projectId: string, updates: Partial<Project>) => void
   onOpenProject?: (projectId: string) => void
   onAddProject?: (project: { name: string }) => Promise<Project | null>
+  // Subtask support
+  onAddSubtask?: (parentId: string, title: string) => Promise<string | undefined>
   // Actionable callback - called after skip/defer/done to refresh timeline
   onActionComplete?: () => void
 }
@@ -191,7 +193,7 @@ function ActionButton({ action, onOpenRecipe }: { action: DetectedAction; onOpen
   )
 }
 
-export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplete, onUpdateEventNote, onOpenRecipe, contact, contacts = [], onSearchContacts, onUpdateContact, onOpenContact, project, projects = [], onSearchProjects, onUpdateProject, onOpenProject, onAddProject, onActionComplete }: DetailPanelProps) {
+export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplete, onUpdateEventNote, onOpenRecipe, contact, contacts = [], onSearchContacts, onUpdateContact, onOpenContact, project, projects = [], onSearchProjects, onUpdateProject, onOpenProject, onAddProject, onAddSubtask, onActionComplete }: DetailPanelProps) {
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [editedTitle, setEditedTitle] = useState(item?.title || '')
@@ -228,6 +230,10 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
 
   // Delete confirmation
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  // Subtask state
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('')
+  const [isAddingSubtask, setIsAddingSubtask] = useState(false)
 
   // Actionable instances (for events)
   const [actionableInstance, setActionableInstance] = useState<ActionableInstance | null>(null)
@@ -916,6 +922,114 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
             </div>
           )}
         </div>
+
+        {/* Subtasks Section (tasks only) */}
+        {isTask && item.originalTask && (
+          <div className="px-5 py-4 border-b border-neutral-100">
+            <h3 className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-3">
+              Subtasks {item.originalTask.subtasks && item.originalTask.subtasks.length > 0 && (
+                <span className="text-neutral-400 font-normal ml-1">
+                  ({item.originalTask.subtasks.filter(s => s.completed).length}/{item.originalTask.subtasks.length})
+                </span>
+              )}
+            </h3>
+
+            {/* Subtask list */}
+            {item.originalTask.subtasks && item.originalTask.subtasks.length > 0 && (
+              <ul className="space-y-1 mb-3">
+                {item.originalTask.subtasks.map((subtask) => (
+                  <li key={subtask.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-neutral-50 transition-colors">
+                    <button
+                      onClick={() => onToggleComplete?.(subtask.id)}
+                      className="flex-shrink-0"
+                      aria-label={subtask.completed ? 'Mark incomplete' : 'Mark complete'}
+                    >
+                      <span
+                        className={`
+                          w-5 h-5 rounded border-2
+                          flex items-center justify-center
+                          transition-colors
+                          ${subtask.completed
+                            ? 'bg-primary-500 border-primary-500 text-white'
+                            : 'border-neutral-300 hover:border-primary-400'
+                          }
+                        `}
+                      >
+                        {subtask.completed && (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </span>
+                    </button>
+                    <span className={`flex-1 text-sm ${subtask.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>
+                      {subtask.title}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/* Add subtask input */}
+            {onAddSubtask && (
+              isAddingSubtask ? (
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault()
+                    if (!newSubtaskTitle.trim() || !item.originalTask) return
+                    await onAddSubtask(item.originalTask.id, newSubtaskTitle.trim())
+                    setNewSubtaskTitle('')
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <input
+                    type="text"
+                    value={newSubtaskTitle}
+                    onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setIsAddingSubtask(false)
+                        setNewSubtaskTitle('')
+                      }
+                    }}
+                    placeholder="Subtask title..."
+                    className="flex-1 px-3 py-2 text-sm rounded-lg border border-neutral-200
+                               focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    autoFocus
+                  />
+                  <button
+                    type="submit"
+                    disabled={!newSubtaskTitle.trim()}
+                    className="px-3 py-2 text-sm font-medium bg-primary-600 text-white
+                               rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Add
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddingSubtask(false)
+                      setNewSubtaskTitle('')
+                    }}
+                    className="px-3 py-2 text-sm text-neutral-500 hover:text-neutral-700"
+                  >
+                    Done
+                  </button>
+                </form>
+              ) : (
+                <button
+                  onClick={() => setIsAddingSubtask(true)}
+                  className="w-full flex items-center gap-2 p-2 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-50 transition-colors text-sm"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                  </svg>
+                  Add subtask
+                </button>
+              )
+            )}
+          </div>
+        )}
 
         {/* Location (events only) */}
         {item.location && (

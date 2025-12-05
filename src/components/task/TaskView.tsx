@@ -24,6 +24,8 @@ interface TaskViewProps {
   onSearchProjects?: (query: string) => Project[]
   onOpenProject?: (projectId: string) => void
   onAddProject?: (project: { name: string }) => Promise<Project | null>
+  // Subtask support
+  onAddSubtask?: (parentId: string, title: string) => Promise<string | undefined>
 }
 
 export function TaskView({
@@ -43,6 +45,7 @@ export function TaskView({
   onSearchProjects,
   onOpenProject,
   onAddProject,
+  onAddSubtask,
 }: TaskViewProps) {
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -82,6 +85,10 @@ export function TaskView({
   // Links editing
   const [newLink, setNewLink] = useState('')
   const [newLinkTitle, setNewLinkTitle] = useState('')
+
+  // Subtask state
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('')
+  const [isAddingSubtask, setIsAddingSubtask] = useState(false)
 
   // Sync state when task changes
   useEffect(() => {
@@ -1018,6 +1025,113 @@ export function TaskView({
                          focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
                          resize-none"
             />
+          </div>
+
+          {/* Subtasks Section */}
+          <div className="bg-white rounded-xl border border-neutral-100 p-4">
+            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">
+              Subtasks {task.subtasks && task.subtasks.length > 0 && (
+                <span className="text-neutral-400 font-normal">
+                  ({task.subtasks.filter(s => s.completed).length} of {task.subtasks.length} complete)
+                </span>
+              )}
+            </h2>
+
+            {/* Subtask list */}
+            {task.subtasks && task.subtasks.length > 0 && (
+              <ul className="space-y-1 mb-3">
+                {task.subtasks.map((subtask) => (
+                  <li key={subtask.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-neutral-50 transition-colors">
+                    <button
+                      onClick={() => onToggleComplete(subtask.id)}
+                      className="flex-shrink-0"
+                      aria-label={subtask.completed ? 'Mark incomplete' : 'Mark complete'}
+                    >
+                      <span
+                        className={`
+                          w-5 h-5 rounded border-2
+                          flex items-center justify-center
+                          transition-colors
+                          ${subtask.completed
+                            ? 'bg-primary-500 border-primary-500 text-white'
+                            : 'border-neutral-300 hover:border-primary-400'
+                          }
+                        `}
+                      >
+                        {subtask.completed && (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </span>
+                    </button>
+                    <span className={`flex-1 text-sm ${subtask.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>
+                      {subtask.title}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/* Add subtask input */}
+            {onAddSubtask && (
+              isAddingSubtask ? (
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault()
+                    if (!newSubtaskTitle.trim()) return
+                    await onAddSubtask(task.id, newSubtaskTitle.trim())
+                    setNewSubtaskTitle('')
+                    // Keep input open for rapid entry
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <input
+                    type="text"
+                    value={newSubtaskTitle}
+                    onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setIsAddingSubtask(false)
+                        setNewSubtaskTitle('')
+                      }
+                    }}
+                    placeholder="Subtask title..."
+                    className="flex-1 px-3 py-2 text-sm rounded-lg border border-neutral-200
+                               focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    autoFocus
+                  />
+                  <button
+                    type="submit"
+                    disabled={!newSubtaskTitle.trim()}
+                    className="px-3 py-2 text-sm font-medium bg-primary-600 text-white
+                               rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Add
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddingSubtask(false)
+                      setNewSubtaskTitle('')
+                    }}
+                    className="px-3 py-2 text-sm text-neutral-500 hover:text-neutral-700"
+                  >
+                    Done
+                  </button>
+                </form>
+              ) : (
+                <button
+                  onClick={() => setIsAddingSubtask(true)}
+                  className="w-full flex items-center gap-2 p-2 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-50 transition-colors text-sm"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                  </svg>
+                  Add subtask
+                </button>
+              )
+            )}
           </div>
         </div>
       </div>

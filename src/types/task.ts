@@ -21,4 +21,6 @@ export interface Task {
   contactId?: string // Linked contact (who task is ABOUT)
   assignedTo?: string // Who should DO this task (contact id)
   projectId?: string // Linked project
+  parentTaskId?: string // If set, this is a subtask
+  subtasks?: Task[] // Populated on fetch, not stored in DB
 }

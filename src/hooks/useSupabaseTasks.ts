@@ -19,6 +19,7 @@ interface DbTask {
   contact_id: string | null
   assigned_to: string | null
   project_id: string | null
+  parent_task_id: string | null
   created_at: string
   updated_at: string
 }
@@ -51,7 +52,39 @@ function dbTaskToTask(dbTask: DbTask): Task {
     contactId: dbTask.contact_id ?? undefined,
     assignedTo: dbTask.assigned_to ?? undefined,
     projectId: dbTask.project_id ?? undefined,
+    parentTaskId: dbTask.parent_task_id ?? undefined,
   }
+}
+
+// Nest subtasks under their parent tasks
+function nestSubtasks(tasks: Task[]): Task[] {
+  const taskMap = new Map<string, Task>()
+  const subtasksByParent = new Map<string, Task[]>()
+
+  // First pass: index all tasks and group subtasks
+  for (const task of tasks) {
+    taskMap.set(task.id, { ...task })
+    if (task.parentTaskId) {
+      const existing = subtasksByParent.get(task.parentTaskId) || []
+      existing.push(task)
+      subtasksByParent.set(task.parentTaskId, existing)
+    }
+  }
+
+  // Second pass: attach subtasks to parents and filter out subtasks from top level
+  const result: Task[] = []
+  for (const task of tasks) {
+    if (!task.parentTaskId) {
+      const taskWithSubtasks = taskMap.get(task.id)!
+      const subtasks = subtasksByParent.get(task.id)
+      if (subtasks && subtasks.length > 0) {
+        taskWithSubtasks.subtasks = subtasks
+      }
+      result.push(taskWithSubtasks)
+    }
+  }
+
+  return result
 }
 
 export function useSupabaseTasks() {
@@ -87,7 +120,8 @@ export function useSupabaseTasks() {
         return
       }
 
-      setTasks((data as DbTask[]).map(dbTaskToTask))
+      const allTasks = (data as DbTask[]).map(dbTaskToTask)
+      setTasks(nestSubtasks(allTasks))
       setLoading(false)
     }
 
@@ -140,29 +174,193 @@ export function useSupabaseTasks() {
     return createdTask.id
   }, [user])
 
-  const toggleTask = useCallback(async (id: string) => {
-    const task = tasks.find((t) => t.id === id)
-    if (!task) return
+  // Add a subtask to a parent task
+  const addSubtask = useCallback(async (parentId: string, title: string): Promise<string | undefined> => {
+    if (!user) return undefined
 
-    // Optimistic update
-    const newCompleted = !task.completed
+    // Find parent to inherit properties
+    const parent = tasks.find((t) => t.id === parentId)
+    if (!parent) return undefined
+
+    const tempId = crypto.randomUUID()
+    const optimisticSubtask: Task = {
+      id: tempId,
+      title,
+      completed: false,
+      createdAt: new Date(),
+      parentTaskId: parentId,
+      projectId: parent.projectId,
+      contactId: parent.contactId,
+    }
+
+    // Optimistic: add subtask to parent's subtasks array
     setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, completed: newCompleted } : t))
+      prev.map((t) =>
+        t.id === parentId
+          ? { ...t, subtasks: [...(t.subtasks || []), optimisticSubtask] }
+          : t
+      )
     )
 
-    const { error: updateError } = await supabase
+    const { data, error: insertError } = await supabase
       .from('tasks')
-      .update({ completed: newCompleted })
-      .eq('id', id)
+      .insert({
+        user_id: user.id,
+        title,
+        completed: false,
+        parent_task_id: parentId,
+        project_id: parent.projectId ?? null,
+        contact_id: parent.contactId ?? null,
+      })
+      .select()
+      .single()
 
-    if (updateError) {
-      // Rollback on error
+    if (insertError) {
+      // Rollback
       setTasks((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, completed: !newCompleted } : t))
+        prev.map((t) =>
+          t.id === parentId
+            ? { ...t, subtasks: (t.subtasks || []).filter((s) => s.id !== tempId) }
+            : t
+        )
       )
-      setError(updateError.message)
+      setError(insertError.message)
+      return undefined
     }
+
+    const createdSubtask = dbTaskToTask(data as DbTask)
+
+    // Replace optimistic subtask with real one
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === parentId
+          ? {
+              ...t,
+              subtasks: (t.subtasks || []).map((s) =>
+                s.id === tempId ? createdSubtask : s
+              ),
+            }
+          : t
+      )
+    )
+
+    return createdSubtask.id
+  }, [user, tasks])
+
+  // Helper to find a task by id, including in subtasks
+  const findTaskById = useCallback((id: string): Task | undefined => {
+    for (const task of tasks) {
+      if (task.id === id) return task
+      if (task.subtasks) {
+        const subtask = task.subtasks.find((s) => s.id === id)
+        if (subtask) return subtask
+      }
+    }
+    return undefined
   }, [tasks])
+
+  // Helper to find parent of a subtask
+  const findParentOfSubtask = useCallback((subtaskId: string): Task | undefined => {
+    return tasks.find((t) => t.subtasks?.some((s) => s.id === subtaskId))
+  }, [tasks])
+
+  const toggleTask = useCallback(async (id: string) => {
+    const task = findTaskById(id)
+    if (!task) return
+
+    const newCompleted = !task.completed
+    const isSubtask = !!task.parentTaskId
+
+    if (isSubtask) {
+      // Toggle subtask - update within parent's subtasks array
+      const parent = findParentOfSubtask(id)
+      if (!parent) return
+
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === parent.id
+            ? {
+                ...t,
+                subtasks: (t.subtasks || []).map((s) =>
+                  s.id === id ? { ...s, completed: newCompleted } : s
+                ),
+              }
+            : t
+        )
+      )
+
+      const { error: updateError } = await supabase
+        .from('tasks')
+        .update({ completed: newCompleted })
+        .eq('id', id)
+
+      if (updateError) {
+        // Rollback
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === parent.id
+              ? {
+                  ...t,
+                  subtasks: (t.subtasks || []).map((s) =>
+                    s.id === id ? { ...s, completed: !newCompleted } : s
+                  ),
+                }
+              : t
+          )
+        )
+        setError(updateError.message)
+      }
+    } else {
+      // Toggle parent task
+      const hasSubtasks = task.subtasks && task.subtasks.length > 0
+      const incompleteSubtaskIds = hasSubtasks && newCompleted
+        ? task.subtasks!.filter((s) => !s.completed).map((s) => s.id)
+        : []
+
+      // Optimistic update - complete parent and all subtasks if completing
+      setTasks((prev) =>
+        prev.map((t) => {
+          if (t.id === id) {
+            return {
+              ...t,
+              completed: newCompleted,
+              subtasks: newCompleted
+                ? t.subtasks?.map((s) => ({ ...s, completed: true }))
+                : t.subtasks,
+            }
+          }
+          return t
+        })
+      )
+
+      // Update parent in DB
+      const { error: updateError } = await supabase
+        .from('tasks')
+        .update({ completed: newCompleted })
+        .eq('id', id)
+
+      if (updateError) {
+        // Rollback
+        setTasks((prev) =>
+          prev.map((t) => (t.id === id ? task : t))
+        )
+        setError(updateError.message)
+        return
+      }
+
+      // If completing and has incomplete subtasks, complete them too
+      if (incompleteSubtaskIds.length > 0) {
+        const { error: subtaskError } = await supabase
+          .from('tasks')
+          .update({ completed: true })
+          .in('id', incompleteSubtaskIds)
+
+        if (subtaskError) {
+          setError(subtaskError.message)
+        }
+      }
+    }
+  }, [findTaskById, findParentOfSubtask])
 
   const deleteTask = useCallback(async (id: string) => {
     // Save for rollback
@@ -216,6 +414,7 @@ export function useSupabaseTasks() {
     if ('contactId' in updates) dbUpdates.contact_id = updates.contactId ?? null
     if ('assignedTo' in updates) dbUpdates.assigned_to = updates.assignedTo ?? null
     if ('projectId' in updates) dbUpdates.project_id = updates.projectId ?? null
+    if ('parentTaskId' in updates) dbUpdates.parent_task_id = updates.parentTaskId ?? null
 
     const { error: updateError } = await supabase
       .from('tasks')
@@ -270,5 +469,5 @@ export function useSupabaseTasks() {
     }
   }, [tasks, updateTask])
 
-  return { tasks, loading, error, addTask, toggleTask, deleteTask, updateTask, scheduleTask, pushTask }
+  return { tasks, loading, error, addTask, addSubtask, toggleTask, deleteTask, updateTask, scheduleTask, pushTask }
 }

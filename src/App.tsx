@@ -32,7 +32,7 @@ import type { ViewType } from '@/components/layout/Sidebar'
 import type { ActionableInstance } from '@/types/actionable'
 
 function App() {
-  const { tasks, loading: tasksLoading, addTask, toggleTask, deleteTask, updateTask, pushTask } = useSupabaseTasks()
+  const { tasks, loading: tasksLoading, addTask, addSubtask, toggleTask, deleteTask, updateTask, pushTask } = useSupabaseTasks()
   const { user, loading: authLoading, signOut } = useAuth()
   const { isConnected, events, fetchEvents, isFetching: eventsFetching } = useGoogleCalendar()
 
@@ -453,6 +453,7 @@ function App() {
             onUpdateProject={updateProject}
             onOpenProject={handleOpenProject}
             onAddProject={addProject}
+            onAddSubtask={addSubtask}
             onActionComplete={refreshDateInstances}
           />
         )
@@ -559,6 +560,7 @@ function App() {
             onSearchProjects={searchProjects}
             onOpenProject={handleOpenProject}
             onAddProject={addProject}
+            onAddSubtask={addSubtask}
           />
         </Suspense>
       )}

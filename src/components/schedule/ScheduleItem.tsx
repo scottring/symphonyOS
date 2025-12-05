@@ -75,6 +75,7 @@ export function ScheduleItem({
 
   // Check if we should hide project on mobile (passed as prop or detected)
   const hasChips = contactName || projectName
+  const hasSubtasks = item.subtaskCount && item.subtaskCount > 0
 
   return (
     <div
@@ -144,14 +145,25 @@ export function ScheduleItem({
         </div>
 
         {/* Title */}
-        <span
-          className={`
-            flex-1 min-w-0 text-base font-medium line-clamp-2 transition-colors
-            ${item.completed ? 'line-through text-neutral-400' : 'text-neutral-800 group-hover:text-neutral-900'}
-          `}
-        >
-          {item.title}
-        </span>
+        <div className="flex-1 min-w-0">
+          <span
+            className={`
+              text-base font-medium line-clamp-2 transition-colors
+              ${item.completed ? 'line-through text-neutral-400' : 'text-neutral-800 group-hover:text-neutral-900'}
+            `}
+          >
+            {item.title}
+          </span>
+          {/* Subtask indicator */}
+          {hasSubtasks && (
+            <span className="ml-2 inline-flex items-center gap-1 text-xs text-neutral-400">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+              </svg>
+              {item.subtaskCompletedCount}/{item.subtaskCount}
+            </span>
+          )}
+        </div>
 
         {/* Assignee avatar */}
         {familyMembers.length > 0 && onAssign && (

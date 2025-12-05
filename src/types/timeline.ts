@@ -18,6 +18,9 @@ export interface TimelineItem {
   contactId?: string // Linked contact
   projectId?: string // Linked project
   assignedTo?: string | null // Family member assignment
+  // Subtask support
+  subtaskCount?: number // Total subtasks
+  subtaskCompletedCount?: number // Completed subtasks
   // Event-specific
   location?: string
   allDay?: boolean
@@ -33,6 +36,9 @@ export interface TimelineItem {
 export type TimeSection = 'now' | 'soon' | 'later' | 'unscheduled'
 
 export function taskToTimelineItem(task: Task): TimelineItem {
+  const subtaskCount = task.subtasks?.length
+  const subtaskCompletedCount = task.subtasks?.filter(s => s.completed).length
+
   return {
     id: `task-${task.id}`,
     type: 'task',
@@ -47,6 +53,8 @@ export function taskToTimelineItem(task: Task): TimelineItem {
     projectId: task.projectId,
     assignedTo: task.assignedTo,
     allDay: task.isAllDay,
+    subtaskCount,
+    subtaskCompletedCount,
     originalTask: task,
   }
 }
