@@ -64,7 +64,7 @@ export function RoutineInput({ contacts, onSave, onCancel, initialValue = '' }: 
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="iris walks jax every weekday at 7am"
+            placeholder="Walk jax every weekday at 7am"
             className="w-full px-4 py-3 rounded-xl border border-neutral-200 bg-neutral-50
                        text-neutral-800 placeholder:text-neutral-400 text-2xl font-display
                        focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
@@ -159,14 +159,24 @@ export function RoutineInput({ contacts, onSave, onCancel, initialValue = '' }: 
   )
 }
 
-function getRecurrenceText(recurrence: { type: string; days?: number[] }): string {
+function getRecurrenceText(recurrence: { type: string; days?: number[]; interval?: number }): string {
   switch (recurrence.type) {
     case 'daily':
+      if (recurrence.interval === 2) return 'Every other day'
+      if (recurrence.interval && recurrence.interval > 2) return `Every ${recurrence.interval} days`
       return 'Every day'
     case 'weekdays':
       return 'Weekdays'
     case 'weekends':
       return 'Weekends'
+    case 'biweekly': {
+      const days = recurrence.days || []
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+      if (days.length === 1) {
+        return `Every other ${dayNames[days[0]]}`
+      }
+      return 'Every two weeks'
+    }
     case 'weekly': {
       const days = recurrence.days || []
       const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -175,6 +185,12 @@ function getRecurrenceText(recurrence: { type: string; days?: number[] }): strin
       }
       return `Every ${days.map(d => dayNames[d]).join(', ')}`
     }
+    case 'monthly':
+      return 'Monthly'
+    case 'quarterly':
+      return 'Quarterly'
+    case 'yearly':
+      return 'Yearly'
     default:
       return 'Custom'
   }

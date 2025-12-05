@@ -220,6 +220,223 @@ describe('useRoutines', () => {
       expect(routinesForToday).toHaveLength(1)
       expect(routinesForToday[0].name).toBe('Active')
     })
+
+    describe('interval-based daily patterns', () => {
+      it('returns daily with interval=2 on matching days only', async () => {
+        // Start date: Jan 1, 2024 (Monday)
+        const pattern: RecurrencePattern = {
+          type: 'daily',
+          interval: 2,
+          start_date: '2024-01-01',
+        }
+        mockSupabaseData.push(
+          createMockRoutine({ id: '1', name: 'Every Other Day', recurrence_pattern: pattern })
+        )
+
+        const { result } = renderHook(() => useRoutines())
+
+        await waitFor(() => {
+          expect(result.current.routines).toHaveLength(1)
+        })
+
+        // Should match: Jan 1, Jan 3, Jan 5, Jan 7...
+        const jan1 = new Date(2024, 0, 1, 12, 0, 0)
+        const jan2 = new Date(2024, 0, 2, 12, 0, 0)
+        const jan3 = new Date(2024, 0, 3, 12, 0, 0)
+        const jan4 = new Date(2024, 0, 4, 12, 0, 0)
+        const jan5 = new Date(2024, 0, 5, 12, 0, 0)
+
+        expect(result.current.getRoutinesForDate(jan1)).toHaveLength(1)
+        expect(result.current.getRoutinesForDate(jan2)).toHaveLength(0)
+        expect(result.current.getRoutinesForDate(jan3)).toHaveLength(1)
+        expect(result.current.getRoutinesForDate(jan4)).toHaveLength(0)
+        expect(result.current.getRoutinesForDate(jan5)).toHaveLength(1)
+      })
+
+      it('does not match dates before start_date', async () => {
+        const pattern: RecurrencePattern = {
+          type: 'daily',
+          interval: 2,
+          start_date: '2024-01-15',
+        }
+        mockSupabaseData.push(
+          createMockRoutine({ id: '1', name: 'Every Other Day', recurrence_pattern: pattern })
+        )
+
+        const { result } = renderHook(() => useRoutines())
+
+        await waitFor(() => {
+          expect(result.current.routines).toHaveLength(1)
+        })
+
+        const jan10 = new Date(2024, 0, 10, 12, 0, 0)
+        expect(result.current.getRoutinesForDate(jan10)).toHaveLength(0)
+      })
+    })
+
+    describe('biweekly patterns', () => {
+      it('returns biweekly routines on matching weeks', async () => {
+        // Start date: Jan 1, 2024 (Monday), every 2 weeks on Monday
+        const pattern: RecurrencePattern = {
+          type: 'weekly',
+          days: ['mon'],
+          interval: 2,
+          start_date: '2024-01-01',
+        }
+        mockSupabaseData.push(
+          createMockRoutine({ id: '1', name: 'Biweekly Monday', recurrence_pattern: pattern })
+        )
+
+        const { result } = renderHook(() => useRoutines())
+
+        await waitFor(() => {
+          expect(result.current.routines).toHaveLength(1)
+        })
+
+        // Should match: Jan 1, Jan 15, Jan 29...
+        // Should NOT match: Jan 8, Jan 22...
+        const jan1 = new Date(2024, 0, 1, 12, 0, 0) // Monday week 0
+        const jan8 = new Date(2024, 0, 8, 12, 0, 0) // Monday week 1
+        const jan15 = new Date(2024, 0, 15, 12, 0, 0) // Monday week 2
+        const jan22 = new Date(2024, 0, 22, 12, 0, 0) // Monday week 3
+        const jan29 = new Date(2024, 0, 29, 12, 0, 0) // Monday week 4
+
+        expect(result.current.getRoutinesForDate(jan1)).toHaveLength(1)
+        expect(result.current.getRoutinesForDate(jan8)).toHaveLength(0)
+        expect(result.current.getRoutinesForDate(jan15)).toHaveLength(1)
+        expect(result.current.getRoutinesForDate(jan22)).toHaveLength(0)
+        expect(result.current.getRoutinesForDate(jan29)).toHaveLength(1)
+      })
+
+      it('does not match non-scheduled day of week', async () => {
+        const pattern: RecurrencePattern = {
+          type: 'weekly',
+          days: ['mon'],
+          interval: 2,
+          start_date: '2024-01-01',
+        }
+        mockSupabaseData.push(
+          createMockRoutine({ id: '1', name: 'Biweekly Monday', recurrence_pattern: pattern })
+        )
+
+        const { result } = renderHook(() => useRoutines())
+
+        await waitFor(() => {
+          expect(result.current.routines).toHaveLength(1)
+        })
+
+        // Tuesday in the matching week should not match
+        const jan2 = new Date(2024, 0, 2, 12, 0, 0) // Tuesday
+        expect(result.current.getRoutinesForDate(jan2)).toHaveLength(0)
+      })
+    })
+
+    describe('quarterly patterns', () => {
+      it('returns quarterly routines in quarter months only', async () => {
+        const pattern: RecurrencePattern = {
+          type: 'quarterly',
+          day_of_month: 1,
+        }
+        mockSupabaseData.push(
+          createMockRoutine({ id: '1', name: 'Quarterly Review', recurrence_pattern: pattern })
+        )
+
+        const { result } = renderHook(() => useRoutines())
+
+        await waitFor(() => {
+          expect(result.current.routines).toHaveLength(1)
+        })
+
+        // Should match: Jan 1, Apr 1, Jul 1, Oct 1
+        const jan1 = new Date(2024, 0, 1, 12, 0, 0)
+        const feb1 = new Date(2024, 1, 1, 12, 0, 0)
+        const apr1 = new Date(2024, 3, 1, 12, 0, 0)
+        const jul1 = new Date(2024, 6, 1, 12, 0, 0)
+        const oct1 = new Date(2024, 9, 1, 12, 0, 0)
+        const nov1 = new Date(2024, 10, 1, 12, 0, 0)
+
+        expect(result.current.getRoutinesForDate(jan1)).toHaveLength(1)
+        expect(result.current.getRoutinesForDate(feb1)).toHaveLength(0)
+        expect(result.current.getRoutinesForDate(apr1)).toHaveLength(1)
+        expect(result.current.getRoutinesForDate(jul1)).toHaveLength(1)
+        expect(result.current.getRoutinesForDate(oct1)).toHaveLength(1)
+        expect(result.current.getRoutinesForDate(nov1)).toHaveLength(0)
+      })
+
+      it('matches correct day of month for quarterly', async () => {
+        const pattern: RecurrencePattern = {
+          type: 'quarterly',
+          day_of_month: 15,
+        }
+        mockSupabaseData.push(
+          createMockRoutine({ id: '1', name: 'Quarterly on 15th', recurrence_pattern: pattern })
+        )
+
+        const { result } = renderHook(() => useRoutines())
+
+        await waitFor(() => {
+          expect(result.current.routines).toHaveLength(1)
+        })
+
+        const jan1 = new Date(2024, 0, 1, 12, 0, 0)
+        const jan15 = new Date(2024, 0, 15, 12, 0, 0)
+        const apr15 = new Date(2024, 3, 15, 12, 0, 0)
+
+        expect(result.current.getRoutinesForDate(jan1)).toHaveLength(0)
+        expect(result.current.getRoutinesForDate(jan15)).toHaveLength(1)
+        expect(result.current.getRoutinesForDate(apr15)).toHaveLength(1)
+      })
+    })
+
+    describe('yearly patterns', () => {
+      it('returns yearly routines on matching date only', async () => {
+        const pattern: RecurrencePattern = {
+          type: 'yearly',
+          month_of_year: 3, // March
+          day_of_month: 15,
+        }
+        mockSupabaseData.push(
+          createMockRoutine({ id: '1', name: 'Annual Review', recurrence_pattern: pattern })
+        )
+
+        const { result } = renderHook(() => useRoutines())
+
+        await waitFor(() => {
+          expect(result.current.routines).toHaveLength(1)
+        })
+
+        const mar15_2024 = new Date(2024, 2, 15, 12, 0, 0)
+        const mar16_2024 = new Date(2024, 2, 16, 12, 0, 0)
+        const jan15_2024 = new Date(2024, 0, 15, 12, 0, 0)
+        const mar15_2025 = new Date(2025, 2, 15, 12, 0, 0)
+
+        expect(result.current.getRoutinesForDate(mar15_2024)).toHaveLength(1)
+        expect(result.current.getRoutinesForDate(mar16_2024)).toHaveLength(0)
+        expect(result.current.getRoutinesForDate(jan15_2024)).toHaveLength(0)
+        expect(result.current.getRoutinesForDate(mar15_2025)).toHaveLength(1)
+      })
+
+      it('defaults to January 1st when no month/day specified', async () => {
+        const pattern: RecurrencePattern = {
+          type: 'yearly',
+        }
+        mockSupabaseData.push(
+          createMockRoutine({ id: '1', name: 'Yearly Default', recurrence_pattern: pattern })
+        )
+
+        const { result } = renderHook(() => useRoutines())
+
+        await waitFor(() => {
+          expect(result.current.routines).toHaveLength(1)
+        })
+
+        const jan1 = new Date(2024, 0, 1, 12, 0, 0)
+        const jan2 = new Date(2024, 0, 2, 12, 0, 0)
+
+        expect(result.current.getRoutinesForDate(jan1)).toHaveLength(1)
+        expect(result.current.getRoutinesForDate(jan2)).toHaveLength(0)
+      })
+    })
   })
 
   describe('addRoutine', () => {

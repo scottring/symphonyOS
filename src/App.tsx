@@ -572,6 +572,7 @@ function App() {
           <RoutinesList
             routines={allRoutines}
             contacts={contacts}
+            familyMembers={familyMembers}
             onSelectRoutine={(routine) => setSelectedRoutineId(routine.id)}
             onCreateRoutine={() => setCreatingRoutine(true)}
           />

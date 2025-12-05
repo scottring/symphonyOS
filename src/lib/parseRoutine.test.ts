@@ -165,6 +165,149 @@ describe('parseRoutine', () => {
     })
   })
 
+  describe('interval-based daily patterns', () => {
+    it('parses "every other day"', () => {
+      const result = parseRoutine('take out trash every other day')
+      expect(result.recurrence.type).toBe('daily')
+      expect(result.recurrence.interval).toBe(2)
+      expect(result.action).toBe('take out trash')
+    })
+
+    it('parses "alternate days"', () => {
+      const result = parseRoutine('water plants alternate days')
+      expect(result.recurrence.type).toBe('daily')
+      expect(result.recurrence.interval).toBe(2)
+      expect(result.action).toBe('water plants')
+    })
+
+    it('parses "alternate day" (singular)', () => {
+      const result = parseRoutine('check mail alternate day')
+      expect(result.recurrence.type).toBe('daily')
+      expect(result.recurrence.interval).toBe(2)
+    })
+  })
+
+  describe('biweekly patterns', () => {
+    it('parses "biweekly"', () => {
+      const result = parseRoutine('team meeting biweekly')
+      expect(result.recurrence.type).toBe('biweekly')
+      expect(result.action).toBe('team meeting')
+    })
+
+    it('parses "fortnightly"', () => {
+      const result = parseRoutine('lunch with mom fortnightly')
+      expect(result.recurrence.type).toBe('biweekly')
+      expect(result.action).toBe('lunch with mom')
+    })
+
+    it('parses "every other week"', () => {
+      const result = parseRoutine('every other week groceries')
+      expect(result.recurrence.type).toBe('biweekly')
+      expect(result.action).toBe('groceries')
+    })
+
+    it('parses "every two weeks"', () => {
+      const result = parseRoutine('every two weeks laundry')
+      expect(result.recurrence.type).toBe('biweekly')
+      expect(result.action).toBe('laundry')
+    })
+
+    it('parses "every 2 weeks"', () => {
+      const result = parseRoutine('every 2 weeks deep clean')
+      expect(result.recurrence.type).toBe('biweekly')
+      expect(result.action).toBe('deep clean')
+    })
+  })
+
+  describe('biweekly with specific day patterns', () => {
+    it('parses "every other Monday"', () => {
+      const result = parseRoutine('every other Monday standup')
+      expect(result.recurrence.type).toBe('biweekly')
+      expect(result.recurrence.days).toEqual([1]) // Monday = 1
+      expect(result.action).toBe('standup')
+    })
+
+    it('parses "every other Tuesday"', () => {
+      const result = parseRoutine('every other Tuesday dentist')
+      expect(result.recurrence.type).toBe('biweekly')
+      expect(result.recurrence.days).toEqual([2]) // Tuesday = 2
+      expect(result.action).toBe('dentist')
+    })
+
+    it('parses "every other Friday"', () => {
+      const result = parseRoutine('every other Friday happy hour')
+      expect(result.recurrence.type).toBe('biweekly')
+      expect(result.recurrence.days).toEqual([5]) // Friday = 5
+      expect(result.action).toBe('happy hour')
+    })
+
+    it('parses abbreviated day names', () => {
+      const result = parseRoutine('every other Wed team lunch')
+      expect(result.recurrence.type).toBe('biweekly')
+      expect(result.recurrence.days).toEqual([3]) // Wednesday = 3
+    })
+  })
+
+  describe('monthly patterns', () => {
+    it('parses "monthly"', () => {
+      const result = parseRoutine('pay rent monthly')
+      expect(result.recurrence.type).toBe('monthly')
+      expect(result.action).toBe('pay rent')
+    })
+
+    it('parses "every month"', () => {
+      const result = parseRoutine('every month review budget')
+      expect(result.recurrence.type).toBe('monthly')
+      expect(result.action).toBe('review budget')
+    })
+  })
+
+  describe('quarterly patterns', () => {
+    it('parses "quarterly"', () => {
+      const result = parseRoutine('quarterly review')
+      expect(result.recurrence.type).toBe('quarterly')
+      expect(result.action).toBe('review')
+    })
+
+    it('parses "every quarter"', () => {
+      const result = parseRoutine('every quarter taxes')
+      expect(result.recurrence.type).toBe('quarterly')
+      expect(result.action).toBe('taxes')
+    })
+
+    it('parses "every 3 months"', () => {
+      const result = parseRoutine('every 3 months oil change')
+      expect(result.recurrence.type).toBe('quarterly')
+      expect(result.action).toBe('oil change')
+    })
+
+    it('parses "every three months"', () => {
+      const result = parseRoutine('every three months checkup')
+      expect(result.recurrence.type).toBe('quarterly')
+      expect(result.action).toBe('checkup')
+    })
+  })
+
+  describe('yearly patterns', () => {
+    it('parses "annually"', () => {
+      const result = parseRoutine('review goals annually')
+      expect(result.recurrence.type).toBe('yearly')
+      expect(result.action).toBe('review goals')
+    })
+
+    it('parses "every year"', () => {
+      const result = parseRoutine('every year birthday reminder')
+      expect(result.recurrence.type).toBe('yearly')
+      expect(result.action).toBe('birthday reminder')
+    })
+
+    it('parses "yearly"', () => {
+      const result = parseRoutine('yearly physical')
+      expect(result.recurrence.type).toBe('yearly')
+      expect(result.action).toBe('physical')
+    })
+  })
+
   describe('time of day', () => {
     it('extracts morning', () => {
       const result = parseRoutine('exercise morning')
@@ -286,6 +429,67 @@ describe('parsedRoutineToDb', () => {
     const parsed = parseRoutine('take vitamins daily')
     const db = parsedRoutineToDb(parsed)
     expect(db.raw_input).toBe('take vitamins daily')
+  })
+
+  describe('interval-based patterns', () => {
+    it('converts every other day to daily with interval 2', () => {
+      const parsed = parseRoutine('task every other day')
+      const db = parsedRoutineToDb(parsed)
+
+      expect(db.recurrence_pattern.type).toBe('daily')
+      expect(db.recurrence_pattern.interval).toBe(2)
+      expect(db.recurrence_pattern.start_date).toBeDefined()
+    })
+
+    it('converts regular daily without interval', () => {
+      const parsed = parseRoutine('task daily')
+      const db = parsedRoutineToDb(parsed)
+
+      expect(db.recurrence_pattern.type).toBe('daily')
+      expect(db.recurrence_pattern.interval).toBeUndefined()
+    })
+
+    it('converts biweekly to weekly with interval 2', () => {
+      const parsed = parseRoutine('task biweekly')
+      const db = parsedRoutineToDb(parsed)
+
+      expect(db.recurrence_pattern.type).toBe('weekly')
+      expect(db.recurrence_pattern.interval).toBe(2)
+      expect(db.recurrence_pattern.start_date).toBeDefined()
+    })
+
+    it('converts every other Monday to weekly with interval and day', () => {
+      const parsed = parseRoutine('task every other Monday')
+      const db = parsedRoutineToDb(parsed)
+
+      expect(db.recurrence_pattern.type).toBe('weekly')
+      expect(db.recurrence_pattern.interval).toBe(2)
+      expect(db.recurrence_pattern.days).toEqual(['mon'])
+      expect(db.recurrence_pattern.start_date).toBeDefined()
+    })
+  })
+
+  describe('long-term patterns', () => {
+    it('converts monthly pattern', () => {
+      const parsed = parseRoutine('task monthly')
+      const db = parsedRoutineToDb(parsed)
+
+      expect(db.recurrence_pattern.type).toBe('monthly')
+    })
+
+    it('converts quarterly pattern', () => {
+      const parsed = parseRoutine('task quarterly')
+      const db = parsedRoutineToDb(parsed)
+
+      expect(db.recurrence_pattern.type).toBe('quarterly')
+    })
+
+    it('converts yearly pattern', () => {
+      const parsed = parseRoutine('task yearly')
+      const db = parsedRoutineToDb(parsed)
+
+      expect(db.recurrence_pattern.type).toBe('yearly')
+    })
   })
 })
 

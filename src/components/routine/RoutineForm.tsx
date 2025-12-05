@@ -224,19 +224,24 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
               {/* Recurrence Type */}
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-2">Repeats</label>
-                <div className="flex gap-2">
-                  {(['daily', 'weekly'] as const).map((type) => (
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    { value: 'daily', label: 'Daily' },
+                    { value: 'weekly', label: 'Weekly' },
+                    { value: 'monthly', label: 'Monthly' },
+                    { value: 'quarterly', label: 'Quarterly' },
+                  ] as const).map(({ value, label }) => (
                     <button
-                      key={type}
+                      key={value}
                       type="button"
-                      onClick={() => setRecurrenceType(type)}
+                      onClick={() => setRecurrenceType(value)}
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        recurrenceType === type
+                        recurrenceType === value
                           ? 'bg-amber-100 text-amber-700'
                           : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
                       }`}
                     >
-                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                      {label}
                     </button>
                   ))}
                 </div>

@@ -175,18 +175,53 @@ export function useRoutines() {
   const getRoutinesForDate = useCallback((date: Date): Routine[] => {
     const dayOfWeek = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][date.getDay()]
     const dayOfMonth = date.getDate()
+    const month = date.getMonth() + 1 // 1-12
     const dateStr = formatDateString(date)
 
     return activeRoutines.filter(routine => {
       const pattern = routine.recurrence_pattern
 
       switch (pattern.type) {
-        case 'daily':
+        case 'daily': {
+          // Handle interval (e.g., every other day)
+          if (pattern.interval && pattern.interval > 1 && pattern.start_date) {
+            const startDate = new Date(pattern.start_date)
+            const diffTime = date.getTime() - startDate.getTime()
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+            return diffDays >= 0 && diffDays % pattern.interval === 0
+          }
           return true
-        case 'weekly':
+        }
+        case 'weekly': {
+          // Handle interval (e.g., biweekly)
+          if (pattern.interval && pattern.interval > 1 && pattern.start_date) {
+            const startDate = new Date(pattern.start_date)
+            const diffTime = date.getTime() - startDate.getTime()
+            const diffWeeks = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7))
+            if (diffWeeks < 0 || diffWeeks % pattern.interval !== 0) {
+              return false
+            }
+          }
+          // Check day of week
           return pattern.days?.includes(dayOfWeek) ?? false
+        }
         case 'monthly':
           return pattern.day_of_month === dayOfMonth
+        case 'quarterly': {
+          // Quarterly: check if we're in a quarter month (Jan, Apr, Jul, Oct by default)
+          // and on the right day of month
+          const quarterMonths = [1, 4, 7, 10]
+          if (!quarterMonths.includes(month)) return false
+          // If day_of_month is specified, check it; otherwise, use the 1st
+          const targetDay = pattern.day_of_month || 1
+          return dayOfMonth === targetDay
+        }
+        case 'yearly': {
+          // Yearly: check month and day
+          const targetMonth = pattern.month_of_year || 1
+          const targetDay = pattern.day_of_month || 1
+          return month === targetMonth && dayOfMonth === targetDay
+        }
         case 'specific_days':
           return pattern.dates?.includes(dateStr) ?? false
         default:

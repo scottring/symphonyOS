@@ -6,13 +6,16 @@ export type CoverageStatus = 'pending' | 'accepted' | 'declined'
 export type RoutineVisibility = 'active' | 'reference'
 
 // Recurrence pattern types
-export type RecurrenceType = 'daily' | 'weekly' | 'monthly' | 'specific_days'
+export type RecurrenceType = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'specific_days'
 
 export interface RecurrencePattern {
   type: RecurrenceType
   days?: string[] // For weekly: ['mon', 'wed', 'fri']
   day_of_month?: number // For monthly: 1-31
+  month_of_year?: number // For yearly: 1-12
   dates?: string[] // For specific_days: ['2025-01-01', '2025-07-04']
+  interval?: number // Every N days/weeks/months (e.g., 2 = every other)
+  start_date?: string // Reference date for interval calculations (YYYY-MM-DD)
 }
 
 // Database row types
@@ -114,6 +117,30 @@ export function getDeferOptions(recurrence?: RecurrencePattern): DeferOption[] {
     return [
       ...baseOptions,
       { label: 'Next month', value: 'next_month', targetDate: nextMonth },
+      { label: 'Custom...', value: 'custom' },
+    ]
+  }
+
+  if (recurrence.type === 'quarterly') {
+    // Quarterly: Tomorrow, Next quarter, Custom
+    const nextQuarter = new Date()
+    nextQuarter.setMonth(nextQuarter.getMonth() + 3)
+    nextQuarter.setHours(9, 0, 0, 0)
+    return [
+      ...baseOptions,
+      { label: 'Next quarter', value: 'next_month', targetDate: nextQuarter },
+      { label: 'Custom...', value: 'custom' },
+    ]
+  }
+
+  if (recurrence.type === 'yearly') {
+    // Yearly: Tomorrow, Next year, Custom
+    const nextYear = new Date()
+    nextYear.setFullYear(nextYear.getFullYear() + 1)
+    nextYear.setHours(9, 0, 0, 0)
+    return [
+      ...baseOptions,
+      { label: 'Next year', value: 'next_month', targetDate: nextYear },
       { label: 'Custom...', value: 'custom' },
     ]
   }

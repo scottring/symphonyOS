@@ -13,8 +13,10 @@ export interface ParsedRoutine {
   assigneeName: string | null   // Display name
   action: string                // The core action text
   recurrence: {
-    type: 'daily' | 'weekdays' | 'weekends' | 'weekly'
+    type: 'daily' | 'weekdays' | 'weekends' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly'
     days?: number[]             // 0=Sun, 1=Mon, etc. for weekly
+    interval?: number           // e.g., 2 for "every other"
+    dayOfMonth?: number         // For monthly: 1-31
   }
   timeOfDay: 'morning' | 'afternoon' | 'evening' | null
   time: string | null           // HH:MM format
@@ -104,6 +106,25 @@ export function parseRoutine(input: string, contacts: Contact[] = []): ParsedRou
 
   // 2. Extract recurrence patterns
   const recurrencePatterns = [
+    // Every other / alternate patterns (must come first to match before simpler patterns)
+    { regex: /\bevery\s+other\s+day\b/i, result: { type: 'daily' as const, interval: 2 } },
+    { regex: /\balternate\s+days?\b/i, result: { type: 'daily' as const, interval: 2 } },
+    { regex: /\bevery\s+other\s+week\b/i, result: { type: 'biweekly' as const } },
+    { regex: /\bbiweekly\b/i, result: { type: 'biweekly' as const } },
+    { regex: /\bfortnightly\b/i, result: { type: 'biweekly' as const } },
+    { regex: /\bevery\s+two\s+weeks?\b/i, result: { type: 'biweekly' as const } },
+    { regex: /\bevery\s+2\s+weeks?\b/i, result: { type: 'biweekly' as const } },
+    // Quarterly/Yearly
+    { regex: /\bquarterly\b/i, result: { type: 'quarterly' as const } },
+    { regex: /\bevery\s+quarter\b/i, result: { type: 'quarterly' as const } },
+    { regex: /\bevery\s+3\s+months?\b/i, result: { type: 'quarterly' as const } },
+    { regex: /\bevery\s+three\s+months?\b/i, result: { type: 'quarterly' as const } },
+    { regex: /\byearly\b/i, result: { type: 'yearly' as const } },
+    { regex: /\bannually\b/i, result: { type: 'yearly' as const } },
+    { regex: /\bevery\s+year\b/i, result: { type: 'yearly' as const } },
+    // Monthly
+    { regex: /\bmonthly\b/i, result: { type: 'monthly' as const } },
+    { regex: /\bevery\s+month\b/i, result: { type: 'monthly' as const } },
     // Weekdays
     { regex: /\bevery\s+weekday\b/i, result: { type: 'weekdays' as const } },
     { regex: /\bweekdays\b/i, result: { type: 'weekdays' as const } },
@@ -134,6 +155,34 @@ export function parseRoutine(input: string, contacts: Contact[] = []): ParsedRou
       })
       recurrenceFound = true
       break
+    }
+  }
+
+  // Check for "every other [day]" pattern (e.g., "every other monday")
+  if (!recurrenceFound) {
+    const everyOtherDayRegex = /\bevery\s+other\s+((?:sun|mon|tues?|wed(?:nes)?|thurs?|fri|sat)(?:day)?)\b/i
+    const match = normalized.match(everyOtherDayRegex)
+    if (match && match.index !== undefined) {
+      const dayText = match[1].toLowerCase()
+      let dayNum: number | null = null
+
+      for (const [name, num] of Object.entries(DAY_NAMES)) {
+        if (dayText.includes(name)) {
+          dayNum = num
+          break
+        }
+      }
+
+      if (dayNum !== null) {
+        recurrence = { type: 'biweekly', days: [dayNum] }
+        extractedRanges.push({
+          start: match.index,
+          end: match.index + match[0].length,
+          type: 'day-pattern',
+          text: `EVERY OTHER ${['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][dayNum]}`,
+        })
+        recurrenceFound = true
+      }
     }
   }
 
@@ -286,11 +335,21 @@ function formatTimeDisplay(time: string): string {
 function getRecurrenceDisplay(recurrence: ParsedRoutine['recurrence']): string {
   switch (recurrence.type) {
     case 'daily':
+      if (recurrence.interval === 2) return 'EVERY OTHER DAY'
+      if (recurrence.interval && recurrence.interval > 2) return `EVERY ${recurrence.interval} DAYS`
       return 'DAILY'
     case 'weekdays':
       return 'WEEKDAYS'
     case 'weekends':
       return 'WEEKENDS'
+    case 'biweekly': {
+      const days = recurrence.days || []
+      const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+      if (days.length === 1) {
+        return `EVERY OTHER ${dayNames[days[0]]}`
+      }
+      return 'BIWEEKLY'
+    }
     case 'weekly': {
       const days = recurrence.days || []
       const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
@@ -299,6 +358,12 @@ function getRecurrenceDisplay(recurrence: ParsedRoutine['recurrence']): string {
       }
       return days.map(d => dayNames[d]).join(', ')
     }
+    case 'monthly':
+      return 'MONTHLY'
+    case 'quarterly':
+      return 'QUARTERLY'
+    case 'yearly':
+      return 'YEARLY'
     default:
       return 'DAILY'
   }
@@ -309,18 +374,23 @@ function getRecurrenceDisplay(recurrence: ParsedRoutine['recurrence']): string {
  */
 export function parsedRoutineToDb(parsed: ParsedRoutine): {
   name: string
-  recurrence_pattern: { type: string; days?: string[] }
+  recurrence_pattern: { type: string; days?: string[]; interval?: number; start_date?: string }
   time_of_day: string | null
   default_assignee: string | null
   raw_input: string
 } {
   // Convert recurrence to DB format
   const dayMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-  let dbRecurrence: { type: string; days?: string[] }
+  let dbRecurrence: { type: string; days?: string[]; interval?: number; start_date?: string }
+  const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
 
   switch (parsed.recurrence.type) {
     case 'daily':
-      dbRecurrence = { type: 'daily' }
+      if (parsed.recurrence.interval && parsed.recurrence.interval > 1) {
+        dbRecurrence = { type: 'daily', interval: parsed.recurrence.interval, start_date: today }
+      } else {
+        dbRecurrence = { type: 'daily' }
+      }
       break
     case 'weekdays':
       dbRecurrence = { type: 'weekly', days: ['mon', 'tue', 'wed', 'thu', 'fri'] }
@@ -328,11 +398,30 @@ export function parsedRoutineToDb(parsed: ParsedRoutine): {
     case 'weekends':
       dbRecurrence = { type: 'weekly', days: ['sat', 'sun'] }
       break
+    case 'biweekly': {
+      // Store as weekly with interval 2
+      const days = parsed.recurrence.days
+      if (days && days.length > 0) {
+        dbRecurrence = { type: 'weekly', days: days.map(d => dayMap[d]), interval: 2, start_date: today }
+      } else {
+        dbRecurrence = { type: 'weekly', interval: 2, start_date: today }
+      }
+      break
+    }
     case 'weekly':
       dbRecurrence = {
         type: 'weekly',
         days: (parsed.recurrence.days || []).map(d => dayMap[d])
       }
+      break
+    case 'monthly':
+      dbRecurrence = { type: 'monthly' }
+      break
+    case 'quarterly':
+      dbRecurrence = { type: 'quarterly' }
+      break
+    case 'yearly':
+      dbRecurrence = { type: 'yearly' }
       break
     default:
       dbRecurrence = { type: 'daily' }
