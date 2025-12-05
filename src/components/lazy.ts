@@ -1,11 +1,16 @@
 import { lazy } from 'react'
 
-// Project views
+// Project views - Switch to ProjectsListRedesign to test new layout
 export const ProjectsList = lazy(() =>
-  import('./project/ProjectsList').then(m => ({ default: m.ProjectsList }))
+  import('./project/ProjectsListRedesign').then(m => ({ default: m.ProjectsListRedesign }))
 )
 export const ProjectView = lazy(() =>
   import('./project/ProjectViewRedesign').then(m => ({ default: m.ProjectViewRedesign }))
+)
+
+// Original ProjectsList (for rollback)
+export const ProjectsListOriginal = lazy(() =>
+  import('./project/ProjectsList').then(m => ({ default: m.ProjectsList }))
 )
 
 // Original ProjectView (for rollback)
@@ -13,15 +18,20 @@ export const ProjectViewOriginal = lazy(() =>
   import('./project/ProjectView').then(m => ({ default: m.ProjectView }))
 )
 
-// Routine views
+// Routine views - Switch to RoutinesListRedesign to test new layout
 export const RoutinesList = lazy(() =>
-  import('./routine/RoutinesList').then(m => ({ default: m.RoutinesList }))
+  import('./routine/RoutinesListRedesign').then(m => ({ default: m.RoutinesListRedesign }))
 )
 export const RoutineForm = lazy(() =>
   import('./routine/RoutineForm').then(m => ({ default: m.RoutineForm }))
 )
 export const RoutineInput = lazy(() =>
   import('./routine/RoutineInput').then(m => ({ default: m.RoutineInput }))
+)
+
+// Original RoutinesList (for rollback)
+export const RoutinesListOriginal = lazy(() =>
+  import('./routine/RoutinesList').then(m => ({ default: m.RoutinesList }))
 )
 
 // Task view (desktop) - Switch to TaskViewRedesign to test new layout

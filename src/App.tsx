@@ -645,6 +645,7 @@ function App() {
         <Suspense fallback={<LoadingFallback />}>
           <ProjectsList
             projects={projects}
+            tasks={tasks}
             onSelectProject={setSelectedProjectId}
             onAddProject={addProject}
           />
