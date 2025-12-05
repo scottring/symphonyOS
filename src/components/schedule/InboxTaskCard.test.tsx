@@ -8,8 +8,6 @@ describe('InboxTaskCard', () => {
   const mockOnPush = vi.fn()
   const mockOnSelect = vi.fn()
   const mockOnSearchContacts = vi.fn()
-  const mockOnAddContact = vi.fn()
-  const mockOnOpenProject = vi.fn()
   const mockOnAssign = vi.fn()
 
   const mockTask = createMockTask({

@@ -93,9 +93,12 @@ describe('ContactCard', () => {
 
     it('calls tel: link when clicking call button', () => {
       const originalLocation = window.location
-      // @ts-expect-error - mocking location
-      delete window.location
-      window.location = { ...originalLocation, href: '' }
+      const mockLocation = { ...originalLocation, href: '' }
+      Object.defineProperty(window, 'location', {
+        value: mockLocation,
+        writable: true,
+        configurable: true,
+      })
 
       render(<ContactCard contact={mockContact} />)
 
@@ -103,14 +106,21 @@ describe('ContactCard', () => {
 
       expect(window.location.href).toBe('tel:555-123-4567')
 
-      window.location = originalLocation
+      Object.defineProperty(window, 'location', {
+        value: originalLocation,
+        writable: true,
+        configurable: true,
+      })
     })
 
     it('calls sms: link when clicking text button', () => {
       const originalLocation = window.location
-      // @ts-expect-error - mocking location
-      delete window.location
-      window.location = { ...originalLocation, href: '' }
+      const mockLocation = { ...originalLocation, href: '' }
+      Object.defineProperty(window, 'location', {
+        value: mockLocation,
+        writable: true,
+        configurable: true,
+      })
 
       render(<ContactCard contact={mockContact} />)
 
@@ -118,7 +128,11 @@ describe('ContactCard', () => {
 
       expect(window.location.href).toBe('sms:555-123-4567')
 
-      window.location = originalLocation
+      Object.defineProperty(window, 'location', {
+        value: originalLocation,
+        writable: true,
+        configurable: true,
+      })
     })
   })
 

@@ -110,8 +110,6 @@ export function SearchModal({
 
   if (!isOpen) return null
 
-  const flat = flatResults()
-
   // Get current index for a result in the flat list
   const getResultIndex = (type: string, indexInType: number): number => {
     let offset = 0

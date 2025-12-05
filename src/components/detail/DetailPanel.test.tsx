@@ -65,9 +65,6 @@ const mockEvent: TimelineItem = {
     title: 'Test event',
     start_time: '2024-01-01T10:00:00Z',
     end_time: '2024-01-01T11:00:00Z',
-    user_id: 'test-user',
-    created_at: '2024-01-01T00:00:00Z',
-    updated_at: '2024-01-01T00:00:00Z',
   },
 }
 

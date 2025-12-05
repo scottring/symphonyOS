@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { RoutineForm } from './RoutineForm'
-import { createMockRoutine, createMockContact, createMockFamilyMember, resetIdCounter } from '@/test/mocks/factories'
+import { createMockRoutine, createMockFamilyMember, resetIdCounter } from '@/test/mocks/factories'
 import type { Routine } from '@/types/actionable'
 
 describe('RoutineForm', () => {

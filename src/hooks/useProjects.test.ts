@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { useProjects } from './useProjects'
 import { createMockUser, createMockDbProject, resetIdCounter } from '@/test/mocks/factories'
-import type { DbProject, ProjectStatus } from '@/types/project'
+import type { DbProject, ProjectStatus, Project } from '@/types/project'
 
 // Module-level state for mocking
 const mockUser = createMockUser()
@@ -171,14 +171,14 @@ describe('useProjects', () => {
         expect(result.current.loading).toBe(false)
       })
 
-      let addedProject
+      let addedProject: Project | null = null
 
       await act(async () => {
         addedProject = await result.current.addProject({ name: 'New Project' })
       })
 
       expect(addedProject).not.toBeNull()
-      expect(addedProject?.name).toBe('New Project')
+      expect(addedProject!.name).toBe('New Project')
       expect(mockInsert).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'New Project',
@@ -668,7 +668,7 @@ describe('useProjects', () => {
       mockSupabaseData = [
         createMockDbProject({ id: 'proj-1', name: 'Active', status: 'active' }),
         createMockDbProject({ id: 'proj-2', name: 'Completed', status: 'completed' }),
-        createMockDbProject({ id: 'proj-3', name: 'On Hold', status: 'on_hold' }),
+        createMockDbProject({ id: 'proj-3', name: 'Not Started', status: 'not_started' }),
       ]
 
       const { result } = renderHook(() => useProjects())

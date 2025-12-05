@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
-import { useEventNotes } from './useEventNotes'
+import { useEventNotes, type EventNote } from './useEventNotes'
 import { createMockUser, resetIdCounter } from '@/test/mocks/factories'
 
 // Module-level state for mocking
@@ -128,15 +128,15 @@ describe('useEventNotes', () => {
 
       const { result } = renderHook(() => useEventNotes())
 
-      let fetchedNote
+      let fetchedNote: EventNote | null = null
 
       await act(async () => {
         fetchedNote = await result.current.fetchNote('event-123')
       })
 
       expect(fetchedNote).not.toBeNull()
-      expect(fetchedNote?.googleEventId).toBe('event-123')
-      expect(fetchedNote?.notes).toBe('Test notes')
+      expect(fetchedNote!.googleEventId).toBe('event-123')
+      expect(fetchedNote!.notes).toBe('Test notes')
     })
 
     it('returns null when user is not authenticated', async () => {

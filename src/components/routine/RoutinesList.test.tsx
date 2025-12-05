@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { RoutinesList } from './RoutinesList'
 import { createMockRoutine, createMockContact, createMockFamilyMember, resetIdCounter } from '@/test/mocks/factories'
-import type { Routine } from '@/types/actionable'
 
 // Mock localStorage
 const localStorageMock = (() => {

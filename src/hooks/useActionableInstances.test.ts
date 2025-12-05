@@ -127,14 +127,14 @@ describe('useActionableInstances', () => {
 
       const { result } = renderHook(() => useActionableInstances())
 
-      let instance
+      let instance: ActionableInstance | null = null
 
       await act(async () => {
         instance = await result.current.getInstance('routine', 'routine-1', new Date('2024-01-15'))
       })
 
       expect(instance).not.toBeNull()
-      expect(instance?.id).toBe('inst-1')
+      expect(instance!.id).toBe('inst-1')
     })
 
     it('returns null when user is not authenticated', async () => {
@@ -178,14 +178,14 @@ describe('useActionableInstances', () => {
 
       const { result } = renderHook(() => useActionableInstances())
 
-      let instance
+      let instance: ActionableInstance | null = null
 
       await act(async () => {
         instance = await result.current.getOrCreateInstance('routine', 'routine-1', new Date('2024-01-15'))
       })
 
       expect(instance).not.toBeNull()
-      expect(instance?.id).toBe('inst-1')
+      expect(instance!.id).toBe('inst-1')
       expect(mockInsert).not.toHaveBeenCalled()
     })
 
@@ -507,14 +507,14 @@ describe('useActionableInstances', () => {
 
       const { result } = renderHook(() => useActionableInstances())
 
-      let addedNote
+      let addedNote: InstanceNote | null = null
 
       await act(async () => {
         addedNote = await result.current.addNote('routine', 'routine-1', new Date('2024-01-15'), 'Test note')
       })
 
       expect(addedNote).not.toBeNull()
-      expect(addedNote?.note).toBe('Test note')
+      expect(addedNote!.note).toBe('Test note')
     })
 
     it('returns null when user is not authenticated', async () => {
@@ -579,14 +579,14 @@ describe('useActionableInstances', () => {
 
       const { result } = renderHook(() => useActionableInstances())
 
-      let request
+      let request: CoverageRequest | null = null
 
       await act(async () => {
         request = await result.current.requestCoverage('routine', 'routine-1', new Date('2024-01-15'))
       })
 
       expect(request).not.toBeNull()
-      expect(request?.status).toBe('pending')
+      expect(request!.status).toBe('pending')
     })
 
     it('returns null when user is not authenticated', async () => {
