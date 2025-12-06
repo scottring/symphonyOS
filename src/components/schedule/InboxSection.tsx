@@ -1,42 +1,56 @@
+import { useState } from 'react'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
 import { InboxTaskCard } from './InboxTaskCard'
-import { TriageCard } from '@/components/triage'
+import { TriageCard, InboxTriageModal } from '@/components/triage'
 
 interface InboxSectionProps {
   tasks: Task[]
   onUpdateTask: (id: string, updates: Partial<Task>) => void
   onPushTask: (id: string, date: Date) => void
   onSelectTask: (taskId: string) => void
+  onDeleteTask?: (taskId: string) => void
   projects?: Project[]
   contacts?: Contact[]
   onSearchContacts?: (query: string) => Contact[]
   onAddContact?: (name: string) => Promise<Contact | null>
+  onAddProject?: (project: { name: string }) => Promise<Project | null>
   recentlyCreatedTaskId?: string | null
   onTriageCardCollapse?: () => void
   onOpenProject?: (projectId: string) => void
   // Family member assignment
   familyMembers?: FamilyMember[]
   onAssignTask?: (taskId: string, memberId: string | null) => void
+  currentUserId?: string
 }
 
 export function InboxSection({
   tasks,
   onUpdateTask,
   onPushTask,
-  onSelectTask,
+  onSelectTask: _onSelectTask, // Reserved for future use - direct task selection
+  onDeleteTask,
   projects = [],
   contacts = [],
   onSearchContacts,
   onAddContact,
+  onAddProject,
   recentlyCreatedTaskId,
   onTriageCardCollapse,
   onOpenProject,
   familyMembers = [],
-  onAssignTask,
+  onAssignTask: _onAssignTask, // Reserved for future use - assignment from card
+  currentUserId,
 }: InboxSectionProps) {
+  void _onSelectTask
+  void _onAssignTask
+  // Triage modal state
+  const [triageTaskId, setTriageTaskId] = useState<string | null>(null)
+  const triageTask = triageTaskId ? tasks.find(t => t.id === triageTaskId) : null
+
+  // Note: contacts/onSearchContacts/onAddContact kept for TriageCard, but not passed to InboxTaskCard
   // Don't render if no inbox tasks
   if (tasks.length === 0) return null
 
@@ -78,22 +92,59 @@ export function InboxSection({
           <InboxTaskCard
             key={task.id}
             task={task}
+            onDefer={(date) => {
+              if (date) {
+                // Defer to specified date
+                onPushTask(task.id, date)
+              } else {
+                // Clear deferral - show now
+                onUpdateTask(task.id, { deferredUntil: undefined })
+              }
+            }}
             onUpdate={(updates) => onUpdateTask(task.id, updates)}
-            onPush={(date) => onPushTask(task.id, date)}
-            onSelect={() => onSelectTask(task.id)}
+            onSelect={() => setTriageTaskId(task.id)}
             projects={projects}
-            contacts={contacts}
-            onSearchContacts={onSearchContacts}
-            onAddContact={onAddContact}
             onOpenProject={onOpenProject}
-            familyMembers={familyMembers}
-            onAssign={onAssignTask
-              ? (memberId) => onAssignTask(task.id, memberId)
-              : undefined
-            }
           />
         ))}
       </div>
+
+      {/* Inbox Triage Modal */}
+      {triageTask && (
+        <InboxTriageModal
+          task={triageTask}
+          isOpen={!!triageTaskId}
+          onClose={() => setTriageTaskId(null)}
+          onProcessAsTask={(updates) => {
+            onUpdateTask(triageTask.id, updates)
+            setTriageTaskId(null)
+          }}
+          onConvertToProject={async (name, domain) => {
+            // Create project with task's name
+            if (onAddProject) {
+              const newProject = await onAddProject({ name })
+              if (newProject) {
+                // Update task to link to project and optionally set domain
+                const updates: Partial<Task> = { projectId: newProject.id }
+                if (domain) {
+                  updates.context = domain
+                }
+                onUpdateTask(triageTask.id, updates)
+              }
+            }
+            setTriageTaskId(null)
+          }}
+          onDelete={() => {
+            if (onDeleteTask) {
+              onDeleteTask(triageTask.id)
+            }
+            setTriageTaskId(null)
+          }}
+          projects={projects}
+          familyMembers={familyMembers}
+          currentUserId={currentUserId}
+        />
+      )}
     </div>
   )
 }

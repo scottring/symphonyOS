@@ -1,14 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { InboxTaskCard } from './InboxTaskCard'
-import { createMockTask, createMockProject, createMockContact, createMockFamilyMember } from '@/test/mocks/factories'
+import { createMockTask, createMockProject } from '@/test/mocks/factories'
 
 describe('InboxTaskCard', () => {
   const mockOnUpdate = vi.fn()
-  const mockOnPush = vi.fn()
   const mockOnSelect = vi.fn()
-  const mockOnSearchContacts = vi.fn()
-  const mockOnAssign = vi.fn()
+  const mockOnDefer = vi.fn()
 
   const mockTask = createMockTask({
     id: 'task-1',
@@ -20,24 +18,15 @@ describe('InboxTaskCard', () => {
     createMockProject({ id: 'project-1', name: 'My Project' }),
   ]
 
-  const mockContacts = [
-    createMockContact({ id: 'contact-1', name: 'John Doe' }),
-  ]
-
-  const mockFamilyMembers = [
-    createMockFamilyMember({ id: 'member-1', name: 'Alice' }),
-  ]
-
   const defaultProps = {
     task: mockTask,
     onUpdate: mockOnUpdate,
-    onPush: mockOnPush,
     onSelect: mockOnSelect,
+    onDefer: mockOnDefer,
   }
 
   beforeEach(() => {
     vi.clearAllMocks()
-    mockOnSearchContacts.mockReturnValue([])
   })
 
   describe('rendering', () => {
@@ -111,23 +100,61 @@ describe('InboxTaskCard', () => {
     })
   })
 
-  describe('triage icons', () => {
-    it('renders WhenPicker', () => {
+  describe('defer picker', () => {
+    it('renders DeferPicker', () => {
       render(<InboxTaskCard {...defaultProps} />)
 
-      expect(screen.getByRole('button', { name: 'Set date' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Defer item' })).toBeInTheDocument()
     })
 
-    it('renders PushDropdown', () => {
+    it('calls onDefer when Tomorrow is selected', () => {
       render(<InboxTaskCard {...defaultProps} />)
 
-      expect(screen.getByRole('button', { name: 'Push task' })).toBeInTheDocument()
+      // Open DeferPicker
+      fireEvent.click(screen.getByRole('button', { name: 'Defer item' }))
+      // Select Tomorrow
+      fireEvent.click(screen.getByText('Tomorrow'))
+
+      expect(mockOnDefer).toHaveBeenCalledWith(expect.any(Date))
     })
 
-    it('renders AssignPicker', () => {
+    it('calls onDefer when Next Week is selected', () => {
       render(<InboxTaskCard {...defaultProps} />)
 
-      expect(screen.getByRole('button', { name: 'Assign to' })).toBeInTheDocument()
+      // Open DeferPicker
+      fireEvent.click(screen.getByRole('button', { name: 'Defer item' }))
+      // Select Next Week
+      fireEvent.click(screen.getByText('Next Week'))
+
+      expect(mockOnDefer).toHaveBeenCalledWith(expect.any(Date))
+    })
+
+    it('shows Show Now option when task is deferred', () => {
+      const deferredTask = createMockTask({
+        ...mockTask,
+        deferredUntil: new Date('2024-12-25'),
+      })
+      render(<InboxTaskCard {...defaultProps} task={deferredTask} />)
+
+      // Open DeferPicker
+      fireEvent.click(screen.getByRole('button', { name: 'Defer item' }))
+
+      expect(screen.getByText('Show Now')).toBeInTheDocument()
+    })
+
+    it('calls onDefer with undefined when Show Now is clicked', () => {
+      const deferredTask = createMockTask({
+        ...mockTask,
+        deferredUntil: new Date('2024-12-25'),
+      })
+      render(<InboxTaskCard {...defaultProps} task={deferredTask} />)
+
+      // Open DeferPicker
+      fireEvent.click(screen.getByRole('button', { name: 'Defer item' }))
+      // Click Show Now
+      fireEvent.click(screen.getByText('Show Now'))
+
+      expect(mockOnDefer).toHaveBeenCalledWith(undefined)
     })
   })
 
@@ -154,7 +181,7 @@ describe('InboxTaskCard', () => {
       expect(container).toBeInTheDocument()
     })
 
-    it('does not render chip row when no project, contact, or member', () => {
+    it('does not render chip row when no project', () => {
       render(<InboxTaskCard {...defaultProps} projects={mockProjects} />)
 
       // No chips row should be rendered
@@ -163,54 +190,7 @@ describe('InboxTaskCard', () => {
     })
   })
 
-  describe('contact chip', () => {
-    // Note: Chips are hidden on mobile (hidden md:flex class)
-
-    it('renders chip row when task has contact', () => {
-      const taskWithContact = createMockTask({
-        ...mockTask,
-        contactId: 'contact-1',
-      })
-
-      render(
-        <InboxTaskCard
-          {...defaultProps}
-          task={taskWithContact}
-          contacts={mockContacts}
-        />
-      )
-
-      // The chip row exists in DOM even if hidden by CSS
-      const container = document.querySelector('.hidden.md\\:flex')
-      expect(container).toBeInTheDocument()
-    })
-  })
-
-  describe('family member chip', () => {
-    // Note: Chips are hidden on mobile (hidden md:flex class)
-
-    it('renders chip row when task has assignee', () => {
-      const taskWithAssignee = createMockTask({
-        ...mockTask,
-        assignedTo: 'member-1',
-      })
-
-      render(
-        <InboxTaskCard
-          {...defaultProps}
-          task={taskWithAssignee}
-          familyMembers={mockFamilyMembers}
-          onAssign={mockOnAssign}
-        />
-      )
-
-      // The chip row exists in DOM even if hidden by CSS
-      const container = document.querySelector('.hidden.md\\:flex')
-      expect(container).toBeInTheDocument()
-    })
-  })
-
-  describe('defer badge', () => {
+  describe('defer badge in DeferPicker', () => {
     it('shows defer badge when deferCount >= 2', () => {
       const deferredTask = createMockTask({
         ...mockTask,
@@ -237,80 +217,6 @@ describe('InboxTaskCard', () => {
       render(<InboxTaskCard {...defaultProps} />)
 
       expect(screen.queryByText(/↻/)).not.toBeInTheDocument()
-    })
-  })
-
-  describe('family member dropdown', () => {
-    it('renders AssigneeDropdown when family members provided', () => {
-      render(
-        <InboxTaskCard
-          {...defaultProps}
-          familyMembers={mockFamilyMembers}
-          onAssign={mockOnAssign}
-        />
-      )
-
-      // Look for the assignee dropdown button (distinct from AssignPicker)
-      const buttons = screen.getAllByRole('button')
-      // Should have multiple buttons including assignee dropdown
-      expect(buttons.length).toBeGreaterThan(4)
-    })
-
-    it('does not render AssigneeDropdown when no family members', () => {
-      render(
-        <InboxTaskCard
-          {...defaultProps}
-          familyMembers={[]}
-          onAssign={mockOnAssign}
-        />
-      )
-
-      // Should only have the standard buttons
-      const buttons = screen.getAllByRole('button')
-      expect(buttons.length).toBe(5) // checkbox, title, when, push, assign
-    })
-
-    it('does not render AssigneeDropdown when onAssign not provided', () => {
-      render(
-        <InboxTaskCard
-          {...defaultProps}
-          familyMembers={mockFamilyMembers}
-        />
-      )
-
-      // Should only have the standard buttons
-      const buttons = screen.getAllByRole('button')
-      expect(buttons.length).toBe(5) // checkbox, title, when, push, assign
-    })
-  })
-
-  describe('triage picker interactions', () => {
-    it('WhenPicker updates task when date is selected', () => {
-      render(<InboxTaskCard {...defaultProps} />)
-
-      // Open WhenPicker
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
-      // Select Today
-      fireEvent.click(screen.getByText('Today'))
-      // Select All Day
-      fireEvent.click(screen.getByText('All Day'))
-
-      expect(mockOnUpdate).toHaveBeenCalledWith(expect.objectContaining({
-        scheduledFor: expect.any(Date),
-        isAllDay: true,
-        deferredUntil: undefined,
-      }))
-    })
-
-    it('PushDropdown calls onPush when date selected', () => {
-      render(<InboxTaskCard {...defaultProps} />)
-
-      // Open PushDropdown
-      fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
-      // Select Tomorrow
-      fireEvent.click(screen.getByText('Tomorrow'))
-
-      expect(mockOnPush).toHaveBeenCalledWith(expect.any(Date))
     })
   })
 })

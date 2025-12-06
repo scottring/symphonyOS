@@ -494,6 +494,7 @@ export function TodaySchedule({
               onUpdateTask={onUpdateTask}
               onPushTask={onPushTask}
               onSelectTask={(taskId) => onSelectItem(`task-${taskId}`)}
+              onDeleteTask={onDeleteTask}
               projects={projects}
               contacts={contacts}
               onSearchContacts={onSearchContacts}
