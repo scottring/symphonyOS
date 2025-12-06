@@ -1338,7 +1338,8 @@ export function DetailPanelRedesign({
                       const [hours, minutes] = timeValue.split(':').map(Number)
                       const newDate = new Date(existing)
                       newDate.setHours(hours, minutes, 0)
-                      onUpdate(item.originalTask.id, { scheduledFor: newDate })
+                      // When a specific time is set, it's no longer an all-day task
+                      onUpdate(item.originalTask.id, { scheduledFor: newDate, isAllDay: false })
                     }
                   }}
                   className="w-full px-4 py-3 text-base rounded-xl border border-neutral-200

@@ -54,7 +54,8 @@ export function QuickCapture({
     if (!trimmed) return
     onAdd(trimmed)
     setTitle('')
-    handleClose()
+    // Keep modal open and refocus for rapid entry
+    inputRef.current?.focus()
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
