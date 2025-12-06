@@ -298,10 +298,10 @@ export function TodaySchedule({
   const progressPercent = actionableCount > 0 ? (completedCount / actionableCount) * 100 : 0
 
   return (
-    <div className="p-6 md:p-8 max-w-2xl mx-auto">
+    <div className="px-4 py-4 md:p-8 max-w-2xl mx-auto">
       {/* Header */}
-      <div className="mb-8 animate-fade-in-up">
-        <div className="flex items-center justify-between mb-6">
+      <div className="mb-6 animate-fade-in-up">
+        <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="font-display text-2xl md:text-3xl font-semibold text-neutral-900 mb-1">
               {isToday ? 'Today' : formatDate().split(',')[0]}

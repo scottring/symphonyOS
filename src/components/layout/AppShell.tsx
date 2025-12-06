@@ -42,7 +42,7 @@ export function AppShell({
   const isMobile = useMobile()
 
   return (
-    <div className="h-screen flex overflow-hidden bg-bg-base">
+    <div className="h-screen flex overflow-hidden overflow-x-hidden bg-bg-base w-full max-w-[100vw]">
       {/* Sidebar - hidden on mobile */}
       {!isMobile && (
         <Sidebar
@@ -59,25 +59,25 @@ export function AppShell({
       {/* Main content area */}
       <main
         className={`
-          flex-1 overflow-auto
+          flex-1 overflow-auto overflow-x-hidden
           transition-all duration-300 ease-in-out
           ${!isMobile && panelOpen ? 'mr-[420px]' : ''}
-          ${isMobile ? 'pb-24' : ''}
+          ${isMobile ? 'pb-16' : ''}
         `}
-        style={isMobile ? { paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' } : undefined}
+        style={isMobile ? { paddingBottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' } : undefined}
       >
         {/* Mobile header */}
         {isMobile && (
-          <header className="sticky top-0 z-10 bg-bg-elevated/95 backdrop-blur-lg border-b border-neutral-200/50 px-5 py-3"
-                  style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}>
+          <header className="sticky top-0 z-10 bg-bg-elevated/95 backdrop-blur-lg border-b border-neutral-200/50 px-4 py-2"
+                  style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.5rem)' }}>
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <img
                   src={symphonyLogo}
                   alt="Symphony"
-                  className="w-9 h-9 rounded-xl object-cover"
+                  className="w-8 h-8 rounded-lg object-cover"
                 />
-                <span className="font-display text-lg font-semibold text-neutral-900">Symphony</span>
+                <span className="font-display text-base font-semibold text-neutral-900">Symphony</span>
               </div>
               <div className="flex items-center gap-1">
                 {onOpenSearch && (
@@ -161,53 +161,53 @@ export function AppShell({
       {isMobile && !panelOpen && (
         <nav className="fixed bottom-0 left-0 right-0 z-40 bg-bg-elevated/95 backdrop-blur-lg border-t border-neutral-200/50"
              style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-          <div className="flex items-center justify-around px-6 py-2">
+          <div className="flex items-center justify-around px-4 py-1.5">
             <button
               onClick={() => onViewChange('home')}
               className={`
-                flex flex-col items-center gap-1 px-5 py-2 rounded-xl transition-all
+                flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-all
                 ${activeView === 'home'
                   ? 'text-primary-600'
                   : 'text-neutral-400 hover:text-neutral-600'
                 }
               `}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 20 20" fill="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
               </svg>
-              <span className={`text-xs font-medium ${activeView === 'home' ? 'font-semibold' : ''}`}>Home</span>
+              <span className={`text-[10px] font-medium ${activeView === 'home' ? 'font-semibold' : ''}`}>Home</span>
             </button>
 
             <button
               onClick={() => onViewChange('projects')}
               className={`
-                flex flex-col items-center gap-1 px-5 py-2 rounded-xl transition-all
+                flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-all
                 ${activeView === 'projects'
                   ? 'text-blue-600'
                   : 'text-neutral-400 hover:text-neutral-600'
                 }
               `}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 20 20" fill="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
               </svg>
-              <span className={`text-xs font-medium ${activeView === 'projects' ? 'font-semibold' : ''}`}>Projects</span>
+              <span className={`text-[10px] font-medium ${activeView === 'projects' ? 'font-semibold' : ''}`}>Projects</span>
             </button>
 
             <button
               onClick={() => onViewChange('routines')}
               className={`
-                flex flex-col items-center gap-1 px-5 py-2 rounded-xl transition-all
+                flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-all
                 ${activeView === 'routines'
                   ? 'text-amber-600'
                   : 'text-neutral-400 hover:text-neutral-600'
                 }
               `}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 20 20" fill="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
               </svg>
-              <span className={`text-xs font-medium ${activeView === 'routines' ? 'font-semibold' : ''}`}>Routines</span>
+              <span className={`text-[10px] font-medium ${activeView === 'routines' ? 'font-semibold' : ''}`}>Routines</span>
             </button>
           </div>
         </nav>
