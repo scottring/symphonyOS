@@ -73,3 +73,8 @@ export const CalendarConnect = lazy(() =>
 export const OnboardingWizard = lazy(() =>
   import('./onboarding').then(m => ({ default: m.OnboardingWizard }))
 )
+
+// Settings
+export const SettingsPage = lazy(() =>
+  import('./settings/SettingsPage').then(m => ({ default: m.SettingsPage }))
+)

@@ -45,12 +45,12 @@ export function useFamilyMembers() {
         return
       }
 
-      // Seed default family
+      // Only seed the current user - they'll add family in onboarding
+      const userName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Me'
+      const initials = userName.split(/\s+/).map((w: string) => w[0]).join('').substring(0, 2).toUpperCase()
+
       const defaultMembers = [
-        { name: 'Scott', initials: 'SK', color: 'blue', is_full_user: true, display_order: 0, avatar_url: null },
-        { name: 'Iris', initials: 'IR', color: 'purple', is_full_user: false, display_order: 1, avatar_url: null },
-        { name: 'Ella', initials: 'EL', color: 'green', is_full_user: false, display_order: 2, avatar_url: null },
-        { name: 'Kaleb', initials: 'KA', color: 'orange', is_full_user: false, display_order: 3, avatar_url: null },
+        { name: userName, initials, color: 'blue', is_full_user: true, display_order: 0, avatar_url: null },
       ]
 
       try {

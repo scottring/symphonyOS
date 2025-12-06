@@ -27,6 +27,7 @@ import {
   AuthForm,
   CalendarConnect,
   OnboardingWizard,
+  SettingsPage,
 } from '@/components/lazy'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import type { ViewType } from '@/components/layout/Sidebar'
@@ -707,6 +708,12 @@ function App() {
             onDelete={deleteRoutine}
             onToggleVisibility={toggleRoutineVisibility}
           />
+        </Suspense>
+      )}
+
+      {activeView === 'settings' && (
+        <Suspense fallback={<LoadingFallback />}>
+          <SettingsPage onBack={() => handleViewChange('home')} />
         </Suspense>
       )}
 
