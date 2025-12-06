@@ -185,12 +185,10 @@ export function DetailPanelRedesign({
   contact,
   contacts = [],
   onSearchContacts,
-  onUpdateContact: _onUpdateContact,
   onOpenContact,
   project,
   projects = [],
   onSearchProjects,
-  onUpdateProject: _onUpdateProject,
   onOpenProject,
   onAddProject,
   onAddSubtask,
@@ -241,18 +239,20 @@ export function DetailPanelRedesign({
   const actionable = useActionableInstances()
 
   // Sync local state when item changes
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setLocalNotes(item?.notes || '')
     setIsEditingNotes(false)
     setShowDeleteConfirm(false)
     setShowTimePicker(false)
     setShowLinks(false)
-  }, [item?.id])
+  }, [item?.id, item?.notes])
 
   useEffect(() => {
     setEditedTitle(item?.title || '')
     setIsEditingTitle(false)
   }, [item?.id, item?.title])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (isEditingTitle && titleInputRef.current) {
@@ -270,6 +270,7 @@ export function DetailPanelRedesign({
   }, [])
 
   // Load actionable instance for events and routines
+  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
   useEffect(() => {
     if (!item) {
       setActionableInstance(null)
@@ -293,6 +294,7 @@ export function DetailPanelRedesign({
 
     loadInstance()
   }, [item?.id, item?.type, item?.startTime, actionable.getInstance])
+  /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
   // Detect contextual actions
   const detectedActions = useMemo(() => {

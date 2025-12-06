@@ -48,6 +48,7 @@ export function SearchModal({
   }, [results, expandedSections])
 
   // Focus input when modal opens
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (isOpen) {
       inputRef.current?.focus()
@@ -60,6 +61,7 @@ export function SearchModal({
   useEffect(() => {
     setSelectedIndex(0)
   }, [results])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Handle keyboard navigation
   useEffect(() => {

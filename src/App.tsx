@@ -8,7 +8,6 @@ import { useProjects } from '@/hooks/useProjects'
 import { useRoutines } from '@/hooks/useRoutines'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
-import { useMobile } from '@/hooks/useMobile'
 import { useSearch, type SearchResult } from '@/hooks/useSearch'
 import { supabase } from '@/lib/supabase'
 import { AppShell } from '@/components/layout/AppShell'
@@ -56,7 +55,6 @@ function App() {
   } = useRoutines()
   const { getInstancesForDate, markDone, undoDone, skip } = useActionableInstances()
   const { members: familyMembers } = useFamilyMembers()
-  const isMobile = useMobile()
 
   // Search state
   const [searchOpen, setSearchOpen] = useState(false)
@@ -180,7 +178,6 @@ function App() {
   }, [viewedDate, getInstancesForDate])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetch is valid
     refreshDateInstances()
   }, [refreshDateInstances])
 
@@ -350,7 +347,7 @@ function App() {
     return contactsMap.get(selectedContactId) ?? null
   }, [selectedContactId, contactsMap])
 
-  // Handle selecting an item - routes tasks differently on desktop vs mobile
+  // Handle selecting an item - all types open DetailPanel (unified UX)
   const handleSelectItem = useCallback((itemId: string | null) => {
     if (!itemId) {
       setSelectedItemId(null)
@@ -358,26 +355,11 @@ function App() {
       return
     }
 
-    // Check if it's a task
-    if (itemId.startsWith('task-')) {
-      const taskId = itemId.replace('task-', '')
-      if (isMobile) {
-        // Mobile: open DetailPanel as bottom sheet
-        setSelectedItemId(itemId)
-        setSelectedTaskId(null)
-      } else {
-        // Desktop: navigate to TaskView page
-        setSelectedTaskId(taskId)
-        setActiveView('task-detail')
-        setSelectedItemId(null)
-      }
-    } else {
-      // Events and routines: always use DetailPanel
-      setSelectedItemId(itemId)
-      setSelectedTaskId(null)
-    }
+    // All item types (tasks, events, routines) use DetailPanel
+    setSelectedItemId(itemId)
+    setSelectedTaskId(null)
     setRecipeUrl(null)
-  }, [isMobile])
+  }, [])
 
   // Get selected task for TaskView (desktop)
   const selectedTask = useMemo(() => {

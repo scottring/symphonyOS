@@ -85,6 +85,7 @@ export function TaskViewRedesign({
   const [isAddingSubtask, setIsAddingSubtask] = useState(false)
 
   // Sync state when task changes
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setEditedTitle(task.title)
     setLocalNotes(task.notes || '')
@@ -92,6 +93,7 @@ export function TaskViewRedesign({
     setShowDeleteConfirm(false)
     setShowTimePicker(false)
   }, [task.id, task.title, task.notes])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (isEditingTitle && titleInputRef.current) {

@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { AuthForm } from './AuthForm'
+
+const { mockSignInWithEmail, mockSignUpWithEmail } = vi.hoisted(() => ({
+  mockSignInWithEmail: vi.fn(),
+  mockSignUpWithEmail: vi.fn(),
+}))
 
 // Mock the useAuth hook
 vi.mock('@/hooks/useAuth', () => ({
@@ -10,14 +15,11 @@ vi.mock('@/hooks/useAuth', () => ({
   }),
 }))
 
-const mockSignInWithEmail = vi.fn()
-const mockSignUpWithEmail = vi.fn()
-
 describe('AuthForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockSignInWithEmail.mockResolvedValue({ error: null })
-    mockSignUpWithEmail.mockResolvedValue({ error: null })
+    mockSignInWithEmail.mockImplementation(() => Promise.resolve({ error: null }))
+    mockSignUpWithEmail.mockImplementation(() => Promise.resolve({ error: null }))
   })
 
   describe('rendering', () => {
@@ -179,13 +181,18 @@ describe('AuthForm', () => {
     })
 
     it('shows error message on sign in failure', async () => {
-      mockSignInWithEmail.mockResolvedValue({ error: { message: 'Invalid credentials' } })
-
       render(<AuthForm />)
 
       fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'test@example.com' } })
       fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'wrong' } })
-      fireEvent.click(screen.getByRole('button', { name: 'Sign In' }))
+
+      // Set mock to return error before form submission
+      mockSignInWithEmail.mockImplementation(() => Promise.resolve({ error: { message: 'Invalid credentials' } }))
+
+      const form = screen.getByRole('button', { name: 'Sign In' }).closest('form')!
+      await act(async () => {
+        fireEvent.submit(form)
+      })
 
       await waitFor(() => {
         expect(screen.getByText('Invalid credentials')).toBeInTheDocument()
@@ -208,7 +215,7 @@ describe('AuthForm', () => {
     })
 
     it('shows success message on successful sign up', async () => {
-      mockSignUpWithEmail.mockResolvedValue({ error: null })
+      mockSignUpWithEmail.mockImplementation(() => Promise.resolve({ error: null }))
 
       render(<AuthForm />)
 
@@ -223,7 +230,7 @@ describe('AuthForm', () => {
     })
 
     it('shows error message on sign up failure', async () => {
-      mockSignUpWithEmail.mockResolvedValue({ error: { message: 'Email already taken' } })
+      mockSignUpWithEmail.mockImplementation(() => Promise.resolve({ error: { message: 'Email already taken' } }))
 
       render(<AuthForm />)
 
@@ -240,7 +247,7 @@ describe('AuthForm', () => {
 
   describe('error styling', () => {
     it('applies success styling for confirmation message', async () => {
-      mockSignUpWithEmail.mockResolvedValue({ error: null })
+      mockSignUpWithEmail.mockImplementation(() => Promise.resolve({ error: null }))
 
       render(<AuthForm />)
 
@@ -256,13 +263,18 @@ describe('AuthForm', () => {
     })
 
     it('applies error styling for error messages', async () => {
-      mockSignInWithEmail.mockResolvedValue({ error: { message: 'Invalid credentials' } })
-
       render(<AuthForm />)
 
       fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'test@example.com' } })
       fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'wrong' } })
-      fireEvent.click(screen.getByRole('button', { name: 'Sign In' }))
+
+      // Set mock to return error before form submission
+      mockSignInWithEmail.mockImplementation(() => Promise.resolve({ error: { message: 'Invalid credentials' } }))
+
+      const form = screen.getByRole('button', { name: 'Sign In' }).closest('form')!
+      await act(async () => {
+        fireEvent.submit(form)
+      })
 
       await waitFor(() => {
         const message = screen.getByText('Invalid credentials')

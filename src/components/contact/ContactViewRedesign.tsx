@@ -43,6 +43,7 @@ export function ContactViewRedesign({
   const completedTasks = linkedTasks.filter(t => t.completed)
 
   // Sync state when contact changes
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setEditedName(contact.name)
     setLocalPhone(contact.phone || '')
@@ -51,6 +52,7 @@ export function ContactViewRedesign({
     setIsEditingName(false)
     setShowDeleteConfirm(false)
   }, [contact.id, contact.name, contact.phone, contact.email, contact.notes])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (isEditingName && nameInputRef.current) {

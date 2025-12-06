@@ -14,6 +14,42 @@ interface ProjectWithStats extends Project {
   completedCount: number
 }
 
+interface SectionHeaderProps {
+  title: string
+  count: number
+  collapsed?: boolean
+  onToggle?: () => void
+}
+
+function SectionHeader({ title, count, collapsed, onToggle }: SectionHeaderProps) {
+  return (
+    <div className="flex items-center gap-3 mb-4">
+      {onToggle ? (
+        <button
+          onClick={onToggle}
+          className="flex items-center gap-2 text-xs font-semibold text-neutral-400 uppercase tracking-wider
+                     hover:text-neutral-600 transition-colors"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className={`w-4 h-4 transition-transform duration-200 ${collapsed ? '' : 'rotate-90'}`}
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+          </svg>
+          {title}
+          <span className="text-neutral-300">({count})</span>
+        </button>
+      ) : (
+        <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
+          {title} <span className="text-neutral-300">({count})</span>
+        </span>
+      )}
+    </div>
+  )
+}
+
 export function ProjectsListRedesign({ projects, tasks = [], onSelectProject, onAddProject }: ProjectsListProps) {
   const [isCreating, setIsCreating] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
@@ -148,44 +184,6 @@ export function ProjectsListRedesign({ projects, tasks = [], onSelectProject, on
       </button>
     )
   }
-
-  // Section header component
-  const SectionHeader = ({
-    title,
-    count,
-    collapsed,
-    onToggle
-  }: {
-    title: string
-    count: number
-    collapsed?: boolean
-    onToggle?: () => void
-  }) => (
-    <div className="flex items-center gap-3 mb-4">
-      {onToggle ? (
-        <button
-          onClick={onToggle}
-          className="flex items-center gap-2 text-xs font-semibold text-neutral-400 uppercase tracking-wider
-                     hover:text-neutral-600 transition-colors"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className={`w-4 h-4 transition-transform duration-200 ${collapsed ? '' : 'rotate-90'}`}
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-          </svg>
-          {title}
-          <span className="text-neutral-300">({count})</span>
-        </button>
-      ) : (
-        <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
-          {title} <span className="text-neutral-300">({count})</span>
-        </span>
-      )}
-    </div>
-  )
 
   const hasProjects = projects.length > 0
 

@@ -55,6 +55,7 @@ export function useSearch({ tasks, projects, contacts, routines }: UseSearchProp
   const [isSearching, setIsSearching] = useState(false)
 
   // Debounce the query
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (query === '') {
       setDebouncedQuery('')
@@ -70,6 +71,7 @@ export function useSearch({ tasks, projects, contacts, routines }: UseSearchProp
 
     return () => clearTimeout(timer)
   }, [query])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Flatten tasks to include subtasks
   const allTasks = useMemo(() => flattenTasks(tasks), [tasks])

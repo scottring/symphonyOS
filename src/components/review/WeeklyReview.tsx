@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
@@ -37,10 +37,10 @@ export function WeeklyReview({
   }
 
   // Graceful close with animation
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setIsClosing(true)
     setTimeout(onClose, 200)
-  }
+  }, [onClose])
 
   // Close on escape key
   useEffect(() => {
@@ -51,7 +51,7 @@ export function WeeklyReview({
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [handleClose])
 
   // Close on click outside
   useEffect(() => {
@@ -62,7 +62,7 @@ export function WeeklyReview({
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [handleClose])
 
   // Wrapped handlers that track processed state
   const handleSchedule = (taskId: string, date: Date | undefined, isAllDay?: boolean) => {

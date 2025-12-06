@@ -23,6 +23,7 @@ export function AddStopInput({ onAddStop, onSearch, onGetDetails }: AddStopInput
   }, [isOpen])
 
   // Debounced search
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!query.trim()) {
       setResults([])
@@ -46,6 +47,7 @@ export function AddStopInput({ onAddStop, onSearch, onGetDetails }: AddStopInput
       }
     }
   }, [query, onSearch])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleSelectPlace = async (result: PlaceAutocompleteResult) => {
     const details = await onGetDetails(result.placeId)

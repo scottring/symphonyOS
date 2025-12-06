@@ -1115,8 +1115,8 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
               <div
                 role="button"
                 tabIndex={0}
-                onClick={() => contact ? toggleSection('contact') : setShowContactPicker(true)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); contact ? toggleSection('contact') : setShowContactPicker(true) } }}
+                onClick={() => { if (contact) { toggleSection('contact') } else { setShowContactPicker(true) } }}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (contact) { toggleSection('contact') } else { setShowContactPicker(true) } } }}
                 className="w-full px-4 py-3 flex items-center gap-3 hover:bg-neutral-50 transition-colors cursor-pointer"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-neutral-400" viewBox="0 0 20 20" fill="currentColor">
@@ -1229,7 +1229,7 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
           {isTask && (
             <div>
               <button
-                onClick={() => project ? toggleSection('project') : setShowProjectPicker(true)}
+                onClick={() => { if (project) { toggleSection('project') } else { setShowProjectPicker(true) } }}
                 className="w-full px-4 py-3 flex items-center gap-3 hover:bg-neutral-50 transition-colors"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-neutral-400" viewBox="0 0 20 20" fill="currentColor">

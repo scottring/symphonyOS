@@ -42,6 +42,7 @@ export function ContactView({
   const linkedTasks = tasks.filter((t) => t.contactId === contact.id)
 
   // Sync state when contact changes
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setEditedName(contact.name)
     setLocalPhone(contact.phone || '')
@@ -50,6 +51,7 @@ export function ContactView({
     setIsEditingName(false)
     setShowDeleteConfirm(false)
   }, [contact.id, contact.name, contact.phone, contact.email, contact.notes])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Focus name input when editing starts
   useEffect(() => {

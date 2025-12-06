@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { WeeklyReview } from './WeeklyReview'
 import { createMockTask, createMockProject, createMockContact } from '@/test/mocks/factories'
 
@@ -194,21 +193,22 @@ describe('WeeklyReview', () => {
       expect(mockOnClose).toHaveBeenCalled()
     })
 
-    it('calls onClose when clicking backdrop (with animation delay)', async () => {
-      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    it('calls onClose when clicking backdrop (with animation delay)', () => {
       render(<WeeklyReview {...defaultProps} />)
       const backdrop = document.querySelector('.fixed.inset-0')
       if (backdrop) {
-        await user.click(backdrop)
+        fireEvent.mouseDown(backdrop)
       }
       vi.advanceTimersByTime(200)
       expect(mockOnClose).toHaveBeenCalled()
     })
 
-    it('does not close when clicking inside modal', async () => {
-      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    it('does not close when clicking inside modal', () => {
       render(<WeeklyReview {...defaultProps} />)
-      await user.click(screen.getByText('Weekly Review'))
+      const modal = screen.getByText('Weekly Review').closest('div')
+      if (modal) {
+        fireEvent.mouseDown(modal)
+      }
       vi.advanceTimersByTime(200)
       expect(mockOnClose).not.toHaveBeenCalled()
     })

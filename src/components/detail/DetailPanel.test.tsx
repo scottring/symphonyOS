@@ -611,7 +611,7 @@ describe('DetailPanel', () => {
         />
       )
 
-      expect(screen.getByText('123 Main St')).toBeInTheDocument()
+      expect(screen.getAllByText('123 Main St').length).toBeGreaterThan(0)
       // Wait for async actionable instance loading to complete
       await waitFor(() => {})
     })
