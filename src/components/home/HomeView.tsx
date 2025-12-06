@@ -7,6 +7,7 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
 import { useHomeView } from '@/hooks/useHomeView'
+import { useMobile } from '@/hooks/useMobile'
 import { HomeViewSwitcher } from './HomeViewSwitcher'
 import { WeekView } from './WeekView'
 import { TodaySchedule } from '@/components/schedule/TodaySchedule'
@@ -81,6 +82,7 @@ export function HomeView({
   onSkipEvent,
 }: HomeViewProps) {
   const { currentView, setCurrentView } = useHomeView()
+  const isMobile = useMobile()
 
   // Week view state
   const [weekStart, setWeekStart] = useState(() => {
@@ -156,17 +158,56 @@ export function HomeView({
 
   return (
     <div className="relative flex flex-col h-full">
-      {/* View switcher - floating in upper right */}
-      <div className="absolute top-4 right-6 z-20">
-        <HomeViewSwitcher
-          currentView={currentView}
-          onViewChange={setCurrentView}
-        />
-      </div>
+      {/* View switcher - floating in upper right, hidden on mobile */}
+      {!isMobile && (
+        <div className="absolute top-4 right-6 z-20">
+          <HomeViewSwitcher
+            currentView={currentView}
+            onViewChange={setCurrentView}
+          />
+        </div>
+      )}
 
       {/* Main content area */}
       <div className="flex-1 overflow-y-auto">
-        {renderContent()}
+        {isMobile ? (
+          <TodaySchedule
+            tasks={tasks}
+            events={events}
+            routines={routines}
+            dateInstances={dateInstances}
+            selectedItemId={selectedItemId}
+            onSelectItem={onSelectItem}
+            onToggleTask={onToggleTask}
+            onUpdateTask={onUpdateTask}
+            onPushTask={onPushTask}
+            onDeleteTask={onDeleteTask}
+            loading={loading}
+            viewedDate={viewedDate}
+            onDateChange={onDateChange}
+            contactsMap={contactsMap}
+            projectsMap={projectsMap}
+            projects={projects}
+            contacts={contacts}
+            onSearchContacts={onSearchContacts}
+            onAddContact={onAddContact}
+            eventNotesMap={eventNotesMap}
+            onRefreshInstances={onRefreshInstances}
+            recentlyCreatedTaskId={recentlyCreatedTaskId}
+            onTriageCardCollapse={onTriageCardCollapse}
+            onOpenProject={onOpenProject}
+            familyMembers={familyMembers}
+            onAssignTask={onAssignTask}
+            onAssignEvent={onAssignEvent}
+            onAssignRoutine={onAssignRoutine}
+            onCompleteRoutine={onCompleteRoutine}
+            onSkipRoutine={onSkipRoutine}
+            onCompleteEvent={onCompleteEvent}
+            onSkipEvent={onSkipEvent}
+          />
+        ) : (
+          renderContent()
+        )}
       </div>
     </div>
   )
