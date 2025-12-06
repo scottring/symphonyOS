@@ -34,7 +34,7 @@ import type { ViewType } from '@/components/layout/Sidebar'
 import type { ActionableInstance } from '@/types/actionable'
 
 function App() {
-  const { tasks, loading: tasksLoading, addTask, addSubtask, toggleTask, deleteTask, updateTask, pushTask } = useSupabaseTasks()
+  const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, toggleTask, deleteTask, updateTask, pushTask } = useSupabaseTasks()
   const { user, loading: authLoading, signOut } = useAuth()
   const { isConnected, events, fetchEvents, isFetching: eventsFetching } = useGoogleCalendar()
 
@@ -507,6 +507,9 @@ function App() {
             onAddProject={addProject}
             onAddSubtask={addSubtask}
             onActionComplete={refreshDateInstances}
+            prepTasks={tasks}
+            onAddPrepTask={addPrepTask}
+            onTogglePrepTask={toggleTask}
           />
         )
       }

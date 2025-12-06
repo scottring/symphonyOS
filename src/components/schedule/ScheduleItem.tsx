@@ -1,6 +1,7 @@
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
 import { formatTime, formatTimeRange } from '@/lib/timeUtils'
+import { getProjectColor } from '@/lib/projectUtils'
 import { PushDropdown } from '@/components/triage'
 import { AssigneeDropdown } from '@/components/family'
 
@@ -13,11 +14,20 @@ interface ScheduleItemProps {
   contactName?: string
   projectName?: string
   projectId?: string
-  onOpenProject?: (projectId: string) => void
   // Family member assignment
   familyMembers?: FamilyMember[]
   assignedTo?: string | null
   onAssign?: (memberId: string | null) => void
+  // Overdue styling
+  isOverdue?: boolean
+  overdueLabel?: string
+}
+
+// Warm amber color tokens for overdue styling
+const overdueColors = {
+  warning50: 'hsl(38 75% 96%)',
+  warning500: 'hsl(35 80% 50%)',
+  warning600: 'hsl(32 80% 44%)',
 }
 
 export function ScheduleItem({
@@ -29,10 +39,11 @@ export function ScheduleItem({
   contactName,
   projectName,
   projectId,
-  onOpenProject,
   familyMembers = [],
   assignedTo,
   onAssign,
+  isOverdue,
+  overdueLabel,
 }: ScheduleItemProps) {
   const isTask = item.type === 'task'
   const isRoutine = item.type === 'routine'
@@ -74,8 +85,11 @@ export function ScheduleItem({
   const timeDisplay = getTimeDisplay()
 
   // Check if we should hide project on mobile (passed as prop or detected)
-  const hasChips = contactName || projectName
+  const hasContactChip = !!contactName
   const hasSubtasks = item.subtaskCount && item.subtaskCount > 0
+
+  // Get project color for left edge indicator
+  const projectColor = projectId ? getProjectColor(projectId) : null
 
   return (
     <div
@@ -85,7 +99,7 @@ export function ScheduleItem({
       role="button"
       aria-pressed={selected}
       className={`
-        group px-3 py-2.5 rounded-xl cursor-pointer
+        group relative px-3 py-2.5 rounded-xl cursor-pointer
         transition-all duration-200 border
         ${selected
           ? 'bg-primary-50 border-primary-200 shadow-md ring-1 ring-primary-200'
@@ -94,15 +108,45 @@ export function ScheduleItem({
         ${item.completed ? 'opacity-60' : ''}
       `}
     >
+      {/* Left edge indicator - amber for overdue, project color otherwise */}
+      {(isOverdue || projectColor) && (
+        <div
+          className="absolute left-0 top-[20%] w-[3px] h-[60%] rounded-none"
+          style={{ backgroundColor: isOverdue ? overdueColors.warning500 : projectColor! }}
+        />
+      )}
+
+      {/* Project name tooltip - appears on hover, positioned above card */}
+      {projectName && (
+        <div className="
+          absolute left-0 -top-8
+          opacity-0 group-hover:opacity-100
+          pointer-events-none
+          px-2 py-1 text-xs font-medium
+          bg-neutral-800 text-white rounded
+          whitespace-nowrap
+          transition-opacity duration-150
+          z-20
+        ">
+          {projectName}
+        </div>
+      )}
       {/* Main row: time | checkbox/circle | title */}
       <div className="relative flex items-center gap-3">
         {/* Time column - fixed width for alignment */}
-        <div className="w-12 shrink-0 text-xs text-neutral-400 font-medium">
-          {timeDisplay ? (
+        <div className="w-12 shrink-0 text-xs font-medium">
+          {isOverdue && overdueLabel ? (
+            <span
+              className="text-xs font-medium"
+              style={{ color: overdueColors.warning600 }}
+            >
+              {overdueLabel}
+            </span>
+          ) : timeDisplay ? (
             timeDisplay.type === 'allday' ? (
-              <span>All day</span>
+              <span className="text-neutral-400">All day</span>
             ) : timeDisplay.type === 'range' ? (
-              <div className="leading-tight">
+              <div className="leading-tight text-neutral-400">
                 <div>{timeDisplay.start}</div>
                 <div className="text-neutral-300">{timeDisplay.end}</div>
               </div>
@@ -186,43 +230,20 @@ export function ScheduleItem({
             className="hidden md:block absolute right-8 opacity-0 group-hover:opacity-100 transition-opacity"
             onClick={(e) => e.stopPropagation()}
           >
-            <PushDropdown onPush={onPush} size="sm" />
+            <PushDropdown onPush={onPush} size="sm" showTodayOption={isOverdue} />
           </div>
         )}
       </div>
 
-      {/* Chips row - desktop only, aligned with title */}
-      {hasChips && (
+      {/* Contact chip row - desktop only, aligned with title */}
+      {hasContactChip && (
         <div className="hidden md:flex items-center gap-2 mt-1.5 ml-[5.75rem]">
-          {projectName && projectId && onOpenProject ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onOpenProject(projectId)
-              }}
-              className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs font-medium border border-blue-100 max-w-[140px] hover:bg-blue-100 transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-              </svg>
-              <span className="truncate">{projectName}</span>
-            </button>
-          ) : projectName && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs font-medium border border-blue-100 max-w-[140px]">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-              </svg>
-              <span className="truncate">{projectName}</span>
-            </span>
-          )}
-          {contactName && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-xs font-medium border border-primary-100 max-w-[100px]">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-              </svg>
-              <span className="truncate">{contactName}</span>
-            </span>
-          )}
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-xs font-medium border border-primary-100 max-w-[100px]">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+            </svg>
+            <span className="truncate">{contactName}</span>
+          </span>
         </div>
       )}
     </div>

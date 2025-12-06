@@ -2,6 +2,7 @@ import { useRef, useState, useCallback, useMemo, useEffect, type TouchEvent } fr
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
 import { formatTime } from '@/lib/timeUtils'
+import { getProjectColor } from '@/lib/projectUtils'
 import { TypeIcon } from './TypeIcon'
 import { AssigneeDropdown } from '@/components/family'
 
@@ -60,6 +61,9 @@ export function SwipeableCard({
     return familyMembers.find(m => m.id === assignedTo)
   }, [assignedTo, familyMembers])
   void assignedMember // Will be used for avatar display
+
+  // Get project color for left edge indicator
+  const projectColor = item.projectId ? getProjectColor(item.projectId) : null
 
   // Touch handlers
   const handleTouchStart = useCallback((e: TouchEvent) => {
@@ -241,6 +245,14 @@ export function SwipeableCard({
         `}
         style={{ transform: `translateX(${translateX}px)` }}
       >
+        {/* Project color indicator - left edge */}
+        {projectColor && (
+          <div
+            className="absolute left-0 top-[20%] w-[3px] h-[60%] rounded-none"
+            style={{ backgroundColor: projectColor }}
+          />
+        )}
+
         <div className="flex items-center gap-3">
           {/* Time - compact, left side */}
           <div className="w-10 shrink-0 text-xs text-neutral-400 font-medium tabular-nums">

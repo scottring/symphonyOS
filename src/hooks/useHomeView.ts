@@ -2,14 +2,10 @@ import { useState, useCallback, useEffect } from 'react'
 import type { HomeViewType } from '@/types/homeView'
 
 const STORAGE_KEY = 'symphony-home-view'
-const SIDEBAR_STORAGE_KEY = 'symphony-context-sidebar-collapsed'
 
 interface UseHomeViewResult {
   currentView: HomeViewType
   setCurrentView: (view: HomeViewType) => void
-  sidebarCollapsed: boolean
-  setSidebarCollapsed: (collapsed: boolean) => void
-  toggleSidebar: () => void
 }
 
 export function useHomeView(): UseHomeViewResult {
@@ -17,15 +13,14 @@ export function useHomeView(): UseHomeViewResult {
   const [currentView, setCurrentViewState] = useState<HomeViewType>(() => {
     if (typeof window === 'undefined') return 'today'
     const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored === 'today' || stored === 'today-context' || stored === 'week') {
-      return stored
+    // Migrate old 'today-context' to 'today'
+    if (stored === 'today' || stored === 'today-context') {
+      return 'today'
+    }
+    if (stored === 'week') {
+      return 'week'
     }
     return 'today'
-  })
-
-  const [sidebarCollapsed, setSidebarCollapsedState] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true'
   })
 
   // Persist view preference
@@ -34,26 +29,13 @@ export function useHomeView(): UseHomeViewResult {
     localStorage.setItem(STORAGE_KEY, view)
   }, [])
 
-  // Persist sidebar state
-  const setSidebarCollapsed = useCallback((collapsed: boolean) => {
-    setSidebarCollapsedState(collapsed)
-    localStorage.setItem(SIDEBAR_STORAGE_KEY, String(collapsed))
-  }, [])
-
-  const toggleSidebar = useCallback(() => {
-    setSidebarCollapsed(!sidebarCollapsed)
-  }, [sidebarCollapsed, setSidebarCollapsed])
-
   // Sync with localStorage on mount (in case another tab changed it)
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY && e.newValue) {
-        if (e.newValue === 'today' || e.newValue === 'today-context' || e.newValue === 'week') {
+        if (e.newValue === 'today' || e.newValue === 'week') {
           setCurrentViewState(e.newValue)
         }
-      }
-      if (e.key === SIDEBAR_STORAGE_KEY) {
-        setSidebarCollapsedState(e.newValue === 'true')
       }
     }
 
@@ -64,8 +46,5 @@ export function useHomeView(): UseHomeViewResult {
   return {
     currentView,
     setCurrentView,
-    sidebarCollapsed,
-    setSidebarCollapsed,
-    toggleSidebar,
   }
 }

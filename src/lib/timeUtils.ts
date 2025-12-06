@@ -212,3 +212,38 @@ export function getDaySectionLabel(section: DaySection): string {
     case 'unscheduled': return 'Unscheduled'
   }
 }
+
+/**
+ * Format an overdue date for display.
+ * Returns "Yesterday", "X days ago", "Last week", or a short date.
+ */
+export function formatOverdueDate(date: Date): string {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const taskDate = new Date(date)
+  taskDate.setHours(0, 0, 0, 0)
+
+  const diffMs = today.getTime() - taskDate.getTime()
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+  if (diffDays === 1) return 'Yesterday'
+  if (diffDays < 7) return `${diffDays} days ago`
+  if (diffDays < 14) return 'Last week'
+  return taskDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+/**
+ * Calculate days overdue for a task.
+ * Returns 0 if not overdue.
+ */
+export function getDaysOverdue(date: Date): number {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const taskDate = new Date(date)
+  taskDate.setHours(0, 0, 0, 0)
+
+  const diffMs = today.getTime() - taskDate.getTime()
+  return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)))
+}

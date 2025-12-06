@@ -1,9 +1,8 @@
-export type HomeViewType = 'today' | 'today-context' | 'week'
+export type HomeViewType = 'today' | 'week'
 
 export interface HomeViewPreference {
   userId: string
   preferredView: HomeViewType
-  sidebarCollapsed: boolean // for today-context view
 }
 
 export interface DayProgress {

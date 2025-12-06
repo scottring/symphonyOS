@@ -3,15 +3,14 @@ import { render, screen } from '@/test/test-utils'
 import { HomeViewSwitcher } from './HomeViewSwitcher'
 
 describe('HomeViewSwitcher', () => {
-  it('renders all three view options as icon buttons', () => {
+  it('renders two view options as icon buttons', () => {
     const onViewChange = vi.fn()
     render(<HomeViewSwitcher currentView="today" onViewChange={onViewChange} />)
 
-    // Three icon buttons with aria-labels
+    // Two icon buttons with aria-labels
     const buttons = screen.getAllByRole('button')
-    expect(buttons).toHaveLength(3)
+    expect(buttons).toHaveLength(2)
     expect(screen.getByRole('button', { name: 'Today' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Today + Context' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Week' })).toBeInTheDocument()
   })
 
@@ -40,17 +39,6 @@ describe('HomeViewSwitcher', () => {
     await user.click(screen.getByRole('button', { name: 'Today' }))
 
     expect(onViewChange).toHaveBeenCalledWith('today')
-  })
-
-  it('calls onViewChange with "today-context" when Today+Context icon is clicked', async () => {
-    const onViewChange = vi.fn()
-    const { user } = render(
-      <HomeViewSwitcher currentView="today" onViewChange={onViewChange} />
-    )
-
-    await user.click(screen.getByRole('button', { name: 'Today + Context' }))
-
-    expect(onViewChange).toHaveBeenCalledWith('today-context')
   })
 
   it('calls onViewChange with "week" when Week icon is clicked', async () => {

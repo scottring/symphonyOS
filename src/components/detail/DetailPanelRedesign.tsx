@@ -8,6 +8,8 @@ import { formatTime, formatTimeRange } from '@/lib/timeUtils'
 import { detectActions, type DetectedAction } from '@/lib/actionDetection'
 import { ActionableActions } from './ActionableActions'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
+import { RecipeSection } from '@/components/recipe/RecipeSection'
+import { DirectionsBuilder } from '@/components/directions'
 
 // Component to render text with clickable links (handles HTML links and plain URLs)
 function RichText({ text }: { text: string }) {
@@ -69,6 +71,9 @@ interface DetailPanelRedesignProps {
   onDelete?: (taskId: string) => void
   onToggleComplete?: (taskId: string) => void
   onUpdateEventNote?: (googleEventId: string, notes: string | null) => void
+  // Recipe support
+  eventRecipeUrl?: string | null
+  onUpdateRecipeUrl?: (googleEventId: string, recipeUrl: string | null) => void
   onOpenRecipe?: (url: string) => void
   contact?: Contact | null
   contacts?: Contact[]
@@ -83,6 +88,10 @@ interface DetailPanelRedesignProps {
   onAddProject?: (project: { name: string }) => Promise<Project | null>
   onAddSubtask?: (parentId: string, title: string) => Promise<string | undefined>
   onActionComplete?: () => void
+  // Prep task support (for meal events)
+  prepTasks?: Task[]
+  onAddPrepTask?: (title: string, linkedEventId: string, scheduledFor: Date) => Promise<string | undefined>
+  onTogglePrepTask?: (taskId: string) => void
 }
 
 function ActionIcon({ type }: { type: DetectedAction['icon'] }) {
@@ -170,6 +179,8 @@ export function DetailPanelRedesign({
   onDelete,
   onToggleComplete,
   onUpdateEventNote,
+  eventRecipeUrl,
+  onUpdateRecipeUrl,
   onOpenRecipe,
   contact,
   contacts = [],
@@ -184,6 +195,9 @@ export function DetailPanelRedesign({
   onAddProject,
   onAddSubtask,
   onActionComplete,
+  prepTasks,
+  onAddPrepTask,
+  onTogglePrepTask,
 }: DetailPanelRedesignProps) {
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -284,7 +298,12 @@ export function DetailPanelRedesign({
   const detectedActions = useMemo(() => {
     if (!item) return []
     const descriptionForActions = item.type === 'event' ? item.googleDescription : item.notes
-    return detectActions(item.title, descriptionForActions, item.location, item.phoneNumber)
+    const actions = detectActions(item.title, descriptionForActions, item.location, item.phoneNumber)
+    // Filter out 'directions' action when location exists, since DirectionsBuilder handles it
+    if (item.location) {
+      return actions.filter(action => action.type !== 'directions')
+    }
+    return actions
   }, [item])
 
   // Filter contacts for picker
@@ -302,6 +321,13 @@ export function DetailPanelRedesign({
     }
     return projects.slice(0, 5)
   }, [projects, projectSearchQuery, onSearchProjects])
+
+  // Filter prep tasks for current event
+  const eventPrepTasks = useMemo(() => {
+    if (!item || item.type !== 'event' || !item.originalEvent || !prepTasks) return []
+    const eventId = item.originalEvent.google_event_id || item.originalEvent.id
+    return prepTasks.filter(t => t.linkedEventId === eventId)
+  }, [item, prepTasks])
 
   // Actionable callbacks
   const getEventEntityId = useCallback(() => {
@@ -970,19 +996,41 @@ export function DetailPanelRedesign({
           </div>
         )}
 
-        {/* Location (events only) */}
+        {/* Directions Builder (when location exists) - includes destination display */}
         {item.location && (
-          <div className="mx-4 mt-4 bg-white rounded-2xl shadow-sm border border-neutral-100 px-4 py-3.5 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
-              <svg className="w-5 h-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <div className="text-xs font-medium text-neutral-400 uppercase tracking-wide">Location</div>
-              <div className="text-base text-neutral-800">{item.location}</div>
-            </div>
+          <div className="mx-4 mt-4 bg-white rounded-2xl shadow-sm border border-neutral-100 overflow-hidden">
+            <DirectionsBuilder
+              destination={{
+                name: item.title,
+                address: item.location,
+              }}
+              eventTitle={item.title}
+            />
           </div>
+        )}
+
+        {/* Recipe Section (events only) */}
+        {isEvent && item.originalEvent && (
+          <RecipeSection
+            recipeUrl={eventRecipeUrl}
+            eventTitle={item.title}
+            eventTime={item.startTime ?? undefined}
+            prepTasks={eventPrepTasks}
+            onOpenRecipe={(url) => onOpenRecipe?.(url)}
+            onUpdateRecipeUrl={(url) => {
+              const eventId = item.originalEvent?.google_event_id || item.originalEvent?.id
+              if (eventId && onUpdateRecipeUrl) {
+                onUpdateRecipeUrl(eventId, url)
+              }
+            }}
+            onAddPrepTask={onAddPrepTask ? async (title, scheduledFor) => {
+              const eventId = item.originalEvent?.google_event_id || item.originalEvent?.id
+              if (eventId) {
+                return onAddPrepTask(title, eventId, scheduledFor)
+              }
+            } : undefined}
+            onTogglePrepTask={onTogglePrepTask}
+          />
         )}
 
         {/* Notes Section */}

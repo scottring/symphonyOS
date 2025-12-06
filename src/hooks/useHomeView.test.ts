@@ -4,7 +4,6 @@ import { useHomeView } from './useHomeView'
 
 describe('useHomeView', () => {
   const STORAGE_KEY = 'symphony-home-view'
-  const SIDEBAR_STORAGE_KEY = 'symphony-context-sidebar-collapsed'
 
   beforeEach(() => {
     localStorage.clear()
@@ -21,27 +20,16 @@ describe('useHomeView', () => {
       expect(result.current.currentView).toBe('today')
     })
 
-    it('defaults sidebar to expanded when no localStorage value', () => {
-      const { result } = renderHook(() => useHomeView())
-      expect(result.current.sidebarCollapsed).toBe(false)
-    })
-
     it('restores view from localStorage', () => {
       localStorage.setItem(STORAGE_KEY, 'week')
       const { result } = renderHook(() => useHomeView())
       expect(result.current.currentView).toBe('week')
     })
 
-    it('restores today-context view from localStorage', () => {
+    it('migrates today-context view to today', () => {
       localStorage.setItem(STORAGE_KEY, 'today-context')
       const { result } = renderHook(() => useHomeView())
-      expect(result.current.currentView).toBe('today-context')
-    })
-
-    it('restores sidebar collapsed state from localStorage', () => {
-      localStorage.setItem(SIDEBAR_STORAGE_KEY, 'true')
-      const { result } = renderHook(() => useHomeView())
-      expect(result.current.sidebarCollapsed).toBe(true)
+      expect(result.current.currentView).toBe('today')
     })
 
     it('defaults to "today" if localStorage has invalid value', () => {
@@ -66,13 +54,13 @@ describe('useHomeView', () => {
       const { result } = renderHook(() => useHomeView())
 
       act(() => {
-        result.current.setCurrentView('today-context')
+        result.current.setCurrentView('week')
       })
 
-      expect(localStorage.getItem(STORAGE_KEY)).toBe('today-context')
+      expect(localStorage.getItem(STORAGE_KEY)).toBe('week')
     })
 
-    it('allows switching between all three views', () => {
+    it('allows switching between both views', () => {
       const { result } = renderHook(() => useHomeView())
 
       act(() => {
@@ -81,77 +69,14 @@ describe('useHomeView', () => {
       expect(result.current.currentView).toBe('today')
 
       act(() => {
-        result.current.setCurrentView('today-context')
-      })
-      expect(result.current.currentView).toBe('today-context')
-
-      act(() => {
         result.current.setCurrentView('week')
       })
       expect(result.current.currentView).toBe('week')
-    })
-  })
-
-  describe('setSidebarCollapsed', () => {
-    it('updates sidebar collapsed state', () => {
-      const { result } = renderHook(() => useHomeView())
 
       act(() => {
-        result.current.setSidebarCollapsed(true)
+        result.current.setCurrentView('today')
       })
-
-      expect(result.current.sidebarCollapsed).toBe(true)
-    })
-
-    it('persists sidebar state to localStorage', () => {
-      const { result } = renderHook(() => useHomeView())
-
-      act(() => {
-        result.current.setSidebarCollapsed(true)
-      })
-
-      expect(localStorage.getItem(SIDEBAR_STORAGE_KEY)).toBe('true')
-    })
-  })
-
-  describe('toggleSidebar', () => {
-    it('toggles sidebar from expanded to collapsed', () => {
-      const { result } = renderHook(() => useHomeView())
-      expect(result.current.sidebarCollapsed).toBe(false)
-
-      act(() => {
-        result.current.toggleSidebar()
-      })
-
-      expect(result.current.sidebarCollapsed).toBe(true)
-    })
-
-    it('toggles sidebar from collapsed to expanded', () => {
-      localStorage.setItem(SIDEBAR_STORAGE_KEY, 'true')
-      const { result } = renderHook(() => useHomeView())
-      expect(result.current.sidebarCollapsed).toBe(true)
-
-      act(() => {
-        result.current.toggleSidebar()
-      })
-
-      expect(result.current.sidebarCollapsed).toBe(false)
-    })
-
-    it('persists toggle state to localStorage', () => {
-      const { result } = renderHook(() => useHomeView())
-
-      act(() => {
-        result.current.toggleSidebar()
-      })
-
-      expect(localStorage.getItem(SIDEBAR_STORAGE_KEY)).toBe('true')
-
-      act(() => {
-        result.current.toggleSidebar()
-      })
-
-      expect(localStorage.getItem(SIDEBAR_STORAGE_KEY)).toBe('false')
+      expect(result.current.currentView).toBe('today')
     })
   })
 })

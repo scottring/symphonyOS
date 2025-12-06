@@ -7,9 +7,7 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
 import { useHomeView } from '@/hooks/useHomeView'
-import { useMobile } from '@/hooks/useMobile'
 import { HomeViewSwitcher } from './HomeViewSwitcher'
-import { ContextSidebar } from './ContextSidebar'
 import { WeekView } from './WeekView'
 import { TodaySchedule } from '@/components/schedule/TodaySchedule'
 
@@ -82,8 +80,7 @@ export function HomeView({
   onCompleteEvent,
   onSkipEvent,
 }: HomeViewProps) {
-  const isMobile = useMobile()
-  const { currentView, setCurrentView, sidebarCollapsed, toggleSidebar } = useHomeView()
+  const { currentView, setCurrentView } = useHomeView()
 
   // Week view state
   const [weekStart, setWeekStart] = useState(() => {
@@ -102,12 +99,9 @@ export function HomeView({
     setCurrentView('today')
   }
 
-  // On mobile, don't show context sidebar - just show Today or Week
-  const effectiveView = isMobile && currentView === 'today-context' ? 'today' : currentView
-
   // Render the appropriate view
   const renderContent = () => {
-    if (effectiveView === 'week') {
+    if (currentView === 'week') {
       return (
         <WeekView
           tasks={tasks}
@@ -171,23 +165,8 @@ export function HomeView({
       </div>
 
       {/* Main content area */}
-      <div className="flex flex-1 min-h-0">
-        {/* Primary content */}
-        <div className="flex-1 overflow-y-auto">
-          {renderContent()}
-        </div>
-
-        {/* Context sidebar - only show for today-context view on desktop */}
-        {effectiveView === 'today-context' && !isMobile && (
-          <ContextSidebar
-            tasks={tasks}
-            projects={projects}
-            familyMembers={familyMembers}
-            collapsed={sidebarCollapsed}
-            onToggleCollapsed={toggleSidebar}
-            onOpenProject={onOpenProject}
-          />
-        )}
+      <div className="flex-1 overflow-y-auto">
+        {renderContent()}
       </div>
     </div>
   )

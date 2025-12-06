@@ -10,6 +10,8 @@ import { ContactCard } from './ContactCard'
 import { ProjectCard } from './ProjectCard'
 import { ActionableActions } from './ActionableActions'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
+import { RecipeSection } from '@/components/recipe/RecipeSection'
+import { DirectionsBuilder } from '@/components/directions'
 
 // Component to render text with clickable links (handles HTML links and plain URLs)
 function RichText({ text }: { text: string }) {
@@ -89,7 +91,9 @@ interface DetailPanelProps {
   onToggleComplete?: (taskId: string) => void
   // Event notes
   onUpdateEventNote?: (googleEventId: string, notes: string | null) => void
-  // Recipe viewer
+  // Recipe support
+  eventRecipeUrl?: string | null
+  onUpdateRecipeUrl?: (googleEventId: string, recipeUrl: string | null) => void
   onOpenRecipe?: (url: string) => void
   // Contact support
   contact?: Contact | null
@@ -108,6 +112,10 @@ interface DetailPanelProps {
   onAddSubtask?: (parentId: string, title: string) => Promise<string | undefined>
   // Actionable callback - called after skip/defer/done to refresh timeline
   onActionComplete?: () => void
+  // Prep task support (for meal events)
+  prepTasks?: Task[]
+  onAddPrepTask?: (title: string, linkedEventId: string, scheduledFor: Date) => Promise<string | undefined>
+  onTogglePrepTask?: (taskId: string) => void
 }
 
 // Icon components for actions
@@ -193,7 +201,7 @@ function ActionButton({ action, onOpenRecipe }: { action: DetectedAction; onOpen
   )
 }
 
-export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplete, onUpdateEventNote, onOpenRecipe, contact, contacts = [], onSearchContacts, onUpdateContact, onOpenContact, project, projects = [], onSearchProjects, onUpdateProject, onOpenProject, onAddProject, onAddSubtask, onActionComplete }: DetailPanelProps) {
+export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplete, onUpdateEventNote, eventRecipeUrl, onUpdateRecipeUrl, onOpenRecipe, contact, contacts = [], onSearchContacts, onUpdateContact, onOpenContact, project, projects = [], onSearchProjects, onUpdateProject, onOpenProject, onAddProject, onAddSubtask, onActionComplete, prepTasks, onAddPrepTask, onTogglePrepTask }: DetailPanelProps) {
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [editedTitle, setEditedTitle] = useState(item?.title || '')
@@ -305,12 +313,17 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
     // For events, use googleDescription for action detection (links, video calls, etc.)
     // For tasks, use notes
     const descriptionForActions = item.type === 'event' ? item.googleDescription : item.notes
-    return detectActions(
+    const actions = detectActions(
       item.title,
       descriptionForActions,
       item.location,
       item.phoneNumber
     )
+    // Filter out 'directions' action when location exists, since DirectionsBuilder handles it
+    if (item.location) {
+      return actions.filter(action => action.type !== 'directions')
+    }
+    return actions
   }, [item])
 
   // Filter contacts for picker
@@ -328,6 +341,13 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
     }
     return projects.slice(0, 5)
   }, [projects, projectSearchQuery, onSearchProjects])
+
+  // Filter prep tasks for current event
+  const eventPrepTasks = useMemo(() => {
+    if (!item || item.type !== 'event' || !item.originalEvent || !prepTasks) return []
+    const eventId = item.originalEvent.google_event_id || item.originalEvent.id
+    return prepTasks.filter(t => t.linkedEventId === eventId)
+  }, [item, prepTasks])
 
   // Get entity ID and date for actionable instance operations
   // These must be defined before the early return to maintain hook order
@@ -1039,6 +1059,41 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
             </svg>
             <span className="text-sm text-neutral-600 flex-1">{item.location}</span>
           </div>
+        )}
+
+        {/* Directions Builder (when location exists) */}
+        {item.location && (
+          <DirectionsBuilder
+            destination={{
+              name: item.title,
+              address: item.location,
+            }}
+            eventTitle={item.title}
+          />
+        )}
+
+        {/* Recipe Section (events only) */}
+        {isEvent && item.originalEvent && (
+          <RecipeSection
+            recipeUrl={eventRecipeUrl}
+            eventTitle={item.title}
+            eventTime={item.startTime ?? undefined}
+            prepTasks={eventPrepTasks}
+            onOpenRecipe={(url) => onOpenRecipe?.(url)}
+            onUpdateRecipeUrl={(url) => {
+              const eventId = item.originalEvent?.google_event_id || item.originalEvent?.id
+              if (eventId && onUpdateRecipeUrl) {
+                onUpdateRecipeUrl(eventId, url)
+              }
+            }}
+            onAddPrepTask={onAddPrepTask ? async (title, scheduledFor) => {
+              const eventId = item.originalEvent?.google_event_id || item.originalEvent?.id
+              if (eventId) {
+                return onAddPrepTask(title, eventId, scheduledFor)
+              }
+            } : undefined}
+            onTogglePrepTask={onTogglePrepTask}
+          />
         )}
 
         {/* Detected Contextual Actions */}

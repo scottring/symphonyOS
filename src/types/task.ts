@@ -23,4 +23,5 @@ export interface Task {
   projectId?: string // Linked project
   parentTaskId?: string // If set, this is a subtask
   subtasks?: Task[] // Populated on fetch, not stored in DB
+  linkedEventId?: string // Links prep task to meal event
 }

@@ -1,12 +1,14 @@
 import { useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { detectRecipeUrl } from '@/lib/recipeDetection'
 
 export interface EventNote {
   id: string
   googleEventId: string
   notes: string | null
   assignedTo?: string | null
+  recipeUrl?: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -17,6 +19,7 @@ interface DbEventNote {
   google_event_id: string
   notes: string | null
   assigned_to: string | null
+  recipe_url: string | null
   created_at: string
   updated_at: string
 }
@@ -27,6 +30,7 @@ function dbNoteToEventNote(dbNote: DbEventNote): EventNote {
     googleEventId: dbNote.google_event_id,
     notes: dbNote.notes,
     assignedTo: dbNote.assigned_to,
+    recipeUrl: dbNote.recipe_url,
     createdAt: new Date(dbNote.created_at),
     updatedAt: new Date(dbNote.updated_at),
   }
@@ -251,6 +255,87 @@ export function useEventNotes() {
     }
   }, [user, notes])
 
+  // Update recipe URL for an event (upsert)
+  const updateRecipeUrl = useCallback(async (googleEventId: string, recipeUrl: string | null) => {
+    if (!user) return
+
+    const existingNote = notes.get(googleEventId)
+
+    // Optimistic update
+    const optimisticNote: EventNote = existingNote
+      ? { ...existingNote, recipeUrl, updatedAt: new Date() }
+      : {
+          id: crypto.randomUUID(),
+          googleEventId,
+          notes: null,
+          recipeUrl,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }
+
+    setNotes((prev) => new Map(prev).set(googleEventId, optimisticNote))
+
+    // Upsert to database
+    const { data, error: upsertError } = await supabase
+      .from('event_notes')
+      .upsert(
+        {
+          user_id: user.id,
+          google_event_id: googleEventId,
+          recipe_url: recipeUrl,
+        },
+        {
+          onConflict: 'user_id,google_event_id',
+        }
+      )
+      .select()
+      .single()
+
+    if (upsertError) {
+      // Rollback on error
+      if (existingNote) {
+        setNotes((prev) => new Map(prev).set(googleEventId, existingNote))
+      } else {
+        setNotes((prev) => {
+          const newMap = new Map(prev)
+          newMap.delete(googleEventId)
+          return newMap
+        })
+      }
+      setError(upsertError.message)
+      return
+    }
+
+    // Update with real data from DB
+    if (data) {
+      const realNote = dbNoteToEventNote(data as DbEventNote)
+      setNotes((prev) => new Map(prev).set(googleEventId, realNote))
+    }
+  }, [user, notes])
+
+  // Auto-detect and store recipe URLs for events
+  // Call this after fetching calendar events
+  const autoDetectRecipes = useCallback(async (
+    events: Array<{ id: string; google_event_id?: string; description?: string | null }>
+  ) => {
+    if (!user) return
+
+    for (const event of events) {
+      const eventId = event.google_event_id || event.id
+      const existingNote = notes.get(eventId)
+
+      // Skip if we already have a recipe URL for this event
+      if (existingNote?.recipeUrl) continue
+
+      // Try to detect a recipe URL from the description
+      const detectedUrl = detectRecipeUrl(event.description)
+      if (detectedUrl) {
+        // Store the detected recipe URL
+        await updateRecipeUrl(eventId, detectedUrl)
+      }
+    }
+  }, [user, notes, updateRecipeUrl])
+
   return {
     notes,
     loading,
@@ -259,6 +344,8 @@ export function useEventNotes() {
     fetchNotesForEvents,
     updateNote,
     updateEventAssignment,
+    updateRecipeUrl,
+    autoDetectRecipes,
     deleteNote,
     getNote,
   }

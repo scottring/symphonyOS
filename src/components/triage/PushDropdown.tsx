@@ -3,9 +3,10 @@ import { useState, useRef, useEffect } from 'react'
 interface PushDropdownProps {
   onPush: (date: Date) => void
   size?: 'sm' | 'md'
+  showTodayOption?: boolean
 }
 
-export function PushDropdown({ onPush, size = 'md' }: PushDropdownProps) {
+export function PushDropdown({ onPush, size = 'md', showTodayOption = false }: PushDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [showDatePicker, setShowDatePicker] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -23,6 +24,12 @@ export function PushDropdown({ onPush, size = 'md' }: PushDropdownProps) {
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [isOpen])
+
+  const getToday = () => {
+    const date = new Date()
+    date.setHours(0, 0, 0, 0)
+    return date
+  }
 
   const getTomorrow = () => {
     const date = new Date()
@@ -74,8 +81,16 @@ export function PushDropdown({ onPush, size = 'md' }: PushDropdownProps) {
           {!showDatePicker ? (
             <div className="space-y-1">
               <div className="px-3 py-1 text-xs font-medium text-neutral-500 uppercase tracking-wide">
-                Push until
+                {showTodayOption ? 'Reschedule to' : 'Push until'}
               </div>
+              {showTodayOption && (
+                <button
+                  onClick={() => handlePush(getToday())}
+                  className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-primary-700 font-medium"
+                >
+                  Today
+                </button>
+              )}
               <button
                 onClick={() => handlePush(getTomorrow())}
                 className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"

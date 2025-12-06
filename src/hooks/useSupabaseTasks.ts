@@ -20,6 +20,7 @@ interface DbTask {
   assigned_to: string | null
   project_id: string | null
   parent_task_id: string | null
+  linked_event_id: string | null
   created_at: string
   updated_at: string
 }
@@ -53,6 +54,7 @@ function dbTaskToTask(dbTask: DbTask): Task {
     assignedTo: dbTask.assigned_to ?? undefined,
     projectId: dbTask.project_id ?? undefined,
     parentTaskId: dbTask.parent_task_id ?? undefined,
+    linkedEventId: dbTask.linked_event_id ?? undefined,
   }
 }
 
@@ -415,6 +417,7 @@ export function useSupabaseTasks() {
     if ('assignedTo' in updates) dbUpdates.assigned_to = updates.assignedTo ?? null
     if ('projectId' in updates) dbUpdates.project_id = updates.projectId ?? null
     if ('parentTaskId' in updates) dbUpdates.parent_task_id = updates.parentTaskId ?? null
+    if ('linkedEventId' in updates) dbUpdates.linked_event_id = updates.linkedEventId ?? null
 
     const { error: updateError } = await supabase
       .from('tasks')
@@ -469,5 +472,59 @@ export function useSupabaseTasks() {
     }
   }, [tasks, updateTask])
 
-  return { tasks, loading, error, addTask, addSubtask, toggleTask, deleteTask, updateTask, scheduleTask, pushTask }
+  // Add a prep task linked to an event (e.g., "Defrost chicken" for a dinner event)
+  const addPrepTask = useCallback(async (
+    title: string,
+    linkedEventId: string,
+    scheduledFor: Date
+  ): Promise<string | undefined> => {
+    if (!user) return undefined
+
+    // Optimistic update
+    const tempId = crypto.randomUUID()
+    const optimisticTask: Task = {
+      id: tempId,
+      title,
+      completed: false,
+      createdAt: new Date(),
+      scheduledFor,
+      linkedEventId,
+    }
+    setTasks((prev) => [optimisticTask, ...prev])
+
+    const { data, error: insertError } = await supabase
+      .from('tasks')
+      .insert({
+        user_id: user.id,
+        title,
+        completed: false,
+        scheduled_for: scheduledFor.toISOString(),
+        linked_event_id: linkedEventId,
+      })
+      .select()
+      .single()
+
+    if (insertError) {
+      // Rollback on error
+      setTasks((prev) => prev.filter((t) => t.id !== tempId))
+      setError(insertError.message)
+      return undefined
+    }
+
+    const createdTask = dbTaskToTask(data as DbTask)
+
+    // Replace optimistic task with real one
+    setTasks((prev) =>
+      prev.map((t) => (t.id === tempId ? createdTask : t))
+    )
+
+    return createdTask.id
+  }, [user])
+
+  // Get prep tasks for a specific event
+  const getPrepTasks = useCallback((eventId: string): Task[] => {
+    return tasks.filter((t) => t.linkedEventId === eventId)
+  }, [tasks])
+
+  return { tasks, loading, error, addTask, addSubtask, addPrepTask, getPrepTasks, toggleTask, deleteTask, updateTask, scheduleTask, pushTask }
 }

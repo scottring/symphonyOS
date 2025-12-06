@@ -14,6 +14,7 @@ import { ScheduleItem } from './ScheduleItem'
 import { SwipeableCard } from './SwipeableCard'
 import { DateNavigator } from './DateNavigator'
 import { InboxSection } from './InboxSection'
+import { OverdueSection } from './OverdueSection'
 import { WeeklyReview } from '@/components/review/WeeklyReview'
 
 interface TodayScheduleProps {
@@ -130,6 +131,24 @@ export function TodaySchedule({
       viewedDate.getDate() === today.getDate()
     )
   }, [viewedDate])
+
+  // Overdue tasks: scheduled for past days, not completed - only shown on today's view
+  const overdueTasks = useMemo(() => {
+    if (!isToday) return []
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    return tasks.filter((task) => {
+      if (task.completed) return false
+      if (!task.scheduledFor) return false
+
+      const taskDate = new Date(task.scheduledFor)
+      taskDate.setHours(0, 0, 0, 0)
+
+      return taskDate < today
+    })
+  }, [tasks, isToday])
 
   // Inbox tasks: needs triage - only shown on today's view
   // Includes: no scheduledFor, OR deferredUntil <= today
@@ -274,8 +293,8 @@ export function TodaySchedule({
   const completedTasks = filteredTasks.filter((t) => t.completed).length
   const completedRoutines = visibleRoutines.filter((r) => routineStatusMap.get(r.id)?.status === 'completed').length
   const completedCount = completedTasks + completedRoutines
-  const actionableCount = filteredTasks.length + visibleRoutines.length
-  const totalItems = filteredTasks.length + filteredEvents.length + visibleRoutines.length + inboxTasks.length
+  const actionableCount = filteredTasks.length + visibleRoutines.length + overdueTasks.length
+  const totalItems = filteredTasks.length + filteredEvents.length + visibleRoutines.length + inboxTasks.length + overdueTasks.length
   const progressPercent = actionableCount > 0 ? (completedCount / actionableCount) * 100 : 0
 
   return (
@@ -359,6 +378,21 @@ export function TodaySchedule({
         </div>
       ) : (
         <div>
+          {/* Overdue section - at top, only on today's view */}
+          {isToday && overdueTasks.length > 0 && (
+            <OverdueSection
+              tasks={overdueTasks}
+              selectedItemId={selectedItemId}
+              onSelectTask={onSelectItem}
+              onToggleTask={onToggleTask}
+              onPushTask={onPushTask}
+              contactsMap={contactsMap}
+              projectsMap={projectsMap}
+              familyMembers={familyMembers}
+              onAssignTask={onAssignTask}
+            />
+          )}
+
           {sections.map((section) => {
             const items = grouped[section]
             return (
@@ -435,7 +469,6 @@ export function TodaySchedule({
                       contactName={contactName || undefined}
                       projectName={projectName || undefined}
                       projectId={item.projectId || undefined}
-                      onOpenProject={onOpenProject}
                       familyMembers={familyMembers}
                       assignedTo={item.assignedTo}
                       onAssign={
