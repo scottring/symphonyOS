@@ -10,6 +10,8 @@ import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useLists } from '@/hooks/useLists'
 import { useListItems } from '@/hooks/useListItems'
+import { useNotes } from '@/hooks/useNotes'
+import { useNoteTopics } from '@/hooks/useNoteTopics'
 import { useSearch, type SearchResult } from '@/hooks/useSearch'
 import { supabase } from '@/lib/supabase'
 import { AppShell } from '@/components/layout/AppShell'
@@ -19,6 +21,7 @@ import { DetailPanelRedesign as DetailPanel } from '@/components/detail/DetailPa
 import { SearchModal } from '@/components/search/SearchModal'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 import { ListsList, ListView } from '@/components/list'
+import { NotesPage } from '@/components/notes'
 import {
   ProjectsList,
   ProjectView,
@@ -78,6 +81,22 @@ function App() {
     deleteItem: deleteListItem,
     reorderItems: reorderListItems,
   } = useListItems(selectedListId)
+
+  // Notes state
+  const {
+    notes,
+    notesByDate,
+    loading: notesLoading,
+    addNote,
+    updateNote: updateNoteContent,
+    deleteNote,
+    getEntityLinks,
+  } = useNotes()
+  const {
+    topicsMap,
+    activeTopics,
+    addTopic,
+  } = useNoteTopics()
 
   // Get selected list for ListView
   const selectedList = useMemo(() => {
@@ -781,6 +800,27 @@ function App() {
           onUpdateItem={updateListItem}
           onDeleteItem={deleteListItem}
           onReorderItems={reorderListItems}
+        />
+      )}
+
+      {activeView === 'notes' && (
+        <NotesPage
+          notes={notes}
+          notesByDate={notesByDate}
+          topics={activeTopics}
+          topicsMap={topicsMap}
+          loading={notesLoading}
+          onAddNote={async (content, topicId) => {
+            return addNote({ content, topicId })
+          }}
+          onUpdateNote={async (id, updates) => {
+            await updateNoteContent(id, updates)
+          }}
+          onDeleteNote={deleteNote}
+          onAddTopic={async (name) => {
+            return addTopic({ name })
+          }}
+          getEntityLinks={getEntityLinks}
         />
       )}
 
