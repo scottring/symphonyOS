@@ -44,8 +44,8 @@ export function PlanningTaskDrawer({ tasks, onPushTask }: PlanningTaskDrawerProp
         </p>
       </div>
 
-      {/* Task list */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-2">
+      {/* Task list - overflow-x-clip allows dropdown to show while y scrolls */}
+      <div className="flex-1 overflow-y-auto overflow-x-clip p-3 space-y-2">
         {tasks.length === 0 ? (
           <div className={`text-center py-8 ${isOver ? 'opacity-50' : ''}`}>
             <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-neutral-100 flex items-center justify-center">

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 
 interface PushDropdownProps {
   onPush: (date: Date) => void
@@ -9,12 +10,29 @@ interface PushDropdownProps {
 export function PushDropdown({ onPush, size = 'md', showTodayOption = false }: PushDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [showDatePicker, setShowDatePicker] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 })
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Calculate dropdown position when opening
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      setDropdownPosition({
+        top: rect.bottom + 4,
+        right: window.innerWidth - rect.right,
+      })
+    }
+  }, [isOpen])
 
   // Close on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node
+      const clickedButton = buttonRef.current?.contains(target)
+      const clickedDropdown = dropdownRef.current?.contains(target)
+      
+      if (!clickedButton && !clickedDropdown) {
         setIsOpen(false)
         setShowDatePicker(false)
       }
@@ -46,6 +64,7 @@ export function PushDropdown({ onPush, size = 'md', showTodayOption = false }: P
   }
 
   const handlePush = (date: Date) => {
+    console.log('PushDropdown handlePush called with date:', date)
     onPush(date)
     setIsOpen(false)
     setShowDatePicker(false)
@@ -65,8 +84,9 @@ export function PushDropdown({ onPush, size = 'md', showTodayOption = false }: P
   const iconClasses = size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'
 
   return (
-    <div ref={containerRef} className="relative">
+    <div className="relative">
       <button
+        ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
         className={buttonClasses}
         aria-label="Push task"
@@ -76,8 +96,15 @@ export function PushDropdown({ onPush, size = 'md', showTodayOption = false }: P
         </svg>
       </button>
 
-      {isOpen && (
-        <div className="absolute right-0 top-full mt-1 z-50 bg-white rounded-xl border border-neutral-200 shadow-lg p-2 min-w-[160px]">
+      {isOpen && createPortal(
+        <div
+          ref={dropdownRef}
+          className="fixed z-[100] bg-white rounded-xl border border-neutral-200 shadow-lg p-2 min-w-[160px]"
+          style={{ top: dropdownPosition.top, right: dropdownPosition.right }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
           {!showDatePicker ? (
             <div className="space-y-1">
               <div className="px-3 py-1 text-xs font-medium text-neutral-500 uppercase tracking-wide">
@@ -132,7 +159,8 @@ export function PushDropdown({ onPush, size = 'md', showTodayOption = false }: P
               />
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

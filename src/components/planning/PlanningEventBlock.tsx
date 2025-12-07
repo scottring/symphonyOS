@@ -1,11 +1,23 @@
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
+import { FAMILY_COLORS, type FamilyMember, type FamilyMemberColor } from '@/types/family'
 
 interface PlanningEventBlockProps {
   event: CalendarEvent
   height: number
+  assignee?: FamilyMember
 }
 
-export function PlanningEventBlock({ event, height }: PlanningEventBlockProps) {
+export function PlanningEventBlock({ event, height, assignee }: PlanningEventBlockProps) {
+  // Get colors based on assignee, fallback to neutral (event default)
+  const colors = assignee
+    ? FAMILY_COLORS[assignee.color as FamilyMemberColor] || FAMILY_COLORS.blue
+    : null
+
+  const bgClass = colors ? colors.bg : 'bg-neutral-100'
+  const borderClass = colors ? colors.border : 'border-neutral-200'
+  const textClass = colors ? colors.text : 'text-neutral-600'
+  const iconClass = colors ? colors.icon : 'text-neutral-400'
+  const subtextClass = colors ? colors.icon : 'text-neutral-400'
   const startTimeStr = event.start_time || event.startTime
   const startDate = startTimeStr ? new Date(startTimeStr) : null
 
@@ -19,7 +31,7 @@ export function PlanningEventBlock({ event, height }: PlanningEventBlockProps) {
 
   return (
     <div
-      className="h-full px-2 py-1 rounded-lg bg-neutral-100 border border-neutral-200 overflow-hidden"
+      className={`h-full px-2 py-1 rounded-lg ${bgClass} border ${borderClass} overflow-hidden`}
       style={{ minHeight: height }}
     >
       <div className="flex items-start gap-1.5">
@@ -27,7 +39,7 @@ export function PlanningEventBlock({ event, height }: PlanningEventBlockProps) {
         <div className="shrink-0 mt-0.5">
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            className="w-3 h-3 text-neutral-400"
+            className={`w-3 h-3 ${iconClass}`}
             viewBox="0 0 20 20"
             fill="currentColor"
           >
@@ -41,11 +53,11 @@ export function PlanningEventBlock({ event, height }: PlanningEventBlockProps) {
 
         {/* Event info */}
         <div className="flex-1 min-w-0">
-          <span className="text-xs font-medium text-neutral-600 line-clamp-1">
+          <span className={`text-xs font-medium ${textClass} line-clamp-1`}>
             {event.title}
           </span>
           {startDate && (
-            <span className="text-[10px] text-neutral-400">
+            <span className={`text-[10px] ${subtextClass}`}>
               {formatTime(startDate)}
             </span>
           )}

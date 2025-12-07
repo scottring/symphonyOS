@@ -1,18 +1,31 @@
 import type { Routine } from '@/types/actionable'
+import { FAMILY_COLORS, type FamilyMember, type FamilyMemberColor } from '@/types/family'
 
 interface PlanningRoutineBlockProps {
   routine: Routine
+  assignee?: FamilyMember
 }
 
-export function PlanningRoutineBlock({ routine }: PlanningRoutineBlockProps) {
+export function PlanningRoutineBlock({ routine, assignee }: PlanningRoutineBlockProps) {
+  // Get colors based on assignee, fallback to sage (routine default)
+  const colors = assignee
+    ? FAMILY_COLORS[assignee.color as FamilyMemberColor] || FAMILY_COLORS.green
+    : null
+
+  const bgClass = colors ? colors.bg : 'bg-sage-50'
+  const borderClass = colors ? colors.border : 'border-sage-200'
+  const textClass = colors ? colors.text : 'text-sage-700'
+  const iconClass = colors ? colors.icon : 'text-sage-400'
+  const subtextClass = colors ? colors.icon : 'text-sage-500'
+
   return (
-    <div className="h-full px-2 py-1 rounded-lg bg-sage-50 border border-sage-200 overflow-hidden">
+    <div className={`h-full px-2 py-1 rounded-lg ${bgClass} border ${borderClass} overflow-hidden`}>
       <div className="flex items-start gap-1.5">
         {/* Routine icon (circle for checkbox-like appearance) */}
         <div className="shrink-0 mt-0.5">
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            className="w-3 h-3 text-sage-400"
+            className={`w-3 h-3 ${iconClass}`}
             viewBox="0 0 20 20"
             fill="currentColor"
           >
@@ -26,11 +39,11 @@ export function PlanningRoutineBlock({ routine }: PlanningRoutineBlockProps) {
 
         {/* Routine info */}
         <div className="flex-1 min-w-0">
-          <span className="text-xs font-medium text-sage-700 line-clamp-1">
+          <span className={`text-xs font-medium ${textClass} line-clamp-1`}>
             {routine.name}
           </span>
           {routine.time_of_day && (
-            <span className="text-[10px] text-sage-500">
+            <span className={`text-[10px] ${subtextClass}`}>
               {formatTimeOfDay(routine.time_of_day)}
             </span>
           )}

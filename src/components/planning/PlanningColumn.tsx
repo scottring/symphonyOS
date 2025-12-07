@@ -1,7 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useCallback } from 'react'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
+import type { EventNote } from '@/hooks/useEventNotes'
 import type { Routine } from '@/types/actionable'
+import type { FamilyMember } from '@/types/family'
 import { PlanningTimeSlot } from './PlanningTimeSlot'
 import { PlanningTaskCard } from './PlanningTaskCard'
 import { PlanningEventBlock } from './PlanningEventBlock'
@@ -18,6 +20,8 @@ interface PlanningColumnProps {
   tasks: Task[]
   events: CalendarEvent[]
   routines: Routine[]
+  familyMembers: FamilyMember[]
+  eventNotesMap?: Map<string, EventNote>
   timeLabels: TimeLabel[]
   slotHeight: number
   dayStartHour: number
@@ -28,10 +32,17 @@ export function PlanningColumn({
   tasks,
   events,
   routines,
+  familyMembers,
+  eventNotesMap,
   timeLabels,
   slotHeight,
   dayStartHour,
 }: PlanningColumnProps) {
+  // Helper to find family member by ID
+  const getMember = useCallback((id: string | null | undefined) => {
+    if (!id) return undefined
+    return familyMembers.find(m => m.id === id)
+  }, [familyMembers])
   const dateKey = formatDateKey(date)
   const isToday = useMemo(() => {
     const today = new Date()
@@ -220,28 +231,33 @@ export function PlanningColumn({
             <div
               key={task.id}
               className="absolute z-10"
-              style={{ 
-                top: `${top}px`, 
+              style={{
+                top: `${top}px`,
                 height: `${height}px`,
                 left: `calc(4px + ${leftPercent}%)`,
                 width: `calc(${widthPercent}% - 8px)`,
               }}
             >
-              <PlanningTaskCard task={task} isPlaced />
+              <PlanningTaskCard task={task} isPlaced assignee={getMember(task.assignedTo)} />
             </div>
           )
         })}
 
         {/* Placed events - not draggable */}
-        {placedEvents.map(({ event, top, height }) => (
-          <div
-            key={event.id}
-            className="absolute left-1 right-1 pointer-events-none"
-            style={{ top: `${top}px`, height: `${height}px` }}
-          >
-            <PlanningEventBlock event={event} height={height} />
-          </div>
-        ))}
+        {placedEvents.map(({ event, top, height }) => {
+          const eventId = event.google_event_id || event.id
+          const eventNote = eventNotesMap?.get(eventId)
+          const eventAssignee = eventNote?.assignedTo ? getMember(eventNote.assignedTo) : undefined
+          return (
+            <div
+              key={event.id}
+              className="absolute left-1 right-1 pointer-events-none"
+              style={{ top: `${top}px`, height: `${height}px` }}
+            >
+              <PlanningEventBlock event={event} height={height} assignee={eventAssignee} />
+            </div>
+          )
+        })}
 
         {/* Placed routines - not draggable */}
         {placedRoutines.map(({ routine, top, height }) => (
@@ -250,7 +266,7 @@ export function PlanningColumn({
             className="absolute left-1 right-1 pointer-events-none"
             style={{ top: `${top}px`, height: `${height}px` }}
           >
-            <PlanningRoutineBlock routine={routine} />
+            <PlanningRoutineBlock routine={routine} assignee={getMember(routine.assigned_to)} />
           </div>
         ))}
       </div>

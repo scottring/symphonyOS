@@ -12,11 +12,18 @@ export interface FamilyMember {
 
 export type FamilyMemberColor = 'blue' | 'purple' | 'green' | 'orange' | 'pink' | 'teal'
 
-export const FAMILY_COLORS: Record<FamilyMemberColor, { bg: string; text: string; ring: string }> = {
-  blue: { bg: 'bg-blue-100', text: 'text-blue-700', ring: 'ring-blue-300' },
-  purple: { bg: 'bg-purple-100', text: 'text-purple-700', ring: 'ring-purple-300' },
-  green: { bg: 'bg-green-100', text: 'text-green-700', ring: 'ring-green-300' },
-  orange: { bg: 'bg-orange-100', text: 'text-orange-700', ring: 'ring-orange-300' },
-  pink: { bg: 'bg-pink-100', text: 'text-pink-700', ring: 'ring-pink-300' },
-  teal: { bg: 'bg-teal-100', text: 'text-teal-700', ring: 'ring-teal-300' },
+export const FAMILY_COLORS: Record<FamilyMemberColor, {
+  bg: string
+  text: string
+  ring: string
+  border: string
+  hoverBorder: string
+  icon: string
+}> = {
+  blue: { bg: 'bg-blue-100', text: 'text-blue-700', ring: 'ring-blue-300', border: 'border-blue-200', hoverBorder: 'hover:border-blue-300', icon: 'text-blue-400' },
+  purple: { bg: 'bg-purple-100', text: 'text-purple-700', ring: 'ring-purple-300', border: 'border-purple-200', hoverBorder: 'hover:border-purple-300', icon: 'text-purple-400' },
+  green: { bg: 'bg-green-100', text: 'text-green-700', ring: 'ring-green-300', border: 'border-green-200', hoverBorder: 'hover:border-green-300', icon: 'text-green-400' },
+  orange: { bg: 'bg-orange-100', text: 'text-orange-700', ring: 'ring-orange-300', border: 'border-orange-200', hoverBorder: 'hover:border-orange-300', icon: 'text-orange-400' },
+  pink: { bg: 'bg-pink-100', text: 'text-pink-700', ring: 'ring-pink-300', border: 'border-pink-200', hoverBorder: 'hover:border-pink-300', icon: 'text-pink-400' },
+  teal: { bg: 'bg-teal-100', text: 'text-teal-700', ring: 'ring-teal-300', border: 'border-teal-200', hoverBorder: 'hover:border-teal-300', icon: 'text-teal-400' },
 }

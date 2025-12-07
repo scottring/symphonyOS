@@ -1,7 +1,9 @@
 import { useMemo } from 'react'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
+import type { EventNote } from '@/hooks/useEventNotes'
 import type { Routine } from '@/types/actionable'
+import type { FamilyMember } from '@/types/family'
 import { PlanningColumn } from './PlanningColumn'
 
 interface PlanningGridProps {
@@ -9,6 +11,8 @@ interface PlanningGridProps {
   scheduledTasksByDate: Map<string, Task[]>
   eventsByDate: Map<string, CalendarEvent[]>
   routinesByDate: Map<string, Routine[]>
+  familyMembers: FamilyMember[]
+  eventNotesMap?: Map<string, EventNote>
   dayStartHour: number
   dayEndHour: number
   slotDuration: number
@@ -19,6 +23,8 @@ export function PlanningGrid({
   scheduledTasksByDate,
   eventsByDate,
   routinesByDate,
+  familyMembers,
+  eventNotesMap,
   dayStartHour,
   dayEndHour,
   slotDuration,
@@ -84,6 +90,8 @@ export function PlanningGrid({
               tasks={tasks}
               events={events}
               routines={routines}
+              familyMembers={familyMembers}
+              eventNotesMap={eventNotesMap}
               timeLabels={timeLabels}
               slotHeight={slotHeight}
               dayStartHour={dayStartHour}

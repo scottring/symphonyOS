@@ -14,7 +14,9 @@ import {
 } from '@dnd-kit/core'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
+import type { EventNote } from '@/hooks/useEventNotes'
 import type { Routine } from '@/types/actionable'
+import type { FamilyMember } from '@/types/family'
 import { PlanningHeader } from './PlanningHeader'
 import { PlanningGrid } from './PlanningGrid'
 import { PlanningTaskDrawer } from './PlanningTaskDrawer'
@@ -24,6 +26,8 @@ interface PlanningSessionProps {
   tasks: Task[]
   events: CalendarEvent[]
   routines: Routine[]
+  familyMembers?: FamilyMember[]
+  eventNotesMap?: Map<string, EventNote>
   onUpdateTask: (id: string, updates: Partial<Task>) => void
   onPushTask: (id: string, date: Date) => void
   onClose: () => void
@@ -47,6 +51,8 @@ export function PlanningSession({
   tasks,
   events,
   routines,
+  familyMembers = [],
+  eventNotesMap,
   onUpdateTask,
   onPushTask,
   onClose,
@@ -79,13 +85,19 @@ export function PlanningSession({
     })
   )
 
-  // Get unscheduled tasks (no scheduledFor or in the past)
+  // Get unscheduled tasks (no scheduledFor or in the past, and not deferred to future)
   const unscheduledTasks = useMemo(() => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
     return tasks.filter((task) => {
       if (task.completed) return false
+      // Exclude tasks deferred to a future date
+      if (task.deferredUntil) {
+        const deferDate = new Date(task.deferredUntil)
+        deferDate.setHours(0, 0, 0, 0)
+        if (deferDate > today) return false
+      }
       if (!task.scheduledFor) return true
       // Include tasks scheduled for past dates (they need to be rescheduled)
       const taskDate = new Date(task.scheduledFor)
@@ -303,6 +315,8 @@ export function PlanningSession({
             scheduledTasksByDate={scheduledTasksByDate}
             eventsByDate={eventsByDate}
             routinesByDate={routinesByDate}
+            familyMembers={familyMembers}
+            eventNotesMap={eventNotesMap}
             dayStartHour={DAY_START_HOUR}
             dayEndHour={DAY_END_HOUR}
             slotDuration={SLOT_DURATION}

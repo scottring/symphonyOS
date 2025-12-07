@@ -29,6 +29,7 @@ describe('PlanningSession', () => {
         events={[]}
         routines={[]}
         onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
         onClose={onClose}
       />
     )
@@ -46,6 +47,7 @@ describe('PlanningSession', () => {
         events={[]}
         routines={[]}
         onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
         onClose={vi.fn()}
       />
     )
@@ -69,6 +71,7 @@ describe('PlanningSession', () => {
         events={[]}
         routines={[]}
         onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
         onClose={vi.fn()}
         initialDate={today}
       />
@@ -89,6 +92,7 @@ describe('PlanningSession', () => {
         events={[]}
         routines={[]}
         onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
         onClose={vi.fn()}
       />
     )
@@ -111,6 +115,7 @@ describe('PlanningSession', () => {
         events={[event]}
         routines={[]}
         onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
         onClose={vi.fn()}
         initialDate={today}
       />
@@ -131,6 +136,7 @@ describe('PlanningSession', () => {
         events={[]}
         routines={[routine]}
         onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
         onClose={vi.fn()}
       />
     )
@@ -146,6 +152,7 @@ describe('PlanningSession', () => {
         events={[]}
         routines={[]}
         onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
         onClose={onClose}
       />
     )
@@ -169,6 +176,7 @@ describe('PlanningSession', () => {
         events={[]}
         routines={[]}
         onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
         onClose={vi.fn()}
       />
     )
@@ -191,6 +199,7 @@ describe('PlanningSession', () => {
         events={[]}
         routines={[]}
         onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
         onClose={vi.fn()}
         initialDate={today}
       />

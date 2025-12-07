@@ -617,6 +617,8 @@ function App() {
           onClose={() => setPlanningOpen(false)}
           onUpdateTask={updateTask}
           onPushTask={pushTask}
+          familyMembers={familyMembers}
+          eventNotesMap={eventNotesMap}
         />
       )}
 
