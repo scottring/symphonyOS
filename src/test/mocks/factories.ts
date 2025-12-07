@@ -3,6 +3,7 @@ import type { Contact } from '@/types/contact'
 import type { Project, ProjectStatus, DbProject } from '@/types/project'
 import type { Routine, RecurrencePattern, ActionableInstance, ActionableStatus, EntityType } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
+import type { List, ListItem, DbList, DbListItem, ListCategory, ListVisibility } from '@/types/list'
 
 // Counter for generating unique IDs
 let idCounter = 0
@@ -260,6 +261,76 @@ export function createMockFamilyMember(overrides: Partial<FamilyMember> = {}): F
     is_full_user: false,
     display_order: 0,
     created_at: '2024-01-01T00:00:00Z',
+    ...overrides,
+  }
+}
+
+/**
+ * Create a mock List with sensible defaults
+ */
+export function createMockList(overrides: Partial<List> = {}): List {
+  return {
+    id: generateId('list'),
+    title: 'Test List',
+    icon: undefined,
+    category: 'other' as ListCategory,
+    visibility: 'self' as ListVisibility,
+    hiddenFrom: undefined,
+    sortOrder: 0,
+    createdAt: new Date('2024-01-01T00:00:00Z'),
+    updatedAt: new Date('2024-01-01T00:00:00Z'),
+    ...overrides,
+  }
+}
+
+/**
+ * Create a mock DB list (snake_case format from Supabase)
+ */
+export function createMockDbList(overrides: Partial<DbList> = {}): DbList {
+  return {
+    id: generateId('list'),
+    user_id: 'test-user-id',
+    title: 'Test List',
+    icon: null,
+    category: 'other' as ListCategory,
+    visibility: 'self' as ListVisibility,
+    hidden_from: null,
+    sort_order: 0,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+    ...overrides,
+  }
+}
+
+/**
+ * Create a mock ListItem with sensible defaults
+ */
+export function createMockListItem(overrides: Partial<ListItem> = {}): ListItem {
+  return {
+    id: generateId('list-item'),
+    listId: 'list-1',
+    text: 'Test Item',
+    note: undefined,
+    sortOrder: 0,
+    createdAt: new Date('2024-01-01T00:00:00Z'),
+    updatedAt: new Date('2024-01-01T00:00:00Z'),
+    ...overrides,
+  }
+}
+
+/**
+ * Create a mock DB list item (snake_case format from Supabase)
+ */
+export function createMockDbListItem(overrides: Partial<DbListItem> = {}): DbListItem {
+  return {
+    id: generateId('list-item'),
+    user_id: 'test-user-id',
+    list_id: 'list-1',
+    text: 'Test Item',
+    note: null,
+    sort_order: 0,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
     ...overrides,
   }
 }

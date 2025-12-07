@@ -21,6 +21,7 @@ interface DbTask {
   project_id: string | null
   parent_task_id: string | null
   linked_event_id: string | null
+  estimated_duration: number | null
   created_at: string
   updated_at: string
 }
@@ -55,6 +56,7 @@ function dbTaskToTask(dbTask: DbTask): Task {
     projectId: dbTask.project_id ?? undefined,
     parentTaskId: dbTask.parent_task_id ?? undefined,
     linkedEventId: dbTask.linked_event_id ?? undefined,
+    estimatedDuration: dbTask.estimated_duration ?? undefined,
   }
 }
 
@@ -418,6 +420,7 @@ export function useSupabaseTasks() {
     if ('projectId' in updates) dbUpdates.project_id = updates.projectId ?? null
     if ('parentTaskId' in updates) dbUpdates.parent_task_id = updates.parentTaskId ?? null
     if ('linkedEventId' in updates) dbUpdates.linked_event_id = updates.linkedEventId ?? null
+    if ('estimatedDuration' in updates) dbUpdates.estimated_duration = updates.estimatedDuration ?? null
 
     const { error: updateError } = await supabase
       .from('tasks')

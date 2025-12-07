@@ -8,13 +8,17 @@ import { useProjects } from '@/hooks/useProjects'
 import { useRoutines } from '@/hooks/useRoutines'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
+import { useLists } from '@/hooks/useLists'
+import { useListItems } from '@/hooks/useListItems'
 import { useSearch, type SearchResult } from '@/hooks/useSearch'
 import { supabase } from '@/lib/supabase'
 import { AppShell } from '@/components/layout/AppShell'
 import { HomeView } from '@/components/home'
+import { PlanningSession } from '@/components/planning'
 import { DetailPanelRedesign as DetailPanel } from '@/components/detail/DetailPanelRedesign'
 import { SearchModal } from '@/components/search/SearchModal'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
+import { ListsList, ListView } from '@/components/list'
 import {
   ProjectsList,
   ProjectView,
@@ -24,10 +28,10 @@ import {
   TaskView,
   ContactView,
   RecipeViewer,
-  AuthForm,
   CalendarConnect,
   OnboardingWizard,
   SettingsPage,
+  AuthForm,
 } from '@/components/lazy'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import type { ViewType } from '@/components/layout/Sidebar'
@@ -57,6 +61,30 @@ function App() {
   const { getInstancesForDate, markDone, undoDone, skip } = useActionableInstances()
   const { members: familyMembers } = useFamilyMembers()
 
+  // Lists state
+  const [selectedListId, setSelectedListId] = useState<string | null>(null)
+  const {
+    lists,
+    listsByCategory,
+    addList,
+    updateList,
+    deleteList,
+    getListById,
+  } = useLists()
+  const {
+    items: listItems,
+    addItem: addListItem,
+    updateItem: updateListItem,
+    deleteItem: deleteListItem,
+    reorderItems: reorderListItems,
+  } = useListItems(selectedListId)
+
+  // Get selected list for ListView
+  const selectedList = useMemo(() => {
+    if (!selectedListId) return null
+    return getListById(selectedListId) ?? null
+  }, [selectedListId, getListById])
+
   // Search state
   const [searchOpen, setSearchOpen] = useState(false)
   const {
@@ -71,6 +99,7 @@ function App() {
     projects,
     contacts,
     routines: allRoutines,
+    lists,
   })
 
   // Actionable instances for the viewed date (to filter skipped/completed events)
@@ -92,6 +121,7 @@ function App() {
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null)
   const [creatingRoutine, setCreatingRoutine] = useState(false)
   const [recentlyCreatedTaskId, setRecentlyCreatedTaskId] = useState<string | null>(null)
+  const [planningOpen, setPlanningOpen] = useState(false)
 
   // Toggle quick add modal
   const openQuickAdd = useCallback(() => setQuickAddOpen(true), [])
@@ -318,6 +348,7 @@ function App() {
     setSelectedProjectId(null)
     setSelectedRoutineId(null)
     setSelectedContactId(null)
+    setSelectedListId(null)
     setCreatingRoutine(false)
     setRecipeUrl(null)
   }, [])
@@ -399,6 +430,10 @@ function App() {
         setSelectedRoutineId(result.id)
         setActiveView('routines')
         break
+      case 'list':
+        setSelectedListId(result.id)
+        setActiveView('lists')
+        break
     }
   }, [clearSearch, handleSelectItem, handleOpenProject, handleOpenContact])
 
@@ -417,12 +452,11 @@ function App() {
   }
 
   if (!user) {
+    // Show login form for unauthenticated users
     return (
-      <div className="min-h-screen bg-bg-base">
-        <Suspense fallback={<LoadingFallback />}>
-          <AuthForm />
-        </Suspense>
-      </div>
+      <Suspense fallback={<LoadingFallback />}>
+        <AuthForm />
+      </Suspense>
     )
   }
 
@@ -568,8 +602,21 @@ function App() {
               await skip('calendar_event', eventId, viewedDate)
               refreshDateInstances()
             }}
+            onOpenPlanning={() => setPlanningOpen(true)}
           />
         </div>
+      )}
+
+      {/* Planning Session - fullscreen overlay */}
+      {planningOpen && (
+        <PlanningSession
+          tasks={tasks}
+          events={events}
+          routines={filteredRoutines}
+          initialDate={viewedDate}
+          onClose={() => setPlanningOpen(false)}
+          onUpdateTask={updateTask}
+        />
       )}
 
       {activeView === 'task-detail' && selectedTask && (
@@ -709,6 +756,29 @@ function App() {
             onToggleVisibility={toggleRoutineVisibility}
           />
         </Suspense>
+      )}
+
+      {activeView === 'lists' && !selectedListId && (
+        <ListsList
+          lists={lists}
+          listsByCategory={listsByCategory}
+          onSelectList={setSelectedListId}
+          onAddList={addList}
+        />
+      )}
+
+      {activeView === 'lists' && selectedList && (
+        <ListView
+          list={selectedList}
+          items={listItems}
+          onBack={() => setSelectedListId(null)}
+          onUpdateList={updateList}
+          onDeleteList={deleteList}
+          onAddItem={addListItem}
+          onUpdateItem={updateListItem}
+          onDeleteItem={deleteListItem}
+          onReorderItems={reorderListItems}
+        />
       )}
 
       {activeView === 'settings' && (

@@ -4,8 +4,10 @@ import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { Routine } from '@/types/actionable'
+import type { List } from '@/types/list'
+import { getCategoryLabel } from '@/types/list'
 
-export type SearchResultType = 'task' | 'project' | 'contact' | 'routine'
+export type SearchResultType = 'task' | 'project' | 'contact' | 'routine' | 'list'
 
 export interface SearchResult {
   type: SearchResultType
@@ -14,7 +16,7 @@ export interface SearchResult {
   subtitle?: string
   matchedField?: string
   completed?: boolean
-  item: Task | Project | Contact | Routine
+  item: Task | Project | Contact | Routine | List
 }
 
 export interface GroupedSearchResults {
@@ -22,6 +24,7 @@ export interface GroupedSearchResults {
   projects: SearchResult[]
   contacts: SearchResult[]
   routines: SearchResult[]
+  lists: SearchResult[]
 }
 
 interface UseSearchProps {
@@ -29,6 +32,7 @@ interface UseSearchProps {
   projects: Project[]
   contacts: Contact[]
   routines: Routine[]
+  lists?: List[]
 }
 
 const FUSE_OPTIONS = {
@@ -49,7 +53,7 @@ function flattenTasks(tasks: Task[]): Task[] {
   return result
 }
 
-export function useSearch({ tasks, projects, contacts, routines }: UseSearchProps) {
+export function useSearch({ tasks, projects, contacts, routines, lists = [] }: UseSearchProps) {
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
@@ -127,6 +131,17 @@ export function useSearch({ tasks, projects, contacts, routines }: UseSearchProp
     [routines]
   )
 
+  const listFuse = useMemo(
+    () =>
+      new Fuse(lists, {
+        ...FUSE_OPTIONS,
+        keys: [
+          { name: 'title', weight: 2 },
+        ],
+      }),
+    [lists]
+  )
+
   // Get project name helper
   const getProjectName = useCallback(
     (projectId: string | undefined): string | undefined => {
@@ -168,13 +183,14 @@ export function useSearch({ tasks, projects, contacts, routines }: UseSearchProp
   // Search results
   const results = useMemo((): GroupedSearchResults => {
     if (!debouncedQuery.trim()) {
-      return { tasks: [], projects: [], contacts: [], routines: [] }
+      return { tasks: [], projects: [], contacts: [], routines: [], lists: [] }
     }
 
     const taskResults = taskFuse.search(debouncedQuery)
     const projectResults = projectFuse.search(debouncedQuery)
     const contactResults = contactFuse.search(debouncedQuery)
     const routineResults = routineFuse.search(debouncedQuery)
+    const listResults = listFuse.search(debouncedQuery)
 
     // Convert to SearchResult format
     const tasks: SearchResult[] = taskResults.map((r) => ({
@@ -220,20 +236,31 @@ export function useSearch({ tasks, projects, contacts, routines }: UseSearchProp
       item: r.item,
     }))
 
+    const listsResult: SearchResult[] = listResults.map((r) => ({
+      type: 'list' as const,
+      id: r.item.id,
+      title: r.item.title,
+      subtitle: getCategoryLabel(r.item.category),
+      matchedField: r.matches?.[0]?.key,
+      item: r.item,
+    }))
+
     return {
       tasks,
       projects: projectsResult,
       contacts: contactsResult,
       routines: routinesResult,
+      lists: listsResult,
     }
-  }, [debouncedQuery, taskFuse, projectFuse, contactFuse, routineFuse, getProjectName])
+  }, [debouncedQuery, taskFuse, projectFuse, contactFuse, routineFuse, listFuse, getProjectName])
 
   // Total result count
   const totalResults =
     results.tasks.length +
     results.projects.length +
     results.contacts.length +
-    results.routines.length
+    results.routines.length +
+    results.lists.length
 
   // Clear search
   const clearSearch = useCallback(() => {

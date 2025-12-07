@@ -5,6 +5,7 @@ import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { Routine } from '@/types/actionable'
+import type { List } from '@/types/list'
 
 // Mock data factories
 function createMockTask(overrides: Partial<Task> = {}): Task {
@@ -57,6 +58,19 @@ function createMockRoutine(overrides: Partial<Routine> = {}): Routine {
   }
 }
 
+function createMockList(overrides: Partial<List> = {}): List {
+  return {
+    id: 'list-1',
+    title: 'Test List',
+    category: 'other',
+    visibility: 'self',
+    sortOrder: 0,
+    createdAt: new Date('2024-01-01'),
+    updatedAt: new Date('2024-01-01'),
+    ...overrides,
+  }
+}
+
 describe('useSearch', () => {
   beforeEach(() => {
     vi.useFakeTimers()
@@ -69,7 +83,7 @@ describe('useSearch', () => {
   describe('initial state', () => {
     it('starts with empty query and no results', () => {
       const { result } = renderHook(() =>
-        useSearch({ tasks: [], projects: [], contacts: [], routines: [] })
+        useSearch({ tasks: [], projects: [], contacts: [], routines: [], lists: [] })
       )
 
       expect(result.current.query).toBe('')
@@ -80,6 +94,7 @@ describe('useSearch', () => {
         projects: [],
         contacts: [],
         routines: [],
+        lists: [],
       })
     })
   })
@@ -494,6 +509,71 @@ describe('useSearch', () => {
     })
   })
 
+  describe('list search', () => {
+    it('finds lists by title', async () => {
+      const lists = [
+        createMockList({ id: 'l1', title: 'Movies to Watch' }),
+        createMockList({ id: 'l2', title: 'Restaurants to Try' }),
+      ]
+      const { result } = renderHook(() =>
+        useSearch({ tasks: [], projects: [], contacts: [], routines: [], lists })
+      )
+
+      act(() => {
+        result.current.setQuery('movies')
+      })
+
+      await act(async () => {
+        vi.advanceTimersByTime(200)
+      })
+
+      expect(result.current.results.lists).toHaveLength(1)
+      expect(result.current.results.lists[0].title).toBe('Movies to Watch')
+    })
+
+    it('shows category label as subtitle', async () => {
+      const lists = [
+        createMockList({
+          title: 'Best Pizzerias',
+          category: 'food_drink',
+        }),
+      ]
+      const { result } = renderHook(() =>
+        useSearch({ tasks: [], projects: [], contacts: [], routines: [], lists })
+      )
+
+      act(() => {
+        result.current.setQuery('pizza')
+      })
+
+      await act(async () => {
+        vi.advanceTimersByTime(200)
+      })
+
+      expect(result.current.results.lists[0].subtitle).toBe('Food & Drink')
+    })
+
+    it('includes list type and id in result', async () => {
+      const list = createMockList({ id: 'list-123', title: 'Test List' })
+      const { result } = renderHook(() =>
+        useSearch({ tasks: [], projects: [], contacts: [], routines: [], lists: [list] })
+      )
+
+      act(() => {
+        result.current.setQuery('test')
+      })
+
+      await act(async () => {
+        vi.advanceTimersByTime(200)
+      })
+
+      const searchResult = result.current.results.lists[0]
+      expect(searchResult.type).toBe('list')
+      expect(searchResult.id).toBe('list-123')
+      expect(searchResult.item).toBe(list)
+    })
+  })
+
   describe('fuzzy matching', () => {
     it('finds results with typos', async () => {
       const tasks = [createMockTask({ title: 'Schedule appointment' })]
@@ -536,9 +616,10 @@ describe('useSearch', () => {
       const projects = [createMockProject({ name: 'Test project' })]
       const contacts = [createMockContact({ name: 'Test person' })]
       const routines = [createMockRoutine({ name: 'Test routine' })]
+      const lists = [createMockList({ title: 'Test list' })]
 
       const { result } = renderHook(() =>
-        useSearch({ tasks, projects, contacts, routines })
+        useSearch({ tasks, projects, contacts, routines, lists })
       )
 
       act(() => {
@@ -553,13 +634,14 @@ describe('useSearch', () => {
       expect(result.current.results.projects).toHaveLength(1)
       expect(result.current.results.contacts).toHaveLength(1)
       expect(result.current.results.routines).toHaveLength(1)
-      expect(result.current.totalResults).toBe(4)
+      expect(result.current.results.lists).toHaveLength(1)
+      expect(result.current.totalResults).toBe(5)
     })
 
     it('returns empty arrays when no matches', async () => {
       const tasks = [createMockTask({ title: 'Buy groceries' })]
       const { result } = renderHook(() =>
-        useSearch({ tasks, projects: [], contacts: [], routines: [] })
+        useSearch({ tasks, projects: [], contacts: [], routines: [], lists: [] })
       )
 
       act(() => {
@@ -574,6 +656,7 @@ describe('useSearch', () => {
       expect(result.current.results.projects).toHaveLength(0)
       expect(result.current.results.contacts).toHaveLength(0)
       expect(result.current.results.routines).toHaveLength(0)
+      expect(result.current.results.lists).toHaveLength(0)
       expect(result.current.totalResults).toBe(0)
     })
   })

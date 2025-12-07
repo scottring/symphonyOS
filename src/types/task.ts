@@ -24,4 +24,5 @@ export interface Task {
   parentTaskId?: string // If set, this is a subtask
   subtasks?: Task[] // Populated on fetch, not stored in DB
   linkedEventId?: string // Links prep task to meal event
+  estimatedDuration?: number // Duration in minutes (default 30 in UI)
 }

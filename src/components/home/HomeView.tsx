@@ -45,6 +45,7 @@ interface HomeViewProps {
   onSkipRoutine?: (routineId: string) => void
   onCompleteEvent?: (eventId: string, completed: boolean) => void
   onSkipEvent?: (eventId: string) => void
+  onOpenPlanning?: () => void
 }
 
 export function HomeView({
@@ -80,6 +81,7 @@ export function HomeView({
   onSkipRoutine,
   onCompleteEvent,
   onSkipEvent,
+  onOpenPlanning,
 }: HomeViewProps) {
   const { currentView, setCurrentView } = useHomeView()
   const isMobile = useMobile()
@@ -152,6 +154,7 @@ export function HomeView({
         onSkipRoutine={onSkipRoutine}
         onCompleteEvent={onCompleteEvent}
         onSkipEvent={onSkipEvent}
+        onOpenPlanning={onOpenPlanning}
       />
     )
   }
@@ -204,6 +207,7 @@ export function HomeView({
             onSkipRoutine={onSkipRoutine}
             onCompleteEvent={onCompleteEvent}
             onSkipEvent={onSkipEvent}
+            onOpenPlanning={onOpenPlanning}
           />
         ) : (
           renderContent()
