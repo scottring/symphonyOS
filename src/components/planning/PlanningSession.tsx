@@ -244,7 +244,7 @@ export function PlanningSession({
       // Handle dropping on unscheduled drawer
       if (dropTarget === 'unscheduled-drawer') {
         onUpdateTask(activeId, {
-          scheduledFor: null,
+          scheduledFor: undefined,
           isAllDay: true,
         })
         return
