@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react'
 import {
   DndContext,
   DragOverlay,
-  rectIntersection,
+  pointerWithin,
   MouseSensor,
   TouchSensor,
   useSensor,
@@ -282,7 +282,7 @@ export function PlanningSession({
       <div className="flex-1 flex overflow-hidden">
         <DndContext
           sensors={sensors}
-          collisionDetection={rectIntersection}
+          collisionDetection={pointerWithin}
           measuring={{
             droppable: {
               strategy: MeasuringStrategy.Always,
