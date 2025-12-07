@@ -25,6 +25,7 @@ interface PlanningSessionProps {
   events: CalendarEvent[]
   routines: Routine[]
   onUpdateTask: (id: string, updates: Partial<Task>) => void
+  onPushTask: (id: string, date: Date) => void
   onClose: () => void
   initialDate?: Date
   getRoutinesForDate?: (date: Date) => Routine[]
@@ -47,6 +48,7 @@ export function PlanningSession({
   events,
   routines,
   onUpdateTask,
+  onPushTask,
   onClose,
   initialDate,
   getRoutinesForDate,
@@ -293,7 +295,7 @@ export function PlanningSession({
           onDragEnd={handleDragEnd}
         >
           {/* Task drawer (sidebar) */}
-          <PlanningTaskDrawer tasks={unscheduledTasks} />
+          <PlanningTaskDrawer tasks={unscheduledTasks} onPushTask={onPushTask} />
 
           {/* Planning grid */}
           <PlanningGrid

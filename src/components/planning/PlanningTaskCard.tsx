@@ -1,14 +1,16 @@
 import { useDraggable } from '@dnd-kit/core'
 import type { Task } from '@/types/task'
 import { PlanningResizeHandle } from './PlanningResizeHandle'
+import { PushDropdown } from '@/components/triage'
 
 interface PlanningTaskCardProps {
   task: Task
   isDragging?: boolean
   isPlaced?: boolean
+  onPushTask?: (id: string, date: Date) => void
 }
 
-export function PlanningTaskCard({ task, isDragging, isPlaced }: PlanningTaskCardProps) {
+export function PlanningTaskCard({ task, isDragging, isPlaced, onPushTask }: PlanningTaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging: isCurrentlyDragging } = useDraggable({
     id: task.id,
   })
@@ -63,12 +65,26 @@ export function PlanningTaskCard({ task, isDragging, isPlaced }: PlanningTaskCar
 
         {/* Task title */}
         <span
-          className={`text-xs font-medium leading-tight line-clamp-2 ${
+          className={`flex-1 text-xs font-medium leading-tight line-clamp-2 ${
             task.completed ? 'text-neutral-400 line-through' : 'text-primary-700'
           }`}
         >
           {task.title}
         </span>
+
+        {/* Defer button - only for unscheduled tasks */}
+        {!isPlaced && onPushTask && (
+          <div 
+            className="shrink-0 -mr-1"
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <PushDropdown 
+              size="sm"
+              onPush={(date) => onPushTask(task.id, date)} 
+            />
+          </div>
+        )}
       </div>
 
       {/* Resize handle - only for placed tasks */}

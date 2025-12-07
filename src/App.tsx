@@ -616,6 +616,7 @@ function App() {
           initialDate={viewedDate}
           onClose={() => setPlanningOpen(false)}
           onUpdateTask={updateTask}
+          onPushTask={pushTask}
         />
       )}
 

@@ -4,9 +4,10 @@ import { PlanningTaskCard } from './PlanningTaskCard'
 
 interface PlanningTaskDrawerProps {
   tasks: Task[]
+  onPushTask: (id: string, date: Date) => void
 }
 
-export function PlanningTaskDrawer({ tasks }: PlanningTaskDrawerProps) {
+export function PlanningTaskDrawer({ tasks, onPushTask }: PlanningTaskDrawerProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: 'unscheduled-drawer',
   })
@@ -69,7 +70,11 @@ export function PlanningTaskDrawer({ tasks }: PlanningTaskDrawerProps) {
           </div>
         ) : (
           tasks.map((task) => (
-            <PlanningTaskCard key={task.id} task={task} />
+            <PlanningTaskCard 
+              key={task.id} 
+              task={task} 
+              onPushTask={onPushTask}
+            />
           ))
         )}
       </div>
