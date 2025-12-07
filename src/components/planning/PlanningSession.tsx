@@ -37,6 +37,11 @@ const SLOT_DURATION = 30
 const DAY_START_HOUR = 6
 const DAY_END_HOUR = 22
 
+// Resize constants
+const MIN_DURATION = 15
+const SLOT_HEIGHT = 40
+const PIXELS_PER_15_MIN = SLOT_HEIGHT / 2
+
 export function PlanningSession({
   tasks,
   events,
@@ -206,10 +211,6 @@ export function PlanningSession({
     // Can add visual feedback here if needed
   }, [])
 
-  // Slot height in pixels (40px = 30 min, so 20px = 15 min)
-  const SLOT_HEIGHT = 40
-  const PIXELS_PER_15_MIN = SLOT_HEIGHT / 2
-
   // Handle drag end
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
@@ -228,7 +229,7 @@ export function PlanningSession({
         // Calculate duration change: positive delta.y = increase duration
         // Round to 15-minute increments
         const durationChange = Math.round(delta.y / PIXELS_PER_15_MIN) * 15
-        const newDuration = Math.max(15, currentDuration + durationChange) // Minimum 15 min
+        const newDuration = Math.max(MIN_DURATION, currentDuration + durationChange)
 
         if (newDuration !== currentDuration) {
           onUpdateTask(taskId, { estimatedDuration: newDuration })
@@ -251,16 +252,11 @@ export function PlanningSession({
 
       // Parse the drop target: "slot-{date}-{hour}-{minute}"
       if (dropTarget.startsWith('slot-')) {
-        const parts = dropTarget.split('-')
-        // slot-2024-12-07-9-30 → [slot, 2024, 12, 07, 9, 30]
-        const year = parseInt(parts[1], 10)
-        const month = parseInt(parts[2], 10) - 1 // JS months are 0-indexed
-        const day = parseInt(parts[3], 10)
-        const hour = parseInt(parts[4], 10)
-        const minute = parseInt(parts[5], 10)
+        const parsed = parseSlotId(dropTarget)
+        if (!parsed) return
 
         // Create date in local time (not UTC) to avoid timezone shift
-        const scheduledFor = new Date(year, month, day, hour, minute, 0, 0)
+        const scheduledFor = new Date(parsed.year, parsed.month, parsed.day, parsed.hour, parsed.minute, 0, 0)
 
         onUpdateTask(activeId, {
           scheduledFor,
@@ -328,4 +324,17 @@ function formatDateKey(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+// Helper to parse slot ID into date components
+function parseSlotId(slotId: string): { year: number; month: number; day: number; hour: number; minute: number } | null {
+  const match = slotId.match(/^slot-(\d+)-(\d+)-(\d+)-(\d+)-(\d+)$/)
+  if (!match) return null
+  return {
+    year: parseInt(match[1], 10),
+    month: parseInt(match[2], 10) - 1, // JS months are 0-indexed
+    day: parseInt(match[3], 10),
+    hour: parseInt(match[4], 10),
+    minute: parseInt(match[5], 10),
+  }
 }

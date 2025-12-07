@@ -38,14 +38,14 @@ export function PlanningTaskCard({ task, isDragging, isPlaced }: PlanningTaskCar
       style={style}
       {...listeners}
       {...attributes}
-      className={`relative px-2 py-1.5 rounded-lg transition-shadow ${
+      className={`relative px-2 py-1.5 rounded-lg transition-shadow touch-none ${
         isPlaced ? 'h-full' : 'min-h-[40px]'
       } ${
         isDragging
           ? 'bg-primary-100 border-2 border-primary-400 shadow-lg opacity-90 cursor-grabbing'
           : isPlaced
           ? 'bg-primary-50 border border-primary-200 hover:border-primary-300 cursor-grab'
-          : 'bg-primary-50 border border-primary-200 hover:border-primary-300 hover:shadow-md cursor-grab active:cursor-grabbing touch-none'
+          : 'bg-primary-50 border border-primary-200 hover:border-primary-300 hover:shadow-md cursor-grab active:cursor-grabbing'
       }`}
     >
       <div className="flex items-start gap-1.5">
@@ -73,10 +73,7 @@ export function PlanningTaskCard({ task, isDragging, isPlaced }: PlanningTaskCar
 
       {/* Resize handle - only for placed tasks */}
       {isPlaced && (
-        <PlanningResizeHandle 
-          taskId={task.id} 
-          currentDuration={task.estimatedDuration || 30} 
-        />
+        <PlanningResizeHandle taskId={task.id} />
       )}
     </div>
   )

@@ -173,7 +173,7 @@ export function PlanningColumn({
         {placedEvents.map(({ event, top, height }) => (
           <div
             key={event.id}
-            className="absolute left-1 right-1 pointer-events-none z-5"
+            className="absolute left-1 right-1 pointer-events-none"
             style={{ top: `${top}px`, height: `${height}px` }}
           >
             <PlanningEventBlock event={event} height={height} />
@@ -184,7 +184,7 @@ export function PlanningColumn({
         {placedRoutines.map(({ routine, top, height }) => (
           <div
             key={routine.id}
-            className="absolute left-1 right-1 pointer-events-none z-5"
+            className="absolute left-1 right-1 pointer-events-none"
             style={{ top: `${top}px`, height: `${height}px` }}
           >
             <PlanningRoutineBlock routine={routine} />
