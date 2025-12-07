@@ -1,4 +1,5 @@
 import { useDraggable } from '@dnd-kit/core'
+import type { SyntheticEvent } from 'react'
 
 interface PlanningResizeHandleProps {
   taskId: string
@@ -9,11 +10,18 @@ export function PlanningResizeHandle({ taskId }: PlanningResizeHandleProps) {
     id: `resize-${taskId}`,
   })
 
+  // Stop propagation to prevent parent task card from capturing drag events
+  const handlePointerDown = (e: SyntheticEvent) => {
+    e.stopPropagation()
+    listeners?.onPointerDown?.(e as never)
+  }
+
   return (
     <div
       ref={setNodeRef}
       {...listeners}
       {...attributes}
+      onPointerDown={handlePointerDown}
       aria-label="Resize task duration"
       role="slider"
       className={`absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize group flex items-center justify-center ${
