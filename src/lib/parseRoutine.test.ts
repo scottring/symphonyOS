@@ -510,3 +510,213 @@ describe('isValidParsedRoutine', () => {
     expect(isValidParsedRoutine(parsed)).toBe(false)
   })
 })
+
+// =============================================================================
+// NEW FLEXIBLE PARSING TESTS
+// =============================================================================
+
+describe('flexible time parsing', () => {
+  it('parses "700p" as 7:00 PM', () => {
+    const result = parseRoutine('gym 700p')
+    expect(result.time).toBe('19:00')
+  })
+
+  it('parses "700pm" as 7:00 PM', () => {
+    const result = parseRoutine('gym 700pm')
+    expect(result.time).toBe('19:00')
+  })
+
+  it('parses "7p" as 7:00 PM', () => {
+    const result = parseRoutine('gym 7p')
+    expect(result.time).toBe('19:00')
+  })
+
+  it('parses "1130a" as 11:30 AM', () => {
+    const result = parseRoutine('meeting 1130a')
+    expect(result.time).toBe('11:30')
+  })
+
+  it('parses "1130am" as 11:30 AM', () => {
+    const result = parseRoutine('meeting 1130am')
+    expect(result.time).toBe('11:30')
+  })
+
+  it('parses military time "1930"', () => {
+    const result = parseRoutine('dinner 1930')
+    expect(result.time).toBe('19:30')
+  })
+
+  it('parses military time "0700"', () => {
+    const result = parseRoutine('wake up 0700')
+    expect(result.time).toBe('07:00')
+  })
+
+  it('parses time without "at" keyword', () => {
+    const result = parseRoutine('7pm gym')
+    expect(result.time).toBe('19:00')
+    expect(result.action).toBe('gym')
+  })
+
+  it('parses "12p" as noon', () => {
+    const result = parseRoutine('lunch 12p')
+    expect(result.time).toBe('12:00')
+  })
+
+  it('parses "12a" as midnight', () => {
+    const result = parseRoutine('reset 12a')
+    expect(result.time).toBe('00:00')
+  })
+
+  it('parses "7a" as 7:00 AM', () => {
+    const result = parseRoutine('task 7a')
+    expect(result.time).toBe('07:00')
+  })
+})
+
+describe('days without "every" prefix', () => {
+  it('parses "monday gym"', () => {
+    const result = parseRoutine('monday gym')
+    expect(result.recurrence.type).toBe('weekly')
+    expect(result.recurrence.days).toEqual([1])
+    expect(result.action).toBe('gym')
+  })
+
+  it('parses "gym monday"', () => {
+    const result = parseRoutine('gym monday')
+    expect(result.recurrence.type).toBe('weekly')
+    expect(result.recurrence.days).toEqual([1])
+    expect(result.action).toBe('gym')
+  })
+
+  it('parses "monday wednesday gym"', () => {
+    const result = parseRoutine('monday wednesday gym')
+    expect(result.recurrence.type).toBe('weekly')
+    expect(result.recurrence.days).toEqual([1, 3])
+    expect(result.action).toBe('gym')
+  })
+
+  it('parses "gym monday wednesday"', () => {
+    const result = parseRoutine('gym monday wednesday')
+    expect(result.recurrence.type).toBe('weekly')
+    expect(result.recurrence.days).toEqual([1, 3])
+    expect(result.action).toBe('gym')
+  })
+
+  it('parses "gym monday and wednesday at 6pm"', () => {
+    const result = parseRoutine('gym monday and wednesday at 6pm')
+    expect(result.recurrence.type).toBe('weekly')
+    expect(result.recurrence.days).toEqual([1, 3])
+    expect(result.time).toBe('18:00')
+    expect(result.action).toBe('gym')
+  })
+
+  it('parses pluralized days "tuesdays"', () => {
+    const result = parseRoutine('trash tuesdays')
+    expect(result.recurrence.type).toBe('weekly')
+    expect(result.recurrence.days).toEqual([2])
+    expect(result.action).toBe('trash')
+  })
+
+  it('parses "mondays and wednesdays"', () => {
+    const result = parseRoutine('gym mondays and wednesdays')
+    expect(result.recurrence.type).toBe('weekly')
+    expect(result.recurrence.days).toEqual([1, 3])
+  })
+})
+
+describe('"on [days]" pattern', () => {
+  it('parses "gym on monday"', () => {
+    const result = parseRoutine('gym on monday')
+    expect(result.recurrence.type).toBe('weekly')
+    expect(result.recurrence.days).toEqual([1])
+    expect(result.action).toBe('gym')
+  })
+
+  it('parses "on tuesdays take out trash"', () => {
+    const result = parseRoutine('on tuesdays take out trash')
+    expect(result.recurrence.type).toBe('weekly')
+    expect(result.recurrence.days).toEqual([2])
+    expect(result.action).toBe('take out trash')
+  })
+
+  it('parses "meeting on monday and friday"', () => {
+    const result = parseRoutine('meeting on monday and friday')
+    expect(result.recurrence.type).toBe('weekly')
+    expect(result.recurrence.days).toEqual([1, 5])
+  })
+})
+
+describe('no recurrence defaults to daily', () => {
+  it('parses "take vitamins" as daily', () => {
+    const result = parseRoutine('take vitamins')
+    expect(result.recurrence.type).toBe('daily')
+    expect(result.action).toBe('take vitamins')
+    expect(isValidParsedRoutine(result)).toBe(true)
+  })
+
+  it('parses "walk the dog" as daily', () => {
+    const result = parseRoutine('walk the dog')
+    expect(result.recurrence.type).toBe('daily')
+    expect(result.action).toBe('walk the dog')
+    expect(isValidParsedRoutine(result)).toBe(true)
+  })
+
+  it('parses "take vitamins at 7am" as daily at 7am', () => {
+    const result = parseRoutine('take vitamins at 7am')
+    expect(result.recurrence.type).toBe('daily')
+    expect(result.time).toBe('07:00')
+    expect(result.action).toBe('take vitamins')
+  })
+})
+
+describe('flexible word order', () => {
+  it('parses "7pm gym monday"', () => {
+    const result = parseRoutine('7pm gym monday')
+    expect(result.time).toBe('19:00')
+    expect(result.recurrence.type).toBe('weekly')
+    expect(result.recurrence.days).toEqual([1])
+    expect(result.action).toBe('gym')
+  })
+
+  it('parses "monday 7pm gym"', () => {
+    const result = parseRoutine('monday 7pm gym')
+    expect(result.time).toBe('19:00')
+    expect(result.recurrence.type).toBe('weekly')
+    expect(result.recurrence.days).toEqual([1])
+    expect(result.action).toBe('gym')
+  })
+
+  it('parses "700p monday wednesday gym"', () => {
+    const result = parseRoutine('700p monday wednesday gym')
+    expect(result.time).toBe('19:00')
+    expect(result.recurrence.type).toBe('weekly')
+    expect(result.recurrence.days).toEqual([1, 3])
+    expect(result.action).toBe('gym')
+  })
+})
+
+describe('complex real-world inputs', () => {
+  it('parses "iris walks jax 7a weekdays"', () => {
+    const result = parseRoutine('iris walks jax 7a weekdays', mockContacts)
+    expect(result.assignee).toBe('iris-id')
+    expect(result.time).toBe('07:00')
+    expect(result.recurrence.type).toBe('weekdays')
+    expect(result.action).toBe('walks jax')
+  })
+
+  it('parses "trash tuesday thursday 7p"', () => {
+    const result = parseRoutine('trash tuesday thursday 7p')
+    expect(result.time).toBe('19:00')
+    expect(result.recurrence.type).toBe('weekly')
+    expect(result.recurrence.days).toEqual([2, 4])
+    expect(result.action).toBe('trash')
+  })
+
+  it('parses "family dinner sundays 6pm"', () => {
+    const result = parseRoutine('family dinner sundays 6pm')
+    expect(result.time).toBe('18:00')
+    expect(result.recurrence.type).toBe('weekly')
+    expect(result.recurrence.days).toEqual([0])
+    expect(result.action).toBe('family dinner')
+  })
+})

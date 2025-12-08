@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import type { Routine, RecurrencePattern, RoutineVisibility } from '@/types/actionable'
+import type { Routine, RecurrencePattern, RoutineVisibility, PrepFollowupTemplate } from '@/types/actionable'
 
 export interface CreateRoutineInput {
   name: string
@@ -10,6 +10,8 @@ export interface CreateRoutineInput {
   visibility?: RoutineVisibility
   default_assignee?: string | null
   raw_input?: string | null
+  prep_task_templates?: PrepFollowupTemplate[]
+  followup_task_templates?: PrepFollowupTemplate[]
 }
 
 export interface UpdateRoutineInput {
@@ -22,6 +24,8 @@ export interface UpdateRoutineInput {
   assigned_to?: string | null
   raw_input?: string | null
   show_on_timeline?: boolean
+  prep_task_templates?: PrepFollowupTemplate[]
+  followup_task_templates?: PrepFollowupTemplate[]
 }
 
 export function useRoutines() {
@@ -80,6 +84,8 @@ export function useRoutines() {
           visibility: input.visibility || 'active',
           default_assignee: input.default_assignee || null,
           raw_input: input.raw_input || null,
+          prep_task_templates: input.prep_task_templates || [],
+          followup_task_templates: input.followup_task_templates || [],
         })
         .select()
         .single()
@@ -112,6 +118,8 @@ export function useRoutines() {
       if (input.assigned_to !== undefined) updates.assigned_to = input.assigned_to
       if (input.raw_input !== undefined) updates.raw_input = input.raw_input
       if (input.show_on_timeline !== undefined) updates.show_on_timeline = input.show_on_timeline
+      if (input.prep_task_templates !== undefined) updates.prep_task_templates = input.prep_task_templates
+      if (input.followup_task_templates !== undefined) updates.followup_task_templates = input.followup_task_templates
 
       const { error: updateError } = await supabase
         .from('routines')

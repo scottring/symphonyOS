@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import type { TimelineItem } from '@/types/timeline'
-import type { Task, TaskLink } from '@/types/task'
+import type { Task, TaskLink, LinkedActivity, LinkType, LinkedActivityType } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
-import type { ActionableInstance } from '@/types/actionable'
+import type { ActionableInstance, Routine, PrepFollowupTemplate } from '@/types/actionable'
 import type { Attachment, AttachmentEntityType } from '@/types/attachment'
 import { formatTime, formatTimeRange } from '@/lib/timeUtils'
 import { detectActions, type DetectedAction } from '@/lib/actionDetection'
@@ -112,6 +112,22 @@ interface DetailPanelRedesignProps {
   onPin?: (entityType: PinnableEntityType, entityId: string) => Promise<boolean>
   onUnpin?: (entityType: PinnableEntityType, entityId: string) => Promise<boolean>
   onMaxPinsReached?: () => void
+  // Linked tasks (prep/follow-up)
+  linkedTasks?: {
+    prep: Task[]
+    followup: Task[]
+  }
+  onAddLinkedTask?: (
+    title: string,
+    linkedTo: LinkedActivity,
+    linkType: LinkType,
+    scheduledFor?: Date
+  ) => Promise<void>
+  onToggleLinkedTask?: (taskId: string) => void
+  onDeleteLinkedTask?: (taskId: string) => void
+  // Routine for template management
+  routine?: Routine | null
+  onUpdateRoutine?: (routineId: string, updates: { prep_task_templates?: PrepFollowupTemplate[], followup_task_templates?: PrepFollowupTemplate[] }) => Promise<boolean>
 }
 
 function ActionIcon({ type }: { type: DetectedAction['icon'] }) {
@@ -154,6 +170,70 @@ function ActionIcon({ type }: { type: DetectedAction['icon'] }) {
         </svg>
       )
   }
+}
+
+// Component for adding linked prep/follow-up tasks
+interface AddLinkedTaskInputProps {
+  placeholder: string
+  onAdd: (title: string) => void
+  showTemplateOption?: boolean
+  onAddAsTemplate?: (title: string) => void
+}
+
+function AddLinkedTaskInput({
+  placeholder,
+  onAdd,
+  showTemplateOption,
+  onAddAsTemplate,
+}: AddLinkedTaskInputProps) {
+  const [value, setValue] = useState('')
+  const [addToAll, setAddToAll] = useState(false)
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!value.trim()) return
+
+    if (addToAll && onAddAsTemplate) {
+      onAddAsTemplate(value.trim())
+    } else {
+      onAdd(value.trim())
+    }
+    setValue('')
+    setAddToAll(false)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-2">
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={placeholder}
+          className="flex-1 px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+        />
+        <button
+          type="submit"
+          disabled={!value.trim()}
+          className="px-3 py-2 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          Add
+        </button>
+      </div>
+
+      {showTemplateOption && value.trim() && (
+        <label className="flex items-center gap-2 text-xs text-neutral-500 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={addToAll}
+            onChange={(e) => setAddToAll(e.target.checked)}
+            className="rounded border-neutral-300 text-primary-500 focus:ring-primary-500"
+          />
+          Add to all future instances
+        </label>
+      )}
+    </form>
+  )
 }
 
 function ActionButton({ action, onOpenRecipe }: { action: DetectedAction; onOpenRecipe?: (url: string) => void }) {
@@ -228,6 +308,12 @@ export function DetailPanelRedesign({
   onPin,
   onUnpin,
   onMaxPinsReached,
+  linkedTasks,
+  onAddLinkedTask,
+  onToggleLinkedTask,
+  onDeleteLinkedTask,
+  routine,
+  onUpdateRoutine,
 }: DetailPanelRedesignProps) {
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -510,6 +596,60 @@ export function DetailPanelRedesign({
     const result = await actionable.addNote('routine', entityId, getRoutineDate(), note)
     return !!result
   }, [actionable, getRoutineEntityId, getRoutineDate])
+
+  // Get activity identifier for linked tasks
+  const getActivityIdentifier = useCallback((): { type: LinkedActivityType; id: string } | null => {
+    if (!item) return null
+    if (item.type === 'task' && item.originalTask) {
+      return { type: 'task', id: item.originalTask.id }
+    }
+    if (item.type === 'routine' && item.originalRoutine) {
+      // Composite key: routineId_date
+      const dateStr = item.startTime
+        ? item.startTime.toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0]
+      return {
+        type: 'routine_instance',
+        id: `${item.originalRoutine.id}_${dateStr}`,
+      }
+    }
+    if (item.type === 'event' && item.originalEvent) {
+      const eventId = item.originalEvent.google_event_id || item.originalEvent.id
+      return { type: 'calendar_event', id: eventId }
+    }
+    return null
+  }, [item])
+
+  // Handle adding linked prep/follow-up task
+  const handleAddLinkedTask = useCallback(async (title: string, linkType: LinkType) => {
+    const activity = getActivityIdentifier()
+    if (!activity || !onAddLinkedTask) return
+    await onAddLinkedTask(title, activity, linkType)
+  }, [getActivityIdentifier, onAddLinkedTask])
+
+  // Handle adding as template (routines only)
+  const handleAddAsTemplate = useCallback(async (title: string, linkType: LinkType) => {
+    if (!item || item.type !== 'routine' || !item.originalRoutine || !routine || !onUpdateRoutine) return
+
+    const template: PrepFollowupTemplate = {
+      id: crypto.randomUUID(),
+      title,
+    }
+
+    // Update routine with new template
+    if (linkType === 'prep') {
+      await onUpdateRoutine(routine.id, {
+        prep_task_templates: [...(routine.prep_task_templates || []), template],
+      })
+    } else {
+      await onUpdateRoutine(routine.id, {
+        followup_task_templates: [...(routine.followup_task_templates || []), template],
+      })
+    }
+
+    // Also create the task for this instance
+    await handleAddLinkedTask(title, linkType)
+  }, [item, routine, onUpdateRoutine, handleAddLinkedTask])
 
   if (!item) return null
 
@@ -1198,6 +1338,142 @@ export function DetailPanelRedesign({
             } : undefined}
             onTogglePrepTask={onTogglePrepTask}
           />
+        )}
+
+        {/* Prep Tasks Section (for all activity types with linked task support) */}
+        {onAddLinkedTask && (
+          <div className="mx-4 mt-4 bg-white rounded-2xl shadow-sm border border-neutral-100">
+            <div className="p-4">
+              <h3 className="text-xs font-medium text-neutral-400 uppercase tracking-wide mb-3">
+                Prep Tasks
+              </h3>
+
+              {linkedTasks && linkedTasks.prep.length > 0 ? (
+                <div className="space-y-1 mb-3">
+                  {linkedTasks.prep.map((task) => (
+                    <div
+                      key={task.id}
+                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-neutral-50 group"
+                    >
+                      <button
+                        onClick={() => onToggleLinkedTask?.(task.id)}
+                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${
+                          task.completed
+                            ? 'bg-primary-500 border-primary-500'
+                            : 'border-neutral-300 hover:border-primary-400'
+                        }`}
+                      >
+                        {task.completed && (
+                          <svg className="w-3 h-3 text-white" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </button>
+
+                      <span className={`flex-1 text-sm ${task.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>
+                        {task.title}
+                      </span>
+
+                      {/* Schedule indicator */}
+                      {task.scheduledFor && (
+                        <span className="text-xs text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full">
+                          {task.scheduledFor.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                        </span>
+                      )}
+
+                      {/* Delete button */}
+                      <button
+                        onClick={() => onDeleteLinkedTask?.(task.id)}
+                        className="text-neutral-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-neutral-400 italic mb-3">No prep tasks</p>
+              )}
+
+              {/* Add prep task input */}
+              <AddLinkedTaskInput
+                placeholder="Add prep task..."
+                onAdd={(title) => handleAddLinkedTask(title, 'prep')}
+                showTemplateOption={isRoutine && !!routine && !!onUpdateRoutine}
+                onAddAsTemplate={(title) => handleAddAsTemplate(title, 'prep')}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Follow-up Tasks Section */}
+        {onAddLinkedTask && (
+          <div className="mx-4 mt-4 bg-white rounded-2xl shadow-sm border border-neutral-100">
+            <div className="p-4">
+              <h3 className="text-xs font-medium text-neutral-400 uppercase tracking-wide mb-3">
+                Follow-up Tasks
+              </h3>
+
+              {linkedTasks && linkedTasks.followup.length > 0 ? (
+                <div className="space-y-1 mb-3">
+                  {linkedTasks.followup.map((task) => (
+                    <div
+                      key={task.id}
+                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-neutral-50 group"
+                    >
+                      <button
+                        onClick={() => onToggleLinkedTask?.(task.id)}
+                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${
+                          task.completed
+                            ? 'bg-primary-500 border-primary-500'
+                            : 'border-neutral-300 hover:border-primary-400'
+                        }`}
+                      >
+                        {task.completed && (
+                          <svg className="w-3 h-3 text-white" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </button>
+
+                      <span className={`flex-1 text-sm ${task.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>
+                        {task.title}
+                      </span>
+
+                      {/* Schedule indicator */}
+                      {task.scheduledFor && (
+                        <span className="text-xs text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full">
+                          {task.scheduledFor.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                        </span>
+                      )}
+
+                      {/* Delete button */}
+                      <button
+                        onClick={() => onDeleteLinkedTask?.(task.id)}
+                        className="text-neutral-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-neutral-400 italic mb-3">No follow-up tasks</p>
+              )}
+
+              {/* Add follow-up task input */}
+              <AddLinkedTaskInput
+                placeholder="Add follow-up task..."
+                onAdd={(title) => handleAddLinkedTask(title, 'followup')}
+                showTemplateOption={isRoutine && !!routine && !!onUpdateRoutine}
+                onAddAsTemplate={(title) => handleAddAsTemplate(title, 'followup')}
+              />
+            </div>
+          </div>
         )}
 
         {/* Notes Section */}

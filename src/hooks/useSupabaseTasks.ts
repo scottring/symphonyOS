@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
-import type { Task, TaskLink, TaskContext } from '@/types/task'
+import type { Task, TaskLink, TaskContext, LinkedActivity, LinkType, LinkedActivityType } from '@/types/task'
 
 interface DbTask {
   id: string
@@ -21,6 +21,10 @@ interface DbTask {
   project_id: string | null
   parent_task_id: string | null
   linked_event_id: string | null
+  // Generalized prep/follow-up linking
+  link_type: 'prep' | 'followup' | null
+  linked_activity_type: LinkedActivityType | null
+  linked_activity_id: string | null
   estimated_duration: number | null
   location: string | null
   location_place_id: string | null
@@ -40,6 +44,12 @@ function normalizeLinks(links: (string | TaskLink)[] | null): TaskLink[] | undef
 }
 
 function dbTaskToTask(dbTask: DbTask): Task {
+  // Build linkedTo from new generalized fields if present
+  const linkedTo: LinkedActivity | undefined =
+    dbTask.linked_activity_type && dbTask.linked_activity_id
+      ? { type: dbTask.linked_activity_type, id: dbTask.linked_activity_id }
+      : undefined
+
   return {
     id: dbTask.id,
     title: dbTask.title,
@@ -58,6 +68,8 @@ function dbTaskToTask(dbTask: DbTask): Task {
     projectId: dbTask.project_id ?? undefined,
     parentTaskId: dbTask.parent_task_id ?? undefined,
     linkedEventId: dbTask.linked_event_id ?? undefined,
+    linkedTo,
+    linkType: dbTask.link_type ?? undefined,
     estimatedDuration: dbTask.estimated_duration ?? undefined,
     location: dbTask.location ?? undefined,
     locationPlaceId: dbTask.location_place_id ?? undefined,
@@ -136,7 +148,19 @@ export function useSupabaseTasks() {
     fetchTasks()
   }, [user])
 
-  const addTask = useCallback(async (title: string, contactId?: string, projectId?: string, scheduledFor?: Date): Promise<string | undefined> => {
+  // Options for creating linked tasks
+  interface AddTaskOptions {
+    linkedTo?: LinkedActivity
+    linkType?: LinkType
+  }
+
+  const addTask = useCallback(async (
+    title: string,
+    contactId?: string,
+    projectId?: string,
+    scheduledFor?: Date,
+    options?: AddTaskOptions
+  ): Promise<string | undefined> => {
     if (!user) return undefined
 
     // Optimistic update
@@ -149,6 +173,8 @@ export function useSupabaseTasks() {
       contactId,
       projectId,
       scheduledFor,
+      linkedTo: options?.linkedTo,
+      linkType: options?.linkType,
     }
     setTasks((prev) => [optimisticTask, ...prev])
 
@@ -161,6 +187,9 @@ export function useSupabaseTasks() {
         contact_id: contactId ?? null,
         project_id: projectId ?? null,
         scheduled_for: scheduledFor?.toISOString() ?? null,
+        linked_activity_type: options?.linkedTo?.type ?? null,
+        linked_activity_id: options?.linkedTo?.id ?? null,
+        link_type: options?.linkType ?? null,
       })
       .select()
       .single()
@@ -424,6 +453,11 @@ export function useSupabaseTasks() {
     if ('projectId' in updates) dbUpdates.project_id = updates.projectId ?? null
     if ('parentTaskId' in updates) dbUpdates.parent_task_id = updates.parentTaskId ?? null
     if ('linkedEventId' in updates) dbUpdates.linked_event_id = updates.linkedEventId ?? null
+    if ('linkedTo' in updates) {
+      dbUpdates.linked_activity_type = updates.linkedTo?.type ?? null
+      dbUpdates.linked_activity_id = updates.linkedTo?.id ?? null
+    }
+    if ('linkType' in updates) dbUpdates.link_type = updates.linkType ?? null
     if ('estimatedDuration' in updates) dbUpdates.estimated_duration = updates.estimatedDuration ?? null
     if ('location' in updates) dbUpdates.location = updates.location ?? null
     if ('locationPlaceId' in updates) dbUpdates.location_place_id = updates.locationPlaceId ?? null
@@ -530,10 +564,25 @@ export function useSupabaseTasks() {
     return createdTask.id
   }, [user])
 
-  // Get prep tasks for a specific event
+  // Get prep tasks for a specific event (legacy - use getLinkedTasks for new code)
   const getPrepTasks = useCallback((eventId: string): Task[] => {
     return tasks.filter((t) => t.linkedEventId === eventId)
   }, [tasks])
 
-  return { tasks, loading, error, addTask, addSubtask, addPrepTask, getPrepTasks, toggleTask, deleteTask, updateTask, scheduleTask, pushTask }
+  // Get all linked tasks (prep and followup) for any activity type
+  const getLinkedTasks = useCallback((
+    activityType: LinkedActivityType,
+    activityId: string
+  ): { prep: Task[], followup: Task[] } => {
+    const linked = tasks.filter(t =>
+      t.linkedTo?.type === activityType &&
+      t.linkedTo?.id === activityId
+    )
+    return {
+      prep: linked.filter(t => t.linkType === 'prep'),
+      followup: linked.filter(t => t.linkType === 'followup'),
+    }
+  }, [tasks])
+
+  return { tasks, loading, error, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, deleteTask, updateTask, scheduleTask, pushTask }
 }

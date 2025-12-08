@@ -53,6 +53,13 @@ export interface CoverageRequest {
   responded_at: string | null
 }
 
+// Template for auto-generating prep/follow-up tasks
+export interface PrepFollowupTemplate {
+  id: string // UUID for tracking
+  title: string
+  defaultScheduleOffset?: 'same_day' | 'day_before' | 'day_after' // Optional, for future use
+}
+
 export interface Routine {
   id: string
   user_id: string
@@ -65,6 +72,9 @@ export interface Routine {
   time_of_day: string | null // HH:MM:SS format
   raw_input: string | null // Original natural language input
   show_on_timeline: boolean // Whether to display on Today view (default true)
+  // Templates for auto-generation of linked tasks
+  prep_task_templates?: PrepFollowupTemplate[]
+  followup_task_templates?: PrepFollowupTemplate[]
   created_at: string
   updated_at: string
 }

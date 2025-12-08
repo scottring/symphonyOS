@@ -55,36 +55,78 @@ export function parseRoutine(input: string, contacts: Contact[] = []): ParsedRou
   // Track what we've extracted to build the action string
   const extractedRanges: Array<{ start: number; end: number; type: SemanticToken['type']; text: string }> = []
 
-  // 1. Extract time (e.g., "at 7", "at 7am", "at 7:30pm", "at noon")
+  // 1. Extract time - MUCH more flexible patterns
   const timePatterns = [
-    // "at noon" / "at midnight"
-    { regex: /\bat\s+noon\b/i, parse: () => '12:00' },
-    { regex: /\bat\s+midnight\b/i, parse: () => '00:00' },
-    // "at 7:30am" / "at 7:30 am" / "at 7:30pm"
-    { regex: /\bat\s+(\d{1,2}):(\d{2})\s*(am|pm|a|p)\b/i, parse: (m: RegExpMatchArray) => {
+    // Named times (with optional "at")
+    { regex: /\b(?:at\s+)?noon\b/i, parse: () => '12:00' },
+    { regex: /\b(?:at\s+)?midnight\b/i, parse: () => '00:00' },
+
+    // Military time: 1930, 0700, 1400 (4 digits, NOT followed by am/pm)
+    { regex: /\b(\d{4})\b(?!\s*(?:am?|pm?))/i, parse: (m: RegExpMatchArray) => {
+      const num = m[1]
+      const hours = parseInt(num.slice(0, 2), 10)
+      const minutes = parseInt(num.slice(2), 10)
+      if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
+      }
+      return null
+    }},
+
+    // Compact no-colon with meridiem: 700p, 700pm, 1130a, 1130am (with optional "at")
+    { regex: /\b(?:at\s+)?(\d{3,4})\s*(am?|pm?)\b/i, parse: (m: RegExpMatchArray) => {
+      const num = m[1]
+      const meridiem = m[2].toLowerCase()
+      let hours: number
+      let minutes: number
+
+      if (num.length === 3) {
+        // 700 = 7:00
+        hours = parseInt(num[0], 10)
+        minutes = parseInt(num.slice(1), 10)
+      } else {
+        // 1130 = 11:30
+        hours = parseInt(num.slice(0, 2), 10)
+        minutes = parseInt(num.slice(2), 10)
+      }
+
+      if (minutes > 59) return null
+
+      if (meridiem.startsWith('p')) {
+        if (hours !== 12) hours += 12
+      } else if (hours === 12) {
+        hours = 0
+      }
+
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
+    }},
+
+    // Standard with colon and meridiem: 7:30pm, 7:30 pm, at 7:30pm (with optional "at")
+    { regex: /\b(?:at\s+)?(\d{1,2}):(\d{2})\s*(am?|pm?)\b/i, parse: (m: RegExpMatchArray) => {
       let hours = parseInt(m[1], 10)
       const minutes = parseInt(m[2], 10)
       const meridiem = m[3].toLowerCase()
-      if (meridiem === 'pm' || meridiem === 'p') {
+      if (meridiem.startsWith('p')) {
         if (hours !== 12) hours += 12
       } else if (hours === 12) {
         hours = 0
       }
       return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
     }},
-    // "at 7am" / "at 7 am" / "at 7pm"
-    { regex: /\bat\s+(\d{1,2})\s*(am|pm|a|p)\b/i, parse: (m: RegExpMatchArray) => {
+
+    // Just hour with meridiem: 7pm, 7p, 7 pm, at 7pm (with optional "at")
+    { regex: /\b(?:at\s+)?(\d{1,2})\s*(am?|pm?)\b/i, parse: (m: RegExpMatchArray) => {
       let hours = parseInt(m[1], 10)
       const meridiem = m[2].toLowerCase()
-      if (meridiem === 'pm' || meridiem === 'p') {
+      if (meridiem.startsWith('p')) {
         if (hours !== 12) hours += 12
       } else if (hours === 12) {
         hours = 0
       }
       return `${hours.toString().padStart(2, '0')}:00`
     }},
-    // "at 7" (assume AM if no meridiem, use 24h if > 12)
-    { regex: /\bat\s+(\d{1,2})\b(?!\s*:)/i, parse: (m: RegExpMatchArray) => {
+
+    // "at 7" (requires "at" prefix - bare numbers without meridiem)
+    { regex: /\bat\s+(\d{1,2})\b(?!\s*:|(?:\d)|(?:am?|pm?))/i, parse: (m: RegExpMatchArray) => {
       const hours = parseInt(m[1], 10)
       return `${hours.toString().padStart(2, '0')}:00`
     }},
@@ -93,14 +135,17 @@ export function parseRoutine(input: string, contacts: Contact[] = []): ParsedRou
   for (const { regex, parse } of timePatterns) {
     const match = normalized.match(regex)
     if (match && match.index !== undefined) {
-      time = parse(match)
-      extractedRanges.push({
-        start: match.index,
-        end: match.index + match[0].length,
-        type: 'time',
-        text: formatTimeDisplay(time),
-      })
-      break
+      const parsedTime = parse(match)
+      if (parsedTime !== null) {
+        time = parsedTime
+        extractedRanges.push({
+          start: match.index,
+          end: match.index + match[0].length,
+          type: 'time',
+          text: formatTimeDisplay(time),
+        })
+        break
+      }
     }
   }
 
@@ -217,6 +262,81 @@ export function parseRoutine(input: string, contacts: Contact[] = []): ParsedRou
     }
   }
 
+  // Day mappings for parsing day names (including plurals)
+  const dayMappings: Array<[RegExp, number]> = [
+    [/\bsun(?:day)?s?\b/, 0],
+    [/\bmon(?:day)?s?\b/, 1],
+    [/\btues?(?:day)?s?\b/, 2],
+    [/\bwed(?:nes)?(?:day)?s?\b/, 3],
+    [/\bthurs?(?:day)?s?\b/, 4],
+    [/\bfri(?:day)?s?\b/, 5],
+    [/\bsat(?:urday)?s?\b/, 6],
+  ]
+
+  // Check for "on [days]" pattern: "gym on monday", "on tuesdays take out trash"
+  if (!recurrenceFound) {
+    const onDaysRegex = /\bon\s+((?:(?:sun|mon|tues?|wed(?:nes)?|thurs?|fri|sat)(?:(?:ur)?day)?s?(?:\s*(?:,|and|&)\s*)?)+)\b/i
+    const onDaysMatch = normalized.match(onDaysRegex)
+    if (onDaysMatch && onDaysMatch.index !== undefined) {
+      const daysText = onDaysMatch[1].toLowerCase()
+      const days: number[] = []
+
+      for (const [pattern, dayNum] of dayMappings) {
+        if (pattern.test(daysText) && !days.includes(dayNum)) {
+          days.push(dayNum)
+        }
+      }
+
+      if (days.length > 0) {
+        days.sort((a, b) => a - b)
+        recurrence = { type: 'weekly', days }
+        recurrenceFound = true
+        extractedRanges.push({
+          start: onDaysMatch.index,
+          end: onDaysMatch.index + onDaysMatch[0].length,
+          type: 'day-pattern',
+          text: getRecurrenceDisplay(recurrence),
+        })
+      }
+    }
+  }
+
+  // Check for standalone days without "every" or "on" prefix
+  // "monday wednesday gym" or "gym monday wednesday" or "trash tuesdays"
+  if (!recurrenceFound) {
+    const standaloneDaysRegex = /\b((?:(?:sun|mon|tues?|wed(?:nes)?|thurs?|fri|sat)(?:(?:ur)?day)?s?(?:\s*(?:,|and|&)\s*)?)+)\b/gi
+    const dayMatches = [...normalized.matchAll(standaloneDaysRegex)]
+
+    if (dayMatches.length > 0) {
+      const allDaysText = dayMatches.map(m => m[1]).join(' ').toLowerCase()
+      const days: number[] = []
+
+      for (const [pattern, dayNum] of dayMappings) {
+        if (pattern.test(allDaysText) && !days.includes(dayNum)) {
+          days.push(dayNum)
+        }
+      }
+
+      if (days.length > 0) {
+        days.sort((a, b) => a - b)
+        recurrence = { type: 'weekly', days }
+        recurrenceFound = true
+
+        // Mark these ranges as extracted for token building
+        for (const match of dayMatches) {
+          if (match.index !== undefined) {
+            extractedRanges.push({
+              start: match.index,
+              end: match.index + match[0].length,
+              type: 'day-pattern',
+              text: getRecurrenceDisplay(recurrence),
+            })
+          }
+        }
+      }
+    }
+  }
+
   // 3. Extract time of day
   for (const tod of TIME_OF_DAY_KEYWORDS) {
     const regex = new RegExp(`\\b${tod}\\b`, 'i')
@@ -279,8 +399,14 @@ export function parseRoutine(input: string, contacts: Contact[] = []): ParsedRou
   }
 
   action = actionParts.join(' ')
-    .replace(/\s+/g, ' ')
-    .replace(/^\s*at\s*/i, '') // Remove leading "at" if present
+    .replace(/\s+/g, ' ')           // Normalize whitespace
+    .replace(/^[-–—]\s*/, '')       // Remove leading dashes
+    .replace(/^\s*at\s*/i, '')      // Remove leading "at"
+    .replace(/^\s*on\s*/i, '')      // Remove leading "on"
+    .replace(/^\s*every\s*/i, '')   // Remove orphaned "every"
+    .replace(/\s+at\s*$/i, '')      // Remove trailing "at"
+    .replace(/\s+on\s*$/i, '')      // Remove trailing "on"
+    .replace(/\s+and\s*$/i, '')     // Remove trailing "and"
     .trim()
 
   // 6. Build tokens array for display
