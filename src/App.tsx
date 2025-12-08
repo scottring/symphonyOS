@@ -546,7 +546,7 @@ function App() {
     projects,
     contacts,
     routines: allRoutines,
-    lists,
+    lists: lists.map(l => ({ id: l.id, name: l.title })),
   }), [tasks, projects, contacts, allRoutines, lists])
 
   if (authLoading || onboardingLoading) {
@@ -799,8 +799,8 @@ function App() {
             }}
             isPinned={pinnedItems.isPinned('contact', selectedContactForView.id)}
             canPin={pinnedItems.canPin()}
-            onPin={pinnedItems.pin}
-            onUnpin={pinnedItems.unpin}
+            onPin={() => pinnedItems.pin('contact', selectedContactForView.id)}
+            onUnpin={() => pinnedItems.unpin('contact', selectedContactForView.id)}
           />
         </Suspense>
       )}
@@ -831,8 +831,8 @@ function App() {
             selectedTaskId={selectedItemId}
             isPinned={pinnedItems.isPinned('project', selectedProject.id)}
             canPin={pinnedItems.canPin()}
-            onPin={pinnedItems.pin}
-            onUnpin={pinnedItems.unpin}
+            onPin={() => pinnedItems.pin('project', selectedProject.id)}
+            onUnpin={() => pinnedItems.unpin('project', selectedProject.id)}
           />
         </Suspense>
       )}
@@ -891,8 +891,8 @@ function App() {
             onToggleVisibility={toggleRoutineVisibility}
             isPinned={pinnedItems.isPinned('routine', selectedRoutine.id)}
             canPin={pinnedItems.canPin()}
-            onPin={pinnedItems.pin}
-            onUnpin={pinnedItems.unpin}
+            onPin={() => pinnedItems.pin('routine', selectedRoutine.id)}
+            onUnpin={() => pinnedItems.unpin('routine', selectedRoutine.id)}
           />
         </Suspense>
       )}
@@ -918,9 +918,9 @@ function App() {
           onDeleteItem={deleteListItem}
           onReorderItems={reorderListItems}
           isPinned={pinnedItems.isPinned('list', selectedList.id)}
-          canPin={pinnedItems.canPin}
-          onPin={pinnedItems.pin}
-          onUnpin={pinnedItems.unpin}
+          canPin={pinnedItems.canPin()}
+          onPin={() => pinnedItems.pin('list', selectedList.id)}
+          onUnpin={() => pinnedItems.unpin('list', selectedList.id)}
         />
       )}
 

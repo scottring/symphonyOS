@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { FileUpload } from '../FileUpload'
 
 // Helper to create a mock File
@@ -53,7 +52,6 @@ describe('FileUpload', () => {
 
   describe('file selection', () => {
     it('opens file picker on click', async () => {
-      const user = userEvent.setup()
       render(<FileUpload onFileSelect={mockOnFileSelect} />)
 
       const dropZone = screen.getByText('Click or drag to upload').closest('div')

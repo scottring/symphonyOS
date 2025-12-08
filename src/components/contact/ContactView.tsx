@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import type { Contact } from '@/types/contact'
 import type { Task } from '@/types/task'
-import type { PinnableEntityType } from '@/types/pin'
 import { PinButton } from '@/components/pins'
 
 interface ContactViewProps {
@@ -15,8 +14,8 @@ interface ContactViewProps {
   // Pin props
   isPinned?: boolean
   canPin?: boolean
-  onPin?: (entityType: PinnableEntityType, entityId: string) => Promise<boolean>
-  onUnpin?: (entityType: PinnableEntityType, entityId: string) => Promise<boolean>
+  onPin?: () => Promise<boolean>
+  onUnpin?: () => Promise<boolean>
 }
 
 export function ContactView({

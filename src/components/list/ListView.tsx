@@ -2,7 +2,6 @@ import { useState } from 'react'
 import type { List, ListItem, ListCategory, ListVisibility } from '@/types/list'
 import { getCategoryLabel, getCategoryIcon, LIST_CATEGORIES } from '@/types/list'
 import { ListItemRow } from './ListItemRow'
-import type { PinnableEntityType } from '@/types/pin'
 import { PinButton } from '@/components/pins'
 
 interface ListViewProps {
@@ -17,8 +16,8 @@ interface ListViewProps {
   onReorderItems?: (itemIds: string[]) => void
   isPinned?: boolean
   canPin?: boolean
-  onPin?: (entityType: PinnableEntityType, entityId: string) => Promise<boolean>
-  onUnpin?: (entityType: PinnableEntityType, entityId: string) => Promise<boolean>
+  onPin?: () => Promise<boolean>
+  onUnpin?: () => Promise<boolean>
 }
 
 export function ListView({

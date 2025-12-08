@@ -9,6 +9,11 @@ interface ContactViewProps {
   onDelete: (id: string) => Promise<void>
   tasks: Task[]
   onSelectTask: (taskId: string) => void
+  // Pin props (available but not used in redesign yet)
+  isPinned?: boolean
+  canPin?: boolean
+  onPin?: () => Promise<boolean>
+  onUnpin?: () => Promise<boolean>
 }
 
 export function ContactViewRedesign({
@@ -18,6 +23,10 @@ export function ContactViewRedesign({
   onDelete,
   tasks,
   onSelectTask,
+  isPinned: _isPinned,
+  canPin: _canPin,
+  onPin: _onPin,
+  onUnpin: _onUnpin,
 }: ContactViewProps) {
   // Name editing
   const [isEditingName, setIsEditingName] = useState(false)

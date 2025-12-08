@@ -3,7 +3,6 @@ import type { Routine, RecurrencePattern } from '@/types/actionable'
 import type { UpdateRoutineInput } from '@/hooks/useRoutines'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
-import type { PinnableEntityType } from '@/types/pin'
 import { FAMILY_COLORS, type FamilyMemberColor } from '@/types/family'
 import { parseRoutine, parsedRoutineToDb, isValidParsedRoutine } from '@/lib/parseRoutine'
 import { SemanticRoutine } from './SemanticRoutine'
@@ -20,8 +19,8 @@ interface RoutineFormProps {
   // Pin props
   isPinned?: boolean
   canPin?: boolean
-  onPin?: (entityType: PinnableEntityType, entityId: string) => Promise<boolean>
-  onUnpin?: (entityType: PinnableEntityType, entityId: string) => Promise<boolean>
+  onPin?: () => Promise<boolean>
+  onUnpin?: () => Promise<boolean>
 }
 
 const DAYS = [

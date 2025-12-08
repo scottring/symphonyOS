@@ -14,6 +14,11 @@ interface ProjectViewProps {
   onSelectTask: (taskId: string) => void
   onToggleTask: (taskId: string) => void
   selectedTaskId?: string | null
+  // Pin props (available but not used in redesign yet)
+  isPinned?: boolean
+  canPin?: boolean
+  onPin?: () => Promise<boolean>
+  onUnpin?: () => Promise<boolean>
 }
 
 export function ProjectViewRedesign({
@@ -27,6 +32,10 @@ export function ProjectViewRedesign({
   onSelectTask,
   onToggleTask,
   selectedTaskId,
+  isPinned: _isPinned,
+  canPin: _canPin,
+  onPin: _onPin,
+  onUnpin: _onUnpin,
 }: ProjectViewProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState('')
