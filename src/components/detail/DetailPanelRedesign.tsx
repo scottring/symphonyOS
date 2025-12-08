@@ -447,6 +447,9 @@ export function DetailPanelRedesign({
 
   // Location picker (for tasks with Places autocomplete)
   const [showLocationPicker, setShowLocationPicker] = useState(false)
+
+  // Collapsible Details section
+  const [detailsExpanded, setDetailsExpanded] = useState(true)
   const directions = useDirections()
 
   // Sync local state when item changes
@@ -909,9 +912,6 @@ export function DetailPanelRedesign({
     : 'Unscheduled'
 
   const phoneNumber = contact?.phone || item.phoneNumber
-
-  // State for collapsible Details section
-  const [detailsExpanded, setDetailsExpanded] = useState(true)
 
   return (
     <div className="h-full flex flex-col bg-bg-base">
