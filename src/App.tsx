@@ -41,10 +41,11 @@ import {
 } from '@/components/lazy'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import type { ViewType } from '@/components/layout/Sidebar'
-import type { ActionableInstance } from '@/types/actionable'
+import type { ActionableInstance, Routine } from '@/types/actionable'
+import type { LinkedActivityType } from '@/types/task'
 
 function App() {
-  const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, toggleTask, deleteTask, updateTask, pushTask } = useSupabaseTasks()
+  const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, getLinkedTasks, toggleTask, deleteTask, updateTask, pushTask } = useSupabaseTasks()
   const { user, loading: authLoading, signOut } = useAuth()
   const { isConnected, events, fetchEvents, isFetching: eventsFetching } = useGoogleCalendar()
   const attachments = useAttachments()
@@ -275,6 +276,48 @@ function App() {
     })
   }, [getRoutinesForDate, viewedDate, dateInstances])
 
+  // Generate prep tasks from routine templates when routines surface for the day
+  // This runs once when filteredRoutines changes for a given date
+  useEffect(() => {
+    if (tasksLoading || routinesLoading) return
+    if (filteredRoutines.length === 0) return
+
+    // Format date string for instance ID
+    const dateStr = viewedDate.toISOString().split('T')[0]
+
+    const generateTemplatedTasks = async () => {
+      for (const routine of filteredRoutines) {
+        // Skip if no prep templates
+        if (!routine.prep_task_templates || routine.prep_task_templates.length === 0) {
+          continue
+        }
+
+        const instanceId = `${routine.id}_${dateStr}`
+        const existingLinked = getLinkedTasks('routine_instance' as LinkedActivityType, instanceId)
+
+        for (const template of routine.prep_task_templates) {
+          // Check if a task with this title already exists for this instance
+          const exists = existingLinked.prep.some(t => t.title === template.title)
+          if (!exists) {
+            // Create prep task scheduled for today
+            await addTask(
+              template.title,
+              undefined, // contactId
+              undefined, // projectId
+              viewedDate, // scheduledFor - same day as routine
+              {
+                linkedTo: { type: 'routine_instance' as LinkedActivityType, id: instanceId },
+                linkType: 'prep',
+              }
+            )
+          }
+        }
+      }
+    }
+
+    generateTemplatedTasks()
+  }, [filteredRoutines, viewedDate, tasksLoading, routinesLoading, getLinkedTasks, addTask])
+
   // Fetch event notes when an event is selected
   useEffect(() => {
     if (selectedItemId?.startsWith('event-')) {
@@ -376,6 +419,35 @@ function App() {
     }
     return []
   }, [selectedItemId, attachments])
+
+  // Get linked tasks (prep/followup) for selected item
+  const selectedItemLinkedTasks = useMemo(() => {
+    if (!selectedItemId) return { prep: [], followup: [] }
+
+    const dateStr = viewedDate.toISOString().split('T')[0]
+
+    if (selectedItemId.startsWith('task-')) {
+      const taskId = selectedItemId.replace('task-', '')
+      return getLinkedTasks('task' as LinkedActivityType, taskId)
+    }
+    if (selectedItemId.startsWith('routine-')) {
+      const routineId = selectedItemId.replace('routine-', '')
+      const instanceId = `${routineId}_${dateStr}`
+      return getLinkedTasks('routine_instance' as LinkedActivityType, instanceId)
+    }
+    if (selectedItemId.startsWith('event-')) {
+      const eventId = selectedItemId.replace('event-', '')
+      return getLinkedTasks('calendar_event' as LinkedActivityType, eventId)
+    }
+    return { prep: [], followup: [] }
+  }, [selectedItemId, viewedDate, getLinkedTasks])
+
+  // Get routine for selected routine item (for templates)
+  const selectedItemRoutine = useMemo((): Routine | null => {
+    if (!selectedItemId?.startsWith('routine-')) return null
+    const routineId = selectedItemId.replace('routine-', '')
+    return allRoutines.find(r => r.id === routineId) ?? null
+  }, [selectedItemId, allRoutines])
 
   // Get project for project view
   const selectedProject = useMemo(() => {
@@ -505,6 +577,32 @@ function App() {
       await pinnedItems.unpin('task', taskId)
     }
   }, [tasks, toggleTask, pinnedItems])
+
+  // Handler for adding linked prep/followup tasks from DetailPanel
+  const handleAddLinkedTask = useCallback(async (
+    title: string,
+    linkedTo: { type: LinkedActivityType; id: string },
+    linkType: 'prep' | 'followup',
+    scheduledFor?: Date
+  ) => {
+    await addTask(
+      title,
+      undefined, // contactId
+      undefined, // projectId
+      scheduledFor ?? viewedDate, // Default to viewed date
+      { linkedTo, linkType }
+    )
+  }, [addTask, viewedDate])
+
+  // Handler for toggling a linked task's completion
+  const handleToggleLinkedTask = useCallback(async (taskId: string) => {
+    await toggleTask(taskId)
+  }, [toggleTask])
+
+  // Handler for deleting a linked task
+  const handleDeleteLinkedTask = useCallback(async (taskId: string) => {
+    await deleteTask(taskId)
+  }, [deleteTask])
 
   // Wrapper for updateProject that auto-unpins when marked complete
   const handleUpdateProject = useCallback(async (id: string, updates: Partial<typeof projects[0]>) => {
@@ -665,6 +763,12 @@ function App() {
             canPin={pinnedItems.canPin()}
             onPin={pinnedItems.pin}
             onUnpin={pinnedItems.unpin}
+            linkedTasks={selectedItemLinkedTasks}
+            onAddLinkedTask={handleAddLinkedTask}
+            onToggleLinkedTask={handleToggleLinkedTask}
+            onDeleteLinkedTask={handleDeleteLinkedTask}
+            routine={selectedItemRoutine}
+            onUpdateRoutine={updateRoutine}
           />
         )
       }
