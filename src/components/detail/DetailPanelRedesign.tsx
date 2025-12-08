@@ -203,7 +203,6 @@ export function DetailPanelRedesign({
   const titleInputRef = useRef<HTMLInputElement>(null)
 
   // Notes editing
-  const [isEditingNotes, setIsEditingNotes] = useState(false)
   const [localNotes, setLocalNotes] = useState(item?.notes || '')
   const notesInputRef = useRef<HTMLTextAreaElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -242,7 +241,6 @@ export function DetailPanelRedesign({
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setLocalNotes(item?.notes || '')
-    setIsEditingNotes(false)
     setShowDeleteConfirm(false)
     setShowTimePicker(false)
     setShowLinks(false)
@@ -1055,34 +1053,16 @@ export function DetailPanelRedesign({
               </div>
             )}
 
-            {isEditingNotes ? (
-              <textarea
-                ref={notesInputRef}
-                value={localNotes}
-                onChange={handleNotesChange}
-                onBlur={() => setIsEditingNotes(false)}
-                placeholder="Add notes..."
-                rows={4}
-                autoFocus
-                className="w-full px-4 py-3 text-base rounded-xl border border-neutral-200
-                           focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
-              />
-            ) : (
-              <button
-                onClick={() => setIsEditingNotes(true)}
-                className="w-full text-left"
-              >
-                {localNotes ? (
-                  <div className="text-base text-neutral-600 whitespace-pre-wrap">
-                    <RichText text={localNotes} />
-                  </div>
-                ) : (
-                  <div className="text-base text-neutral-400 italic py-2">
-                    Tap to add notes...
-                  </div>
-                )}
-              </button>
-            )}
+            {/* Always show textarea - no toggle between display/edit mode */}
+            <textarea
+              ref={notesInputRef}
+              value={localNotes}
+              onChange={handleNotesChange}
+              placeholder="Add notes..."
+              rows={4}
+              className="w-full px-4 py-3 text-base rounded-xl border border-neutral-200
+                         focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+            />
           </div>
         </div>
 
