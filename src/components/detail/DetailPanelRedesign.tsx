@@ -236,6 +236,92 @@ function AddLinkedTaskInput({
   )
 }
 
+// DetailRow component for consistent field styling in Details zone
+interface DetailRowProps {
+  icon: React.ReactNode
+  label: string
+  value: string | null | undefined
+  onClick: () => void
+  actions?: React.ReactNode
+}
+
+function DetailRow({ icon, label, value, onClick, actions }: DetailRowProps) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-3 p-3 -mx-3 rounded-lg
+                 hover:bg-neutral-50 text-left group transition-colors"
+    >
+      <span className="text-neutral-400">{icon}</span>
+      <span className="text-sm text-neutral-500 w-20">{label}</span>
+      <span className={`flex-1 text-sm ${value ? 'text-neutral-900' : 'text-neutral-400'}`}>
+        {value || 'None'}
+      </span>
+      {actions}
+      <svg
+        className="w-4 h-4 text-neutral-300 opacity-0 group-hover:opacity-100 transition-opacity"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+      >
+        <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+      </svg>
+    </button>
+  )
+}
+
+// LinkedTaskRow component for prep/follow-up tasks
+interface LinkedTaskRowProps {
+  task: Task
+  onToggle?: (taskId: string) => void
+  onDelete?: (taskId: string) => void
+}
+
+function LinkedTaskRow({ task, onToggle, onDelete }: LinkedTaskRowProps) {
+  return (
+    <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-neutral-50 group transition-colors">
+      <button
+        onClick={() => onToggle?.(task.id)}
+        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${
+          task.completed
+            ? 'bg-primary-500 border-primary-500'
+            : 'border-neutral-300 hover:border-primary-400'
+        }`}
+      >
+        {task.completed && (
+          <svg className="w-3 h-3 text-white" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+          </svg>
+        )}
+      </button>
+
+      <span className={`flex-1 text-sm ${task.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>
+        {task.title}
+      </span>
+
+      {task.scheduledFor ? (
+        <span className="text-xs text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full">
+          {task.scheduledFor.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+        </span>
+      ) : (
+        <button className="text-xs text-primary-600 opacity-0 group-hover:opacity-100 transition-opacity">
+          + Add to Today
+        </button>
+      )}
+
+      {onDelete && (
+        <button
+          onClick={() => onDelete(task.id)}
+          className="text-neutral-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+          </svg>
+        </button>
+      )}
+    </div>
+  )
+}
+
 function ActionButton({ action, onOpenRecipe }: { action: DetectedAction; onOpenRecipe?: (url: string) => void }) {
   const handleClick = () => {
     if (action.type === 'recipe' && action.url && onOpenRecipe) {
@@ -824,90 +910,132 @@ export function DetailPanelRedesign({
 
   const phoneNumber = contact?.phone || item.phoneNumber
 
+  // State for collapsible Details section
+  const [detailsExpanded, setDetailsExpanded] = useState(true)
+
   return (
     <div className="h-full flex flex-col bg-bg-base">
-      {/* Header - Enhanced with better hierarchy */}
-      <div className="bg-white border-b border-neutral-100 safe-area-top">
-        {/* Drag handle for bottom sheet feel */}
-        <div className="flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 rounded-full bg-neutral-200" />
-        </div>
+      {/* ========================================
+          ZONE 1: HEADER (Hero)
+          - Title is largest text, primary focus
+          - Inline metadata pills only when populated
+          ======================================== */}
+      <div className="p-6 border-b border-neutral-100 bg-white relative safe-area-top">
+        {/* Close button - top right */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-neutral-400 hover:text-neutral-600 transition-colors"
+          aria-label="Close"
+        >
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
 
-        <div className="px-5 pb-4 pt-2">
-          <div className="flex items-start gap-4">
-            {/* Checkbox/indicator */}
-            {isTask ? (
-              <button
-                onClick={handleToggle}
-                className={`mt-1.5 w-7 h-7 rounded-lg border-2 flex-shrink-0 flex items-center justify-center transition-all ${
-                  item.completed
-                    ? 'bg-primary-500 border-primary-500 text-white'
-                    : 'border-neutral-300 hover:border-primary-400'
-                }`}
-                aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
-              >
-                {item.completed && (
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                )}
-              </button>
-            ) : isRoutine ? (
-              <div className={`mt-1.5 w-7 h-7 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
-                item.completed ? 'bg-amber-500 border-amber-500 text-white' : 'border-amber-400'
-              }`}>
-                {item.completed && (
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                )}
-              </div>
+        {/* Checkbox + Title */}
+        <div className="flex items-start gap-4 pr-8">
+          {/* Checkbox/indicator */}
+          {isTask ? (
+            <button
+              onClick={handleToggle}
+              className={`mt-1 w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${
+                item.completed
+                  ? 'bg-primary-500 border-primary-500 text-white'
+                  : 'border-neutral-300 hover:border-primary-500'
+              }`}
+              aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
+            >
+              {item.completed && (
+                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              )}
+            </button>
+          ) : isRoutine ? (
+            <div className={`mt-1 w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+              item.completed ? 'bg-amber-500 border-amber-500 text-white' : 'border-amber-400'
+            }`}>
+              {item.completed && (
+                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              )}
+            </div>
+          ) : (
+            <div className="mt-1.5 w-4 h-4 rounded-full bg-gradient-to-br from-blue-400 to-blue-500 flex-shrink-0 shadow-sm" />
+          )}
+
+          <div className="flex-1 min-w-0">
+            {/* Title - text-xl font-semibold, largest text in panel */}
+            {isEditingTitle ? (
+              <input
+                ref={titleInputRef}
+                type="text"
+                value={editedTitle}
+                onChange={(e) => setEditedTitle(e.target.value)}
+                onBlur={handleTitleSave}
+                onKeyDown={handleTitleKeyDown}
+                className="w-full text-xl font-semibold text-neutral-900 leading-tight
+                           bg-transparent border-b-2 border-primary-500 focus:outline-none"
+              />
             ) : (
-              <div className="mt-2.5 w-4 h-4 rounded-full bg-gradient-to-br from-blue-400 to-blue-500 flex-shrink-0 shadow-sm" />
+              <h2
+                className={`text-xl font-semibold leading-tight ${
+                  item.completed ? 'text-neutral-400 line-through' : 'text-neutral-900'
+                } ${isTask ? 'cursor-pointer hover:text-primary-600 transition-colors' : ''}`}
+                onClick={() => isTask && setIsEditingTitle(true)}
+              >
+                {item.title}
+              </h2>
             )}
 
-            {/* Title */}
-            <div className="flex-1 min-w-0">
-              {isEditingTitle ? (
-                <input
-                  ref={titleInputRef}
-                  type="text"
-                  value={editedTitle}
-                  onChange={(e) => setEditedTitle(e.target.value)}
-                  onBlur={handleTitleSave}
-                  onKeyDown={handleTitleKeyDown}
-                  className="w-full font-display text-2xl font-semibold text-neutral-800 leading-tight
-                             bg-transparent border-b-2 border-primary-500 focus:outline-none"
-                />
-              ) : (
-                <h2
-                  className={`font-display text-2xl font-semibold leading-tight ${
-                    item.completed ? 'text-neutral-400 line-through' : 'text-neutral-900'
-                  } ${isTask ? 'cursor-pointer active:text-primary-600' : ''}`}
-                  onClick={() => isTask && setIsEditingTitle(true)}
+            {/* Inline metadata pills - only show if populated */}
+            <div className="flex flex-wrap gap-2 mt-3">
+              {item.startTime && (
+                <button
+                  onClick={() => isTask && setShowTimePicker(!showTimePicker)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1
+                            bg-neutral-100 text-neutral-600 text-sm rounded-full
+                            hover:bg-neutral-200 transition-colors"
                 >
-                  {item.title}
-                </h2>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {timeDisplay}
+                </button>
               )}
-
-              {/* Time display */}
-              <button
-                onClick={() => isTask && setShowTimePicker(!showTimePicker)}
-                className={`mt-1 text-sm flex items-center gap-1.5 ${
-                  isTask ? 'text-neutral-500 active:text-primary-600' : 'text-neutral-500'
-                }`}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {timeDisplay}
-              </button>
+              {contact && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1
+                                bg-primary-50 text-primary-700 text-sm rounded-full">
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                  </svg>
+                  {contact.name}
+                </span>
+              )}
+              {item.location && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1
+                                bg-neutral-100 text-neutral-600 text-sm rounded-full">
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                  </svg>
+                  {item.location}
+                </span>
+              )}
+              {project && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1
+                                bg-amber-50 text-amber-700 text-sm rounded-full">
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                  </svg>
+                  {project.name}
+                </span>
+              )}
             </div>
 
-            {/* Action buttons */}
-            <div className="flex items-center gap-1">
-              {/* Pin button - only for tasks (other entities pinned from their own views) */}
-              {isTask && item.originalTask && onPin && onUnpin && (
+            {/* Pin button for tasks - inline in header */}
+            {isTask && item.originalTask && onPin && onUnpin && (
+              <div className="mt-3">
                 <PinButton
                   entityType="task"
                   entityId={item.originalTask.id}
@@ -917,142 +1045,162 @@ export function DetailPanelRedesign({
                   onUnpin={() => onUnpin('task', item.originalTask!.id)}
                   onMaxPinsReached={onMaxPinsReached}
                 />
-              )}
-
-              {/* Close button */}
-              <button
-                onClick={onClose}
-                className="p-2 -mr-2 rounded-xl text-neutral-400 active:bg-neutral-100"
-                aria-label="Close"
-              >
-                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <path d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-auto">
-        {/* SUBTASKS - The Centerpiece for Tasks */}
-        {isTask && item.originalTask && (
-          <div className="bg-white mx-4 mt-4 rounded-2xl shadow-sm border border-neutral-100">
-            <div className="p-4">
+        {/* ========================================
+            ZONE 2: PRIMARY CONTENT (Subtasks + Notes)
+            - Always visible, prominent
+            - "Do the work" sections
+            ======================================== */}
+        <div className="p-6 space-y-6 border-b border-neutral-100">
+          {/* Subtasks */}
+          {isTask && item.originalTask && (
+            <div>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-display text-lg font-semibold text-neutral-800">
-                  Subtasks
+                <h3 className="text-sm font-medium text-neutral-500 uppercase tracking-wide">
+                  Subtasks {subtasks.length > 0 && `(${subtasks.length})`}
                 </h3>
-                {subtasks.length > 0 && (
-                  <span className="text-sm font-medium text-neutral-500">
-                    {completedSubtasks}/{subtasks.length}
-                  </span>
+                {onAddSubtask && !isAddingSubtask && (
+                  <button
+                    onClick={() => setIsAddingSubtask(true)}
+                    className="text-sm text-primary-600 hover:text-primary-700 transition-colors"
+                  >
+                    + Add subtask
+                  </button>
                 )}
               </div>
 
-              {/* Progress bar */}
-              {subtasks.length > 0 && (
-                <div className="h-2 bg-neutral-100 rounded-full overflow-hidden mb-4">
-                  <div
-                    className="h-full bg-gradient-to-r from-primary-400 to-primary-500 transition-all duration-300"
-                    style={{ width: `${subtaskProgress}%` }}
-                  />
-                </div>
-              )}
-
-              {/* Subtask list */}
-              {subtasks.length > 0 && (
-                <ul className="space-y-1 mb-3">
+              {subtasks.length > 0 ? (
+                <div className="space-y-2">
                   {subtasks.map((subtask) => (
-                    <li
+                    <div
                       key={subtask.id}
-                      className="flex items-center gap-3 p-3 rounded-xl bg-neutral-50 active:bg-neutral-100 transition-colors"
+                      className="flex items-center gap-3 p-2 -mx-2 rounded-lg hover:bg-neutral-50 group transition-colors"
                     >
                       <button
                         onClick={() => onToggleComplete?.(subtask.id)}
-                        className="flex-shrink-0"
+                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${
+                          subtask.completed
+                            ? 'bg-primary-500 border-primary-500'
+                            : 'border-neutral-300 hover:border-primary-400'
+                        }`}
                         aria-label={subtask.completed ? 'Mark incomplete' : 'Mark complete'}
                       >
-                        <span className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-colors ${
-                          subtask.completed
-                            ? 'bg-primary-500 border-primary-500 text-white'
-                            : 'border-neutral-300'
-                        }`}>
-                          {subtask.completed && (
-                            <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          )}
-                        </span>
+                        {subtask.completed && (
+                          <svg className="w-3 h-3 text-white" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
                       </button>
-                      <span className={`flex-1 text-base ${subtask.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>
+                      <span className={`flex-1 text-sm ${subtask.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>
                         {subtask.title}
                       </span>
-                    </li>
+                      <button className="opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-red-500 transition-all p-1">
+                        <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
                   ))}
-                </ul>
-              )}
+                  {/* Progress bar */}
+                  <div className="mt-3 pt-3 border-t border-neutral-100">
+                    <div className="flex items-center justify-between text-xs text-neutral-500 mb-1.5">
+                      <span>{completedSubtasks} of {subtasks.length} complete</span>
+                      <span>{Math.round(subtaskProgress)}%</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-neutral-200 overflow-hidden">
+                      <div
+                        className="h-full bg-primary-500 rounded-full transition-all duration-300"
+                        style={{ width: `${subtaskProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : null}
 
-              {/* Add subtask */}
-              {onAddSubtask && (
-                isAddingSubtask ? (
-                  <form
-                    onSubmit={async (e) => {
-                      e.preventDefault()
-                      if (!newSubtaskTitle.trim() || !item.originalTask) return
-                      await onAddSubtask(item.originalTask.id, newSubtaskTitle.trim())
-                      setNewSubtaskTitle('')
+              {/* Add subtask input */}
+              {isAddingSubtask && (
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault()
+                    if (!newSubtaskTitle.trim() || !item.originalTask || !onAddSubtask) return
+                    await onAddSubtask(item.originalTask.id, newSubtaskTitle.trim())
+                    setNewSubtaskTitle('')
+                  }}
+                  className="flex items-center gap-2 mt-2"
+                >
+                  <input
+                    type="text"
+                    value={newSubtaskTitle}
+                    onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setIsAddingSubtask(false)
+                        setNewSubtaskTitle('')
+                      }
                     }}
-                    className="flex items-center gap-2"
-                  >
-                    <input
-                      type="text"
-                      value={newSubtaskTitle}
-                      onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Escape') {
-                          setIsAddingSubtask(false)
-                          setNewSubtaskTitle('')
-                        }
-                      }}
-                      placeholder="Subtask title..."
-                      className="flex-1 px-4 py-3 text-base rounded-xl border border-neutral-200
-                                 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      autoFocus
-                    />
-                    <button
-                      type="submit"
-                      disabled={!newSubtaskTitle.trim()}
-                      className="px-4 py-3 text-sm font-semibold bg-primary-600 text-white
-                                 rounded-xl disabled:opacity-50"
-                    >
-                      Add
-                    </button>
-                  </form>
-                ) : (
+                    placeholder="Subtask title..."
+                    className="flex-1 px-3 py-2 text-sm rounded-lg border border-neutral-200
+                               focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    autoFocus
+                  />
                   <button
-                    onClick={() => setIsAddingSubtask(true)}
-                    className="w-full flex items-center justify-center gap-2 p-3 rounded-xl
-                               border-2 border-dashed border-neutral-200 text-neutral-500
-                               active:bg-neutral-50 transition-colors"
+                    type="submit"
+                    disabled={!newSubtaskTitle.trim()}
+                    className="px-3 py-2 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-lg disabled:opacity-50 transition-colors"
                   >
-                    <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                    </svg>
-                    <span className="font-medium">Add subtask</span>
+                    Add
                   </button>
-                )
-              )}
-
-              {subtasks.length === 0 && !isAddingSubtask && !onAddSubtask && (
-                <p className="text-center text-neutral-400 py-4 text-sm">
-                  No subtasks yet
-                </p>
+                  <button
+                    type="button"
+                    onClick={() => { setIsAddingSubtask(false); setNewSubtaskTitle('') }}
+                    className="px-3 py-2 text-sm text-neutral-500 hover:bg-neutral-50 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </form>
               )}
             </div>
+          )}
+
+          {/* Notes - always a textarea, invites input */}
+          <div>
+            <h3 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">
+              Notes
+            </h3>
+
+            {/* Google Calendar description (read-only, events only) */}
+            {isEvent && item.googleDescription && (
+              <div className="mb-3">
+                <div className="text-xs text-blue-600 font-medium mb-1 flex items-center gap-1">
+                  <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                  </svg>
+                  From Calendar
+                </div>
+                <div className="text-sm text-neutral-600 whitespace-pre-wrap bg-blue-50 rounded-lg p-3 border border-blue-100">
+                  <RichText text={item.googleDescription} />
+                </div>
+              </div>
+            )}
+
+            <textarea
+              ref={notesInputRef}
+              value={localNotes}
+              onChange={handleNotesChange}
+              placeholder="Add notes..."
+              className="w-full p-3 text-sm border border-neutral-200 rounded-lg
+                         focus:ring-2 focus:ring-primary-500 focus:border-transparent
+                         resize-none min-h-[80px] transition-all"
+            />
           </div>
-        )}
+        </div>
 
         {/* Actionable Actions (events and routines) */}
         {isEvent && item.originalEvent && item.startTime && (
@@ -1102,201 +1250,181 @@ export function DetailPanelRedesign({
           </div>
         )}
 
-        {/* Metadata Section - Project, Contact, When */}
+        {/* ========================================
+            ZONE 3: DETAILS (Collapsible)
+            - Context fields - less important, can be collapsed
+            ======================================== */}
         {isTask && (
-          <div className="mx-4 mt-4 bg-white rounded-2xl shadow-sm border border-neutral-100 divide-y divide-neutral-100">
-            {/* Project */}
+          <div className="border-b border-neutral-100">
+            {/* Collapse header */}
             <button
-              onClick={() => project ? (onOpenProject && onOpenProject(project.id)) : setShowProjectPicker(true)}
-              className="w-full px-4 py-3.5 flex items-center gap-3 active:bg-neutral-50"
+              onClick={() => setDetailsExpanded(!detailsExpanded)}
+              className="w-full p-6 flex items-center justify-between hover:bg-neutral-50 transition-colors"
             >
-              <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
-                <svg className="w-5 h-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-                </svg>
-              </div>
-              <div className="flex-1 text-left">
-                <div className="text-xs font-medium text-neutral-400 uppercase tracking-wide">Project</div>
-                <div className={`text-base ${project ? 'text-neutral-800 font-medium' : 'text-neutral-400'}`}>
-                  {project ? project.name : 'None'}
-                </div>
-              </div>
-              <svg className="w-5 h-5 text-neutral-300" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+              <h3 className="text-sm font-medium text-neutral-500 uppercase tracking-wide">
+                Details
+              </h3>
+              <svg
+                className={`w-5 h-5 text-neutral-400 transition-transform duration-200 ${detailsExpanded ? '' : '-rotate-90'}`}
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
               </svg>
             </button>
 
-            {/* Contact */}
-            <button
-              onClick={() => contact ? (onOpenContact && onOpenContact(contact.id)) : setShowContactPicker(true)}
-              className="w-full px-4 py-3.5 flex items-center gap-3 active:bg-neutral-50"
-            >
-              <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center">
-                <svg className="w-5 h-5 text-primary-600" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="flex-1 text-left">
-                <div className="text-xs font-medium text-neutral-400 uppercase tracking-wide">Contact</div>
-                <div className={`text-base ${contact ? 'text-neutral-800 font-medium' : 'text-neutral-400'}`}>
-                  {contact ? contact.name : 'None'}
-                </div>
-              </div>
-              {contact && phoneNumber && (
-                <div className="flex gap-1 mr-2" onClick={(e) => e.stopPropagation()}>
-                  <a
-                    href={`tel:${phoneNumber}`}
-                    className="p-2 rounded-lg bg-primary-50 text-primary-600 active:bg-primary-100"
-                  >
-                    <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+            {/* Expanded details */}
+            {detailsExpanded && (
+              <div className="px-6 pb-6 space-y-1">
+                {/* Project Row */}
+                <DetailRow
+                  icon={
+                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
                     </svg>
-                  </a>
-                  <a
-                    href={`sms:${phoneNumber}`}
-                    className="p-2 rounded-lg bg-primary-50 text-primary-600 active:bg-primary-100"
-                  >
-                    <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
-                    </svg>
-                  </a>
-                </div>
-              )}
-              <svg className="w-5 h-5 text-neutral-300" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-              </svg>
-            </button>
-
-            {/* Links */}
-            <button
-              onClick={() => setShowLinks(!showLinks)}
-              className="w-full px-4 py-3.5 flex items-center gap-3 active:bg-neutral-50"
-            >
-              <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center">
-                <svg className="w-5 h-5 text-purple-600" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="flex-1 text-left">
-                <div className="text-xs font-medium text-neutral-400 uppercase tracking-wide">Links</div>
-                <div className={`text-base ${item.links && item.links.length > 0 ? 'text-neutral-800 font-medium' : 'text-neutral-400'}`}>
-                  {item.links && item.links.length > 0 ? `${item.links.length} link${item.links.length > 1 ? 's' : ''}` : 'None'}
-                </div>
-              </div>
-              <svg className={`w-5 h-5 text-neutral-300 transition-transform ${showLinks ? 'rotate-90' : ''}`} viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-              </svg>
-            </button>
-
-            {/* Expanded links */}
-            {showLinks && (
-              <div className="p-4 space-y-3">
-                {item.links && item.links.length > 0 && (
-                  <ul className="space-y-2">
-                    {item.links.map((link) => {
-                      const url = link.url.startsWith('http') ? link.url : `https://${link.url}`
-                      const displayText = link.title || link.url.replace(/^https?:\/\//, '').split('/')[0]
-                      return (
-                        <li key={link.url} className="flex items-center gap-2 text-sm bg-neutral-50 rounded-xl px-4 py-3">
-                          <a
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex-1 truncate text-primary-600"
-                          >
-                            {displayText}
-                          </a>
-                          <button
-                            onClick={() => handleRemoveLink(link)}
-                            className="text-neutral-400 active:text-red-500 p-1"
-                          >
-                            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                            </svg>
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
-                <form onSubmit={handleAddLink} className="space-y-2">
-                  <input
-                    type="text"
-                    value={newLink}
-                    onChange={(e) => setNewLink(e.target.value)}
-                    placeholder="URL"
-                    className="w-full px-4 py-3 text-base rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newLinkTitle}
-                      onChange={(e) => setNewLinkTitle(e.target.value)}
-                      placeholder="Title (optional)"
-                      className="flex-1 px-4 py-3 text-base rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    />
-                    <button
-                      type="submit"
-                      disabled={!newLink.trim()}
-                      className="px-5 py-3 font-semibold bg-neutral-100 text-neutral-700 rounded-xl disabled:opacity-50"
-                    >
-                      Add
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {/* Location */}
-            <button
-              onClick={() => setShowLocationPicker(!showLocationPicker)}
-              className="w-full px-4 py-3.5 flex items-center gap-3 active:bg-neutral-50"
-            >
-              <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
-                <svg className="w-5 h-5 text-red-600" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="flex-1 text-left">
-                <div className="text-xs font-medium text-neutral-400 uppercase tracking-wide">Location</div>
-                <div className={`text-base ${item.location ? 'text-neutral-800 font-medium' : 'text-neutral-400'}`}>
-                  {item.location || 'None'}
-                </div>
-              </div>
-              <svg className={`w-5 h-5 text-neutral-300 transition-transform ${showLocationPicker ? 'rotate-90' : ''}`} viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-              </svg>
-            </button>
-
-            {/* Expanded location picker */}
-            {showLocationPicker && (
-              <div className="p-4">
-                <PlacesAutocomplete
-                  value={item.location ? {
-                    address: item.location,
-                    placeId: item.originalTask?.locationPlaceId,
-                  } : null}
-                  onSelect={(place: PlaceSelection) => {
-                    if (item.originalTask && onUpdate) {
-                      onUpdate(item.originalTask.id, {
-                        location: place.address,
-                        locationPlaceId: place.placeId,
-                      })
-                      setShowLocationPicker(false)
-                    }
-                  }}
-                  onClear={() => {
-                    if (item.originalTask && onUpdate) {
-                      onUpdate(item.originalTask.id, {
-                        location: undefined,
-                        locationPlaceId: undefined,
-                      })
-                    }
-                  }}
-                  onSearch={directions.searchPlaces}
-                  onGetDetails={directions.getPlaceDetails}
-                  placeholder="Search for a place..."
+                  }
+                  label="Project"
+                  value={project?.name}
+                  onClick={() => project ? (onOpenProject && onOpenProject(project.id)) : setShowProjectPicker(true)}
                 />
+
+                {/* Contact Row */}
+                <DetailRow
+                  icon={
+                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                    </svg>
+                  }
+                  label="Contact"
+                  value={contact?.name}
+                  onClick={() => contact ? (onOpenContact && onOpenContact(contact.id)) : setShowContactPicker(true)}
+                  actions={contact && phoneNumber && (
+                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                      <a
+                        href={`tel:${phoneNumber}`}
+                        className="p-1.5 hover:bg-neutral-100 rounded transition-colors"
+                      >
+                        <svg className="w-4 h-4 text-primary-600" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                        </svg>
+                      </a>
+                      <a
+                        href={`sms:${phoneNumber}`}
+                        className="p-1.5 hover:bg-neutral-100 rounded transition-colors"
+                      >
+                        <svg className="w-4 h-4 text-primary-600" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+                        </svg>
+                      </a>
+                    </div>
+                  )}
+                />
+
+                {/* Location Row */}
+                <DetailRow
+                  icon={
+                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                    </svg>
+                  }
+                  label="Location"
+                  value={item.location}
+                  onClick={() => setShowLocationPicker(!showLocationPicker)}
+                />
+
+                {/* Location picker (expanded) */}
+                {showLocationPicker && (
+                  <div className="mt-2 ml-7">
+                    <PlacesAutocomplete
+                      value={item.location ? {
+                        address: item.location,
+                        placeId: item.originalTask?.locationPlaceId,
+                      } : null}
+                      onSelect={(place: PlaceSelection) => {
+                        if (item.originalTask && onUpdate) {
+                          onUpdate(item.originalTask.id, {
+                            location: place.address,
+                            locationPlaceId: place.placeId,
+                          })
+                          setShowLocationPicker(false)
+                        }
+                      }}
+                      onClear={() => {
+                        if (item.originalTask && onUpdate) {
+                          onUpdate(item.originalTask.id, {
+                            location: undefined,
+                            locationPlaceId: undefined,
+                          })
+                        }
+                      }}
+                      onSearch={directions.searchPlaces}
+                      onGetDetails={directions.getPlaceDetails}
+                      placeholder="Search for a place..."
+                    />
+                  </div>
+                )}
+
+                {/* Links Row */}
+                <DetailRow
+                  icon={
+                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd" />
+                    </svg>
+                  }
+                  label="Links"
+                  value={item.links && item.links.length > 0 ? `${item.links.length} link${item.links.length > 1 ? 's' : ''}` : null}
+                  onClick={() => setShowLinks(!showLinks)}
+                />
+
+                {/* Links expanded */}
+                {showLinks && (
+                  <div className="mt-2 ml-7 space-y-2">
+                    {item.links && item.links.length > 0 && (
+                      <ul className="space-y-1">
+                        {item.links.map((link) => {
+                          const url = link.url.startsWith('http') ? link.url : `https://${link.url}`
+                          const displayText = link.title || link.url.replace(/^https?:\/\//, '').split('/')[0]
+                          return (
+                            <li key={link.url} className="flex items-center gap-2 text-sm p-2 rounded-lg bg-neutral-50 hover:bg-neutral-100 transition-colors">
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex-1 truncate text-primary-600 hover:underline"
+                              >
+                                {displayText}
+                              </a>
+                              <button
+                                onClick={() => handleRemoveLink(link)}
+                                className="text-neutral-400 hover:text-red-500 transition-colors p-1"
+                              >
+                                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                </svg>
+                              </button>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    )}
+                    <form onSubmit={handleAddLink} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newLink}
+                        onChange={(e) => setNewLink(e.target.value)}
+                        placeholder="Add link URL..."
+                        className="flex-1 px-3 py-2 text-sm rounded-lg border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      />
+                      <button
+                        type="submit"
+                        disabled={!newLink.trim()}
+                        className="px-3 py-2 text-sm text-primary-600 hover:bg-primary-50 rounded-lg disabled:opacity-50 transition-colors"
+                      >
+                        +
+                      </button>
+                    </form>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1340,227 +1468,166 @@ export function DetailPanelRedesign({
           />
         )}
 
-        {/* Prep Tasks Section (for all activity types with linked task support) */}
+        {/* ========================================
+            ZONE 4: LINKED TASKS (Prep & Follow-up)
+            - Only prominent when populated
+            - Collapsed headers when empty
+            ======================================== */}
         {onAddLinkedTask && (
-          <div className="mx-4 mt-4 bg-white rounded-2xl shadow-sm border border-neutral-100">
-            <div className="p-4">
-              <h3 className="text-xs font-medium text-neutral-400 uppercase tracking-wide mb-3">
-                Prep Tasks
-              </h3>
+          <div className="p-6 border-b border-neutral-100 space-y-4">
+            {/* Prep Tasks */}
+            <div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-neutral-500 uppercase tracking-wide">
+                  Prep Tasks {linkedTasks && linkedTasks.prep.length > 0 && (
+                    <span className="ml-1 text-primary-600">({linkedTasks.prep.length})</span>
+                  )}
+                </h3>
+                <button
+                  onClick={() => {/* Focus the input below */}}
+                  className="text-sm text-primary-600 hover:text-primary-700 transition-colors"
+                >
+                  + Add
+                </button>
+              </div>
 
-              {linkedTasks && linkedTasks.prep.length > 0 ? (
-                <div className="space-y-1 mb-3">
+              {linkedTasks && linkedTasks.prep.length > 0 && (
+                <div className="mt-3 space-y-2">
                   {linkedTasks.prep.map((task) => (
-                    <div
+                    <LinkedTaskRow
                       key={task.id}
-                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-neutral-50 group"
-                    >
-                      <button
-                        onClick={() => onToggleLinkedTask?.(task.id)}
-                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${
-                          task.completed
-                            ? 'bg-primary-500 border-primary-500'
-                            : 'border-neutral-300 hover:border-primary-400'
-                        }`}
-                      >
-                        {task.completed && (
-                          <svg className="w-3 h-3 text-white" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                        )}
-                      </button>
-
-                      <span className={`flex-1 text-sm ${task.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>
-                        {task.title}
-                      </span>
-
-                      {/* Schedule indicator */}
-                      {task.scheduledFor && (
-                        <span className="text-xs text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full">
-                          {task.scheduledFor.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                        </span>
-                      )}
-
-                      {/* Delete button */}
-                      <button
-                        onClick={() => onDeleteLinkedTask?.(task.id)}
-                        className="text-neutral-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1"
-                      >
-                        <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                      </button>
-                    </div>
+                      task={task}
+                      onToggle={onToggleLinkedTask}
+                      onDelete={onDeleteLinkedTask}
+                    />
                   ))}
                 </div>
-              ) : (
-                <p className="text-sm text-neutral-400 italic mb-3">No prep tasks</p>
               )}
 
               {/* Add prep task input */}
-              <AddLinkedTaskInput
-                placeholder="Add prep task..."
-                onAdd={(title) => handleAddLinkedTask(title, 'prep')}
-                showTemplateOption={isRoutine && !!routine && !!onUpdateRoutine}
-                onAddAsTemplate={(title) => handleAddAsTemplate(title, 'prep')}
-              />
+              <div className="mt-3">
+                <AddLinkedTaskInput
+                  placeholder="Add prep task..."
+                  onAdd={(title) => handleAddLinkedTask(title, 'prep')}
+                  showTemplateOption={isRoutine && !!routine && !!onUpdateRoutine}
+                  onAddAsTemplate={(title) => handleAddAsTemplate(title, 'prep')}
+                />
+              </div>
             </div>
-          </div>
-        )}
 
-        {/* Follow-up Tasks Section */}
-        {onAddLinkedTask && (
-          <div className="mx-4 mt-4 bg-white rounded-2xl shadow-sm border border-neutral-100">
-            <div className="p-4">
-              <h3 className="text-xs font-medium text-neutral-400 uppercase tracking-wide mb-3">
-                Follow-up Tasks
-              </h3>
+            {/* Follow-up Tasks */}
+            <div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-neutral-500 uppercase tracking-wide">
+                  Follow-up Tasks {linkedTasks && linkedTasks.followup.length > 0 && (
+                    <span className="ml-1 text-primary-600">({linkedTasks.followup.length})</span>
+                  )}
+                </h3>
+                <button
+                  onClick={() => {/* Focus the input below */}}
+                  className="text-sm text-primary-600 hover:text-primary-700 transition-colors"
+                >
+                  + Add
+                </button>
+              </div>
 
-              {linkedTasks && linkedTasks.followup.length > 0 ? (
-                <div className="space-y-1 mb-3">
+              {linkedTasks && linkedTasks.followup.length > 0 && (
+                <div className="mt-3 space-y-2">
                   {linkedTasks.followup.map((task) => (
-                    <div
+                    <LinkedTaskRow
                       key={task.id}
-                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-neutral-50 group"
-                    >
-                      <button
-                        onClick={() => onToggleLinkedTask?.(task.id)}
-                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${
-                          task.completed
-                            ? 'bg-primary-500 border-primary-500'
-                            : 'border-neutral-300 hover:border-primary-400'
-                        }`}
-                      >
-                        {task.completed && (
-                          <svg className="w-3 h-3 text-white" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                        )}
-                      </button>
-
-                      <span className={`flex-1 text-sm ${task.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>
-                        {task.title}
-                      </span>
-
-                      {/* Schedule indicator */}
-                      {task.scheduledFor && (
-                        <span className="text-xs text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full">
-                          {task.scheduledFor.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                        </span>
-                      )}
-
-                      {/* Delete button */}
-                      <button
-                        onClick={() => onDeleteLinkedTask?.(task.id)}
-                        className="text-neutral-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1"
-                      >
-                        <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                      </button>
-                    </div>
+                      task={task}
+                      onToggle={onToggleLinkedTask}
+                      onDelete={onDeleteLinkedTask}
+                    />
                   ))}
                 </div>
-              ) : (
-                <p className="text-sm text-neutral-400 italic mb-3">No follow-up tasks</p>
               )}
 
               {/* Add follow-up task input */}
-              <AddLinkedTaskInput
-                placeholder="Add follow-up task..."
-                onAdd={(title) => handleAddLinkedTask(title, 'followup')}
-                showTemplateOption={isRoutine && !!routine && !!onUpdateRoutine}
-                onAddAsTemplate={(title) => handleAddAsTemplate(title, 'followup')}
-              />
+              <div className="mt-3">
+                <AddLinkedTaskInput
+                  placeholder="Add follow-up task..."
+                  onAdd={(title) => handleAddLinkedTask(title, 'followup')}
+                  showTemplateOption={isRoutine && !!routine && !!onUpdateRoutine}
+                  onAddAsTemplate={(title) => handleAddAsTemplate(title, 'followup')}
+                />
+              </div>
             </div>
           </div>
         )}
 
-        {/* Notes Section */}
-        <div className="mx-4 mt-4 mb-4 bg-white rounded-2xl shadow-sm border border-neutral-100">
-          <div className="p-4">
-            <h3 className="text-xs font-medium text-neutral-400 uppercase tracking-wide mb-3">Notes</h3>
+        {/* ========================================
+            ZONE 5: ATTACHMENTS
+            - Drop zone when empty
+            - Compact file rows when populated
+            ======================================== */}
+        {attachmentEntityInfo && (onUploadAttachment || attachments.length > 0) && (
+          <div className="p-6 border-b border-neutral-100">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-neutral-500 uppercase tracking-wide">
+                Attachments {attachments.length > 0 && `(${attachments.length})`}
+              </h3>
+              {attachments.length > 0 && onUploadAttachment && (
+                <button className="text-sm text-primary-600 hover:text-primary-700 transition-colors">
+                  + Add file
+                </button>
+              )}
+            </div>
 
-            {/* Google Calendar description (read-only, events only) */}
-            {isEvent && item.googleDescription && (
-              <div className="mb-3">
-                <div className="text-xs text-blue-600 font-medium mb-1 flex items-center gap-1">
-                  <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                  </svg>
-                  From Calendar
-                </div>
-                <div className="text-sm text-neutral-600 whitespace-pre-wrap bg-blue-50 rounded-xl p-3 border border-blue-100">
-                  <RichText text={item.googleDescription} />
-                </div>
+            {attachments.length > 0 ? (
+              <div className="space-y-2">
+                <AttachmentList
+                  attachments={attachments}
+                  onDelete={handleAttachmentDelete}
+                  onOpen={handleAttachmentOpen}
+                />
               </div>
-            )}
+            ) : onUploadAttachment ? (
+              <FileUpload
+                onFileSelect={handleFileUpload}
+                isUploading={isUploadingAttachment}
+                error={attachmentError}
+                compact={false}
+              />
+            ) : null}
 
-            {/* Always show textarea - no toggle between display/edit mode */}
-            <textarea
-              ref={notesInputRef}
-              value={localNotes}
-              onChange={handleNotesChange}
-              placeholder="Add notes..."
-              rows={4}
-              className="w-full px-4 py-3 text-base rounded-xl border border-neutral-200
-                         focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
-            />
-
-            {/* Attachments section */}
-            {attachmentEntityInfo && (onUploadAttachment || attachments.length > 0) && (
-              <div className="mt-4 pt-4 border-t border-neutral-100">
-                <h4 className="text-xs font-medium text-neutral-400 uppercase tracking-wide mb-3">
-                  Attachments
-                </h4>
-
-                {/* Attachment list */}
-                {attachments.length > 0 && (
-                  <div className="mb-3">
-                    <AttachmentList
-                      attachments={attachments}
-                      onDelete={handleAttachmentDelete}
-                      onOpen={handleAttachmentOpen}
-                    />
-                  </div>
-                )}
-
-                {/* File upload */}
-                {onUploadAttachment && (
-                  <FileUpload
-                    onFileSelect={handleFileUpload}
-                    isUploading={isUploadingAttachment}
-                    error={attachmentError}
-                    compact={attachments.length > 0}
-                  />
-                )}
+            {/* Show compact uploader when already has attachments */}
+            {attachments.length > 0 && onUploadAttachment && (
+              <div className="mt-3">
+                <FileUpload
+                  onFileSelect={handleFileUpload}
+                  isUploading={isUploadingAttachment}
+                  error={attachmentError}
+                  compact={true}
+                />
               </div>
             )}
           </div>
-        </div>
-
-        {/* Empty state for events with no content */}
-        {!isTask && !item.notes && !item.googleDescription && !item.location && detectedActions.length === 0 && (
-          <p className="text-base text-neutral-400 text-center py-8">
-            No additional details
-          </p>
         )}
+
       </div>
 
-      {/* Footer - Delete button (tasks only) */}
+      {/* ========================================
+          ZONE 6: DANGER ZONE (Delete)
+          - Always at bottom
+          - Red color, not alarming until hovered
+          ======================================== */}
       {isTask && (
-        <div className="p-4 border-t border-neutral-100 bg-white safe-area-bottom">
+        <div className="p-6 safe-area-bottom">
           {showDeleteConfirm ? (
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 py-3.5 text-base font-semibold text-neutral-600 bg-neutral-100 rounded-xl"
+                className="flex-1 p-3 text-sm font-medium text-neutral-600 bg-neutral-100
+                           hover:bg-neutral-200 rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDelete}
-                className="flex-1 py-3.5 text-base font-semibold text-white bg-red-500 rounded-xl"
+                className="flex-1 p-3 text-sm font-medium text-white bg-red-500
+                           hover:bg-red-600 rounded-lg transition-colors"
               >
                 Delete
               </button>
@@ -1568,7 +1635,8 @@ export function DetailPanelRedesign({
           ) : (
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="w-full py-3.5 text-base font-medium text-neutral-500 active:text-red-600 active:bg-red-50 rounded-xl transition-colors"
+              className="w-full p-3 text-sm text-red-600 hover:bg-red-50
+                         rounded-lg transition-colors text-center"
             >
               Delete task
             </button>
