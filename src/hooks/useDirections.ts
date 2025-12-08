@@ -69,9 +69,7 @@ export function useDirections(): UseDirectionsResult {
   // }, [sdkReady])
   // =============================================================================
 
-  // Calculate route using Google Directions API
-  // Note: Direct browser calls to Google Directions API are blocked by CORS.
-  // For now, we use mock data. The "Open in Maps" button works regardless.
+  // Calculate route using Google Directions Service (client-side API)
   const calculateRoute = useCallback(async (context: DirectionsContext): Promise<DirectionsResult | null> => {
     setIsCalculating(true)
     setError(null)
@@ -89,42 +87,66 @@ export function useDirections(): UseDirectionsResult {
         return null
       }
 
-      // Generate estimated duration based on typical commute patterns
-      // This is a rough estimate - actual time will be shown in Maps
-      // Build ordered list of all waypoints
-      const sortedStops = [...context.stops].sort((a, b) => a.order - b.order)
-      const allWaypoints = [
-        context.origin,
-        ...sortedStops,
-        context.destination,
-      ]
-
-      // Generate legs between each consecutive waypoint
-      const legs: DirectionsResult['legs'] = []
-      for (let i = 0; i < allWaypoints.length - 1; i++) {
-        // Random duration 10-20 mins per leg
-        const legDuration = 600 + Math.floor(Math.random() * 600)
-        const legDistance = legDuration * 13.4 // ~30mph average
-        legs.push({
-          startAddress: allWaypoints[i].address,
-          endAddress: allWaypoints[i + 1].address,
-          duration: legDuration,
-          distance: legDistance,
-        })
+      // Check if SDK is ready
+      if (!sdkReady || !window.google?.maps?.DirectionsService) {
+        setError('Maps service not ready')
+        setResult(null)
+        return null
       }
 
-      // Calculate totals from legs
+      // Map travel mode to Google API format
+      const travelModeMap: Record<TravelMode, google.maps.TravelMode> = {
+        driving: google.maps.TravelMode.DRIVING,
+        walking: google.maps.TravelMode.WALKING,
+        transit: google.maps.TravelMode.TRANSIT,
+      }
+
+      // Build waypoints for intermediate stops
+      const sortedStops = [...context.stops].sort((a, b) => a.order - b.order)
+      const waypoints: google.maps.DirectionsWaypoint[] = sortedStops.map(stop => ({
+        location: stop.address,
+        stopover: true,
+      }))
+
+      // Create directions service and make request
+      const directionsService = new google.maps.DirectionsService()
+
+      const response = await directionsService.route({
+        origin: context.origin.address,
+        destination: context.destination.address,
+        waypoints: waypoints.length > 0 ? waypoints : undefined,
+        travelMode: travelModeMap[context.travelMode],
+        optimizeWaypoints: false, // Keep order as specified
+      })
+
+      if (response.status !== 'OK' || !response.routes[0]) {
+        setError('Could not calculate route')
+        setResult(null)
+        return null
+      }
+
+      const route = response.routes[0]
+
+      // Extract leg information
+      const legs: DirectionsResult['legs'] = route.legs.map(leg => ({
+        startAddress: leg.start_address || '',
+        endAddress: leg.end_address || '',
+        duration: leg.duration?.value || 0, // seconds
+        distance: leg.distance?.value || 0, // meters
+      }))
+
+      // Calculate totals
       const totalDuration = legs.reduce((sum, leg) => sum + leg.duration, 0)
       const totalDistance = legs.reduce((sum, leg) => sum + leg.distance, 0)
 
-      const mockResult: DirectionsResult = {
+      const directionsResult: DirectionsResult = {
         duration: totalDuration,
         distance: totalDistance,
         legs,
       }
 
-      setResult(mockResult)
-      return mockResult
+      setResult(directionsResult)
+      return directionsResult
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unable to calculate route'
       setError(message)
@@ -132,7 +154,7 @@ export function useDirections(): UseDirectionsResult {
     } finally {
       setIsCalculating(false)
     }
-  }, [])
+  }, [sdkReady])
 
   // =============================================================================
   // NEW PLACES API - searchPlaces using AutocompleteSuggestion
