@@ -594,6 +594,19 @@ function App() {
           setRecentlyCreatedTaskId(taskId)
         }
       }}
+      onQuickAddRich={async (data) => {
+        const taskId = await addTask(
+          data.title,
+          data.contactId,
+          data.projectId,
+          data.scheduledFor
+        )
+        if (taskId) {
+          setRecentlyCreatedTaskId(taskId)
+        }
+      }}
+      quickAddProjects={projects.map(p => ({ id: p.id, name: p.name }))}
+      quickAddContacts={contacts.map(c => ({ id: c.id, name: c.name }))}
       quickAddOpen={quickAddOpen}
       onOpenQuickAdd={openQuickAdd}
       onCloseQuickAdd={closeQuickAdd}

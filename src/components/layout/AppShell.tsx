@@ -28,6 +28,16 @@ interface AppShellProps {
   userEmail?: string
   onSignOut?: () => void
   onQuickAdd?: (title: string) => void
+  // Rich add with parsed fields (for natural language parser)
+  onQuickAddRich?: (data: {
+    title: string
+    projectId?: string
+    contactId?: string
+    scheduledFor?: Date
+  }) => void
+  // Context for QuickCapture parser
+  quickAddProjects?: Array<{ id: string; name: string }>
+  quickAddContacts?: Array<{ id: string; name: string }>
   quickAddOpen?: boolean
   onOpenQuickAdd?: () => void
   onCloseQuickAdd?: () => void
@@ -52,6 +62,9 @@ export function AppShell({
   userEmail,
   onSignOut,
   onQuickAdd,
+  onQuickAddRich,
+  quickAddProjects,
+  quickAddContacts,
   quickAddOpen = false,
   onOpenQuickAdd,
   onCloseQuickAdd,
@@ -144,6 +157,9 @@ export function AppShell({
       {onQuickAdd && (
         <QuickCapture
           onAdd={onQuickAdd}
+          onAddRich={onQuickAddRich}
+          projects={quickAddProjects}
+          contacts={quickAddContacts}
           isOpen={quickAddOpen}
           onOpen={onOpenQuickAdd}
           onClose={onCloseQuickAdd}

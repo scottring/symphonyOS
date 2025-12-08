@@ -45,18 +45,19 @@ export function InboxTriageModal({
   const [newProjectName, setNewProjectName] = useState('')
 
   // Reset form when modal opens/closes or task changes
+  // Preserve existing task values as defaults
   useEffect(() => {
     if (isOpen) {
       setItemType('task')
       setWhenOption(null)
       setCustomDate('')
-      setSelectedMemberId(currentUserId ?? null)
-      setDomain(null)
-      setProjectId(null)
+      setSelectedMemberId(task.assignedTo ?? currentUserId ?? null)
+      setDomain(task.context ?? null)
+      setProjectId(task.projectId ?? null)
       setIsCreatingProject(false)
       setNewProjectName('')
     }
-  }, [isOpen, task.id, currentUserId])
+  }, [isOpen, task.id, task.assignedTo, task.context, task.projectId, currentUserId])
 
   // Close on outside click
   useEffect(() => {
@@ -189,9 +190,10 @@ export function InboxTriageModal({
         <div className="p-5 space-y-5">
           {/* Item Type Selection */}
           <div>
-            <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">
-              Type
+            <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wide mb-1">
+              What Is This?
             </label>
+            <p className="text-xs text-neutral-400 mb-2">Is this a single task or a larger project?</p>
             <div className="flex gap-2">
               <button
                 onClick={() => setItemType('task')}
@@ -219,9 +221,10 @@ export function InboxTriageModal({
           {/* When (Task only) */}
           {itemType === 'task' && (
             <div>
-              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">
-                When
+              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wide mb-1">
+                Schedule For
               </label>
+              <p className="text-xs text-neutral-400 mb-2">When should this appear on your schedule?</p>
               <div className="grid grid-cols-3 gap-2">
                 <button
                   onClick={() => setWhenOption('today')}
@@ -289,9 +292,10 @@ export function InboxTriageModal({
           {/* Who (Task only) */}
           {itemType === 'task' && familyMembers.length > 0 && (
             <div>
-              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">
-                Who
+              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wide mb-1">
+                Assign To
               </label>
+              <p className="text-xs text-neutral-400 mb-2">Who is responsible for this task?</p>
               <div className="flex flex-wrap gap-2">
                 {familyMembers.map((member) => {
                   const colorKey = member.color as FamilyMemberColor
@@ -321,9 +325,10 @@ export function InboxTriageModal({
 
           {/* Domain */}
           <div>
-            <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">
-              Domain
+            <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wide mb-1">
+              Context
             </label>
+            <p className="text-xs text-neutral-400 mb-2">What area of life does this belong to?</p>
             <div className="flex gap-2">
               <button
                 onClick={() => setDomain(domain === 'work' ? null : 'work')}
@@ -361,9 +366,10 @@ export function InboxTriageModal({
           {/* Project (Task only) */}
           {itemType === 'task' && (
             <div>
-              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">
+              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wide mb-1">
                 Project
               </label>
+              <p className="text-xs text-neutral-400 mb-2">Link to an existing project (optional)</p>
               {!isCreatingProject ? (
                 <div className="space-y-2">
                   <select
