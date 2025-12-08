@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import type { Project, ProjectStatus } from '@/types/project'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
+import type { PinnableEntityType } from '@/types/pin'
+import { PinButton } from '@/components/pins'
 
 interface ProjectViewProps {
   project: Project
@@ -14,6 +16,11 @@ interface ProjectViewProps {
   onSelectTask: (taskId: string) => void
   onToggleTask: (taskId: string) => void
   selectedTaskId?: string | null
+  // Pin props
+  isPinned?: boolean
+  canPin?: boolean
+  onPin?: (entityType: PinnableEntityType, entityId: string) => Promise<boolean>
+  onUnpin?: (entityType: PinnableEntityType, entityId: string) => Promise<boolean>
 }
 
 export function ProjectView({
@@ -27,6 +34,10 @@ export function ProjectView({
   onSelectTask,
   onToggleTask,
   selectedTaskId,
+  isPinned,
+  canPin,
+  onPin,
+  onUnpin,
 }: ProjectViewProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState('')
@@ -257,6 +268,17 @@ export function ProjectView({
                 </div>
               </div>
               <div className="flex items-center gap-1">
+                {onPin && onUnpin && (
+                  <PinButton
+                    entityType="project"
+                    entityId={project.id}
+                    isPinned={isPinned ?? false}
+                    canPin={canPin ?? true}
+                    onPin={onPin}
+                    onUnpin={onUnpin}
+                    size="md"
+                  />
+                )}
                 <button
                   onClick={handleEdit}
                   className="p-2 text-neutral-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"

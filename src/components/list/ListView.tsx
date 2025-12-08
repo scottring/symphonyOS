@@ -2,6 +2,8 @@ import { useState } from 'react'
 import type { List, ListItem, ListCategory, ListVisibility } from '@/types/list'
 import { getCategoryLabel, getCategoryIcon, LIST_CATEGORIES } from '@/types/list'
 import { ListItemRow } from './ListItemRow'
+import type { PinnableEntityType } from '@/types/pin'
+import { PinButton } from '@/components/pins'
 
 interface ListViewProps {
   list: List
@@ -13,6 +15,10 @@ interface ListViewProps {
   onUpdateItem?: (itemId: string, updates: Partial<ListItem>) => void
   onDeleteItem?: (itemId: string) => void
   onReorderItems?: (itemIds: string[]) => void
+  isPinned?: boolean
+  canPin?: boolean
+  onPin?: (entityType: PinnableEntityType, entityId: string) => Promise<boolean>
+  onUnpin?: (entityType: PinnableEntityType, entityId: string) => Promise<boolean>
 }
 
 export function ListView({
@@ -25,6 +31,10 @@ export function ListView({
   onUpdateItem,
   onDeleteItem,
   onReorderItems: _onReorderItems,
+  isPinned,
+  canPin,
+  onPin,
+  onUnpin,
 }: ListViewProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editTitle, setEditTitle] = useState('')
@@ -219,6 +229,17 @@ export function ListView({
                 </div>
               </div>
               <div className="flex items-center gap-1">
+                {onPin && onUnpin && (
+                  <PinButton
+                    entityType="list"
+                    entityId={list.id}
+                    isPinned={isPinned ?? false}
+                    canPin={canPin ?? true}
+                    onPin={onPin}
+                    onUnpin={onUnpin}
+                    size="md"
+                  />
+                )}
                 <button
                   onClick={handleEdit}
                   className="p-2 text-neutral-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"

@@ -3,9 +3,11 @@ import type { Routine, RecurrencePattern } from '@/types/actionable'
 import type { UpdateRoutineInput } from '@/hooks/useRoutines'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
+import type { PinnableEntityType } from '@/types/pin'
 import { FAMILY_COLORS, type FamilyMemberColor } from '@/types/family'
 import { parseRoutine, parsedRoutineToDb, isValidParsedRoutine } from '@/lib/parseRoutine'
 import { SemanticRoutine } from './SemanticRoutine'
+import { PinButton } from '@/components/pins'
 
 interface RoutineFormProps {
   routine: Routine
@@ -15,6 +17,11 @@ interface RoutineFormProps {
   onUpdate: (id: string, input: UpdateRoutineInput) => Promise<boolean>
   onDelete: (id: string) => Promise<boolean>
   onToggleVisibility: (id: string) => Promise<boolean>
+  // Pin props
+  isPinned?: boolean
+  canPin?: boolean
+  onPin?: (entityType: PinnableEntityType, entityId: string) => Promise<boolean>
+  onUnpin?: (entityType: PinnableEntityType, entityId: string) => Promise<boolean>
 }
 
 const DAYS = [
@@ -27,7 +34,7 @@ const DAYS = [
   { key: 'sat', label: 'Sat' },
 ]
 
-export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack, onUpdate, onDelete, onToggleVisibility }: RoutineFormProps) {
+export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack, onUpdate, onDelete, onToggleVisibility, isPinned, canPin, onPin, onUnpin }: RoutineFormProps) {
   // Determine if this is a NL routine
   const isNLRoutine = !!routine.raw_input
 
@@ -128,6 +135,18 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
             </svg>
           </button>
           <h1 className="text-xl font-semibold text-neutral-800 flex-1">Edit Routine</h1>
+          {/* Pin button */}
+          {onPin && onUnpin && (
+            <PinButton
+              entityType="routine"
+              entityId={routine.id}
+              isPinned={isPinned ?? false}
+              canPin={canPin ?? true}
+              onPin={onPin}
+              onUnpin={onUnpin}
+              size="md"
+            />
+          )}
           {/* Visibility toggle */}
           <button
             onClick={handleToggleVisibility}

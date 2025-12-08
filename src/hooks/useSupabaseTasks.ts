@@ -22,6 +22,8 @@ interface DbTask {
   parent_task_id: string | null
   linked_event_id: string | null
   estimated_duration: number | null
+  location: string | null
+  location_place_id: string | null
   created_at: string
   updated_at: string
 }
@@ -57,6 +59,8 @@ function dbTaskToTask(dbTask: DbTask): Task {
     parentTaskId: dbTask.parent_task_id ?? undefined,
     linkedEventId: dbTask.linked_event_id ?? undefined,
     estimatedDuration: dbTask.estimated_duration ?? undefined,
+    location: dbTask.location ?? undefined,
+    locationPlaceId: dbTask.location_place_id ?? undefined,
   }
 }
 
@@ -421,6 +425,8 @@ export function useSupabaseTasks() {
     if ('parentTaskId' in updates) dbUpdates.parent_task_id = updates.parentTaskId ?? null
     if ('linkedEventId' in updates) dbUpdates.linked_event_id = updates.linkedEventId ?? null
     if ('estimatedDuration' in updates) dbUpdates.estimated_duration = updates.estimatedDuration ?? null
+    if ('location' in updates) dbUpdates.location = updates.location ?? null
+    if ('locationPlaceId' in updates) dbUpdates.location_place_id = updates.locationPlaceId ?? null
 
     const { error: updateError } = await supabase
       .from('tasks')

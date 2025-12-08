@@ -4,12 +4,18 @@ import type { Task, TaskLink } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
 import type { ActionableInstance } from '@/types/actionable'
+import type { Attachment, AttachmentEntityType } from '@/types/attachment'
 import { formatTime, formatTimeRange } from '@/lib/timeUtils'
 import { detectActions, type DetectedAction } from '@/lib/actionDetection'
 import { ActionableActions } from './ActionableActions'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { RecipeSection } from '@/components/recipe/RecipeSection'
 import { DirectionsBuilder } from '@/components/directions'
+import { FileUpload, AttachmentList } from '@/components/attachments'
+import { PlacesAutocomplete, type PlaceSelection } from '@/components/location'
+import { useDirections } from '@/hooks/useDirections'
+import { PinButton } from '@/components/pins'
+import type { PinnableEntityType } from '@/types/pin'
 
 // Component to render text with clickable links (handles HTML links and plain URLs)
 function RichText({ text }: { text: string }) {
@@ -92,6 +98,19 @@ interface DetailPanelRedesignProps {
   prepTasks?: Task[]
   onAddPrepTask?: (title: string, linkedEventId: string, scheduledFor: Date) => Promise<string | undefined>
   onTogglePrepTask?: (taskId: string) => void
+  // Attachments support
+  attachments?: Attachment[]
+  onUploadAttachment?: (entityType: AttachmentEntityType, entityId: string, file: File) => Promise<Attachment | null>
+  onDeleteAttachment?: (attachment: Attachment) => Promise<boolean>
+  onOpenAttachment?: (attachment: Attachment) => void
+  isUploadingAttachment?: boolean
+  attachmentError?: string | null
+  // Pin support
+  isPinned?: boolean
+  canPin?: boolean
+  onPin?: (entityType: PinnableEntityType, entityId: string) => Promise<boolean>
+  onUnpin?: (entityType: PinnableEntityType, entityId: string) => Promise<boolean>
+  onMaxPinsReached?: () => void
 }
 
 function ActionIcon({ type }: { type: DetectedAction['icon'] }) {
@@ -196,6 +215,17 @@ export function DetailPanelRedesign({
   prepTasks,
   onAddPrepTask,
   onTogglePrepTask,
+  attachments = [],
+  onUploadAttachment,
+  onDeleteAttachment,
+  onOpenAttachment,
+  isUploadingAttachment = false,
+  attachmentError,
+  isPinned = false,
+  canPin = true,
+  onPin,
+  onUnpin,
+  onMaxPinsReached,
 }: DetailPanelRedesignProps) {
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -237,6 +267,10 @@ export function DetailPanelRedesign({
   const [actionableInstance, setActionableInstance] = useState<ActionableInstance | null>(null)
   const actionable = useActionableInstances()
 
+  // Location picker (for tasks with Places autocomplete)
+  const [showLocationPicker, setShowLocationPicker] = useState(false)
+  const directions = useDirections()
+
   // Sync local state when item changes
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -244,6 +278,7 @@ export function DetailPanelRedesign({
     setShowDeleteConfirm(false)
     setShowTimePicker(false)
     setShowLinks(false)
+    setShowLocationPicker(false)
   }, [item?.id, item?.notes])
 
   useEffect(() => {
@@ -476,6 +511,35 @@ export function DetailPanelRedesign({
   const isEvent = item.type === 'event'
   const isRoutine = item.type === 'routine'
 
+  // Get attachment entity info based on item type
+  const getAttachmentEntityInfo = (): { entityType: AttachmentEntityType; entityId: string } | null => {
+    if (isTask && item.originalTask) {
+      return { entityType: 'task', entityId: item.originalTask.id }
+    }
+    if (isEvent && item.originalEvent) {
+      const eventId = item.originalEvent.google_event_id || item.originalEvent.id
+      return { entityType: 'event_note', entityId: eventId }
+    }
+    // Routines don't currently support attachments
+    return null
+  }
+
+  const attachmentEntityInfo = getAttachmentEntityInfo()
+
+  const handleFileUpload = async (file: File) => {
+    if (!attachmentEntityInfo || !onUploadAttachment) return
+    await onUploadAttachment(attachmentEntityInfo.entityType, attachmentEntityInfo.entityId, file)
+  }
+
+  const handleAttachmentDelete = async (attachment: Attachment) => {
+    if (!onDeleteAttachment) return
+    await onDeleteAttachment(attachment)
+  }
+
+  const handleAttachmentOpen = (attachment: Attachment) => {
+    onOpenAttachment?.(attachment)
+  }
+
   // Calculate subtask progress
   const subtasks = isTask && item.originalTask?.subtasks ? item.originalTask.subtasks : []
   const completedSubtasks = subtasks.filter(s => s.completed).length
@@ -667,16 +731,32 @@ export function DetailPanelRedesign({
               </button>
             </div>
 
-            {/* Close button */}
-            <button
-              onClick={onClose}
-              className="p-2 -mr-2 rounded-xl text-neutral-400 active:bg-neutral-100"
-              aria-label="Close"
-            >
-              <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                <path d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            {/* Action buttons */}
+            <div className="flex items-center gap-1">
+              {/* Pin button - only for tasks (other entities pinned from their own views) */}
+              {isTask && item.originalTask && onPin && onUnpin && (
+                <PinButton
+                  entityType="task"
+                  entityId={item.originalTask.id}
+                  isPinned={isPinned}
+                  canPin={canPin}
+                  onPin={() => onPin('task', item.originalTask!.id)}
+                  onUnpin={() => onUnpin('task', item.originalTask!.id)}
+                  onMaxPinsReached={onMaxPinsReached}
+                />
+              )}
+
+              {/* Close button */}
+              <button
+                onClick={onClose}
+                className="p-2 -mr-2 rounded-xl text-neutral-400 active:bg-neutral-100"
+                aria-label="Close"
+              >
+                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -993,6 +1073,59 @@ export function DetailPanelRedesign({
                 </form>
               </div>
             )}
+
+            {/* Location */}
+            <button
+              onClick={() => setShowLocationPicker(!showLocationPicker)}
+              className="w-full px-4 py-3.5 flex items-center gap-3 active:bg-neutral-50"
+            >
+              <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
+                <svg className="w-5 h-5 text-red-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="flex-1 text-left">
+                <div className="text-xs font-medium text-neutral-400 uppercase tracking-wide">Location</div>
+                <div className={`text-base ${item.location ? 'text-neutral-800 font-medium' : 'text-neutral-400'}`}>
+                  {item.location || 'None'}
+                </div>
+              </div>
+              <svg className={`w-5 h-5 text-neutral-300 transition-transform ${showLocationPicker ? 'rotate-90' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+              </svg>
+            </button>
+
+            {/* Expanded location picker */}
+            {showLocationPicker && (
+              <div className="p-4">
+                <PlacesAutocomplete
+                  value={item.location ? {
+                    address: item.location,
+                    placeId: item.originalTask?.locationPlaceId,
+                  } : null}
+                  onSelect={(place: PlaceSelection) => {
+                    if (item.originalTask && onUpdate) {
+                      onUpdate(item.originalTask.id, {
+                        location: place.address,
+                        locationPlaceId: place.placeId,
+                      })
+                      setShowLocationPicker(false)
+                    }
+                  }}
+                  onClear={() => {
+                    if (item.originalTask && onUpdate) {
+                      onUpdate(item.originalTask.id, {
+                        location: undefined,
+                        locationPlaceId: undefined,
+                      })
+                    }
+                  }}
+                  onSearch={directions.searchPlaces}
+                  onGetDetails={directions.getPlaceDetails}
+                  placeholder="Search for a place..."
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -1003,6 +1136,7 @@ export function DetailPanelRedesign({
               destination={{
                 name: item.title,
                 address: item.location,
+                placeId: item.originalTask?.locationPlaceId,
               }}
               eventTitle={item.title}
             />
@@ -1063,6 +1197,36 @@ export function DetailPanelRedesign({
               className="w-full px-4 py-3 text-base rounded-xl border border-neutral-200
                          focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
             />
+
+            {/* Attachments section */}
+            {attachmentEntityInfo && (onUploadAttachment || attachments.length > 0) && (
+              <div className="mt-4 pt-4 border-t border-neutral-100">
+                <h4 className="text-xs font-medium text-neutral-400 uppercase tracking-wide mb-3">
+                  Attachments
+                </h4>
+
+                {/* Attachment list */}
+                {attachments.length > 0 && (
+                  <div className="mb-3">
+                    <AttachmentList
+                      attachments={attachments}
+                      onDelete={handleAttachmentDelete}
+                      onOpen={handleAttachmentOpen}
+                    />
+                  </div>
+                )}
+
+                {/* File upload */}
+                {onUploadAttachment && (
+                  <FileUpload
+                    onFileSelect={handleFileUpload}
+                    isUploading={isUploadingAttachment}
+                    error={attachmentError}
+                    compact={attachments.length > 0}
+                  />
+                )}
+              </div>
+            )}
           </div>
         </div>
 

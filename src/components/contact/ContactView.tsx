@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import type { Contact } from '@/types/contact'
 import type { Task } from '@/types/task'
+import type { PinnableEntityType } from '@/types/pin'
+import { PinButton } from '@/components/pins'
 
 interface ContactViewProps {
   contact: Contact
@@ -10,6 +12,11 @@ interface ContactViewProps {
   // Linked tasks
   tasks: Task[]
   onSelectTask: (taskId: string) => void
+  // Pin props
+  isPinned?: boolean
+  canPin?: boolean
+  onPin?: (entityType: PinnableEntityType, entityId: string) => Promise<boolean>
+  onUnpin?: (entityType: PinnableEntityType, entityId: string) => Promise<boolean>
 }
 
 export function ContactView({
@@ -19,6 +26,10 @@ export function ContactView({
   onDelete,
   tasks,
   onSelectTask,
+  isPinned,
+  canPin,
+  onPin,
+  onUnpin,
 }: ContactViewProps) {
   // Name editing
   const [isEditingName, setIsEditingName] = useState(false)
@@ -175,16 +186,29 @@ export function ContactView({
               )}
             </div>
 
-            {/* Delete button */}
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            {/* Action buttons */}
+            <div className="flex items-center gap-1">
+              {onPin && onUnpin && (
+                <PinButton
+                  entityType="contact"
+                  entityId={contact.id}
+                  isPinned={isPinned ?? false}
+                  canPin={canPin ?? true}
+                  onPin={onPin}
+                  onUnpin={onUnpin}
+                  size="md"
+                />
+              )}
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
               aria-label="Delete contact"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
             </button>
+            </div>
           </div>
 
           {/* Delete confirmation */}

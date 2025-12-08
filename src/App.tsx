@@ -13,6 +13,9 @@ import { useListItems } from '@/hooks/useListItems'
 import { useNotes } from '@/hooks/useNotes'
 import { useNoteTopics } from '@/hooks/useNoteTopics'
 import { useSearch, type SearchResult } from '@/hooks/useSearch'
+import { useAttachments } from '@/hooks/useAttachments'
+import { usePinnedItems } from '@/hooks/usePinnedItems'
+import type { PinnableEntityType } from '@/types/pin'
 import { supabase } from '@/lib/supabase'
 import { AppShell } from '@/components/layout/AppShell'
 import { HomeView } from '@/components/home'
@@ -44,6 +47,8 @@ function App() {
   const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, toggleTask, deleteTask, updateTask, pushTask } = useSupabaseTasks()
   const { user, loading: authLoading, signOut } = useAuth()
   const { isConnected, events, fetchEvents, isFetching: eventsFetching } = useGoogleCalendar()
+  const attachments = useAttachments()
+  const pinnedItems = usePinnedItems()
 
   // Onboarding state
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null)
@@ -278,6 +283,17 @@ function App() {
     }
   }, [selectedItemId, fetchNote])
 
+  // Fetch attachments when an item is selected
+  useEffect(() => {
+    if (selectedItemId?.startsWith('task-')) {
+      const taskId = selectedItemId.replace('task-', '')
+      attachments.fetchAttachments('task', taskId)
+    } else if (selectedItemId?.startsWith('event-')) {
+      const eventId = selectedItemId.replace('event-', '')
+      attachments.fetchAttachments('event_note', eventId)
+    }
+  }, [selectedItemId, attachments.fetchAttachments])
+
   // Batch fetch event notes for all visible events (for info icon display)
   useEffect(() => {
     if (filteredEvents.length > 0) {
@@ -346,6 +362,20 @@ function App() {
     if (!selectedItem?.projectId) return null
     return projectsMap.get(selectedItem.projectId) ?? null
   }, [selectedItem, projectsMap])
+
+  // Get attachments for selected item
+  const selectedItemAttachments = useMemo(() => {
+    if (!selectedItemId) return []
+    if (selectedItemId.startsWith('task-')) {
+      const taskId = selectedItemId.replace('task-', '')
+      return attachments.getAttachments('task', taskId)
+    }
+    if (selectedItemId.startsWith('event-')) {
+      const eventId = selectedItemId.replace('event-', '')
+      return attachments.getAttachments('event_note', eventId)
+    }
+    return []
+  }, [selectedItemId, attachments])
 
   // Get project for project view
   const selectedProject = useMemo(() => {
@@ -462,6 +492,63 @@ function App() {
     clearSearch()
   }, [clearSearch])
 
+  // Wrapper for toggleTask that auto-unpins completed tasks
+  const handleToggleTask = useCallback(async (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId)
+    const wasCompleted = task?.completed ?? false
+
+    await toggleTask(taskId)
+
+    // If task is being completed (was not completed), auto-unpin it
+    if (!wasCompleted) {
+      // Silent unpin - won't error if not pinned
+      await pinnedItems.unpin('task', taskId)
+    }
+  }, [tasks, toggleTask, pinnedItems])
+
+  // Wrapper for updateProject that auto-unpins when marked complete
+  const handleUpdateProject = useCallback(async (id: string, updates: Partial<typeof projects[0]>) => {
+    await updateProject(id, updates)
+
+    // If project is being marked as completed, auto-unpin it
+    if (updates.status === 'completed') {
+      // Silent unpin - won't error if not pinned
+      await pinnedItems.unpin('project', id)
+    }
+  }, [updateProject, pinnedItems])
+
+  // Handle pin navigation
+  const handlePinNavigate = useCallback((entityType: PinnableEntityType, entityId: string) => {
+    switch (entityType) {
+      case 'task':
+        handleSelectItem(`task-${entityId}`)
+        break
+      case 'project':
+        handleOpenProject(entityId)
+        break
+      case 'contact':
+        handleOpenContact(entityId)
+        break
+      case 'routine':
+        setSelectedRoutineId(entityId)
+        setActiveView('routines')
+        break
+      case 'list':
+        setSelectedListId(entityId)
+        setActiveView('lists')
+        break
+    }
+  }, [handleSelectItem, handleOpenProject, handleOpenContact])
+
+  // Entity data for PinnedSection
+  const pinnedEntities = useMemo(() => ({
+    tasks,
+    projects,
+    contacts,
+    routines: allRoutines,
+    lists,
+  }), [tasks, projects, contacts, allRoutines, lists])
+
   if (authLoading || onboardingLoading) {
     return (
       <div className="min-h-screen bg-bg-base flex items-center justify-center">
@@ -513,6 +600,11 @@ function App() {
       activeView={activeView}
       onViewChange={handleViewChange}
       onOpenSearch={() => setSearchOpen(true)}
+      pins={pinnedItems.pins}
+      entities={pinnedEntities}
+      onPinNavigate={handlePinNavigate}
+      onPinMarkAccessed={pinnedItems.markAccessed}
+      onPinRefreshStale={pinnedItems.refreshStale}
       panel={
         recipeUrl ? (
           <Suspense fallback={<LoadingFallback />}>
@@ -527,7 +619,7 @@ function App() {
             onClose={() => setSelectedItemId(null)}
             onUpdate={updateTask}
             onDelete={deleteTask}
-            onToggleComplete={toggleTask}
+            onToggleComplete={handleToggleTask}
             onUpdateEventNote={updateNote}
             onOpenRecipe={setRecipeUrl}
             contact={selectedContact}
@@ -538,14 +630,27 @@ function App() {
             project={selectedItemProject}
             projects={projects}
             onSearchProjects={searchProjects}
-            onUpdateProject={updateProject}
+            onUpdateProject={handleUpdateProject}
             onOpenProject={handleOpenProject}
             onAddProject={addProject}
             onAddSubtask={addSubtask}
             onActionComplete={refreshDateInstances}
             prepTasks={tasks}
             onAddPrepTask={addPrepTask}
-            onTogglePrepTask={toggleTask}
+            onTogglePrepTask={handleToggleTask}
+            attachments={selectedItemAttachments}
+            onUploadAttachment={attachments.uploadAttachment}
+            onDeleteAttachment={attachments.deleteAttachment}
+            onOpenAttachment={async (attachment) => {
+              const url = await attachments.getSignedUrl(attachment.storagePath)
+              if (url) window.open(url, '_blank')
+            }}
+            isUploadingAttachment={attachments.isLoading}
+            attachmentError={attachments.error}
+            isPinned={selectedItem?.originalTask ? pinnedItems.isPinned('task', selectedItem.originalTask.id) : false}
+            canPin={pinnedItems.canPin()}
+            onPin={pinnedItems.pin}
+            onUnpin={pinnedItems.unpin}
           />
         )
       }
@@ -569,7 +674,7 @@ function App() {
             dateInstances={dateInstances}
             selectedItemId={selectedItemId}
             onSelectItem={handleSelectItem}
-            onToggleTask={toggleTask}
+            onToggleTask={handleToggleTask}
             onUpdateTask={updateTask}
             onPushTask={pushTask}
             onDeleteTask={deleteTask}
@@ -655,7 +760,7 @@ function App() {
               setSelectedTaskId(null)
               setActiveView('home')
             }}
-            onToggleComplete={toggleTask}
+            onToggleComplete={handleToggleTask}
             onPush={pushTask}
             contact={selectedTaskContact}
             contacts={contacts}
@@ -692,6 +797,10 @@ function App() {
               setActiveView('task-detail')
               setSelectedContactId(null)
             }}
+            isPinned={pinnedItems.isPinned('contact', selectedContactForView.id)}
+            canPin={pinnedItems.canPin()}
+            onPin={pinnedItems.pin}
+            onUnpin={pinnedItems.unpin}
           />
         </Suspense>
       )}
@@ -714,12 +823,16 @@ function App() {
             tasks={tasks}
             contactsMap={contactsMap}
             onBack={() => setSelectedProjectId(null)}
-            onUpdateProject={updateProject}
+            onUpdateProject={handleUpdateProject}
             onDeleteProject={deleteProject}
             onAddTask={(title, projectId) => addTask(title, undefined, projectId)}
             onSelectTask={handleSelectItem}
-            onToggleTask={toggleTask}
+            onToggleTask={handleToggleTask}
             selectedTaskId={selectedItemId}
+            isPinned={pinnedItems.isPinned('project', selectedProject.id)}
+            canPin={pinnedItems.canPin()}
+            onPin={pinnedItems.pin}
+            onUnpin={pinnedItems.unpin}
           />
         </Suspense>
       )}
@@ -776,6 +889,10 @@ function App() {
             onUpdate={updateRoutine}
             onDelete={deleteRoutine}
             onToggleVisibility={toggleRoutineVisibility}
+            isPinned={pinnedItems.isPinned('routine', selectedRoutine.id)}
+            canPin={pinnedItems.canPin()}
+            onPin={pinnedItems.pin}
+            onUnpin={pinnedItems.unpin}
           />
         </Suspense>
       )}
@@ -800,6 +917,10 @@ function App() {
           onUpdateItem={updateListItem}
           onDeleteItem={deleteListItem}
           onReorderItems={reorderListItems}
+          isPinned={pinnedItems.isPinned('list', selectedList.id)}
+          canPin={pinnedItems.canPin}
+          onPin={pinnedItems.pin}
+          onUnpin={pinnedItems.unpin}
         />
       )}
 

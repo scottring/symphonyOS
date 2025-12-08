@@ -53,6 +53,7 @@ export function taskToTimelineItem(task: Task): TimelineItem {
     projectId: task.projectId,
     assignedTo: task.assignedTo,
     allDay: task.isAllDay,
+    location: task.location,
     subtaskCount,
     subtaskCompletedCount,
     originalTask: task,

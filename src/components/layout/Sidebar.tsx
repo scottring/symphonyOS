@@ -1,4 +1,11 @@
 import symphonyLogo from '@/assets/symphony-logo.jpg'
+import { PinnedSection } from '@/components/pins'
+import type { PinnedItem } from '@/types/pin'
+import type { PinnableEntityType } from '@/types/pin'
+import type { Task } from '@/types/task'
+import type { Project } from '@/types/project'
+import type { Contact } from '@/types/contact'
+import type { Routine } from '@/types/routine'
 
 // Feature flags for in-progress features
 const FEATURES = {
@@ -6,6 +13,14 @@ const FEATURES = {
 }
 
 export type ViewType = 'home' | 'projects' | 'routines' | 'lists' | 'notes' | 'task-detail' | 'contact-detail' | 'settings'
+
+interface EntityData {
+  tasks: Task[]
+  projects: Project[]
+  contacts: Contact[]
+  routines: Routine[]
+  lists: Array<{ id: string; name: string }>
+}
 
 interface SidebarProps {
   collapsed: boolean
@@ -15,9 +30,28 @@ interface SidebarProps {
   activeView: ViewType
   onViewChange: (view: ViewType) => void
   onOpenSearch?: () => void
+  // Pinned items props
+  pins?: PinnedItem[]
+  entities?: EntityData
+  onPinNavigate?: (entityType: PinnableEntityType, entityId: string) => void
+  onPinMarkAccessed?: (entityType: PinnableEntityType, entityId: string) => void
+  onPinRefreshStale?: (id: string) => void
 }
 
-export function Sidebar({ collapsed, onToggle, userEmail, onSignOut, activeView, onViewChange, onOpenSearch }: SidebarProps) {
+export function Sidebar({
+  collapsed,
+  onToggle,
+  userEmail,
+  onSignOut,
+  activeView,
+  onViewChange,
+  onOpenSearch,
+  pins = [],
+  entities,
+  onPinNavigate,
+  onPinMarkAccessed,
+  onPinRefreshStale,
+}: SidebarProps) {
   return (
     <aside
       className={`
@@ -90,6 +124,18 @@ export function Sidebar({ collapsed, onToggle, userEmail, onSignOut, activeView,
             )}
           </button>
         </div>
+      )}
+
+      {/* Pinned Section */}
+      {pins.length > 0 && entities && onPinNavigate && onPinMarkAccessed && onPinRefreshStale && (
+        <PinnedSection
+          pins={pins}
+          entities={entities}
+          collapsed={collapsed}
+          onNavigate={onPinNavigate}
+          onMarkAccessed={onPinMarkAccessed}
+          onRefreshStale={onPinRefreshStale}
+        />
       )}
 
       {/* Navigation */}

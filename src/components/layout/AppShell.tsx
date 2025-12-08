@@ -3,6 +3,20 @@ import { Sidebar, type ViewType } from './Sidebar'
 import { QuickCapture } from './QuickCapture'
 import { useMobile } from '@/hooks/useMobile'
 import symphonyLogo from '@/assets/symphony-logo.jpg'
+import type { PinnedItem } from '@/types/pin'
+import type { PinnableEntityType } from '@/types/pin'
+import type { Task } from '@/types/task'
+import type { Project } from '@/types/project'
+import type { Contact } from '@/types/contact'
+import type { Routine } from '@/types/routine'
+
+interface EntityData {
+  tasks: Task[]
+  projects: Project[]
+  contacts: Contact[]
+  routines: Routine[]
+  lists: Array<{ id: string; name: string }>
+}
 
 interface AppShellProps {
   children: ReactNode
@@ -20,6 +34,12 @@ interface AppShellProps {
   activeView: ViewType
   onViewChange: (view: ViewType) => void
   onOpenSearch?: () => void
+  // Pinned items props
+  pins?: PinnedItem[]
+  entities?: EntityData
+  onPinNavigate?: (entityType: PinnableEntityType, entityId: string) => void
+  onPinMarkAccessed?: (entityType: PinnableEntityType, entityId: string) => void
+  onPinRefreshStale?: (id: string) => void
 }
 
 export function AppShell({
@@ -38,6 +58,11 @@ export function AppShell({
   activeView,
   onViewChange,
   onOpenSearch,
+  pins,
+  entities,
+  onPinNavigate,
+  onPinMarkAccessed,
+  onPinRefreshStale,
 }: AppShellProps) {
   const isMobile = useMobile()
 
@@ -53,6 +78,11 @@ export function AppShell({
           activeView={activeView}
           onViewChange={onViewChange}
           onOpenSearch={onOpenSearch}
+          pins={pins}
+          entities={entities}
+          onPinNavigate={onPinNavigate}
+          onPinMarkAccessed={onPinMarkAccessed}
+          onPinRefreshStale={onPinRefreshStale}
         />
       )}
 
