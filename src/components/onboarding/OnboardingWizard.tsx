@@ -13,6 +13,8 @@ import { FamilySetup } from './steps/FamilySetup'
 import { AssignRoutines } from './steps/AssignRoutines'
 import { TriageDemo } from './steps/TriageDemo'
 import { TodayPreview } from './steps/TodayPreview'
+import { ReviewIntro } from './steps/ReviewIntro'
+import { PlanningIntro } from './steps/PlanningIntro'
 import { CompleteStep } from './steps/CompleteStep'
 
 interface OnboardingWizardProps {
@@ -149,6 +151,10 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       }
       case 'today':
         return <TodayPreview onContinue={nextStep} />
+      case 'review':
+        return <ReviewIntro onContinue={nextStep} />
+      case 'plan':
+        return <PlanningIntro onContinue={nextStep} />
       case 'complete':
         return <CompleteStep onComplete={handleComplete} />
       default:

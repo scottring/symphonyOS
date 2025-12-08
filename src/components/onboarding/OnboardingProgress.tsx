@@ -14,7 +14,9 @@ const STEP_LABELS: Record<OnboardingStep, string> = {
   family: 'Family',
   assign: 'Assignments',
   triage: 'Triage',
-  today: 'Preview',
+  today: 'Today View',
+  review: 'Review',
+  plan: 'Planning',
   complete: 'Complete',
 }
 

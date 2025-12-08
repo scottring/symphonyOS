@@ -1,144 +1,131 @@
+import { useState, useCallback, useEffect } from 'react'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useRoutines } from '@/hooks/useRoutines'
+import { useProjects } from '@/hooks/useProjects'
+import { useContacts } from '@/hooks/useContacts'
+import { useActionableInstances } from '@/hooks/useActionableInstances'
+import { useFamilyMembers } from '@/hooks/useFamilyMembers'
+import { TodaySchedule } from '@/components/schedule/TodaySchedule'
 
 interface TodayPreviewProps {
   onContinue: () => void
 }
 
-
 export function TodayPreview({ onContinue }: TodayPreviewProps) {
-  const { tasks } = useSupabaseTasks()
-  const { getRoutinesForDate } = useRoutines()
+  const { tasks, loading: tasksLoading, toggleTask, updateTask, pushTask, deleteTask } = useSupabaseTasks()
+  const { getRoutinesForDate, activeRoutines, updateRoutine, loading: routinesLoading } = useRoutines()
+  const { projects, projectsMap } = useProjects()
+  const { contacts, contactsMap, searchContacts, addContact } = useContacts()
+  const { getInstancesForDate, markDone, undoDone, skip } = useActionableInstances()
+  const { members: familyMembers } = useFamilyMembers()
 
-  const today = new Date()
-  const todaysRoutines = getRoutinesForDate(today)
+  const [viewedDate] = useState(() => new Date())
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+  const [dateInstances, setDateInstances] = useState<Awaited<ReturnType<typeof getInstancesForDate>>>([])
 
-  // Filter tasks for today
-  const todaysTasks = tasks.filter(task => {
-    if (!task.scheduledFor) return false
-    const taskDate = new Date(task.scheduledFor)
-    return taskDate.toDateString() === today.toDateString()
-  })
+  // Get routines for today
+  const todaysRoutines = getRoutinesForDate(viewedDate)
 
-  // Get inbox tasks
-  const inboxTasks = tasks.filter(task => !task.scheduledFor && !task.completed)
+  // Fetch actionable instances
+  const refreshDateInstances = useCallback(async () => {
+    const instances = await getInstancesForDate(viewedDate)
+    setDateInstances(instances)
+  }, [viewedDate, getInstancesForDate])
+
+  useEffect(() => {
+    refreshDateInstances()
+  }, [refreshDateInstances])
+
+  // Handlers
+  const handleToggleTask = useCallback(async (taskId: string) => {
+    await toggleTask(taskId)
+  }, [toggleTask])
+
+  const handleCompleteRoutine = useCallback(async (routineId: string, completed: boolean) => {
+    if (completed) {
+      await markDone('routine', routineId, viewedDate)
+    } else {
+      await undoDone('routine', routineId, viewedDate)
+    }
+    refreshDateInstances()
+  }, [markDone, undoDone, viewedDate, refreshDateInstances])
+
+  const handleSkipRoutine = useCallback(async (routineId: string) => {
+    await skip('routine', routineId, viewedDate)
+    refreshDateInstances()
+  }, [skip, viewedDate, refreshDateInstances])
+
+  const handleAssignTask = useCallback((taskId: string, memberId: string | null) => {
+    updateTask(taskId, { assignedTo: memberId ?? undefined })
+  }, [updateTask])
+
+  const handleAssignRoutine = useCallback((routineId: string, memberId: string | null) => {
+    updateRoutine(routineId, { assigned_to: memberId })
+  }, [updateRoutine])
+
+  const loading = tasksLoading || routinesLoading
 
   return (
-    <div className="min-h-screen flex flex-col items-center px-6 py-12 pt-24">
-      <div className="w-full max-w-lg">
-        {/* Header */}
-        <h1 className="font-display text-3xl md:text-4xl font-semibold text-neutral-800 text-center mb-4">
-          Your Today view
+    <div className="min-h-screen flex flex-col bg-bg-base">
+      {/* Header */}
+      <div className="px-6 pt-8 pb-4 text-center">
+        <h1 className="font-display text-2xl md:text-3xl font-semibold text-neutral-800 mb-2">
+          This is your Today view
         </h1>
-        <p className="text-lg text-neutral-500 text-center mb-8">
-          Everything you need to do, right here.
-          <br />
-          Nothing hidden, nothing forgotten.
+        <p className="text-neutral-500">
+          Everything you need to do, all in one place. Try checking something off!
         </p>
+      </div>
 
-        {/* Preview card */}
-        <div className="bg-white rounded-xl border border-neutral-100 shadow-lg overflow-hidden mb-8">
-          {/* Date header */}
-          <div className="p-4 border-b border-neutral-100">
-            <div className="text-sm text-neutral-400 uppercase tracking-wide">
-              {today.toLocaleDateString([], { weekday: 'long' })}
-            </div>
-            <div className="font-display text-2xl font-semibold text-neutral-800">
-              {today.toLocaleDateString([], { month: 'long', day: 'numeric' })}
-            </div>
+      {/* Actual TodaySchedule */}
+      <div className="flex-1 overflow-hidden">
+        <div className="h-full overflow-y-auto">
+          <TodaySchedule
+            tasks={tasks}
+            events={[]} // No calendar events during onboarding
+            routines={todaysRoutines}
+            dateInstances={dateInstances}
+            selectedItemId={selectedItemId}
+            onSelectItem={setSelectedItemId}
+            onToggleTask={handleToggleTask}
+            onUpdateTask={updateTask}
+            onPushTask={pushTask}
+            onDeleteTask={deleteTask}
+            loading={loading}
+            viewedDate={viewedDate}
+            onDateChange={() => {}} // Don't allow date change in onboarding
+            contactsMap={contactsMap}
+            projectsMap={projectsMap}
+            projects={projects}
+            contacts={contacts}
+            onSearchContacts={searchContacts}
+            onAddContact={(name) => addContact({ name })}
+            onRefreshInstances={refreshDateInstances}
+            familyMembers={familyMembers}
+            onAssignTask={handleAssignTask}
+            onAssignRoutine={handleAssignRoutine}
+            onCompleteRoutine={handleCompleteRoutine}
+            onSkipRoutine={handleSkipRoutine}
+          />
+        </div>
+      </div>
+
+      {/* Bottom CTA */}
+      <div className="shrink-0 p-6 bg-gradient-to-t from-bg-base via-bg-base to-transparent">
+        <div className="max-w-lg mx-auto">
+          {/* Tip */}
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+            <p className="text-sm text-amber-800">
+              💡 <span className="font-medium">Daily habit:</span> Check this each morning.
+              Triage your inbox each evening. That's the rhythm that makes this work.
+            </p>
           </div>
 
-          {/* Content */}
-          <div className="divide-y divide-neutral-50">
-            {/* Routines section */}
-            {todaysRoutines.length > 0 && (
-              <div className="p-4">
-                <div className="text-xs text-neutral-400 uppercase tracking-wide mb-2">
-                  Routines
-                </div>
-                {todaysRoutines.slice(0, 3).map((routine) => (
-                  <div key={routine.id} className="flex items-center gap-3 py-2">
-                    <span className="w-5 h-5 rounded-full border-2 border-neutral-300" />
-                    <span className="text-neutral-700">{routine.name}</span>
-                    {routine.time_of_day && (
-                      <span className="text-sm text-neutral-400 ml-auto">
-                        {routine.time_of_day.substring(0, 5)}
-                      </span>
-                    )}
-                  </div>
-                ))}
-                {todaysRoutines.length > 3 && (
-                  <div className="text-sm text-neutral-400 mt-1">
-                    +{todaysRoutines.length - 3} more
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Scheduled tasks section */}
-            {todaysTasks.length > 0 && (
-              <div className="p-4">
-                <div className="text-xs text-neutral-400 uppercase tracking-wide mb-2">
-                  Tasks
-                </div>
-                {todaysTasks.slice(0, 3).map((task) => (
-                  <div key={task.id} className="flex items-center gap-3 py-2">
-                    <span className="w-5 h-5 rounded-full border-2 border-neutral-300" />
-                    <span className="text-neutral-700">{task.title}</span>
-                  </div>
-                ))}
-                {todaysTasks.length > 3 && (
-                  <div className="text-sm text-neutral-400 mt-1">
-                    +{todaysTasks.length - 3} more
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Inbox section */}
-            {inboxTasks.length > 0 && (
-              <div className="p-4 bg-neutral-50">
-                <div className="text-xs text-neutral-400 uppercase tracking-wide mb-2">
-                  Inbox
-                </div>
-                {inboxTasks.slice(0, 3).map((task) => (
-                  <div key={task.id} className="flex items-center gap-3 py-2">
-                    <span className="w-5 h-5 rounded-full border-2 border-neutral-300" />
-                    <span className="text-neutral-600">{task.title}</span>
-                  </div>
-                ))}
-                {inboxTasks.length > 3 && (
-                  <div className="text-sm text-neutral-400 mt-1">
-                    +{inboxTasks.length - 3} more
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Empty state */}
-            {todaysRoutines.length === 0 && todaysTasks.length === 0 && inboxTasks.length === 0 && (
-              <div className="p-8 text-center text-neutral-400">
-                Your schedule will appear here
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Tip */}
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-8">
-          <p className="text-sm text-amber-800">
-            💡 <span className="font-medium">Tip:</span> Check this each morning.
-            Triage your inbox each evening. That's the habit that makes this work.
-          </p>
-        </div>
-
-        {/* CTA */}
-        <div className="flex justify-center">
           <button
             onClick={onContinue}
-            className="btn-primary px-8 py-3 text-lg font-medium"
+            className="w-full btn-primary py-3 text-lg font-medium"
           >
-            Continue
+            Looks great — let's finish up
           </button>
         </div>
       </div>

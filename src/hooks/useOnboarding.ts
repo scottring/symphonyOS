@@ -11,6 +11,8 @@ export type OnboardingStep =
   | 'assign'
   | 'triage'
   | 'today'
+  | 'review'
+  | 'plan'
   | 'complete'
 
 const STEP_ORDER: OnboardingStep[] = [
@@ -23,6 +25,8 @@ const STEP_ORDER: OnboardingStep[] = [
   'assign',
   'triage',
   'today',
+  'review',
+  'plan',
   'complete',
 ]
 
