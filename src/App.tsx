@@ -627,6 +627,7 @@ function App() {
             onSearchContacts={searchContacts}
             onUpdateContact={updateContact}
             onOpenContact={handleOpenContact}
+            onAddContact={addContact}
             project={selectedItemProject}
             projects={projects}
             onSearchProjects={searchProjects}

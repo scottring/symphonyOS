@@ -86,6 +86,7 @@ interface DetailPanelRedesignProps {
   onSearchContacts?: (query: string) => Contact[]
   onUpdateContact?: (contactId: string, updates: Partial<Contact>) => void
   onOpenContact?: (contactId: string) => void
+  onAddContact?: (contact: { name: string; phone?: string; email?: string }) => Promise<Contact | null>
   project?: Project | null
   projects?: Project[]
   onSearchProjects?: (query: string) => Project[]
@@ -205,6 +206,7 @@ export function DetailPanelRedesign({
   contacts = [],
   onSearchContacts,
   onOpenContact,
+  onAddContact,
   project,
   projects = [],
   onSearchProjects,
@@ -243,6 +245,10 @@ export function DetailPanelRedesign({
   // Contact picker state
   const [showContactPicker, setShowContactPicker] = useState(false)
   const [contactSearchQuery, setContactSearchQuery] = useState('')
+  const [isCreatingContact, setIsCreatingContact] = useState(false)
+  const [newContactName, setNewContactName] = useState('')
+  const [newContactPhone, setNewContactPhone] = useState('')
+  const [isCreatingContactLoading, setIsCreatingContactLoading] = useState(false)
 
   // Project picker state
   const [showProjectPicker, setShowProjectPicker] = useState(false)
@@ -572,6 +578,33 @@ export function DetailPanelRedesign({
       setNewProjectName('')
       setShowProjectPicker(false)
       setProjectSearchQuery('')
+    }
+  }
+
+  const handleCreateAndLinkContact = async () => {
+    if (!onAddContact || !newContactName.trim() || !isTask || !item.originalTask || !onUpdate) return
+    setIsCreatingContactLoading(true)
+    try {
+      const createdContact = await onAddContact({
+        name: newContactName.trim(),
+        phone: newContactPhone.trim() || undefined,
+      })
+      if (createdContact) {
+        // Link the contact to the task - if this fails, contact still exists but isn't linked
+        // User can manually link it later, which is acceptable UX
+        onUpdate(item.originalTask.id, { contactId: createdContact.id })
+        setIsCreatingContact(false)
+        setNewContactName('')
+        setNewContactPhone('')
+        setShowContactPicker(false)
+        setContactSearchQuery('')
+      }
+      // If createdContact is null, addContact already handles error state in the hook
+    } catch {
+      // Error is handled by the useContacts hook which sets error state
+      // Keep modal open so user can retry
+    } finally {
+      setIsCreatingContactLoading(false)
     }
   }
 
@@ -1275,7 +1308,7 @@ export function DetailPanelRedesign({
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-display text-lg font-semibold">Select Contact</h3>
                 <button
-                  onClick={() => { setShowContactPicker(false); setContactSearchQuery('') }}
+                  onClick={() => { setShowContactPicker(false); setContactSearchQuery(''); setIsCreatingContact(false); setNewContactName(''); setNewContactPhone('') }}
                   className="p-2 text-neutral-400"
                 >
                   <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -1283,41 +1316,98 @@ export function DetailPanelRedesign({
                   </svg>
                 </button>
               </div>
-              <input
-                type="text"
-                value={contactSearchQuery}
-                onChange={(e) => setContactSearchQuery(e.target.value)}
-                placeholder="Search contacts..."
-                className="w-full px-4 py-3 text-base rounded-xl border border-neutral-200 bg-neutral-50
-                           focus:outline-none focus:ring-2 focus:ring-primary-500"
-                autoFocus
-              />
-            </div>
-            <div className="flex-1 overflow-auto">
-              {filteredContacts.length > 0 ? (
-                filteredContacts.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => handleLinkContact(c)}
-                    className="w-full px-4 py-3.5 flex items-center gap-3 active:bg-neutral-50 border-b border-neutral-100"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-neutral-200 flex items-center justify-center">
-                      <svg className="w-5 h-5 text-neutral-600" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 text-left">
-                      <div className="font-medium text-neutral-800">{c.name}</div>
-                      {c.phone && <div className="text-sm text-neutral-500">{c.phone}</div>}
-                    </div>
-                  </button>
-                ))
+              {!isCreatingContact ? (
+                <input
+                  type="text"
+                  value={contactSearchQuery}
+                  onChange={(e) => setContactSearchQuery(e.target.value)}
+                  placeholder="Search contacts..."
+                  className="w-full px-4 py-3 text-base rounded-xl border border-neutral-200 bg-neutral-50
+                             focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  autoFocus
+                />
               ) : (
-                <div className="px-4 py-8 text-center text-neutral-400">
-                  No contacts found
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    value={newContactName}
+                    onChange={(e) => setNewContactName(e.target.value)}
+                    placeholder="Name..."
+                    className="w-full px-4 py-3 text-base rounded-xl border border-neutral-200 bg-neutral-50
+                               focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    autoFocus
+                    disabled={isCreatingContactLoading}
+                  />
+                  <input
+                    type="tel"
+                    value={newContactPhone}
+                    onChange={(e) => setNewContactPhone(e.target.value)}
+                    placeholder="Phone (optional)..."
+                    className="w-full px-4 py-3 text-base rounded-xl border border-neutral-200 bg-neutral-50
+                               focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    disabled={isCreatingContactLoading}
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setIsCreatingContact(false); setNewContactName(''); setNewContactPhone('') }}
+                      className="flex-1 py-3 text-base font-medium text-neutral-600 bg-neutral-100 rounded-xl"
+                      disabled={isCreatingContactLoading}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleCreateAndLinkContact}
+                      disabled={!newContactName.trim() || isCreatingContactLoading}
+                      className="flex-1 py-3 text-base font-semibold text-white bg-primary-600 rounded-xl disabled:opacity-50"
+                    >
+                      {isCreatingContactLoading ? 'Creating...' : 'Create'}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
+            {!isCreatingContact && (
+              <>
+                <div className="flex-1 overflow-auto">
+                  {filteredContacts.length > 0 ? (
+                    filteredContacts.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => handleLinkContact(c)}
+                        className="w-full px-4 py-3.5 flex items-center gap-3 active:bg-neutral-50 border-b border-neutral-100"
+                      >
+                        <div className="w-10 h-10 rounded-full bg-neutral-200 flex items-center justify-center">
+                          <svg className="w-5 h-5 text-neutral-600" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 text-left">
+                          <div className="font-medium text-neutral-800">{c.name}</div>
+                          {c.phone && <div className="text-sm text-neutral-500">{c.phone}</div>}
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-4 py-8 text-center text-neutral-400">
+                      No contacts found
+                    </div>
+                  )}
+                </div>
+                {onAddContact && (
+                  <div className="p-4 border-t border-neutral-100">
+                    <button
+                      onClick={() => { setIsCreatingContact(true); setNewContactName(contactSearchQuery) }}
+                      className="w-full py-3.5 text-base font-semibold text-white bg-primary-600 rounded-xl flex items-center justify-center gap-2"
+                    >
+                      <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                      </svg>
+                      Add New Contact
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}
