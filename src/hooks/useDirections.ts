@@ -119,7 +119,8 @@ export function useDirections(): UseDirectionsResult {
         optimizeWaypoints: false, // Keep order as specified
       })
 
-      if (response.status !== 'OK' || !response.routes[0]) {
+      // Promise-based API throws on error, so if we get here status is OK
+      if (!response.routes?.[0]) {
         setError('Could not calculate route')
         setResult(null)
         return null
