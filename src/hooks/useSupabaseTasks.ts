@@ -153,6 +153,7 @@ export function useSupabaseTasks() {
   interface AddTaskOptions {
     linkedTo?: LinkedActivity
     linkType?: LinkType
+    assignedTo?: string  // Family member ID to assign task to
   }
 
   const addTask = useCallback(async (
@@ -176,6 +177,7 @@ export function useSupabaseTasks() {
       scheduledFor,
       linkedTo: options?.linkedTo,
       linkType: options?.linkType,
+      assignedTo: options?.assignedTo,
     }
     setTasks((prev) => [optimisticTask, ...prev])
 
@@ -191,6 +193,7 @@ export function useSupabaseTasks() {
         linked_activity_type: options?.linkedTo?.type ?? null,
         linked_activity_id: options?.linkedTo?.id ?? null,
         link_type: options?.linkType ?? null,
+        assigned_to: options?.assignedTo ?? null,
       })
       .select()
       .single()

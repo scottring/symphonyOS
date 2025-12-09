@@ -68,7 +68,7 @@ function App() {
     toggleVisibility: toggleRoutineVisibility,
   } = useRoutines()
   const { getInstancesForDate, markDone, undoDone, skip } = useActionableInstances()
-  const { members: familyMembers } = useFamilyMembers()
+  const { members: familyMembers, getCurrentUserMember } = useFamilyMembers()
 
   // Lists state
   const [selectedListId, setSelectedListId] = useState<string | null>(null)
@@ -308,6 +308,7 @@ function App() {
               {
                 linkedTo: { type: 'routine_instance' as LinkedActivityType, id: instanceId },
                 linkType: 'prep',
+                assignedTo: getCurrentUserMember()?.id,
               }
             )
           }
@@ -590,9 +591,9 @@ function App() {
       undefined, // contactId
       undefined, // projectId
       scheduledFor ?? viewedDate, // Default to viewed date
-      { linkedTo, linkType }
+      { linkedTo, linkType, assignedTo: getCurrentUserMember()?.id }
     )
-  }, [addTask, viewedDate])
+  }, [addTask, viewedDate, getCurrentUserMember])
 
   // Handler for toggling a linked task's completion
   const handleToggleLinkedTask = useCallback(async (taskId: string) => {
@@ -687,7 +688,7 @@ function App() {
       userEmail={user.email ?? undefined}
       onSignOut={signOut}
       onQuickAdd={async (title) => {
-        const taskId = await addTask(title)
+        const taskId = await addTask(title, undefined, undefined, undefined, { assignedTo: getCurrentUserMember()?.id })
         if (taskId) {
           setRecentlyCreatedTaskId(taskId)
         }
@@ -697,7 +698,8 @@ function App() {
           data.title,
           data.contactId,
           data.projectId,
-          data.scheduledFor
+          data.scheduledFor,
+          { assignedTo: getCurrentUserMember()?.id }
         )
         if (taskId) {
           setRecentlyCreatedTaskId(taskId)
@@ -943,7 +945,7 @@ function App() {
             onBack={() => setSelectedProjectId(null)}
             onUpdateProject={handleUpdateProject}
             onDeleteProject={deleteProject}
-            onAddTask={(title, projectId) => addTask(title, undefined, projectId)}
+            onAddTask={(title, projectId) => addTask(title, undefined, projectId, undefined, { assignedTo: getCurrentUserMember()?.id })}
             onSelectTask={handleSelectItem}
             onToggleTask={handleToggleTask}
             selectedTaskId={selectedItemId}

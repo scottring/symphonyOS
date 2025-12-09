@@ -38,7 +38,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const { tasks, addTask, updateTask } = useSupabaseTasks()
   const { addProject } = useProjects()
   const { routines, addRoutine, updateRoutine } = useRoutines()
-  const { members: familyMembers, addMember, updateMember, deleteMember, refetch: refetchFamily } = useFamilyMembers()
+  const { members: familyMembers, addMember, updateMember, deleteMember, refetch: refetchFamily, getCurrentUserMember } = useFamilyMembers()
 
   if (loading) {
     return (
@@ -49,7 +49,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   }
 
   const handleAddTask = async (title: string): Promise<string | null> => {
-    const id = await addTask(title)
+    const id = await addTask(title, undefined, undefined, undefined, { assignedTo: getCurrentUserMember()?.id })
     if (id) {
       addTaskId(id)
       return id
