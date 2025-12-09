@@ -1,10 +1,17 @@
 import type { HomeViewType } from '@/types/homeView'
+import type { FamilyMember } from '@/types/family'
+import { AssigneeFilter } from './AssigneeFilter'
 
 interface HomeViewSwitcherProps {
   currentView: HomeViewType
   onViewChange: (view: HomeViewType) => void
   inboxCount?: number    // Badge on Today (shows inbox items needing triage)
   reviewCount?: number   // Badge on Review (incomplete + overdue)
+  // Assignee filter props
+  selectedAssignee?: string | null
+  onSelectAssignee?: (id: string | null) => void
+  assigneesWithTasks?: FamilyMember[]
+  hasUnassignedTasks?: boolean
 }
 
 // Today icon - single day focus (sun symbol)
@@ -60,7 +67,18 @@ const views: { value: HomeViewType; label: string; icon: typeof TodayIcon; badge
   { value: 'review', label: 'Review', icon: ReviewIcon, badgeKey: 'review' },
 ]
 
-export function HomeViewSwitcher({ currentView, onViewChange, inboxCount = 0, reviewCount = 0 }: HomeViewSwitcherProps) {
+export function HomeViewSwitcher({
+  currentView,
+  onViewChange,
+  inboxCount = 0,
+  reviewCount = 0,
+  selectedAssignee,
+  onSelectAssignee,
+  assigneesWithTasks = [],
+  hasUnassignedTasks = false,
+}: HomeViewSwitcherProps) {
+  const showFilter = onSelectAssignee && (assigneesWithTasks.length > 0 || hasUnassignedTasks)
+
   return (
     <div className="inline-flex items-center bg-neutral-100/80 rounded-lg p-0.5 gap-0.5">
       {views.map((view) => {
@@ -110,6 +128,15 @@ export function HomeViewSwitcher({ currentView, onViewChange, inboxCount = 0, re
           </button>
         )
       })}
+      {/* Assignee Filter */}
+      {showFilter && (
+        <AssigneeFilter
+          selectedAssignee={selectedAssignee ?? null}
+          onSelectAssignee={onSelectAssignee!}
+          assigneesWithTasks={assigneesWithTasks}
+          hasUnassignedTasks={hasUnassignedTasks}
+        />
+      )}
     </div>
   )
 }

@@ -17,9 +17,21 @@ interface ReviewData {
 /**
  * Categorizes tasks for Review mode display
  * Returns tasks grouped by urgency/attention level
+ * @param selectedAssignee - Filter by assignee: null = "All", "unassigned" = no assignee
  */
-export function useReviewData(tasks: Task[], viewedDate: Date): ReviewData {
+export function useReviewData(
+  tasks: Task[],
+  viewedDate: Date,
+  selectedAssignee?: string | null
+): ReviewData {
   return useMemo(() => {
+    // Helper function to check if a task matches the assignee filter
+    const matchesAssigneeFilter = (assignedTo: string | null | undefined): boolean => {
+      if (selectedAssignee === null || selectedAssignee === undefined) return true // "All" - show everything
+      if (selectedAssignee === 'unassigned') return !assignedTo // Show only unassigned
+      return assignedTo === selectedAssignee // Show items assigned to selected person
+    }
+
     const today = new Date(viewedDate)
     today.setHours(0, 0, 0, 0)
 
@@ -46,6 +58,7 @@ export function useReviewData(tasks: Task[], viewedDate: Date): ReviewData {
 
     for (const task of tasks) {
       if (task.completed) continue
+      if (!matchesAssigneeFilter(task.assignedTo)) continue
 
       const scheduledTime = task.scheduledFor ? new Date(task.scheduledFor).getTime() : null
 
@@ -112,5 +125,5 @@ export function useReviewData(tasks: Task[], viewedDate: Date): ReviewData {
       tomorrowTasks,
       reviewCount,
     }
-  }, [tasks, viewedDate])
+  }, [tasks, viewedDate, selectedAssignee])
 }

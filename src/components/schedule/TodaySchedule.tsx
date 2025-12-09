@@ -71,6 +71,8 @@ interface TodayScheduleProps {
   mode?: ViewMode
   reviewData?: ReviewData
   onCreateTask?: (title: string) => void
+  // Assignee filter
+  selectedAssignee?: string | null  // null = "All", "unassigned" = unassigned only
 }
 
 function LoadingSkeleton() {
@@ -140,10 +142,19 @@ export function TodaySchedule({
   mode = 'today',
   reviewData,
   onCreateTask,
+  selectedAssignee,
 }: TodayScheduleProps) {
   void _onOpenPlanning // Reserved - planning now handled by ModeToggle
   const isMobile = useMobile()
   const isReviewMode = mode === 'review'
+
+  // Helper function to check if an item matches the assignee filter
+  const matchesAssigneeFilter = (assignedTo: string | null | undefined): boolean => {
+    if (selectedAssignee === null) return true // "All" - show everything
+    if (selectedAssignee === 'unassigned') return !assignedTo // Show only unassigned
+    return assignedTo === selectedAssignee // Show items assigned to selected person
+  }
+
   // Weekly review modal state
   const [showWeeklyReview, setShowWeeklyReview] = useState(false)
   // Check if we're viewing today
@@ -166,13 +177,14 @@ export function TodaySchedule({
     return tasks.filter((task) => {
       if (task.completed) return false
       if (!task.scheduledFor) return false
+      if (!matchesAssigneeFilter(task.assignedTo)) return false
 
       const taskDate = new Date(task.scheduledFor)
       taskDate.setHours(0, 0, 0, 0)
 
       return taskDate < today
     })
-  }, [tasks, isToday])
+  }, [tasks, isToday, selectedAssignee])
 
   // Inbox tasks: needs triage - only shown on today's view
   // Includes: no scheduledFor, OR deferredUntil <= today
@@ -183,6 +195,7 @@ export function TodaySchedule({
 
     return tasks.filter((task) => {
       if (task.completed) return false
+      if (!matchesAssigneeFilter(task.assignedTo)) return false
       // No scheduled date = inbox item
       if (!task.scheduledFor) {
         // If deferred to a future date, don't show yet
@@ -195,7 +208,7 @@ export function TodaySchedule({
       }
       return false
     })
-  }, [tasks, isToday])
+  }, [tasks, isToday, selectedAssignee])
 
   // Filter tasks for the viewed date (only tasks with scheduledFor)
   const filteredTasks = useMemo(() => {
@@ -205,13 +218,14 @@ export function TodaySchedule({
     endOfDay.setHours(23, 59, 59, 999)
 
     return tasks.filter((task) => {
+      if (!matchesAssigneeFilter(task.assignedTo)) return false
       if (task.scheduledFor) {
         const taskDate = new Date(task.scheduledFor)
         return taskDate >= startOfDay && taskDate <= endOfDay
       }
       return false // Unscheduled tasks go to inbox, not here
     })
-  }, [tasks, viewedDate])
+  }, [tasks, viewedDate, selectedAssignee])
 
   // Filter events for the viewed date and deduplicate by title + start time
   const filteredEvents = useMemo(() => {
@@ -272,36 +286,42 @@ export function TodaySchedule({
   const grouped = useMemo(() => {
     const taskItems = filteredTasks.map(taskToTimelineItem)
 
-    const eventItems = filteredEvents.map((event) => {
-      const item = eventToTimelineItem(event)
-      const eventId = event.google_event_id || event.id
-      const eventNote = eventNotesMap?.get(eventId)
-      if (eventNote?.notes) {
-        item.notes = eventNote.notes
-      }
-      if (eventNote?.assignedTo) {
-        item.assignedTo = eventNote.assignedTo
-      }
-      // Check if event is completed via actionable_instances
-      const instance = eventStatusMap.get(eventId)
-      if (instance?.status === 'completed') {
-        item.completed = true
-      }
-      return item
-    })
+    // Map and filter events by assignee
+    const eventItems = filteredEvents
+      .map((event) => {
+        const item = eventToTimelineItem(event)
+        const eventId = event.google_event_id || event.id
+        const eventNote = eventNotesMap?.get(eventId)
+        if (eventNote?.notes) {
+          item.notes = eventNote.notes
+        }
+        if (eventNote?.assignedTo) {
+          item.assignedTo = eventNote.assignedTo
+        }
+        // Check if event is completed via actionable_instances
+        const instance = eventStatusMap.get(eventId)
+        if (instance?.status === 'completed') {
+          item.completed = true
+        }
+        return item
+      })
+      .filter((item) => matchesAssigneeFilter(item.assignedTo))
 
-    const routineItems = visibleRoutines.map((routine) => {
-      const item = routineToTimelineItem(routine, viewedDate)
-      const instance = routineStatusMap.get(routine.id)
-      if (instance?.status === 'completed') {
-        item.completed = true
-      }
-      return item
-    })
+    // Map and filter routines by assignee
+    const routineItems = visibleRoutines
+      .filter((routine) => matchesAssigneeFilter(routine.assigned_to))
+      .map((routine) => {
+        const item = routineToTimelineItem(routine, viewedDate)
+        const instance = routineStatusMap.get(routine.id)
+        if (instance?.status === 'completed') {
+          item.completed = true
+        }
+        return item
+      })
 
     const allItems = [...taskItems, ...eventItems, ...routineItems]
     return groupByDaySection(allItems)
-  }, [filteredTasks, filteredEvents, visibleRoutines, viewedDate, routineStatusMap, eventStatusMap, eventNotesMap])
+  }, [filteredTasks, filteredEvents, visibleRoutines, viewedDate, routineStatusMap, eventStatusMap, eventNotesMap, selectedAssignee])
 
   const sections: DaySection[] = ['allday', 'morning', 'afternoon', 'evening', 'unscheduled']
 

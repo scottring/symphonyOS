@@ -30,6 +30,8 @@ interface WeekViewProps {
   weekStart: Date
   onWeekChange: (date: Date) => void
   onSelectDay: (date: Date) => void
+  selectedAssignee?: string | null  // null = "All", "unassigned" = unassigned only
+  eventNotesMap?: Map<string, { assignedTo?: string | null }>
 }
 
 interface DayData {
@@ -195,7 +197,15 @@ export function WeekView({
   weekStart,
   onWeekChange,
   onSelectDay,
+  selectedAssignee,
+  eventNotesMap,
 }: WeekViewProps) {
+  // Helper function to check if an item matches the assignee filter
+  const matchesAssigneeFilter = (assignedTo: string | null | undefined): boolean => {
+    if (selectedAssignee === null || selectedAssignee === undefined) return true // "All" - show everything
+    if (selectedAssignee === 'unassigned') return !assignedTo // Show only unassigned
+    return assignedTo === selectedAssignee // Show items assigned to selected person
+  }
   // Generate 7 days of the week
   const weekDays = useMemo(() => {
     const days: DayData[] = []
@@ -218,9 +228,10 @@ export function WeekView({
       const nextDate = new Date(date)
       nextDate.setDate(nextDate.getDate() + 1)
 
-      // Filter items for this day
+      // Filter items for this day and by assignee
       const dayTasks = tasks.filter((task) => {
         if (!task.scheduledFor) return false
+        if (!matchesAssigneeFilter(task.assignedTo)) return false
         const taskDate = new Date(task.scheduledFor)
         return taskDate >= date && taskDate < nextDate
       })
@@ -228,12 +239,20 @@ export function WeekView({
       const dayEvents = events.filter((event) => {
         const startTimeStr = event.start_time || event.startTime
         if (!startTimeStr) return false
+        // Get assignedTo from eventNotesMap
+        const eventId = event.google_event_id || event.id
+        const eventNote = eventNotesMap?.get(eventId)
+        if (!matchesAssigneeFilter(eventNote?.assignedTo)) return false
         const eventDate = new Date(startTimeStr)
         return eventDate >= date && eventDate < nextDate
       })
 
-      // Only active routines (visibility === 'active')
-      const activeRoutines = routines.filter((r) => r.visibility === 'active' && r.show_on_timeline !== false)
+      // Only active routines (visibility === 'active') and matching assignee filter
+      const activeRoutines = routines.filter((r) =>
+        r.visibility === 'active' &&
+        r.show_on_timeline !== false &&
+        matchesAssigneeFilter(r.assigned_to)
+      )
 
       // Convert to timeline items and group by section
       const sections: DayData['sections'] = {
@@ -286,7 +305,7 @@ export function WeekView({
     }
 
     return days
-  }, [weekStart, tasks, events, routines, dateInstances])
+  }, [weekStart, tasks, events, routines, dateInstances, selectedAssignee, eventNotesMap])
 
   // Format week label
   const weekLabel = useMemo(() => {

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
@@ -91,11 +91,66 @@ export function HomeView({
   const isMobile = useMobile()
   const { showInboxBadge, showReviewBadge } = useBadgeVisibility()
 
-  // Review data
-  const reviewData = useReviewData(tasks, viewedDate)
+  // Assignee filter state - reset when switching views
+  const [selectedAssignee, setSelectedAssignee] = useState<string | null>(null)
+
+  // Reset filter when view changes
+  const handleViewChange = useCallback((view: typeof currentView) => {
+    setSelectedAssignee(null)
+    setCurrentView(view)
+  }, [setCurrentView])
+
+  // Review data - pass selectedAssignee for filtering
+  const reviewData = useReviewData(tasks, viewedDate, selectedAssignee)
 
   // Derive mode from currentView for TodaySchedule compatibility
   const viewMode = currentView === 'review' ? 'review' : 'today'
+
+  // Compute assignees with tasks in current view for the filter dropdown
+  const { assigneesWithTasks, hasUnassignedTasks } = useMemo(() => {
+    // Get all assignedTo values from tasks, events, and routines in the current view
+    const assigneeIds = new Set<string>()
+    let hasUnassigned = false
+
+    // Check tasks
+    tasks.forEach(task => {
+      if (!task.completed) {
+        if (task.assignedTo) {
+          assigneeIds.add(task.assignedTo)
+        } else {
+          hasUnassigned = true
+        }
+      }
+    })
+
+    // Check events
+    events.forEach(event => {
+      const eventId = event.google_event_id || event.id
+      const eventNote = eventNotesMap?.get(eventId)
+      if (eventNote?.assignedTo) {
+        assigneeIds.add(eventNote.assignedTo)
+      } else {
+        hasUnassigned = true
+      }
+    })
+
+    // Check routines
+    routines.forEach(routine => {
+      if (routine.assigned_to) {
+        assigneeIds.add(routine.assigned_to)
+      } else {
+        hasUnassigned = true
+      }
+    })
+
+    // Filter family members to only those with tasks
+    const membersWithTasks = familyMembers.filter(m => assigneeIds.has(m.id))
+
+    return {
+      assigneesWithTasks: membersWithTasks,
+      hasUnassignedTasks: hasUnassigned,
+    }
+  }, [tasks, events, routines, familyMembers, eventNotesMap])
 
   // Inbox count for Today badge
   const inboxCount = useMemo(() => {
@@ -144,6 +199,8 @@ export function HomeView({
           weekStart={weekStart}
           onWeekChange={setWeekStart}
           onSelectDay={handleSelectDay}
+          selectedAssignee={selectedAssignee}
+          eventNotesMap={eventNotesMap}
         />
       )
     }
@@ -187,6 +244,7 @@ export function HomeView({
         mode={viewMode}
         reviewData={reviewData}
         onCreateTask={onCreateTask}
+        selectedAssignee={selectedAssignee}
       />
     )
   }
@@ -196,12 +254,16 @@ export function HomeView({
       {/* Header controls - floating in upper right, hidden on mobile */}
       {!isMobile && (
         <div className="absolute top-4 right-6 z-20 flex items-center gap-3">
-          {/* Unified view switcher (Today/Week/Review) */}
+          {/* Unified view switcher (Today/Week/Review) with assignee filter */}
           <HomeViewSwitcher
             currentView={currentView}
-            onViewChange={setCurrentView}
+            onViewChange={handleViewChange}
             inboxCount={showInboxBadge ? inboxCount : 0}
             reviewCount={showReviewBadge ? reviewData.reviewCount : 0}
+            selectedAssignee={selectedAssignee}
+            onSelectAssignee={setSelectedAssignee}
+            assigneesWithTasks={assigneesWithTasks}
+            hasUnassignedTasks={hasUnassignedTasks}
           />
         </div>
       )}
@@ -216,9 +278,13 @@ export function HomeView({
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-30">
           <HomeViewSwitcher
             currentView={currentView}
-            onViewChange={setCurrentView}
+            onViewChange={handleViewChange}
             inboxCount={showInboxBadge ? inboxCount : 0}
             reviewCount={showReviewBadge ? reviewData.reviewCount : 0}
+            selectedAssignee={selectedAssignee}
+            onSelectAssignee={setSelectedAssignee}
+            assigneesWithTasks={assigneesWithTasks}
+            hasUnassignedTasks={hasUnassignedTasks}
           />
         </div>
       )}
