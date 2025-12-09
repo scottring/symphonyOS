@@ -57,7 +57,7 @@ function App() {
   // Onboarding state
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null)
   const [onboardingLoading, setOnboardingLoading] = useState(true)
-  const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, getNote, notes: eventNotesMap } = useEventNotes()
+  const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, updateRecipeUrl, getNote, notes: eventNotesMap } = useEventNotes()
   const { contacts, contactsMap, addContact, updateContact, deleteContact, searchContacts } = useContacts()
   const { projects, projectsMap, addProject, updateProject, deleteProject, searchProjects } = useProjects()
   const {
@@ -450,6 +450,14 @@ function App() {
     return projectsMap.get(selectedItem.projectId) ?? null
   }, [selectedItem, projectsMap])
 
+  // Get recipe URL for selected event
+  const selectedEventRecipeUrl = useMemo(() => {
+    if (!selectedItem?.originalEvent) return null
+    const eventId = selectedItem.originalEvent.google_event_id || selectedItem.originalEvent.id
+    const eventNote = eventNotesMap.get(eventId)
+    return eventNote?.recipeUrl ?? null
+  }, [selectedItem, eventNotesMap])
+
   // Get attachments for selected item
   const selectedItemAttachments = useMemo(() => {
     if (!selectedItemId) return []
@@ -783,6 +791,8 @@ function App() {
             onDelete={deleteTask}
             onToggleComplete={handleToggleTask}
             onUpdateEventNote={updateNote}
+            eventRecipeUrl={selectedEventRecipeUrl}
+            onUpdateRecipeUrl={updateRecipeUrl}
             onOpenRecipe={setRecipeUrl}
             contact={selectedContact}
             contacts={contacts}
