@@ -61,6 +61,13 @@
   --color-danger-500: hsl(4 60% 52%);
   --color-danger-600: hsl(4 65% 45%);
 
+  /* Review mode - warm evening tones (candlelight reflection) */
+  --color-review-50: hsl(28 35% 96%);
+  --color-review-100: hsl(28 30% 92%);
+  --color-review-200: hsl(28 25% 85%);
+  --color-review-500: hsl(28 40% 45%);
+  --color-review-600: hsl(28 45% 38%);
+
   /* Background Tiers - Warm cream base */
   --color-bg-base: hsl(42 40% 95%);        /* Warm cream base */
   --color-bg-elevated: hsl(44 50% 98%);    /* Soft off-white for cards */
