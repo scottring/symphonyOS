@@ -11,6 +11,7 @@ export interface TimelineItem {
   startTime: Date | null // null for unscheduled tasks
   endTime: Date | null
   completed: boolean
+  skipped?: boolean
   // Context (from tasks)
   notes?: string
   links?: TaskLink[]

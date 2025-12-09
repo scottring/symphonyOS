@@ -2,8 +2,9 @@ import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
 import { formatTime, formatTimeRange } from '@/lib/timeUtils'
 import { getProjectColor } from '@/lib/projectUtils'
-import { PushDropdown } from '@/components/triage'
+import { PushDropdown, SchedulePopover } from '@/components/triage'
 import { AssigneeDropdown } from '@/components/family'
+import { Redo2 } from 'lucide-react'
 
 interface ScheduleItemProps {
   item: TimelineItem
@@ -11,6 +12,8 @@ interface ScheduleItemProps {
   onSelect: () => void
   onToggleComplete: () => void
   onPush?: (date: Date) => void
+  onSchedule?: (date: Date, isAllDay: boolean) => void
+  onSkip?: () => void
   contactName?: string
   projectName?: string
   projectId?: string
@@ -36,6 +39,8 @@ export function ScheduleItem({
   onSelect,
   onToggleComplete,
   onPush,
+  onSchedule,
+  onSkip,
   contactName,
   projectName,
   projectId,
@@ -105,7 +110,7 @@ export function ScheduleItem({
           ? 'bg-primary-50 border-primary-200 shadow-md ring-1 ring-primary-200'
           : 'bg-bg-elevated border-transparent hover:border-neutral-200 hover:shadow-md'
         }
-        ${item.completed ? 'opacity-60' : ''}
+        ${item.completed || item.skipped ? 'opacity-60' : ''}
       `}
     >
       {/* Left edge indicator - amber for overdue, project color otherwise */}
@@ -133,30 +138,80 @@ export function ScheduleItem({
       )}
       {/* Main row: time | checkbox/circle | title */}
       <div className="relative flex items-center gap-3">
-        {/* Time column - fixed width for alignment */}
-        <div className="w-12 shrink-0 text-xs font-medium">
-          {isOverdue && overdueLabel ? (
-            <span
-              className="text-xs font-medium"
-              style={{ color: overdueColors.warning600 }}
-            >
-              {overdueLabel}
-            </span>
-          ) : timeDisplay ? (
-            timeDisplay.type === 'allday' ? (
-              <span className="text-neutral-400">All day</span>
-            ) : timeDisplay.type === 'range' ? (
-              <div className="leading-tight text-neutral-400">
-                <div>{timeDisplay.start}</div>
-                <div className="text-neutral-300">{timeDisplay.end}</div>
-              </div>
+        {/* Time column - fixed width for alignment, clickable to reschedule */}
+        {/* Tasks use onSchedule, routines/events use onPush for one-off rescheduling */}
+        {(isTask && onSchedule) || ((isRoutine || item.type === 'event') && onPush) ? (
+          <div
+            className="w-12 shrink-0 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <SchedulePopover
+              value={item.startTime ?? undefined}
+              isAllDay={item.allDay}
+              onSchedule={(date, isAllDay) => {
+                if (isTask && onSchedule) {
+                  onSchedule(date, isAllDay)
+                } else if (onPush) {
+                  // For routines/events, use push/reschedule as one-off
+                  onPush(date)
+                }
+              }}
+              onClear={isTask && onSchedule ? () => {
+                // Clear schedule - set to unscheduled (inbox) - only for tasks
+                onSchedule(undefined as unknown as Date, false)
+              } : undefined}
+              trigger={
+                <button
+                  className="w-full text-left text-xs font-medium rounded-md px-1 py-0.5 -mx-1 hover:bg-neutral-100 transition-colors cursor-pointer"
+                  title="Change time"
+                >
+                  {isOverdue && overdueLabel ? (
+                    <span style={{ color: overdueColors.warning600 }}>
+                      {overdueLabel}
+                    </span>
+                  ) : timeDisplay ? (
+                    timeDisplay.type === 'allday' ? (
+                      <span className="text-neutral-400">All day</span>
+                    ) : timeDisplay.type === 'range' ? (
+                      <div className="leading-tight text-neutral-400">
+                        <div>{timeDisplay.start}</div>
+                        <div className="text-neutral-300">{timeDisplay.end}</div>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-neutral-500 tabular-nums">{timeDisplay.time}</span>
+                    )
+                  ) : (
+                    <span className="text-neutral-300">—</span>
+                  )}
+                </button>
+              }
+            />
+          </div>
+        ) : (
+          <div className="w-12 shrink-0 text-xs font-medium">
+            {isOverdue && overdueLabel ? (
+              <span
+                className="text-xs font-medium"
+                style={{ color: overdueColors.warning600 }}
+              >
+                {overdueLabel}
+              </span>
+            ) : timeDisplay ? (
+              timeDisplay.type === 'allday' ? (
+                <span className="text-neutral-400">All day</span>
+              ) : timeDisplay.type === 'range' ? (
+                <div className="leading-tight text-neutral-400">
+                  <div>{timeDisplay.start}</div>
+                  <div className="text-neutral-300">{timeDisplay.end}</div>
+                </div>
+              ) : (
+                <span className="text-sm text-neutral-500 tabular-nums">{timeDisplay.time}</span>
+              )
             ) : (
-              <span className="text-sm text-neutral-500 tabular-nums">{timeDisplay.time}</span>
-            )
-          ) : (
-            <span className="text-neutral-300">—</span>
-          )}
-        </div>
+              <span className="text-neutral-300">—</span>
+            )}
+          </div>
+        )}
 
         {/* Checkbox/circle - fixed width for alignment */}
         <div className="w-5 shrink-0 flex items-center justify-center">
@@ -193,7 +248,7 @@ export function ScheduleItem({
           <span
             className={`
               text-base font-medium line-clamp-2 transition-colors
-              ${item.completed ? 'line-through text-neutral-400' : 'text-neutral-800 group-hover:text-neutral-900'}
+              ${item.completed || item.skipped ? 'line-through text-neutral-400' : 'text-neutral-800 group-hover:text-neutral-900'}
             `}
           >
             {item.title}
@@ -208,6 +263,21 @@ export function ScheduleItem({
             </span>
           )}
         </div>
+
+        {/* Skip button - for routines and events, hidden by default, shows on hover */}
+        {(isRoutine || item.type === 'event') && onSkip && !item.completed && !item.skipped && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onSkip()
+            }}
+            className="shrink-0 p-1.5 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-all opacity-0 group-hover:opacity-100"
+            title="Skip this time"
+            aria-label="Skip this time"
+          >
+            <Redo2 className="w-4 h-4" />
+          </button>
+        )}
 
         {/* Assignee avatar */}
         {familyMembers.length > 0 && onAssign && (

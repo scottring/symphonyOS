@@ -62,9 +62,11 @@ interface TodayScheduleProps {
   // Routine completion
   onCompleteRoutine?: (routineId: string, completed: boolean) => void
   onSkipRoutine?: (routineId: string) => void
+  onPushRoutine?: (routineId: string, date: Date) => void
   // Event completion/skip
   onCompleteEvent?: (eventId: string, completed: boolean) => void
   onSkipEvent?: (eventId: string) => void
+  onPushEvent?: (eventId: string, date: Date) => void
   // Planning session
   onOpenPlanning?: () => void
   // Mode toggle (Today/Review)
@@ -136,8 +138,10 @@ export function TodaySchedule({
   onAssignRoutine,
   onCompleteRoutine,
   onSkipRoutine,
+  onPushRoutine,
   onCompleteEvent,
   onSkipEvent,
+  onPushEvent,
   onOpenPlanning: _onOpenPlanning,
   mode = 'today',
   reviewData,
@@ -303,6 +307,11 @@ export function TodaySchedule({
         if (instance?.status === 'completed') {
           item.completed = true
         }
+        // Override time if rescheduled (deferred_to on same day)
+        if (instance?.deferred_to && instance.status === 'pending') {
+          const deferredTime = new Date(instance.deferred_to)
+          item.startTime = deferredTime
+        }
         return item
       })
       .filter((item) => matchesAssigneeFilter(item.assignedTo))
@@ -315,6 +324,16 @@ export function TodaySchedule({
         const instance = routineStatusMap.get(routine.id)
         if (instance?.status === 'completed') {
           item.completed = true
+        } else if (instance?.status === 'skipped') {
+          item.skipped = true
+        }
+        // Override time if rescheduled (deferred_to on same day)
+        if (instance?.deferred_to) {
+          const deferredTime = new Date(instance.deferred_to)
+          // Only apply override if it's still the same day (time change, not date change)
+          if (instance.status === 'pending') {
+            item.startTime = deferredTime
+          }
         }
         return item
       })
@@ -512,9 +531,25 @@ export function TodaySchedule({
                           onCompleteRoutine(routineId, !item.completed)
                         }
                       }}
-                      onPush={item.type === 'task' && taskId && onPushTask
-                        ? (date: Date) => onPushTask(taskId, date)
+                      onPush={
+                        item.type === 'task' && taskId && onPushTask
+                          ? (date: Date) => onPushTask(taskId, date)
+                          : item.type === 'routine' && onPushRoutine
+                          ? (date: Date) => onPushRoutine(item.id.replace('routine-', ''), date)
+                          : item.type === 'event' && onPushEvent
+                          ? (date: Date) => onPushEvent(item.id.replace('event-', ''), date)
+                          : undefined
+                      }
+                      onSchedule={item.type === 'task' && taskId && onUpdateTask
+                        ? (date: Date, isAllDay: boolean) => onUpdateTask(taskId, { scheduledFor: date, isAllDay })
                         : undefined
+                      }
+                      onSkip={
+                        item.type === 'routine' && onSkipRoutine
+                          ? () => onSkipRoutine(item.id.replace('routine-', ''))
+                          : item.type === 'event' && onSkipEvent
+                          ? () => onSkipEvent(item.id.replace('event-', ''))
+                          : undefined
                       }
                       contactName={contactName || undefined}
                       projectName={projectName || undefined}

@@ -45,8 +45,10 @@ interface HomeViewProps {
   onAssignRoutine?: (routineId: string, memberId: string | null) => void
   onCompleteRoutine?: (routineId: string, completed: boolean) => void
   onSkipRoutine?: (routineId: string) => void
+  onPushRoutine?: (routineId: string, date: Date) => void
   onCompleteEvent?: (eventId: string, completed: boolean) => void
   onSkipEvent?: (eventId: string) => void
+  onPushEvent?: (eventId: string, date: Date) => void
   onOpenPlanning?: () => void
   onCreateTask?: (title: string) => void
 }
@@ -82,8 +84,10 @@ export function HomeView({
   onAssignRoutine,
   onCompleteRoutine,
   onSkipRoutine,
+  onPushRoutine,
   onCompleteEvent,
   onSkipEvent,
+  onPushEvent,
   onOpenPlanning,
   onCreateTask,
 }: HomeViewProps) {
@@ -238,8 +242,10 @@ export function HomeView({
         onAssignRoutine={onAssignRoutine}
         onCompleteRoutine={onCompleteRoutine}
         onSkipRoutine={onSkipRoutine}
+        onPushRoutine={onPushRoutine}
         onCompleteEvent={onCompleteEvent}
         onSkipEvent={onSkipEvent}
+        onPushEvent={onPushEvent}
         onOpenPlanning={onOpenPlanning}
         mode={viewMode}
         reviewData={reviewData}

@@ -249,6 +249,60 @@ export function useActionableInstances() {
     }
   }, [getOrCreateInstance])
 
+  // Reschedule to a new date/time (smart - handles same-day vs different-day)
+  const reschedule = useCallback(async (
+    entityType: EntityType,
+    entityId: string,
+    fromDate: Date,
+    toDateTime: Date
+  ): Promise<boolean> => {
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const instance = await getOrCreateInstance(entityType, entityId, fromDate)
+      if (!instance) throw new Error('Failed to get instance')
+
+      // Check if same day (just a time change) vs different day
+      const fromDateStr = toDateString(fromDate)
+      const toDateStr = toDateString(toDateTime)
+      const isSameDay = fromDateStr === toDateStr
+
+      if (isSameDay) {
+        // Same day - just update the override time, keep status pending
+        const { error: updateError } = await supabase
+          .from('actionable_instances')
+          .update({
+            status: 'pending' as ActionableStatus,
+            deferred_to: toDateTime.toISOString(),
+          })
+          .eq('id', instance.id)
+
+        if (updateError) throw updateError
+      } else {
+        // Different day - mark as deferred (hides from today, will show on new day)
+        const { error: updateError } = await supabase
+          .from('actionable_instances')
+          .update({
+            status: 'deferred' as ActionableStatus,
+            deferred_to: toDateTime.toISOString(),
+          })
+          .eq('id', instance.id)
+
+        if (updateError) throw updateError
+      }
+
+      return true
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to reschedule'
+      setError(message)
+      console.error('reschedule error:', err)
+      return false
+    } finally {
+      setIsLoading(false)
+    }
+  }, [getOrCreateInstance])
+
   // ============================================================================
   // NOTES
   // ============================================================================
@@ -446,6 +500,7 @@ export function useActionableInstances() {
     undoDone,
     skip,
     defer,
+    reschedule,
     // Notes
     getNotes,
     addNote,

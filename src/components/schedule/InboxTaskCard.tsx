@@ -82,8 +82,8 @@ export function InboxTaskCard({
           {task.title}
         </span>
 
-        {/* Action buttons */}
-        <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+        {/* Action buttons - hidden by default, show on hover */}
+        <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
           {/* Schedule button */}
           <SchedulePopover
             value={task.scheduledFor}

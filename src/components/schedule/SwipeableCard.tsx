@@ -5,6 +5,7 @@ import { formatTime } from '@/lib/timeUtils'
 import { getProjectColor } from '@/lib/projectUtils'
 import { TypeIcon } from './TypeIcon'
 import { AssigneeDropdown } from '@/components/family'
+import { CalendarArrowDown, Redo2, MoreHorizontal } from 'lucide-react'
 
 interface SwipeableCardProps {
   item: TimelineItem
@@ -202,27 +203,21 @@ export function SwipeableCard({
           onClick={() => handleAction('tomorrow')}
           className="w-[60px] flex flex-col items-center justify-center gap-1 bg-amber-500 text-white text-xs font-medium active:bg-amber-600"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-          </svg>
-          <span>Tomorrow</span>
+          <CalendarArrowDown className="w-5 h-5" />
+          <span>Push</span>
         </button>
         <button
           onClick={() => handleAction('skip')}
           className="w-[60px] flex flex-col items-center justify-center gap-1 bg-neutral-500 text-white text-xs font-medium active:bg-neutral-600"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-          </svg>
+          <Redo2 className="w-5 h-5" />
           <span>Skip</span>
         </button>
         <button
           onClick={() => handleAction('more')}
           className="w-[60px] flex flex-col items-center justify-center gap-1 bg-blue-500 text-white text-xs font-medium active:bg-blue-600"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
-          </svg>
+          <MoreHorizontal className="w-5 h-5" />
           <span>More</span>
         </button>
       </div>

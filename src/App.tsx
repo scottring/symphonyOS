@@ -15,6 +15,7 @@ import { useNoteTopics } from '@/hooks/useNoteTopics'
 import { useSearch, type SearchResult } from '@/hooks/useSearch'
 import { useAttachments } from '@/hooks/useAttachments'
 import { usePinnedItems } from '@/hooks/usePinnedItems'
+import { useUndo } from '@/hooks/useUndo'
 import type { PinnableEntityType } from '@/types/pin'
 import { supabase } from '@/lib/supabase'
 import { AppShell } from '@/components/layout/AppShell'
@@ -25,6 +26,7 @@ import { SearchModal } from '@/components/search/SearchModal'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 import { ListsList, ListView } from '@/components/list'
 import { NotesPage } from '@/components/notes'
+import { UndoToast } from '@/components/undo'
 import {
   ProjectsList,
   ProjectView,
@@ -50,6 +52,7 @@ function App() {
   const { isConnected, events, fetchEvents, isFetching: eventsFetching } = useGoogleCalendar()
   const attachments = useAttachments()
   const pinnedItems = usePinnedItems()
+  const undo = useUndo({ duration: 5000 })
 
   // Onboarding state
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null)
@@ -67,7 +70,7 @@ function App() {
     deleteRoutine,
     toggleVisibility: toggleRoutineVisibility,
   } = useRoutines()
-  const { getInstancesForDate, markDone, undoDone, skip } = useActionableInstances()
+  const { getInstancesForDate, markDone, undoDone, skip, defer, reschedule } = useActionableInstances()
   const { members: familyMembers, getCurrentUserMember } = useFamilyMembers()
 
   // Lists state
@@ -569,6 +572,7 @@ function App() {
   const handleToggleTask = useCallback(async (taskId: string) => {
     const task = tasks.find(t => t.id === taskId)
     const wasCompleted = task?.completed ?? false
+    const taskTitle = task?.title || 'Task'
 
     await toggleTask(taskId)
 
@@ -576,8 +580,13 @@ function App() {
     if (!wasCompleted) {
       // Silent unpin - won't error if not pinned
       await pinnedItems.unpin('task', taskId)
+      
+      // Add undo action
+      undo.pushAction(`Completed "${taskTitle}"`, async () => {
+        await toggleTask(taskId)
+      })
     }
-  }, [tasks, toggleTask, pinnedItems])
+  }, [tasks, toggleTask, pinnedItems, undo])
 
   // Handler for adding linked prep/followup tasks from DetailPanel
   const handleAddLinkedTask = useCallback(async (
@@ -823,27 +832,77 @@ function App() {
               updateRoutine(routineId, { assigned_to: memberId })
             }}
             onCompleteRoutine={async (routineId, completed) => {
+              const routine = allRoutines.find(r => r.id === routineId)
+              const routineName = routine?.name || 'Routine'
+
               if (completed) {
                 await markDone('routine', routineId, viewedDate)
+                undo.pushAction(`Completed "${routineName}"`, async () => {
+                  await undoDone('routine', routineId, viewedDate)
+                  refreshDateInstances()
+                })
               } else {
                 await undoDone('routine', routineId, viewedDate)
               }
               refreshDateInstances()
             }}
             onSkipRoutine={async (routineId) => {
+              const routine = allRoutines.find(r => r.id === routineId)
+              const routineName = routine?.name || 'Routine'
+
               await skip('routine', routineId, viewedDate)
+              undo.pushAction(`Skipped "${routineName}"`, async () => {
+                await undoDone('routine', routineId, viewedDate)
+                refreshDateInstances()
+              })
+              refreshDateInstances()
+            }}
+            onPushRoutine={async (routineId, date) => {
+              const routine = allRoutines.find(r => r.id === routineId)
+              const routineName = routine?.name || 'Routine'
+
+              await reschedule('routine', routineId, viewedDate, date)
+              undo.pushAction(`Rescheduled "${routineName}"`, async () => {
+                await undoDone('routine', routineId, viewedDate)
+                refreshDateInstances()
+              })
               refreshDateInstances()
             }}
             onCompleteEvent={async (eventId, completed) => {
+              const event = events.find(e => (e.google_event_id || e.id) === eventId)
+              const eventName = event?.title || 'Event'
+              
               if (completed) {
                 await markDone('calendar_event', eventId, viewedDate)
+                undo.pushAction(`Completed "${eventName}"`, async () => {
+                  await undoDone('calendar_event', eventId, viewedDate)
+                  refreshDateInstances()
+                })
               } else {
                 await undoDone('calendar_event', eventId, viewedDate)
               }
               refreshDateInstances()
             }}
             onSkipEvent={async (eventId) => {
+              const event = events.find(e => (e.google_event_id || e.id) === eventId)
+              const eventName = event?.title || 'Event'
+
               await skip('calendar_event', eventId, viewedDate)
+              undo.pushAction(`Skipped "${eventName}"`, async () => {
+                await undoDone('calendar_event', eventId, viewedDate)
+                refreshDateInstances()
+              })
+              refreshDateInstances()
+            }}
+            onPushEvent={async (eventId, date) => {
+              const event = events.find(e => (e.google_event_id || e.id) === eventId)
+              const eventName = event?.title || 'Event'
+
+              await reschedule('calendar_event', eventId, viewedDate, date)
+              undo.pushAction(`Rescheduled "${eventName}"`, async () => {
+                await undoDone('calendar_event', eventId, viewedDate)
+                refreshDateInstances()
+              })
               refreshDateInstances()
             }}
             onOpenPlanning={() => setPlanningOpen(true)}
