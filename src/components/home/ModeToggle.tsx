@@ -1,5 +1,3 @@
-import { useState, useRef, useEffect } from 'react'
-
 export type ViewMode = 'today' | 'review'
 
 interface ModeToggleProps {
@@ -12,112 +10,75 @@ interface ModeToggleProps {
 // Sun icon for Today mode - warmth, energy, active planning
 function SunIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 20 20" fill="none">
-      <circle cx="10" cy="10" r="3.5" stroke="currentColor" strokeWidth={1.5} />
-      <path
-        d="M10 3v1.5M10 15.5V17M17 10h-1.5M4.5 10H3M14.95 5.05l-1.06 1.06M6.11 13.89l-1.06 1.06M14.95 14.95l-1.06-1.06M6.11 6.11L5.05 5.05"
-        stroke="currentColor"
-        strokeWidth={1.5}
-        strokeLinecap="round"
-      />
+    <svg className={className} viewBox="0 0 24 24" fill="none">
+      {/* Central circle */}
+      <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth={1.5} fill="none" />
+      {/* Sun rays */}
+      <line x1="12" y1="3" x2="12" y2="5" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <line x1="12" y1="19" x2="12" y2="21" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <line x1="3" y1="12" x2="5" y2="12" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <line x1="19" y1="12" x2="21" y2="12" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <line x1="5.64" y1="5.64" x2="7.05" y2="7.05" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <line x1="16.95" y1="16.95" x2="18.36" y2="18.36" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <line x1="5.64" y1="18.36" x2="7.05" y2="16.95" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <line x1="16.95" y1="7.05" x2="18.36" y2="5.64" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
     </svg>
   )
 }
 
-// Moon/reflection icon for Review mode - evening, introspection
-function MoonIcon({ className }: { className?: string }) {
+// ClipboardCheck icon for Review mode - evening review, checklist
+function ClipboardCheckIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 20 20" fill="none">
-      <path
-        d="M17.293 13.293A8 8 0 016.707 2.707a8.003 8.003 0 1010.586 10.586z"
-        stroke="currentColor"
-        strokeWidth={1.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
     </svg>
   )
 }
+
+const modes = [
+  { value: 'today' as ViewMode, label: 'Today', icon: SunIcon },
+  { value: 'review' as ViewMode, label: 'Review', icon: ClipboardCheckIcon },
+]
 
 export function ModeToggle({ mode, onModeChange, inboxCount, reviewCount }: ModeToggleProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 })
-
-  // Calculate indicator position based on active mode
-  useEffect(() => {
-    if (!containerRef.current) return
-    const container = containerRef.current
-    const activeButton = container.querySelector(`[data-mode="${mode}"]`) as HTMLButtonElement
-    if (activeButton) {
-      setIndicatorStyle({
-        left: activeButton.offsetLeft,
-        width: activeButton.offsetWidth,
-      })
-    }
-  }, [mode])
-
-  const modes = [
-    { value: 'today' as ViewMode, label: 'Today', icon: SunIcon, count: inboxCount },
-    { value: 'review' as ViewMode, label: 'Review', icon: MoonIcon, count: reviewCount },
-  ]
-
   return (
-    <div
-      ref={containerRef}
-      className="relative inline-flex items-center p-1 rounded-xl"
-      style={{
-        background: 'linear-gradient(180deg, hsl(38 25% 90%) 0%, hsl(40 30% 92%) 100%)',
-        boxShadow: 'inset 0 1px 2px hsl(32 20% 20% / 0.06)',
-      }}
-    >
-      {/* Sliding indicator */}
-      <div
-        className="absolute top-1 h-[calc(100%-8px)] rounded-lg transition-all duration-300 ease-out"
-        style={{
-          left: indicatorStyle.left,
-          width: indicatorStyle.width,
-          background: mode === 'review'
-            ? 'linear-gradient(180deg, hsl(28 30% 98%) 0%, hsl(28 25% 96%) 100%)'
-            : 'linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(40 40% 98%) 100%)',
-          boxShadow: '0 1px 3px hsl(32 20% 20% / 0.08), 0 2px 6px hsl(32 20% 20% / 0.04)',
-        }}
-      />
-
-      {modes.map(({ value, label, icon: Icon, count }) => {
-        const isActive = mode === value
-        const isReview = value === 'review'
+    <div className="inline-flex items-center bg-neutral-100/80 rounded-lg p-0.5 gap-0.5">
+      {modes.map((view) => {
+        const isActive = mode === view.value
+        const Icon = view.icon
+        const count = view.value === 'today' ? inboxCount : reviewCount
+        const isReview = view.value === 'review'
 
         return (
           <button
-            key={value}
-            data-mode={value}
-            onClick={() => onModeChange(value)}
+            key={view.value}
+            onClick={() => onModeChange(view.value)}
+            title={view.label}
+            aria-label={view.label}
             className={`
-              relative z-10 flex items-center gap-2 px-4 py-2 rounded-lg
-              font-medium text-sm transition-colors duration-200
+              relative p-2 rounded-md
+              transition-all duration-200 ease-out
               ${isActive
                 ? isReview
-                  ? 'text-review-600'
-                  : 'text-neutral-800'
-                : 'text-neutral-400 hover:text-neutral-600'
+                  ? 'text-review-600 bg-white shadow-sm'
+                  : 'text-neutral-800 bg-white shadow-sm'
+                : 'text-neutral-400 hover:text-neutral-600 hover:bg-white/50'
               }
             `}
           >
-            <Icon className="w-4 h-4" />
-            <span className="font-display tracking-wide">{label}</span>
-
+            <Icon className="w-5 h-5" />
             {/* Badge */}
             {count > 0 && (
               <span
                 className={`
-                  min-w-[1.25rem] h-5 px-1.5 flex items-center justify-center
-                  rounded-full text-xs font-semibold tabular-nums
-                  transition-all duration-200
+                  absolute -top-1 -right-1 min-w-[1.125rem] h-[1.125rem] px-1
+                  flex items-center justify-center
+                  rounded-full text-[10px] font-semibold tabular-nums
                   ${isActive
                     ? isReview
                       ? 'bg-review-500 text-white'
                       : 'bg-primary-500 text-white'
-                    : 'bg-neutral-200 text-neutral-500'
+                    : 'bg-neutral-300 text-white'
                   }
                 `}
               >

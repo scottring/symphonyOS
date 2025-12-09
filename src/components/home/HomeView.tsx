@@ -10,7 +10,6 @@ import { useHomeView } from '@/hooks/useHomeView'
 import { useMobile } from '@/hooks/useMobile'
 import { useReviewData } from '@/hooks/useReviewData'
 import { HomeViewSwitcher } from './HomeViewSwitcher'
-import { ModeToggle, type ViewMode } from './ModeToggle'
 import { WeekView } from './WeekView'
 import { TodaySchedule } from '@/components/schedule/TodaySchedule'
 
@@ -90,11 +89,11 @@ export function HomeView({
   const { currentView, setCurrentView } = useHomeView()
   const isMobile = useMobile()
 
-  // Today/Review mode state
-  const [viewMode, setViewMode] = useState<ViewMode>('today')
-
   // Review data
   const reviewData = useReviewData(tasks, viewedDate)
+
+  // Derive mode from currentView for TodaySchedule compatibility
+  const viewMode = currentView === 'review' ? 'review' : 'today'
 
   // Inbox count for Today badge
   const inboxCount = useMemo(() => {
@@ -147,7 +146,7 @@ export function HomeView({
       )
     }
 
-    // Today view (also used for today-context)
+    // Today view and Review view both use TodaySchedule with different mode
     return (
       <TodaySchedule
         tasks={tasks}
@@ -195,75 +194,27 @@ export function HomeView({
       {/* Header controls - floating in upper right, hidden on mobile */}
       {!isMobile && (
         <div className="absolute top-4 right-6 z-20 flex items-center gap-3">
-          {/* Mode toggle (Today/Review) - only show when in today view */}
-          {currentView === 'today' && (
-            <ModeToggle
-              mode={viewMode}
-              onModeChange={setViewMode}
-              inboxCount={inboxCount}
-              reviewCount={reviewData.reviewCount}
-            />
-          )}
-          {/* View switcher (Today/Week) */}
+          {/* Unified view switcher (Today/Week/Review) */}
           <HomeViewSwitcher
             currentView={currentView}
             onViewChange={setCurrentView}
+            inboxCount={inboxCount}
+            reviewCount={reviewData.reviewCount}
           />
         </div>
       )}
 
       {/* Main content area */}
       <div className="flex-1 overflow-y-auto">
-        {isMobile ? (
-          <TodaySchedule
-            tasks={tasks}
-            events={events}
-            routines={routines}
-            dateInstances={dateInstances}
-            selectedItemId={selectedItemId}
-            onSelectItem={onSelectItem}
-            onToggleTask={onToggleTask}
-            onUpdateTask={onUpdateTask}
-            onPushTask={onPushTask}
-            onDeleteTask={onDeleteTask}
-            loading={loading}
-            viewedDate={viewedDate}
-            onDateChange={onDateChange}
-            contactsMap={contactsMap}
-            projectsMap={projectsMap}
-            projects={projects}
-            contacts={contacts}
-            onSearchContacts={onSearchContacts}
-            onAddContact={onAddContact}
-            eventNotesMap={eventNotesMap}
-            onRefreshInstances={onRefreshInstances}
-            recentlyCreatedTaskId={recentlyCreatedTaskId}
-            onTriageCardCollapse={onTriageCardCollapse}
-            onOpenProject={onOpenProject}
-            familyMembers={familyMembers}
-            onAssignTask={onAssignTask}
-            onAssignEvent={onAssignEvent}
-            onAssignRoutine={onAssignRoutine}
-            onCompleteRoutine={onCompleteRoutine}
-            onSkipRoutine={onSkipRoutine}
-            onCompleteEvent={onCompleteEvent}
-            onSkipEvent={onSkipEvent}
-            onOpenPlanning={onOpenPlanning}
-            mode={viewMode}
-            reviewData={reviewData}
-            onCreateTask={onCreateTask}
-          />
-        ) : (
-          renderContent()
-        )}
+        {renderContent()}
       </div>
 
-      {/* Mobile mode toggle - fixed at bottom on mobile */}
+      {/* Mobile view toggle - fixed at bottom on mobile */}
       {isMobile && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-30">
-          <ModeToggle
-            mode={viewMode}
-            onModeChange={setViewMode}
+          <HomeViewSwitcher
+            currentView={currentView}
+            onViewChange={setCurrentView}
             inboxCount={inboxCount}
             reviewCount={reviewData.reviewCount}
           />

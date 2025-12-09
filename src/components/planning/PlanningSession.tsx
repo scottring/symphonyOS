@@ -343,8 +343,9 @@ function formatDateKey(date: Date): string {
 }
 
 // Helper to parse slot ID into date components
+// Slot ID format: slot-YYYY-MM-DD-HH-MM (e.g., slot-2025-12-09-14-30)
 function parseSlotId(slotId: string): { year: number; month: number; day: number; hour: number; minute: number } | null {
-  const match = slotId.match(/^slot-(\d+)-(\d+)-(\d+)-(\d+)-(\d+)$/)
+  const match = slotId.match(/^slot-(\d{4})-(\d{2})-(\d{2})-(\d+)-(\d+)$/)
   if (!match) return null
   return {
     year: parseInt(match[1], 10),

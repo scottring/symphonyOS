@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
-import { SchedulePopover } from '@/components/triage'
+import { SchedulePopover, DeferPicker } from '@/components/triage'
 import { AssigneeDropdown } from '@/components/family'
 
 interface ReviewSectionProps {
@@ -18,6 +18,7 @@ interface ReviewSectionProps {
   projects?: Project[]
   familyMembers?: FamilyMember[]
   onAssignTask?: (taskId: string, memberId: string | null) => void
+  onDefer?: (id: string, date: Date | undefined) => void
 }
 
 interface ReviewTaskCardProps {
@@ -30,6 +31,8 @@ interface ReviewTaskCardProps {
   project?: Project
   familyMembers?: FamilyMember[]
   onAssign?: (memberId: string | null) => void
+  onDefer?: (date: Date | undefined) => void
+  showDefer?: boolean
 }
 
 function ReviewTaskCard({
@@ -42,6 +45,8 @@ function ReviewTaskCard({
   project,
   familyMembers = [],
   onAssign,
+  onDefer,
+  showDefer = false,
 }: ReviewTaskCardProps) {
   const urgencyStyles = {
     warning: {
@@ -119,10 +124,19 @@ function ReviewTaskCard({
             onSchedule={onReschedule}
           />
 
-          {/* Drop/Delete */}
+          {/* Defer - only shown for stale tasks */}
+          {showDefer && onDefer && (
+            <DeferPicker
+              deferredUntil={task.deferredUntil}
+              deferCount={task.deferCount}
+              onDefer={onDefer}
+            />
+          )}
+
+          {/* Drop/Delete - always visible */}
           <button
             onClick={onDrop}
-            className="p-1.5 rounded-lg text-neutral-300 hover:text-danger-500 hover:bg-danger-50 transition-colors opacity-0 group-hover:opacity-100"
+            className="p-1.5 rounded-lg text-neutral-400 hover:text-danger-500 hover:bg-danger-50 transition-colors"
             title="Drop task"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
@@ -230,6 +244,7 @@ export function ReviewSection({
   projects = [],
   familyMembers = [],
   onAssignTask,
+  onDefer,
 }: ReviewSectionProps) {
   const [captureText, setCaptureText] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -368,6 +383,8 @@ export function ReviewSection({
               project={getProject(task.projectId)}
               familyMembers={familyMembers}
               onAssign={onAssignTask ? (memberId) => onAssignTask(task.id, memberId) : undefined}
+              showDefer={true}
+              onDefer={onDefer ? (date) => onDefer(task.id, date) : undefined}
             />
           ))}
         </CollapsibleSection>

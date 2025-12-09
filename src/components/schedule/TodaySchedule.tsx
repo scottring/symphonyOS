@@ -17,7 +17,9 @@ import { InboxSection } from './InboxSection'
 import { OverdueSection } from './OverdueSection'
 import { WeeklyReview } from '@/components/review/WeeklyReview'
 import { ReviewSection } from '@/components/review/ReviewSection'
-import type { ViewMode } from '@/components/home/ModeToggle'
+
+// View mode for TodaySchedule - 'today' or 'review'
+type ViewMode = 'today' | 'review'
 
 interface ReviewData {
   incompleteTasks: Task[]
@@ -323,27 +325,23 @@ export function TodaySchedule({
     <div className="px-4 py-4 md:p-8 max-w-2xl mx-auto">
       {/* Header */}
       <div className="mb-6 animate-fade-in-up">
-        <div className="flex items-start justify-between mb-2">
-          <div>
-            <h2 className="font-display text-2xl md:text-3xl font-semibold text-neutral-900">
-              {isReviewMode
-                ? 'Evening Review'
-                : isToday
-                ? `Today is ${formatDate()}`
-                : formatDate()}
-            </h2>
-            {isReviewMode && (
-              <p className="text-neutral-500 text-sm mt-1">
-                Reflect and prepare for tomorrow
-              </p>
-            )}
-          </div>
-        </div>
-        {/* Date navigation - below heading */}
-        {!isReviewMode && (
-          <div className="flex items-center gap-2 mt-2">
+        <div className="flex items-center gap-3 mb-2">
+          <h2 className="font-display text-2xl md:text-3xl font-semibold text-neutral-900">
+            {isReviewMode
+              ? 'Evening Review'
+              : isToday
+              ? `Today is ${formatDate()}`
+              : formatDate()}
+          </h2>
+          {/* Date navigation - inline with heading */}
+          {!isReviewMode && (
             <DateNavigator date={viewedDate} onDateChange={onDateChange} showTodayButton={!isToday} />
-          </div>
+          )}
+        </div>
+        {isReviewMode && (
+          <p className="text-neutral-500 text-sm">
+            Reflect and prepare for tomorrow
+          </p>
         )}
 
         {/* Progress bar - hide in review mode */}
@@ -379,6 +377,7 @@ export function TodaySchedule({
           projects={projects}
           familyMembers={familyMembers}
           onAssignTask={onAssignTask}
+          onDefer={(id, date) => onUpdateTask(id, { deferredUntil: date, deferCount: date ? undefined : 0 })}
         />
       ) : loading ? (
         <LoadingSkeleton />

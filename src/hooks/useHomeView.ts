@@ -20,6 +20,9 @@ export function useHomeView(): UseHomeViewResult {
     if (stored === 'week') {
       return 'week'
     }
+    if (stored === 'review') {
+      return 'review'
+    }
     return 'today'
   })
 
@@ -33,7 +36,7 @@ export function useHomeView(): UseHomeViewResult {
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY && e.newValue) {
-        if (e.newValue === 'today' || e.newValue === 'week') {
+        if (e.newValue === 'today' || e.newValue === 'week' || e.newValue === 'review') {
           setCurrentViewState(e.newValue)
         }
       }
