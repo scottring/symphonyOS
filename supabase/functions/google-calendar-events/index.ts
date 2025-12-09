@@ -6,11 +6,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Custom error class for token refresh failures
+class TokenRefreshError extends Error {
+  constructor(message: string, public readonly shouldDisconnect: boolean = false) {
+    super(message)
+    this.name = 'TokenRefreshError'
+  }
+}
+
 async function refreshAccessToken(
   supabaseAdmin: ReturnType<typeof createClient>,
   userId: string,
   refreshToken: string
-) {
+): Promise<string> {
   const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
   const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET')
 
@@ -28,7 +36,16 @@ async function refreshAccessToken(
   const tokenData = await tokenResponse.json()
 
   if (tokenData.error) {
-    throw new Error(tokenData.error_description || tokenData.error)
+    // Check for errors that mean the refresh token is permanently invalid
+    // These errors require user to re-authenticate
+    const permanentErrors = ['invalid_grant', 'invalid_client', 'unauthorized_client']
+    const shouldDisconnect = permanentErrors.includes(tokenData.error)
+
+    console.error('Token refresh failed:', tokenData.error, tokenData.error_description)
+
+    // Use Google's error description if available, otherwise use error code
+    const message = tokenData.error_description || tokenData.error
+    throw new TokenRefreshError(message, shouldDisconnect)
   }
 
   const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
@@ -95,7 +112,22 @@ serve(async (req) => {
     const fiveMinutes = 5 * 60 * 1000
 
     if (expiresAt.getTime() - now.getTime() < fiveMinutes) {
-      accessToken = await refreshAccessToken(supabaseAdmin, user.id, connection.refresh_token)
+      try {
+        accessToken = await refreshAccessToken(supabaseAdmin, user.id, connection.refresh_token)
+      } catch (err) {
+        if (err instanceof TokenRefreshError) {
+          // Return a structured error that the frontend can interpret
+          return new Response(JSON.stringify({
+            error: err.message,
+            errorCode: 'invalid_grant',
+            needsReconnect: err.shouldDisconnect,
+          }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+        throw err
+      }
     }
 
     // First, get list of all calendars the user has access to

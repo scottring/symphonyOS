@@ -20,38 +20,83 @@ export interface CalendarEvent {
 
 export function useGoogleCalendar() {
   const [isConnected, setIsConnected] = useState(false)
+  const [needsReconnect, setNeedsReconnect] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isFetching, setIsFetching] = useState(false)
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [error, setError] = useState<string | null>(null)
 
-  // Check connection status
+  // Check connection status and validate token
   useEffect(() => {
-    async function checkConnection() {
+    async function checkAndValidateConnection() {
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
           setIsConnected(false)
+          setNeedsReconnect(false)
           setIsLoading(false)
           return
         }
 
-        const { data, error } = await supabase
+        // Get connection with token expiry info
+        const { data: connection, error: connError } = await supabase
           .from('calendar_connections')
-          .select('id')
+          .select('id, token_expires_at')
           .eq('user_id', user.id)
           .eq('provider', 'google')
           .single()
 
-        setIsConnected(!error && !!data)
-      } catch {
+        if (connError || !connection) {
+          setIsConnected(false)
+          setNeedsReconnect(false)
+          setIsLoading(false)
+          return
+        }
+
+        // Connection exists - now validate it by making a test API call
+        // This will trigger token refresh if needed and catch invalid refresh tokens
+        const { data, error: validateError } = await supabase.functions.invoke('google-calendar-events', {
+          body: {
+            startDate: new Date().toISOString(),
+            endDate: new Date().toISOString(),
+          },
+        })
+
+        if (validateError || data?.error) {
+          const errorMsg = data?.error || validateError?.message || ''
+          // Check for auth-related errors indicating the connection is broken
+          if (
+            errorMsg.includes('invalid_grant') ||
+            errorMsg.includes('Token has been expired or revoked') ||
+            errorMsg.includes('Unauthorized') ||
+            errorMsg.includes('No calendar connection found')
+          ) {
+            console.warn('Calendar connection invalid, needs reconnect:', errorMsg)
+            setIsConnected(false)
+            setNeedsReconnect(true)
+            setError('Calendar connection expired. Please reconnect.')
+          } else {
+            // Other errors - connection might still be valid
+            console.warn('Calendar validation failed but connection may be valid:', errorMsg)
+            setIsConnected(true)
+            setNeedsReconnect(false)
+          }
+        } else {
+          // Connection is valid
+          setIsConnected(true)
+          setNeedsReconnect(false)
+          setError(null)
+        }
+      } catch (err) {
+        console.error('Error checking calendar connection:', err)
         setIsConnected(false)
+        setNeedsReconnect(false)
       } finally {
         setIsLoading(false)
       }
     }
 
-    checkConnection()
+    checkAndValidateConnection()
   }, [])
 
   // Connect to Google Calendar
@@ -135,9 +180,15 @@ export function useGoogleCalendar() {
       // Check for auth errors that might indicate token refresh failure
       if (data?.error) {
         // Common auth error patterns
-        if (data.error.includes('Unauthorized') || data.error.includes('invalid_grant') || data.error.includes('Token')) {
+        if (
+          data.error.includes('Unauthorized') ||
+          data.error.includes('invalid_grant') ||
+          data.error.includes('Token has been expired or revoked') ||
+          data.error.includes('Token')
+        ) {
           setError('Calendar connection expired. Please reconnect.')
           setIsConnected(false)
+          setNeedsReconnect(true)
           return []
         }
         throw new Error(data.error)
@@ -176,6 +227,7 @@ export function useGoogleCalendar() {
 
   return {
     isConnected,
+    needsReconnect,
     isLoading,
     isFetching,
     events,
