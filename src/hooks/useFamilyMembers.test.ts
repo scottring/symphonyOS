@@ -41,7 +41,8 @@ const resetMocks = () => {
 
   mockSelect.mockImplementation(() => ({
     eq: mockEq,
-    single: mockSingle
+    single: mockSingle,
+    order: mockOrder
   }))
 
   mockInsert.mockImplementation(() => ({

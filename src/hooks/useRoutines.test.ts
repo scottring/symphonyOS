@@ -21,7 +21,10 @@ vi.mock('@/lib/supabase', () => ({
       getUser: () => mockGetUser(),
     },
     from: () => ({
-      select: () => ({ eq: () => ({ order: () => mockOrder() }) }),
+      select: () => ({
+        eq: () => ({ order: () => mockOrder() }),
+        order: () => mockOrder()
+      }),
       insert: (data: unknown) => {
         mockInsert(data)
         return { select: () => ({ single: () => mockSingle() }) }

@@ -74,6 +74,7 @@ vi.mock('@/lib/supabase', () => ({
         eq: () => ({
           order: () => Promise.resolve({ data: mockSupabaseData, error: mockError }),
         }),
+        order: () => Promise.resolve({ data: mockSupabaseData, error: mockError }),
       }),
       insert: (data: Partial<MockDbTask>) => {
         mockInsert(data)

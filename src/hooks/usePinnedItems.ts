@@ -62,7 +62,6 @@ export function usePinnedItems(): UsePinnedItemsReturn {
       // Auto-unpin items that are past the threshold
       const staleToUnpin = fetchedPins.filter((pin) => shouldAutoUnpin(pin.lastAccessedAt))
       if (staleToUnpin.length > 0) {
-        console.log(`Auto-unpinning ${staleToUnpin.length} stale items:`, staleToUnpin.map((p) => p.entityId))
         // Delete stale items from database
         await supabase
           .from('pinned_items')

@@ -65,7 +65,6 @@ export function PushDropdown({ onPush, size = 'md', showTodayOption = false }: P
   }
 
   const handlePush = (date: Date) => {
-    console.log('PushDropdown handlePush called with date:', date)
     onPush(date)
     setIsOpen(false)
     setShowDatePicker(false)

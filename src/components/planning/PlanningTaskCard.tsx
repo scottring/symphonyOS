@@ -93,10 +93,7 @@ export function PlanningTaskCard({ task, isDragging, isPlaced, onPushTask, assig
           <div className="shrink-0 -mr-1">
             <PushDropdown
               size="sm"
-              onPush={(date) => {
-                console.log('PlanningTaskCard onPush called for task:', task.id, 'date:', date)
-                onPushTask(task.id, date)
-              }}
+              onPush={(date) => onPushTask(task.id, date)}
             />
           </div>
         )}
