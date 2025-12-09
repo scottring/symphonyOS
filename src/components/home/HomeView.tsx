@@ -9,6 +9,7 @@ import type { EventNote } from '@/hooks/useEventNotes'
 import { useHomeView } from '@/hooks/useHomeView'
 import { useMobile } from '@/hooks/useMobile'
 import { useReviewData } from '@/hooks/useReviewData'
+import { useBadgeVisibility } from '@/hooks/useBadgeVisibility'
 import { HomeViewSwitcher } from './HomeViewSwitcher'
 import { WeekView } from './WeekView'
 import { TodaySchedule } from '@/components/schedule/TodaySchedule'
@@ -88,6 +89,7 @@ export function HomeView({
 }: HomeViewProps) {
   const { currentView, setCurrentView } = useHomeView()
   const isMobile = useMobile()
+  const { showInboxBadge, showReviewBadge } = useBadgeVisibility()
 
   // Review data
   const reviewData = useReviewData(tasks, viewedDate)
@@ -198,8 +200,8 @@ export function HomeView({
           <HomeViewSwitcher
             currentView={currentView}
             onViewChange={setCurrentView}
-            inboxCount={inboxCount}
-            reviewCount={reviewData.reviewCount}
+            inboxCount={showInboxBadge ? inboxCount : 0}
+            reviewCount={showReviewBadge ? reviewData.reviewCount : 0}
           />
         </div>
       )}
@@ -215,8 +217,8 @@ export function HomeView({
           <HomeViewSwitcher
             currentView={currentView}
             onViewChange={setCurrentView}
-            inboxCount={inboxCount}
-            reviewCount={reviewData.reviewCount}
+            inboxCount={showInboxBadge ? inboxCount : 0}
+            reviewCount={showReviewBadge ? reviewData.reviewCount : 0}
           />
         </div>
       )}
