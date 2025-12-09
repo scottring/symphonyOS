@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
@@ -8,7 +8,9 @@ import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
 import { useHomeView } from '@/hooks/useHomeView'
 import { useMobile } from '@/hooks/useMobile'
+import { useReviewData } from '@/hooks/useReviewData'
 import { HomeViewSwitcher } from './HomeViewSwitcher'
+import { ModeToggle, type ViewMode } from './ModeToggle'
 import { WeekView } from './WeekView'
 import { TodaySchedule } from '@/components/schedule/TodaySchedule'
 
@@ -46,6 +48,7 @@ interface HomeViewProps {
   onCompleteEvent?: (eventId: string, completed: boolean) => void
   onSkipEvent?: (eventId: string) => void
   onOpenPlanning?: () => void
+  onCreateTask?: (title: string) => void
 }
 
 export function HomeView({
@@ -82,9 +85,34 @@ export function HomeView({
   onCompleteEvent,
   onSkipEvent,
   onOpenPlanning,
+  onCreateTask,
 }: HomeViewProps) {
   const { currentView, setCurrentView } = useHomeView()
   const isMobile = useMobile()
+
+  // Today/Review mode state
+  const [viewMode, setViewMode] = useState<ViewMode>('today')
+
+  // Review data
+  const reviewData = useReviewData(tasks, viewedDate)
+
+  // Inbox count for Today badge
+  const inboxCount = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return tasks.filter(task => {
+      if (task.completed) return false
+      if (!task.scheduledFor) {
+        if (task.deferredUntil) {
+          const deferredDate = new Date(task.deferredUntil)
+          deferredDate.setHours(0, 0, 0, 0)
+          return deferredDate <= today
+        }
+        return true
+      }
+      return false
+    }).length
+  }, [tasks])
 
   // Week view state
   const [weekStart, setWeekStart] = useState(() => {
@@ -155,15 +183,28 @@ export function HomeView({
         onCompleteEvent={onCompleteEvent}
         onSkipEvent={onSkipEvent}
         onOpenPlanning={onOpenPlanning}
+        mode={viewMode}
+        reviewData={reviewData}
+        onCreateTask={onCreateTask}
       />
     )
   }
 
   return (
     <div className="relative flex flex-col h-full">
-      {/* View switcher - floating in upper right, hidden on mobile */}
+      {/* Header controls - floating in upper right, hidden on mobile */}
       {!isMobile && (
-        <div className="absolute top-4 right-6 z-20">
+        <div className="absolute top-4 right-6 z-20 flex items-center gap-3">
+          {/* Mode toggle (Today/Review) - only show when in today view */}
+          {currentView === 'today' && (
+            <ModeToggle
+              mode={viewMode}
+              onModeChange={setViewMode}
+              inboxCount={inboxCount}
+              reviewCount={reviewData.reviewCount}
+            />
+          )}
+          {/* View switcher (Today/Week) */}
           <HomeViewSwitcher
             currentView={currentView}
             onViewChange={setCurrentView}
@@ -208,11 +249,26 @@ export function HomeView({
             onCompleteEvent={onCompleteEvent}
             onSkipEvent={onSkipEvent}
             onOpenPlanning={onOpenPlanning}
+            mode={viewMode}
+            reviewData={reviewData}
+            onCreateTask={onCreateTask}
           />
         ) : (
           renderContent()
         )}
       </div>
+
+      {/* Mobile mode toggle - fixed at bottom on mobile */}
+      {isMobile && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-30">
+          <ModeToggle
+            mode={viewMode}
+            onModeChange={setViewMode}
+            inboxCount={inboxCount}
+            reviewCount={reviewData.reviewCount}
+          />
+        </div>
+      )}
     </div>
   )
 }

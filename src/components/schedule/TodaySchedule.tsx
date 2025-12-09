@@ -16,6 +16,16 @@ import { DateNavigator } from './DateNavigator'
 import { InboxSection } from './InboxSection'
 import { OverdueSection } from './OverdueSection'
 import { WeeklyReview } from '@/components/review/WeeklyReview'
+import { ReviewSection } from '@/components/review/ReviewSection'
+import type { ViewMode } from '@/components/home/ModeToggle'
+
+interface ReviewData {
+  incompleteTasks: Task[]
+  overdueTasks: Task[]
+  staleDeferredTasks: Task[]
+  tomorrowTasks: Task[]
+  reviewCount: number
+}
 
 interface TodayScheduleProps {
   tasks: Task[]
@@ -55,6 +65,10 @@ interface TodayScheduleProps {
   onSkipEvent?: (eventId: string) => void
   // Planning session
   onOpenPlanning?: () => void
+  // Mode toggle (Today/Review)
+  mode?: ViewMode
+  reviewData?: ReviewData
+  onCreateTask?: (title: string) => void
 }
 
 function LoadingSkeleton() {
@@ -120,9 +134,14 @@ export function TodaySchedule({
   onSkipRoutine,
   onCompleteEvent,
   onSkipEvent,
-  onOpenPlanning,
+  onOpenPlanning: _onOpenPlanning,
+  mode = 'today',
+  reviewData,
+  onCreateTask,
 }: TodayScheduleProps) {
+  void _onOpenPlanning // Reserved - planning now handled by ModeToggle
   const isMobile = useMobile()
+  const isReviewMode = mode === 'review'
   // Weekly review modal state
   const [showWeeklyReview, setShowWeeklyReview] = useState(false)
   // Check if we're viewing today
@@ -304,50 +323,32 @@ export function TodaySchedule({
     <div className="px-4 py-4 md:p-8 max-w-2xl mx-auto">
       {/* Header */}
       <div className="mb-6 animate-fade-in-up">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-start justify-between mb-2">
           <div>
-            <h2 className="font-display text-2xl md:text-3xl font-semibold text-neutral-900 mb-1">
-              {isToday ? 'Today' : formatDate().split(',')[0]}
+            <h2 className="font-display text-2xl md:text-3xl font-semibold text-neutral-900">
+              {isReviewMode
+                ? 'Evening Review'
+                : isToday
+                ? `Today is ${formatDate()}`
+                : formatDate()}
             </h2>
-            <p className="text-neutral-500 text-sm">
-              {formatDate()}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Plan button - desktop only */}
-            {!isMobile && onOpenPlanning && (
-              <button
-                onClick={onOpenPlanning}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100 transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 5v14M9 5v14M6 5h4a2 2 0 012 2v10a2 2 0 01-2 2H6M6 9h6M6 13h6M14 5h4a2 2 0 012 2v10a2 2 0 01-2 2h-4m0-14v14m0-14a2 2 0 012-2h2a2 2 0 012 2m-6 0h6m-6 4h6m-6 4h6" />
-                </svg>
-                <span>Plan</span>
-              </button>
+            {isReviewMode && (
+              <p className="text-neutral-500 text-sm mt-1">
+                Reflect and prepare for tomorrow
+              </p>
             )}
-            {/* Weekly Review button */}
-            <button
-              onClick={() => setShowWeeklyReview(true)}
-              className="relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100 transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-              </svg>
-              <span className="hidden sm:inline">Review</span>
-              {inboxTasks.length > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-amber-500 text-white text-xs font-semibold">
-                  {inboxTasks.length}
-                </span>
-              )}
-            </button>
-            <DateNavigator date={viewedDate} onDateChange={onDateChange} />
           </div>
         </div>
+        {/* Date navigation - below heading */}
+        {!isReviewMode && (
+          <div className="flex items-center gap-2 mt-2">
+            <DateNavigator date={viewedDate} onDateChange={onDateChange} showTodayButton={!isToday} />
+          </div>
+        )}
 
-        {/* Progress bar */}
-        {actionableCount > 0 && (
-          <div className="flex items-center gap-4">
+        {/* Progress bar - hide in review mode */}
+        {!isReviewMode && actionableCount > 0 && (
+          <div className="flex items-center gap-4 mt-4">
             <div className="flex-1">
               <div className="progress-bar" style={{ '--progress-width': `${progressPercent}%` } as React.CSSProperties}>
                 <div
@@ -363,8 +364,23 @@ export function TodaySchedule({
         )}
       </div>
 
-      {/* Schedule content */}
-      {loading ? (
+      {/* Review Mode Content */}
+      {isReviewMode && reviewData && onUpdateTask && onDeleteTask ? (
+        <ReviewSection
+          incompleteTasks={reviewData.incompleteTasks}
+          overdueTasks={reviewData.overdueTasks}
+          staleDeferredTasks={reviewData.staleDeferredTasks}
+          tomorrowTasks={reviewData.tomorrowTasks}
+          onReschedule={(id, date, isAllDay) => onUpdateTask(id, { scheduledFor: date, isAllDay, deferredUntil: undefined })}
+          onComplete={(id) => onToggleTask(id)}
+          onDrop={(id) => onDeleteTask(id)}
+          onCapture={(title) => onCreateTask?.(title)}
+          onSelectTask={(id) => onSelectItem(`task-${id}`)}
+          projects={projects}
+          familyMembers={familyMembers}
+          onAssignTask={onAssignTask}
+        />
+      ) : loading ? (
         <LoadingSkeleton />
       ) : totalItems === 0 ? (
         <div className="text-center py-16 animate-fade-in-up">

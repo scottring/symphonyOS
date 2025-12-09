@@ -1,9 +1,10 @@
 interface DateNavigatorProps {
   date: Date
   onDateChange: (date: Date) => void
+  showTodayButton?: boolean
 }
 
-export function DateNavigator({ date, onDateChange }: DateNavigatorProps) {
+export function DateNavigator({ date, onDateChange, showTodayButton = false }: DateNavigatorProps) {
   const goToPrevDay = () => {
     const prev = new Date(date)
     prev.setDate(prev.getDate() - 1)
@@ -21,7 +22,17 @@ export function DateNavigator({ date, onDateChange }: DateNavigatorProps) {
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1">
+      {/* Today button - only shown when NOT viewing today */}
+      {showTodayButton && (
+        <button
+          onClick={goToToday}
+          className="text-sm font-medium text-primary-600 hover:text-primary-700 bg-primary-50 hover:bg-primary-100 px-2.5 py-1 rounded-lg transition-colors mr-1"
+        >
+          Today
+        </button>
+      )}
+
       {/* Previous day button */}
       <button
         onClick={goToPrevDay}
@@ -40,14 +51,6 @@ export function DateNavigator({ date, onDateChange }: DateNavigatorProps) {
             clipRule="evenodd"
           />
         </svg>
-      </button>
-
-      {/* Today button - always shows "Today", clicking jumps to today */}
-      <button
-        onClick={goToToday}
-        className="text-sm font-medium text-neutral-700 hover:text-primary-600 transition-colors px-2"
-      >
-        Today
       </button>
 
       {/* Next day button */}

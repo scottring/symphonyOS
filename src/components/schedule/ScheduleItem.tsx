@@ -131,6 +131,25 @@ export function ScheduleItem({
           {projectName}
         </div>
       )}
+      {/* Drag handle - appears on hover, left edge */}
+      <div className="
+        absolute -left-6 top-1/2 -translate-y-1/2
+        opacity-0 group-hover:opacity-100
+        transition-opacity duration-150
+        cursor-grab active:cursor-grabbing
+        hidden md:flex items-center justify-center
+        w-5 h-8 rounded text-neutral-300 hover:text-neutral-500
+      ">
+        <svg className="w-4 h-5" viewBox="0 0 16 20" fill="currentColor">
+          <circle cx="5" cy="4" r="1.5" />
+          <circle cx="11" cy="4" r="1.5" />
+          <circle cx="5" cy="10" r="1.5" />
+          <circle cx="11" cy="10" r="1.5" />
+          <circle cx="5" cy="16" r="1.5" />
+          <circle cx="11" cy="16" r="1.5" />
+        </svg>
+      </div>
+
       {/* Main row: time | checkbox/circle | title */}
       <div className="relative flex items-center gap-3">
         {/* Time column - fixed width for alignment */}

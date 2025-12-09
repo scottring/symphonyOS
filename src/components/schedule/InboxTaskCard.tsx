@@ -1,33 +1,51 @@
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
-import { DeferPicker } from '@/components/triage'
+import type { FamilyMember } from '@/types/family'
+import { DeferPicker, SchedulePopover } from '@/components/triage'
+import { AssigneeDropdown } from '@/components/family'
 
 interface InboxTaskCardProps {
   task: Task
   onDefer: (date: Date | undefined) => void
+  onSchedule?: (date: Date, isAllDay: boolean) => void
   onUpdate: (updates: Partial<Task>) => void
   onSelect: () => void
   projects?: Project[]
   onOpenProject?: (projectId: string) => void
+  // Family member assignment
+  familyMembers?: FamilyMember[]
+  onAssignTask?: (memberId: string | null) => void
 }
 
 export function InboxTaskCard({
   task,
   onDefer,
+  onSchedule,
   onUpdate,
   onSelect,
   projects = [],
   onOpenProject,
+  familyMembers = [],
+  onAssignTask,
 }: InboxTaskCardProps) {
   const project = projects.find(p => p.id === task.projectId)
+
+  const handleSchedule = (date: Date, isAllDay: boolean) => {
+    if (onSchedule) {
+      onSchedule(date, isAllDay)
+    } else {
+      // Fallback to onUpdate if onSchedule not provided
+      onUpdate({ scheduledFor: date, isAllDay, deferredUntil: undefined })
+    }
+  }
 
   return (
     <div
       onClick={onSelect}
-      className="bg-white rounded-xl border border-neutral-100 px-3 py-2.5 shadow-sm cursor-pointer hover:border-primary-200 hover:shadow-md transition-all"
+      className="bg-white rounded-xl border border-neutral-100 px-3 py-2.5 shadow-sm cursor-pointer hover:border-primary-200 hover:shadow-md transition-all group"
     >
-      {/* Main row: checkbox | title | triage icons */}
-      <div className="flex items-center gap-3">
+      {/* Main row: checkbox | title | actions | avatar */}
+      <div className="flex items-center gap-2.5">
         {/* Checkbox - fixed width to align with ScheduleItem */}
         <div className="w-5 shrink-0 flex items-center justify-center">
           <button
@@ -64,14 +82,35 @@ export function InboxTaskCard({
           {task.title}
         </span>
 
-        {/* Defer picker - hide inbox item until later */}
-        <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+        {/* Action buttons */}
+        <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+          {/* Schedule button */}
+          <SchedulePopover
+            value={task.scheduledFor}
+            isAllDay={task.isAllDay}
+            onSchedule={handleSchedule}
+            onClear={() => onUpdate({ scheduledFor: undefined, isAllDay: undefined })}
+          />
+
+          {/* Defer/Later button */}
           <DeferPicker
             deferredUntil={task.deferredUntil}
             deferCount={task.deferCount}
             onDefer={onDefer}
           />
         </div>
+
+        {/* Assignee avatar - always visible */}
+        {familyMembers.length > 0 && onAssignTask && (
+          <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+            <AssigneeDropdown
+              members={familyMembers}
+              selectedId={task.assignedTo}
+              onSelect={onAssignTask}
+              size="sm"
+            />
+          </div>
+        )}
       </div>
 
       {/* Chips row - desktop only, only show if project exists */}

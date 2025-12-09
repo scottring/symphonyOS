@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { ArrowRightToLine } from 'lucide-react'
 
 interface DeferPickerProps {
   deferredUntil?: Date
@@ -75,11 +76,10 @@ export function DeferPicker({ deferredUntil, deferCount, onDefer }: DeferPickerP
             ? 'text-amber-600 bg-amber-50 hover:bg-amber-100'
             : 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100'
         }`}
+        title="Defer: I will decide what to do with this later"
         aria-label="Defer item"
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
+        <ArrowRightToLine className="w-4 h-4" />
         {showDeferBadge && (
           <span className="text-xs font-medium">↻{deferCount}</span>
         )}
@@ -89,6 +89,10 @@ export function DeferPicker({ deferredUntil, deferCount, onDefer }: DeferPickerP
         <div className="absolute right-0 top-full mt-1 z-50 bg-white rounded-xl border border-neutral-200 shadow-lg p-2 min-w-[160px]">
           {!showDateInput ? (
             <div className="space-y-1">
+              {/* Header */}
+              <div className="text-xs font-medium text-neutral-400 uppercase tracking-wider px-3 pt-1 pb-2">
+                Defer
+              </div>
               {/* Clear deferral - show now */}
               {hasValue && (
                 <>

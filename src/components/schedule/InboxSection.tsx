@@ -30,7 +30,7 @@ export function InboxSection({
   tasks,
   onUpdateTask,
   onPushTask,
-  onSelectTask: _onSelectTask, // Reserved for future use - direct task selection
+  onSelectTask,
   onDeleteTask,
   projects = [],
   contacts = [],
@@ -41,11 +41,9 @@ export function InboxSection({
   onTriageCardCollapse,
   onOpenProject,
   familyMembers = [],
-  onAssignTask: _onAssignTask, // Reserved for future use - assignment from card
+  onAssignTask,
   currentUserId,
 }: InboxSectionProps) {
-  void _onSelectTask
-  void _onAssignTask
   // Triage modal state
   const [triageTaskId, setTriageTaskId] = useState<string | null>(null)
   const triageTask = triageTaskId ? tasks.find(t => t.id === triageTaskId) : null
@@ -101,10 +99,15 @@ export function InboxSection({
                 onUpdateTask(task.id, { deferredUntil: undefined })
               }
             }}
+            onSchedule={(date, isAllDay) => {
+              onUpdateTask(task.id, { scheduledFor: date, isAllDay, deferredUntil: undefined })
+            }}
             onUpdate={(updates) => onUpdateTask(task.id, updates)}
-            onSelect={() => setTriageTaskId(task.id)}
+            onSelect={() => onSelectTask(task.id)}
             projects={projects}
             onOpenProject={onOpenProject}
+            familyMembers={familyMembers}
+            onAssignTask={onAssignTask ? (memberId) => onAssignTask(task.id, memberId) : undefined}
           />
         ))}
       </div>
