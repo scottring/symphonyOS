@@ -47,10 +47,10 @@ export function useContacts() {
       setLoading(true)
       setError(null)
 
+      // RLS policies handle household sharing - no need to filter by user_id
       const { data, error: fetchError } = await supabase
         .from('contacts')
         .select('*')
-        .eq('user_id', user.id)
         .order('name', { ascending: true })
 
       if (fetchError) {

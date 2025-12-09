@@ -32,11 +32,10 @@ export function useActionableInstances() {
 
       const dateStr = toDateString(date)
 
-      // Try to get existing instance
+      // Try to get existing instance (RLS handles household sharing)
       const { data: existing, error: fetchError } = await supabase
         .from('actionable_instances')
         .select('*')
-        .eq('user_id', user.id)
         .eq('entity_type', entityType)
         .eq('entity_id', entityId)
         .eq('date', dateStr)
@@ -77,10 +76,10 @@ export function useActionableInstances() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return null
 
+      // RLS handles household sharing
       const { data, error: fetchError } = await supabase
         .from('actionable_instances')
         .select('*')
-        .eq('user_id', user.id)
         .eq('entity_type', entityType)
         .eq('entity_id', entityId)
         .eq('date', toDateString(date))
@@ -99,10 +98,10 @@ export function useActionableInstances() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return []
 
+      // RLS handles household sharing
       const { data, error: fetchError } = await supabase
         .from('actionable_instances')
         .select('*')
-        .eq('user_id', user.id)
         .eq('date', toDateString(date))
 
       if (fetchError) throw fetchError

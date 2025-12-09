@@ -8,6 +8,48 @@ export interface FamilyMember {
   is_full_user: boolean
   display_order: number
   created_at: string
+  auth_user_id?: string | null // Links to auth.users for users with accounts
+}
+
+// ============================================================================
+// HOUSEHOLD TYPES
+// ============================================================================
+
+export interface Household {
+  id: string
+  name: string
+  owner_id: string
+  created_at: string
+  updated_at: string
+}
+
+export type HouseholdMemberRole = 'owner' | 'admin' | 'member'
+export type HouseholdMemberStatus = 'pending' | 'active' | 'declined'
+
+export interface HouseholdMember {
+  id: string
+  household_id: string
+  user_id: string
+  role: HouseholdMemberRole
+  status: HouseholdMemberStatus
+  invited_by: string | null
+  invited_email: string | null
+  joined_at: string | null
+  created_at: string
+  // Joined data
+  user_email?: string
+  user_name?: string
+}
+
+export interface HouseholdInvitation {
+  id: string
+  household_id: string
+  email: string
+  invited_by: string
+  token: string
+  expires_at: string
+  accepted_at: string | null
+  created_at: string
 }
 
 export type FamilyMemberColor = 'blue' | 'purple' | 'green' | 'orange' | 'pink' | 'teal'

@@ -36,10 +36,10 @@ export function useProjects() {
       setLoading(true)
       setError(null)
 
+      // RLS policies handle household sharing - no need to filter by user_id
       const { data, error: fetchError } = await supabase
         .from('projects')
         .select('*')
-        .eq('user_id', user.id)
         .order('name', { ascending: true })
 
       if (fetchError) {

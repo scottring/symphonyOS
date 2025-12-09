@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
+import { HouseholdSettings } from './HouseholdSettings'
 import type { FamilyMember } from '@/types/family'
 
 interface SettingsPageProps {
@@ -127,9 +128,19 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
           <h1 className="font-display text-2xl font-semibold text-neutral-800">Settings</h1>
         </div>
 
+        {/* Household Sharing Section */}
+        <section className="mb-10">
+          <h2 className="text-lg font-semibold text-neutral-700 mb-4">Household Sharing</h2>
+          <p className="text-sm text-neutral-500 mb-6">
+            Invite family members to share tasks, routines, and lists. Everyone in your household
+            can see and manage shared items.
+          </p>
+          <HouseholdSettings />
+        </section>
+
         {/* Family Members Section */}
         <section>
-          <h2 className="text-lg font-semibold text-neutral-700 mb-4">Family Members</h2>
+          <h2 className="text-lg font-semibold text-neutral-700 mb-4">Family Members (Assignees)</h2>
           <p className="text-sm text-neutral-500 mb-6">
             Manage the people in your household. You can assign tasks, routines, and events to family members.
           </p>

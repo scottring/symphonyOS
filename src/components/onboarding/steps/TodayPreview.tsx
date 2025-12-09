@@ -13,7 +13,7 @@ interface TodayPreviewProps {
 
 export function TodayPreview({ onContinue }: TodayPreviewProps) {
   const { tasks, loading: tasksLoading, toggleTask, updateTask, pushTask, deleteTask } = useSupabaseTasks()
-  const { getRoutinesForDate, activeRoutines, updateRoutine, loading: routinesLoading } = useRoutines()
+  const { getRoutinesForDate, updateRoutine, loading: routinesLoading } = useRoutines()
   const { projects, projectsMap } = useProjects()
   const { contacts, contactsMap, searchContacts, addContact } = useContacts()
   const { getInstancesForDate, markDone, undoDone, skip } = useActionableInstances()

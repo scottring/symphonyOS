@@ -13,10 +13,10 @@ export function useFamilyMembers() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
+      // RLS policies handle household sharing - no need to filter by user_id
       const { data, error } = await supabase
         .from('family_members')
         .select('*')
-        .eq('user_id', user.id)
         .order('display_order', { ascending: true })
 
       if (error) throw error

@@ -43,10 +43,10 @@ export function useRoutines() {
         return
       }
 
+      // RLS policies handle household sharing - no need to filter by user_id
       const { data, error: fetchError } = await supabase
         .from('routines')
         .select('*')
-        .eq('user_id', user.id)
         .order('name', { ascending: true })
 
       if (fetchError) throw fetchError

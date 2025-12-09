@@ -128,10 +128,11 @@ export function useSupabaseTasks() {
       setLoading(true)
       setError(null)
 
+      // RLS policies handle household sharing - no need to filter by user_id
+      // All tasks visible to this user (their own + household members') will be returned
       const { data, error: fetchError } = await supabase
         .from('tasks')
         .select('*')
-        .eq('user_id', user.id)
         .order('created_at', { ascending: false })
 
       if (fetchError) {
