@@ -142,15 +142,16 @@ describe('TodaySchedule', () => {
     it('renders date header', () => {
       render(<TodaySchedule {...defaultProps} />)
 
-      // "Today" appears in both header and DateNavigator button
-      expect(screen.getByRole('heading', { name: 'Today' })).toBeInTheDocument()
+      // Date header shows "Today is [weekday], [month] [day]"
+      expect(screen.getByRole('heading', { name: /Today is Monday, January 15/ })).toBeInTheDocument()
     })
 
     it('shows weekday name for non-today dates', () => {
       const futureDate = new Date('2024-01-20T12:00:00Z')
       render(<TodaySchedule {...defaultProps} viewedDate={futureDate} />)
 
-      expect(screen.getByText('Saturday')).toBeInTheDocument()
+      // For non-today dates, shows full date like "Saturday, January 20"
+      expect(screen.getByRole('heading', { name: /Saturday, January 20/ })).toBeInTheDocument()
     })
 
     it('renders progress bar when there are actionable items', () => {
@@ -423,14 +424,30 @@ describe('TodaySchedule', () => {
     })
   })
 
-  describe('weekly review', () => {
-    it('shows review button', () => {
-      render(<TodaySchedule {...defaultProps} />)
+  describe('review mode', () => {
+    it('shows Evening Review heading when in review mode', () => {
+      render(
+        <TodaySchedule
+          {...defaultProps}
+          mode="review"
+          reviewData={{
+            incompleteTasks: [],
+            overdueTasks: [],
+            staleDeferredTasks: [],
+            tomorrowTasks: [],
+            reviewCount: 0,
+          }}
+          onUpdateTask={vi.fn()}
+          onDeleteTask={vi.fn()}
+        />
+      )
 
-      expect(screen.getByText('Review')).toBeInTheDocument()
+      // There may be multiple "Evening Review" headings (main heading + section heading)
+      const headings = screen.getAllByRole('heading', { name: /Evening Review/i })
+      expect(headings.length).toBeGreaterThanOrEqual(1)
     })
 
-    it('shows inbox count badge on review button', () => {
+    it('shows inbox tasks count in progress bar', () => {
       const tasks = [
         createMockTask({ id: '1', scheduledFor: undefined }),
         createMockTask({ id: '2', scheduledFor: undefined }),
@@ -445,23 +462,31 @@ describe('TodaySchedule', () => {
         />
       )
 
-      expect(screen.getByText('2')).toBeInTheDocument()
+      // Inbox section should show count
+      expect(screen.getByText(/Inbox \(2\)/)).toBeInTheDocument()
     })
 
-    it('opens weekly review modal when review button clicked', () => {
+    it('shows ReviewSection when in review mode with review data', () => {
+      const reviewData = {
+        incompleteTasks: [createMockTask({ id: '1', title: 'Incomplete task' })],
+        overdueTasks: [],
+        staleDeferredTasks: [],
+        tomorrowTasks: [],
+        reviewCount: 1,
+      }
+
       render(
         <TodaySchedule
           {...defaultProps}
+          mode="review"
+          reviewData={reviewData}
           onUpdateTask={vi.fn()}
-          onPushTask={vi.fn()}
           onDeleteTask={vi.fn()}
         />
       )
 
-      fireEvent.click(screen.getByText('Review'))
-
-      // WeeklyReview modal should open - look for its content
-      expect(screen.getByText(/Weekly Review/i)).toBeInTheDocument()
+      // ReviewSection content should be visible
+      expect(screen.getByText('Incomplete task')).toBeInTheDocument()
     })
   })
 

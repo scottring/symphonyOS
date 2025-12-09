@@ -9,6 +9,7 @@ const mockUser = createMockUser()
 let mockUserState: ReturnType<typeof createMockUser> | null = mockUser
 let mockError: { message: string } | null = null
 let mockFetchResult: unknown = null
+let mockDeferredFetchResult: unknown = null // Separate result for deferred instances query
 let mockInsertResult: unknown = null
 let mockUpdateError: { message: string } | null = null
 const mockSelect = vi.fn()
@@ -18,13 +19,17 @@ const mockDelete = vi.fn()
 const mockEq = vi.fn()
 const mockSingle = vi.fn()
 const mockOrder = vi.fn()
+const mockGte = vi.fn()
+const mockLte = vi.fn()
 
 // Create a recursive eq chain builder
-const createEqChain = (depth: number = 0): unknown => ({
+const createEqChain = (depth: number = 0, isDeferred: boolean = false): unknown => ({
   eq: (field: string, value: string) => {
     mockEq(field, value)
+    // Track if this is the deferred query (status = 'deferred')
+    const nextIsDeferred = isDeferred || (field === 'status' && value === 'deferred')
     if (depth < 4) {
-      return createEqChain(depth + 1)
+      return createEqChain(depth + 1, nextIsDeferred)
     }
     return {
       single: () => {
@@ -32,6 +37,15 @@ const createEqChain = (depth: number = 0): unknown => ({
         return Promise.resolve({ data: mockFetchResult, error: mockError })
       },
     }
+  },
+  gte: (field: string, value: string) => {
+    mockGte(field, value)
+    return createEqChain(depth + 1, isDeferred)
+  },
+  lte: (field: string, value: string) => {
+    mockLte(field, value)
+    // After lte, we're at the end of the deferred query chain
+    return Promise.resolve({ data: isDeferred ? mockDeferredFetchResult : mockFetchResult, error: mockError })
   },
   single: () => {
     mockSingle()
@@ -99,6 +113,7 @@ describe('useActionableInstances', () => {
     mockError = null
     mockUpdateError = null
     mockFetchResult = null
+    mockDeferredFetchResult = null
     mockInsertResult = null
     mockUserState = mockUser
     vi.clearAllMocks()
@@ -246,6 +261,7 @@ describe('useActionableInstances', () => {
         createMockActionableInstance({ id: 'inst-2', date: '2024-01-15' }),
       ]
       mockFetchResult = instances
+      mockDeferredFetchResult = [] // No deferred instances for this test
       mockError = null
 
       const { result } = renderHook(() => useActionableInstances())
@@ -257,6 +273,36 @@ describe('useActionableInstances', () => {
       })
 
       expect(fetched).toHaveLength(2)
+    })
+
+    it('includes instances deferred to the target date', async () => {
+      const originalInstances = [
+        createMockActionableInstance({ id: 'inst-1', date: '2024-01-15' }),
+      ]
+      const deferredInstances = [
+        createMockActionableInstance({
+          id: 'inst-deferred',
+          date: '2024-01-14', // Originally scheduled for yesterday
+          status: 'deferred',
+          deferred_to: '2024-01-15T10:00:00.000Z', // Deferred to today
+        }),
+      ]
+      mockFetchResult = originalInstances
+      mockDeferredFetchResult = deferredInstances
+      mockError = null
+
+      const { result } = renderHook(() => useActionableInstances())
+
+      let fetched: ActionableInstance[] = []
+
+      await act(async () => {
+        fetched = await result.current.getInstancesForDate(new Date('2024-01-15'))
+      })
+
+      // Should include both original and deferred instances
+      expect(fetched).toHaveLength(2)
+      expect(fetched.map(i => i.id)).toContain('inst-1')
+      expect(fetched.map(i => i.id)).toContain('inst-deferred')
     })
 
     it('returns empty array when user is not authenticated', async () => {

@@ -93,19 +93,53 @@ export function useActionableInstances() {
   }, [])
 
   // Get all instances for a date (for daily view)
+  // This includes both:
+  // 1. Instances originally scheduled for this date
+  // 2. Instances that were deferred TO this date (status='deferred', deferred_to matches this date)
   const getInstancesForDate = useCallback(async (date: Date): Promise<ActionableInstance[]> => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return []
 
-      // RLS handles household sharing
-      const { data, error: fetchError } = await supabase
+      const dateStr = toDateString(date)
+
+      // Query 1: Instances originally scheduled for this date
+      const { data: originalInstances, error: fetchError } = await supabase
         .from('actionable_instances')
         .select('*')
-        .eq('date', toDateString(date))
+        .eq('date', dateStr)
 
       if (fetchError) throw fetchError
-      return (data || []) as ActionableInstance[]
+
+      // Query 2: Instances deferred TO this date
+      // These have status='deferred' and deferred_to starts with this date
+      const startOfDay = new Date(date)
+      startOfDay.setHours(0, 0, 0, 0)
+      const endOfDay = new Date(date)
+      endOfDay.setHours(23, 59, 59, 999)
+
+      const { data: deferredInstances, error: deferredError } = await supabase
+        .from('actionable_instances')
+        .select('*')
+        .eq('status', 'deferred')
+        .gte('deferred_to', startOfDay.toISOString())
+        .lte('deferred_to', endOfDay.toISOString())
+
+      if (deferredError) throw deferredError
+
+      // Combine results, avoiding duplicates (by instance id)
+      const instanceMap = new Map<string, ActionableInstance>()
+      for (const instance of (originalInstances || [])) {
+        instanceMap.set(instance.id, instance as ActionableInstance)
+      }
+      for (const instance of (deferredInstances || [])) {
+        // Only add if not already in the map (original date instances take precedence)
+        if (!instanceMap.has(instance.id)) {
+          instanceMap.set(instance.id, instance as ActionableInstance)
+        }
+      }
+
+      return Array.from(instanceMap.values())
     } catch (err) {
       console.error('Failed to get instances for date:', err)
       return []

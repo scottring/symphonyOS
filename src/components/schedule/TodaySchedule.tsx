@@ -154,7 +154,7 @@ export function TodaySchedule({
 
   // Helper function to check if an item matches the assignee filter
   const matchesAssigneeFilter = (assignedTo: string | null | undefined): boolean => {
-    if (selectedAssignee === null) return true // "All" - show everything
+    if (selectedAssignee === null || selectedAssignee === undefined) return true // "All" or not specified - show everything
     if (selectedAssignee === 'unassigned') return !assignedTo // Show only unassigned
     return assignedTo === selectedAssignee // Show items assigned to selected person
   }
@@ -327,11 +327,19 @@ export function TodaySchedule({
         } else if (instance?.status === 'skipped') {
           item.skipped = true
         }
-        // Override time if rescheduled (deferred_to on same day)
+        // Override time if rescheduled
+        // This applies when:
+        // 1. Same-day reschedule (status='pending', deferred_to is a time change)
+        // 2. Cross-day reschedule showing on target day (status='deferred', viewing the deferred_to date)
         if (instance?.deferred_to) {
           const deferredTime = new Date(instance.deferred_to)
-          // Only apply override if it's still the same day (time change, not date change)
-          if (instance.status === 'pending') {
+          const deferredDateStr = deferredTime.toISOString().split('T')[0]
+          const viewedDateStr = viewedDate.toISOString().split('T')[0]
+
+          // Apply time override if:
+          // - Same-day time change (pending status)
+          // - Or this is a deferred routine and we're viewing the target date
+          if (instance.status === 'pending' || (instance.status === 'deferred' && deferredDateStr === viewedDateStr)) {
             item.startTime = deferredTime
           }
         }

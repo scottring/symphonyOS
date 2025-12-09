@@ -3,15 +3,16 @@ import { render, screen } from '@/test/test-utils'
 import { HomeViewSwitcher } from './HomeViewSwitcher'
 
 describe('HomeViewSwitcher', () => {
-  it('renders two view options as icon buttons', () => {
+  it('renders three view options as icon buttons', () => {
     const onViewChange = vi.fn()
     render(<HomeViewSwitcher currentView="today" onViewChange={onViewChange} />)
 
-    // Two icon buttons with aria-labels
+    // Three icon buttons with aria-labels: Today, Week, Review
     const buttons = screen.getAllByRole('button')
-    expect(buttons).toHaveLength(2)
+    expect(buttons).toHaveLength(3)
     expect(screen.getByRole('button', { name: 'Today' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Week' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Review' })).toBeInTheDocument()
   })
 
   it('highlights the currently selected view', () => {
