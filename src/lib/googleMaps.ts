@@ -3,6 +3,7 @@
  * Loads the Google Maps JavaScript SDK dynamically with the Places library
  *
  * Updated to support Places API (New) - December 2024
+ * Uses google.maps.importLibrary() for proper async loading
  */
 
 // Extend window type to include google namespace
@@ -13,21 +14,23 @@ declare global {
 }
 
 // Track loading state
-let loadPromise: Promise<void> | null = null
+let coreLoadPromise: Promise<void> | null = null
+let placesLibrary: google.maps.PlacesLibrary | null = null
+let placesLoadPromise: Promise<google.maps.PlacesLibrary> | null = null
 
 /**
- * Load the Google Maps SDK with Places library (New API)
- * Returns a promise that resolves when the SDK is ready
+ * Load the Google Maps core SDK
+ * Returns a promise that resolves when the core SDK is ready
  */
 export async function loadGoogleMapsSDK(): Promise<void> {
-  // Already loaded - check for new Places API marker
-  if (window.google?.maps?.places?.Place) {
+  // Already loaded
+  if (window.google?.maps) {
     return
   }
 
   // Already loading
-  if (loadPromise) {
-    return loadPromise
+  if (coreLoadPromise) {
+    return coreLoadPromise
   }
 
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
@@ -35,7 +38,7 @@ export async function loadGoogleMapsSDK(): Promise<void> {
     throw new Error('VITE_GOOGLE_MAPS_API_KEY is not configured')
   }
 
-  loadPromise = new Promise((resolve, reject) => {
+  coreLoadPromise = new Promise((resolve, reject) => {
     // Create callback for when SDK loads
     const callbackName = '__googleMapsCallback__' + Date.now()
     ;(window as unknown as Record<string, () => void>)[callbackName] = () => {
@@ -43,28 +46,67 @@ export async function loadGoogleMapsSDK(): Promise<void> {
       resolve()
     }
 
-    // Create script element
-    // Using 'places' library for autocomplete and 'routes' for DirectionsService
+    // Create script element - load core only, we'll import libraries dynamically
     const script = document.createElement('script')
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,routes&callback=${callbackName}`
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=${callbackName}`
     script.async = true
     script.defer = true
     script.onerror = () => {
-      loadPromise = null
+      coreLoadPromise = null
       reject(new Error('Failed to load Google Maps SDK'))
     }
 
     document.head.appendChild(script)
   })
 
-  return loadPromise
+  return coreLoadPromise
 }
 
 /**
- * Check if the Google Maps SDK is loaded (with new Places API)
+ * Load the Places library using importLibrary (required for new Places API)
+ * Returns the Places library with AutocompleteSuggestion, Place, etc.
+ */
+export async function loadPlacesLibrary(): Promise<google.maps.PlacesLibrary> {
+  // Already loaded
+  if (placesLibrary) {
+    return placesLibrary
+  }
+
+  // Already loading
+  if (placesLoadPromise) {
+    return placesLoadPromise
+  }
+
+  // Ensure core SDK is loaded first
+  await loadGoogleMapsSDK()
+
+  placesLoadPromise = google.maps.importLibrary('places').then((lib) => {
+    placesLibrary = lib as google.maps.PlacesLibrary
+    return placesLibrary
+  })
+
+  return placesLoadPromise
+}
+
+/**
+ * Check if the Google Maps core SDK is loaded
  */
 export function isGoogleMapsLoaded(): boolean {
-  return Boolean(window.google?.maps?.places?.Place)
+  return Boolean(window.google?.maps)
+}
+
+/**
+ * Check if the Places library is loaded
+ */
+export function isPlacesLibraryLoaded(): boolean {
+  return Boolean(placesLibrary)
+}
+
+/**
+ * Get the loaded Places library (returns null if not loaded)
+ */
+export function getPlacesLibrary(): google.maps.PlacesLibrary | null {
+  return placesLibrary
 }
 
 // =============================================================================

@@ -1,11 +1,11 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import type {
   DirectionsContext,
   DirectionsResult,
   TravelMode,
   PlaceAutocompleteResult,
 } from '@/types/directions'
-import { loadGoogleMapsSDK, isGoogleMapsLoaded } from '@/lib/googleMaps'
+import { loadPlacesLibrary, isGoogleMapsLoaded, getPlacesLibrary } from '@/lib/googleMaps'
 
 interface UseDirectionsResult {
   // State
@@ -23,6 +23,7 @@ interface UseDirectionsResult {
 /**
  * Hook for Google Maps/Directions integration
  * Updated to use Places API (New) - December 2024
+ * Uses google.maps.importLibrary() for proper Places API loading
  * Note: Requires VITE_GOOGLE_MAPS_API_KEY environment variable
  */
 export function useDirections(): UseDirectionsResult {
@@ -30,17 +31,25 @@ export function useDirections(): UseDirectionsResult {
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<DirectionsResult | null>(null)
   const [sdkReady, setSdkReady] = useState(isGoogleMapsLoaded())
+  const placesLibraryRef = useRef<google.maps.PlacesLibrary | null>(getPlacesLibrary())
 
-  // Load Google Maps SDK on mount
+  // Load Google Maps SDK and Places library on mount
   useEffect(() => {
-    if (sdkReady) return
+    if (sdkReady && placesLibraryRef.current) {
+      console.log('[Places] SDK already ready')
+      return
+    }
 
-    loadGoogleMapsSDK()
-      .then(() => {
+    console.log('[Places] Loading Places library...')
+    loadPlacesLibrary()
+      .then((lib) => {
+        console.log('[Places] Library loaded:', lib)
+        console.log('[Places] AutocompleteSuggestion available:', !!lib.AutocompleteSuggestion)
+        placesLibraryRef.current = lib
         setSdkReady(true)
       })
       .catch((err) => {
-        console.error('Failed to load Google Maps SDK:', err)
+        console.error('[Places] Failed to load Google Maps SDK:', err)
       })
   }, [sdkReady])
 
@@ -164,17 +173,23 @@ export function useDirections(): UseDirectionsResult {
     if (!query.trim()) return []
 
     // If SDK not ready yet, return empty
-    if (!sdkReady || !window.google?.maps?.places?.AutocompleteSuggestion) {
+    if (!sdkReady || !placesLibraryRef.current) {
       console.warn('Google Maps SDK not ready for autocomplete')
       return []
     }
 
     try {
+      const { AutocompleteSuggestion } = placesLibraryRef.current
+      console.log('[Places] Searching for:', query.trim())
+      console.log('[Places] AutocompleteSuggestion:', AutocompleteSuggestion)
+
       // Use the new Places API AutocompleteSuggestion
-      const { suggestions } = await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+      const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
         input: query.trim(),
         // includedPrimaryTypes can filter results - omitting for broad results
       })
+
+      console.log('[Places] Got suggestions:', suggestions)
 
       // Map to our PlaceAutocompleteResult format
       return suggestions.map((suggestion) => {
@@ -187,7 +202,7 @@ export function useDirections(): UseDirectionsResult {
         }
       }).filter(result => result.placeId) // Filter out any without placeId
     } catch (err) {
-      console.warn('Places autocomplete error:', err)
+      console.error('[Places] Autocomplete error:', err)
       return []
     }
   }, [sdkReady])
@@ -239,14 +254,16 @@ export function useDirections(): UseDirectionsResult {
   // =============================================================================
   const getPlaceDetails = useCallback(async (placeId: string): Promise<{ address: string; name: string } | null> => {
     // If SDK not ready yet, return null
-    if (!sdkReady || !window.google?.maps?.places?.Place) {
+    if (!sdkReady || !placesLibraryRef.current) {
       console.warn('Google Maps SDK not ready for place details')
       return null
     }
 
     try {
+      const { Place } = placesLibraryRef.current
+
       // Use the new Places API Place class
-      const place = new google.maps.places.Place({ id: placeId })
+      const place = new Place({ id: placeId })
       await place.fetchFields({ fields: ['formattedAddress', 'displayName'] })
 
       return {
