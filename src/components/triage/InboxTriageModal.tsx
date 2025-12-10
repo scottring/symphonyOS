@@ -3,6 +3,8 @@ import type { Task, TaskContext, TaskCategory } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
 import { FAMILY_COLORS, type FamilyMemberColor } from '@/types/family'
+import { PlacesAutocomplete, type PlaceSelection } from '@/components/location/PlacesAutocomplete'
+import { useDirections } from '@/hooks/useDirections'
 
 interface InboxTriageModalProps {
   task: Task
@@ -42,6 +44,7 @@ export function InboxTriageModal({
   currentUserId,
 }: InboxTriageModalProps) {
   const modalRef = useRef<HTMLDivElement>(null)
+  const { searchPlaces, getPlaceDetails } = useDirections()
 
   // Form state
   const [category, setCategory] = useState<TaskCategory>('task')
@@ -50,7 +53,7 @@ export function InboxTriageModal({
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(currentUserId ?? null)
   const [domain, setDomain] = useState<TaskContext | null>(null)
   const [projectId, setProjectId] = useState<string | null>(null)
-  const [location, setLocation] = useState<string>('')
+  const [locationData, setLocationData] = useState<PlaceSelection | null>(null)
   // Event-specific
   const [startTime, setStartTime] = useState<string>('')
   const [endTime, setEndTime] = useState<string>('')
@@ -66,7 +69,8 @@ export function InboxTriageModal({
       setSelectedMemberId(task.assignedTo ?? currentUserId ?? null)
       setDomain(task.context ?? 'family') // Default to family context
       setProjectId(task.projectId ?? null)
-      setLocation(task.location ?? '')
+      // Convert existing location string to PlaceSelection format
+      setLocationData(task.location ? { name: task.location, address: task.location, placeId: '' } : null)
       setStartTime('')
       setEndTime('')
       setForChildId(null)
@@ -150,8 +154,8 @@ export function InboxTriageModal({
       updates.projectId = projectId
     }
 
-    if (location && (category === 'errand' || category === 'event' || category === 'activity')) {
-      updates.location = location
+    if (locationData && (category === 'errand' || category === 'event' || category === 'activity')) {
+      updates.location = locationData.address || locationData.name
     }
 
     onProcessAsTask(updates)
@@ -291,13 +295,13 @@ export function InboxTriageModal({
               <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">
                 Location
               </label>
-              <input
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
+              <PlacesAutocomplete
+                value={locationData ? { name: locationData.name, address: locationData.address, placeId: locationData.placeId } : null}
+                onSelect={(place) => setLocationData(place)}
+                onClear={() => setLocationData(null)}
+                onSearch={searchPlaces}
+                onGetDetails={getPlaceDetails}
                 placeholder={category === 'errand' ? 'Store, address, etc.' : 'Where is this?'}
-                className="w-full px-3 py-2.5 text-sm rounded-lg border border-neutral-200
-                           focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
           )}
