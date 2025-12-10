@@ -75,14 +75,26 @@ export function InboxTaskCard({
           </button>
         </div>
 
-        {/* Title */}
-        <span
-          className={`flex-1 text-left min-w-0 text-base font-medium line-clamp-2 ${
-            task.completed ? 'text-neutral-400 line-through' : 'text-neutral-800'
-          }`}
-        >
-          {task.title}
-        </span>
+        {/* Title and category */}
+        <div className="flex-1 flex items-center gap-2 min-w-0">
+          <span
+            className={`text-left min-w-0 text-base font-medium line-clamp-2 ${
+              task.completed ? 'text-neutral-400 line-through' : 'text-neutral-800'
+            }`}
+          >
+            {task.title}
+          </span>
+          {/* Category chip - only show for non-task categories */}
+          {task.category && task.category !== 'task' && (
+            <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded text-xs font-medium">
+              {task.category === 'errand' && '🚗'}
+              {task.category === 'chore' && '🧹'}
+              {task.category === 'event' && '📅'}
+              {task.category === 'activity' && '⚽'}
+              <span className="hidden sm:inline">{task.category}</span>
+            </span>
+          )}
+        </div>
 
         {/* Action buttons - hidden by default, show on hover */}
         <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>

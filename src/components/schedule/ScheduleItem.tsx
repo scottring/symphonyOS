@@ -245,23 +245,35 @@ export function ScheduleItem({
 
         {/* Title */}
         <div className="flex-1 min-w-0">
-          <span
-            className={`
-              text-base font-medium line-clamp-2 transition-colors
-              ${item.completed || item.skipped ? 'line-through text-neutral-400' : 'text-neutral-800 group-hover:text-neutral-900'}
-            `}
-          >
-            {item.title}
-          </span>
-          {/* Subtask indicator */}
-          {hasSubtasks && (
-            <span className="ml-2 inline-flex items-center gap-1 text-xs text-neutral-400">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-              </svg>
-              {item.subtaskCompletedCount}/{item.subtaskCount}
+          <div className="flex items-center gap-2">
+            <span
+              className={`
+                text-base font-medium line-clamp-2 transition-colors
+                ${item.completed || item.skipped ? 'line-through text-neutral-400' : 'text-neutral-800 group-hover:text-neutral-900'}
+              `}
+            >
+              {item.title}
             </span>
-          )}
+            {/* Category chip - only show for non-task categories */}
+            {item.category && item.category !== 'task' && (
+              <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded text-xs font-medium">
+                {item.category === 'errand' && '🚗'}
+                {item.category === 'chore' && '🧹'}
+                {item.category === 'event' && '📅'}
+                {item.category === 'activity' && '⚽'}
+                <span className="hidden sm:inline">{item.category}</span>
+              </span>
+            )}
+            {/* Subtask indicator */}
+            {hasSubtasks && (
+              <span className="shrink-0 inline-flex items-center gap-1 text-xs text-neutral-400">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                </svg>
+                {item.subtaskCompletedCount}/{item.subtaskCount}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Skip button - for routines and events, hidden by default, shows on hover */}

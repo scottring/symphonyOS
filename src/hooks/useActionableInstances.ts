@@ -39,7 +39,7 @@ export function useActionableInstances() {
         .eq('entity_type', entityType)
         .eq('entity_id', entityId)
         .eq('date', dateStr)
-        .single()
+        .maybeSingle()
 
       if (existing && !fetchError) {
         return existing as ActionableInstance
@@ -83,7 +83,7 @@ export function useActionableInstances() {
         .eq('entity_type', entityType)
         .eq('entity_id', entityId)
         .eq('date', toDateString(date))
-        .single()
+        .maybeSingle()
 
       if (fetchError || !data) return null
       return data as ActionableInstance

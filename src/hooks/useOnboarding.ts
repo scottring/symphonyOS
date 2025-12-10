@@ -73,10 +73,9 @@ export function useOnboarding() {
         .from('user_profiles')
         .select('*')
         .eq('user_id', user.id)
-        .single()
+        .maybeSingle()
 
-      if (error && error.code !== 'PGRST116') {
-        // PGRST116 = row not found, which is expected for new users
+      if (error) {
         console.error('Error fetching onboarding state:', error)
       }
 

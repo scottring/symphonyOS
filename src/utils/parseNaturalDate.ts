@@ -14,8 +14,8 @@ export interface ParseResult {
   scheduledFor: Date
 }
 
-// Time patterns: 3pm, 3:00pm, 3:00, at 3, at 3pm
-const TIME_PATTERN = /\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i
+// Time patterns: 3pm, 3p, 3:00pm, 3:00, at 3, at 3pm, at 3p
+const TIME_PATTERN = /\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(a|am|p|pm)?\b/i
 
 // Day names for matching
 const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
@@ -33,9 +33,10 @@ function parseTime(match: RegExpMatchArray): { hours: number; minutes: number } 
   if (hours > 23) return null
   if (minutes > 59) return null
 
-  // Handle AM/PM
+  // Handle AM/PM (including abbreviated a/p)
   if (meridiem) {
-    const isPM = meridiem.toLowerCase() === 'pm'
+    const lower = meridiem.toLowerCase()
+    const isPM = lower === 'pm' || lower === 'p'
     if (isPM && hours !== 12) hours += 12
     if (!isPM && hours === 12) hours = 0
   } else if (hours <= 12) {

@@ -104,7 +104,7 @@ export function QuickCapture({
     return contacts.find(c => c.id === effectiveParsed.contactId)?.name ?? null
   }, [effectiveParsed.contactId, contacts])
 
-  // Format date for display
+  // Format date and time for display
   const formatDate = (date: Date) => {
     const today = new Date()
     const tomorrow = new Date(today)
@@ -113,14 +113,26 @@ export function QuickCapture({
     const isToday = date.toDateString() === today.toDateString()
     const isTomorrow = date.toDateString() === tomorrow.toDateString()
 
-    if (isToday) return 'Today'
-    if (isTomorrow) return 'Tomorrow'
+    // Check if time is set (not midnight exactly)
+    const hasTime = date.getHours() !== 0 || date.getMinutes() !== 0
+    const timeStr = hasTime
+      ? date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+      : ''
 
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-    })
+    let dateStr: string
+    if (isToday) {
+      dateStr = 'Today'
+    } else if (isTomorrow) {
+      dateStr = 'Tomorrow'
+    } else {
+      dateStr = date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      })
+    }
+
+    return hasTime ? `${dateStr} at ${timeStr}` : dateStr
   }
 
   const handleSubmit = (e?: React.FormEvent) => {
@@ -256,10 +268,12 @@ export function QuickCapture({
                     </div>
                   )}
 
-                  {/* Date chip */}
+                  {/* Date/time chip */}
                   {effectiveParsed.dueDate && (
                     <div className="flex items-center gap-2">
-                      <span className="text-base">📅</span>
+                      <span className="text-base">
+                        {effectiveParsed.dueDate.getHours() !== 0 || effectiveParsed.dueDate.getMinutes() !== 0 ? '🕐' : '📅'}
+                      </span>
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary-50 text-primary-700 rounded-full text-xs font-medium border border-primary-100">
                         {formatDate(effectiveParsed.dueDate)}
                         <button

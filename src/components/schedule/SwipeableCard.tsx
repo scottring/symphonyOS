@@ -5,7 +5,7 @@ import { formatTime } from '@/lib/timeUtils'
 import { getProjectColor } from '@/lib/projectUtils'
 import { TypeIcon } from './TypeIcon'
 import { AssigneeDropdown } from '@/components/family'
-import { CalendarArrowDown, Redo2, MoreHorizontal } from 'lucide-react'
+import { ArrowRightToLine, Redo2, MoreHorizontal } from 'lucide-react'
 
 interface SwipeableCardProps {
   item: TimelineItem
@@ -203,7 +203,7 @@ export function SwipeableCard({
           onClick={() => handleAction('tomorrow')}
           className="w-[60px] flex flex-col items-center justify-center gap-1 bg-amber-500 text-white text-xs font-medium active:bg-amber-600"
         >
-          <CalendarArrowDown className="w-5 h-5" />
+          <ArrowRightToLine className="w-5 h-5" />
           <span>Push</span>
         </button>
         <button
@@ -259,15 +259,26 @@ export function SwipeableCard({
             <TypeIcon type={item.type} completed={item.completed} />
           </div>
 
-          {/* Title */}
-          <span
-            className={`
-              flex-1 min-w-0 text-base font-medium leading-snug truncate
-              ${item.completed ? 'line-through text-neutral-400' : 'text-neutral-800'}
-            `}
-          >
-            {item.title}
-          </span>
+          {/* Title and category */}
+          <div className="flex-1 min-w-0 flex items-center gap-1.5">
+            <span
+              className={`
+                text-base font-medium leading-snug truncate
+                ${item.completed ? 'line-through text-neutral-400' : 'text-neutral-800'}
+              `}
+            >
+              {item.title}
+            </span>
+            {/* Category emoji only on mobile for space */}
+            {item.category && item.category !== 'task' && (
+              <span className="shrink-0 text-sm">
+                {item.category === 'errand' && '🚗'}
+                {item.category === 'chore' && '🧹'}
+                {item.category === 'event' && '📅'}
+                {item.category === 'activity' && '⚽'}
+              </span>
+            )}
+          </div>
 
           {/* Assignee avatar */}
           {familyMembers.length > 0 && (

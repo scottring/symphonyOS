@@ -1,4 +1,4 @@
-import type { Task, TaskLink } from './task'
+import type { Task, TaskLink, TaskCategory } from './task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, RecurrencePattern } from './actionable'
 
@@ -19,6 +19,7 @@ export interface TimelineItem {
   contactId?: string // Linked contact
   projectId?: string // Linked project
   assignedTo?: string | null // Family member assignment
+  category?: TaskCategory // Type of task: task, chore, errand, event, activity
   // Subtask support
   subtaskCount?: number // Total subtasks
   subtaskCompletedCount?: number // Completed subtasks
@@ -53,6 +54,7 @@ export function taskToTimelineItem(task: Task): TimelineItem {
     contactId: task.contactId,
     projectId: task.projectId,
     assignedTo: task.assignedTo,
+    category: task.category,
     allDay: task.isAllDay,
     location: task.location,
     subtaskCount,

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { CalendarArrowDown } from 'lucide-react'
+import { ArrowRightToLine } from 'lucide-react'
 
 interface PushDropdownProps {
   onPush: (date: Date) => void
@@ -91,7 +91,7 @@ export function PushDropdown({ onPush, size = 'md', showTodayOption = false }: P
         className={buttonClasses}
         aria-label="Push task"
       >
-        <CalendarArrowDown className={iconClasses} />
+        <ArrowRightToLine className={iconClasses} />
       </button>
 
       {isOpen && createPortal(

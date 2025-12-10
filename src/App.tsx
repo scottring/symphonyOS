@@ -16,6 +16,7 @@ import { useSearch, type SearchResult } from '@/hooks/useSearch'
 import { useAttachments } from '@/hooks/useAttachments'
 import { usePinnedItems } from '@/hooks/usePinnedItems'
 import { useUndo } from '@/hooks/useUndo'
+import { useToast } from '@/hooks/useToast'
 import type { PinnableEntityType } from '@/types/pin'
 import { supabase } from '@/lib/supabase'
 import { AppShell } from '@/components/layout/AppShell'
@@ -26,7 +27,7 @@ import { SearchModal } from '@/components/search/SearchModal'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 import { ListsList, ListView } from '@/components/list'
 import { NotesPage } from '@/components/notes'
-// UndoToast available if needed: import { UndoToast } from '@/components/undo'
+import { Toast } from '@/components/toast'
 import {
   ProjectsList,
   ProjectView,
@@ -53,6 +54,7 @@ function App() {
   const attachments = useAttachments()
   const pinnedItems = usePinnedItems()
   const undo = useUndo({ duration: 5000 })
+  const { toast, showToast, dismissToast } = useToast()
 
   // Onboarding state
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null)
@@ -71,7 +73,7 @@ function App() {
     toggleVisibility: toggleRoutineVisibility,
   } = useRoutines()
   const { getInstancesForDate, markDone, undoDone, skip, reschedule } = useActionableInstances()
-  const { members: familyMembers, getCurrentUserMember } = useFamilyMembers()
+  const { members: familyMembers, getCurrentUserMember, refetch: refetchFamilyMembers } = useFamilyMembers()
 
   // Lists state
   const [selectedListId, setSelectedListId] = useState<string | null>(null)
@@ -173,9 +175,9 @@ function App() {
           .from('user_profiles')
           .select('onboarding_completed_at')
           .eq('user_id', user.id)
-          .single()
+          .maybeSingle()
 
-        if (error && error.code !== 'PGRST116') {
+        if (error) {
           console.error('Error checking onboarding:', error)
           // Assume complete on error to not block the app
           setOnboardingComplete(true)
@@ -673,6 +675,39 @@ function App() {
     }
   }, [updateProject, pinnedItems])
 
+  // Helper to format date for toast message
+  const formatDateForToast = useCallback((date: Date): string => {
+    const today = new Date()
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+
+    if (date.toDateString() === today.toDateString()) return 'today'
+    if (date.toDateString() === tomorrow.toDateString()) return 'tomorrow'
+
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+  }, [])
+
+  // Wrapper for updateTask that shows toast when scheduling to future date
+  const handleUpdateTaskWithToast = useCallback(async (
+    id: string,
+    updates: Parameters<typeof updateTask>[1]
+  ) => {
+    await updateTask(id, updates)
+
+    // Show toast if scheduling to a future date (not today)
+    if (updates.scheduledFor) {
+      const scheduleDate = updates.scheduledFor
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const scheduleDateStart = new Date(scheduleDate)
+      scheduleDateStart.setHours(0, 0, 0, 0)
+
+      if (scheduleDateStart > today) {
+        showToast(`Scheduled for ${formatDateForToast(scheduleDate)}`, 'info', 2500)
+      }
+    }
+  }, [updateTask, showToast, formatDateForToast])
+
   // Handle pin navigation
   const handlePinNavigate = useCallback((entityType: PinnableEntityType, entityId: string) => {
     switch (entityType) {
@@ -857,7 +892,7 @@ function App() {
             selectedItemId={selectedItemId}
             onSelectItem={handleSelectItem}
             onToggleTask={handleToggleTask}
-            onUpdateTask={updateTask}
+            onUpdateTask={handleUpdateTaskWithToast}
             onPushTask={pushTask}
             onDeleteTask={deleteTask}
             loading={tasksLoading || eventsFetching || routinesLoading}
@@ -1180,7 +1215,10 @@ function App() {
 
       {activeView === 'settings' && (
         <Suspense fallback={<LoadingFallback />}>
-          <SettingsPage onBack={() => handleViewChange('home')} />
+          <SettingsPage onBack={() => {
+            refetchFamilyMembers() // Refresh family members in case they were edited
+            handleViewChange('home')
+          }} />
         </Suspense>
       )}
 
@@ -1195,6 +1233,9 @@ function App() {
         isSearching={isSearching}
         onSelectResult={handleSearchSelect}
       />
+
+      {/* Toast notifications */}
+      <Toast toast={toast} onDismiss={dismissToast} />
     </AppShell>
   )
 }
