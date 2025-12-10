@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { HouseholdSettings } from './HouseholdSettings'
+import { WaitlistAdmin } from './WaitlistAdmin'
 import type { FamilyMember } from '@/types/family'
 
 interface SettingsPageProps {
@@ -349,6 +350,15 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
               </button>
             )}
           </div>
+        </section>
+
+        {/* Admin Section */}
+        <section className="mt-10 pt-10 border-t border-neutral-200">
+          <h2 className="text-lg font-semibold text-neutral-700 mb-4">Admin</h2>
+          <p className="text-sm text-neutral-500 mb-6">
+            Manage waitlist signups from the landing page.
+          </p>
+          <WaitlistAdmin />
         </section>
       </div>
     </div>

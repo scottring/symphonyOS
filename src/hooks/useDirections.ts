@@ -35,21 +35,15 @@ export function useDirections(): UseDirectionsResult {
 
   // Load Google Maps SDK and Places library on mount
   useEffect(() => {
-    if (sdkReady && placesLibraryRef.current) {
-      console.log('[Places] SDK already ready')
-      return
-    }
+    if (sdkReady && placesLibraryRef.current) return
 
-    console.log('[Places] Loading Places library...')
     loadPlacesLibrary()
       .then((lib) => {
-        console.log('[Places] Library loaded:', lib)
-        console.log('[Places] AutocompleteSuggestion available:', !!lib.AutocompleteSuggestion)
         placesLibraryRef.current = lib
         setSdkReady(true)
       })
       .catch((err) => {
-        console.error('[Places] Failed to load Google Maps SDK:', err)
+        console.error('Failed to load Google Maps SDK:', err)
       })
   }, [sdkReady])
 
@@ -180,16 +174,11 @@ export function useDirections(): UseDirectionsResult {
 
     try {
       const { AutocompleteSuggestion } = placesLibraryRef.current
-      console.log('[Places] Searching for:', query.trim())
-      console.log('[Places] AutocompleteSuggestion:', AutocompleteSuggestion)
 
       // Use the new Places API AutocompleteSuggestion
       const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
         input: query.trim(),
-        // includedPrimaryTypes can filter results - omitting for broad results
       })
-
-      console.log('[Places] Got suggestions:', suggestions)
 
       // Map to our PlaceAutocompleteResult format
       return suggestions.map((suggestion) => {
@@ -202,7 +191,7 @@ export function useDirections(): UseDirectionsResult {
         }
       }).filter(result => result.placeId) // Filter out any without placeId
     } catch (err) {
-      console.error('[Places] Autocomplete error:', err)
+      console.warn('Places autocomplete error:', err)
       return []
     }
   }, [sdkReady])
