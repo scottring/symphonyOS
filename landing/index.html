@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Symphony — One System for Your Whole Life</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,400;1,9..144,400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --cream: #FDFCFA;
+      --cream-warm: #FAF6F1;
+      --forest: #2D5A47;
+      --forest-light: #3D7A5F;
+      --charcoal: #1A1A1A;
+      --sage: #A8C5B8;
+      --peach: #F5DDD3;
+      --lavender: #E5DFF5;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--cream);
+      color: var(--charcoal);
+      overflow-x: hidden;
+    }
+
+    /* Nav */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      padding: 1.5rem 2rem;
+      background: rgba(253, 252, 250, 0.85);
+      backdrop-filter: blur(20px);
+    }
+
+    nav .inner {
+      max-width: 1000px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      font-family: 'Fraunces', serif;
+      font-size: 1.35rem;
+      color: var(--forest);
+      text-decoration: none;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .login-link {
+      color: var(--forest);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      opacity: 0.8;
+      transition: opacity 0.2s;
+    }
+
+    .login-link:hover {
+      opacity: 1;
+    }
+
+    .cta {
+      background: var(--forest);
+      color: white;
+      padding: 0.7rem 1.4rem;
+      border-radius: 100px;
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: transform 0.2s, box-shadow 0.2s;
+      border: none;
+      cursor: pointer;
+    }
+
+    .cta:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(45, 90, 71, 0.25);
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(26, 26, 26, 0.4);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s, visibility 0.3s;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal {
+      background: var(--cream);
+      border-radius: 24px;
+      padding: 3rem;
+      max-width: 420px;
+      width: 90%;
+      text-align: center;
+      transform: translateY(20px) scale(0.95);
+      transition: transform 0.3s ease;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.15);
+    }
+
+    .modal-overlay.active .modal {
+      transform: translateY(0) scale(1);
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: #999;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-close:hover {
+      background: var(--cream-warm);
+    }
+
+    .modal-icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 1.5rem;
+    }
+
+    .modal h3 {
+      font-family: 'Fraunces', serif;
+      font-size: 1.5rem;
+      font-weight: 400;
+      margin-bottom: 0.5rem;
+    }
+
+    .modal p {
+      font-size: 1rem;
+      color: #666;
+      margin-bottom: 1.5rem;
+    }
+
+    .modal form {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .modal input[type="email"] {
+      padding: 1rem 1.25rem;
+      border: 2px solid var(--cream-warm);
+      border-radius: 12px;
+      font-size: 1rem;
+      font-family: inherit;
+      transition: border-color 0.2s;
+    }
+
+    .modal input[type="email"]:focus {
+      outline: none;
+      border-color: var(--forest);
+    }
+
+    .modal .cta {
+      width: 100%;
+      padding: 1rem;
+      font-size: 1rem;
+    }
+
+    .modal-note {
+      font-size: 0.8rem;
+      color: #999;
+      margin-top: 1rem;
+    }
+
+    /* Success state */
+    .modal-success {
+      display: none;
+    }
+
+    .modal.success .modal-form {
+      display: none;
+    }
+
+    .modal.success .modal-success {
+      display: block;
+    }
+
+    .success-check {
+      width: 48px;
+      height: 48px;
+      background: var(--sage);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1rem;
+    }
+
+    .success-check svg {
+      width: 24px;
+      height: 24px;
+      color: white;
+    }
+
+    /* Sections */
+    section {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 8rem 2rem;
+      text-align: center;
+    }
+
+    h1, h2 {
+      font-family: 'Fraunces', serif;
+      font-weight: 400;
+      line-height: 1.15;
+    }
+
+    h1 { font-size: clamp(2.5rem, 6vw, 4rem); }
+    h2 { font-size: clamp(1.8rem, 4vw, 2.5rem); }
+
+    h1 em, h2 em {
+      font-style: italic;
+      color: var(--forest);
+    }
+
+    p {
+      font-size: 1.15rem;
+      color: #555;
+      max-width: 480px;
+      line-height: 1.7;
+    }
+
+    /* Hero */
+    .hero {
+      background: linear-gradient(180deg, var(--cream) 0%, var(--cream-warm) 100%);
+      gap: 2rem;
+    }
+
+    .hero-illustration {
+      width: min(90%, 500px);
+      margin-bottom: 1rem;
+    }
+
+    /* Illustration styles */
+    .illustration {
+      width: min(85%, 420px);
+      margin: 2rem 0;
+    }
+
+    /* Vision section */
+    .vision {
+      background: var(--cream-warm);
+    }
+
+    /* Intersection section */
+    .insight {
+      background: var(--forest);
+      color: white;
+    }
+
+    .insight p { color: rgba(255,255,255,0.8); }
+    .insight h2 em { color: var(--sage); }
+
+    /* Solution section */
+    .solution {
+      background: var(--cream);
+    }
+
+    /* Principles - horizontal scroll cards */
+    .principles {
+      background: var(--cream-warm);
+      padding: 6rem 0;
+    }
+
+    .principles h2 {
+      margin-bottom: 3rem;
+    }
+
+    .cards {
+      display: flex;
+      gap: 1.5rem;
+      padding: 0 2rem;
+      max-width: 1000px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .card {
+      background: white;
+      border-radius: 20px;
+      padding: 2rem;
+      width: 280px;
+      text-align: left;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.04);
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.08);
+    }
+
+    .card-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card h3 {
+      font-family: 'Fraunces', serif;
+      font-size: 1.15rem;
+      font-weight: 400;
+      margin-bottom: 0.5rem;
+    }
+
+    .card p {
+      font-size: 0.95rem;
+      color: #666;
+    }
+
+    /* Final CTA */
+    .final {
+      background: linear-gradient(180deg, var(--cream) 0%, var(--cream-warm) 100%);
+      gap: 1.5rem;
+    }
+
+    .final .cta {
+      padding: 1rem 2rem;
+      font-size: 1rem;
+    }
+
+    .made-with {
+      margin-top: 3rem;
+      font-size: 0.9rem;
+      color: #888;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .made-with svg {
+      width: 16px;
+      height: 16px;
+      color: #E57373;
+    }
+
+    /* Footer */
+    footer {
+      padding: 3rem 2rem;
+      text-align: center;
+      font-size: 0.85rem;
+      color: #999;
+    }
+
+    @media (max-width: 768px) {
+      section { padding: 6rem 1.5rem; }
+      .cards { flex-direction: column; align-items: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="inner">
+      <a href="#" class="logo">Symphony</a>
+      <div class="nav-links">
+        <a href="https://app.symphony-os.com" class="login-link">Log in</a>
+        <button class="cta" onclick="openModal()">Request Access</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <svg class="hero-illustration" viewBox="0 0 500 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- Split life illustration: two worlds becoming one -->
+      <!-- Left side: work elements -->
+      <circle cx="150" cy="150" r="100" fill="#E5DFF5" opacity="0.6"/>
+      <rect x="110" y="120" width="80" height="60" rx="8" fill="white" stroke="#2D5A47" stroke-width="2"/>
+      <line x1="120" y1="140" x2="180" y2="140" stroke="#2D5A47" stroke-width="2" stroke-linecap="round"/>
+      <line x1="120" y1="155" x2="160" y2="155" stroke="#A8C5B8" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="130" cy="100" r="8" fill="#2D5A47"/>
+      <circle cx="155" cy="95" r="5" fill="#A8C5B8"/>
+      
+      <!-- Right side: family elements -->
+      <circle cx="350" cy="150" r="100" fill="#F5DDD3" opacity="0.6"/>
+      <path d="M330 160 Q350 130 370 160" stroke="#2D5A47" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="330" cy="140" r="12" fill="white" stroke="#2D5A47" stroke-width="2"/>
+      <circle cx="370" cy="140" r="10" fill="white" stroke="#2D5A47" stroke-width="2"/>
+      <circle cx="350" cy="175" r="8" fill="white" stroke="#2D5A47" stroke-width="2"/>
+      <path d="M320 190 L340 200 L360 190 L380 200" stroke="#A8C5B8" stroke-width="2" fill="none" stroke-linecap="round"/>
+      
+      <!-- Center: the merge/symphony -->
+      <circle cx="250" cy="150" r="40" fill="#2D5A47" opacity="0.1"/>
+      <circle cx="250" cy="150" r="25" fill="#2D5A47" opacity="0.2"/>
+      <path d="M240 145 L250 155 L270 135" stroke="#2D5A47" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      
+      <!-- Connection lines -->
+      <path d="M200 150 Q225 150 250 150" stroke="#2D5A47" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.4"/>
+      <path d="M300 150 Q275 150 250 150" stroke="#2D5A47" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.4"/>
+    </svg>
+    
+    <h1>One system for<br/>your <em>whole</em> life</h1>
+    <p>Work and family, beautifully in sync.</p>
+    <a href="#access" class="cta">Request Access</a>
+  </section>
+
+  <!-- Vision -->
+  <section class="vision">
+    <svg class="illustration" viewBox="0 0 400 280" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- Person centered and calm, with life flowing around them -->
+      <circle cx="200" cy="140" r="90" fill="#FAF6F1" opacity="0.5"/>
+      <circle cx="200" cy="140" r="60" fill="white" stroke="#2D5A47" stroke-width="2"/>
+      <!-- Happy face -->
+      <circle cx="185" cy="130" r="4" fill="#2D5A47"/>
+      <circle cx="215" cy="130" r="4" fill="#2D5A47"/>
+      <path d="M185 155 Q200 170 215 155" stroke="#2D5A47" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <!-- Orbiting life elements -->
+      <circle cx="95" cy="100" r="28" fill="#E5DFF5" opacity="0.7"/>
+      <rect x="83" y="92" width="24" height="4" rx="2" fill="#2D5A47" opacity="0.4"/>
+      <rect x="83" y="100" width="16" height="4" rx="2" fill="#2D5A47" opacity="0.3"/>
+      <circle cx="305" cy="100" r="28" fill="#F5DDD3" opacity="0.7"/>
+      <circle cx="297" cy="95" r="6" fill="white" stroke="#2D5A47" stroke-width="1.5"/>
+      <circle cx="313" cy="95" r="5" fill="white" stroke="#2D5A47" stroke-width="1.5"/>
+      <circle cx="130" cy="220" r="24" fill="#A8C5B8" opacity="0.6"/>
+      <path d="M120 218 L128 226 L142 212" stroke="#2D5A47" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="270" cy="220" r="24" fill="#E5DFF5" opacity="0.6"/>
+      <circle cx="270" cy="218" r="10" stroke="#2D5A47" stroke-width="1.5" fill="none"/>
+      <path d="M270 213 L270 218 L274 218" stroke="#2D5A47" stroke-width="1.5" stroke-linecap="round"/>
+      <!-- Connection flows -->
+      <path d="M123 115 Q160 130 175 135" stroke="#2D5A47" stroke-width="1" stroke-dasharray="3 3" opacity="0.3"/>
+      <path d="M277 115 Q240 130 225 135" stroke="#2D5A47" stroke-width="1" stroke-dasharray="3 3" opacity="0.3"/>
+      <path d="M145 205 Q170 180 185 165" stroke="#2D5A47" stroke-width="1" stroke-dasharray="3 3" opacity="0.3"/>
+      <path d="M255 205 Q230 180 215 165" stroke="#2D5A47" stroke-width="1" stroke-dasharray="3 3" opacity="0.3"/>
+    </svg>
+    
+    <h2>You at the center.<br/><em>Everything</em> in flow.</h2>
+    <p>Work, family, personal — all connected, all clear, all yours.</p>
+  </section>
+
+  <!-- Intersection -->
+  <section class="insight">
+    <svg class="illustration" viewBox="0 0 400 250" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- Beautiful intersection/venn -->
+      <circle cx="160" cy="125" r="80" fill="white" opacity="0.1"/>
+      <circle cx="240" cy="125" r="80" fill="white" opacity="0.1"/>
+      
+      <!-- Glowing intersection -->
+      <ellipse cx="200" cy="125" rx="40" ry="70" fill="white" opacity="0.2"/>
+      
+      <!-- Work elements flowing in -->
+      <rect x="95" y="105" width="40" height="40" rx="8" fill="white" opacity="0.15"/>
+      <rect x="103" y="118" width="24" height="3" rx="1.5" fill="white" opacity="0.8"/>
+      <rect x="103" y="126" width="16" height="3" rx="1.5" fill="white" opacity="0.5"/>
+      
+      <!-- Family elements flowing in -->
+      <circle cx="285" cy="110" r="10" fill="white" opacity="0.15"/>
+      <circle cx="270" cy="130" r="8" fill="white" opacity="0.15"/>
+      <circle cx="300" cy="130" r="8" fill="white" opacity="0.15"/>
+      
+      <!-- Center: heart in the intersection -->
+      <circle cx="200" cy="125" r="20" fill="#A8C5B8"/>
+      <path d="M200 135 L192 127 Q189 120 195 120 Q200 120 200 126 Q200 120 205 120 Q211 120 208 127 Z" fill="white"/>
+      
+      <!-- Sparkles showing harmony -->
+      <circle cx="200" cy="55" r="5" fill="white" opacity="0.4"/>
+      <circle cx="200" cy="195" r="5" fill="white" opacity="0.4"/>
+      <circle cx="125" cy="75" r="3" fill="white" opacity="0.3"/>
+      <circle cx="275" cy="75" r="3" fill="white" opacity="0.3"/>
+      <circle cx="155" cy="180" r="3" fill="white" opacity="0.3"/>
+      <circle cx="245" cy="180" r="3" fill="white" opacity="0.3"/>
+    </svg>
+    
+    <h2>Where work meets family?<br/>That's where we <em>thrive</em>.</h2>
+    <p>Symphony embraces the beautiful intersection.</p>
+  </section>
+
+  <!-- Solution -->
+  <section class="solution">
+    <svg class="illustration" viewBox="0 0 400 280" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- Unified, harmonious system -->
+      <rect x="80" y="50" width="240" height="180" rx="20" fill="white" stroke="#2D5A47" stroke-width="2"/>
+      
+      <!-- Sidebar -->
+      <rect x="80" y="50" width="60" height="180" rx="20" fill="#FAF6F1"/>
+      <rect x="80" y="50" width="60" height="180" rx="20" fill="none" stroke="#2D5A47" stroke-width="2"/>
+      <circle cx="110" cy="90" r="8" fill="#2D5A47"/>
+      <circle cx="110" cy="120" r="8" fill="#A8C5B8"/>
+      <circle cx="110" cy="150" r="8" fill="#F5DDD3"/>
+      <circle cx="110" cy="180" r="8" fill="#E5DFF5"/>
+      
+      <!-- Main content area with blended tasks -->
+      <rect x="155" y="75" width="150" height="24" rx="6" fill="#E5DFF5" opacity="0.5"/>
+      <rect x="165" y="83" width="80" height="8" rx="4" fill="#2D5A47" opacity="0.3"/>
+      
+      <rect x="155" y="110" width="150" height="24" rx="6" fill="#F5DDD3" opacity="0.5"/>
+      <rect x="165" y="118" width="60" height="8" rx="4" fill="#2D5A47" opacity="0.3"/>
+      
+      <rect x="155" y="145" width="150" height="24" rx="6" fill="#A8C5B8" opacity="0.4"/>
+      <rect x="165" y="153" width="90" height="8" rx="4" fill="#2D5A47" opacity="0.3"/>
+      
+      <rect x="155" y="180" width="150" height="24" rx="6" fill="#E5DFF5" opacity="0.5"/>
+      <rect x="165" y="188" width="50" height="8" rx="4" fill="#2D5A47" opacity="0.3"/>
+      
+      <!-- Floating elements showing harmony -->
+      <circle cx="60" cy="100" r="12" fill="#A8C5B8" opacity="0.4"/>
+      <circle cx="350" cy="80" r="10" fill="#F5DDD3" opacity="0.5"/>
+      <circle cx="340" cy="200" r="8" fill="#E5DFF5" opacity="0.5"/>
+      <circle cx="50" cy="180" r="6" fill="#F5DDD3" opacity="0.4"/>
+    </svg>
+    
+    <h2>See your whole life.<br/><em>Clearly.</em></h2>
+    <p>Work, family, personal — beautifully woven together.</p>
+  </section>
+
+  <!-- Principles -->
+  <section class="principles">
+    <h2>Crafted with <em>care</em></h2>
+    <div class="cards">
+      <div class="card">
+        <div class="card-icon" style="background: #E5DFF5;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2D5A47" stroke-width="2" stroke-linecap="round">
+            <circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8" opacity="0.3"/>
+          </svg>
+        </div>
+        <h3>Connected domains</h3>
+        <p>Different lenses on one unified life.</p>
+      </div>
+      
+      <div class="card">
+        <div class="card-icon" style="background: #F5DDD3;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2D5A47" stroke-width="2" stroke-linecap="round">
+            <rect x="5" y="4" width="14" height="16" rx="2"/><path d="M12 8v8M8 12h8"/>
+          </svg>
+        </div>
+        <h3>Plan, then execute</h3>
+        <p>Desktop for thinking. Mobile for doing.</p>
+      </div>
+      
+      <div class="card">
+        <div class="card-icon" style="background: #A8C5B8;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2D5A47" stroke-width="2" stroke-linecap="round">
+            <circle cx="9" cy="10" r="4"/><circle cx="15" cy="10" r="4"/><path d="M12 14v6"/>
+          </svg>
+        </div>
+        <h3>Shared with care</h3>
+        <p>Family sees family. Work stays private.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Final CTA -->
+  <section class="final" id="access">
+    <svg class="illustration" viewBox="0 0 300 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- Heart/home combined icon -->
+      <circle cx="150" cy="100" r="60" fill="#FAF6F1"/>
+      <circle cx="150" cy="100" r="45" fill="white" stroke="#2D5A47" stroke-width="2"/>
+      
+      <!-- Heart shape made of two people/elements coming together -->
+      <path d="M150 130 L130 110 Q125 95 140 95 Q150 95 150 108 Q150 95 160 95 Q175 95 170 110 Z" fill="#F5DDD3" stroke="#2D5A47" stroke-width="2"/>
+      
+      <!-- Small orbital elements -->
+      <circle cx="150" cy="35" r="6" fill="#A8C5B8"/>
+      <circle cx="200" cy="70" r="5" fill="#E5DFF5"/>
+      <circle cx="200" cy="130" r="4" fill="#F5DDD3"/>
+      <circle cx="100" cy="130" r="5" fill="#A8C5B8"/>
+      <circle cx="100" cy="70" r="4" fill="#E5DFF5"/>
+    </svg>
+    
+    <h2>Your life, <em>harmonized</em></h2>
+    <a href="#" class="cta">Request Access</a>
+    
+    <div class="made-with">
+      <span>Made with</span>
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+      <span>for families like ours</span>
+    </div>
+  </section>
+
+  <footer>
+    © 2025 Symphony
+  </footer>
+
+  <!-- Request Access Modal -->
+  <div class="modal-overlay" id="modal" onclick="closeModalOutside(event)">
+    <div class="modal" id="modalContent">
+      <div class="modal-form">
+        <svg class="modal-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="32" cy="32" r="30" fill="#FAF6F1"/>
+          <circle cx="32" cy="32" r="22" fill="white" stroke="#2D5A47" stroke-width="2"/>
+          <path d="M32 44 L22 34 Q18 26 28 26 Q32 26 32 33 Q32 26 36 26 Q46 26 42 34 Z" fill="#F5DDD3" stroke="#2D5A47" stroke-width="2"/>
+        </svg>
+        <h3>Join the waitlist</h3>
+        <p>We're onboarding families one at a time.</p>
+        <form onsubmit="handleSubmit(event)">
+          <input type="email" placeholder="you@example.com" required id="emailInput">
+          <button type="submit" class="cta" id="submitBtn">Get Early Access</button>
+        </form>
+        <p class="modal-note">No spam. Just an invite when it's your turn.</p>
+        <p class="modal-error" id="errorMsg" style="display:none; color:#c0392b; font-size:0.85rem; margin-top:0.5rem;"></p>
+      </div>
+      <div class="modal-success">
+        <div class="success-check">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+        <h3>You're on the list</h3>
+        <p>We'll reach out when Symphony is ready for you.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Supabase SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <script>
+    // Initialize Supabase
+    const SUPABASE_URL = 'https://mwadppyrqzuzgstmwpuy.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13YWRwcHlycXp1emdzdG13cHV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzI4Njk2OTksImV4cCI6MjA0ODQ0NTY5OX0.urt1JCvbvb-cmiRMwElByugFEjc7LWB8A0VBopMIBvQ';
+    
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    function openModal() {
+      document.getElementById('modal').classList.add('active');
+      document.body.style.overflow = 'hidden';
+      document.getElementById('errorMsg').style.display = 'none';
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    function closeModalOutside(event) {
+      if (event.target === document.getElementById('modal')) {
+        closeModal();
+      }
+    }
+
+    async function handleSubmit(event) {
+      event.preventDefault();
+      
+      const email = document.getElementById('emailInput').value;
+      const submitBtn = document.getElementById('submitBtn');
+      const errorMsg = document.getElementById('errorMsg');
+      
+      // Disable button while submitting
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Joining...';
+      errorMsg.style.display = 'none';
+      
+      try {
+        const { data, error } = await supabase
+          .from('waitlist')
+          .insert([{ email, source: 'landing_page' }]);
+        
+        if (error) {
+          // Handle duplicate email
+          if (error.code === '23505') {
+            errorMsg.textContent = "You're already on the list! We'll be in touch soon.";
+            errorMsg.style.color = '#2D5A47';
+          } else {
+            errorMsg.textContent = 'Something went wrong. Please try again.';
+            errorMsg.style.color = '#c0392b';
+          }
+          errorMsg.style.display = 'block';
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Get Early Access';
+          return;
+        }
+        
+        // Show success state
+        document.getElementById('modalContent').classList.add('success');
+        
+        // Close after delay
+        setTimeout(() => {
+          closeModal();
+          setTimeout(() => {
+            document.getElementById('modalContent').classList.remove('success');
+            document.getElementById('emailInput').value = '';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Get Early Access';
+          }, 300);
+        }, 2500);
+        
+      } catch (err) {
+        errorMsg.textContent = 'Connection error. Please try again.';
+        errorMsg.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Get Early Access';
+      }
+    }
+
+    // Close on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
+    });
+
+    // Wire up all CTA buttons
+    document.querySelectorAll('a.cta[href="#access"]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        openModal();
+      });
+    });
+  </script>
+
+</body>
+</html>
