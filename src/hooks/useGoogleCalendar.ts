@@ -1,6 +1,32 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 
+export interface CreateEventParams {
+  title: string
+  description?: string
+  startTime: Date
+  endTime: Date
+  location?: string
+  allDay?: boolean
+  /** Optional timezone (e.g., 'America/New_York'). Defaults to browser timezone. */
+  timeZone?: string
+  /** Optional idempotency key to prevent duplicate events on retry */
+  requestId?: string
+}
+
+/** Error thrown when calendar needs reconnection due to expired/revoked permissions */
+export class CalendarReconnectError extends Error {
+  constructor(message: string = 'Calendar connection expired. Please reconnect.') {
+    super(message)
+    this.name = 'CalendarReconnectError'
+  }
+}
+
+export interface CreateEventResult {
+  id: string
+  htmlLink?: string
+}
+
 export interface CalendarEvent {
   // Support both snake_case (from edge function) and camelCase (possibly cached/transformed)
   id: string
@@ -225,6 +251,51 @@ export function useGoogleCalendar() {
     return fetchEvents(today, nextWeek)
   }, [fetchEvents])
 
+  // Create a new calendar event
+  // Throws CalendarReconnectError if permissions are expired (catch this to show reconnect UI)
+  const createEvent = useCallback(async (params: CreateEventParams): Promise<CreateEventResult> => {
+    if (!isConnected) {
+      throw new Error('Not connected to Google Calendar')
+    }
+
+    // Default to browser timezone if not specified
+    const timeZone = params.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone
+
+    const { data, error } = await supabase.functions.invoke('google-calendar-create-event', {
+      body: {
+        title: params.title,
+        description: params.description,
+        startTime: params.startTime.toISOString(),
+        endTime: params.endTime.toISOString(),
+        location: params.location,
+        allDay: params.allDay,
+        timeZone,
+        requestId: params.requestId,
+      },
+    })
+
+    if (error) throw error
+
+    // Check for auth errors that require reconnection
+    if (data?.error) {
+      const isAuthError =
+        data.error.includes('Unauthorized') ||
+        data.error.includes('invalid_grant') ||
+        data.error.includes('Token has been expired or revoked') ||
+        data.needsReconnect
+
+      if (isAuthError) {
+        setError('Calendar connection expired. Please reconnect.')
+        setIsConnected(false)
+        setNeedsReconnect(true)
+        throw new CalendarReconnectError()
+      }
+      throw new Error(data.error)
+    }
+
+    return { id: data.eventId, htmlLink: data.htmlLink }
+  }, [isConnected])
+
   return {
     isConnected,
     needsReconnect,
@@ -237,5 +308,6 @@ export function useGoogleCalendar() {
     fetchEvents,
     fetchTodayEvents,
     fetchWeekEvents,
+    createEvent,
   }
 }
