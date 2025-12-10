@@ -257,6 +257,7 @@ export function AppShell({
               <span className={`text-[10px] font-medium ${activeView === 'routines' ? 'font-semibold' : ''}`}>Routines</span>
             </button>
 
+            {/* Lists button hidden - feature not complete
             <button
               onClick={() => onViewChange('lists')}
               className={`
@@ -273,6 +274,7 @@ export function AppShell({
               </svg>
               <span className={`text-[10px] font-medium ${activeView === 'lists' ? 'font-semibold' : ''}`}>Lists</span>
             </button>
+            */}
           </div>
         </nav>
       )}
