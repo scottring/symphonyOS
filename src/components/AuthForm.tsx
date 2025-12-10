@@ -53,7 +53,7 @@ export function AuthForm() {
             Symphony
           </h1>
           <p className="text-neutral-500 text-lg">
-            Your personal operating system
+            Finally be on the same page
           </p>
         </div>
 
