@@ -55,8 +55,8 @@ Deno.serve(async (req) => {
     const state = btoa(JSON.stringify({ userId: user.id }))
 
     const scopes = [
-      'https://www.googleapis.com/auth/calendar.readonly',
-      'https://www.googleapis.com/auth/calendar.events.readonly',
+      'https://www.googleapis.com/auth/calendar',
+      'https://www.googleapis.com/auth/calendar.events',
     ]
 
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth')

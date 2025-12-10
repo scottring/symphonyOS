@@ -51,6 +51,7 @@ interface HomeViewProps {
   onPushEvent?: (eventId: string, date: Date) => void
   onOpenPlanning?: () => void
   onCreateTask?: (title: string) => void
+  onAddProject?: (project: { name: string }) => Promise<Project | null>
 }
 
 export function HomeView({
@@ -90,6 +91,7 @@ export function HomeView({
   onPushEvent,
   onOpenPlanning,
   onCreateTask,
+  onAddProject,
 }: HomeViewProps) {
   const { currentView, setCurrentView } = useHomeView()
   const isMobile = useMobile()
@@ -250,6 +252,7 @@ export function HomeView({
         mode={viewMode}
         reviewData={reviewData}
         onCreateTask={onCreateTask}
+        onAddProject={onAddProject}
         selectedAssignee={selectedAssignee}
       />
     )

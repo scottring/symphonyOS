@@ -956,6 +956,7 @@ function App() {
               refreshDateInstances()
             }}
             onOpenPlanning={() => setPlanningOpen(true)}
+            onAddProject={addProject}
           />
         </div>
       )}

@@ -104,6 +104,7 @@ export function InboxSection({
             }}
             onUpdate={(updates) => onUpdateTask(task.id, updates)}
             onSelect={() => onSelectTask(task.id)}
+            onTriage={() => setTriageTaskId(task.id)}
             projects={projects}
             onOpenProject={onOpenProject}
             familyMembers={familyMembers}
@@ -123,16 +124,12 @@ export function InboxSection({
             setTriageTaskId(null)
           }}
           onConvertToProject={async (name, domain) => {
-            // Create project with task's name
+            // Create project and delete the inbox task
             if (onAddProject) {
-              const newProject = await onAddProject({ name })
-              if (newProject) {
-                // Update task to link to project and optionally set domain
-                const updates: Partial<Task> = { projectId: newProject.id }
-                if (domain) {
-                  updates.context = domain
-                }
-                onUpdateTask(triageTask.id, updates)
+              await onAddProject({ name })
+              // Delete the original task - it's now a project
+              if (onDeleteTask) {
+                onDeleteTask(triageTask.id)
               }
             }
             setTriageTaskId(null)

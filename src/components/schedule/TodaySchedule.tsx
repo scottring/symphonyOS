@@ -73,6 +73,7 @@ interface TodayScheduleProps {
   mode?: ViewMode
   reviewData?: ReviewData
   onCreateTask?: (title: string) => void
+  onAddProject?: (project: { name: string }) => Promise<Project | null>
   // Assignee filter
   selectedAssignee?: string | null  // null = "All", "unassigned" = unassigned only
 }
@@ -146,6 +147,7 @@ export function TodaySchedule({
   mode = 'today',
   reviewData,
   onCreateTask,
+  onAddProject,
   selectedAssignee,
 }: TodayScheduleProps) {
   void _onOpenPlanning // Reserved - planning now handled by ModeToggle
@@ -592,6 +594,7 @@ export function TodaySchedule({
               contacts={contacts}
               onSearchContacts={onSearchContacts}
               onAddContact={onAddContact}
+              onAddProject={onAddProject}
               recentlyCreatedTaskId={recentlyCreatedTaskId}
               onTriageCardCollapse={onTriageCardCollapse}
               onOpenProject={onOpenProject}

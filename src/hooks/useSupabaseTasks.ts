@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
-import type { Task, TaskLink, TaskContext, LinkedActivity, LinkType, LinkedActivityType } from '@/types/task'
+import type { Task, TaskLink, TaskContext, TaskCategory, LinkedActivity, LinkType, LinkedActivityType } from '@/types/task'
 
 interface DbTask {
   id: string
@@ -13,6 +13,7 @@ interface DbTask {
   defer_count: number | null
   is_all_day: boolean | null
   context: TaskContext | null
+  category: string | null
   notes: string | null
   links: (string | TaskLink)[] | null // Can be old string format or new object format
   phone_number: string | null
@@ -60,6 +61,7 @@ function dbTaskToTask(dbTask: DbTask): Task {
     deferCount: dbTask.defer_count ?? undefined,
     isAllDay: dbTask.is_all_day ?? undefined,
     context: dbTask.context ?? undefined,
+    category: (dbTask.category as TaskCategory) ?? 'task',
     notes: dbTask.notes ?? undefined,
     links: normalizeLinks(dbTask.links),
     phoneNumber: dbTask.phone_number ?? undefined,
@@ -154,6 +156,7 @@ export function useSupabaseTasks() {
     linkedTo?: LinkedActivity
     linkType?: LinkType
     assignedTo?: string  // Family member ID to assign task to
+    category?: TaskCategory  // What kind of family item
   }
 
   const addTask = useCallback(async (
@@ -178,6 +181,7 @@ export function useSupabaseTasks() {
       linkedTo: options?.linkedTo,
       linkType: options?.linkType,
       assignedTo: options?.assignedTo,
+      category: options?.category ?? 'task',
     }
     setTasks((prev) => [optimisticTask, ...prev])
 
@@ -194,6 +198,7 @@ export function useSupabaseTasks() {
         linked_activity_id: options?.linkedTo?.id ?? null,
         link_type: options?.linkType ?? null,
         assigned_to: options?.assignedTo ?? null,
+        category: options?.category ?? 'task',
       })
       .select()
       .single()
@@ -449,6 +454,7 @@ export function useSupabaseTasks() {
     if ('deferCount' in updates) dbUpdates.defer_count = updates.deferCount ?? 0
     if ('isAllDay' in updates) dbUpdates.is_all_day = updates.isAllDay ?? null
     if ('context' in updates) dbUpdates.context = updates.context ?? null
+    if ('category' in updates) dbUpdates.category = updates.category ?? 'task'
     if ('notes' in updates) dbUpdates.notes = updates.notes ?? null
     if ('links' in updates) dbUpdates.links = updates.links ?? null
     if ('phoneNumber' in updates) dbUpdates.phone_number = updates.phoneNumber ?? null

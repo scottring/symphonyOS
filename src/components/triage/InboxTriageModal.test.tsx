@@ -70,26 +70,21 @@ describe('InboxTriageModal', () => {
     expect(screen.queryByText('Test inbox item')).not.toBeInTheDocument()
   })
 
-  it('shows type selection buttons', () => {
+  it('shows category selection buttons', () => {
     render(<InboxTriageModal {...defaultProps} />)
+    expect(screen.getByText('Event')).toBeInTheDocument()
+    expect(screen.getByText('Activity')).toBeInTheDocument()
+    expect(screen.getByText('Chore')).toBeInTheDocument()
+    expect(screen.getByText('Errand')).toBeInTheDocument()
     expect(screen.getByText('Task')).toBeInTheDocument()
-    // 'Project' appears as both a type button and project picker label
-    expect(screen.getAllByText('Project').length).toBeGreaterThanOrEqual(1)
   })
 
-  it('shows when options for task type', () => {
+  it('shows when/schedule options', () => {
     render(<InboxTriageModal {...defaultProps} />)
     expect(screen.getByText('Today')).toBeInTheDocument()
     expect(screen.getByText('Tomorrow')).toBeInTheDocument()
     expect(screen.getByText('Next Week')).toBeInTheDocument()
     expect(screen.getByText('Someday/Maybe')).toBeInTheDocument()
-  })
-
-  it('shows domain selection', () => {
-    render(<InboxTriageModal {...defaultProps} />)
-    expect(screen.getByText('Work')).toBeInTheDocument()
-    expect(screen.getByText('Personal')).toBeInTheDocument()
-    expect(screen.getByText('Family')).toBeInTheDocument()
   })
 
   it('shows family members for assignment', () => {
@@ -98,16 +93,14 @@ describe('InboxTriageModal', () => {
     expect(screen.getByText('Iris')).toBeInTheDocument()
   })
 
-  it('shows project picker for task type', () => {
+  it('shows project picker', () => {
     render(<InboxTriageModal {...defaultProps} />)
-    // Project section should be visible
     expect(screen.getByText('Test Project')).toBeInTheDocument()
   })
 
   it('calls onClose when close button is clicked', () => {
     const onClose = vi.fn()
     render(<InboxTriageModal {...defaultProps} onClose={onClose} />)
-
     fireEvent.click(screen.getByLabelText('Close'))
     expect(onClose).toHaveBeenCalled()
   })
@@ -115,58 +108,48 @@ describe('InboxTriageModal', () => {
   it('calls onDelete when delete button is clicked', () => {
     const onDelete = vi.fn()
     render(<InboxTriageModal {...defaultProps} onDelete={onDelete} />)
-
     fireEvent.click(screen.getByLabelText('Delete'))
     expect(onDelete).toHaveBeenCalled()
   })
 
-  it('calls onProcessAsTask when Done is clicked with task type', () => {
+  it('calls onProcessAsTask with category when Done is clicked', () => {
     const onProcessAsTask = vi.fn()
     render(<InboxTriageModal {...defaultProps} onProcessAsTask={onProcessAsTask} />)
 
     // Click Today to set a date
     fireEvent.click(screen.getByText('Today'))
-
     // Click Done
     fireEvent.click(screen.getByText('Done'))
-    expect(onProcessAsTask).toHaveBeenCalled()
+    
+    expect(onProcessAsTask).toHaveBeenCalledWith(
+      expect.objectContaining({ category: 'task' }) // Default category
+    )
   })
 
-  it('switches to project mode when Project type is selected', () => {
-    render(<InboxTriageModal {...defaultProps} />)
-
-    // Click the Project type button (first one, in the Type section)
-    const projectButtons = screen.getAllByText('Project')
-    fireEvent.click(projectButtons[0])
-
-    // Done button should now say "Create Project"
-    expect(screen.getByText('Create Project')).toBeInTheDocument()
-    // When picker should be hidden for projects
-    expect(screen.queryByText('Today')).not.toBeInTheDocument()
-  })
-
-  it('calls onConvertToProject when Done is clicked with project type', () => {
-    const onConvertToProject = vi.fn()
-    render(<InboxTriageModal {...defaultProps} onConvertToProject={onConvertToProject} />)
-
-    // Click the Project type button (first one, in the Type section)
-    const projectButtons = screen.getAllByText('Project')
-    fireEvent.click(projectButtons[0])
-    fireEvent.click(screen.getByText('Create Project'))
-
-    expect(onConvertToProject).toHaveBeenCalledWith('Test inbox item', undefined)
-  })
-
-  it('selects domain when domain button is clicked', () => {
+  it('changes category when category button is clicked', () => {
     const onProcessAsTask = vi.fn()
     render(<InboxTriageModal {...defaultProps} onProcessAsTask={onProcessAsTask} />)
 
-    fireEvent.click(screen.getByText('Work'))
+    // Click Chore category
+    fireEvent.click(screen.getByText('Chore'))
     fireEvent.click(screen.getByText('Done'))
 
     expect(onProcessAsTask).toHaveBeenCalledWith(
-      expect.objectContaining({ context: 'work' })
+      expect.objectContaining({ category: 'chore' })
     )
+  })
+
+  it('shows Create Project button in footer', () => {
+    render(<InboxTriageModal {...defaultProps} />)
+    expect(screen.getByText('Create Project')).toBeInTheDocument()
+  })
+
+  it('calls onConvertToProject when Create Project is clicked', () => {
+    const onConvertToProject = vi.fn()
+    render(<InboxTriageModal {...defaultProps} onConvertToProject={onConvertToProject} />)
+
+    fireEvent.click(screen.getByText('Create Project'))
+    expect(onConvertToProject).toHaveBeenCalledWith('Test inbox item', 'family')
   })
 
   it('toggles family member selection', () => {
@@ -180,5 +163,39 @@ describe('InboxTriageModal', () => {
     expect(onProcessAsTask).toHaveBeenCalledWith(
       expect.objectContaining({ assignedTo: 'member-2' })
     )
+  })
+
+  it('shows location field for errand category', () => {
+    render(<InboxTriageModal {...defaultProps} />)
+    
+    // Select Errand category
+    fireEvent.click(screen.getByText('Errand'))
+    
+    // Location field should appear
+    expect(screen.getByPlaceholderText('Store, address, etc.')).toBeInTheDocument()
+  })
+
+  it('shows time fields for event category', () => {
+    render(<InboxTriageModal {...defaultProps} />)
+    
+    // Select Event category
+    fireEvent.click(screen.getByText('Event'))
+    
+    // Time fields should appear
+    expect(screen.getByText('Start Time')).toBeInTheDocument()
+    expect(screen.getByText('End Time')).toBeInTheDocument()
+  })
+
+  it('hides Someday/Maybe for event category', () => {
+    render(<InboxTriageModal {...defaultProps} />)
+    
+    // Initially Someday/Maybe is visible
+    expect(screen.getByText('Someday/Maybe')).toBeInTheDocument()
+    
+    // Select Event category
+    fireEvent.click(screen.getByText('Event'))
+    
+    // Someday/Maybe should be hidden for events
+    expect(screen.queryByText('Someday/Maybe')).not.toBeInTheDocument()
   })
 })

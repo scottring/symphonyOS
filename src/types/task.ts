@@ -5,6 +5,10 @@ export interface TaskLink {
 
 export type TaskContext = 'work' | 'family' | 'personal'
 
+// Category represents what KIND of family item this is
+// Defaults to 'task' for backwards compatibility
+export type TaskCategory = 'task' | 'chore' | 'errand' | 'event' | 'activity'
+
 // Prep/Follow-up task linking
 export type LinkType = 'prep' | 'followup'
 
@@ -25,6 +29,7 @@ export interface Task {
   deferCount?: number // Times this task has been deferred
   isAllDay?: boolean // True = all day task, false/undefined = specific time
   context?: TaskContext // Context: work, family, personal
+  category?: TaskCategory // What kind of family item (default: 'task')
   notes?: string
   links?: TaskLink[]
   phoneNumber?: string
