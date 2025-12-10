@@ -10,6 +10,8 @@ export interface ParsedQuickInput {
   dueDate?: Date                     // Parsed date
   dueDateMatch?: string              // What text matched (e.g., "tomorrow")
   priority?: 'high' | 'medium' | 'low'
+  category?: 'task' | 'chore' | 'errand' | 'event' | 'activity'
+  categoryMatch?: string             // What text matched (e.g., "errand:")
 }
 
 export interface ParserContext {
@@ -30,6 +32,29 @@ export function parseQuickInput(
 
   // Helper for normalized string comparison
   const normalizeStr = (s: string) => s.toLowerCase().replace(/[.,]/g, '').replace(/\s+/g, ' ').trim()
+
+  // 0. Check for category prefix (must be at start of input)
+  const categoryPrefixes: Record<string, ParsedQuickInput['category']> = {
+    'event:': 'event',
+    'activity:': 'activity',
+    'chore:': 'chore',
+    'errand:': 'errand',
+    'task:': 'task',
+    // Short aliases
+    'ev:': 'event',
+    'act:': 'activity',
+    'ch:': 'chore',
+    'er:': 'errand',
+  }
+
+  for (const [prefix, category] of Object.entries(categoryPrefixes)) {
+    if (workingText.toLowerCase().startsWith(prefix)) {
+      result.category = category
+      result.categoryMatch = workingText.slice(0, prefix.length)
+      workingText = workingText.slice(prefix.length).trim()
+      break
+    }
+  }
 
   // 1. Extract dates using chrono-node
   const dateResults = chrono.parse(workingText)
@@ -130,5 +155,5 @@ export function parseQuickInput(
 
 // Helper to check if anything was parsed beyond the title
 export function hasParsedFields(parsed: ParsedQuickInput): boolean {
-  return !!(parsed.projectId || parsed.contactId || parsed.dueDate || parsed.priority)
+  return !!(parsed.projectId || parsed.contactId || parsed.dueDate || parsed.priority || parsed.category)
 }

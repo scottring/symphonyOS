@@ -126,3 +126,85 @@ describe('parseQuickInput', () => {
     expect(result.title).toBe('call @unknown')
   })
 })
+
+describe('category prefix parsing', () => {
+  it('parses event: prefix', () => {
+    const result = parseQuickInput('event: dentist tomorrow', mockContext)
+    expect(result.category).toBe('event')
+    expect(result.title).toBe('dentist')
+    expect(result.dueDate).toBeDefined()
+  })
+
+  it('parses errand: prefix', () => {
+    const result = parseQuickInput('errand: pick up dry cleaning', mockContext)
+    expect(result.category).toBe('errand')
+    expect(result.title).toBe('pick up dry cleaning')
+  })
+
+  it('parses chore: prefix', () => {
+    const result = parseQuickInput('chore: take out trash', mockContext)
+    expect(result.category).toBe('chore')
+    expect(result.title).toBe('take out trash')
+  })
+
+  it('parses activity: prefix', () => {
+    const result = parseQuickInput('activity: soccer practice', mockContext)
+    expect(result.category).toBe('activity')
+    expect(result.title).toBe('soccer practice')
+  })
+
+  it('parses task: prefix', () => {
+    const result = parseQuickInput('task: review code', mockContext)
+    expect(result.category).toBe('task')
+    expect(result.title).toBe('review code')
+  })
+
+  it('parses short aliases (er:, ev:, ch:, act:)', () => {
+    expect(parseQuickInput('er: groceries', mockContext).category).toBe('errand')
+    expect(parseQuickInput('ev: meeting', mockContext).category).toBe('event')
+    expect(parseQuickInput('ch: dishes', mockContext).category).toBe('chore')
+    expect(parseQuickInput('act: piano', mockContext).category).toBe('activity')
+  })
+
+  it('is case insensitive', () => {
+    const result = parseQuickInput('EVENT: birthday party', mockContext)
+    expect(result.category).toBe('event')
+    expect(result.title).toBe('birthday party')
+  })
+
+  it('combines with other parsed fields', () => {
+    const result = parseQuickInput('errand: pick up cake tomorrow #montreal', mockContext)
+    expect(result.category).toBe('errand')
+    expect(result.title).toBe('pick up cake')
+    expect(result.dueDate).toBeDefined()
+    expect(result.projectId).toBe('p1')
+  })
+
+  it('does not match prefix in middle of text', () => {
+    const result = parseQuickInput('buy event: tickets', mockContext)
+    expect(result.category).toBeUndefined()
+  })
+
+  it('preserves categoryMatch for matched prefix', () => {
+    const result = parseQuickInput('Event: dentist', mockContext)
+    expect(result.categoryMatch).toBe('Event:')
+  })
+
+  it('hasParsedFields returns true when category is parsed', () => {
+    const result = parseQuickInput('errand: groceries', mockContext)
+    expect(hasParsedFields(result)).toBe(true)
+  })
+
+  it('works without space after colon', () => {
+    const result = parseQuickInput('errand:pick up milk', mockContext)
+    expect(result.category).toBe('errand')
+    expect(result.title).toBe('pick up milk')
+  })
+
+  it('handles time with colon after category prefix', () => {
+    const result = parseQuickInput('event: meeting at 2:30pm', mockContext)
+    expect(result.category).toBe('event')
+    expect(result.title).toBe('meeting')
+    expect(result.dueDate).toBeDefined()
+  })
+})

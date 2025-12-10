@@ -34,6 +34,7 @@ interface AppShellProps {
     projectId?: string
     contactId?: string
     scheduledFor?: Date
+    category?: 'task' | 'chore' | 'errand' | 'event' | 'activity'
   }) => void
   // Context for QuickCapture parser
   quickAddProjects?: Array<{ id: string; name: string }>

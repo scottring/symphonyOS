@@ -756,7 +756,10 @@ function App() {
           data.contactId,
           data.projectId,
           data.scheduledFor,
-          { assignedTo: getCurrentUserMember()?.id }
+          {
+            assignedTo: getCurrentUserMember()?.id,
+            category: data.category,
+          }
         )
         if (taskId) {
           setRecentlyCreatedTaskId(taskId)

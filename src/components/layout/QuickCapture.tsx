@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { parseQuickInput, hasParsedFields, type ParsedQuickInput } from '@/lib/quickInputParser'
+import type { TaskCategory } from '@/types/task'
 
 interface QuickCaptureProps {
   onAdd: (title: string) => void
@@ -9,6 +10,7 @@ interface QuickCaptureProps {
     projectId?: string
     contactId?: string
     scheduledFor?: Date
+    category?: TaskCategory
   }) => void
   // Context for parser
   projects?: Array<{ id: string; name: string }>
@@ -42,6 +44,7 @@ export function QuickCapture({
     projectId?: string | null
     contactId?: string | null
     dueDate?: Date | null
+    category?: TaskCategory | null
   }>({})
 
   const handleOpen = () => {
@@ -84,6 +87,7 @@ export function QuickCapture({
       projectId: overrides.projectId === null ? undefined : (overrides.projectId ?? parsed.projectId),
       contactId: overrides.contactId === null ? undefined : (overrides.contactId ?? parsed.contactId),
       dueDate: overrides.dueDate === null ? undefined : (overrides.dueDate ?? parsed.dueDate),
+      category: overrides.category === null ? undefined : (overrides.category ?? parsed.category),
     }
   }, [parsed, overrides])
 
@@ -138,6 +142,7 @@ export function QuickCapture({
         projectId: effectiveParsed.projectId,
         contactId: effectiveParsed.contactId,
         scheduledFor: effectiveParsed.dueDate,
+        category: effectiveParsed.category,
       })
     } else {
       // Fallback if onAddRich not provided
@@ -168,6 +173,7 @@ export function QuickCapture({
   const clearProject = () => setOverrides(prev => ({ ...prev, projectId: null }))
   const clearContact = () => setOverrides(prev => ({ ...prev, contactId: null }))
   const clearDate = () => setOverrides(prev => ({ ...prev, dueDate: null }))
+  const clearCategory = () => setOverrides(prev => ({ ...prev, category: null }))
 
   return (
     <>
@@ -294,6 +300,28 @@ export function QuickCapture({
                           : 'bg-yellow-50 text-yellow-700 border-yellow-100'
                       }`}>
                         {effectiveParsed.priority === 'high' ? 'High Priority' : 'Medium Priority'}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Category chip - only show for non-task categories */}
+                  {effectiveParsed.category && effectiveParsed.category !== 'task' && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">
+                        {effectiveParsed.category === 'event' && '📅'}
+                        {effectiveParsed.category === 'activity' && '⚽'}
+                        {effectiveParsed.category === 'chore' && '🧹'}
+                        {effectiveParsed.category === 'errand' && '🚗'}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-purple-50 text-purple-700 rounded-full text-xs font-medium border border-purple-100">
+                        {effectiveParsed.category.charAt(0).toUpperCase() + effectiveParsed.category.slice(1)}
+                        <button
+                          type="button"
+                          onClick={clearCategory}
+                          className="ml-1 text-purple-400 hover:text-purple-600"
+                        >
+                          ×
+                        </button>
                       </span>
                     </div>
                   )}
