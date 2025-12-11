@@ -81,12 +81,16 @@ vi.mock('@/lib/supabase', () => ({
           delete: mockDelete,
         }
       }
+      // Mock for 'tasks' table (used in deleteMember to unassign tasks)
       return {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             order: vi.fn().mockResolvedValue({ data: [], error: null })
           })
-        })
+        }),
+        update: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ data: null, error: null })
+        }),
       }
     }),
   },

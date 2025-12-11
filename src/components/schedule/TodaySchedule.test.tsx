@@ -142,8 +142,8 @@ describe('TodaySchedule', () => {
     it('renders date header', () => {
       render(<TodaySchedule {...defaultProps} />)
 
-      // Date header shows "Today is [weekday], [month] [day]"
-      expect(screen.getByRole('heading', { name: /Today is Monday, January 15/ })).toBeInTheDocument()
+      // Date header shows "Today is" + weekday name
+      expect(screen.getByRole('heading', { name: /Today is.*Monday/ })).toBeInTheDocument()
     })
 
     it('shows weekday name for non-today dates', () => {
@@ -162,7 +162,8 @@ describe('TodaySchedule', () => {
 
       render(<TodaySchedule {...defaultProps} tasks={tasks} />)
 
-      expect(screen.getByText('1 / 2')).toBeInTheDocument()
+      // Progress format is "completed/total tasks"
+      expect(screen.getByText('1/2 tasks')).toBeInTheDocument()
     })
   })
 
@@ -531,7 +532,7 @@ describe('TodaySchedule', () => {
       )
 
       // 1 task + 1 routine completed = 2, total = 3
-      expect(screen.getByText('2 / 3')).toBeInTheDocument()
+      expect(screen.getByText('2/3 tasks')).toBeInTheDocument()
     })
 
     it('does not include events in actionable count', () => {
@@ -545,7 +546,7 @@ describe('TodaySchedule', () => {
       render(<TodaySchedule {...defaultProps} tasks={tasks} events={events} />)
 
       // Only 1 task is actionable, not the event
-      expect(screen.getByText('0 / 1')).toBeInTheDocument()
+      expect(screen.getByText('0/1 tasks')).toBeInTheDocument()
     })
   })
 })

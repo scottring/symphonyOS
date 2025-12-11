@@ -35,8 +35,8 @@ describe('AuthForm', () => {
     it('renders Symphony branding', () => {
       render(<AuthForm />)
 
-      expect(screen.getByText('Symphony')).toBeInTheDocument()
-      expect(screen.getByText('Your personal operating system')).toBeInTheDocument()
+      expect(screen.getByText('Symphony OS')).toBeInTheDocument()
+      expect(screen.getByText('The family coordination platform')).toBeInTheDocument()
       expect(screen.getByAltText('Symphony Logo')).toBeInTheDocument()
     })
 
@@ -50,7 +50,7 @@ describe('AuthForm', () => {
     it('renders footer text', () => {
       render(<AuthForm />)
 
-      expect(screen.getByText('Organize your life with clarity and purpose')).toBeInTheDocument()
+      expect(screen.getByText(/For families juggling multiple schedules/)).toBeInTheDocument()
     })
   })
 

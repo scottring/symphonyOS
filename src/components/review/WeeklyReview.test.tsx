@@ -219,8 +219,8 @@ describe('WeeklyReview', () => {
       render(<WeeklyReview {...defaultProps} />)
       const scheduleButtons = screen.getAllByRole('button', { name: 'Schedule' })
       fireEvent.click(scheduleButtons[0])
-      // SchedulePopover shows time slots or date options
-      expect(screen.getByText('All Day')).toBeInTheDocument()
+      // SchedulePopover shows date options first
+      expect(screen.getByText('Today')).toBeInTheDocument()
     })
 
     it('opens PushDropdown when clicking push button', () => {

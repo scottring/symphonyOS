@@ -36,6 +36,10 @@ const createEqChain = (depth: number = 0, isDeferred: boolean = false): unknown 
         mockSingle()
         return Promise.resolve({ data: mockFetchResult, error: mockError })
       },
+      maybeSingle: () => {
+        mockSingle()
+        return Promise.resolve({ data: mockFetchResult, error: mockError })
+      },
     }
   },
   gte: (field: string, value: string) => {
@@ -48,6 +52,10 @@ const createEqChain = (depth: number = 0, isDeferred: boolean = false): unknown 
     return Promise.resolve({ data: isDeferred ? mockDeferredFetchResult : mockFetchResult, error: mockError })
   },
   single: () => {
+    mockSingle()
+    return Promise.resolve({ data: mockFetchResult, error: mockError })
+  },
+  maybeSingle: () => {
     mockSingle()
     return Promise.resolve({ data: mockFetchResult, error: mockError })
   },
