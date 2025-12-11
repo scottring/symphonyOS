@@ -8,7 +8,6 @@ import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
 import { useHomeView } from '@/hooks/useHomeView'
 import { useMobile } from '@/hooks/useMobile'
-import { useReviewData } from '@/hooks/useReviewData'
 import { useBadgeVisibility } from '@/hooks/useBadgeVisibility'
 import { HomeViewSwitcher } from './HomeViewSwitcher'
 import { WeekView } from './WeekView'
@@ -95,7 +94,7 @@ export function HomeView({
 }: HomeViewProps) {
   const { currentView, setCurrentView } = useHomeView()
   const isMobile = useMobile()
-  const { showInboxBadge, showReviewBadge } = useBadgeVisibility()
+  const { showInboxBadge } = useBadgeVisibility()
 
   // Assignee filter state - reset when switching views
   const [selectedAssignee, setSelectedAssignee] = useState<string | null>(null)
@@ -105,12 +104,6 @@ export function HomeView({
     setSelectedAssignee(null)
     setCurrentView(view)
   }, [setCurrentView])
-
-  // Review data - pass selectedAssignee for filtering
-  const reviewData = useReviewData(tasks, viewedDate, selectedAssignee)
-
-  // Derive mode from currentView for TodaySchedule compatibility
-  const viewMode = currentView === 'review' ? 'review' : 'today'
 
   // Compute assignees with tasks in current view for the filter dropdown
   const { assigneesWithTasks, hasUnassignedTasks } = useMemo(() => {
@@ -211,7 +204,7 @@ export function HomeView({
       )
     }
 
-    // Today view and Review view both use TodaySchedule with different mode
+    // Today view uses TodaySchedule
     return (
       <TodaySchedule
         tasks={tasks}
@@ -249,40 +242,26 @@ export function HomeView({
         onSkipEvent={onSkipEvent}
         onPushEvent={onPushEvent}
         onOpenPlanning={onOpenPlanning}
-        mode={viewMode}
-        reviewData={reviewData}
         onCreateTask={onCreateTask}
         onAddProject={onAddProject}
         selectedAssignee={selectedAssignee}
+        onSelectAssignee={setSelectedAssignee}
+        assigneesWithTasks={assigneesWithTasks}
+        hasUnassignedTasks={hasUnassignedTasks}
       />
     )
   }
 
   return (
     <div className="relative flex flex-col h-full">
-      {/* Header controls - floating in upper right on desktop, sticky bar on mobile */}
-      {!isMobile ? (
+      {/* Header controls - floating in upper right on desktop only */}
+      {!isMobile && (
         <div className="absolute top-4 right-6 z-20 flex items-center gap-3">
-          {/* Unified view switcher (Today/Week/Review) with assignee filter */}
+          {/* Unified view switcher (Today/Week) with assignee filter */}
           <HomeViewSwitcher
             currentView={currentView}
             onViewChange={handleViewChange}
             inboxCount={showInboxBadge ? inboxCount : 0}
-            reviewCount={showReviewBadge ? reviewData.reviewCount : 0}
-            selectedAssignee={selectedAssignee}
-            onSelectAssignee={setSelectedAssignee}
-            assigneesWithTasks={assigneesWithTasks}
-            hasUnassignedTasks={hasUnassignedTasks}
-          />
-        </div>
-      ) : (
-        /* Mobile view toggle - sticky below header, part of content flow */
-        <div className="sticky top-0 z-20 bg-bg-base/95 backdrop-blur-sm py-2 px-4 flex justify-center border-b border-neutral-100">
-          <HomeViewSwitcher
-            currentView={currentView}
-            onViewChange={handleViewChange}
-            inboxCount={showInboxBadge ? inboxCount : 0}
-            reviewCount={showReviewBadge ? reviewData.reviewCount : 0}
             selectedAssignee={selectedAssignee}
             onSelectAssignee={setSelectedAssignee}
             assigneesWithTasks={assigneesWithTasks}

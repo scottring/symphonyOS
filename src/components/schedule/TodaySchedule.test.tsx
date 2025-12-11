@@ -424,29 +424,7 @@ describe('TodaySchedule', () => {
     })
   })
 
-  describe('review mode', () => {
-    it('shows Evening Review heading when in review mode', () => {
-      render(
-        <TodaySchedule
-          {...defaultProps}
-          mode="review"
-          reviewData={{
-            incompleteTasks: [],
-            overdueTasks: [],
-            staleDeferredTasks: [],
-            tomorrowTasks: [],
-            reviewCount: 0,
-          }}
-          onUpdateTask={vi.fn()}
-          onDeleteTask={vi.fn()}
-        />
-      )
-
-      // There may be multiple "Evening Review" headings (main heading + section heading)
-      const headings = screen.getAllByRole('heading', { name: /Evening Review/i })
-      expect(headings.length).toBeGreaterThanOrEqual(1)
-    })
-
+  describe('inbox tasks', () => {
     it('shows inbox tasks count in progress bar', () => {
       const tasks = [
         createMockTask({ id: '1', scheduledFor: undefined }),
@@ -464,29 +442,6 @@ describe('TodaySchedule', () => {
 
       // Inbox section should show count
       expect(screen.getByText(/Inbox \(2\)/)).toBeInTheDocument()
-    })
-
-    it('shows ReviewSection when in review mode with review data', () => {
-      const reviewData = {
-        incompleteTasks: [createMockTask({ id: '1', title: 'Incomplete task' })],
-        overdueTasks: [],
-        staleDeferredTasks: [],
-        tomorrowTasks: [],
-        reviewCount: 1,
-      }
-
-      render(
-        <TodaySchedule
-          {...defaultProps}
-          mode="review"
-          reviewData={reviewData}
-          onUpdateTask={vi.fn()}
-          onDeleteTask={vi.fn()}
-        />
-      )
-
-      // ReviewSection content should be visible
-      expect(screen.getByText('Incomplete task')).toBeInTheDocument()
     })
   })
 

@@ -16,18 +16,7 @@ import { DateNavigator } from './DateNavigator'
 import { InboxSection } from './InboxSection'
 import { OverdueSection } from './OverdueSection'
 import { WeeklyReview } from '@/components/review/WeeklyReview'
-import { ReviewSection } from '@/components/review/ReviewSection'
-
-// View mode for TodaySchedule - 'today' or 'review'
-type ViewMode = 'today' | 'review'
-
-interface ReviewData {
-  incompleteTasks: Task[]
-  overdueTasks: Task[]
-  staleDeferredTasks: Task[]
-  tomorrowTasks: Task[]
-  reviewCount: number
-}
+import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
 interface TodayScheduleProps {
   tasks: Task[]
@@ -69,13 +58,13 @@ interface TodayScheduleProps {
   onPushEvent?: (eventId: string, date: Date) => void
   // Planning session
   onOpenPlanning?: () => void
-  // Mode toggle (Today/Review)
-  mode?: ViewMode
-  reviewData?: ReviewData
   onCreateTask?: (title: string) => void
   onAddProject?: (project: { name: string }) => Promise<Project | null>
   // Assignee filter
   selectedAssignee?: string | null  // null = "All", "unassigned" = unassigned only
+  onSelectAssignee?: (id: string | null) => void
+  assigneesWithTasks?: FamilyMember[]
+  hasUnassignedTasks?: boolean
 }
 
 function LoadingSkeleton() {
@@ -144,15 +133,16 @@ export function TodaySchedule({
   onSkipEvent,
   onPushEvent,
   onOpenPlanning: _onOpenPlanning,
-  mode = 'today',
-  reviewData,
-  onCreateTask,
+  onCreateTask: _onCreateTask,
   onAddProject,
   selectedAssignee,
+  onSelectAssignee,
+  assigneesWithTasks = [],
+  hasUnassignedTasks = false,
 }: TodayScheduleProps) {
   void _onOpenPlanning // Reserved - planning now handled by ModeToggle
+  void _onCreateTask // Reserved - was used by ReviewSection
   const isMobile = useMobile()
-  const isReviewMode = mode === 'review'
 
   // Helper function to check if an item matches the assignee filter
   const matchesAssigneeFilter = (assignedTo: string | null | undefined): boolean => {
@@ -376,21 +366,26 @@ export function TodaySchedule({
       <div className="mb-6 animate-fade-in-up">
         <div className="flex items-center gap-3 mb-2">
           <h2 className="font-display text-2xl md:text-3xl font-semibold text-neutral-900">
-            {isReviewMode
-              ? 'Evening Review'
-              : isToday
-              ? `Today is ${formatDate()}`
-              : formatDate()}
+            {isToday ? `Today is ${formatDate()}` : formatDate()}
           </h2>
           {/* Date navigation - inline with heading */}
-          {!isReviewMode && (
-            <DateNavigator date={viewedDate} onDateChange={onDateChange} showTodayButton={!isToday} />
+          <DateNavigator date={viewedDate} onDateChange={onDateChange} showTodayButton={!isToday} />
+          {/* Mobile-only: Assignee filter (moved from top bar on mobile) */}
+          {isMobile && onSelectAssignee && (assigneesWithTasks.length > 0 || hasUnassignedTasks) && (
+            <div className="ml-auto">
+              <AssigneeFilter
+                selectedAssignee={selectedAssignee ?? null}
+                onSelectAssignee={onSelectAssignee}
+                assigneesWithTasks={assigneesWithTasks}
+                hasUnassignedTasks={hasUnassignedTasks}
+              />
+            </div>
           )}
-          {/* Weekly Review button - shows only in Today mode with inbox badge */}
-          {!isReviewMode && isToday && (
+          {/* Weekly Review button - shows only on today's view with inbox badge */}
+          {isToday && (
             <button
               onClick={() => setShowWeeklyReview(true)}
-              className="relative ml-auto flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100 transition-colors"
+              className={`relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100 transition-colors ${!isMobile || !(onSelectAssignee && (assigneesWithTasks.length > 0 || hasUnassignedTasks)) ? 'ml-auto' : ''}`}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
@@ -404,14 +399,9 @@ export function TodaySchedule({
             </button>
           )}
         </div>
-        {isReviewMode && (
-          <p className="text-neutral-500 text-sm">
-            Reflect and prepare for tomorrow
-          </p>
-        )}
 
-        {/* Progress bar - hide in review mode */}
-        {!isReviewMode && actionableCount > 0 && (
+        {/* Progress bar */}
+        {actionableCount > 0 && (
           <div className="flex items-center gap-4 mt-4">
             <div className="flex-1">
               <div className="progress-bar" style={{ '--progress-width': `${progressPercent}%` } as React.CSSProperties}>
@@ -428,24 +418,7 @@ export function TodaySchedule({
         )}
       </div>
 
-      {/* Review Mode Content */}
-      {isReviewMode && reviewData && onUpdateTask && onDeleteTask ? (
-        <ReviewSection
-          incompleteTasks={reviewData.incompleteTasks}
-          overdueTasks={reviewData.overdueTasks}
-          staleDeferredTasks={reviewData.staleDeferredTasks}
-          tomorrowTasks={reviewData.tomorrowTasks}
-          onReschedule={(id, date, isAllDay) => onUpdateTask(id, { scheduledFor: date, isAllDay, deferredUntil: undefined })}
-          onComplete={(id) => onToggleTask(id)}
-          onDrop={(id) => onDeleteTask(id)}
-          onCapture={(title) => onCreateTask?.(title)}
-          onSelectTask={(id) => onSelectItem(`task-${id}`)}
-          projects={projects}
-          familyMembers={familyMembers}
-          onAssignTask={onAssignTask}
-          onDefer={(id, date) => onUpdateTask(id, { deferredUntil: date, deferCount: date ? undefined : 0 })}
-        />
-      ) : loading ? (
+      {loading ? (
         <LoadingSkeleton />
       ) : totalItems === 0 ? (
         <div className="text-center py-16 animate-fade-in-up">
