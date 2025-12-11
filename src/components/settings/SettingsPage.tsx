@@ -10,6 +10,49 @@ interface SettingsPageProps {
 
 type Tab = 'general' | 'calendar' | 'admin'
 
+interface DeleteConfirmationProps {
+  memberName: string
+  onConfirm: () => void
+  onCancel: () => void
+  isDeleting: boolean
+}
+
+function DeleteConfirmation({ memberName, onConfirm, onCancel, isDeleting }: DeleteConfirmationProps) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 animate-scale-up">
+        <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+          <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <h3 className="text-lg font-semibold text-neutral-800 text-center mb-2">
+          Remove {memberName}?
+        </h3>
+        <p className="text-sm text-neutral-500 text-center mb-6">
+          Tasks assigned to {memberName} will become unassigned. This action cannot be undone.
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            disabled={isDeleting}
+            className="btn-secondary flex-1 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isDeleting}
+            className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+          >
+            {isDeleting ? 'Removing...' : 'Remove'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const COLORS = [
   { value: 'blue', bg: 'bg-blue-500', label: 'Blue' },
   { value: 'purple', bg: 'bg-purple-500', label: 'Purple' },
@@ -54,6 +97,11 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
   const [editName, setEditName] = useState('')
   const [editColor, setEditColor] = useState('blue')
 
+  // Delete confirmation state
+  const [deletingMember, setDeletingMember] = useState<FamilyMember | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteSuccess, setDeleteSuccess] = useState<string | null>(null)
+
   const handleAdd = async () => {
     if (!newName.trim() || isSubmitting) return
 
@@ -77,10 +125,29 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
     }
   }
 
-  const handleDelete = async (id: string) => {
-    const member = members.find(m => m.id === id)
-    if (member?.is_full_user) return // Can't delete main user
-    await deleteMember(id)
+  const handleDeleteClick = (member: FamilyMember) => {
+    if (member.is_full_user) return // Can't delete main user
+    setDeletingMember(member)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deletingMember) return
+
+    setIsDeleting(true)
+    try {
+      await deleteMember(deletingMember.id)
+      setDeleteSuccess(`${deletingMember.name} has been removed`)
+      setTimeout(() => setDeleteSuccess(null), 3000)
+    } catch (err) {
+      console.error('Failed to delete member:', err)
+    } finally {
+      setIsDeleting(false)
+      setDeletingMember(null)
+    }
+  }
+
+  const handleCancelDelete = () => {
+    setDeletingMember(null)
   }
 
   const startEditing = (member: FamilyMember) => {
@@ -321,7 +388,7 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
                               </svg>
                             </button>
                             <button
-                              onClick={() => handleDelete(member.id)}
+                              onClick={() => handleDeleteClick(member)}
                               className="text-neutral-400 hover:text-red-500 p-1"
                               title="Remove"
                             >
@@ -414,6 +481,28 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
           </div>
         )}
       </div>
+
+      {/* Delete confirmation modal */}
+      {deletingMember && (
+        <DeleteConfirmation
+          memberName={deletingMember.name}
+          onConfirm={handleConfirmDelete}
+          onCancel={handleCancelDelete}
+          isDeleting={isDeleting}
+        />
+      )}
+
+      {/* Success toast */}
+      {deleteSuccess && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-fade-in-up">
+          <div className="flex items-center gap-2 px-4 py-3 bg-neutral-800 text-white rounded-lg shadow-lg">
+            <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="text-sm font-medium">{deleteSuccess}</span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

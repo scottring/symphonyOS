@@ -111,6 +111,18 @@ export function useFamilyMembers() {
 
   const deleteMember = useCallback(async (id: string) => {
     try {
+      // First, unassign all tasks assigned to this member
+      const { error: unassignError } = await supabase
+        .from('tasks')
+        .update({ assigned_to: null })
+        .eq('assigned_to', id)
+
+      if (unassignError) {
+        console.error('Error unassigning tasks:', unassignError)
+        // Continue with deletion even if unassign fails
+      }
+
+      // Then delete the family member
       const { error } = await supabase
         .from('family_members')
         .delete()
