@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
 
 export interface CreateEventParams {
@@ -44,7 +44,24 @@ export interface CalendarEvent {
   location?: string | null
 }
 
-export function useGoogleCalendar() {
+interface GoogleCalendarContextValue {
+  isConnected: boolean
+  needsReconnect: boolean
+  isLoading: boolean
+  isFetching: boolean
+  events: CalendarEvent[]
+  error: string | null
+  connect: () => Promise<void>
+  disconnect: () => Promise<void>
+  fetchEvents: (startDate: Date, endDate: Date) => Promise<CalendarEvent[]>
+  fetchTodayEvents: () => Promise<CalendarEvent[]>
+  fetchWeekEvents: () => Promise<CalendarEvent[]>
+  createEvent: (params: CreateEventParams) => Promise<CreateEventResult>
+}
+
+const GoogleCalendarContext = createContext<GoogleCalendarContextValue | null>(null)
+
+export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
   const [isConnected, setIsConnected] = useState(false)
   const [needsReconnect, setNeedsReconnect] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -175,7 +192,9 @@ export function useGoogleCalendar() {
         .eq('provider', 'google')
 
       setIsConnected(false)
+      setNeedsReconnect(false)
       setEvents([])
+      setError(null)
     } catch (err) {
       console.error('Failed to disconnect:', err)
       throw err
@@ -296,7 +315,7 @@ export function useGoogleCalendar() {
     return { id: data.eventId, htmlLink: data.htmlLink }
   }, [isConnected])
 
-  return {
+  const value: GoogleCalendarContextValue = {
     isConnected,
     needsReconnect,
     isLoading,
@@ -310,4 +329,18 @@ export function useGoogleCalendar() {
     fetchWeekEvents,
     createEvent,
   }
+
+  return (
+    <GoogleCalendarContext.Provider value={value}>
+      {children}
+    </GoogleCalendarContext.Provider>
+  )
+}
+
+export function useGoogleCalendar() {
+  const context = useContext(GoogleCalendarContext)
+  if (!context) {
+    throw new Error('useGoogleCalendar must be used within a GoogleCalendarProvider')
+  }
+  return context
 }

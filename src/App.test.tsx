@@ -88,20 +88,7 @@ vi.mock('@/hooks/useSupabaseTasks', () => ({
   },
 }))
 
-// Mock useGoogleCalendar to avoid Supabase calls
-vi.mock('@/hooks/useGoogleCalendar', () => ({
-  useGoogleCalendar: () => ({
-    isConnected: false,
-    isLoading: false,
-    isFetching: false,
-    events: [],
-    connect: vi.fn(),
-    disconnect: vi.fn(),
-    fetchTodayEvents: vi.fn(),
-    fetchWeekEvents: vi.fn(),
-    fetchEvents: vi.fn(),
-  }),
-}))
+// useGoogleCalendar is globally mocked in src/test/setup.ts
 
 // Mock useEventNotes to avoid Supabase calls
 vi.mock('@/hooks/useEventNotes', () => ({
