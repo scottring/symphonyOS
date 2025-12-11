@@ -7,13 +7,14 @@ export function createSupabaseMock() {
   let singleResult: unknown = null
 
   const createChainableMock = () => {
-    const chain: Record<string, ReturnType<typeof vi.fn>> = {}
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const chain: Record<string, any> = {}
 
     chain.select = vi.fn().mockReturnValue(chain)
     chain.insert = vi.fn().mockImplementation((data) => {
       // Return a promise-like chain that can continue or resolve
       const insertChain = { ...chain }
-      insertChain.then = (resolve: (value: any) => void) => {
+      insertChain.then = (resolve: (value: unknown) => void) => {
         resolve({ data, error: lastError })
         return Promise.resolve()
       }
@@ -22,7 +23,7 @@ export function createSupabaseMock() {
     chain.update = vi.fn().mockImplementation((data) => {
       // Return a promise-like chain that can continue or resolve
       const updateChain = { ...chain }
-      updateChain.then = (resolve: (value: any) => void) => {
+      updateChain.then = (resolve: (value: unknown) => void) => {
         resolve({ data, error: lastError })
         return Promise.resolve()
       }
@@ -31,7 +32,7 @@ export function createSupabaseMock() {
     chain.delete = vi.fn().mockImplementation(() => {
       // Return a promise-like chain that can continue or resolve
       const deleteChain = { ...chain }
-      deleteChain.then = (resolve: (value: any) => void) => {
+      deleteChain.then = (resolve: (value: unknown) => void) => {
         resolve({ data: null, error: lastError })
         return Promise.resolve()
       }
@@ -40,7 +41,7 @@ export function createSupabaseMock() {
     chain.upsert = vi.fn().mockImplementation((data) => {
       // Return a promise-like chain that can continue or resolve
       const upsertChain = { ...chain }
-      upsertChain.then = (resolve: (value: any) => void) => {
+      upsertChain.then = (resolve: (value: unknown) => void) => {
         resolve({ data, error: lastError })
         return Promise.resolve()
       }

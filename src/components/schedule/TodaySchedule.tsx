@@ -18,7 +18,7 @@ import { InboxSection } from './InboxSection'
 import { OverdueSection } from './OverdueSection'
 import { WeeklyReview } from '@/components/review/WeeklyReview'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
-import { SystemHealthWidget } from '@/components/health'
+import { useSystemHealth } from '@/hooks/useSystemHealth'
 
 // Bento box / grid icon for "Organize"
 function BentoIcon({ className }: { className?: string }) {
@@ -47,27 +47,221 @@ interface OrganizeButtonProps {
 }
 
 function OrganizeButton({ onClick, inboxCount, isMobile, hasAssigneeFilter }: OrganizeButtonProps) {
+  void isMobile // Not used after layout change
+  void hasAssigneeFilter // Not used after layout change
   const emphasized = isOrganizeTime() && inboxCount > 0
 
   return (
     <button
       onClick={onClick}
-      className={`relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+      className={`relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
         emphasized
-          ? 'text-primary-700 bg-primary-50 hover:bg-primary-100 shadow-sm ring-1 ring-primary-200'
-          : 'text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100'
-      } ${!isMobile || !hasAssigneeFilter ? 'ml-auto' : ''}`}
+          ? 'text-primary-700 bg-primary-50 hover:bg-primary-100'
+          : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100'
+      }`}
     >
       <BentoIcon className={`w-5 h-5 ${emphasized ? 'text-primary-600' : ''}`} />
       <span className="hidden sm:inline">Organize</span>
       {inboxCount > 0 && (
-        <span className={`absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full text-white text-xs font-semibold ${
-          emphasized ? 'bg-primary-600 animate-pulse' : 'bg-amber-500'
+        <span className={`absolute -top-1.5 -right-1.5 min-w-[1.125rem] h-[1.125rem] px-1 flex items-center justify-center rounded-full text-white text-[10px] font-bold ${
+          emphasized ? 'bg-primary-500' : 'bg-neutral-400'
         }`}>
           {inboxCount}
         </span>
       )}
     </button>
+  )
+}
+
+// Inline Clarity indicator - clickable with expandable explanation
+interface ClarityIndicatorProps {
+  tasks: Task[]
+}
+
+function ClarityIndicator({ tasks }: ClarityIndicatorProps) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const metrics = useSystemHealth(tasks)
+
+  if (tasks.length === 0) return null
+
+  const colorClass = {
+    excellent: 'text-primary-600',
+    good: 'text-sage-600',
+    fair: 'text-amber-600',
+    needsAttention: 'text-orange-600',
+  }[metrics.healthColor]
+
+  const ringColor = {
+    excellent: 'stroke-primary-500',
+    good: 'stroke-sage-500',
+    fair: 'stroke-amber-500',
+    needsAttention: 'stroke-orange-500',
+  }[metrics.healthColor]
+
+  const bgColor = {
+    excellent: 'bg-primary-50',
+    good: 'bg-sage-50',
+    fair: 'bg-amber-50',
+    needsAttention: 'bg-orange-50',
+  }[metrics.healthColor]
+
+  const size = 32
+  const strokeWidth = 3
+  const radius = (size - strokeWidth) / 2
+  const circumference = 2 * Math.PI * radius
+  const offset = circumference - (metrics.score / 100) * circumference
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center gap-2 px-2 py-1.5 -mx-2 rounded-lg hover:bg-neutral-100/60 transition-colors"
+      >
+        {/* Mini ring */}
+        <div className="relative" style={{ width: size, height: size }}>
+          <svg width={size} height={size} className="transform -rotate-90">
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={strokeWidth}
+              className="text-neutral-100"
+            />
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              fill="none"
+              strokeWidth={strokeWidth}
+              strokeLinecap="round"
+              strokeDasharray={circumference}
+              strokeDashoffset={offset}
+              className={`${ringColor} transition-all duration-500`}
+            />
+          </svg>
+          <span className={`absolute inset-0 flex items-center justify-center text-[11px] font-semibold ${colorClass}`}>
+            {metrics.score}
+          </span>
+        </div>
+        <div className="hidden sm:flex flex-col items-start">
+          <span className="text-xs font-medium text-neutral-600">Clarity</span>
+          <span className={`text-[10px] ${colorClass}`}>{metrics.healthStatus}</span>
+        </div>
+      </button>
+
+      {/* Expanded explanation popover */}
+      {isExpanded && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setIsExpanded(false)}
+          />
+          <div className={`absolute top-full left-0 mt-2 z-50 w-72 p-4 rounded-xl ${bgColor} border border-neutral-200/60 shadow-lg animate-fade-in-scale`}>
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <h4 className="font-medium text-neutral-800">Clarity Score</h4>
+                <p className={`text-sm ${colorClass}`}>{metrics.healthStatus}</p>
+              </div>
+              <span className={`text-2xl font-semibold ${colorClass}`}>{metrics.score}</span>
+            </div>
+            <p className="text-sm text-neutral-600 mb-3">
+              Clarity measures how organized your tasks are. Higher scores mean more items have scheduled dates and fewer are sitting in your inbox.
+            </p>
+            <div className="space-y-1.5 text-xs text-neutral-500">
+              <div className="flex justify-between">
+                <span>Scheduled items</span>
+                <span className="font-medium text-neutral-700">{metrics.itemsWithHome}</span>
+              </div>
+              {metrics.freshInboxItems > 0 && (
+                <div className="flex justify-between">
+                  <span>Fresh inbox items</span>
+                  <span className="font-medium text-neutral-700">{metrics.freshInboxItems}</span>
+                </div>
+              )}
+              {metrics.agingItems > 0 && (
+                <div className="flex justify-between">
+                  <span>Aging items (4-7 days)</span>
+                  <span className="font-medium text-amber-600">{metrics.agingItems}</span>
+                </div>
+              )}
+              {metrics.staleItems > 0 && (
+                <div className="flex justify-between">
+                  <span>Stale items (8+ days)</span>
+                  <span className="font-medium text-orange-600">{metrics.staleItems}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// Progress indicator - clickable with expandable explanation
+interface ProgressIndicatorProps {
+  completed: number
+  total: number
+  percent: number
+}
+
+function ProgressIndicator({ completed, total, percent }: ProgressIndicatorProps) {
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  return (
+    <div className="relative flex-1 flex justify-center">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-neutral-100/60 transition-colors"
+      >
+        <div className="w-24 sm:w-32">
+          <div className="progress-bar">
+            <div
+              className="absolute inset-0 bg-primary-500 rounded-full transition-all duration-500"
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+        </div>
+        <span className="text-sm text-neutral-500 tabular-nums whitespace-nowrap">
+          {completed}/{total} tasks
+        </span>
+      </button>
+
+      {/* Expanded explanation popover */}
+      {isExpanded && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setIsExpanded(false)}
+          />
+          <div className="absolute top-full left-0 mt-2 z-50 w-64 p-4 rounded-xl bg-neutral-50 border border-neutral-200/60 shadow-lg animate-fade-in-scale">
+            <div className="flex items-start justify-between mb-3">
+              <h4 className="font-medium text-neutral-800">Today's Progress</h4>
+              <span className="text-lg font-semibold text-primary-600">{Math.round(percent)}%</span>
+            </div>
+            <p className="text-sm text-neutral-600 mb-3">
+              Track your progress through today's tasks and routines. Complete items to fill the bar.
+            </p>
+            <div className="space-y-1.5 text-xs text-neutral-500">
+              <div className="flex justify-between">
+                <span>Completed</span>
+                <span className="font-medium text-primary-600">{completed}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Remaining</span>
+                <span className="font-medium text-neutral-700">{total - completed}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Total for today</span>
+                <span className="font-medium text-neutral-700">{total}</span>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
   )
 }
 
@@ -484,60 +678,62 @@ export function TodaySchedule({
   }, [tasks, events, visibleRoutines, routineStatusMap])
 
   return (
-    <div className="px-4 py-4 md:p-8 max-w-2xl mx-auto">
-      {/* Header */}
-      <div className="mb-6 animate-fade-in-up">
-        <div className="flex items-center gap-3 mb-2">
-          <h2 className="font-display text-2xl md:text-3xl font-semibold text-neutral-900">
-            {isToday ? `Today is ${formatDate()}` : formatDate()}
-          </h2>
-          {/* Date navigation - inline with heading */}
+    <div className="px-5 py-6 md:px-10 md:py-10 max-w-[680px] mx-auto">
+      {/* Header - Editorial style with large date */}
+      <header className="mb-10 animate-fade-in-up">
+        {/* Large editorial date display with inline navigation */}
+        <div className="flex items-end gap-3 mb-6">
+          <h1 className="font-display text-4xl md:text-5xl text-neutral-900 tracking-tight leading-none">
+            {isToday ? (
+              <>
+                <span className="text-neutral-400 font-normal text-2xl md:text-3xl block mb-1">Today is</span>
+                {viewedDate.toLocaleDateString('en-US', { weekday: 'long' })}
+              </>
+            ) : (
+              formatDate()
+            )}
+          </h1>
+          {/* Date navigation arrows inline with the day name */}
           <DateNavigator date={viewedDate} onDateChange={onDateChange} showTodayButton={!isToday} />
-          {/* Mobile-only: Assignee filter (moved from top bar on mobile) */}
-          {isMobile && onSelectAssignee && (assigneesWithTasks.length > 0 || hasUnassignedTasks) && (
-            <div className="ml-auto">
-              <AssigneeFilter
-                selectedAssignees={selectedAssignee ? [selectedAssignee] : []}
-                onSelectAssignees={(ids) => onSelectAssignee(ids.length > 0 ? ids[0] : null)}
-                assigneesWithTasks={assigneesWithTasks}
-                hasUnassignedTasks={hasUnassignedTasks}
-              />
-            </div>
-          )}
-          {/* Organize button - shows only on today's view with inbox badge */}
-          {/* Emphasized (glowing) during morning (6-9am) and evening (6-9pm) hours */}
+        </div>
+
+        {/* Stats row: Organize, Progress (centered), Clarity */}
+        <div className="flex items-center gap-4 pt-5 border-t border-neutral-200/60">
+          {/* Organize button - left side */}
           {isToday && (
             <OrganizeButton
               onClick={() => setShowWeeklyReview(true)}
               inboxCount={inboxTasks.length}
               isMobile={isMobile}
-              hasAssigneeFilter={!!(onSelectAssignee && (assigneesWithTasks.length > 0 || hasUnassignedTasks))}
+              hasAssigneeFilter={false}
             />
           )}
+
+          {/* Progress - centered with flex-1 */}
+          {actionableCount > 0 && (
+            <ProgressIndicator
+              completed={completedCount}
+              total={actionableCount}
+              percent={progressPercent}
+            />
+          )}
+
+          {/* Assignee filter */}
+          {isMobile && onSelectAssignee && (assigneesWithTasks.length > 0 || hasUnassignedTasks) && (
+            <AssigneeFilter
+              selectedAssignees={selectedAssignee ? [selectedAssignee] : []}
+              onSelectAssignees={(ids) => onSelectAssignee(ids.length > 0 ? ids[0] : null)}
+              assigneesWithTasks={assigneesWithTasks}
+              hasUnassignedTasks={hasUnassignedTasks}
+            />
+          )}
+
+          {/* Clarity score - right side */}
+          {isToday && !loading && tasks.length > 0 && (
+            <ClarityIndicator tasks={tasks} />
+          )}
         </div>
-
-        {/* Progress bar */}
-        {actionableCount > 0 && (
-          <div className="flex items-center gap-4 mt-4">
-            <div className="flex-1">
-              <div className="progress-bar" style={{ '--progress-width': `${progressPercent}%` } as React.CSSProperties}>
-                <div
-                  className="absolute inset-0 bg-gradient-to-r from-primary-500 to-primary-400 rounded-full transition-all duration-500"
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
-            </div>
-            <span className="text-sm font-medium text-neutral-600 tabular-nums min-w-[4rem] text-right">
-              {completedCount} / {actionableCount}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Clarity Widget - shows only on today's view */}
-      {isToday && !loading && (
-        <SystemHealthWidget tasks={tasks} />
-      )}
+      </header>
 
       {loading ? (
         <LoadingSkeleton />
