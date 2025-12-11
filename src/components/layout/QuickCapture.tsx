@@ -219,22 +219,25 @@ export function QuickCapture({
           >
             {/* Header with keyboard hint and close button */}
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-neutral-800 flex items-center gap-2">
-                <kbd className="px-2 py-1 text-xs font-mono bg-neutral-100 text-neutral-500 rounded">
-                  ⌘K
-                </kbd>
+              <h2 className="text-lg font-semibold text-neutral-800">
                 Quick Add
               </h2>
-              <button
-                type="button"
-                onClick={handleClose}
-                className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
-                aria-label="Close"
-              >
-                <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Keyboard hint - hidden on mobile */}
+                <kbd className="hidden md:inline-block px-2 py-1 text-xs font-mono bg-neutral-100 text-neutral-500 rounded">
+                  ⌘K
+                </kbd>
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
+                  aria-label="Close"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -247,7 +250,7 @@ export function QuickCapture({
                   onKeyDown={handleKeyDown}
                   placeholder="What's on your mind?"
                   className="w-full px-4 py-3 rounded-xl border border-neutral-200 bg-neutral-50
-                             text-neutral-800 placeholder:text-neutral-400 text-2xl font-display
+                             text-neutral-800 placeholder:text-neutral-400 text-lg md:text-2xl font-display
                              focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
               </div>
