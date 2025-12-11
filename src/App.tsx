@@ -61,7 +61,7 @@ function App() {
   // Onboarding state
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null)
   const [onboardingLoading, setOnboardingLoading] = useState(true)
-  const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, updateRecipeUrl, getNote, notes: eventNotesMap } = useEventNotes()
+  const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, updateEventAssignmentAll, updateRecipeUrl, getNote, notes: eventNotesMap } = useEventNotes()
   const { contacts, contactsMap, addContact, updateContact, deleteContact, searchContacts } = useContacts()
   const { projects, projectsMap, addProject, updateProject, deleteProject, searchProjects } = useProjects()
   const {
@@ -470,6 +470,14 @@ function App() {
     const eventId = selectedItem.originalEvent.google_event_id || selectedItem.originalEvent.id
     const eventNote = eventNotesMap.get(eventId)
     return eventNote?.recipeUrl ?? null
+  }, [selectedItem, eventNotesMap])
+
+  // Get assigned family members for selected event
+  const selectedEventAssignedToAll = useMemo(() => {
+    if (!selectedItem?.originalEvent) return []
+    const eventId = selectedItem.originalEvent.google_event_id || selectedItem.originalEvent.id
+    const eventNote = eventNotesMap.get(eventId)
+    return eventNote?.assignedToAll ?? []
   }, [selectedItem, eventNotesMap])
 
   // Get attachments for selected item
@@ -917,6 +925,9 @@ function App() {
             onDeleteLinkedTask={handleDeleteLinkedTask}
             routine={selectedItemRoutine}
             onUpdateRoutine={updateRoutine}
+            familyMembers={familyMembers}
+            eventAssignedToAll={selectedEventAssignedToAll}
+            onUpdateEventAssignment={updateEventAssignmentAll}
           />
         )
       }
@@ -962,11 +973,20 @@ function App() {
             onAssignTask={(taskId, memberId) => {
               updateTask(taskId, { assignedTo: memberId ?? undefined })
             }}
+            onAssignTaskAll={(taskId, memberIds) => {
+              updateTask(taskId, { assignedToAll: memberIds, assignedTo: memberIds[0] ?? undefined })
+            }}
             onAssignEvent={(eventId, memberId) => {
               updateEventAssignment(eventId, memberId)
             }}
+            onAssignEventAll={(eventId, memberIds) => {
+              updateEventAssignmentAll(eventId, memberIds)
+            }}
             onAssignRoutine={(routineId, memberId) => {
               updateRoutine(routineId, { assigned_to: memberId })
+            }}
+            onAssignRoutineAll={(routineId, memberIds) => {
+              updateRoutine(routineId, { assigned_to_all: memberIds, assigned_to: memberIds[0] ?? null })
             }}
             onCompleteRoutine={async (routineId, completed) => {
               const routine = allRoutines.find(r => r.id === routineId)

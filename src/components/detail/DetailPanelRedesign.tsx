@@ -15,7 +15,9 @@ import { FileUpload, AttachmentList } from '@/components/attachments'
 import { PlacesAutocomplete, type PlaceSelection } from '@/components/location'
 import { useDirections } from '@/hooks/useDirections'
 import { PinButton } from '@/components/pins'
+import { MultiAssigneeDropdown } from '@/components/family'
 import type { PinnableEntityType } from '@/types/pin'
+import type { FamilyMember } from '@/types/family'
 
 // Component to render text with clickable links (handles HTML links and plain URLs)
 function RichText({ text }: { text: string }) {
@@ -128,6 +130,10 @@ interface DetailPanelRedesignProps {
   // Routine for template management
   routine?: Routine | null
   onUpdateRoutine?: (routineId: string, updates: { prep_task_templates?: PrepFollowupTemplate[], followup_task_templates?: PrepFollowupTemplate[] }) => Promise<boolean>
+  // Family member assignment (for shared events)
+  familyMembers?: FamilyMember[]
+  eventAssignedToAll?: string[]
+  onUpdateEventAssignment?: (googleEventId: string, memberIds: string[]) => void
 }
 
 function ActionIcon({ type }: { type: DetectedAction['icon'] }) {
@@ -467,6 +473,9 @@ export function DetailPanelRedesign({
   onDeleteLinkedTask,
   routine,
   onUpdateRoutine,
+  familyMembers = [],
+  eventAssignedToAll = [],
+  onUpdateEventAssignment,
 }: DetailPanelRedesignProps) {
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -1300,6 +1309,40 @@ export function DetailPanelRedesign({
               onAddNote={handleRoutineAddNote}
               isLoading={actionable.isLoading}
             />
+          </div>
+        )}
+
+        {/* Family member assignment (events only - for shared events) */}
+        {isEvent && item.originalEvent && familyMembers.length > 1 && onUpdateEventAssignment && (
+          <div className="mx-4 mt-4 p-3 bg-neutral-50 rounded-xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-neutral-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
+                </svg>
+                <span className="text-sm font-medium text-neutral-700">Who's attending?</span>
+              </div>
+              <MultiAssigneeDropdown
+                members={familyMembers}
+                selectedIds={eventAssignedToAll}
+                onSelect={(memberIds) => {
+                  const eventId = item.originalEvent?.google_event_id || item.originalEvent?.id
+                  if (eventId) {
+                    onUpdateEventAssignment(eventId, memberIds)
+                  }
+                }}
+                size="sm"
+                label="Select attendees"
+              />
+            </div>
+            {eventAssignedToAll.length >= 2 && (
+              <p className="mt-2 text-xs text-primary-600 flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                Shared event — subway lines will converge on timeline!
+              </p>
+            )}
           </div>
         )}
 

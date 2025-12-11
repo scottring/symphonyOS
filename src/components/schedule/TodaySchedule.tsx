@@ -293,8 +293,11 @@ interface TodayScheduleProps {
   // Family member assignment
   familyMembers?: FamilyMember[]
   onAssignTask?: (taskId: string, memberId: string | null) => void
+  onAssignTaskAll?: (taskId: string, memberIds: string[]) => void
   onAssignEvent?: (eventId: string, memberId: string | null) => void
+  onAssignEventAll?: (eventId: string, memberIds: string[]) => void
   onAssignRoutine?: (routineId: string, memberId: string | null) => void
+  onAssignRoutineAll?: (routineId: string, memberIds: string[]) => void
   // Routine completion
   onCompleteRoutine?: (routineId: string, completed: boolean) => void
   onSkipRoutine?: (routineId: string) => void
@@ -371,8 +374,11 @@ export function TodaySchedule({
   onOpenProject,
   familyMembers = [],
   onAssignTask,
+  onAssignTaskAll,
   onAssignEvent,
+  onAssignEventAll,
   onAssignRoutine,
+  onAssignRoutineAll,
   onCompleteRoutine,
   onSkipRoutine,
   onPushRoutine,
@@ -880,6 +886,24 @@ export function TodaySchedule({
                           ? (memberId) => onAssignEvent(item.id.replace('event-', ''), memberId)
                           : item.type === 'routine' && onAssignRoutine
                           ? (memberId) => onAssignRoutine(item.id.replace('routine-', ''), memberId)
+                          : undefined
+                      }
+                      assignedToAll={
+                        item.type === 'event' && eventNotesMap
+                          ? eventNotesMap.get(item.id.replace('event-', ''))?.assignedToAll ?? []
+                          : item.type === 'task'
+                          ? item.originalTask?.assignedToAll ?? []
+                          : item.type === 'routine'
+                          ? item.originalRoutine?.assigned_to_all ?? []
+                          : []
+                      }
+                      onAssignAll={
+                        item.type === 'task' && taskId && onAssignTaskAll
+                          ? (memberIds) => onAssignTaskAll(taskId, memberIds)
+                          : item.type === 'event' && onAssignEventAll
+                          ? (memberIds) => onAssignEventAll(item.id.replace('event-', ''), memberIds)
+                          : item.type === 'routine' && onAssignRoutineAll
+                          ? (memberIds) => onAssignRoutineAll(item.id.replace('routine-', ''), memberIds)
                           : undefined
                       }
                       getScheduleItemsForDate={getScheduleItemsForDate}

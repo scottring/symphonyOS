@@ -3,7 +3,7 @@ import type { FamilyMember } from '@/types/family'
 import { formatTime, formatTimeRange } from '@/lib/timeUtils'
 import { getProjectColor } from '@/lib/projectUtils'
 import { PushDropdown, SchedulePopover, type ScheduleContextItem } from '@/components/triage'
-import { AssigneeDropdown } from '@/components/family'
+import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
 import { Redo2 } from 'lucide-react'
 
 interface ScheduleItemProps {
@@ -21,6 +21,9 @@ interface ScheduleItemProps {
   familyMembers?: FamilyMember[]
   assignedTo?: string | null
   onAssign?: (memberId: string | null) => void
+  // Multi-member assignment (for events)
+  assignedToAll?: string[]
+  onAssignAll?: (memberIds: string[]) => void
   // Overdue styling
   isOverdue?: boolean
   overdueLabel?: string
@@ -49,6 +52,8 @@ export function ScheduleItem({
   familyMembers = [],
   assignedTo,
   onAssign,
+  assignedToAll = [],
+  onAssignAll,
   isOverdue,
   overdueLabel,
   getScheduleItemsForDate,
@@ -295,8 +300,21 @@ export function ScheduleItem({
           </button>
         )}
 
-        {/* Assignee avatar */}
-        {familyMembers.length > 0 && onAssign && (
+        {/* Assignee avatar - use multi-select when onAssignAll is provided */}
+        {familyMembers.length > 0 && onAssignAll ? (
+          <div
+            className="shrink-0"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <MultiAssigneeDropdown
+              members={familyMembers}
+              selectedIds={assignedToAll}
+              onSelect={onAssignAll}
+              size="sm"
+              label={item.type === 'event' ? "Who's attending?" : "Who's responsible?"}
+            />
+          </div>
+        ) : familyMembers.length > 0 && onAssign && (
           <div
             className="shrink-0"
             onClick={(e) => e.stopPropagation()}

@@ -66,7 +66,8 @@ export interface Routine {
   name: string
   description: string | null
   default_assignee: string | null
-  assigned_to: string | null // Family member assignment
+  assigned_to: string | null // Family member assignment - legacy single
+  assigned_to_all: string[] | null // Multi-member assignment
   visibility: RoutineVisibility
   recurrence_pattern: RecurrencePattern
   time_of_day: string | null // HH:MM:SS format

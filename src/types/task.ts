@@ -35,7 +35,8 @@ export interface Task {
   links?: TaskLink[]
   phoneNumber?: string
   contactId?: string // Linked contact (who task is ABOUT)
-  assignedTo?: string // Who should DO this task (contact id)
+  assignedTo?: string // Who should DO this task (family member id) - legacy single assignment
+  assignedToAll?: string[] // Multi-member assignment
   projectId?: string // Linked project
   parentTaskId?: string // If set, this is a subtask
   subtasks?: Task[] // Populated on fetch, not stored in DB

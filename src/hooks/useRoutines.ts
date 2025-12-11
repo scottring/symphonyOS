@@ -22,6 +22,7 @@ export interface UpdateRoutineInput {
   visibility?: RoutineVisibility
   default_assignee?: string | null
   assigned_to?: string | null
+  assigned_to_all?: string[] | null
   raw_input?: string | null
   show_on_timeline?: boolean
   prep_task_templates?: PrepFollowupTemplate[]
@@ -116,6 +117,7 @@ export function useRoutines() {
       if (input.visibility !== undefined) updates.visibility = input.visibility
       if (input.default_assignee !== undefined) updates.default_assignee = input.default_assignee
       if (input.assigned_to !== undefined) updates.assigned_to = input.assigned_to
+      if (input.assigned_to_all !== undefined) updates.assigned_to_all = input.assigned_to_all
       if (input.raw_input !== undefined) updates.raw_input = input.raw_input
       if (input.show_on_timeline !== undefined) updates.show_on_timeline = input.show_on_timeline
       if (input.prep_task_templates !== undefined) updates.prep_task_templates = input.prep_task_templates

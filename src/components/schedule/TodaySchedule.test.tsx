@@ -40,6 +40,7 @@ const createMockRoutine = (overrides: Partial<Routine> = {}): Routine => ({
   description: null,
   default_assignee: null,
   assigned_to: null,
+  assigned_to_all: null,
   recurrence_pattern: { type: 'daily' },
   time_of_day: '09:00',
   raw_input: null,

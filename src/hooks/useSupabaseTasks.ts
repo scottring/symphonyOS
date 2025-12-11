@@ -20,6 +20,7 @@ interface DbTask {
   phone_number: string | null
   contact_id: string | null
   assigned_to: string | null
+  assigned_to_all: string[] | null
   project_id: string | null
   parent_task_id: string | null
   linked_event_id: string | null
@@ -69,6 +70,7 @@ function dbTaskToTask(dbTask: DbTask): Task {
     phoneNumber: dbTask.phone_number ?? undefined,
     contactId: dbTask.contact_id ?? undefined,
     assignedTo: dbTask.assigned_to ?? undefined,
+    assignedToAll: dbTask.assigned_to_all ?? undefined,
     projectId: dbTask.project_id ?? undefined,
     parentTaskId: dbTask.parent_task_id ?? undefined,
     linkedEventId: dbTask.linked_event_id ?? undefined,
@@ -463,6 +465,7 @@ export function useSupabaseTasks() {
     if ('phoneNumber' in updates) dbUpdates.phone_number = updates.phoneNumber ?? null
     if ('contactId' in updates) dbUpdates.contact_id = updates.contactId ?? null
     if ('assignedTo' in updates) dbUpdates.assigned_to = updates.assignedTo ?? null
+    if ('assignedToAll' in updates) dbUpdates.assigned_to_all = updates.assignedToAll ?? null
     if ('projectId' in updates) dbUpdates.project_id = updates.projectId ?? null
     if ('parentTaskId' in updates) dbUpdates.parent_task_id = updates.parentTaskId ?? null
     if ('linkedEventId' in updates) dbUpdates.linked_event_id = updates.linkedEventId ?? null

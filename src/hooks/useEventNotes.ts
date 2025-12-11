@@ -7,7 +7,8 @@ export interface EventNote {
   id: string
   googleEventId: string
   notes: string | null
-  assignedTo?: string | null
+  assignedTo?: string | null // Legacy single assignment (for backwards compat)
+  assignedToAll?: string[] // Multi-member assignment
   recipeUrl?: string | null
   createdAt: Date
   updatedAt: Date
@@ -19,6 +20,7 @@ interface DbEventNote {
   google_event_id: string
   notes: string | null
   assigned_to: string | null
+  assigned_to_all: string[] | null
   recipe_url: string | null
   created_at: string
   updated_at: string
@@ -30,6 +32,7 @@ function dbNoteToEventNote(dbNote: DbEventNote): EventNote {
     googleEventId: dbNote.google_event_id,
     notes: dbNote.notes,
     assignedTo: dbNote.assigned_to,
+    assignedToAll: dbNote.assigned_to_all || [],
     recipeUrl: dbNote.recipe_url,
     createdAt: new Date(dbNote.created_at),
     updatedAt: new Date(dbNote.updated_at),
@@ -336,6 +339,67 @@ export function useEventNotes() {
     }
   }, [user, notes, updateRecipeUrl])
 
+  // Update multi-member assignment for an event (upsert)
+  // This assigns multiple family members to a shared event (e.g., family dinner)
+  const updateEventAssignmentAll = useCallback(async (googleEventId: string, memberIds: string[]) => {
+    if (!user) return
+
+    const existingNote = notes.get(googleEventId)
+
+    // Optimistic update
+    const optimisticNote: EventNote = existingNote
+      ? { ...existingNote, assignedToAll: memberIds, assignedTo: memberIds[0] || null, updatedAt: new Date() }
+      : {
+          id: crypto.randomUUID(),
+          googleEventId,
+          notes: null,
+          assignedTo: memberIds[0] || null,
+          assignedToAll: memberIds,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }
+
+    setNotes((prev) => new Map(prev).set(googleEventId, optimisticNote))
+
+    // Upsert to database - update both assigned_to (first member) and assigned_to_all (all members)
+    const { data, error: upsertError } = await supabase
+      .from('event_notes')
+      .upsert(
+        {
+          user_id: user.id,
+          google_event_id: googleEventId,
+          assigned_to: memberIds[0] || null,
+          assigned_to_all: memberIds,
+        },
+        {
+          onConflict: 'user_id,google_event_id',
+        }
+      )
+      .select()
+      .single()
+
+    if (upsertError) {
+      // Rollback on error
+      if (existingNote) {
+        setNotes((prev) => new Map(prev).set(googleEventId, existingNote))
+      } else {
+        setNotes((prev) => {
+          const newMap = new Map(prev)
+          newMap.delete(googleEventId)
+          return newMap
+        })
+      }
+      setError(upsertError.message)
+      return
+    }
+
+    // Update with real data from DB
+    if (data) {
+      const realNote = dbNoteToEventNote(data as DbEventNote)
+      setNotes((prev) => new Map(prev).set(googleEventId, realNote))
+    }
+  }, [user, notes])
+
   return {
     notes,
     loading,
@@ -344,6 +408,7 @@ export function useEventNotes() {
     fetchNotesForEvents,
     updateNote,
     updateEventAssignment,
+    updateEventAssignmentAll,
     updateRecipeUrl,
     autoDetectRecipes,
     deleteNote,

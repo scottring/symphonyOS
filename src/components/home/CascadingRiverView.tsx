@@ -63,6 +63,11 @@ interface ConvergenceZone {
   events: TimelineEvent[]
 }
 
+interface FreeTimeZone {
+  startMinutes: number
+  endMinutes: number
+}
+
 // =============================================================================
 // CONSTANTS
 // =============================================================================
@@ -397,6 +402,69 @@ function EventCard({
 }
 
 // =============================================================================
+// FREE TIME ZONE DISPLAY
+// =============================================================================
+
+interface FreeTimeZoneDisplayProps {
+  zone: FreeTimeZone
+  width: number
+}
+
+function FreeTimeZoneDisplay({ zone, width }: FreeTimeZoneDisplayProps) {
+  const startY = minutesToY(zone.startMinutes)
+  const endY = minutesToY(zone.endMinutes)
+  const height = endY - startY
+
+  // Only show label for zones that are at least 1 hour (60 minutes)
+  const showLabel = zone.endMinutes - zone.startMinutes >= 60
+
+  return (
+    <g className="free-time-zone">
+      {/* Subtle background stripe */}
+      <rect
+        x={70}
+        y={startY}
+        width={width - 90}
+        height={height}
+        fill="hsl(152, 40%, 96%)"
+        rx={4}
+      />
+
+      {/* Dashed border on sides */}
+      <line
+        x1={70}
+        y1={startY}
+        x2={70}
+        y2={endY}
+        stroke="hsl(152, 35%, 80%)"
+        strokeWidth={1}
+        strokeDasharray="4 4"
+      />
+      <line
+        x1={width - 20}
+        y1={startY}
+        x2={width - 20}
+        y2={endY}
+        stroke="hsl(152, 35%, 80%)"
+        strokeWidth={1}
+        strokeDasharray="4 4"
+      />
+
+      {/* "All free" label - only for larger zones */}
+      {showLabel && (
+        <foreignObject x={width - 90} y={startY + height / 2 - 12} width={70} height={24}>
+          <div className="flex items-center justify-end h-full">
+            <span className="text-[10px] font-medium text-primary-500/70 bg-primary-50/80 px-2 py-0.5 rounded-full">
+              All free
+            </span>
+          </div>
+        </foreignObject>
+      )}
+    </g>
+  )
+}
+
+// =============================================================================
 // CONVERGENCE ZONE DISPLAY
 // =============================================================================
 
@@ -618,36 +686,108 @@ export function CascadingRiverView({
     return result.sort((a, b) => a.startTime.getTime() - b.startTime.getTime())
   }, [tasks, events, routines, viewedDate, selectedAssignees, eventNotesMap, routineStatusMap, eventStatusMap])
 
-  // Detect convergence zones
+  // Detect convergence zones - only for SHARED events (same event assigned to multiple people)
+  // This creates the subway map effect where lines merge when family members are truly together
   const convergenceZones = useMemo(() => {
     const zones: ConvergenceZone[] = []
-    const buckets = new Map<number, TimelineEvent[]>()
+
+    // Group events by their ID to find shared events
+    const eventGroups = new Map<string, { event: TimelineEvent; memberIds: Set<string> }>()
 
     for (const event of timelineEvents) {
-      const bucket = Math.floor(getMinutesFromMidnight(event.startTime) / 30) * 30
-      if (!buckets.has(bucket)) {
-        buckets.set(bucket, [])
+      if (!event.assignedTo) continue
+
+      // For shared events, multiple timeline entries will have the same base event ID
+      // We need to check assignedToAll from eventNotesMap
+      const eventId = event.id
+
+      if (!eventGroups.has(eventId)) {
+        eventGroups.set(eventId, { event, memberIds: new Set() })
       }
-      buckets.get(bucket)!.push(event)
+      eventGroups.get(eventId)!.memberIds.add(event.assignedTo)
     }
 
-    for (const [bucket, bucketEvents] of buckets) {
-      const memberIds = new Set<string>()
-
-      for (const event of bucketEvents) {
-        if (event.assignedTo && selectedAssignees.includes(event.assignedTo)) {
-          memberIds.add(event.assignedTo)
+    // Also check eventNotesMap for multi-assignment (assignedToAll)
+    if (eventNotesMap) {
+      for (const [eventId, note] of eventNotesMap) {
+        if (note.assignedToAll && note.assignedToAll.length >= 2) {
+          // Find the corresponding timeline event
+          const timelineEvent = timelineEvents.find(e => e.id === eventId)
+          if (timelineEvent) {
+            const relevantMembers = note.assignedToAll.filter(id => selectedAssignees.includes(id))
+            if (relevantMembers.length >= 2) {
+              const bucket = Math.floor(getMinutesFromMidnight(timelineEvent.startTime) / 30) * 30
+              zones.push({
+                startMinutes: bucket,
+                endMinutes: bucket + 30,
+                memberIds: relevantMembers,
+                events: [timelineEvent],
+              })
+            }
+          }
         }
       }
+    }
 
-      if (memberIds.size >= 2) {
-        zones.push({
-          startMinutes: bucket,
-          endMinutes: bucket + 30,
-          memberIds: Array.from(memberIds),
-          events: bucketEvents,
-        })
+    return zones
+  }, [timelineEvents, selectedAssignees, eventNotesMap])
+
+  // Detect "all free" time zones - periods when all selected members have no events
+  const freeTimeZones = useMemo(() => {
+    if (selectedAssignees.length < 2) return [] // Need 2+ people to show "all free"
+
+    const zones: FreeTimeZone[] = []
+    const BUCKET_SIZE = 30 // 30-minute buckets
+
+    // Build a map of which members are busy at each time bucket
+    const busyBuckets = new Map<number, Set<string>>()
+
+    for (const event of timelineEvents) {
+      if (!event.assignedTo) continue
+
+      const startBucket = Math.floor(getMinutesFromMidnight(event.startTime) / BUCKET_SIZE) * BUCKET_SIZE
+      // If event has end time, mark all buckets until end as busy
+      const endMinutes = event.endTime
+        ? getMinutesFromMidnight(event.endTime)
+        : startBucket + BUCKET_SIZE // Default to single bucket
+
+      for (let bucket = startBucket; bucket < endMinutes; bucket += BUCKET_SIZE) {
+        if (!busyBuckets.has(bucket)) {
+          busyBuckets.set(bucket, new Set())
+        }
+        busyBuckets.get(bucket)!.add(event.assignedTo)
       }
+    }
+
+    // Find buckets where NO selected members are busy
+    let currentZoneStart: number | null = null
+
+    for (let bucket = START_HOUR * 60; bucket < END_HOUR * 60; bucket += BUCKET_SIZE) {
+      const busyMembers = busyBuckets.get(bucket) || new Set()
+      const allFree = selectedAssignees.every(id => !busyMembers.has(id))
+
+      if (allFree) {
+        if (currentZoneStart === null) {
+          currentZoneStart = bucket
+        }
+      } else {
+        if (currentZoneStart !== null) {
+          // End the current free zone
+          zones.push({
+            startMinutes: currentZoneStart,
+            endMinutes: bucket,
+          })
+          currentZoneStart = null
+        }
+      }
+    }
+
+    // Close any open zone at end of day
+    if (currentZoneStart !== null) {
+      zones.push({
+        startMinutes: currentZoneStart,
+        endMinutes: END_HOUR * 60,
+      })
     }
 
     return zones
@@ -751,7 +891,16 @@ export function CascadingRiverView({
             {/* Time markers */}
             <TimeMarkers currentMinutes={currentMinutes} width={svgWidth} />
 
-            {/* Convergence zones */}
+            {/* Free time zones - rendered first (below everything else) */}
+            {freeTimeZones.map(zone => (
+              <FreeTimeZoneDisplay
+                key={`free-${zone.startMinutes}`}
+                zone={zone}
+                width={svgWidth}
+              />
+            ))}
+
+            {/* Convergence zones - for shared events */}
             {convergenceZones.map(zone => (
               <ConvergenceZoneDisplay
                 key={`zone-${zone.startMinutes}`}

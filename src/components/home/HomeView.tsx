@@ -41,8 +41,11 @@ interface HomeViewProps {
   onOpenProject?: (projectId: string) => void
   familyMembers: FamilyMember[]
   onAssignTask?: (taskId: string, memberId: string | null) => void
+  onAssignTaskAll?: (taskId: string, memberIds: string[]) => void
   onAssignEvent?: (eventId: string, memberId: string | null) => void
+  onAssignEventAll?: (eventId: string, memberIds: string[]) => void
   onAssignRoutine?: (routineId: string, memberId: string | null) => void
+  onAssignRoutineAll?: (routineId: string, memberIds: string[]) => void
   onCompleteRoutine?: (routineId: string, completed: boolean) => void
   onSkipRoutine?: (routineId: string) => void
   onPushRoutine?: (routineId: string, date: Date) => void
@@ -81,8 +84,11 @@ export function HomeView({
   onOpenProject,
   familyMembers,
   onAssignTask,
+  onAssignTaskAll,
   onAssignEvent,
+  onAssignEventAll,
   onAssignRoutine,
+  onAssignRoutineAll,
   onCompleteRoutine,
   onSkipRoutine,
   onPushRoutine,
@@ -121,51 +127,33 @@ export function HomeView({
     return null // Multi-select uses river view, schedule shows all
   }, [selectedAssignees])
 
-  // Compute assignees with tasks in current view for the filter dropdown
-  const { assigneesWithTasks, hasUnassignedTasks } = useMemo(() => {
-    // Get all assignedTo values from tasks, events, and routines in the current view
-    const assigneeIds = new Set<string>()
-    let hasUnassigned = false
-
+  // Check if there are any unassigned tasks/events/routines for the filter dropdown
+  const hasUnassignedTasks = useMemo(() => {
     // Check tasks
-    tasks.forEach(task => {
-      if (!task.completed) {
-        if (task.assignedTo) {
-          assigneeIds.add(task.assignedTo)
-        } else {
-          hasUnassigned = true
-        }
+    for (const task of tasks) {
+      if (!task.completed && !task.assignedTo && (!task.assignedToAll || task.assignedToAll.length === 0)) {
+        return true
       }
-    })
+    }
 
     // Check events
-    events.forEach(event => {
+    for (const event of events) {
       const eventId = event.google_event_id || event.id
       const eventNote = eventNotesMap?.get(eventId)
-      if (eventNote?.assignedTo) {
-        assigneeIds.add(eventNote.assignedTo)
-      } else {
-        hasUnassigned = true
+      if (!eventNote?.assignedTo && (!eventNote?.assignedToAll || eventNote.assignedToAll.length === 0)) {
+        return true
       }
-    })
+    }
 
     // Check routines
-    routines.forEach(routine => {
-      if (routine.assigned_to) {
-        assigneeIds.add(routine.assigned_to)
-      } else {
-        hasUnassigned = true
+    for (const routine of routines) {
+      if (!routine.assigned_to && (!routine.assigned_to_all || routine.assigned_to_all.length === 0)) {
+        return true
       }
-    })
-
-    // Filter family members to only those with tasks
-    const membersWithTasks = familyMembers.filter(m => assigneeIds.has(m.id))
-
-    return {
-      assigneesWithTasks: membersWithTasks,
-      hasUnassignedTasks: hasUnassigned,
     }
-  }, [tasks, events, routines, familyMembers, eventNotesMap])
+
+    return false
+  }, [tasks, events, routines, eventNotesMap])
 
   // Inbox count for Today badge
   const inboxCount = useMemo(() => {
@@ -283,8 +271,11 @@ export function HomeView({
         onOpenProject={onOpenProject}
         familyMembers={familyMembers}
         onAssignTask={onAssignTask}
+        onAssignTaskAll={onAssignTaskAll}
         onAssignEvent={onAssignEvent}
+        onAssignEventAll={onAssignEventAll}
         onAssignRoutine={onAssignRoutine}
+        onAssignRoutineAll={onAssignRoutineAll}
         onCompleteRoutine={onCompleteRoutine}
         onSkipRoutine={onSkipRoutine}
         onPushRoutine={onPushRoutine}
@@ -296,7 +287,7 @@ export function HomeView({
         onAddProject={onAddProject}
         selectedAssignee={selectedAssigneeForSchedule}
         onSelectAssignee={(id) => setSelectedAssignees(id ? [id] : [])}
-        assigneesWithTasks={assigneesWithTasks}
+        assigneesWithTasks={familyMembers}
         hasUnassignedTasks={hasUnassignedTasks}
       />
     )
@@ -314,7 +305,7 @@ export function HomeView({
             inboxCount={showInboxBadge ? inboxCount : 0}
             selectedAssignees={selectedAssignees}
             onSelectAssignees={setSelectedAssignees}
-            assigneesWithTasks={assigneesWithTasks}
+            assigneesWithTasks={familyMembers}
             hasUnassignedTasks={hasUnassignedTasks}
           />
         </div>
