@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 
 interface WhenPickerProps {
   value?: Date
@@ -13,12 +14,29 @@ export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerP
   const [isOpen, setIsOpen] = useState(false)
   const [step, setStep] = useState<Step>('day')
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 })
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Calculate dropdown position when opening
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      setDropdownPosition({
+        top: rect.bottom + 4,
+        right: window.innerWidth - rect.right,
+      })
+    }
+  }, [isOpen])
 
   // Close on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node
+      const clickedButton = buttonRef.current?.contains(target)
+      const clickedDropdown = dropdownRef.current?.contains(target)
+
+      if (!clickedButton && !clickedDropdown) {
         setIsOpen(false)
         setStep('day')
         setSelectedDate(null)
@@ -109,8 +127,9 @@ export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerP
   }
 
   return (
-    <div ref={containerRef} className="relative">
+    <div className="relative">
       <button
+        ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
         className={`p-1.5 rounded-lg transition-colors ${
           hasValue
@@ -124,8 +143,15 @@ export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerP
         </svg>
       </button>
 
-      {isOpen && (
-        <div className="absolute right-0 top-full mt-1 z-50 bg-white rounded-xl border border-neutral-200 shadow-lg p-2 min-w-[160px]">
+      {isOpen && createPortal(
+        <div
+          ref={dropdownRef}
+          className="fixed z-[100] bg-white rounded-xl border border-neutral-200 shadow-lg p-2 min-w-[160px]"
+          style={{ top: dropdownPosition.top, right: dropdownPosition.right }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* Step 1: Pick the day */}
           {step === 'day' && (
             <div className="space-y-1">
@@ -257,7 +283,8 @@ export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerP
               />
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
