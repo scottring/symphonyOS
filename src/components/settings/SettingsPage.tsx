@@ -6,6 +6,7 @@ import type { FamilyMember } from '@/types/family'
 
 interface SettingsPageProps {
   onBack: () => void
+  onFamilyMembersChanged?: () => void
 }
 
 type Tab = 'general' | 'calendar' | 'admin'
@@ -82,7 +83,7 @@ function generateInitials(name: string): string {
   return (words[0][0] + words[words.length - 1][0]).toUpperCase()
 }
 
-export function SettingsPage({ onBack }: SettingsPageProps) {
+export function SettingsPage({ onBack, onFamilyMembersChanged }: SettingsPageProps) {
   const { members, addMember, updateMember, deleteMember } = useFamilyMembers()
   const [activeTab, setActiveTab] = useState<Tab>('general')
 
@@ -118,6 +119,8 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
       setNewName('')
       setNewColor('blue')
       setIsAdding(false)
+      // Notify parent to refresh family members
+      onFamilyMembersChanged?.()
     } catch (err) {
       console.error('Failed to add member:', err)
     } finally {
@@ -138,6 +141,8 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
       await deleteMember(deletingMember.id)
       setDeleteSuccess(`${deletingMember.name} has been removed`)
       setTimeout(() => setDeleteSuccess(null), 3000)
+      // Notify parent to refresh family members
+      onFamilyMembersChanged?.()
     } catch (err) {
       console.error('Failed to delete member:', err)
     } finally {

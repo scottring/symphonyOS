@@ -1261,10 +1261,13 @@ function App() {
 
       {activeView === 'settings' && (
         <Suspense fallback={<LoadingFallback />}>
-          <SettingsPage onBack={() => {
-            refetchFamilyMembers() // Refresh family members in case they were edited
-            handleViewChange('home')
-          }} />
+          <SettingsPage
+            onBack={() => {
+              refetchFamilyMembers() // Refresh family members in case they were edited
+              handleViewChange('home')
+            }}
+            onFamilyMembersChanged={refetchFamilyMembers}
+          />
         </Suspense>
       )}
 
