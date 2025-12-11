@@ -444,8 +444,8 @@ export function TodaySchedule({
           {isMobile && onSelectAssignee && (assigneesWithTasks.length > 0 || hasUnassignedTasks) && (
             <div className="ml-auto">
               <AssigneeFilter
-                selectedAssignee={selectedAssignee ?? null}
-                onSelectAssignee={onSelectAssignee}
+                selectedAssignees={selectedAssignee ? [selectedAssignee] : []}
+                onSelectAssignees={(ids) => onSelectAssignee(ids.length > 0 ? ids[0] : null)}
                 assigneesWithTasks={assigneesWithTasks}
                 hasUnassignedTasks={hasUnassignedTasks}
               />

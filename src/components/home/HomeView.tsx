@@ -11,6 +11,7 @@ import { useMobile } from '@/hooks/useMobile'
 import { useBadgeVisibility } from '@/hooks/useBadgeVisibility'
 import { HomeViewSwitcher } from './HomeViewSwitcher'
 import { WeekView } from './WeekView'
+import { CascadingRiverView } from './CascadingRiverView'
 import { TodaySchedule } from '@/components/schedule/TodaySchedule'
 
 interface HomeViewProps {
@@ -96,14 +97,29 @@ export function HomeView({
   const isMobile = useMobile()
   const { showInboxBadge } = useBadgeVisibility()
 
-  // Assignee filter state - reset when switching views
-  const [selectedAssignee, setSelectedAssignee] = useState<string | null>(null)
+  // Assignee filter state - now supports multi-select
+  // Empty array = "All", single id = single filter, multiple ids = river view
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
+
+  // Check if we should show river view (2+ real members selected, not counting 'unassigned')
+  const showRiverView = useMemo(() => {
+    const realMemberCount = selectedAssignees.filter(id => id !== 'unassigned').length
+    return realMemberCount >= 2
+  }, [selectedAssignees])
 
   // Reset filter when view changes
   const handleViewChange = useCallback((view: typeof currentView) => {
-    setSelectedAssignee(null)
+    setSelectedAssignees([])
     setCurrentView(view)
   }, [setCurrentView])
+
+  // Convert multi-select to single-select format for TodaySchedule compatibility
+  // When single member selected or 'unassigned', pass that. Otherwise null for 'all'.
+  const selectedAssigneeForSchedule = useMemo(() => {
+    if (selectedAssignees.length === 0) return null // All
+    if (selectedAssignees.length === 1) return selectedAssignees[0] // Single
+    return null // Multi-select uses river view, schedule shows all
+  }, [selectedAssignees])
 
   // Compute assignees with tasks in current view for the filter dropdown
   const { assigneesWithTasks, hasUnassignedTasks } = useMemo(() => {
@@ -198,8 +214,42 @@ export function HomeView({
           weekStart={weekStart}
           onWeekChange={setWeekStart}
           onSelectDay={handleSelectDay}
-          selectedAssignee={selectedAssignee}
+          selectedAssignee={selectedAssigneeForSchedule}
           eventNotesMap={eventNotesMap}
+        />
+      )
+    }
+
+    // River view when 2+ family members selected
+    if (showRiverView) {
+      return (
+        <CascadingRiverView
+          tasks={tasks}
+          events={events}
+          routines={routines}
+          dateInstances={dateInstances}
+          selectedItemId={selectedItemId}
+          onSelectItem={onSelectItem}
+          onToggleTask={onToggleTask}
+          onUpdateTask={onUpdateTask}
+          onPushTask={onPushTask}
+          onDeleteTask={onDeleteTask}
+          viewedDate={viewedDate}
+          onDateChange={onDateChange}
+          contactsMap={contactsMap}
+          projectsMap={projectsMap}
+          eventNotesMap={eventNotesMap}
+          familyMembers={familyMembers}
+          selectedAssignees={selectedAssignees}
+          onAssignTask={onAssignTask}
+          onAssignEvent={onAssignEvent}
+          onAssignRoutine={onAssignRoutine}
+          onCompleteRoutine={onCompleteRoutine}
+          onSkipRoutine={onSkipRoutine}
+          onPushRoutine={onPushRoutine}
+          onCompleteEvent={onCompleteEvent}
+          onSkipEvent={onSkipEvent}
+          onPushEvent={onPushEvent}
         />
       )
     }
@@ -244,8 +294,8 @@ export function HomeView({
         onOpenPlanning={onOpenPlanning}
         onCreateTask={onCreateTask}
         onAddProject={onAddProject}
-        selectedAssignee={selectedAssignee}
-        onSelectAssignee={setSelectedAssignee}
+        selectedAssignee={selectedAssigneeForSchedule}
+        onSelectAssignee={(id) => setSelectedAssignees(id ? [id] : [])}
         assigneesWithTasks={assigneesWithTasks}
         hasUnassignedTasks={hasUnassignedTasks}
       />
@@ -262,8 +312,8 @@ export function HomeView({
             currentView={currentView}
             onViewChange={handleViewChange}
             inboxCount={showInboxBadge ? inboxCount : 0}
-            selectedAssignee={selectedAssignee}
-            onSelectAssignee={setSelectedAssignee}
+            selectedAssignees={selectedAssignees}
+            onSelectAssignees={setSelectedAssignees}
             assigneesWithTasks={assigneesWithTasks}
             hasUnassignedTasks={hasUnassignedTasks}
           />

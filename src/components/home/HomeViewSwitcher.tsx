@@ -6,9 +6,9 @@ interface HomeViewSwitcherProps {
   currentView: HomeViewType
   onViewChange: (view: HomeViewType) => void
   inboxCount?: number    // Badge on Day (shows inbox items needing triage)
-  // Assignee filter props
-  selectedAssignee?: string | null
-  onSelectAssignee?: (id: string | null) => void
+  // Assignee filter props - now multi-select
+  selectedAssignees?: string[]
+  onSelectAssignees?: (ids: string[]) => void
   assigneesWithTasks?: FamilyMember[]
   hasUnassignedTasks?: boolean
 }
@@ -22,12 +22,12 @@ export function HomeViewSwitcher({
   currentView,
   onViewChange,
   inboxCount = 0,
-  selectedAssignee,
-  onSelectAssignee,
+  selectedAssignees = [],
+  onSelectAssignees,
   assigneesWithTasks = [],
   hasUnassignedTasks = false,
 }: HomeViewSwitcherProps) {
-  const showFilter = onSelectAssignee && (assigneesWithTasks.length > 0 || hasUnassignedTasks)
+  const showFilter = onSelectAssignees && (assigneesWithTasks.length > 0 || hasUnassignedTasks)
 
   return (
     <div className="inline-flex items-center gap-2">
@@ -70,11 +70,11 @@ export function HomeViewSwitcher({
           )
         })}
       </div>
-      {/* Assignee Filter */}
+      {/* Assignee Filter - multi-select */}
       {showFilter && (
         <AssigneeFilter
-          selectedAssignee={selectedAssignee ?? null}
-          onSelectAssignee={onSelectAssignee!}
+          selectedAssignees={selectedAssignees}
+          onSelectAssignees={onSelectAssignees!}
           assigneesWithTasks={assigneesWithTasks}
           hasUnassignedTasks={hasUnassignedTasks}
         />
