@@ -11,20 +11,17 @@ interface TaskViewProps {
   onDelete: (id: string) => void
   onToggleComplete: (id: string) => void
   onPush?: (id: string, date: Date) => void
-  // Contact support
   contact?: Contact | null
   contacts?: Contact[]
   onSearchContacts?: (query: string) => Contact[]
   onUpdateContact?: (id: string, updates: Partial<Contact>) => Promise<void>
   onAddContact?: (contact: { name: string; phone?: string; email?: string }) => Promise<Contact | null>
   onOpenContact?: (contactId: string) => void
-  // Project support
   project?: Project | null
   projects?: Project[]
   onSearchProjects?: (query: string) => Project[]
   onOpenProject?: (projectId: string) => void
   onAddProject?: (project: { name: string }) => Promise<Project | null>
-  // Subtask support
   onAddSubtask?: (parentId: string, title: string) => Promise<string | undefined>
 }
 
@@ -58,14 +55,10 @@ export function TaskView({
 
   // Time picker state
   const [showTimePicker, setShowTimePicker] = useState(false)
-  const [showHourPicker, setShowHourPicker] = useState(false)
-  const [showMinutePicker, setShowMinutePicker] = useState(false)
 
   // Contact picker state
   const [showContactPicker, setShowContactPicker] = useState(false)
   const [contactSearchQuery, setContactSearchQuery] = useState('')
-
-  // Contact creation state
   const [isCreatingContact, setIsCreatingContact] = useState(false)
   const [newContactName, setNewContactName] = useState('')
   const [newContactPhone, setNewContactPhone] = useState('')
@@ -85,22 +78,23 @@ export function TaskView({
   // Links editing
   const [newLink, setNewLink] = useState('')
   const [newLinkTitle, setNewLinkTitle] = useState('')
+  const [showAddLink, setShowAddLink] = useState(false)
 
   // Subtask state
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('')
   const [isAddingSubtask, setIsAddingSubtask] = useState(false)
 
   // Sync state when task changes
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing state on task change is valid
     setEditedTitle(task.title)
     setLocalNotes(task.notes || '')
     setIsEditingTitle(false)
     setShowDeleteConfirm(false)
     setShowTimePicker(false)
   }, [task.id, task.title, task.notes])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Focus title input when editing starts
   useEffect(() => {
     if (isEditingTitle && titleInputRef.current) {
       titleInputRef.current.focus()
@@ -108,7 +102,6 @@ export function TaskView({
     }
   }, [isEditingTitle])
 
-  // Cleanup debounce on unmount
   useEffect(() => {
     return () => {
       if (debounceRef.current) {
@@ -117,12 +110,10 @@ export function TaskView({
     }
   }, [])
 
-  // Filter contacts for picker
   const filteredContacts = onSearchContacts && contactSearchQuery
     ? onSearchContacts(contactSearchQuery)
     : contacts.slice(0, 5)
 
-  // Filter projects for picker
   const filteredProjects = onSearchProjects && projectSearchQuery
     ? onSearchProjects(projectSearchQuery)
     : projects.slice(0, 5)
@@ -136,9 +127,8 @@ export function TaskView({
   }
 
   const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      handleTitleSave()
-    } else if (e.key === 'Escape') {
+    if (e.key === 'Enter') handleTitleSave()
+    else if (e.key === 'Escape') {
       setEditedTitle(task.title)
       setIsEditingTitle(false)
     }
@@ -147,12 +137,7 @@ export function TaskView({
   const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value
     setLocalNotes(value)
-
-    // Debounce the actual save
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current)
-    }
-
+    if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
       onUpdate(task.id, { notes: value || undefined })
     }, 500)
@@ -175,7 +160,6 @@ export function TaskView({
 
   const handleCreateAndLinkContact = async () => {
     if (!onAddContact || !newContactName.trim()) return
-
     setIsCreatingContactLoading(true)
     const createdContact = await onAddContact({
       name: newContactName.trim(),
@@ -183,7 +167,6 @@ export function TaskView({
       email: newContactEmail.trim() || undefined,
     })
     setIsCreatingContactLoading(false)
-
     if (createdContact) {
       onUpdate(task.id, { contactId: createdContact.id })
       setIsCreatingContact(false)
@@ -207,11 +190,9 @@ export function TaskView({
 
   const handleCreateAndLinkProject = async () => {
     if (!onAddProject || !newProjectName.trim()) return
-
     setIsCreatingProjectLoading(true)
     const createdProject = await onAddProject({ name: newProjectName.trim() })
     setIsCreatingProjectLoading(false)
-
     if (createdProject) {
       onUpdate(task.id, { projectId: createdProject.id })
       setIsCreatingProject(false)
@@ -226,23 +207,18 @@ export function TaskView({
     const trimmedUrl = newLink.trim()
     const trimmedTitle = newLinkTitle.trim()
     if (!trimmedUrl) return
-
     const currentLinks = task.links || []
-    // Check if URL already exists
     if (currentLinks.some((link) => link.url === trimmedUrl)) {
       setNewLink('')
       setNewLinkTitle('')
       return
     }
-
-    // Add link with URL and optional title
     const newLinkObj: TaskLink = { url: trimmedUrl }
-    if (trimmedTitle) {
-      newLinkObj.title = trimmedTitle
-    }
+    if (trimmedTitle) newLinkObj.title = trimmedTitle
     onUpdate(task.id, { links: [...currentLinks, newLinkObj] })
     setNewLink('')
     setNewLinkTitle('')
+    setShowAddLink(false)
   }
 
   const handleRemoveLink = (linkToRemove: TaskLink) => {
@@ -253,11 +229,7 @@ export function TaskView({
 
   const formatDate = (date: Date | undefined) => {
     if (!date) return null
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-    })
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
   }
 
   const formatTime = (date: Date | undefined) => {
@@ -269,870 +241,742 @@ export function TaskView({
     return `${hour}:${m.toString().padStart(2, '0')} ${ampm}`
   }
 
-  // Get phone number from contact
   const phoneNumber = contact?.phone
+  const completedSubtasks = task.subtasks?.filter(s => s.completed).length || 0
+  const totalSubtasks = task.subtasks?.length || 0
 
   return (
-    <div className="h-full overflow-auto">
-      <div className="p-6 max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="mb-6">
-          {/* Breadcrumb */}
-          <div className="flex items-center gap-2 mb-4">
-            <button
-              onClick={onBack}
-              className="flex items-center gap-1 text-sm text-neutral-500 hover:text-neutral-700 transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              Back
-            </button>
-            <span className="text-neutral-300">/</span>
-            <span className="text-sm font-medium text-neutral-600">Task</span>
-          </div>
+    <div className="h-full overflow-auto bg-[var(--color-bg-base)]">
+      {/* Subtle top gradient accent */}
+      <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-primary-50/40 to-transparent pointer-events-none" />
 
-          <div className="flex items-start gap-4">
-            {/* Large checkbox */}
-            <button
-              onClick={() => onToggleComplete(task.id)}
-              className="mt-1 flex-shrink-0"
-              aria-label={task.completed ? 'Mark incomplete' : 'Mark complete'}
-            >
-              <span
-                className={`
-                  w-7 h-7 rounded-lg border-2
-                  flex items-center justify-center
-                  transition-colors
-                  ${task.completed
-                    ? 'bg-primary-500 border-primary-500 text-white'
-                    : 'border-neutral-300 hover:border-primary-400'
-                  }
-                `}
-              >
-                {task.completed && (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                )}
-              </span>
-            </button>
+      <div className="relative max-w-6xl mx-auto px-6 py-8">
+        {/* Minimal breadcrumb */}
+        <button
+          onClick={onBack}
+          className="inline-flex items-center gap-2 text-sm text-neutral-400 hover:text-neutral-600
+                     transition-colors mb-8 group"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="w-4 h-4 transition-transform group-hover:-translate-x-1"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+          </svg>
+          Back to tasks
+        </button>
 
-            {/* Title */}
-            <div className="flex-1 min-w-0">
-              {isEditingTitle ? (
-                <input
-                  ref={titleInputRef}
-                  type="text"
-                  value={editedTitle}
-                  onChange={(e) => setEditedTitle(e.target.value)}
-                  onBlur={handleTitleSave}
-                  onKeyDown={handleTitleKeyDown}
-                  className="w-full font-display text-2xl font-semibold text-neutral-800 leading-tight
-                             bg-transparent border-b-2 border-primary-500
-                             focus:outline-none py-0.5 -my-0.5"
-                />
-              ) : (
-                <h1
-                  className={`font-display text-2xl font-semibold leading-tight cursor-pointer
-                             hover:text-primary-600 transition-colors
-                             ${task.completed ? 'text-neutral-400 line-through' : 'text-neutral-900'}`}
-                  onClick={() => setIsEditingTitle(true)}
-                >
-                  {task.title}
-                </h1>
-              )}
-            </div>
-
-            {/* Action buttons */}
-            <div className="flex items-center gap-1">
-              {/* Push button */}
-              {onPush && (
-                <span title="Push task">
-                  <PushDropdown onPush={(date) => onPush(task.id, date)} />
-                </span>
-              )}
-
-              {/* Delete button */}
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                aria-label="Delete task"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {/* Delete confirmation */}
-          {showDeleteConfirm && (
-            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl">
-              <p className="text-sm text-red-800 mb-3">
-                Are you sure you want to delete this task?
-              </p>
-              <div className="flex gap-2">
+        {/* Two-column layout */}
+        <div className="flex gap-12 lg:gap-16">
+          {/* ========== MAIN COLUMN - Task & Subtasks ========== */}
+          <div className="flex-1 min-w-0">
+            {/* Task Header */}
+            <div className="mb-10">
+              <div className="flex items-start gap-5">
+                {/* Completion checkbox - prominent */}
                 <button
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 py-2 px-3 text-sm font-medium text-neutral-600 bg-white rounded-lg hover:bg-neutral-50 transition-colors border border-neutral-200"
+                  onClick={() => onToggleComplete(task.id)}
+                  className="mt-2 flex-shrink-0 group"
+                  aria-label={task.completed ? 'Mark incomplete' : 'Mark complete'}
                 >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDelete}
-                  className="flex-1 py-2 px-3 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
-                >
-                  Delete Task
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Main content */}
-        <div className="space-y-6">
-          {/* Date & Time Section */}
-          <div className="bg-white rounded-xl border border-neutral-100 p-4">
-            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">When</h2>
-
-            {!showTimePicker ? (
-              <button
-                onClick={() => setShowTimePicker(true)}
-                className="w-full flex items-center gap-3 p-3 rounded-lg bg-neutral-50 hover:bg-neutral-100 transition-colors text-left"
-              >
-                <svg className="w-5 h-5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <span className="flex-1">
-                  {task.scheduledFor ? (
-                    <span className="text-neutral-800">
-                      {formatDate(task.scheduledFor)}{task.isAllDay ? ' (All Day)' : ` at ${formatTime(task.scheduledFor)}`}
-                    </span>
-                  ) : (
-                    <span className="text-neutral-400">Add date & time</span>
-                  )}
-                </span>
-              </button>
-            ) : (
-              <div className="space-y-3">
-                {/* Date picker row */}
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="date"
-                    value={task.scheduledFor ? task.scheduledFor.toISOString().split('T')[0] : ''}
-                    onChange={(e) => {
-                      const dateValue = e.target.value
-                      if (dateValue) {
-                        const existing = task.scheduledFor || new Date()
-                        const [year, month, day] = dateValue.split('-').map(Number)
-                        const newDate = new Date(existing)
-                        newDate.setFullYear(year, month - 1, day)
-                        // If no existing time and not already all-day, default to all-day
-                        const shouldBeAllDay = !task.scheduledFor ? true : task.isAllDay
-                        onUpdate(task.id, { scheduledFor: newDate, isAllDay: shouldBeAllDay })
-                      } else {
-                        onUpdate(task.id, { scheduledFor: undefined, isAllDay: undefined })
+                  <span
+                    className={`
+                      w-8 h-8 rounded-xl border-2 flex items-center justify-center
+                      transition-all duration-300 ease-out
+                      ${task.completed
+                        ? 'bg-primary-500 border-primary-500 text-white shadow-[0_4px_12px_-2px_hsl(152_50%_32%/0.3)]'
+                        : 'border-neutral-300 group-hover:border-primary-400 group-hover:scale-105'
                       }
-                    }}
-                    className="flex-1 px-3 py-2 text-sm rounded-lg border border-neutral-200
-                               focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                  {/* Time pickers - only show if not all day */}
-                  {task.scheduledFor && !task.isAllDay && (
-                    <>
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={() => setShowHourPicker(!showHourPicker)}
-                          className="w-16 px-2 py-2 text-sm rounded-lg border border-neutral-200 bg-white
-                                     flex items-center justify-between"
-                        >
-                          <span>
-                            {task.scheduledFor
-                              ? (() => {
-                                  const h = task.scheduledFor.getHours()
-                                  return h === 0 ? '12a' : h < 12 ? `${h}a` : h === 12 ? '12p' : `${h - 12}p`
-                                })()
-                              : '--'}
-                          </span>
-                          <svg className="w-3 h-3 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-                        {showHourPicker && (
-                          <div className="absolute top-full left-0 mt-1 w-20 max-h-48 overflow-auto bg-white border border-neutral-200 rounded-lg shadow-lg z-50">
-                            {Array.from({ length: 24 }, (_, i) => (
-                              <button
-                                key={i}
-                                type="button"
-                                onClick={() => {
-                                  const existing = task.scheduledFor || new Date()
-                                  const newDate = new Date(existing)
-                                  newDate.setHours(i)
-                                  newDate.setSeconds(0)
-                                  onUpdate(task.id, { scheduledFor: newDate })
-                                  setShowHourPicker(false)
-                                }}
-                                className={`w-full px-3 py-1.5 text-sm text-left hover:bg-neutral-100
-                                  ${task.scheduledFor?.getHours() === i ? 'bg-primary-50 text-primary-700 font-medium' : ''}`}
-                              >
-                                {i === 0 ? '12 AM' : i < 12 ? `${i} AM` : i === 12 ? '12 PM' : `${i - 12} PM`}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={() => setShowMinutePicker(!showMinutePicker)}
-                          className="w-14 px-2 py-2 text-sm rounded-lg border border-neutral-200 bg-white
-                                     flex items-center justify-between"
-                        >
-                          <span>
-                            {task.scheduledFor
-                              ? `:${(Math.round(task.scheduledFor.getMinutes() / 5) * 5).toString().padStart(2, '0')}`
-                              : '--'}
-                          </span>
-                          <svg className="w-3 h-3 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-                        {showMinutePicker && (
-                          <div className="absolute top-full left-0 mt-1 w-16 max-h-48 overflow-auto bg-white border border-neutral-200 rounded-lg shadow-lg z-50">
-                            {Array.from({ length: 12 }, (_, i) => i * 5).map((m) => {
-                              const currentMinute = task.scheduledFor
-                                ? Math.round(task.scheduledFor.getMinutes() / 5) * 5
-                                : null
-                              return (
-                                <button
-                                  key={m}
-                                  type="button"
-                                  onClick={() => {
-                                    const existing = task.scheduledFor || new Date()
-                                    const newDate = new Date(existing)
-                                    newDate.setMinutes(m)
-                                    newDate.setSeconds(0)
-                                    onUpdate(task.id, { scheduledFor: newDate })
-                                    setShowMinutePicker(false)
-                                  }}
-                                  className={`w-full px-3 py-1.5 text-sm text-left hover:bg-neutral-100
-                                    ${currentMinute === m ? 'bg-primary-50 text-primary-700 font-medium' : ''}`}
-                                >
-                                  :{m.toString().padStart(2, '0')}
-                                </button>
-                              )
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* All Day toggle - only show when date is set */}
-                {task.scheduledFor && (
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <div className="relative">
-                      <input
-                        type="checkbox"
-                        checked={task.isAllDay || false}
-                        onChange={(e) => {
-                          onUpdate(task.id, { isAllDay: e.target.checked })
-                          // Close time pickers when toggling
-                          setShowHourPicker(false)
-                          setShowMinutePicker(false)
-                        }}
-                        className="sr-only"
-                      />
-                      <div className={`w-10 h-6 rounded-full transition-colors ${task.isAllDay ? 'bg-primary-500' : 'bg-neutral-200'}`}>
-                        <div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform mt-1 ${task.isAllDay ? 'translate-x-5' : 'translate-x-1'}`} />
-                      </div>
-                    </div>
-                    <span className="text-sm text-neutral-600">All Day</span>
-                  </label>
-                )}
-
-                <div className="flex gap-2">
-                  {task.scheduledFor && (
-                    <button
-                      onClick={() => onUpdate(task.id, { scheduledFor: undefined, isAllDay: undefined })}
-                      className="text-sm text-neutral-500 hover:text-red-600 transition-colors"
-                    >
-                      Clear
-                    </button>
-                  )}
-                  <button
-                    onClick={() => setShowTimePicker(false)}
-                    className="ml-auto text-sm text-primary-600 hover:text-primary-700 font-medium"
+                    `}
                   >
-                    Done
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Contact Section */}
-          <div className="bg-white rounded-xl border border-neutral-100 p-4">
-            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">Contact</h2>
-
-            {contact ? (
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-neutral-50">
-                <button
-                  onClick={() => onOpenContact?.(contact.id)}
-                  className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 hover:bg-primary-200 transition-colors"
-                  disabled={!onOpenContact}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => onOpenContact?.(contact.id)}
-                  className="flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
-                  disabled={!onOpenContact}
-                >
-                  <div className={`font-medium ${onOpenContact ? 'text-primary-600 hover:underline' : 'text-neutral-800'}`}>{contact.name}</div>
-                  {phoneNumber && <div className="text-sm text-neutral-500">{phoneNumber}</div>}
-                </button>
-                {phoneNumber && (
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => window.location.href = `tel:${phoneNumber}`}
-                      className="p-2 rounded-lg bg-primary-50 text-primary-600 hover:bg-primary-100"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                    {task.completed && (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>
-                    </button>
-                    <button
-                      onClick={() => window.location.href = `sms:${phoneNumber}`}
-                      className="p-2 rounded-lg bg-primary-50 text-primary-600 hover:bg-primary-100"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
-                      </svg>
-                    </button>
-                  </div>
-                )}
-                <button
-                  onClick={handleUnlinkContact}
-                  className="p-2 text-neutral-400 hover:text-red-500 transition-colors"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
+                    )}
+                  </span>
                 </button>
-              </div>
-            ) : showContactPicker ? (
-              <div className="rounded-xl border border-neutral-200 overflow-hidden">
-                {!isCreatingContact ? (
-                  <>
-                    <div className="p-2 border-b border-neutral-100">
-                      <input
-                        type="text"
-                        value={contactSearchQuery}
-                        onChange={(e) => setContactSearchQuery(e.target.value)}
-                        placeholder="Search contacts..."
-                        className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50
-                                   focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        autoFocus
-                      />
-                    </div>
-                    <div className="max-h-48 overflow-auto">
-                      {filteredContacts.length > 0 ? (
-                        filteredContacts.map((c) => (
-                          <button
-                            key={c.id}
-                            onClick={() => handleLinkContact(c)}
-                            className="w-full px-4 py-3 text-left flex items-center gap-3 hover:bg-neutral-50 transition-colors"
-                          >
-                            <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center text-neutral-600">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                              </svg>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-neutral-800 truncate">{c.name}</div>
-                              {c.phone && <div className="text-sm text-neutral-500 truncate">{c.phone}</div>}
-                            </div>
-                          </button>
-                        ))
-                      ) : (
-                        <div className="px-4 py-6 text-center text-sm text-neutral-400">
-                          No contacts found
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-2 border-t border-neutral-100 flex gap-2">
-                      <button
-                        onClick={() => {
-                          setShowContactPicker(false)
-                          setContactSearchQuery('')
-                        }}
-                        className="flex-1 px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50 rounded-lg transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      {onAddContact && (
-                        <button
-                          onClick={() => {
-                            setIsCreatingContact(true)
-                            setNewContactName(contactSearchQuery)
-                          }}
-                          className="flex-1 px-3 py-2 text-sm text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors flex items-center justify-center gap-1"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                          </svg>
-                          New
-                        </button>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <div className="p-3">
-                    <div className="text-sm font-medium text-neutral-700 mb-2">Create new contact</div>
-                    <div className="space-y-2 mb-3">
-                      <input
-                        type="text"
-                        value={newContactName}
-                        onChange={(e) => setNewContactName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Escape') {
-                            setIsCreatingContact(false)
-                            setNewContactName('')
-                            setNewContactPhone('')
-                            setNewContactEmail('')
-                          }
-                        }}
-                        placeholder="Name *"
-                        className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50
-                                   focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        autoFocus
-                        disabled={isCreatingContactLoading}
-                      />
-                      <input
-                        type="tel"
-                        value={newContactPhone}
-                        onChange={(e) => setNewContactPhone(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Escape') {
-                            setIsCreatingContact(false)
-                            setNewContactName('')
-                            setNewContactPhone('')
-                            setNewContactEmail('')
-                          }
-                        }}
-                        placeholder="Phone (optional)"
-                        className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50
-                                   focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        disabled={isCreatingContactLoading}
-                      />
-                      <input
-                        type="email"
-                        value={newContactEmail}
-                        onChange={(e) => setNewContactEmail(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && newContactName.trim()) {
-                            handleCreateAndLinkContact()
-                          } else if (e.key === 'Escape') {
-                            setIsCreatingContact(false)
-                            setNewContactName('')
-                            setNewContactPhone('')
-                            setNewContactEmail('')
-                          }
-                        }}
-                        placeholder="Email (optional)"
-                        className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50
-                                   focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        disabled={isCreatingContactLoading}
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setIsCreatingContact(false)
-                          setNewContactName('')
-                          setNewContactPhone('')
-                          setNewContactEmail('')
-                        }}
-                        className="flex-1 px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50 rounded-lg transition-colors"
-                        disabled={isCreatingContactLoading}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleCreateAndLinkContact}
-                        disabled={!newContactName.trim() || isCreatingContactLoading}
-                        className="flex-1 px-3 py-2 text-sm text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isCreatingContactLoading ? 'Creating...' : 'Create'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <button
-                onClick={() => setShowContactPicker(true)}
-                className="w-full flex items-center gap-3 p-3 rounded-lg bg-neutral-50 hover:bg-neutral-100 transition-colors text-left"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-neutral-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                </svg>
-                <span className="text-neutral-400">Add contact</span>
-              </button>
-            )}
-          </div>
 
-          {/* Project Section */}
-          <div className="bg-white rounded-xl border border-neutral-100 p-4">
-            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">Project</h2>
-
-            {project ? (
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-50">
-                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-                  </svg>
-                </div>
+                {/* Title - Large editorial typography */}
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-neutral-800">{project.name}</div>
+                  {isEditingTitle ? (
+                    <input
+                      ref={titleInputRef}
+                      type="text"
+                      value={editedTitle}
+                      onChange={(e) => setEditedTitle(e.target.value)}
+                      onBlur={handleTitleSave}
+                      onKeyDown={handleTitleKeyDown}
+                      className="w-full font-display text-3xl lg:text-4xl font-semibold text-neutral-900
+                                 leading-tight bg-transparent border-b-2 border-primary-500
+                                 focus:outline-none py-1 -my-1 tracking-tight"
+                    />
+                  ) : (
+                    <h1
+                      className={`font-display text-3xl lg:text-4xl font-semibold leading-tight cursor-pointer
+                                 transition-colors tracking-tight
+                                 ${task.completed ? 'text-neutral-400 line-through' : 'text-neutral-900 hover:text-neutral-700'}`}
+                      onClick={() => setIsEditingTitle(true)}
+                    >
+                      {task.title}
+                    </h1>
+                  )}
                 </div>
-                {onOpenProject && (
-                  <button
-                    onClick={() => onOpenProject(project.id)}
-                    className="p-2 rounded-lg bg-blue-100 text-blue-600 hover:bg-blue-200"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                  </button>
+              </div>
+
+              {/* Quick actions - subtle, top right */}
+              <div className="flex items-center gap-2 mt-4 ml-13">
+                {onPush && (
+                  <span title="Reschedule">
+                    <PushDropdown onPush={(date) => onPush(task.id, date)} />
+                  </span>
                 )}
                 <button
-                  onClick={handleUnlinkProject}
-                  className="p-2 text-neutral-400 hover:text-red-500 transition-colors"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="p-2 text-neutral-300 hover:text-red-500 rounded-lg transition-colors"
+                  aria-label="Delete task"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
                 </button>
               </div>
-            ) : showProjectPicker ? (
-              <div className="rounded-xl border border-neutral-200 overflow-hidden">
-                {!isCreatingProject ? (
-                  <>
-                    <div className="p-2 border-b border-neutral-100">
-                      <input
-                        type="text"
-                        value={projectSearchQuery}
-                        onChange={(e) => setProjectSearchQuery(e.target.value)}
-                        placeholder="Search projects..."
-                        className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50
-                                   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        autoFocus
+
+              {/* Delete confirmation - inline */}
+              {showDeleteConfirm && (
+                <div className="mt-6 p-5 bg-red-50/80 border border-red-200/60 rounded-2xl backdrop-blur-sm">
+                  <p className="text-sm text-red-800 mb-4 font-medium">
+                    Delete this task permanently?
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="flex-1 py-2.5 px-4 text-sm font-medium text-neutral-600 bg-white
+                                 rounded-xl hover:bg-neutral-50 transition-colors border border-neutral-200"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleDelete}
+                      className="flex-1 py-2.5 px-4 text-sm font-medium text-white bg-red-500
+                                 rounded-xl hover:bg-red-600 transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ========== SUBTASKS - The Centerpiece ========== */}
+            <div className="mb-10">
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="font-display text-lg font-medium text-neutral-800 flex items-center gap-3">
+                  Subtasks
+                  {totalSubtasks > 0 && (
+                    <span className="text-sm font-normal text-neutral-400">
+                      {completedSubtasks} of {totalSubtasks}
+                    </span>
+                  )}
+                </h2>
+                {totalSubtasks > 0 && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-24 h-1.5 bg-neutral-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary-500 rounded-full transition-all duration-500 ease-out"
+                        style={{ width: `${(completedSubtasks / totalSubtasks) * 100}%` }}
                       />
                     </div>
-                    <div className="max-h-48 overflow-auto">
-                      {filteredProjects.length > 0 ? (
-                        filteredProjects.map((p) => (
-                          <button
-                            key={p.id}
-                            onClick={() => handleLinkProject(p)}
-                            className="w-full px-4 py-3 text-left flex items-center gap-3 hover:bg-neutral-50 transition-colors"
-                          >
-                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-                              </svg>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-neutral-800 truncate">{p.name}</div>
-                            </div>
-                          </button>
-                        ))
-                      ) : (
-                        <div className="px-4 py-6 text-center text-sm text-neutral-400">
-                          No projects found
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-2 border-t border-neutral-100 flex gap-2">
+                    <span className="text-xs text-neutral-400 font-medium">
+                      {Math.round((completedSubtasks / totalSubtasks) * 100)}%
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Subtask list - spacious, no card */}
+              <div className="space-y-1">
+                {task.subtasks && task.subtasks.length > 0 && (
+                  task.subtasks.map((subtask, index) => (
+                    <div
+                      key={subtask.id}
+                      className="flex items-center gap-4 py-3.5 px-4 -mx-4 rounded-xl
+                                 hover:bg-white/60 transition-colors group"
+                      style={{ animationDelay: `${index * 30}ms` }}
+                    >
                       <button
-                        onClick={() => {
-                          setShowProjectPicker(false)
-                          setProjectSearchQuery('')
-                        }}
-                        className="flex-1 px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50 rounded-lg transition-colors"
+                        onClick={() => onToggleComplete(subtask.id)}
+                        className="flex-shrink-0"
+                        aria-label={subtask.completed ? 'Mark incomplete' : 'Mark complete'}
                       >
-                        Cancel
-                      </button>
-                      {onAddProject && (
-                        <button
-                          onClick={() => {
-                            setIsCreatingProject(true)
-                            setNewProjectName(projectSearchQuery)
-                          }}
-                          className="flex-1 px-3 py-2 text-sm text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors flex items-center justify-center gap-1"
+                        <span
+                          className={`
+                            w-6 h-6 rounded-lg border-2 flex items-center justify-center
+                            transition-all duration-200
+                            ${subtask.completed
+                              ? 'bg-primary-500 border-primary-500 text-white'
+                              : 'border-neutral-300 group-hover:border-primary-400'
+                            }
+                          `}
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                          </svg>
-                          New
-                        </button>
-                      )}
+                          {subtask.completed && (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </span>
+                      </button>
+                      <span className={`flex-1 text-base ${subtask.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>
+                        {subtask.title}
+                      </span>
                     </div>
-                  </>
+                  ))
+                )}
+
+                {/* Add subtask - always visible, spacious */}
+                {onAddSubtask && (
+                  isAddingSubtask ? (
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault()
+                        if (!newSubtaskTitle.trim()) return
+                        await onAddSubtask(task.id, newSubtaskTitle.trim())
+                        setNewSubtaskTitle('')
+                      }}
+                      className="flex items-center gap-4 py-3 px-4 -mx-4"
+                    >
+                      <span className="w-6 h-6 rounded-lg border-2 border-dashed border-neutral-300 flex-shrink-0" />
+                      <input
+                        type="text"
+                        value={newSubtaskTitle}
+                        onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            setIsAddingSubtask(false)
+                            setNewSubtaskTitle('')
+                          }
+                        }}
+                        placeholder="What needs to be done?"
+                        className="flex-1 bg-transparent text-base text-neutral-700 placeholder:text-neutral-400
+                                   focus:outline-none"
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="submit"
+                          disabled={!newSubtaskTitle.trim()}
+                          className="px-4 py-2 text-sm font-medium bg-primary-500 text-white
+                                     rounded-lg hover:bg-primary-600 transition-colors
+                                     disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Add
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsAddingSubtask(false)
+                            setNewSubtaskTitle('')
+                          }}
+                          className="px-4 py-2 text-sm text-neutral-500 hover:text-neutral-700"
+                        >
+                          Done
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <button
+                      onClick={() => setIsAddingSubtask(true)}
+                      className="flex items-center gap-4 py-3.5 px-4 -mx-4 rounded-xl w-full
+                                 text-neutral-400 hover:text-neutral-600 hover:bg-white/60 transition-colors"
+                    >
+                      <span className="w-6 h-6 rounded-lg border-2 border-dashed border-current flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                        </svg>
+                      </span>
+                      <span className="text-base">Add a subtask</span>
+                    </button>
+                  )
+                )}
+              </div>
+
+              {/* Empty state for subtasks */}
+              {(!task.subtasks || task.subtasks.length === 0) && !isAddingSubtask && (
+                <div className="py-8 text-center">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-neutral-100 mb-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                    </svg>
+                  </div>
+                  <p className="text-sm text-neutral-400">Break this task into smaller steps</p>
+                </div>
+              )}
+            </div>
+
+            {/* ========== NOTES - Inline, not a card ========== */}
+            <div className="pt-8 border-t border-neutral-200/60">
+              <h2 className="font-display text-lg font-medium text-neutral-800 mb-4">Notes</h2>
+              <textarea
+                value={localNotes}
+                onChange={handleNotesChange}
+                placeholder="Add notes, thoughts, or context..."
+                rows={5}
+                className="w-full bg-white/50 text-neutral-700 placeholder:text-neutral-400
+                           rounded-xl border border-neutral-200/60 px-4 py-3
+                           focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400
+                           resize-none transition-all"
+              />
+            </div>
+          </div>
+
+          {/* ========== SIDEBAR - Metadata ========== */}
+          <aside className="w-72 lg:w-80 flex-shrink-0 hidden md:block">
+            <div className="sticky top-8 space-y-6">
+              {/* When */}
+              <div className="pb-6 border-b border-neutral-200/60">
+                <h3 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3">
+                  When
+                </h3>
+                {!showTimePicker ? (
+                  <button
+                    onClick={() => setShowTimePicker(true)}
+                    className="flex items-center gap-3 w-full text-left group"
+                  >
+                    <span className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600
+                                     group-hover:bg-amber-100 transition-colors">
+                      <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </span>
+                    <span className={task.scheduledFor ? 'text-neutral-800 font-medium' : 'text-neutral-400'}>
+                      {task.scheduledFor ? (
+                        <>
+                          {formatDate(task.scheduledFor)}
+                          {!task.isAllDay && <span className="text-neutral-500 font-normal"> · {formatTime(task.scheduledFor)}</span>}
+                        </>
+                      ) : (
+                        'Set date'
+                      )}
+                    </span>
+                  </button>
                 ) : (
-                  <div className="p-3">
-                    <div className="text-sm font-medium text-neutral-700 mb-2">Create new project</div>
+                  <div className="bg-white rounded-xl border border-neutral-200 p-4 space-y-4">
                     <input
-                      type="text"
-                      value={newProjectName}
-                      onChange={(e) => setNewProjectName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && newProjectName.trim()) {
-                          handleCreateAndLinkProject()
-                        } else if (e.key === 'Escape') {
-                          setIsCreatingProject(false)
-                          setNewProjectName('')
+                      type="date"
+                      value={task.scheduledFor ? task.scheduledFor.toISOString().split('T')[0] : ''}
+                      onChange={(e) => {
+                        const dateValue = e.target.value
+                        if (dateValue) {
+                          const existing = task.scheduledFor || new Date()
+                          const [year, month, day] = dateValue.split('-').map(Number)
+                          const newDate = new Date(existing)
+                          newDate.setFullYear(year, month - 1, day)
+                          const shouldBeAllDay = !task.scheduledFor ? true : task.isAllDay
+                          onUpdate(task.id, { scheduledFor: newDate, isAllDay: shouldBeAllDay })
+                        } else {
+                          onUpdate(task.id, { scheduledFor: undefined, isAllDay: undefined })
                         }
                       }}
-                      placeholder="Project name..."
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200
+                                 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                    {task.scheduledFor && (
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={task.isAllDay || false}
+                          onChange={(e) => onUpdate(task.id, { isAllDay: e.target.checked })}
+                          className="sr-only"
+                        />
+                        <div className={`w-9 h-5 rounded-full transition-colors ${task.isAllDay ? 'bg-primary-500' : 'bg-neutral-200'}`}>
+                          <div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform mt-0.5 ${task.isAllDay ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                        </div>
+                        <span className="text-sm text-neutral-600">All day</span>
+                      </label>
+                    )}
+                    <div className="flex justify-between text-sm">
+                      {task.scheduledFor && (
+                        <button
+                          onClick={() => onUpdate(task.id, { scheduledFor: undefined, isAllDay: undefined })}
+                          className="text-neutral-500 hover:text-red-600"
+                        >
+                          Clear
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setShowTimePicker(false)}
+                        className="text-primary-600 hover:text-primary-700 font-medium ml-auto"
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Project */}
+              <div className="pb-6 border-b border-neutral-200/60">
+                <h3 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3">
+                  Project
+                </h3>
+                {project ? (
+                  <div className="flex items-center gap-3">
+                    <span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4.5 h-4.5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                      </svg>
+                    </span>
+                    <button
+                      onClick={() => onOpenProject?.(project.id)}
+                      className="flex-1 text-left font-medium text-neutral-800 hover:text-blue-600 transition-colors"
+                    >
+                      {project.name}
+                    </button>
+                    <button
+                      onClick={handleUnlinkProject}
+                      className="p-1.5 text-neutral-300 hover:text-red-500 transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+                ) : showProjectPicker ? (
+                  <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
+                    {!isCreatingProject ? (
+                      <>
+                        <div className="p-2 border-b border-neutral-100">
+                          <input
+                            type="text"
+                            value={projectSearchQuery}
+                            onChange={(e) => setProjectSearchQuery(e.target.value)}
+                            placeholder="Search..."
+                            className="w-full px-3 py-2 text-sm rounded-lg bg-neutral-50
+                                       focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            autoFocus
+                          />
+                        </div>
+                        <div className="max-h-40 overflow-auto">
+                          {filteredProjects.length > 0 ? (
+                            filteredProjects.map((p) => (
+                              <button
+                                key={p.id}
+                                onClick={() => handleLinkProject(p)}
+                                className="w-full px-3 py-2.5 text-left text-sm hover:bg-neutral-50 transition-colors"
+                              >
+                                {p.name}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-3 py-4 text-center text-sm text-neutral-400">No projects</div>
+                          )}
+                        </div>
+                        <div className="p-2 border-t border-neutral-100 flex gap-2">
+                          <button
+                            onClick={() => { setShowProjectPicker(false); setProjectSearchQuery('') }}
+                            className="flex-1 px-3 py-1.5 text-sm text-neutral-500 hover:bg-neutral-50 rounded-lg"
+                          >
+                            Cancel
+                          </button>
+                          {onAddProject && (
+                            <button
+                              onClick={() => { setIsCreatingProject(true); setNewProjectName(projectSearchQuery) }}
+                              className="flex-1 px-3 py-1.5 text-sm text-white bg-primary-500 hover:bg-primary-600 rounded-lg"
+                            >
+                              + New
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="p-3">
+                        <input
+                          type="text"
+                          value={newProjectName}
+                          onChange={(e) => setNewProjectName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && newProjectName.trim()) handleCreateAndLinkProject()
+                            else if (e.key === 'Escape') { setIsCreatingProject(false); setNewProjectName('') }
+                          }}
+                          placeholder="Project name..."
+                          className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50
+                                     focus:outline-none focus:ring-2 focus:ring-primary-500 mb-3"
+                          autoFocus
+                          disabled={isCreatingProjectLoading}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => { setIsCreatingProject(false); setNewProjectName('') }}
+                            className="flex-1 px-3 py-1.5 text-sm text-neutral-500 hover:bg-neutral-50 rounded-lg"
+                            disabled={isCreatingProjectLoading}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleCreateAndLinkProject}
+                            disabled={!newProjectName.trim() || isCreatingProjectLoading}
+                            className="flex-1 px-3 py-1.5 text-sm text-white bg-primary-500 hover:bg-primary-600 rounded-lg disabled:opacity-50"
+                          >
+                            {isCreatingProjectLoading ? '...' : 'Create'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowProjectPicker(true)}
+                    className="flex items-center gap-3 w-full text-left text-neutral-400 hover:text-neutral-600 transition-colors"
+                  >
+                    <span className="w-9 h-9 rounded-xl bg-neutral-100 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4.5 h-4.5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                      </svg>
+                    </span>
+                    <span>Add to project</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Contact */}
+              <div className="pb-6 border-b border-neutral-200/60">
+                <h3 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3">
+                  Related Contact
+                </h3>
+                {contact ? (
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => onOpenContact?.(contact.id)}
+                      className="w-9 h-9 rounded-xl bg-primary-50 flex items-center justify-center text-primary-600
+                                 hover:bg-primary-100 transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4.5 h-4.5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <button
+                        onClick={() => onOpenContact?.(contact.id)}
+                        className="block font-medium text-neutral-800 hover:text-primary-600 transition-colors truncate"
+                      >
+                        {contact.name}
+                      </button>
+                      {phoneNumber && (
+                        <div className="flex gap-2 mt-1">
+                          <a href={`tel:${phoneNumber}`} className="text-xs text-primary-600 hover:underline">Call</a>
+                          <a href={`sms:${phoneNumber}`} className="text-xs text-primary-600 hover:underline">Text</a>
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={handleUnlinkContact}
+                      className="p-1.5 text-neutral-300 hover:text-red-500 transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+                ) : showContactPicker ? (
+                  <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
+                    {!isCreatingContact ? (
+                      <>
+                        <div className="p-2 border-b border-neutral-100">
+                          <input
+                            type="text"
+                            value={contactSearchQuery}
+                            onChange={(e) => setContactSearchQuery(e.target.value)}
+                            placeholder="Search..."
+                            className="w-full px-3 py-2 text-sm rounded-lg bg-neutral-50
+                                       focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            autoFocus
+                          />
+                        </div>
+                        <div className="max-h-40 overflow-auto">
+                          {filteredContacts.length > 0 ? (
+                            filteredContacts.map((c) => (
+                              <button
+                                key={c.id}
+                                onClick={() => handleLinkContact(c)}
+                                className="w-full px-3 py-2.5 text-left text-sm hover:bg-neutral-50 transition-colors"
+                              >
+                                {c.name}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-3 py-4 text-center text-sm text-neutral-400">No contacts</div>
+                          )}
+                        </div>
+                        <div className="p-2 border-t border-neutral-100 flex gap-2">
+                          <button
+                            onClick={() => { setShowContactPicker(false); setContactSearchQuery('') }}
+                            className="flex-1 px-3 py-1.5 text-sm text-neutral-500 hover:bg-neutral-50 rounded-lg"
+                          >
+                            Cancel
+                          </button>
+                          {onAddContact && (
+                            <button
+                              onClick={() => { setIsCreatingContact(true); setNewContactName(contactSearchQuery) }}
+                              className="flex-1 px-3 py-1.5 text-sm text-white bg-primary-500 hover:bg-primary-600 rounded-lg"
+                            >
+                              + New
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="p-3 space-y-2">
+                        <input
+                          type="text"
+                          value={newContactName}
+                          onChange={(e) => setNewContactName(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Escape') { setIsCreatingContact(false); setNewContactName(''); setNewContactPhone(''); setNewContactEmail('') } }}
+                          placeholder="Name *"
+                          className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          autoFocus
+                          disabled={isCreatingContactLoading}
+                        />
+                        <input
+                          type="tel"
+                          value={newContactPhone}
+                          onChange={(e) => setNewContactPhone(e.target.value)}
+                          placeholder="Phone"
+                          className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          disabled={isCreatingContactLoading}
+                        />
+                        <input
+                          type="email"
+                          value={newContactEmail}
+                          onChange={(e) => setNewContactEmail(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter' && newContactName.trim()) handleCreateAndLinkContact() }}
+                          placeholder="Email"
+                          className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          disabled={isCreatingContactLoading}
+                        />
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            onClick={() => { setIsCreatingContact(false); setNewContactName(''); setNewContactPhone(''); setNewContactEmail('') }}
+                            className="flex-1 px-3 py-1.5 text-sm text-neutral-500 hover:bg-neutral-50 rounded-lg"
+                            disabled={isCreatingContactLoading}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleCreateAndLinkContact}
+                            disabled={!newContactName.trim() || isCreatingContactLoading}
+                            className="flex-1 px-3 py-1.5 text-sm text-white bg-primary-500 hover:bg-primary-600 rounded-lg disabled:opacity-50"
+                          >
+                            {isCreatingContactLoading ? '...' : 'Create'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowContactPicker(true)}
+                    className="flex items-center gap-3 w-full text-left text-neutral-400 hover:text-neutral-600 transition-colors"
+                  >
+                    <span className="w-9 h-9 rounded-xl bg-neutral-100 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4.5 h-4.5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                      </svg>
+                    </span>
+                    <span>Add contact</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Links */}
+              <div>
+                <h3 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3">
+                  Links {task.links && task.links.length > 0 && `(${task.links.length})`}
+                </h3>
+
+                {task.links && task.links.length > 0 && (
+                  <ul className="space-y-2 mb-3">
+                    {task.links.map((link) => {
+                      const url = link.url.startsWith('http') ? link.url : `https://${link.url}`
+                      const displayText = link.title || link.url.replace(/^https?:\/\//, '').split('/')[0]
+                      return (
+                        <li key={link.url} className="flex items-center gap-2 group">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-neutral-300 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd" />
+                          </svg>
+                          <a
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 text-sm text-primary-600 hover:underline truncate"
+                          >
+                            {displayText}
+                          </a>
+                          <button
+                            onClick={() => handleRemoveLink(link)}
+                            className="p-1 text-neutral-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+
+                {showAddLink ? (
+                  <form onSubmit={handleAddLink} className="space-y-2">
+                    <input
+                      type="text"
+                      value={newLink}
+                      onChange={(e) => setNewLink(e.target.value)}
+                      placeholder="URL"
                       className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50
-                                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3"
+                                 focus:outline-none focus:ring-2 focus:ring-primary-500"
                       autoFocus
-                      disabled={isCreatingProjectLoading}
+                    />
+                    <input
+                      type="text"
+                      value={newLinkTitle}
+                      onChange={(e) => setNewLinkTitle(e.target.value)}
+                      placeholder="Title (optional)"
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50
+                                 focus:outline-none focus:ring-2 focus:ring-primary-500"
                     />
                     <div className="flex gap-2">
                       <button
-                        onClick={() => {
-                          setIsCreatingProject(false)
-                          setNewProjectName('')
-                        }}
-                        className="flex-1 px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50 rounded-lg transition-colors"
-                        disabled={isCreatingProjectLoading}
+                        type="button"
+                        onClick={() => { setShowAddLink(false); setNewLink(''); setNewLinkTitle('') }}
+                        className="flex-1 px-3 py-1.5 text-sm text-neutral-500 hover:bg-neutral-50 rounded-lg"
                       >
                         Cancel
                       </button>
                       <button
-                        onClick={handleCreateAndLinkProject}
-                        disabled={!newProjectName.trim() || isCreatingProjectLoading}
-                        className="flex-1 px-3 py-2 text-sm text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        type="submit"
+                        disabled={!newLink.trim()}
+                        className="flex-1 px-3 py-1.5 text-sm text-white bg-primary-500 hover:bg-primary-600 rounded-lg disabled:opacity-50"
                       >
-                        {isCreatingProjectLoading ? 'Creating...' : 'Create'}
+                        Add
                       </button>
                     </div>
-                  </div>
+                  </form>
+                ) : (
+                  <button
+                    onClick={() => setShowAddLink(true)}
+                    className="flex items-center gap-2 text-sm text-neutral-400 hover:text-neutral-600 transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                    </svg>
+                    Add link
+                  </button>
                 )}
               </div>
-            ) : (
-              <button
-                onClick={() => setShowProjectPicker(true)}
-                className="w-full flex items-center gap-3 p-3 rounded-lg bg-neutral-50 hover:bg-neutral-100 transition-colors text-left"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-neutral-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-                </svg>
-                <span className="text-neutral-400">Add project</span>
-              </button>
-            )}
-          </div>
-
-          {/* Links Section */}
-          <div className="bg-white rounded-xl border border-neutral-100 p-4">
-            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">
-              Links {task.links && task.links.length > 0 && `(${task.links.length})`}
-            </h2>
-
-            {/* Existing links */}
-            {task.links && task.links.length > 0 && (
-              <ul className="space-y-2 mb-3">
-                {task.links.map((link) => {
-                  const url = link.url.startsWith('http') ? link.url : `https://${link.url}`
-                  const displayText = link.title || link.url.replace(/^https?:\/\//, '').split('/')[0]
-                  return (
-                    <li key={link.url} className="flex items-center gap-2 text-sm bg-neutral-50 rounded-lg px-3 py-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-neutral-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd" />
-                      </svg>
-                      <a
-                        href={url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 truncate text-primary-600 hover:underline"
-                      >
-                        {displayText}
-                      </a>
-                      <button
-                        onClick={() => handleRemoveLink(link)}
-                        className="text-neutral-400 hover:text-red-500 transition-colors flex-shrink-0"
-                        aria-label="Remove link"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-
-            {/* Add new link form */}
-            <form onSubmit={handleAddLink} className="space-y-2">
-              <input
-                type="text"
-                value={newLink}
-                onChange={(e) => setNewLink(e.target.value)}
-                placeholder="URL (e.g., https://example.com)"
-                className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200
-                           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newLinkTitle}
-                  onChange={(e) => setNewLinkTitle(e.target.value)}
-                  placeholder="Title (optional)"
-                  className="flex-1 px-3 py-2 text-sm rounded-lg border border-neutral-200
-                             focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-                <button
-                  type="submit"
-                  disabled={!newLink.trim()}
-                  className="px-4 py-2 text-sm font-medium bg-neutral-100 text-neutral-700
-                             rounded-lg hover:bg-neutral-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Add
-                </button>
-              </div>
-            </form>
-          </div>
-
-          {/* Notes Section */}
-          <div className="bg-white rounded-xl border border-neutral-100 p-4">
-            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">Notes</h2>
-            <textarea
-              value={localNotes}
-              onChange={handleNotesChange}
-              placeholder="Add notes..."
-              rows={4}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200
-                         focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
-                         resize-none"
-            />
-          </div>
-
-          {/* Subtasks Section */}
-          <div className="bg-white rounded-xl border border-neutral-100 p-4">
-            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">
-              Subtasks {task.subtasks && task.subtasks.length > 0 && (
-                <span className="text-neutral-400 font-normal">
-                  ({task.subtasks.filter(s => s.completed).length} of {task.subtasks.length} complete)
-                </span>
-              )}
-            </h2>
-
-            {/* Subtask list */}
-            {task.subtasks && task.subtasks.length > 0 && (
-              <ul className="space-y-1 mb-3">
-                {task.subtasks.map((subtask) => (
-                  <li key={subtask.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-neutral-50 transition-colors">
-                    <button
-                      onClick={() => onToggleComplete(subtask.id)}
-                      className="flex-shrink-0"
-                      aria-label={subtask.completed ? 'Mark incomplete' : 'Mark complete'}
-                    >
-                      <span
-                        className={`
-                          w-5 h-5 rounded border-2
-                          flex items-center justify-center
-                          transition-colors
-                          ${subtask.completed
-                            ? 'bg-primary-500 border-primary-500 text-white'
-                            : 'border-neutral-300 hover:border-primary-400'
-                          }
-                        `}
-                      >
-                        {subtask.completed && (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                        )}
-                      </span>
-                    </button>
-                    <span className={`flex-1 text-sm ${subtask.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>
-                      {subtask.title}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {/* Add subtask input */}
-            {onAddSubtask && (
-              isAddingSubtask ? (
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault()
-                    if (!newSubtaskTitle.trim()) return
-                    await onAddSubtask(task.id, newSubtaskTitle.trim())
-                    setNewSubtaskTitle('')
-                    // Keep input open for rapid entry
-                  }}
-                  className="flex items-center gap-2"
-                >
-                  <input
-                    type="text"
-                    value={newSubtaskTitle}
-                    onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') {
-                        setIsAddingSubtask(false)
-                        setNewSubtaskTitle('')
-                      }
-                    }}
-                    placeholder="Subtask title..."
-                    className="flex-1 px-3 py-2 text-sm rounded-lg border border-neutral-200
-                               focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    autoFocus
-                  />
-                  <button
-                    type="submit"
-                    disabled={!newSubtaskTitle.trim()}
-                    className="px-3 py-2 text-sm font-medium bg-primary-600 text-white
-                               rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Add
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsAddingSubtask(false)
-                      setNewSubtaskTitle('')
-                    }}
-                    className="px-3 py-2 text-sm text-neutral-500 hover:text-neutral-700"
-                  >
-                    Done
-                  </button>
-                </form>
-              ) : (
-                <button
-                  onClick={() => setIsAddingSubtask(true)}
-                  className="w-full flex items-center gap-2 p-2 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-50 transition-colors text-sm"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                  </svg>
-                  Add subtask
-                </button>
-              )
-            )}
-          </div>
+            </div>
+          </aside>
         </div>
       </div>
     </div>

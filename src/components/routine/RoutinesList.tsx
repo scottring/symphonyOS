@@ -121,6 +121,42 @@ function getRoutineName(routine: Routine, contacts: Contact[]): string {
   return routine.name
 }
 
+interface SectionHeaderProps {
+  title: string
+  count: number
+  collapsed?: boolean
+  onToggle?: () => void
+}
+
+function SectionHeader({ title, count, collapsed, onToggle }: SectionHeaderProps) {
+  return (
+    <div className="flex items-center gap-3 mb-4">
+      {onToggle ? (
+        <button
+          onClick={onToggle}
+          className="flex items-center gap-2 text-xs font-semibold text-neutral-400 uppercase tracking-wider
+                     hover:text-neutral-600 transition-colors"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className={`w-4 h-4 transition-transform duration-200 ${collapsed ? '' : 'rotate-90'}`}
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+          </svg>
+          {title}
+          <span className="text-neutral-300">({count})</span>
+        </button>
+      ) : (
+        <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
+          {title} <span className="text-neutral-300">({count})</span>
+        </span>
+      )}
+    </div>
+  )
+}
+
 export function RoutinesList({ routines, contacts = [], familyMembers = [], onSelectRoutine, onCreateRoutine }: RoutinesListProps) {
   // Load sort/group preferences from localStorage
   const [sortBy, setSortBy] = useState<SortOption>(() => {
@@ -129,8 +165,9 @@ export function RoutinesList({ routines, contacts = [], familyMembers = [], onSe
   })
   const [groupBy, setGroupBy] = useState<GroupOption>(() => {
     const saved = localStorage.getItem('routines-group')
-    return (saved as GroupOption) || 'none'
+    return (saved as GroupOption) || 'time'
   })
+  const [pausedExpanded, setPausedExpanded] = useState(false)
 
   // Persist preferences to localStorage
   useEffect(() => {
@@ -296,12 +333,14 @@ export function RoutinesList({ routines, contacts = [], familyMembers = [], onSe
       // Legacy routine - show traditional format
       return (
         <>
-          <div className="font-medium text-neutral-800 truncate">{routine.name}</div>
+          <div className="font-medium text-neutral-800 truncate group-hover:text-amber-700 transition-colors">
+            {routine.name}
+          </div>
           <div className="flex items-center gap-2 text-sm text-neutral-500">
             <span>{formatRecurrence(routine)}</span>
             {routine.time_of_day && (
               <>
-                <span className="text-neutral-300">•</span>
+                <span className="text-neutral-300">·</span>
                 <span>{formatTime(routine.time_of_day)}</span>
               </>
             )}
@@ -312,29 +351,30 @@ export function RoutinesList({ routines, contacts = [], familyMembers = [], onSe
   }
 
   // Render a single routine card
-  const renderRoutineCard = (routine: Routine, isPaused = false) => {
+  const renderRoutineCard = (routine: Routine, index: number, isPaused = false) => {
     const member = getMember(routine.assigned_to)
 
     return (
       <button
         key={routine.id}
         onClick={() => onSelectRoutine(routine)}
-        className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left ${
+        className={`w-full flex items-center gap-4 p-5 rounded-2xl border transition-all duration-200 text-left group ${
           isPaused
             ? 'bg-neutral-50 border-neutral-100 hover:border-neutral-200 hover:shadow-sm opacity-60'
-            : 'bg-white border-neutral-100 hover:border-amber-200 hover:shadow-sm'
+            : 'bg-white border-neutral-100 hover:border-amber-200 hover:shadow-md'
         }`}
+        style={{ animationDelay: `${index * 50}ms` }}
       >
-        {/* Circular indicator */}
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-          isPaused ? 'bg-neutral-200' : 'bg-amber-100'
+        {/* Cycle icon in circle */}
+        <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
+          isPaused ? 'bg-neutral-200' : 'bg-amber-100 group-hover:bg-amber-200'
         }`}>
           {isPaused ? (
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           ) : (
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
           )}
@@ -351,7 +391,12 @@ export function RoutinesList({ routines, contacts = [], familyMembers = [], onSe
         )}
 
         {/* Chevron */}
-        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-neutral-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="w-5 h-5 text-neutral-300 group-hover:text-amber-400 group-hover:translate-x-1 transition-all flex-shrink-0"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
           <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
         </svg>
       </button>
@@ -359,15 +404,27 @@ export function RoutinesList({ routines, contacts = [], familyMembers = [], onSe
   }
 
   return (
-    <div className="h-full overflow-auto">
-      <div className="p-6 max-w-2xl mx-auto">
+    <div className="h-full overflow-auto bg-[var(--color-bg-base)]">
+      {/* Subtle amber gradient accent */}
+      <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-amber-50/40 to-transparent pointer-events-none" />
+
+      <div className="relative max-w-3xl mx-auto px-6 md:px-8 py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-semibold text-neutral-800">Routines</h1>
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <h1 className="font-display text-3xl font-semibold text-neutral-800 tracking-tight">
+              Routines
+            </h1>
+            <p className="text-sm text-neutral-500 mt-1">
+              {routines.length} routine{routines.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+
           <button
             onClick={onCreateRoutine}
-            className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg font-medium
-                       hover:bg-amber-600 active:bg-amber-700 transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white rounded-xl font-medium
+                       hover:bg-amber-600 active:bg-amber-700 transition-colors shadow-sm
+                       hover:shadow-md"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
@@ -378,14 +435,16 @@ export function RoutinesList({ routines, contacts = [], familyMembers = [], onSe
 
         {/* Sort and Group Controls */}
         {routines.length > 0 && (
-          <div className="flex items-center gap-4 mb-6">
+          <div className="flex items-center gap-4 mb-8 p-3 bg-white/60 rounded-xl border border-neutral-200/60">
             <div className="flex items-center gap-2">
-              <label htmlFor="sort-select" className="text-sm text-neutral-500">Sort:</label>
+              <label htmlFor="sort-select" className="text-xs font-medium text-neutral-500 uppercase tracking-wide">
+                Sort
+              </label>
               <select
                 id="sort-select"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="text-sm bg-white border border-neutral-200 rounded-lg px-3 py-1.5
+                className="text-sm bg-white border border-neutral-200 rounded-lg px-3 py-2
                            text-neutral-700 hover:border-neutral-300 focus:outline-none focus:ring-2
                            focus:ring-amber-500 focus:border-transparent cursor-pointer"
               >
@@ -395,13 +454,17 @@ export function RoutinesList({ routines, contacts = [], familyMembers = [], onSe
               </select>
             </div>
 
+            <div className="w-px h-6 bg-neutral-200" />
+
             <div className="flex items-center gap-2">
-              <label htmlFor="group-select" className="text-sm text-neutral-500">Group:</label>
+              <label htmlFor="group-select" className="text-xs font-medium text-neutral-500 uppercase tracking-wide">
+                Group
+              </label>
               <select
                 id="group-select"
                 value={groupBy}
                 onChange={(e) => setGroupBy(e.target.value as GroupOption)}
-                className="text-sm bg-white border border-neutral-200 rounded-lg px-3 py-1.5
+                className="text-sm bg-white border border-neutral-200 rounded-lg px-3 py-2
                            text-neutral-700 hover:border-neutral-300 focus:outline-none focus:ring-2
                            focus:ring-amber-500 focus:border-transparent cursor-pointer"
               >
@@ -415,21 +478,24 @@ export function RoutinesList({ routines, contacts = [], familyMembers = [], onSe
 
         {/* Empty state */}
         {routines.length === 0 && (
-          <div className="text-center py-16">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-100 flex items-center justify-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <div className="text-center py-16 animate-fade-in-up">
+            <div className="w-20 h-20 rounded-2xl bg-amber-100 flex items-center justify-center mx-auto mb-5">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             </div>
-            <h2 className="text-lg font-semibold text-neutral-800 mb-2">No routines yet</h2>
-            <p className="text-neutral-500 mb-6">
-              Routines are recurring tasks that repeat on a schedule.
+            <h2 className="font-display text-xl font-semibold text-neutral-700 mb-2">No routines yet</h2>
+            <p className="text-neutral-500 mb-6 max-w-sm mx-auto">
+              Routines are recurring tasks that repeat on a schedule. Create your first routine to get started.
             </p>
             <button
               onClick={onCreateRoutine}
-              className="px-4 py-2 bg-amber-500 text-white rounded-lg font-medium
-                         hover:bg-amber-600 transition-colors"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-white rounded-xl font-medium
+                         hover:bg-amber-600 transition-colors shadow-sm"
             >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+              </svg>
               Create your first routine
             </button>
           </div>
@@ -437,62 +503,61 @@ export function RoutinesList({ routines, contacts = [], familyMembers = [], onSe
 
         {/* Active Routines */}
         {activeRoutines.length > 0 && (
-          <div className="mb-8">
+          <div className="mb-10">
             {/* When not grouped, show simple list */}
             {!processedActiveRoutines.grouped && (
               <>
-                <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">
-                  Active ({activeRoutines.length})
-                </h2>
-                <div className="space-y-2">
-                  {processedActiveRoutines.routines.map(routine => renderRoutineCard(routine))}
+                <SectionHeader title="Active" count={activeRoutines.length} />
+                <div className="space-y-3 stagger-in">
+                  {processedActiveRoutines.routines.map((routine, index) => renderRoutineCard(routine, index))}
                 </div>
               </>
             )}
 
             {/* When grouped, show sections */}
             {processedActiveRoutines.grouped && (
-              <>
-                <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">
-                  Active ({activeRoutines.length})
-                </h2>
-                <div className="space-y-6">
-                  {processedActiveRoutines.sortedKeys.map(groupKey => {
-                    const groupRoutines = processedActiveRoutines.groups.get(groupKey) || []
-                    return (
-                      <div key={groupKey}>
-                        <h3 className="text-xs font-medium text-neutral-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                          {groupBy === 'assignee' && groupKey !== 'Unassigned' && (
-                            <AssigneeAvatar
-                              member={familyMembers.find(m => m.name === groupKey)}
-                              size="sm"
-                            />
-                          )}
-                          {groupKey}
-                          <span className="text-neutral-300">({groupRoutines.length})</span>
-                        </h3>
-                        <div className="space-y-2">
-                          {groupRoutines.map(routine => renderRoutineCard(routine))}
-                        </div>
+              <div className="space-y-8">
+                {processedActiveRoutines.sortedKeys.map(groupKey => {
+                  const groupRoutines = processedActiveRoutines.groups.get(groupKey) || []
+                  return (
+                    <section key={groupKey}>
+                      <div className="flex items-center gap-3 mb-4">
+                        {groupBy === 'assignee' && groupKey !== 'Unassigned' && (
+                          <AssigneeAvatar
+                            member={familyMembers.find(m => m.name === groupKey)}
+                            size="sm"
+                          />
+                        )}
+                        <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
+                          {groupKey} <span className="text-neutral-300">({groupRoutines.length})</span>
+                        </span>
                       </div>
-                    )
-                  })}
-                </div>
-              </>
+                      <div className="space-y-3 stagger-in">
+                        {groupRoutines.map((routine, index) => renderRoutineCard(routine, index))}
+                      </div>
+                    </section>
+                  )
+                })}
+              </div>
             )}
           </div>
         )}
 
-        {/* Reference Routines (paused) */}
+        {/* Reference Routines (paused) - collapsible */}
         {referenceRoutines.length > 0 && (
-          <div>
-            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">
-              Paused ({referenceRoutines.length})
-            </h2>
-            <div className="space-y-2">
-              {referenceRoutines.map(routine => renderRoutineCard(routine, true))}
-            </div>
-          </div>
+          <section className="pt-8 border-t border-neutral-200/60">
+            <SectionHeader
+              title="Paused"
+              count={referenceRoutines.length}
+              collapsed={!pausedExpanded}
+              onToggle={() => setPausedExpanded(!pausedExpanded)}
+            />
+            {pausedExpanded && (
+              <div className="space-y-3 stagger-in">
+                {referenceRoutines.map((routine, index) => renderRoutineCard(routine, index, true))}
+              </div>
+            )}
+          </section>
         )}
       </div>
     </div>

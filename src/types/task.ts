@@ -1,9 +1,11 @@
+import { type TaskContextValue, type LinkedActivityTypeValue } from './constants'
+
 export interface TaskLink {
   url: string
   title?: string // Fetched page title, falls back to URL if not available
 }
 
-export type TaskContext = 'work' | 'family' | 'personal'
+export type TaskContext = TaskContextValue
 
 // Category represents what KIND of family item this is
 // Defaults to 'task' for backwards compatibility
@@ -12,7 +14,7 @@ export type TaskCategory = 'task' | 'chore' | 'errand' | 'event' | 'activity'
 // Prep/Follow-up task linking
 export type LinkType = 'prep' | 'followup'
 
-export type LinkedActivityType = 'task' | 'routine_instance' | 'calendar_event'
+export type LinkedActivityType = LinkedActivityTypeValue
 
 export interface LinkedActivity {
   type: LinkedActivityType

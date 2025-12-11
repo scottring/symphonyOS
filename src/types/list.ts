@@ -3,18 +3,17 @@
  * Examples: movies to watch, restaurants to try, gift ideas, kids' sizes
  */
 
+import {
+  LIST_CATEGORY,
+  type ListCategoryValue,
+  type ListVisibilityValue,
+} from './constants'
+
 // Category for organizing lists
-export type ListCategory =
-  | 'entertainment'  // Movies, TV shows, books, music
-  | 'food_drink'     // Restaurants, recipes, wines
-  | 'shopping'       // Gift ideas, wishlist, stores
-  | 'travel'         // Places to visit, hotels, activities
-  | 'family_info'    // Kids' sizes, allergies, contacts
-  | 'home'           // Home improvement, maintenance
-  | 'other'
+export type ListCategory = ListCategoryValue
 
 // Sharing visibility
-export type ListVisibility = 'self' | 'family'
+export type ListVisibility = ListVisibilityValue
 
 // Database row type (snake_case, nullables)
 export interface DbList {
@@ -94,11 +93,11 @@ export function getCategoryIcon(category: ListCategory): string {
 
 // All categories for selection UI
 export const LIST_CATEGORIES: ListCategory[] = [
-  'entertainment',
-  'food_drink',
-  'shopping',
-  'travel',
-  'family_info',
-  'home',
-  'other',
+  LIST_CATEGORY.ENTERTAINMENT,
+  LIST_CATEGORY.FOOD_DRINK,
+  LIST_CATEGORY.SHOPPING,
+  LIST_CATEGORY.TRAVEL,
+  LIST_CATEGORY.FAMILY_INFO,
+  LIST_CATEGORY.HOME,
+  LIST_CATEGORY.OTHER,
 ]

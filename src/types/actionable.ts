@@ -1,12 +1,19 @@
 // Actionable Items System Types
+import {
+  type EntityTypeValue,
+  type ActionableStatusValue,
+  type CoverageStatusValue,
+  type RoutineVisibilityValue,
+  type RecurrenceTypeValue,
+} from './constants'
 
-export type EntityType = 'calendar_event' | 'routine'
-export type ActionableStatus = 'pending' | 'completed' | 'skipped' | 'deferred'
-export type CoverageStatus = 'pending' | 'accepted' | 'declined'
-export type RoutineVisibility = 'active' | 'reference'
+export type EntityType = EntityTypeValue
+export type ActionableStatus = ActionableStatusValue
+export type CoverageStatus = CoverageStatusValue
+export type RoutineVisibility = RoutineVisibilityValue
 
 // Recurrence pattern types
-export type RecurrenceType = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'specific_days'
+export type RecurrenceType = RecurrenceTypeValue
 
 export interface RecurrencePattern {
   type: RecurrenceType

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { detectActions, type DetectedAction } from './actionDetection'
+import { detectActions } from './actionDetection'
 
 describe('detectActions', () => {
   describe('video call detection', () => {

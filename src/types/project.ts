@@ -1,4 +1,6 @@
-export type ProjectStatus = 'not_started' | 'active' | 'completed'
+import { type ProjectStatusValue } from './constants'
+
+export type ProjectStatus = ProjectStatusValue
 
 export interface Project {
   id: string

@@ -43,14 +43,14 @@ describe('useToast', () => {
       expect(result.current.toast?.type).toBe('success')
     })
 
-    it('allows specifying error type', () => {
+    it('allows specifying info type explicitly', () => {
       const { result } = renderHook(() => useToast())
 
       act(() => {
-        result.current.showToast('Error occurred', 'error')
+        result.current.showToast('Info message', 'info')
       })
 
-      expect(result.current.toast?.type).toBe('error')
+      expect(result.current.toast?.type).toBe('info')
     })
 
     it('allows specifying warning type', () => {
