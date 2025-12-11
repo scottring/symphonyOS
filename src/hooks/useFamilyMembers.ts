@@ -20,7 +20,9 @@ export function useFamilyMembers() {
         .order('display_order', { ascending: true })
 
       if (error) throw error
-      setMembers(data || [])
+      // Deduplicate by id (in case of data issues)
+      const uniqueMembers = data ? Array.from(new Map(data.map(m => [m.id, m])).values()) : []
+      setMembers(uniqueMembers)
     } catch (err) {
       console.error('Error fetching family members:', err)
       setError(err instanceof Error ? err : new Error('Failed to fetch family members'))
