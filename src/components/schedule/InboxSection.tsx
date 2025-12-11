@@ -33,9 +33,9 @@ export function InboxSection({
   onSelectTask,
   onDeleteTask,
   projects = [],
-  contacts = [],
-  onSearchContacts,
-  onAddContact,
+  contacts: _contacts = [],
+  onSearchContacts: _onSearchContacts,
+  onAddContact: _onAddContact,
   onAddProject,
   recentlyCreatedTaskId,
   onTriageCardCollapse,
@@ -44,11 +44,14 @@ export function InboxSection({
   onAssignTask,
   currentUserId,
 }: InboxSectionProps) {
+  // Suppress unused variable warnings - these are kept in the interface for future use
+  void _contacts
+  void _onSearchContacts
+  void _onAddContact
+
   // Triage modal state
   const [triageTaskId, setTriageTaskId] = useState<string | null>(null)
   const triageTask = triageTaskId ? tasks.find(t => t.id === triageTaskId) : null
-
-  // Note: contacts/onSearchContacts/onAddContact kept for TriageCard, but not passed to InboxTaskCard
   // Don't render if no inbox tasks
   if (tasks.length === 0) return null
 

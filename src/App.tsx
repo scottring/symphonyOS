@@ -829,7 +829,7 @@ function App() {
             showToast('Event added to Google Calendar', 'success')
           } catch (err) {
             console.error('Failed to sync event to Google Calendar:', err)
-            showToast('Event created locally (Calendar sync failed)', 'error')
+            showToast('Event created locally (Calendar sync failed)', 'warning')
           }
         }
 
