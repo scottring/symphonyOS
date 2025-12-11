@@ -50,7 +50,7 @@ import type { LinkedActivityType } from '@/types/task'
 function App() {
   const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, getLinkedTasks, toggleTask, deleteTask, updateTask, pushTask } = useSupabaseTasks()
   const { user, loading: authLoading, signOut } = useAuth()
-  const { isConnected, events, fetchEvents, isFetching: eventsFetching, createEvent } = useGoogleCalendar()
+  const { isConnected, events, fetchEvents, isFetching: eventsFetching, createEvent, connect: connectCalendar } = useGoogleCalendar()
   const attachments = useAttachments()
   const pinnedItems = usePinnedItems()
   const undo = useUndo({ duration: 5000 })
@@ -145,6 +145,15 @@ function App() {
   const [viewedDate, setViewedDate] = useState(() => new Date())
   const [recipeUrl, setRecipeUrl] = useState<string | null>(null)
   const [quickAddOpen, setQuickAddOpen] = useState(false)
+
+  // Calendar reconnect prompt state
+  const [pendingEventData, setPendingEventData] = useState<{
+    title: string
+    contactId?: string
+    projectId?: string
+    scheduledFor?: Date
+    category?: 'task' | 'chore' | 'errand' | 'event' | 'activity'
+  } | null>(null)
   const [activeView, setActiveView] = useState<ViewType>('home')
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [selectedRoutineId, setSelectedRoutineId] = useState<string | null>(null)
@@ -786,6 +795,12 @@ function App() {
         }
       }}
       onQuickAddRich={async (data) => {
+        // If it's an event and calendar is not connected, show reconnect prompt
+        if (data.category === 'event' && data.scheduledFor && !isConnected) {
+          setPendingEventData(data)
+          return // Wait for user to decide in the prompt
+        }
+
         // If it's an event and we have a date, also create in Google Calendar
         if (data.category === 'event' && data.scheduledFor && isConnected) {
           try {
@@ -1267,6 +1282,71 @@ function App() {
 
       {/* Toast notifications */}
       <Toast toast={toast} onDismiss={dismissToast} />
+
+      {/* Calendar reconnect prompt */}
+      {pendingEventData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 animate-scale-up">
+            <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-neutral-800 text-center mb-2">
+              Calendar Not Connected
+            </h3>
+            <p className="text-sm text-neutral-500 text-center mb-6">
+              Your Google Calendar is disconnected. This event will only be saved locally in Symphony and won't appear in your Google Calendar.
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={async () => {
+                  // Store the pending data before redirect
+                  sessionStorage.setItem('pendingEventData', JSON.stringify({
+                    ...pendingEventData,
+                    scheduledFor: pendingEventData.scheduledFor?.toISOString(),
+                  }))
+                  await connectCalendar()
+                }}
+                className="w-full px-4 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors"
+              >
+                Connect Google Calendar
+              </button>
+              <button
+                onClick={async () => {
+                  // Create event locally only
+                  const data = pendingEventData
+                  setPendingEventData(null)
+
+                  const taskId = await addTask(
+                    data.title,
+                    data.contactId,
+                    data.projectId,
+                    data.scheduledFor,
+                    {
+                      assignedTo: getCurrentUserMember()?.id,
+                      category: data.category,
+                    }
+                  )
+                  if (taskId) {
+                    setRecentlyCreatedTaskId(taskId)
+                    showToast('Event saved locally (not in Google Calendar)', 'info')
+                  }
+                }}
+                className="w-full px-4 py-3 border border-neutral-200 text-neutral-600 rounded-lg font-medium hover:bg-neutral-50 transition-colors"
+              >
+                Create Local Only
+              </button>
+              <button
+                onClick={() => setPendingEventData(null)}
+                className="w-full px-4 py-2 text-neutral-400 hover:text-neutral-600 text-sm transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppShell>
   )
 }
