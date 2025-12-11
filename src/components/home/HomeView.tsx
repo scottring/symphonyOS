@@ -260,10 +260,24 @@ export function HomeView({
 
   return (
     <div className="relative flex flex-col h-full">
-      {/* Header controls - floating in upper right, hidden on mobile */}
-      {!isMobile && (
+      {/* Header controls - floating in upper right on desktop, sticky bar on mobile */}
+      {!isMobile ? (
         <div className="absolute top-4 right-6 z-20 flex items-center gap-3">
           {/* Unified view switcher (Today/Week/Review) with assignee filter */}
+          <HomeViewSwitcher
+            currentView={currentView}
+            onViewChange={handleViewChange}
+            inboxCount={showInboxBadge ? inboxCount : 0}
+            reviewCount={showReviewBadge ? reviewData.reviewCount : 0}
+            selectedAssignee={selectedAssignee}
+            onSelectAssignee={setSelectedAssignee}
+            assigneesWithTasks={assigneesWithTasks}
+            hasUnassignedTasks={hasUnassignedTasks}
+          />
+        </div>
+      ) : (
+        /* Mobile view toggle - sticky below header, part of content flow */
+        <div className="sticky top-0 z-20 bg-bg-base/95 backdrop-blur-sm py-2 px-4 flex justify-center border-b border-neutral-100">
           <HomeViewSwitcher
             currentView={currentView}
             onViewChange={handleViewChange}
@@ -281,22 +295,6 @@ export function HomeView({
       <div className="flex-1 overflow-y-auto">
         {renderContent()}
       </div>
-
-      {/* Mobile view toggle - fixed at bottom on mobile */}
-      {isMobile && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-30">
-          <HomeViewSwitcher
-            currentView={currentView}
-            onViewChange={handleViewChange}
-            inboxCount={showInboxBadge ? inboxCount : 0}
-            reviewCount={showReviewBadge ? reviewData.reviewCount : 0}
-            selectedAssignee={selectedAssignee}
-            onSelectAssignee={setSelectedAssignee}
-            assigneesWithTasks={assigneesWithTasks}
-            hasUnassignedTasks={hasUnassignedTasks}
-          />
-        </div>
-      )}
     </div>
   )
 }
