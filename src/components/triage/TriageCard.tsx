@@ -1,30 +1,29 @@
 import { useState, useEffect, useRef } from 'react'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
-import type { Contact } from '@/types/contact'
-import { WhenPicker, AssignPicker, PushDropdown } from '@/components/triage'
+import type { FamilyMember } from '@/types/family'
+import { SchedulePopover, DeferPicker } from '@/components/triage'
+import { AssigneeDropdown } from '@/components/family'
 
 interface TriageCardProps {
   task: Task
   onUpdate: (updates: Partial<Task>) => void
-  onPush: (date: Date) => void
+  onDefer: (date: Date | undefined) => void
   onCollapse: () => void
   projects?: Project[]
-  contacts?: Contact[]
-  onSearchContacts?: (query: string) => Contact[]
-  onAddContact?: (name: string) => Promise<Contact | null>
+  familyMembers?: FamilyMember[]
+  onAssignTask?: (memberId: string | null) => void
   autoCollapseMs?: number
 }
 
 export function TriageCard({
   task,
   onUpdate,
-  onPush,
+  onDefer,
   onCollapse,
   projects = [],
-  contacts = [],
-  onSearchContacts,
-  onAddContact,
+  familyMembers = [],
+  onAssignTask,
   autoCollapseMs = 4000,
 }: TriageCardProps) {
   const [isInteracting, setIsInteracting] = useState(false)
@@ -81,41 +80,42 @@ export function TriageCard({
         </div>
       </div>
 
-      {/* Triage actions row */}
+      {/* Triage actions row - matches InboxTaskCard hover layout */}
       <div className="flex items-center gap-2">
-        <span title="Schedule">
-          <WhenPicker
-            value={task.scheduledFor}
-            isAllDay={task.isAllDay}
-            onChange={(date, isAllDay) => {
-              onUpdate({ scheduledFor: date, isAllDay, deferredUntil: undefined })
-              // Collapse after scheduling
-              setTimeout(onCollapse, 200)
-            }}
-          />
-        </span>
-        <span title="Push">
-          <PushDropdown
-            onPush={(date) => {
-              onPush(date)
-              // Collapse after pushing
-              setTimeout(onCollapse, 200)
-            }}
-          />
-        </span>
-        <span title="Assign">
-          <AssignPicker
-            value={task.assignedTo}
-            contacts={contacts}
-            onSearchContacts={onSearchContacts}
-            onAddContact={onAddContact}
-            onChange={(assignedTo) => onUpdate({ assignedTo })}
-          />
-        </span>
+        {/* Schedule button */}
+        <SchedulePopover
+          value={task.scheduledFor}
+          isAllDay={task.isAllDay}
+          onSchedule={(date, isAllDay) => {
+            onUpdate({ scheduledFor: date, isAllDay, deferredUntil: undefined })
+            // Collapse after scheduling
+            setTimeout(onCollapse, 200)
+          }}
+          onClear={() => onUpdate({ scheduledFor: undefined, isAllDay: undefined })}
+        />
+
+        {/* Defer/Later button */}
+        <DeferPicker
+          deferredUntil={task.deferredUntil}
+          deferCount={task.deferCount}
+          onDefer={(date) => {
+            onDefer(date)
+            // Collapse after deferring
+            if (date) setTimeout(onCollapse, 200)
+          }}
+        />
+
         <div className="flex-1" />
-        <span className="text-xs text-neutral-400">
-          Collapses automatically
-        </span>
+
+        {/* Assignee avatar */}
+        {familyMembers.length > 0 && onAssignTask && (
+          <AssigneeDropdown
+            members={familyMembers}
+            selectedId={task.assignedTo}
+            onSelect={onAssignTask}
+            size="sm"
+          />
+        )}
       </div>
     </div>
   )

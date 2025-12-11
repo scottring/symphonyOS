@@ -76,12 +76,17 @@ export function InboxSection({
           <TriageCard
             task={recentlyCreatedTask}
             onUpdate={(updates) => onUpdateTask(recentlyCreatedTask.id, updates)}
-            onPush={(date) => onPushTask(recentlyCreatedTask.id, date)}
+            onDefer={(date) => {
+              if (date) {
+                onPushTask(recentlyCreatedTask.id, date)
+              } else {
+                onUpdateTask(recentlyCreatedTask.id, { deferredUntil: undefined })
+              }
+            }}
             onCollapse={onTriageCardCollapse}
             projects={projects}
-            contacts={contacts}
-            onSearchContacts={onSearchContacts}
-            onAddContact={onAddContact}
+            familyMembers={familyMembers}
+            onAssignTask={onAssignTask ? (memberId) => onAssignTask(recentlyCreatedTask.id, memberId) : undefined}
           />
         )}
 
