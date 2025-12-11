@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Symphony — Finally Be On the Same Page</title>
+  <title>Symphony OS — The Family Coordination Platform</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,400;1,9..144,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400&display=swap" rel="stylesheet">
   <style>
     :root {
       --cream: #FDFCFA;
@@ -17,10 +17,13 @@
       --sage: #A8C5B8;
       --peach: #F5DDD3;
       --lavender: #E5DFF5;
+      --work: #7C9EB8;
+      --personal: #B8A07C;
+      --family: #B87C8E;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    
+
     body {
       font-family: 'DM Sans', sans-serif;
       background: var(--cream);
@@ -33,13 +36,14 @@
       position: fixed;
       top: 0; left: 0; right: 0;
       z-index: 100;
-      padding: 1.5rem 2rem;
-      background: rgba(253, 252, 250, 0.85);
+      padding: 1.25rem 2rem;
+      background: rgba(253, 252, 250, 0.9);
       backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(45, 90, 71, 0.08);
     }
 
     nav .inner {
-      max-width: 1000px;
+      max-width: 1100px;
       margin: 0 auto;
       display: flex;
       justify-content: space-between;
@@ -48,9 +52,28 @@
 
     .logo {
       font-family: 'Fraunces', serif;
-      font-size: 1.35rem;
+      font-size: 1.25rem;
       color: var(--forest);
       text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .logo-mark {
+      width: 28px;
+      height: 28px;
+      background: var(--forest);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-mark svg {
+      width: 16px;
+      height: 16px;
+      color: white;
     }
 
     .nav-links {
@@ -64,19 +87,17 @@
       text-decoration: none;
       font-size: 0.9rem;
       font-weight: 500;
-      opacity: 0.8;
+      opacity: 0.7;
       transition: opacity 0.2s;
     }
 
-    .login-link:hover {
-      opacity: 1;
-    }
+    .login-link:hover { opacity: 1; }
 
     .cta {
       background: var(--forest);
       color: white;
-      padding: 0.7rem 1.4rem;
-      border-radius: 100px;
+      padding: 0.65rem 1.3rem;
+      border-radius: 10px;
       text-decoration: none;
       font-size: 0.9rem;
       font-weight: 500;
@@ -90,11 +111,22 @@
       box-shadow: 0 8px 24px rgba(45, 90, 71, 0.25);
     }
 
-    /* Modal */
+    .cta-secondary {
+      background: transparent;
+      border: 1.5px solid var(--forest);
+      color: var(--forest);
+    }
+
+    .cta-secondary:hover {
+      background: var(--forest);
+      color: white;
+    }
+
+    /* Modal styles */
     .modal-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(26, 26, 26, 0.4);
+      background: rgba(26, 26, 26, 0.5);
       backdrop-filter: blur(8px);
       display: flex;
       align-items: center;
@@ -112,70 +144,60 @@
 
     .modal {
       background: var(--cream);
-      border-radius: 24px;
-      padding: 3rem;
-      max-width: 420px;
+      border-radius: 20px;
+      padding: 2.5rem;
+      max-width: 400px;
       width: 90%;
       text-align: center;
       transform: translateY(20px) scale(0.95);
       transition: transform 0.3s ease;
-      box-shadow: 0 24px 80px rgba(0,0,0,0.15);
+      box-shadow: 0 24px 80px rgba(0,0,0,0.2);
     }
 
     .modal-overlay.active .modal {
       transform: translateY(0) scale(1);
     }
 
-    .modal-close {
-      position: absolute;
-      top: 1rem;
-      right: 1rem;
-      background: none;
-      border: none;
-      font-size: 1.5rem;
-      cursor: pointer;
-      color: #999;
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
+    .modal-icon {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 1.25rem;
+      background: var(--sage);
+      border-radius: 14px;
       display: flex;
       align-items: center;
       justify-content: center;
     }
 
-    .modal-close:hover {
-      background: var(--cream-warm);
-    }
-
-    .modal-icon {
-      width: 64px;
-      height: 64px;
-      margin: 0 auto 1.5rem;
+    .modal-icon svg {
+      width: 28px;
+      height: 28px;
+      color: var(--forest);
     }
 
     .modal h3 {
       font-family: 'Fraunces', serif;
-      font-size: 1.5rem;
+      font-size: 1.4rem;
       font-weight: 400;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.4rem;
     }
 
     .modal p {
-      font-size: 1rem;
+      font-size: 0.95rem;
       color: #666;
-      margin-bottom: 1.5rem;
+      margin-bottom: 1.25rem;
     }
 
     .modal form {
       display: flex;
       flex-direction: column;
-      gap: 1rem;
+      gap: 0.75rem;
     }
 
     .modal input[type="email"] {
-      padding: 1rem 1.25rem;
-      border: 2px solid var(--cream-warm);
-      border-radius: 12px;
+      padding: 0.9rem 1rem;
+      border: 2px solid #eee;
+      border-radius: 10px;
       font-size: 1rem;
       font-family: inherit;
       transition: border-color 0.2s;
@@ -188,28 +210,20 @@
 
     .modal .cta {
       width: 100%;
-      padding: 1rem;
+      padding: 0.9rem;
       font-size: 1rem;
     }
 
     .modal-note {
       font-size: 0.8rem;
       color: #999;
-      margin-top: 1rem;
+      margin-top: 0.75rem;
+      margin-bottom: 0;
     }
 
-    /* Success state */
-    .modal-success {
-      display: none;
-    }
-
-    .modal.success .modal-form {
-      display: none;
-    }
-
-    .modal.success .modal-success {
-      display: block;
-    }
+    .modal-success { display: none; }
+    .modal.success .modal-form { display: none; }
+    .modal.success .modal-success { display: block; }
 
     .success-check {
       width: 48px;
@@ -228,134 +242,477 @@
       color: white;
     }
 
-    /* Sections */
-    section {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 8rem 2rem;
-      text-align: center;
-    }
-
-    h1, h2 {
+    /* Typography */
+    h1, h2, h3 {
       font-family: 'Fraunces', serif;
       font-weight: 400;
-      line-height: 1.15;
+      line-height: 1.2;
     }
 
-    h1 { font-size: clamp(2.5rem, 6vw, 4rem); }
-    h2 { font-size: clamp(1.8rem, 4vw, 2.5rem); }
+    h1 { font-size: clamp(2.5rem, 5.5vw, 3.5rem); }
+    h2 { font-size: clamp(1.75rem, 4vw, 2.25rem); }
 
     h1 em, h2 em {
       font-style: italic;
       color: var(--forest);
     }
 
-    p {
-      font-size: 1.15rem;
-      color: #555;
-      max-width: 480px;
-      line-height: 1.7;
-    }
-
-    /* Hero */
+    /* Hero Section */
     .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 8rem 2rem 6rem;
+      text-align: center;
       background: linear-gradient(180deg, var(--cream) 0%, var(--cream-warm) 100%);
-      gap: 2rem;
+      position: relative;
     }
 
-    .hero-illustration {
-      width: min(90%, 500px);
-      margin-bottom: 1rem;
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: white;
+      padding: 0.5rem 1rem;
+      border-radius: 100px;
+      font-size: 0.85rem;
+      color: #666;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
     }
 
-    /* Illustration styles */
-    .illustration {
-      width: min(85%, 420px);
-      margin: 2rem 0;
+    .hero-badge span {
+      color: var(--forest);
+      font-weight: 600;
     }
 
-    /* Vision section */
-    .vision {
+    .hero h1 {
+      margin-bottom: 1.25rem;
+      max-width: 700px;
+    }
+
+    .hero-subtitle {
+      font-size: 1.2rem;
+      color: #555;
+      max-width: 520px;
+      line-height: 1.7;
+      margin-bottom: 2rem;
+    }
+
+    .hero-ctas {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 3rem;
+    }
+
+    .hero-ctas .cta {
+      padding: 0.85rem 1.75rem;
+      font-size: 1rem;
+    }
+
+    /* Timeline Companion Preview */
+    .timeline-preview {
+      width: min(90%, 700px);
+      background: white;
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 40px rgba(0,0,0,0.08);
+      margin-top: 1rem;
+    }
+
+    .timeline-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .timeline-date {
+      font-family: 'Fraunces', serif;
+      font-size: 1.1rem;
+      color: var(--charcoal);
+    }
+
+    .timeline-avatars {
+      display: flex;
+      gap: -8px;
+    }
+
+    .timeline-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 2px solid white;
+      margin-left: -8px;
+    }
+
+    .timeline-avatar:first-child { margin-left: 0; }
+
+    /* Subway map style timeline */
+    .subway-map {
+      position: relative;
+      padding: 0.5rem 0;
+    }
+
+    .subway-track {
+      position: absolute;
+      width: 3px;
+      border-radius: 2px;
+      top: 0;
+      bottom: 0;
+    }
+
+    .track-work { left: 60px; background: var(--work); opacity: 0.3; }
+    .track-personal { left: 120px; background: var(--personal); opacity: 0.3; }
+    .track-family { left: 180px; background: var(--family); opacity: 0.3; }
+
+    .subway-row {
+      display: flex;
+      align-items: center;
+      padding: 0.6rem 0;
+      position: relative;
+    }
+
+    .subway-time {
+      width: 50px;
+      font-size: 0.75rem;
+      color: #999;
+      font-weight: 500;
+    }
+
+    .subway-dots {
+      width: 140px;
+      display: flex;
+      position: relative;
+    }
+
+    .subway-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      position: absolute;
+      border: 2px solid white;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .dot-work { left: 5px; background: var(--work); }
+    .dot-personal { left: 65px; background: var(--personal); }
+    .dot-family { left: 125px; background: var(--family); }
+
+    .subway-event {
+      flex: 1;
+      font-size: 0.85rem;
+      color: var(--charcoal);
+      padding-left: 0.75rem;
+    }
+
+    .subway-event.dim { color: #bbb; }
+
+    .subway-convergence {
+      background: linear-gradient(90deg, transparent, rgba(45, 90, 71, 0.08), transparent);
+      border-radius: 8px;
+      margin: 0 -0.5rem;
+      padding: 0 0.5rem;
+    }
+
+    .convergence-label {
+      font-size: 0.7rem;
+      color: var(--forest);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-left: 200px;
+    }
+
+    /* Problem Section */
+    .problem {
+      padding: 6rem 2rem;
       background: var(--cream-warm);
     }
 
-    /* Intersection section */
-    .insight {
+    .problem-inner {
+      max-width: 900px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+      align-items: center;
+    }
+
+    .problem-content h2 {
+      margin-bottom: 1.25rem;
+    }
+
+    .problem-content p {
+      font-size: 1.1rem;
+      color: #555;
+      line-height: 1.8;
+      margin-bottom: 1.5rem;
+    }
+
+    .problem-list {
+      list-style: none;
+    }
+
+    .problem-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.6rem 0;
+      font-size: 1rem;
+      color: #444;
+    }
+
+    .problem-list li::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      background: var(--forest);
+      border-radius: 50%;
+      margin-top: 0.5rem;
+      flex-shrink: 0;
+    }
+
+    .chaos-illustration {
+      position: relative;
+    }
+
+    .chaos-card {
+      background: white;
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+      position: absolute;
+      font-size: 0.9rem;
+      color: #555;
+      max-width: 200px;
+    }
+
+    .chaos-card::before {
+      content: '';
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      background: #E57373;
+      border-radius: 50%;
+      top: -4px;
+      right: -4px;
+    }
+
+    .chaos-1 { top: 0; left: 10%; transform: rotate(-3deg); }
+    .chaos-2 { top: 60px; right: 5%; transform: rotate(2deg); }
+    .chaos-3 { top: 140px; left: 5%; transform: rotate(1deg); }
+    .chaos-4 { top: 200px; right: 15%; transform: rotate(-2deg); }
+    .chaos-5 { top: 270px; left: 20%; transform: rotate(3deg); }
+
+    /* Philosophy Section */
+    .philosophy {
+      padding: 6rem 2rem;
       background: var(--forest);
       color: white;
     }
 
-    .insight p { color: rgba(255,255,255,0.8); }
-    .insight h2 em { color: var(--sage); }
+    .philosophy-inner {
+      max-width: 900px;
+      margin: 0 auto;
+      text-align: center;
+    }
 
-    /* Solution section */
-    .solution {
+    .philosophy h2 {
+      margin-bottom: 1rem;
+    }
+
+    .philosophy h2 em {
+      color: var(--sage);
+    }
+
+    .philosophy > p {
+      font-size: 1.15rem;
+      color: rgba(255,255,255,0.8);
+      max-width: 600px;
+      margin: 0 auto 3rem;
+      line-height: 1.7;
+    }
+
+    .philosophy-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.5rem;
+      text-align: left;
+    }
+
+    .philosophy-card {
+      background: rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 1.75rem;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .philosophy-card h3 {
+      font-size: 1.1rem;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .philosophy-card h3 svg {
+      width: 20px;
+      height: 20px;
+      color: var(--sage);
+    }
+
+    .philosophy-card p {
+      font-size: 0.95rem;
+      color: rgba(255,255,255,0.7);
+      line-height: 1.6;
+    }
+
+    /* Domains Section */
+    .domains {
+      padding: 6rem 2rem;
       background: var(--cream);
     }
 
-    /* Principles - horizontal scroll cards */
-    .principles {
-      background: var(--cream-warm);
-      padding: 6rem 0;
+    .domains-inner {
+      max-width: 900px;
+      margin: 0 auto;
+      text-align: center;
     }
 
-    .principles h2 {
+    .domains h2 {
+      margin-bottom: 0.75rem;
+    }
+
+    .domains > p {
+      font-size: 1.1rem;
+      color: #666;
       margin-bottom: 3rem;
     }
 
-    .cards {
+    .domains-visual {
       display: flex;
-      gap: 1.5rem;
-      padding: 0 2rem;
-      max-width: 1000px;
-      flex-wrap: wrap;
       justify-content: center;
+      gap: 2rem;
+      margin-bottom: 2rem;
     }
 
-    .card {
-      background: white;
-      border-radius: 20px;
-      padding: 2rem;
-      width: 280px;
+    .domain-circle {
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.3s;
+    }
+
+    .domain-circle:hover {
+      transform: scale(1.05);
+    }
+
+    .domain-work { background: rgba(124, 158, 184, 0.2); border: 2px solid var(--work); }
+    .domain-personal { background: rgba(184, 160, 124, 0.2); border: 2px solid var(--personal); }
+    .domain-family { background: rgba(184, 124, 142, 0.2); border: 2px solid var(--family); }
+
+    .domain-circle h3 {
+      font-size: 1rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .domain-circle p {
+      font-size: 0.8rem;
+      color: #666;
+    }
+
+    .domains-note {
+      font-size: 0.95rem;
+      color: #888;
+      font-style: italic;
+    }
+
+    /* Who For Section */
+    .who-for {
+      padding: 6rem 2rem;
+      background: var(--cream-warm);
+    }
+
+    .who-for-inner {
+      max-width: 800px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .who-for h2 {
+      margin-bottom: 2.5rem;
+    }
+
+    .who-for-list {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.25rem;
       text-align: left;
-      box-shadow: 0 2px 20px rgba(0,0,0,0.04);
-      transition: transform 0.3s, box-shadow 0.3s;
     }
 
-    .card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 12px 40px rgba(0,0,0,0.08);
-    }
-
-    .card-icon {
-      width: 48px;
-      height: 48px;
+    .who-for-item {
+      background: white;
       border-radius: 12px;
-      margin-bottom: 1rem;
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    }
+
+    .who-for-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--sage);
+      border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-shrink: 0;
     }
 
-    .card h3 {
-      font-family: 'Fraunces', serif;
-      font-size: 1.15rem;
-      font-weight: 400;
-      margin-bottom: 0.5rem;
+    .who-for-icon svg {
+      width: 20px;
+      height: 20px;
+      color: var(--forest);
     }
 
-    .card p {
+    .who-for-item p {
       font-size: 0.95rem;
-      color: #666;
+      color: #444;
+      line-height: 1.5;
     }
 
     /* Final CTA */
     .final {
+      padding: 6rem 2rem;
       background: linear-gradient(180deg, var(--cream) 0%, var(--cream-warm) 100%);
-      gap: 1.5rem;
+      text-align: center;
+    }
+
+    .final-inner {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .final h2 {
+      margin-bottom: 1rem;
+    }
+
+    .final > p {
+      font-size: 1.1rem;
+      color: #666;
+      margin-bottom: 2rem;
+      line-height: 1.7;
     }
 
     .final .cta {
@@ -369,6 +726,7 @@
       color: #888;
       display: flex;
       align-items: center;
+      justify-content: center;
       gap: 0.4rem;
     }
 
@@ -380,15 +738,29 @@
 
     /* Footer */
     footer {
-      padding: 3rem 2rem;
+      padding: 2rem;
       text-align: center;
       font-size: 0.85rem;
       color: #999;
+      background: var(--cream-warm);
     }
 
+    /* Responsive */
     @media (max-width: 768px) {
-      section { padding: 6rem 1.5rem; }
-      .cards { flex-direction: column; align-items: center; }
+      .hero { padding: 7rem 1.5rem 4rem; }
+      .hero-ctas { flex-direction: column; width: 100%; max-width: 280px; }
+      .timeline-preview { padding: 1rem; }
+      .subway-event { font-size: 0.75rem; }
+
+      .problem-inner { grid-template-columns: 1fr; gap: 2rem; }
+      .chaos-illustration { min-height: 320px; }
+
+      .philosophy-grid { grid-template-columns: 1fr; }
+
+      .domains-visual { flex-direction: column; align-items: center; gap: 1rem; }
+      .domain-circle { width: 120px; height: 120px; }
+
+      .who-for-list { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -396,7 +768,14 @@
 
   <nav>
     <div class="inner">
-      <a href="#" class="logo">Symphony</a>
+      <a href="#" class="logo">
+        <div class="logo-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M12 3v18M3 12h18M7 7l10 10M17 7L7 17"/>
+          </svg>
+        </div>
+        Symphony OS
+      </a>
       <div class="nav-links">
         <a href="https://app.symphony-os.com" class="login-link">Log in</a>
         <button class="cta" onclick="openModal()">Request Access</button>
@@ -406,224 +785,274 @@
 
   <!-- Hero -->
   <section class="hero">
-    <svg class="hero-illustration" viewBox="0 0 500 300" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <!-- Split life illustration: two worlds becoming one -->
-      <!-- Left side: work elements -->
-      <circle cx="150" cy="150" r="100" fill="#E5DFF5" opacity="0.6"/>
-      <rect x="110" y="120" width="80" height="60" rx="8" fill="white" stroke="#2D5A47" stroke-width="2"/>
-      <line x1="120" y1="140" x2="180" y2="140" stroke="#2D5A47" stroke-width="2" stroke-linecap="round"/>
-      <line x1="120" y1="155" x2="160" y2="155" stroke="#A8C5B8" stroke-width="2" stroke-linecap="round"/>
-      <circle cx="130" cy="100" r="8" fill="#2D5A47"/>
-      <circle cx="155" cy="95" r="5" fill="#A8C5B8"/>
-      
-      <!-- Right side: family elements -->
-      <circle cx="350" cy="150" r="100" fill="#F5DDD3" opacity="0.6"/>
-      <path d="M330 160 Q350 130 370 160" stroke="#2D5A47" stroke-width="2" fill="none" stroke-linecap="round"/>
-      <circle cx="330" cy="140" r="12" fill="white" stroke="#2D5A47" stroke-width="2"/>
-      <circle cx="370" cy="140" r="10" fill="white" stroke="#2D5A47" stroke-width="2"/>
-      <circle cx="350" cy="175" r="8" fill="white" stroke="#2D5A47" stroke-width="2"/>
-      <path d="M320 190 L340 200 L360 190 L380 200" stroke="#A8C5B8" stroke-width="2" fill="none" stroke-linecap="round"/>
-      
-      <!-- Center: the merge/symphony -->
-      <circle cx="250" cy="150" r="40" fill="#2D5A47" opacity="0.1"/>
-      <circle cx="250" cy="150" r="25" fill="#2D5A47" opacity="0.2"/>
-      <path d="M240 145 L250 155 L270 135" stroke="#2D5A47" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      
-      <!-- Connection lines -->
-      <path d="M200 150 Q225 150 250 150" stroke="#2D5A47" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.4"/>
-      <path d="M300 150 Q275 150 250 150" stroke="#2D5A47" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.4"/>
-    </svg>
-    
-    <h1>Finally be on<br/>the <em>same</em> page</h1>
-    <p>One place for your whole household to see what's happening.</p>
-    <a href="#access" class="cta">Request Access</a>
-  </section>
+    <div class="hero-badge">
+      <span>New</span> The family coordination platform
+    </div>
 
-  <!-- Vision -->
-  <section class="vision">
-    <svg class="illustration" viewBox="0 0 400 280" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <!-- Person centered and calm, with life flowing around them -->
-      <circle cx="200" cy="140" r="90" fill="#FAF6F1" opacity="0.5"/>
-      <circle cx="200" cy="140" r="60" fill="white" stroke="#2D5A47" stroke-width="2"/>
-      <!-- Happy face -->
-      <circle cx="185" cy="130" r="4" fill="#2D5A47"/>
-      <circle cx="215" cy="130" r="4" fill="#2D5A47"/>
-      <path d="M185 155 Q200 170 215 155" stroke="#2D5A47" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-      <!-- Orbiting life elements -->
-      <circle cx="95" cy="100" r="28" fill="#E5DFF5" opacity="0.7"/>
-      <rect x="83" y="92" width="24" height="4" rx="2" fill="#2D5A47" opacity="0.4"/>
-      <rect x="83" y="100" width="16" height="4" rx="2" fill="#2D5A47" opacity="0.3"/>
-      <circle cx="305" cy="100" r="28" fill="#F5DDD3" opacity="0.7"/>
-      <circle cx="297" cy="95" r="6" fill="white" stroke="#2D5A47" stroke-width="1.5"/>
-      <circle cx="313" cy="95" r="5" fill="white" stroke="#2D5A47" stroke-width="1.5"/>
-      <circle cx="130" cy="220" r="24" fill="#A8C5B8" opacity="0.6"/>
-      <path d="M120 218 L128 226 L142 212" stroke="#2D5A47" stroke-width="2" fill="none" stroke-linecap="round"/>
-      <circle cx="270" cy="220" r="24" fill="#E5DFF5" opacity="0.6"/>
-      <circle cx="270" cy="218" r="10" stroke="#2D5A47" stroke-width="1.5" fill="none"/>
-      <path d="M270 213 L270 218 L274 218" stroke="#2D5A47" stroke-width="1.5" stroke-linecap="round"/>
-      <!-- Connection flows -->
-      <path d="M123 115 Q160 130 175 135" stroke="#2D5A47" stroke-width="1" stroke-dasharray="3 3" opacity="0.3"/>
-      <path d="M277 115 Q240 130 225 135" stroke="#2D5A47" stroke-width="1" stroke-dasharray="3 3" opacity="0.3"/>
-      <path d="M145 205 Q170 180 185 165" stroke="#2D5A47" stroke-width="1" stroke-dasharray="3 3" opacity="0.3"/>
-      <path d="M255 205 Q230 180 215 165" stroke="#2D5A47" stroke-width="1" stroke-dasharray="3 3" opacity="0.3"/>
-    </svg>
-    
-    <h2>End the endless<br/><em>text threads</em></h2>
-    <p>"Did you get the groceries?" "Who's picking up the kids?" "I thought you were handling that."</p>
-  </section>
+    <h1>Stop running your family<br/>like a <em>logistics company</em></h1>
 
-  <!-- Intersection -->
-  <section class="insight">
-    <svg class="illustration" viewBox="0 0 400 250" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <!-- Beautiful intersection/venn -->
-      <circle cx="160" cy="125" r="80" fill="white" opacity="0.1"/>
-      <circle cx="240" cy="125" r="80" fill="white" opacity="0.1"/>
-      
-      <!-- Glowing intersection -->
-      <ellipse cx="200" cy="125" rx="40" ry="70" fill="white" opacity="0.2"/>
-      
-      <!-- Work elements flowing in -->
-      <rect x="95" y="105" width="40" height="40" rx="8" fill="white" opacity="0.15"/>
-      <rect x="103" y="118" width="24" height="3" rx="1.5" fill="white" opacity="0.8"/>
-      <rect x="103" y="126" width="16" height="3" rx="1.5" fill="white" opacity="0.5"/>
-      
-      <!-- Family elements flowing in -->
-      <circle cx="285" cy="110" r="10" fill="white" opacity="0.15"/>
-      <circle cx="270" cy="130" r="8" fill="white" opacity="0.15"/>
-      <circle cx="300" cy="130" r="8" fill="white" opacity="0.15"/>
-      
-      <!-- Center: heart in the intersection -->
-      <circle cx="200" cy="125" r="20" fill="#A8C5B8"/>
-      <path d="M200 135 L192 127 Q189 120 195 120 Q200 120 200 126 Q200 120 205 120 Q211 120 208 127 Z" fill="white"/>
-      
-      <!-- Sparkles showing harmony -->
-      <circle cx="200" cy="55" r="5" fill="white" opacity="0.4"/>
-      <circle cx="200" cy="195" r="5" fill="white" opacity="0.4"/>
-      <circle cx="125" cy="75" r="3" fill="white" opacity="0.3"/>
-      <circle cx="275" cy="75" r="3" fill="white" opacity="0.3"/>
-      <circle cx="155" cy="180" r="3" fill="white" opacity="0.3"/>
-      <circle cx="245" cy="180" r="3" fill="white" opacity="0.3"/>
-    </svg>
-    
-    <h2>Everyone knows<br/><em>what's next</em></h2>
-    <p>Tasks, meals, schedules, who's handling what—all visible to everyone who needs to see it.</p>
-  </section>
+    <p class="hero-subtitle">
+      Symphony OS brings together schedules, tasks, and coordination into one calm place.
+      Plan on desktop, execute on mobile.
+    </p>
 
-  <!-- Solution -->
-  <section class="solution">
-    <svg class="illustration" viewBox="0 0 400 280" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <!-- Unified, harmonious system -->
-      <rect x="80" y="50" width="240" height="180" rx="20" fill="white" stroke="#2D5A47" stroke-width="2"/>
-      
-      <!-- Sidebar -->
-      <rect x="80" y="50" width="60" height="180" rx="20" fill="#FAF6F1"/>
-      <rect x="80" y="50" width="60" height="180" rx="20" fill="none" stroke="#2D5A47" stroke-width="2"/>
-      <circle cx="110" cy="90" r="8" fill="#2D5A47"/>
-      <circle cx="110" cy="120" r="8" fill="#A8C5B8"/>
-      <circle cx="110" cy="150" r="8" fill="#F5DDD3"/>
-      <circle cx="110" cy="180" r="8" fill="#E5DFF5"/>
-      
-      <!-- Main content area with blended tasks -->
-      <rect x="155" y="75" width="150" height="24" rx="6" fill="#E5DFF5" opacity="0.5"/>
-      <rect x="165" y="83" width="80" height="8" rx="4" fill="#2D5A47" opacity="0.3"/>
-      
-      <rect x="155" y="110" width="150" height="24" rx="6" fill="#F5DDD3" opacity="0.5"/>
-      <rect x="165" y="118" width="60" height="8" rx="4" fill="#2D5A47" opacity="0.3"/>
-      
-      <rect x="155" y="145" width="150" height="24" rx="6" fill="#A8C5B8" opacity="0.4"/>
-      <rect x="165" y="153" width="90" height="8" rx="4" fill="#2D5A47" opacity="0.3"/>
-      
-      <rect x="155" y="180" width="150" height="24" rx="6" fill="#E5DFF5" opacity="0.5"/>
-      <rect x="165" y="188" width="50" height="8" rx="4" fill="#2D5A47" opacity="0.3"/>
-      
-      <!-- Floating elements showing harmony -->
-      <circle cx="60" cy="100" r="12" fill="#A8C5B8" opacity="0.4"/>
-      <circle cx="350" cy="80" r="10" fill="#F5DDD3" opacity="0.5"/>
-      <circle cx="340" cy="200" r="8" fill="#E5DFF5" opacity="0.5"/>
-      <circle cx="50" cy="180" r="6" fill="#F5DDD3" opacity="0.4"/>
-    </svg>
-    
-    <h2>Plan together.<br/><em>Know</em> what's next.</h2>
-    <p>Plan on the weekend, then during the week everyone just opens their phone and knows what's happening.</p>
-  </section>
+    <div class="hero-ctas">
+      <button class="cta" onclick="openModal()">Request Early Access</button>
+      <a href="#how-it-works" class="cta cta-secondary">See how it works</a>
+    </div>
 
-  <!-- Principles -->
-  <section class="principles">
-    <h2>Not another<br/><em>kid's birthday party</em> app</h2>
-    <div class="cards">
-      <div class="card">
-        <div class="card-icon" style="background: #E5DFF5;">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2D5A47" stroke-width="2" stroke-linecap="round">
-            <circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8" opacity="0.3"/>
-          </svg>
+    <!-- Timeline Companion Preview -->
+    <div class="timeline-preview">
+      <div class="timeline-header">
+        <span class="timeline-date">Tuesday, December 10</span>
+        <div class="timeline-avatars">
+          <div class="timeline-avatar" style="background: var(--work);"></div>
+          <div class="timeline-avatar" style="background: var(--personal);"></div>
+          <div class="timeline-avatar" style="background: var(--family);"></div>
         </div>
-        <h3>Calm by design</h3>
-        <p>No chaos. No clutter. Just clarity.</p>
       </div>
 
-      <div class="card">
-        <div class="card-icon" style="background: #F5DDD3;">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2D5A47" stroke-width="2" stroke-linecap="round">
-            <rect x="5" y="4" width="14" height="16" rx="2"/><path d="M12 8v8M8 12h8"/>
-          </svg>
+      <div class="subway-map">
+        <div class="subway-track track-work"></div>
+        <div class="subway-track track-personal"></div>
+        <div class="subway-track track-family"></div>
+
+        <div class="subway-row">
+          <span class="subway-time">8:00a</span>
+          <div class="subway-dots">
+            <div class="subway-dot dot-work"></div>
+          </div>
+          <span class="subway-event">Team standup</span>
         </div>
-        <h3>Family-native</h3>
-        <p>Built for households—not a productivity app with sharing bolted on.</p>
+
+        <div class="subway-row">
+          <span class="subway-time">9:30a</span>
+          <div class="subway-dots">
+            <div class="subway-dot dot-personal"></div>
+          </div>
+          <span class="subway-event">Gym</span>
+        </div>
+
+        <div class="subway-row">
+          <span class="subway-time">3:15p</span>
+          <div class="subway-dots">
+            <div class="subway-dot dot-family"></div>
+          </div>
+          <span class="subway-event">School pickup</span>
+        </div>
+
+        <div class="subway-row subway-convergence">
+          <span class="subway-time">6:00p</span>
+          <div class="subway-dots">
+            <div class="subway-dot dot-work" style="left: 65px;"></div>
+            <div class="subway-dot dot-personal" style="left: 75px;"></div>
+            <div class="subway-dot dot-family" style="left: 85px;"></div>
+          </div>
+          <span class="subway-event">Family dinner</span>
+        </div>
+        <div class="convergence-label">Everyone together</div>
+
+        <div class="subway-row">
+          <span class="subway-time">8:00p</span>
+          <div class="subway-dots">
+            <div class="subway-dot dot-family"></div>
+          </div>
+          <span class="subway-event dim">Bedtime routine</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Problem -->
+  <section class="problem" id="how-it-works">
+    <div class="problem-inner">
+      <div class="problem-content">
+        <h2>Sound <em>familiar?</em></h2>
+        <p>
+          Overlapping calendars. Tasks scattered across five apps. The constant mental load
+          of "who needs to be where, when?"
+        </p>
+        <ul class="problem-list">
+          <li>Multiple schedules that need to sync</li>
+          <li>Work tasks and family responsibilities competing for headspace</li>
+          <li>The mental load of "keeping it all together"</li>
+          <li>Trying to coordinate with your partner without constant texting</li>
+        </ul>
       </div>
 
-      <div class="card">
-        <div class="card-icon" style="background: #A8C5B8;">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2D5A47" stroke-width="2" stroke-linecap="round">
-            <circle cx="9" cy="10" r="4"/><circle cx="15" cy="10" r="4"/><path d="M12 14v6"/>
-          </svg>
+      <div class="chaos-illustration">
+        <div class="chaos-card chaos-1">"Did you get the groceries?"</div>
+        <div class="chaos-card chaos-2">"Who's picking up the kids?"</div>
+        <div class="chaos-card chaos-3">"I thought you were handling that"</div>
+        <div class="chaos-card chaos-4">"What time is soccer?"</div>
+        <div class="chaos-card chaos-5">"Can you call the doctor?"</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Philosophy -->
+  <section class="philosophy">
+    <div class="philosophy-inner">
+      <h2>Plan on desktop.<br/><em>Execute on mobile.</em></h2>
+      <p>
+        Think of Sunday evening—you sit down and map out your family's week in one place.
+        Then throughout the week, everyone just opens their phone and knows what's happening.
+      </p>
+
+      <div class="philosophy-grid">
+        <div class="philosophy-card">
+          <h3>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <rect x="2" y="3" width="20" height="14" rx="2"/>
+              <path d="M8 21h8M12 17v4"/>
+            </svg>
+            Desktop for planning
+          </h3>
+          <p>Full-page views for your weekly planning session. See everything, drag and drop, think big picture.</p>
         </div>
-        <h3>Your life, together</h3>
-        <p>Meals, schedules, who's doing what—all in one view.</p>
+
+        <div class="philosophy-card">
+          <h3>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <rect x="5" y="2" width="14" height="20" rx="2"/>
+              <path d="M12 18h.01"/>
+            </svg>
+            Mobile for execution
+          </h3>
+          <p>Quick modals for checking off tasks. Know exactly what's next without hunting through apps.</p>
+        </div>
+
+        <div class="philosophy-card">
+          <h3>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 6v6l4 2"/>
+            </svg>
+            Calm, not chaotic
+          </h3>
+          <p>No notification overload. No gamification. Just peaceful visualization of your family's rhythm.</p>
+        </div>
+
+        <div class="philosophy-card">
+          <h3>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            Family-first
+          </h3>
+          <p>Built for households from day one—not a productivity app with sharing bolted on as an afterthought.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Three Domains -->
+  <section class="domains">
+    <div class="domains-inner">
+      <h2>Three domains. <em>One view.</em></h2>
+      <p>See your whole life when making decisions, but filter when you need focus.</p>
+
+      <div class="domains-visual">
+        <div class="domain-circle domain-work">
+          <h3>Work</h3>
+          <p>Meetings, tasks,<br/>deadlines</p>
+        </div>
+        <div class="domain-circle domain-personal">
+          <h3>Personal</h3>
+          <p>Health, hobbies,<br/>errands</p>
+        </div>
+        <div class="domain-circle domain-family">
+          <h3>Family</h3>
+          <p>Kids, meals,<br/>shared tasks</p>
+        </div>
+      </div>
+
+      <p class="domains-note">Work items at work time. Family in the evening. Context-aware, not overwhelming.</p>
+    </div>
+  </section>
+
+  <!-- Who It's For -->
+  <section class="who-for">
+    <div class="who-for-inner">
+      <h2>Built for families who <em>feel the chaos</em></h2>
+
+      <div class="who-for-list">
+        <div class="who-for-item">
+          <div class="who-for-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <rect x="3" y="4" width="18" height="18" rx="2"/>
+              <path d="M16 2v4M8 2v4M3 10h18"/>
+            </svg>
+          </div>
+          <p>Multiple schedules that need to sync without constant back-and-forth</p>
+        </div>
+
+        <div class="who-for-item">
+          <div class="who-for-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+          </div>
+          <p>Work tasks and family responsibilities competing for the same headspace</p>
+        </div>
+
+        <div class="who-for-item">
+          <div class="who-for-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 8v4l2 2"/>
+            </svg>
+          </div>
+          <p>The invisible mental load of remembering everything for everyone</p>
+        </div>
+
+        <div class="who-for-item">
+          <div class="who-for-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+          </div>
+          <p>Trying to coordinate with your partner without endless text threads</p>
+        </div>
       </div>
     </div>
   </section>
 
   <!-- Final CTA -->
   <section class="final" id="access">
-    <svg class="illustration" viewBox="0 0 300 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <!-- Heart/home combined icon -->
-      <circle cx="150" cy="100" r="60" fill="#FAF6F1"/>
-      <circle cx="150" cy="100" r="45" fill="white" stroke="#2D5A47" stroke-width="2"/>
-      
-      <!-- Heart shape made of two people/elements coming together -->
-      <path d="M150 130 L130 110 Q125 95 140 95 Q150 95 150 108 Q150 95 160 95 Q175 95 170 110 Z" fill="#F5DDD3" stroke="#2D5A47" stroke-width="2"/>
-      
-      <!-- Small orbital elements -->
-      <circle cx="150" cy="35" r="6" fill="#A8C5B8"/>
-      <circle cx="200" cy="70" r="5" fill="#E5DFF5"/>
-      <circle cx="200" cy="130" r="4" fill="#F5DDD3"/>
-      <circle cx="100" cy="130" r="5" fill="#A8C5B8"/>
-      <circle cx="100" cy="70" r="4" fill="#E5DFF5"/>
-    </svg>
-    
-    <h2>Ready to be on<br/>the <em>same page?</em></h2>
-    <a href="#" class="cta">Request Access</a>
-    
-    <div class="made-with">
-      <span>Made with</span>
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-      <span>for families like ours</span>
+    <div class="final-inner">
+      <h2>Ready for <em>calm coordination?</em></h2>
+      <p>
+        We're onboarding families one at a time to make sure Symphony OS
+        actually solves the chaos—not adds to it.
+      </p>
+      <button class="cta" onclick="openModal()">Request Early Access</button>
+
+      <div class="made-with">
+        <span>Made with</span>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+        <span>for families like ours</span>
+      </div>
     </div>
   </section>
 
   <footer>
-    © 2025 Symphony
+    &copy; 2025 Symphony OS
   </footer>
 
   <!-- Request Access Modal -->
   <div class="modal-overlay" id="modal" onclick="closeModalOutside(event)">
     <div class="modal" id="modalContent">
       <div class="modal-form">
-        <svg class="modal-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="32" cy="32" r="30" fill="#FAF6F1"/>
-          <circle cx="32" cy="32" r="22" fill="white" stroke="#2D5A47" stroke-width="2"/>
-          <path d="M32 44 L22 34 Q18 26 28 26 Q32 26 32 33 Q32 26 36 26 Q46 26 42 34 Z" fill="#F5DDD3" stroke="#2D5A47" stroke-width="2"/>
-        </svg>
+        <div class="modal-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
         <h3>Join the waitlist</h3>
         <p>We're onboarding families one at a time.</p>
         <form onsubmit="handleSubmit(event)">
@@ -631,7 +1060,7 @@
           <button type="submit" class="cta" id="submitBtn">Get Early Access</button>
         </form>
         <p class="modal-note">No spam. Just an invite when it's your turn.</p>
-        <p class="modal-error" id="errorMsg" style="display:none; color:#c0392b; font-size:0.85rem; margin-top:0.5rem;"></p>
+        <p class="modal-error" id="errorMsg" style="display:none; font-size:0.85rem; margin-top:0.5rem;"></p>
       </div>
       <div class="modal-success">
         <div class="success-check">
@@ -647,12 +1076,12 @@
 
   <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  
+
   <script>
     // Initialize Supabase
     const SUPABASE_URL = 'https://mwadppyrqzuzgstmwpuy.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13YWRwcHlycXp1emdzdG13cHV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ1MzU0MjcsImV4cCI6MjA4MDExMTQyN30._bWsOu6D-UAMKsxEMzN7PhMM4ENIXr2uZWdVLcoILk4';
-    
+
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     function openModal() {
@@ -674,23 +1103,21 @@
 
     async function handleSubmit(event) {
       event.preventDefault();
-      
+
       const email = document.getElementById('emailInput').value;
       const submitBtn = document.getElementById('submitBtn');
       const errorMsg = document.getElementById('errorMsg');
-      
-      // Disable button while submitting
+
       submitBtn.disabled = true;
       submitBtn.textContent = 'Joining...';
       errorMsg.style.display = 'none';
-      
+
       try {
         const { data, error } = await supabase
           .from('waitlist')
           .insert([{ email, source: 'landing_page' }]);
-        
+
         if (error) {
-          // Handle duplicate email
           if (error.code === '23505') {
             errorMsg.textContent = "You're already on the list! We'll be in touch soon.";
             errorMsg.style.color = '#2D5A47';
@@ -703,11 +1130,9 @@
           submitBtn.textContent = 'Get Early Access';
           return;
         }
-        
-        // Show success state
+
         document.getElementById('modalContent').classList.add('success');
-        
-        // Close after delay
+
         setTimeout(() => {
           closeModal();
           setTimeout(() => {
@@ -717,7 +1142,7 @@
             submitBtn.textContent = 'Get Early Access';
           }, 300);
         }, 2500);
-        
+
       } catch (err) {
         errorMsg.textContent = 'Connection error. Please try again.';
         errorMsg.style.display = 'block';
@@ -726,12 +1151,10 @@
       }
     }
 
-    // Close on Escape key
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') closeModal();
     });
 
-    // Wire up all CTA buttons
     document.querySelectorAll('a.cta[href="#access"]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();

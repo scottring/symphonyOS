@@ -50,10 +50,10 @@ export function AuthForm() {
           </div>
 
           <h1 className="font-display text-4xl font-semibold text-neutral-900 mb-3 tracking-tight">
-            Symphony
+            Symphony OS
           </h1>
-          <p className="text-neutral-500 text-lg">
-            Finally be on the same page
+          <p className="text-neutral-500 text-lg max-w-xs mx-auto">
+            The family coordination platform
           </p>
         </div>
 
@@ -140,10 +140,15 @@ export function AuthForm() {
           </div>
         </div>
 
-        {/* Footer */}
-        <p className="mt-8 text-center text-sm text-neutral-400">
-          Organize your life with clarity and purpose
-        </p>
+        {/* Value proposition */}
+        <div className="mt-10 text-center space-y-4">
+          <p className="text-neutral-600 text-sm leading-relaxed max-w-sm mx-auto">
+            For families juggling multiple schedules, work tasks, and the mental load of keeping it all together.
+          </p>
+          <p className="text-neutral-400 text-xs">
+            Plan on desktop. Execute on mobile.
+          </p>
+        </div>
       </div>
     </div>
   )
