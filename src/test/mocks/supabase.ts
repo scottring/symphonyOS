@@ -10,10 +10,42 @@ export function createSupabaseMock() {
     const chain: Record<string, ReturnType<typeof vi.fn>> = {}
 
     chain.select = vi.fn().mockReturnValue(chain)
-    chain.insert = vi.fn().mockReturnValue(chain)
-    chain.update = vi.fn().mockReturnValue(chain)
-    chain.delete = vi.fn().mockReturnValue(chain)
-    chain.upsert = vi.fn().mockReturnValue(chain)
+    chain.insert = vi.fn().mockImplementation((data) => {
+      // Return a promise-like chain that can continue or resolve
+      const insertChain = { ...chain }
+      insertChain.then = (resolve: (value: any) => void) => {
+        resolve({ data, error: lastError })
+        return Promise.resolve()
+      }
+      return insertChain
+    })
+    chain.update = vi.fn().mockImplementation((data) => {
+      // Return a promise-like chain that can continue or resolve
+      const updateChain = { ...chain }
+      updateChain.then = (resolve: (value: any) => void) => {
+        resolve({ data, error: lastError })
+        return Promise.resolve()
+      }
+      return updateChain
+    })
+    chain.delete = vi.fn().mockImplementation(() => {
+      // Return a promise-like chain that can continue or resolve
+      const deleteChain = { ...chain }
+      deleteChain.then = (resolve: (value: any) => void) => {
+        resolve({ data: null, error: lastError })
+        return Promise.resolve()
+      }
+      return deleteChain
+    })
+    chain.upsert = vi.fn().mockImplementation((data) => {
+      // Return a promise-like chain that can continue or resolve
+      const upsertChain = { ...chain }
+      upsertChain.then = (resolve: (value: any) => void) => {
+        resolve({ data, error: lastError })
+        return Promise.resolve()
+      }
+      return upsertChain
+    })
     chain.eq = vi.fn().mockReturnValue(chain)
     chain.neq = vi.fn().mockReturnValue(chain)
     chain.gt = vi.fn().mockReturnValue(chain)

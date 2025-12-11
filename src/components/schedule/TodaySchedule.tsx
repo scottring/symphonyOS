@@ -20,6 +20,57 @@ import { WeeklyReview } from '@/components/review/WeeklyReview'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { SystemHealthWidget } from '@/components/health'
 
+// Bento box / grid icon for "Organize"
+function BentoIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      {/* 2x2 grid with rounded corners - bento box style */}
+      <rect x="3" y="3" width="7" height="7" rx="1.5" />
+      <rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" />
+      <rect x="14" y="14" width="7" height="7" rx="1.5" />
+    </svg>
+  )
+}
+
+// Check if current time is in "organize hours" (morning 6-9am or evening 6-9pm)
+function isOrganizeTime(): boolean {
+  const hour = new Date().getHours()
+  return (hour >= 6 && hour < 9) || (hour >= 18 && hour < 21)
+}
+
+interface OrganizeButtonProps {
+  onClick: () => void
+  inboxCount: number
+  isMobile: boolean
+  hasAssigneeFilter: boolean
+}
+
+function OrganizeButton({ onClick, inboxCount, isMobile, hasAssigneeFilter }: OrganizeButtonProps) {
+  const emphasized = isOrganizeTime() && inboxCount > 0
+
+  return (
+    <button
+      onClick={onClick}
+      className={`relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+        emphasized
+          ? 'text-primary-700 bg-primary-50 hover:bg-primary-100 shadow-sm ring-1 ring-primary-200'
+          : 'text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100'
+      } ${!isMobile || !hasAssigneeFilter ? 'ml-auto' : ''}`}
+    >
+      <BentoIcon className={`w-5 h-5 ${emphasized ? 'text-primary-600' : ''}`} />
+      <span className="hidden sm:inline">Organize</span>
+      {inboxCount > 0 && (
+        <span className={`absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full text-white text-xs font-semibold ${
+          emphasized ? 'bg-primary-600 animate-pulse' : 'bg-amber-500'
+        }`}>
+          {inboxCount}
+        </span>
+      )}
+    </button>
+  )
+}
+
 interface TodayScheduleProps {
   tasks: Task[]
   events: CalendarEvent[]
@@ -453,22 +504,15 @@ export function TodaySchedule({
               />
             </div>
           )}
-          {/* Weekly Review button - shows only on today's view with inbox badge */}
+          {/* Organize button - shows only on today's view with inbox badge */}
+          {/* Emphasized (glowing) during morning (6-9am) and evening (6-9pm) hours */}
           {isToday && (
-            <button
+            <OrganizeButton
               onClick={() => setShowWeeklyReview(true)}
-              className={`relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100 transition-colors ${!isMobile || !(onSelectAssignee && (assigneesWithTasks.length > 0 || hasUnassignedTasks)) ? 'ml-auto' : ''}`}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-              </svg>
-              <span className="hidden sm:inline">Review</span>
-              {inboxTasks.length > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-amber-500 text-white text-xs font-semibold">
-                  {inboxTasks.length}
-                </span>
-              )}
-            </button>
+              inboxCount={inboxTasks.length}
+              isMobile={isMobile}
+              hasAssigneeFilter={!!(onSelectAssignee && (assigneesWithTasks.length > 0 || hasUnassignedTasks))}
+            />
           )}
         </div>
 

@@ -145,10 +145,10 @@ describe('WeeklyReview', () => {
   })
 
   describe('task actions', () => {
-    it('renders WhenPicker for each task', () => {
+    it('renders SchedulePopover for each task', () => {
       render(<WeeklyReview {...defaultProps} />)
-      const dateButtons = screen.getAllByRole('button', { name: 'Set date' })
-      expect(dateButtons).toHaveLength(2)
+      const scheduleButtons = screen.getAllByRole('button', { name: 'Schedule' })
+      expect(scheduleButtons).toHaveLength(2)
     })
 
     it('renders PushDropdown for each task', () => {
@@ -215,12 +215,12 @@ describe('WeeklyReview', () => {
   })
 
   describe('integration with triage components', () => {
-    it('opens WhenPicker when clicking date button', () => {
+    it('opens SchedulePopover when clicking schedule button', () => {
       render(<WeeklyReview {...defaultProps} />)
-      const dateButtons = screen.getAllByRole('button', { name: 'Set date' })
-      fireEvent.click(dateButtons[0])
-      expect(screen.getByText('Today')).toBeInTheDocument()
-      expect(screen.getByText('Tomorrow')).toBeInTheDocument()
+      const scheduleButtons = screen.getAllByRole('button', { name: 'Schedule' })
+      fireEvent.click(scheduleButtons[0])
+      // SchedulePopover shows time slots or date options
+      expect(screen.getByText('All Day')).toBeInTheDocument()
     })
 
     it('opens PushDropdown when clicking push button', () => {
