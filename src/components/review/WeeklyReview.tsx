@@ -2,12 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
-import { WhenPicker, AssignPicker, PushDropdown } from '@/components/triage'
+import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
+import { AssignPicker, PushDropdown, SchedulePopover, type ScheduleContextItem } from '@/components/triage'
 
 interface WeeklyReviewProps {
   tasks: Task[]
   projects: Project[]
   contacts: Contact[]
+  calendarEvents?: CalendarEvent[]
+  allTasks?: Task[] // All tasks for timeline display
   onSearchContacts: (query: string) => Contact[]
   onAddContact?: (name: string) => Promise<Contact | null>
   onUpdateTask: (id: string, updates: Partial<Task>) => void
@@ -20,6 +23,8 @@ export function WeeklyReview({
   tasks,
   projects,
   contacts,
+  calendarEvents = [],
+  allTasks = [],
   onSearchContacts,
   onAddContact,
   onUpdateTask,
@@ -84,6 +89,56 @@ export function WeeklyReview({
   const processedCount = processedIds.size
   const totalCount = tasks.length + processedCount
   const progressPercent = totalCount > 0 ? (processedCount / totalCount) * 100 : 0
+
+  // Build schedule context for SchedulePopover
+  const getScheduleItemsForDate = useCallback((date: Date): ScheduleContextItem[] => {
+    const startOfDay = new Date(date)
+    startOfDay.setHours(0, 0, 0, 0)
+    const endOfDay = new Date(date)
+    endOfDay.setHours(23, 59, 59, 999)
+
+    const items: ScheduleContextItem[] = []
+
+    // Add tasks scheduled for this date
+    allTasks.forEach(task => {
+      if (!task.scheduledFor) return
+      const taskDate = new Date(task.scheduledFor)
+      if (taskDate >= startOfDay && taskDate <= endOfDay) {
+        items.push({
+          id: task.id,
+          title: task.title,
+          startTime: taskDate,
+          endTime: task.isAllDay ? undefined : new Date(taskDate.getTime() + 3600000), // Assume 1 hour
+          allDay: task.isAllDay,
+          type: 'task',
+          completed: task.completed,
+        })
+      }
+    })
+
+    // Add events for this date
+    calendarEvents.forEach(event => {
+      const startTimeStr = event.start_time || event.startTime
+      if (!startTimeStr) return
+      const eventStart = new Date(startTimeStr)
+      if (eventStart >= startOfDay && eventStart <= endOfDay) {
+        const endTimeStr = event.end_time || event.endTime
+        items.push({
+          id: event.id,
+          title: event.title,
+          startTime: eventStart,
+          endTime: endTimeStr ? new Date(endTimeStr) : undefined,
+          allDay: event.all_day || event.allDay,
+          type: 'event',
+        })
+      }
+    })
+
+    // Sort by start time
+    items.sort((a, b) => (a.startTime?.getTime() ?? 0) - (b.startTime?.getTime() ?? 0))
+
+    return items
+  }, [allTasks, calendarEvents])
 
   return (
     <div 
@@ -227,12 +282,14 @@ export function WeeklyReview({
 
                     {/* Actions row */}
                     <div className="flex items-center gap-1.5">
-                      {/* Schedule */}
+                      {/* Schedule - with schedule context */}
                       <div className="action-button" title="Schedule">
-                        <WhenPicker
+                        <SchedulePopover
                           value={task.scheduledFor}
                           isAllDay={task.isAllDay}
-                          onChange={(date, isAllDay) => handleSchedule(task.id, date, isAllDay)}
+                          onSchedule={(date, isAllDay) => handleSchedule(task.id, date, isAllDay)}
+                          onClear={() => handleSchedule(task.id, undefined, false)}
+                          getItemsForDate={getScheduleItemsForDate}
                         />
                       </div>
                       

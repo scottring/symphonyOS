@@ -23,10 +23,11 @@ export function ContactViewRedesign({
   onDelete,
   tasks,
   onSelectTask,
-  isPinned: _isPinned,
-  canPin: _canPin,
-  onPin: _onPin,
-  onUnpin: _onUnpin,
+  // Pin props reserved for future use
+  // isPinned,
+  // canPin,
+  // onPin,
+  // onUnpin,
 }: ContactViewProps) {
   // Name editing
   const [isEditingName, setIsEditingName] = useState(false)

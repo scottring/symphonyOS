@@ -1,5 +1,19 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
-import { CalendarPlus } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { CalendarPlus, ChevronLeft } from 'lucide-react'
+
+// Minimal schedule item for display
+export interface ScheduleContextItem {
+  id: string
+  title: string
+  startTime?: Date
+  endTime?: Date
+  allDay?: boolean
+  type: 'task' | 'event' | 'routine'
+  completed?: boolean
+}
+
+// Alias for internal use
+type ScheduleItem = ScheduleContextItem
 
 interface SchedulePopoverProps {
   value?: Date
@@ -7,6 +21,9 @@ interface SchedulePopoverProps {
   onSchedule: (date: Date, isAllDay: boolean) => void
   onClear?: () => void
   trigger?: React.ReactNode
+  // Schedule context for showing what's on the selected day
+  scheduleItems?: ScheduleContextItem[]
+  getItemsForDate?: (date: Date) => ScheduleContextItem[]
 }
 
 type Step = 'date' | 'time'
@@ -40,18 +57,114 @@ function generateTimeOptions(): { value: string; label: string }[] {
 
 const TIME_OPTIONS = generateTimeOptions()
 
+// Group items by time of day section
+type DaySection = 'allday' | 'morning' | 'afternoon' | 'evening'
+
+function getTimeOfDay(date: Date): 'morning' | 'afternoon' | 'evening' {
+  const hour = date.getHours()
+  if (hour < 12) return 'morning'
+  if (hour < 17) return 'afternoon'
+  return 'evening'
+}
+
+function groupItemsBySection(items: ScheduleItem[]): Record<DaySection, ScheduleItem[]> {
+  const groups: Record<DaySection, ScheduleItem[]> = {
+    allday: [],
+    morning: [],
+    afternoon: [],
+    evening: [],
+  }
+
+  for (const item of items) {
+    if (item.allDay || !item.startTime) {
+      groups.allday.push(item)
+    } else {
+      groups[getTimeOfDay(item.startTime)].push(item)
+    }
+  }
+
+  // Sort by time within each section
+  const sortByTime = (a: ScheduleItem, b: ScheduleItem) =>
+    (a.startTime?.getTime() ?? 0) - (b.startTime?.getTime() ?? 0)
+
+  groups.morning.sort(sortByTime)
+  groups.afternoon.sort(sortByTime)
+  groups.evening.sort(sortByTime)
+
+  return groups
+}
+
+function formatTimeCompact(date: Date): string {
+  const hours = date.getHours()
+  const minutes = date.getMinutes()
+  const period = hours >= 12 ? 'p' : 'a'
+  const displayHour = hours % 12 || 12
+  if (minutes === 0) return `${displayHour}${period}`
+  return `${displayHour}:${minutes.toString().padStart(2, '0')}${period}`
+}
+
+const SECTION_LABELS: Record<DaySection, string> = {
+  allday: 'All Day',
+  morning: 'Morning',
+  afternoon: 'Afternoon',
+  evening: 'Evening',
+}
+
+// Default time slots for each section when no items exist
+const SECTION_DEFAULT_TIMES: Record<Exclude<DaySection, 'allday'>, number> = {
+  morning: 9,
+  afternoon: 14,
+  evening: 18,
+}
+
 export function SchedulePopover({
   value,
   isAllDay: _isAllDay,
   onSchedule,
   onClear,
   trigger,
+  scheduleItems,
+  getItemsForDate,
 }: SchedulePopoverProps) {
   void _isAllDay // Reserved for visual indicator
   const [isOpen, setIsOpen] = useState(false)
   const [step, setStep] = useState<Step>('date')
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [showCustomTime, setShowCustomTime] = useState(false)
+
+  // Determine if we should show the schedule context view
+  const hasScheduleContext = !!(scheduleItems || getItemsForDate)
+
+  // Get items for the selected date
+  const itemsForSelectedDate = useMemo(() => {
+    if (!selectedDate) return []
+    if (getItemsForDate) return getItemsForDate(selectedDate)
+    if (!scheduleItems) return []
+
+    // Filter scheduleItems to the selected date
+    const startOfDay = new Date(selectedDate)
+    startOfDay.setHours(0, 0, 0, 0)
+    const endOfDay = new Date(selectedDate)
+    endOfDay.setHours(23, 59, 59, 999)
+
+    return scheduleItems.filter(item => {
+      if (item.allDay) {
+        // For all-day items, check if they fall on this date
+        if (!item.startTime) return false
+        const itemDate = new Date(item.startTime)
+        itemDate.setHours(0, 0, 0, 0)
+        return itemDate.getTime() === startOfDay.getTime()
+      }
+      if (!item.startTime) return false
+      return item.startTime >= startOfDay && item.startTime <= endOfDay
+    })
+  }, [selectedDate, scheduleItems, getItemsForDate])
+
+  // Group items by section
+  const groupedItems = useMemo(() => {
+    return groupItemsBySection(itemsForSelectedDate)
+  }, [itemsForSelectedDate])
+
   const [customTimeSearch, setCustomTimeSearch] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
   const customTimeInputRef = useRef<HTMLInputElement>(null)
@@ -269,7 +382,7 @@ export function SchedulePopover({
             </div>
           )}
 
-          {/* Step 2: Pick time */}
+          {/* Step 2: Pick time - with schedule context if available */}
           {step === 'time' && !showCustomTime && (
             <div className="p-3">
               {/* Back button with selected date */}
@@ -277,22 +390,16 @@ export function SchedulePopover({
                 onClick={() => setStep('date')}
                 className="flex items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-700 mb-3 px-1"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                </svg>
+                <ChevronLeft className="w-4 h-4" />
                 <span className="font-medium">{formatSelectedDateLabel()}</span>
               </button>
-
-              <div className="text-xs font-medium text-neutral-400 uppercase tracking-wider mb-3 px-1">
-                What time?
-              </div>
 
               {/* All day option */}
               <button
                 onClick={() => handleTimeSelect('all-day')}
                 className="
-                  w-full flex items-center gap-2 px-3 py-2.5 mb-2 rounded-lg text-sm font-medium
-                  text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
+                  w-full flex items-center gap-2 px-3 py-2 mb-3 rounded-lg text-sm font-medium
+                  text-neutral-600 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
                   transition-all duration-150
                 "
               >
@@ -300,38 +407,167 @@ export function SchedulePopover({
                 <span>All Day</span>
               </button>
 
-              {/* Time presets */}
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                {TIME_PRESETS.map((preset) => (
+              {/* Schedule context view - shows day structure with gaps */}
+              {hasScheduleContext ? (
+                <div className="space-y-3 max-h-[320px] overflow-y-auto">
+                  {/* Render each section with items and gaps */}
+                  {(['morning', 'afternoon', 'evening'] as const).map((section) => {
+                    const sectionItems = groupedItems[section]
+                    const hasItems = sectionItems.length > 0
+                    const defaultHour = SECTION_DEFAULT_TIMES[section]
+
+                    return (
+                      <div key={section}>
+                        {/* Section header */}
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+                            {SECTION_LABELS[section]}
+                          </span>
+                          <div className="flex-1 h-px bg-neutral-100" />
+                        </div>
+
+                        {hasItems ? (
+                          <div className="space-y-1">
+                            {sectionItems.map((item, idx) => {
+                              const prevItem = idx > 0 ? sectionItems[idx - 1] : null
+                              const showGapBefore = prevItem && item.startTime && prevItem.endTime &&
+                                (item.startTime.getTime() - (prevItem.endTime?.getTime() || prevItem.startTime!.getTime() + 3600000)) > 1800000 // 30+ min gap
+
+                              return (
+                                <div key={item.id}>
+                                  {/* Gap slot before this item */}
+                                  {showGapBefore && prevItem?.endTime && (
+                                    <button
+                                      onClick={() => {
+                                        const gapTime = new Date(prevItem.endTime!)
+                                        handleTimeSelect(gapTime.getHours())
+                                      }}
+                                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs
+                                        text-primary-600 bg-primary-50/50 hover:bg-primary-100
+                                        border border-dashed border-primary-200
+                                        transition-all duration-150 mb-1"
+                                    >
+                                      <span className="w-10 text-right font-medium tabular-nums">
+                                        {formatTimeCompact(prevItem.endTime)}
+                                      </span>
+                                      <span className="flex-1 text-left">Schedule here</span>
+                                    </button>
+                                  )}
+
+                                  {/* Existing item */}
+                                  <div
+                                    className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs
+                                      ${item.completed ? 'opacity-50' : ''}
+                                      bg-neutral-50 text-neutral-600
+                                    `}
+                                  >
+                                    <span className="w-10 text-right font-medium text-neutral-400 tabular-nums">
+                                      {item.startTime ? formatTimeCompact(item.startTime) : '—'}
+                                    </span>
+                                    <span className="flex-1 truncate">{item.title}</span>
+                                    {item.type === 'event' && (
+                                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                                    )}
+                                    {item.type === 'routine' && (
+                                      <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })}
+
+                            {/* Gap slot at end of section */}
+                            {sectionItems.length > 0 && (
+                              <button
+                                onClick={() => {
+                                  const lastItem = sectionItems[sectionItems.length - 1]
+                                  const endTime = lastItem.endTime || (lastItem.startTime ? new Date(lastItem.startTime.getTime() + 3600000) : null)
+                                  if (endTime) {
+                                    handleTimeSelect(endTime.getHours())
+                                  }
+                                }}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs
+                                  text-primary-600 hover:bg-primary-50
+                                  transition-all duration-150"
+                              >
+                                <span className="w-10 text-right font-medium tabular-nums">
+                                  {(() => {
+                                    const lastItem = sectionItems[sectionItems.length - 1]
+                                    const endTime = lastItem.endTime || (lastItem.startTime ? new Date(lastItem.startTime.getTime() + 3600000) : null)
+                                    return endTime ? formatTimeCompact(endTime) : '—'
+                                  })()}
+                                </span>
+                                <span className="flex-1 text-left opacity-60">+ Schedule after</span>
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          /* Empty section - show as available slot */
+                          <button
+                            onClick={() => handleTimeSelect(defaultHour)}
+                            className="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs
+                              text-primary-600 bg-primary-50/30 hover:bg-primary-50
+                              border border-dashed border-primary-200/50
+                              transition-all duration-150"
+                          >
+                            <span className="w-10 text-right font-medium tabular-nums">
+                              {defaultHour > 12 ? `${defaultHour - 12}p` : `${defaultHour}a`}
+                            </span>
+                            <span className="flex-1 text-left">Open - schedule here</span>
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+
+                  {/* Custom time option */}
                   <button
-                    key={preset.hour}
-                    onClick={() => handleTimeSelect(preset.hour)}
+                    onClick={() => setShowCustomTime(true)}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs
+                      text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50
+                      transition-all duration-150 mt-2"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Pick exact time...</span>
+                  </button>
+                </div>
+              ) : (
+                /* Fallback: Original time presets when no schedule context */
+                <>
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    {TIME_PRESETS.map((preset) => (
+                      <button
+                        key={preset.hour}
+                        onClick={() => handleTimeSelect(preset.hour)}
+                        className="
+                          flex flex-col items-center px-3 py-2.5 rounded-lg text-sm
+                          text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
+                          transition-all duration-150
+                        "
+                      >
+                        <span className="font-semibold">{preset.label}</span>
+                        <span className="text-xs text-neutral-400">{preset.description}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => setShowCustomTime(true)}
                     className="
-                      flex flex-col items-center px-3 py-2.5 rounded-lg text-sm
-                      text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
+                      w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm
+                      text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50
                       transition-all duration-150
                     "
                   >
-                    <span className="font-semibold">{preset.label}</span>
-                    <span className="text-xs text-neutral-400">{preset.description}</span>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Pick exact time...</span>
                   </button>
-                ))}
-              </div>
-
-              {/* Custom time button */}
-              <button
-                onClick={() => setShowCustomTime(true)}
-                className="
-                  w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm
-                  text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50
-                  transition-all duration-150
-                "
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>Pick exact time...</span>
-              </button>
+                </>
+              )}
             </div>
           )}
 
@@ -343,9 +579,7 @@ export function SchedulePopover({
                 onClick={() => setShowCustomTime(false)}
                 className="flex items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-700 mb-3 px-1"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                </svg>
+                <ChevronLeft className="w-4 h-4" />
                 <span className="font-medium">{formatSelectedDateLabel()}</span>
               </button>
 

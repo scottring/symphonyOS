@@ -1,6 +1,7 @@
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
+import type { ScheduleContextItem } from '@/components/triage'
 import { DeferPicker, SchedulePopover } from '@/components/triage'
 import { AssigneeDropdown } from '@/components/family'
 
@@ -16,6 +17,8 @@ interface InboxTaskCardProps {
   // Family member assignment
   familyMembers?: FamilyMember[]
   onAssignTask?: (memberId: string | null) => void
+  // Schedule context for the schedule popover
+  getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
 }
 
 export function InboxTaskCard({
@@ -29,6 +32,7 @@ export function InboxTaskCard({
   onOpenProject,
   familyMembers = [],
   onAssignTask,
+  getScheduleItemsForDate,
 }: InboxTaskCardProps) {
   const project = projects.find(p => p.id === task.projectId)
 
@@ -117,6 +121,7 @@ export function InboxTaskCard({
             isAllDay={task.isAllDay}
             onSchedule={handleSchedule}
             onClear={() => onUpdate({ scheduledFor: undefined, isAllDay: undefined })}
+            getItemsForDate={getScheduleItemsForDate}
           />
 
           {/* Defer/Later button */}

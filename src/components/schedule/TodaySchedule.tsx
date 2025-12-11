@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
@@ -6,6 +6,7 @@ import type { FamilyMember } from '@/types/family'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
+import type { ScheduleContextItem } from '@/components/triage'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import { groupByDaySection, type DaySection } from '@/lib/timeUtils'
 import { useMobile } from '@/hooks/useMobile'
@@ -360,6 +361,75 @@ export function TodaySchedule({
   const totalItems = filteredTasks.length + filteredEvents.length + visibleRoutines.length + inboxTasks.length + overdueTasks.length
   const progressPercent = actionableCount > 0 ? (completedCount / actionableCount) * 100 : 0
 
+  // Callback to get schedule items for a specific date (used by SchedulePopover)
+  const getScheduleItemsForDate = useCallback((date: Date): ScheduleContextItem[] => {
+    const startOfDay = new Date(date)
+    startOfDay.setHours(0, 0, 0, 0)
+    const endOfDay = new Date(date)
+    endOfDay.setHours(23, 59, 59, 999)
+
+    const items: ScheduleContextItem[] = []
+
+    // Add tasks scheduled for this date
+    tasks.forEach(task => {
+      if (!task.scheduledFor) return
+      const taskDate = new Date(task.scheduledFor)
+      if (taskDate >= startOfDay && taskDate <= endOfDay) {
+        items.push({
+          id: task.id,
+          title: task.title,
+          startTime: taskDate,
+          endTime: task.isAllDay ? undefined : new Date(taskDate.getTime() + 3600000), // Assume 1 hour
+          allDay: task.isAllDay,
+          type: 'task',
+          completed: task.completed,
+        })
+      }
+    })
+
+    // Add events for this date
+    events.forEach(event => {
+      const startTimeStr = event.start_time || event.startTime
+      if (!startTimeStr) return
+      const eventStart = new Date(startTimeStr)
+      if (eventStart >= startOfDay && eventStart <= endOfDay) {
+        const endTimeStr = event.end_time || event.endTime
+        items.push({
+          id: event.id,
+          title: event.title,
+          startTime: eventStart,
+          endTime: endTimeStr ? new Date(endTimeStr) : undefined,
+          allDay: event.all_day || event.allDay,
+          type: 'event',
+        })
+      }
+    })
+
+    // Add routines for this date (routines repeat, so check if this date matches)
+    visibleRoutines.forEach(routine => {
+      // For simplicity, add all routines with their time_of_day
+      // In a real implementation, you'd check the recurrence_pattern
+      if (routine.time_of_day) {
+        const [hours, minutes] = routine.time_of_day.split(':').map(Number)
+        const routineTime = new Date(date)
+        routineTime.setHours(hours, minutes, 0, 0)
+        items.push({
+          id: routine.id,
+          title: routine.name,
+          startTime: routineTime,
+          endTime: new Date(routineTime.getTime() + 1800000), // 30 min default
+          type: 'routine',
+          completed: routineStatusMap.get(routine.id)?.status === 'completed',
+        })
+      }
+    })
+
+    // Sort by start time
+    items.sort((a, b) => (a.startTime?.getTime() ?? 0) - (b.startTime?.getTime() ?? 0))
+
+    return items
+  }, [tasks, events, visibleRoutines, routineStatusMap])
+
   return (
     <div className="px-4 py-4 md:p-8 max-w-2xl mx-auto">
       {/* Header */}
@@ -590,6 +660,7 @@ export function TodaySchedule({
               onOpenProject={onOpenProject}
               familyMembers={familyMembers}
               onAssignTask={onAssignTask}
+              getScheduleItemsForDate={getScheduleItemsForDate}
             />
           )}
         </div>
@@ -601,6 +672,8 @@ export function TodaySchedule({
           tasks={inboxTasks}
           projects={projects}
           contacts={contacts}
+          calendarEvents={events}
+          allTasks={tasks}
           onSearchContacts={onSearchContacts ?? (() => [])}
           onAddContact={onAddContact}
           onUpdateTask={onUpdateTask}

@@ -520,7 +520,6 @@ export function DetailPanelRedesign({
   const directions = useDirections()
 
   // Sync local state when item changes
-  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setLocalNotes(item?.notes || '')
     setShowDeleteConfirm(false)
@@ -533,7 +532,6 @@ export function DetailPanelRedesign({
     setEditedTitle(item?.title || '')
     setIsEditingTitle(false)
   }, [item?.id, item?.title])
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (isEditingTitle && titleInputRef.current) {
@@ -551,7 +549,6 @@ export function DetailPanelRedesign({
   }, [])
 
   // Load actionable instance for events and routines
-  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
   useEffect(() => {
     if (!item) {
       setActionableInstance(null)
@@ -574,8 +571,8 @@ export function DetailPanelRedesign({
     }
 
     loadInstance()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- actionable.getInstance is stable
   }, [item?.id, item?.type, item?.startTime, actionable.getInstance])
-  /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
   // Detect contextual actions
   const detectedActions = useMemo(() => {

@@ -53,6 +53,7 @@ function App() {
   const { user, loading: authLoading, signOut } = useAuth()
   const { isConnected, events, fetchEvents, isFetching: eventsFetching, createEvent, connect: connectCalendar } = useGoogleCalendar()
   const attachments = useAttachments()
+  const { fetchAttachments } = attachments
   const pinnedItems = usePinnedItems()
   const undo = useUndo({ duration: 5000 })
   const { toast, showToast, dismissToast } = useToast()
@@ -373,7 +374,7 @@ function App() {
     }
 
     generateTemplatedTasks()
-  }, [filteredRoutines, viewedDate, tasksLoading, routinesLoading, getLinkedTasks, addTask])
+  }, [filteredRoutines, viewedDate, tasksLoading, routinesLoading, getLinkedTasks, addTask, getCurrentUserMember])
 
   // Fetch event notes when an event is selected
   useEffect(() => {
@@ -387,12 +388,12 @@ function App() {
   useEffect(() => {
     if (selectedItemId?.startsWith('task-')) {
       const taskId = selectedItemId.replace('task-', '')
-      attachments.fetchAttachments('task', taskId)
+      fetchAttachments('task', taskId)
     } else if (selectedItemId?.startsWith('event-')) {
       const eventId = selectedItemId.replace('event-', '')
-      attachments.fetchAttachments('event_note', eventId)
+      fetchAttachments('event_note', eventId)
     }
-  }, [selectedItemId, attachments.fetchAttachments])
+  }, [selectedItemId, fetchAttachments])
 
   // Batch fetch event notes for all visible events (for info icon display)
   useEffect(() => {

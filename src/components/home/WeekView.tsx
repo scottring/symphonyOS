@@ -200,14 +200,14 @@ export function WeekView({
   selectedAssignee,
   eventNotesMap,
 }: WeekViewProps) {
-  // Helper function to check if an item matches the assignee filter
-  const matchesAssigneeFilter = (assignedTo: string | null | undefined): boolean => {
-    if (selectedAssignee === null || selectedAssignee === undefined) return true // "All" - show everything
-    if (selectedAssignee === 'unassigned') return !assignedTo // Show only unassigned
-    return assignedTo === selectedAssignee // Show items assigned to selected person
-  }
   // Generate 7 days of the week
   const weekDays = useMemo(() => {
+    // Helper function to check if an item matches the assignee filter
+    const matchesAssigneeFilter = (assignedTo: string | null | undefined): boolean => {
+      if (selectedAssignee === null || selectedAssignee === undefined) return true // "All" - show everything
+      if (selectedAssignee === 'unassigned') return !assignedTo // Show only unassigned
+      return assignedTo === selectedAssignee // Show items assigned to selected person
+    }
     const days: DayData[] = []
     const today = new Date()
     today.setHours(0, 0, 0, 0)

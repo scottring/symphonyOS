@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import {
@@ -37,6 +37,10 @@ export function useAttachments(): UseAttachmentsReturn {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Use ref for cache lookups to avoid dependency cycle
+  const attachmentsRef = useRef(attachments)
+  attachmentsRef.current = attachments
+
   // Fetch attachments for an entity
   const fetchAttachments = useCallback(
     async (entityType: AttachmentEntityType, entityId: string): Promise<Attachment[]> => {
@@ -44,8 +48,8 @@ export function useAttachments(): UseAttachmentsReturn {
 
       const cacheKey = getCacheKey(entityType, entityId)
 
-      // Check cache first
-      const cached = attachments.get(cacheKey)
+      // Check cache first (use ref to avoid dependency on attachments state)
+      const cached = attachmentsRef.current.get(cacheKey)
       if (cached !== undefined) return cached
 
       setIsLoading(true)
@@ -70,7 +74,7 @@ export function useAttachments(): UseAttachmentsReturn {
       setAttachments((prev) => new Map(prev).set(cacheKey, fetched))
       return fetched
     },
-    [user, attachments]
+    [user]
   )
 
   // Get attachments from cache (synchronous)
