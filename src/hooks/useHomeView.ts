@@ -13,15 +13,12 @@ export function useHomeView(): UseHomeViewResult {
   const [currentView, setCurrentViewState] = useState<HomeViewType>(() => {
     if (typeof window === 'undefined') return 'today'
     const stored = localStorage.getItem(STORAGE_KEY)
-    // Migrate old 'today-context' to 'today'
-    if (stored === 'today' || stored === 'today-context') {
+    // Migrate old 'today-context' and 'review' to 'today'
+    if (stored === 'today' || stored === 'today-context' || stored === 'review') {
       return 'today'
     }
     if (stored === 'week') {
       return 'week'
-    }
-    if (stored === 'review') {
-      return 'review'
     }
     return 'today'
   })
@@ -36,7 +33,7 @@ export function useHomeView(): UseHomeViewResult {
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY && e.newValue) {
-        if (e.newValue === 'today' || e.newValue === 'week' || e.newValue === 'review') {
+        if (e.newValue === 'today' || e.newValue === 'week') {
           setCurrentViewState(e.newValue)
         }
       }
