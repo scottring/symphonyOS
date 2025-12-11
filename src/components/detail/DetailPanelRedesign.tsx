@@ -1585,7 +1585,7 @@ export function DetailPanelRedesign({
                   onAdd={(title, scheduledFor) => handleAddLinkedTask(title, 'prep', scheduledFor)}
                   showTemplateOption={isRoutine && !!routine && !!onUpdateRoutine}
                   onAddAsTemplate={(title) => handleAddAsTemplate(title, 'prep')}
-                  eventDate={item.startTime}
+                  eventDate={item.startTime ?? undefined}
                 />
               </div>
             </div>
@@ -1618,7 +1618,7 @@ export function DetailPanelRedesign({
                   onAdd={(title, scheduledFor) => handleAddLinkedTask(title, 'followup', scheduledFor)}
                   showTemplateOption={isRoutine && !!routine && !!onUpdateRoutine}
                   onAddAsTemplate={(title) => handleAddAsTemplate(title, 'followup')}
-                  eventDate={item.startTime}
+                  eventDate={item.startTime ?? undefined}
                 />
               </div>
             </div>
