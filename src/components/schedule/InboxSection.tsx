@@ -94,6 +94,7 @@ export function InboxSection({
             projects={projects}
             familyMembers={familyMembers}
             onAssignTask={onAssignTask ? (memberId) => onAssignTask(recentlyCreatedTask.id, memberId) : undefined}
+            getScheduleItemsForDate={getScheduleItemsForDate}
           />
         )}
 

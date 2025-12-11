@@ -28,6 +28,7 @@ export interface Task {
   deferredUntil?: Date // Show in inbox again on this date (punt)
   deferCount?: number // Times this task has been deferred
   isAllDay?: boolean // True = all day task, false/undefined = specific time
+  isSomeday?: boolean // True = in someday/maybe list, not in inbox
   context?: TaskContext // Context: work, family, personal
   category?: TaskCategory // What kind of family item (default: 'task')
   notes?: string

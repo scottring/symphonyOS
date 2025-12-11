@@ -4,6 +4,7 @@ import type { FamilyMember } from '@/types/family'
 import type { ScheduleContextItem } from '@/components/triage'
 import { DeferPicker, SchedulePopover } from '@/components/triage'
 import { AssigneeDropdown } from '@/components/family'
+import { AgeIndicator } from '@/components/health'
 
 interface InboxTaskCardProps {
   task: Task
@@ -98,6 +99,8 @@ export function InboxTaskCard({
               <span className="hidden sm:inline">{task.category}</span>
             </span>
           )}
+          {/* Age indicator - shows for tasks > 3 days old */}
+          <AgeIndicator createdAt={task.createdAt} size="sm" />
         </div>
 
         {/* Action buttons - hidden by default, show on hover */}

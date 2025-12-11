@@ -12,6 +12,7 @@ interface DbTask {
   deferred_until: string | null
   defer_count: number | null
   is_all_day: boolean | null
+  is_someday: boolean | null
   context: TaskContext | null
   category: string | null
   notes: string | null
@@ -60,6 +61,7 @@ function dbTaskToTask(dbTask: DbTask): Task {
     deferredUntil: dbTask.deferred_until ? new Date(dbTask.deferred_until) : undefined,
     deferCount: dbTask.defer_count ?? undefined,
     isAllDay: dbTask.is_all_day ?? undefined,
+    isSomeday: dbTask.is_someday ?? undefined,
     context: dbTask.context ?? undefined,
     category: (dbTask.category as TaskCategory) ?? 'task',
     notes: dbTask.notes ?? undefined,
@@ -453,6 +455,7 @@ export function useSupabaseTasks() {
     }
     if ('deferCount' in updates) dbUpdates.defer_count = updates.deferCount ?? 0
     if ('isAllDay' in updates) dbUpdates.is_all_day = updates.isAllDay ?? null
+    if ('isSomeday' in updates) dbUpdates.is_someday = updates.isSomeday ?? false
     if ('context' in updates) dbUpdates.context = updates.context ?? null
     if ('category' in updates) dbUpdates.category = updates.category ?? 'task'
     if ('notes' in updates) dbUpdates.notes = updates.notes ?? null

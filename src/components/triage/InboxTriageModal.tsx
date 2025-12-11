@@ -135,11 +135,18 @@ export function InboxTriageModal({
       category,
     }
 
-    const scheduledDate = getScheduledDate()
-    if (scheduledDate) {
-      updates.scheduledFor = scheduledDate
-      // Events have specific times, others are all-day
-      updates.isAllDay = category !== 'event' || !startTime
+    // Handle someday selection
+    if (whenOption === 'someday') {
+      updates.isSomeday = true
+      updates.scheduledFor = undefined // Ensure not scheduled
+    } else {
+      updates.isSomeday = false // Explicitly clear someday flag
+      const scheduledDate = getScheduledDate()
+      if (scheduledDate) {
+        updates.scheduledFor = scheduledDate
+        // Events have specific times, others are all-day
+        updates.isAllDay = category !== 'event' || !startTime
+      }
     }
 
     if (selectedMemberId) {

@@ -18,6 +18,7 @@ import { InboxSection } from './InboxSection'
 import { OverdueSection } from './OverdueSection'
 import { WeeklyReview } from '@/components/review/WeeklyReview'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
+import { SystemHealthWidget } from '@/components/health'
 
 interface TodayScheduleProps {
   tasks: Task[]
@@ -192,6 +193,7 @@ export function TodaySchedule({
 
     return tasks.filter((task) => {
       if (task.completed) return false
+      if (task.isSomeday) return false // Someday items are not in inbox
       if (!matchesAssigneeFilter(task.assignedTo)) return false
       // No scheduled date = inbox item
       if (!task.scheduledFor) {
@@ -488,6 +490,11 @@ export function TodaySchedule({
         )}
       </div>
 
+      {/* Clarity Widget - shows only on today's view */}
+      {isToday && !loading && (
+        <SystemHealthWidget tasks={tasks} />
+      )}
+
       {loading ? (
         <LoadingSkeleton />
       ) : totalItems === 0 ? (
@@ -635,6 +642,7 @@ export function TodaySchedule({
                           ? (memberId) => onAssignRoutine(item.id.replace('routine-', ''), memberId)
                           : undefined
                       }
+                      getScheduleItemsForDate={getScheduleItemsForDate}
                     />
                   )
                 })}

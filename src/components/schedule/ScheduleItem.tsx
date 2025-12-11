@@ -2,7 +2,7 @@ import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
 import { formatTime, formatTimeRange } from '@/lib/timeUtils'
 import { getProjectColor } from '@/lib/projectUtils'
-import { PushDropdown, SchedulePopover } from '@/components/triage'
+import { PushDropdown, SchedulePopover, type ScheduleContextItem } from '@/components/triage'
 import { AssigneeDropdown } from '@/components/family'
 import { Redo2 } from 'lucide-react'
 
@@ -24,6 +24,8 @@ interface ScheduleItemProps {
   // Overdue styling
   isOverdue?: boolean
   overdueLabel?: string
+  // Schedule context for the schedule popover
+  getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
 }
 
 // Warm amber color tokens for overdue styling
@@ -49,6 +51,7 @@ export function ScheduleItem({
   onAssign,
   isOverdue,
   overdueLabel,
+  getScheduleItemsForDate,
 }: ScheduleItemProps) {
   const isTask = item.type === 'task'
   const isRoutine = item.type === 'routine'
@@ -160,6 +163,7 @@ export function ScheduleItem({
                 // Clear schedule - set to unscheduled (inbox) - only for tasks
                 onSchedule(undefined as unknown as Date, false)
               } : undefined}
+              getItemsForDate={getScheduleItemsForDate}
               trigger={
                 <button
                   className="w-full text-left text-xs font-medium rounded-md px-1 py-0.5 -mx-1 hover:bg-neutral-100 transition-colors cursor-pointer"
