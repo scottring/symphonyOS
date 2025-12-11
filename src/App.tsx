@@ -50,7 +50,7 @@ import type { LinkedActivityType } from '@/types/task'
 function App() {
   const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, getLinkedTasks, toggleTask, deleteTask, updateTask, pushTask } = useSupabaseTasks()
   const { user, loading: authLoading, signOut } = useAuth()
-  const { isConnected, events, fetchEvents, isFetching: eventsFetching } = useGoogleCalendar()
+  const { isConnected, events, fetchEvents, isFetching: eventsFetching, createEvent } = useGoogleCalendar()
   const attachments = useAttachments()
   const pinnedItems = usePinnedItems()
   const undo = useUndo({ duration: 5000 })
@@ -786,6 +786,37 @@ function App() {
         }
       }}
       onQuickAddRich={async (data) => {
+        // If it's an event and we have a date, also create in Google Calendar
+        if (data.category === 'event' && data.scheduledFor && isConnected) {
+          try {
+            // Default to 1 hour event
+            const startTime = new Date(data.scheduledFor)
+            const endTime = new Date(startTime)
+            endTime.setHours(endTime.getHours() + 1)
+
+            await createEvent({
+              title: data.title,
+              startTime,
+              endTime,
+              // Use browser timezone
+              timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            })
+
+            // Refresh calendar events to show the new event
+            const today = new Date()
+            today.setHours(0, 0, 0, 0)
+            const weekLater = new Date(today)
+            weekLater.setDate(weekLater.getDate() + 7)
+            await fetchEvents(today, weekLater)
+
+            showToast('Event added to Google Calendar', 'success')
+          } catch (err) {
+            console.error('Failed to sync event to Google Calendar:', err)
+            showToast('Event created locally (Calendar sync failed)', 'error')
+          }
+        }
+
+        // Always create the task/event locally in Symphony
         const taskId = await addTask(
           data.title,
           data.contactId,
