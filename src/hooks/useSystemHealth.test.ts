@@ -5,11 +5,13 @@ import type { Task } from '@/types/task'
 
 // Helper to create mock tasks
 function createTask(overrides: Partial<Task> = {}): Task {
+  const now = new Date()
   return {
     id: Math.random().toString(36).substring(7),
     title: 'Test Task',
     completed: false,
-    createdAt: new Date(),
+    createdAt: now,
+    updatedAt: now,
     ...overrides,
   }
 }

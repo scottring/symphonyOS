@@ -17,11 +17,13 @@ function getMonday(date: Date = new Date()): Date {
 
 // Helper to create a task for a specific date
 function createTask(overrides: Partial<Task> = {}): Task {
+  const now = new Date()
   return {
     id: 'task-1',
     title: 'Test Task',
     completed: false,
-    createdAt: new Date(),
+    createdAt: now,
+    updatedAt: now,
     ...overrides,
   }
 }

@@ -20,6 +20,7 @@ const mockTasks: Task[] = [
     completed: false,
     projectId: 'project-1',
     createdAt: new Date(),
+    updatedAt: new Date(),
   },
   {
     id: 'task-2',
@@ -27,6 +28,7 @@ const mockTasks: Task[] = [
     completed: true,
     projectId: 'project-1',
     createdAt: new Date(),
+    updatedAt: new Date(),
   },
 ]
 

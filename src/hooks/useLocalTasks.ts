@@ -5,11 +5,13 @@ export function useLocalTasks() {
   const [tasks, setTasks] = useState<Task[]>([])
 
   const addTask = (title: string) => {
+    const now = new Date()
     const newTask: Task = {
       id: crypto.randomUUID(),
       title,
       completed: false,
-      createdAt: new Date(),
+      createdAt: now,
+      updatedAt: now,
     }
     setTasks((prev) => [newTask, ...prev])
   }

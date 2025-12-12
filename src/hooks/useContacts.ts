@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
-import type { Contact } from '@/types/contact'
+import type { Contact, ContactCategory } from '@/types/contact'
 
 interface DbContact {
   id: string
@@ -10,6 +10,10 @@ interface DbContact {
   phone: string | null
   email: string | null
   notes: string | null
+  category: ContactCategory | null
+  birthday: string | null
+  relationship: string | null
+  preferences: string | null
   created_at: string
   updated_at: string
 }
@@ -21,6 +25,10 @@ function dbContactToContact(dbContact: DbContact): Contact {
     phone: dbContact.phone ?? undefined,
     email: dbContact.email ?? undefined,
     notes: dbContact.notes ?? undefined,
+    category: dbContact.category ?? undefined,
+    birthday: dbContact.birthday ?? undefined,
+    relationship: dbContact.relationship ?? undefined,
+    preferences: dbContact.preferences ?? undefined,
     createdAt: new Date(dbContact.created_at),
     updatedAt: new Date(dbContact.updated_at),
   }
@@ -66,7 +74,16 @@ export function useContacts() {
     fetchContacts()
   }, [user])
 
-  const addContact = useCallback(async (contact: { name: string; phone?: string; email?: string; notes?: string }) => {
+  const addContact = useCallback(async (contact: {
+    name: string
+    phone?: string
+    email?: string
+    notes?: string
+    category?: ContactCategory
+    birthday?: string
+    relationship?: string
+    preferences?: string
+  }) => {
     if (!user) return null
 
     // Optimistic update
@@ -77,6 +94,10 @@ export function useContacts() {
       phone: contact.phone,
       email: contact.email,
       notes: contact.notes,
+      category: contact.category,
+      birthday: contact.birthday,
+      relationship: contact.relationship,
+      preferences: contact.preferences,
       createdAt: new Date(),
       updatedAt: new Date(),
     }
@@ -90,6 +111,10 @@ export function useContacts() {
         phone: contact.phone ?? null,
         email: contact.email ?? null,
         notes: contact.notes ?? null,
+        category: contact.category ?? null,
+        birthday: contact.birthday ?? null,
+        relationship: contact.relationship ?? null,
+        preferences: contact.preferences ?? null,
       })
       .select()
       .single()
@@ -125,6 +150,10 @@ export function useContacts() {
     if (updates.phone !== undefined) dbUpdates.phone = updates.phone ?? null
     if (updates.email !== undefined) dbUpdates.email = updates.email ?? null
     if (updates.notes !== undefined) dbUpdates.notes = updates.notes ?? null
+    if (updates.category !== undefined) dbUpdates.category = updates.category ?? null
+    if (updates.birthday !== undefined) dbUpdates.birthday = updates.birthday ?? null
+    if (updates.relationship !== undefined) dbUpdates.relationship = updates.relationship ?? null
+    if (updates.preferences !== undefined) dbUpdates.preferences = updates.preferences ?? null
 
     const { error: updateError } = await supabase
       .from('contacts')

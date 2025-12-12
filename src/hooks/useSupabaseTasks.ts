@@ -58,6 +58,7 @@ function dbTaskToTask(dbTask: DbTask): Task {
     title: dbTask.title,
     completed: dbTask.completed,
     createdAt: new Date(dbTask.created_at),
+    updatedAt: new Date(dbTask.updated_at),
     scheduledFor: dbTask.scheduled_for ? new Date(dbTask.scheduled_for) : undefined,
     deferredUntil: dbTask.deferred_until ? new Date(dbTask.deferred_until) : undefined,
     deferCount: dbTask.defer_count ?? undefined,
@@ -181,11 +182,13 @@ export function useSupabaseTasks() {
 
     // Optimistic update
     const tempId = crypto.randomUUID()
+    const now = new Date()
     const optimisticTask: Task = {
       id: tempId,
       title,
       completed: false,
-      createdAt: new Date(),
+      createdAt: now,
+      updatedAt: now,
       contactId,
       projectId,
       scheduledFor,
@@ -247,11 +250,13 @@ export function useSupabaseTasks() {
     const effectiveAssignedTo = parent.assignedTo ?? options?.defaultAssigneeId ?? null
 
     const tempId = crypto.randomUUID()
+    const now = new Date()
     const optimisticSubtask: Task = {
       id: tempId,
       title,
       completed: false,
-      createdAt: new Date(),
+      createdAt: now,
+      updatedAt: now,
       parentTaskId: parentId,
       projectId: parent.projectId,
       contactId: parent.contactId,
@@ -557,11 +562,13 @@ export function useSupabaseTasks() {
 
     // Optimistic update
     const tempId = crypto.randomUUID()
+    const now = new Date()
     const optimisticTask: Task = {
       id: tempId,
       title,
       completed: false,
-      createdAt: new Date(),
+      createdAt: now,
+      updatedAt: now,
       scheduledFor,
       linkedEventId,
     }

@@ -28,6 +28,7 @@ import { SearchModal } from '@/components/search/SearchModal'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 import { ListsList, ListView } from '@/components/list'
 import { NotesPage } from '@/components/notes'
+import { CompletedTasksView } from '@/components/history/CompletedTasksView'
 import { Toast } from '@/components/toast'
 import {
   ProjectsList,
@@ -1301,6 +1302,16 @@ function App() {
           canPin={pinnedItems.canPin()}
           onPin={() => pinnedItems.pin('list', selectedList.id)}
           onUnpin={() => pinnedItems.unpin('list', selectedList.id)}
+        />
+      )}
+
+      {activeView === 'history' && (
+        <CompletedTasksView
+          tasks={tasks}
+          contactsMap={contactsMap}
+          projectsMap={projectsMap}
+          onSelectTask={(taskId) => handleSelectItem(`task-${taskId}`)}
+          onBack={() => handleViewChange('home')}
         />
       )}
 

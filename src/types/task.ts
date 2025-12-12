@@ -24,6 +24,7 @@ export interface Task {
   title: string
   completed: boolean
   createdAt: Date
+  updatedAt: Date
   scheduledFor?: Date // When this task is scheduled to be done (commitment)
   deferredUntil?: Date // Show in inbox again on this date (punt)
   deferCount?: number // Times this task has been deferred

@@ -3,6 +3,7 @@ import type { Task, TaskLink } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
 import { PushDropdown } from '@/components/triage'
+import { CompletionNotesPrompt } from './CompletionNotesPrompt'
 
 interface TaskViewProps {
   task: Task
@@ -90,6 +91,10 @@ export function TaskView({
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('')
   const [isAddingSubtask, setIsAddingSubtask] = useState(false)
 
+  // Completion notes prompt state
+  const [showCompletionPrompt, setShowCompletionPrompt] = useState(false)
+  const prevCompletedRef = useRef(task.completed)
+
   // Sync state when task changes
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing state on task change is valid
@@ -99,6 +104,16 @@ export function TaskView({
     setShowDeleteConfirm(false)
     setShowTimePicker(false)
   }, [task.id, task.title, task.notes])
+
+  // Show completion notes prompt when task is just completed
+  useEffect(() => {
+    // Detect transition from incomplete to complete
+    if (!prevCompletedRef.current && task.completed && !task.notes) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setShowCompletionPrompt(true)
+    }
+    prevCompletedRef.current = task.completed
+  }, [task.completed, task.notes])
 
   // Focus title input when editing starts
   useEffect(() => {
@@ -386,6 +401,22 @@ export function TaskView({
                   Delete Task
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Completion notes prompt */}
+          {showCompletionPrompt && (
+            <div className="mt-4">
+              <CompletionNotesPrompt
+                taskId={task.id}
+                taskTitle={task.title}
+                onAddNote={(note) => {
+                  onUpdate(task.id, { notes: note })
+                  setLocalNotes(note)
+                  setShowCompletionPrompt(false)
+                }}
+                onDismiss={() => setShowCompletionPrompt(false)}
+              />
             </div>
           )}
         </div>
