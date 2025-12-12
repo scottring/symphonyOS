@@ -153,7 +153,6 @@ export function HomeView({
     return false
   }, [tasks, events, routines, eventNotesMap])
 
-
   // Week view state
   const [weekStart, setWeekStart] = useState(() => {
     const today = new Date()
