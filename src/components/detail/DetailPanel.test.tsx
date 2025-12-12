@@ -72,7 +72,7 @@ const mockProjects: Project[] = [
   {
     id: 'project-1',
     name: 'Existing Project',
-    status: 'active',
+    status: 'in_progress',
     createdAt: new Date(),
     updatedAt: new Date(),
   },

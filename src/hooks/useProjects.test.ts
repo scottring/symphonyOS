@@ -364,7 +364,7 @@ describe('useProjects', () => {
     })
 
     it('updates project status', async () => {
-      const dbProject = createMockDbProject({ id: 'proj-1', name: 'Test', status: 'active' })
+      const dbProject = createMockDbProject({ id: 'proj-1', name: 'Test', status: 'in_progress' })
       mockSupabaseData = [dbProject]
 
       const { result } = renderHook(() => useProjects())
@@ -667,7 +667,7 @@ describe('useProjects', () => {
 
     it('activeProjects filters out completed projects', async () => {
       mockSupabaseData = [
-        createMockDbProject({ id: 'proj-1', name: 'Active', status: 'active' }),
+        createMockDbProject({ id: 'proj-1', name: 'In Progress', status: 'in_progress' }),
         createMockDbProject({ id: 'proj-2', name: 'Completed', status: 'completed' }),
         createMockDbProject({ id: 'proj-3', name: 'Not Started', status: 'not_started' }),
       ]

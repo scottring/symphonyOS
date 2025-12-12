@@ -7,7 +7,7 @@ import type { Task } from '@/types/task'
 const mockProject: Project = {
   id: 'project-1',
   name: 'Test Project',
-  status: 'active',
+  status: 'in_progress',
   notes: 'Some project notes',
   createdAt: new Date(),
   updatedAt: new Date(),

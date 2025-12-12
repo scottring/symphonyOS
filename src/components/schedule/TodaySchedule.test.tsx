@@ -80,7 +80,7 @@ const mockContact: Contact = {
 const mockProject: Project = {
   id: 'project-1',
   name: 'Test Project',
-  status: 'active',
+  status: 'in_progress',
   createdAt: new Date(),
   updatedAt: new Date(),
 }

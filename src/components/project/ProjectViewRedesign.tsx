@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react'
 import type { Project, ProjectStatus } from '@/types/project'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
+import type { FamilyMember } from '@/types/family'
 import { formatTimeWithDate } from '@/lib/timeUtils'
+import { TaskQuickActions, type ScheduleContextItem } from '@/components/triage'
 
 interface ProjectViewProps {
   project: Project
@@ -15,6 +17,10 @@ interface ProjectViewProps {
   onSelectTask: (taskId: string) => void
   onToggleTask: (taskId: string) => void
   selectedTaskId?: string | null
+  // Task quick-action props
+  onUpdateTask?: (taskId: string, updates: Partial<Task>) => void
+  familyMembers?: FamilyMember[]
+  getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
   // Pin props (available but not used in redesign yet)
   isPinned?: boolean
   canPin?: boolean
@@ -33,6 +39,9 @@ export function ProjectViewRedesign({
   onSelectTask,
   onToggleTask,
   selectedTaskId,
+  onUpdateTask,
+  familyMembers = [],
+  getScheduleItemsForDate,
   isPinned: _isPinned,
   canPin: _canPin,
   onPin: _onPin,
@@ -66,7 +75,8 @@ export function ProjectViewRedesign({
 
   const statusConfig: Record<ProjectStatus, { label: string; color: string; bg: string }> = {
     not_started: { label: 'Not Started', color: 'text-neutral-600', bg: 'bg-neutral-100' },
-    active: { label: 'Active', color: 'text-blue-700', bg: 'bg-blue-100' },
+    in_progress: { label: 'In Progress', color: 'text-blue-700', bg: 'bg-blue-100' },
+    on_hold: { label: 'On Hold', color: 'text-amber-700', bg: 'bg-amber-100' },
     completed: { label: 'Completed', color: 'text-green-700', bg: 'bg-green-100' },
   }
 
@@ -242,7 +252,7 @@ export function ProjectViewRedesign({
                     <div>
                       <label className="block text-xs font-medium text-neutral-600 mb-1.5">Status</label>
                       <div className="flex rounded-xl border border-neutral-200 overflow-hidden">
-                        {(['not_started', 'active', 'completed'] as ProjectStatus[]).map((status) => (
+                        {(['not_started', 'in_progress', 'on_hold', 'completed'] as ProjectStatus[]).map((status) => (
                           <button
                             key={status}
                             type="button"
@@ -404,15 +414,6 @@ export function ProjectViewRedesign({
                           </span>
                         </button>
 
-                        {/* Date */}
-                        <div className="w-20 shrink-0">
-                          {task.scheduledFor ? (
-                            <span className="text-xs text-neutral-400 font-medium">{formatTaskDate(task.scheduledFor, task.isAllDay)}</span>
-                          ) : (
-                            <span className="text-xs text-neutral-300">—</span>
-                          )}
-                        </div>
-
                         {/* Title */}
                         <div className="flex-1 min-w-0 flex items-center gap-2">
                           <span className={`text-base truncate ${task.completed ? 'line-through text-neutral-400' : 'text-neutral-800'}`}>
@@ -428,8 +429,37 @@ export function ProjectViewRedesign({
                           )}
                         </div>
 
+                        {/* Date badge */}
+                        {task.scheduledFor && (
+                          <span className="text-xs text-neutral-400 font-medium shrink-0">
+                            {formatTaskDate(task.scheduledFor, task.isAllDay)}
+                          </span>
+                        )}
+
+                        {/* Quick Actions */}
+                        {onUpdateTask && (
+                          <TaskQuickActions
+                            task={task}
+                            onSchedule={(date, isAllDay) => {
+                              onUpdateTask(task.id, {
+                                scheduledFor: date,
+                                isAllDay,
+                              })
+                            }}
+                            getScheduleItemsForDate={getScheduleItemsForDate}
+                            onContextChange={(context) => {
+                              onUpdateTask(task.id, { context })
+                            }}
+                            familyMembers={familyMembers}
+                            onAssign={(memberId) => {
+                              onUpdateTask(task.id, { assignedTo: memberId ?? undefined })
+                            }}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          />
+                        )}
+
                         {/* Arrow */}
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-neutral-300" viewBox="0 0 20 20" fill="currentColor">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-neutral-300 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                           <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
                         </svg>
                       </div>
@@ -452,9 +482,13 @@ export function ProjectViewRedesign({
                       <svg xmlns="http://www.w3.org/2000/svg" className={`w-4.5 h-4.5 ${statusConfig[project.status].color}`} viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>
-                    ) : project.status === 'active' ? (
+                    ) : project.status === 'in_progress' ? (
                       <svg xmlns="http://www.w3.org/2000/svg" className={`w-4.5 h-4.5 ${statusConfig[project.status].color}`} viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                      </svg>
+                    ) : project.status === 'on_hold' ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" className={`w-4.5 h-4.5 ${statusConfig[project.status].color}`} viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
                       </svg>
                     ) : (
                       <div className={`w-2.5 h-2.5 rounded-full ${statusConfig[project.status].color.replace('text-', 'bg-')}`} />

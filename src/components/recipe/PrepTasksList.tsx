@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { Task } from '@/types/task'
+import type { FamilyMember } from '@/types/family'
 import { formatTime } from '@/lib/timeUtils'
+import { TaskQuickActions, type ScheduleContextItem } from '@/components/triage'
 
 interface PrepTasksListProps {
   prepTasks: Task[]
@@ -8,6 +10,10 @@ interface PrepTasksListProps {
   onAddPrepTask: (title: string, scheduledFor: Date) => Promise<string | undefined>
   onTogglePrepTask: (taskId: string) => void
   onOpenTask?: (taskId: string) => void
+  // Quick action props
+  onUpdateTask?: (taskId: string, updates: Partial<Task>) => void
+  getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
+  familyMembers?: FamilyMember[]
 }
 
 /**
@@ -20,6 +26,9 @@ export function PrepTasksList({
   onAddPrepTask,
   onTogglePrepTask,
   onOpenTask,
+  onUpdateTask,
+  getScheduleItemsForDate,
+  familyMembers = [],
 }: PrepTasksListProps) {
   const [isAdding, setIsAdding] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
@@ -90,6 +99,26 @@ export function PrepTasksList({
                   {task.title}
                 </p>
               </div>
+
+              {/* Quick Actions */}
+              {onUpdateTask && (
+                <TaskQuickActions
+                  task={task}
+                  onSchedule={(date, isAllDay) => {
+                    onUpdateTask(task.id, { scheduledFor: date, isAllDay })
+                  }}
+                  getScheduleItemsForDate={getScheduleItemsForDate}
+                  onContextChange={(context) => {
+                    onUpdateTask(task.id, { context })
+                  }}
+                  familyMembers={familyMembers}
+                  onAssign={(memberId) => {
+                    onUpdateTask(task.id, { assignedTo: memberId ?? undefined })
+                  }}
+                  size="sm"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                />
+              )}
 
               {/* Scheduled time */}
               {task.scheduledFor && (

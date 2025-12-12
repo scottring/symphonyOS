@@ -63,7 +63,7 @@ function App() {
   const [onboardingLoading, setOnboardingLoading] = useState(true)
   const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, updateEventAssignmentAll, updateRecipeUrl, getNote, notes: eventNotesMap } = useEventNotes()
   const { contacts, contactsMap, addContact, updateContact, deleteContact, searchContacts } = useContacts()
-  const { projects, projectsMap, addProject, updateProject, deleteProject, searchProjects } = useProjects()
+  const { projects, projectsMap, addProject, updateProject, deleteProject, searchProjects, recalculateProjectStatus } = useProjects()
   const {
     routines: allRoutines,
     activeRoutines,
@@ -638,11 +638,12 @@ function App() {
     clearSearch()
   }, [clearSearch])
 
-  // Wrapper for toggleTask that auto-unpins completed tasks
+  // Wrapper for toggleTask that auto-unpins completed tasks and recalculates project status
   const handleToggleTask = useCallback(async (taskId: string) => {
     const task = tasks.find(t => t.id === taskId)
     const wasCompleted = task?.completed ?? false
     const taskTitle = task?.title || 'Task'
+    const projectId = task?.projectId
 
     await toggleTask(taskId)
 
@@ -650,13 +651,22 @@ function App() {
     if (!wasCompleted) {
       // Silent unpin - won't error if not pinned
       await pinnedItems.unpin('task', taskId)
-      
+
       // Add undo action
       undo.pushAction(`Completed "${taskTitle}"`, async () => {
         await toggleTask(taskId)
       })
     }
-  }, [tasks, toggleTask, pinnedItems, undo])
+
+    // Recalculate project status if task belongs to a project
+    if (projectId) {
+      // Get updated tasks for this project (with the toggle applied)
+      const projectTasks = tasks
+        .filter(t => t.projectId === projectId)
+        .map(t => t.id === taskId ? { ...t, completed: !wasCompleted } : t)
+      await recalculateProjectStatus(projectId, projectTasks)
+    }
+  }, [tasks, toggleTask, pinnedItems, undo, recalculateProjectStatus])
 
   // Handler for adding linked prep/followup tasks from DetailPanel
   const handleAddLinkedTask = useCallback(async (
@@ -1186,6 +1196,8 @@ function App() {
             onAddTask={(title, projectId) => addTask(title, undefined, projectId, undefined, { assignedTo: getCurrentUserMember()?.id })}
             onSelectTask={handleSelectItem}
             onToggleTask={handleToggleTask}
+            onUpdateTask={handleUpdateTaskWithToast}
+            familyMembers={familyMembers}
             selectedTaskId={selectedItemId}
             isPinned={pinnedItems.isPinned('project', selectedProject.id)}
             canPin={pinnedItems.canPin()}

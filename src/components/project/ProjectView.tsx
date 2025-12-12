@@ -73,8 +73,10 @@ export function ProjectView({
     switch (status) {
       case 'not_started':
         return 'Not Started'
-      case 'active':
-        return 'Active'
+      case 'in_progress':
+        return 'In Progress'
+      case 'on_hold':
+        return 'On Hold'
       case 'completed':
         return 'Completed'
     }
@@ -84,8 +86,10 @@ export function ProjectView({
     switch (status) {
       case 'not_started':
         return 'bg-neutral-100 text-neutral-600'
-      case 'active':
+      case 'in_progress':
         return 'bg-blue-100 text-blue-700'
+      case 'on_hold':
+        return 'bg-amber-100 text-amber-700'
       case 'completed':
         return 'bg-green-100 text-green-700'
     }
@@ -194,14 +198,25 @@ export function ProjectView({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setEditStatus('active')}
+                      onClick={() => setEditStatus('in_progress')}
                       className={`flex-1 py-2 px-3 text-sm font-medium border-l border-neutral-200 transition-colors
-                        ${editStatus === 'active'
+                        ${editStatus === 'in_progress'
                           ? 'bg-blue-100 text-blue-700'
                           : 'bg-white text-neutral-500 hover:bg-neutral-50'
                         }`}
                     >
-                      Active
+                      In Progress
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditStatus('on_hold')}
+                      className={`flex-1 py-2 px-3 text-sm font-medium border-l border-neutral-200 transition-colors
+                        ${editStatus === 'on_hold'
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-white text-neutral-500 hover:bg-neutral-50'
+                        }`}
+                    >
+                      On Hold
                     </button>
                     <button
                       type="button"

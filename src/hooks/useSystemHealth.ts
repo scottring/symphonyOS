@@ -87,8 +87,9 @@ export function useSystemHealth(tasksOrInput: Task[] | SystemHealthInput): Syste
     const unassignedRoutines = activeRoutines.filter(r => !r.assigned_to && !r.assigned_to_all?.length)
     const unassignedItems = unassignedTasks.length + unassignedRoutines.length
 
-    // Count empty projects (active/not_started with zero associated incomplete tasks)
-    const activeProjects = projects.filter(p => p.status !== 'completed')
+    // Count empty projects (not_started or in_progress with zero associated incomplete tasks)
+    // Projects that are on_hold or completed don't count as "empty" - they're intentionally paused or done
+    const activeProjects = projects.filter(p => p.status !== 'completed' && p.status !== 'on_hold')
     const projectTaskCounts = new Map<string, number>()
     for (const task of incompleteTasks) {
       if (task.projectId) {

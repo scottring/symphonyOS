@@ -16,7 +16,7 @@ const mockProjects: Project[] = [
   {
     id: 'project-1',
     name: 'Test Project',
-    status: 'active',
+    status: 'in_progress',
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
   },

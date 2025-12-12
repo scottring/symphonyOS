@@ -18,6 +18,7 @@ import { PinButton } from '@/components/pins'
 import { MultiAssigneeDropdown } from '@/components/family'
 import type { PinnableEntityType } from '@/types/pin'
 import type { FamilyMember } from '@/types/family'
+import { TaskQuickActions, type ScheduleContextItem } from '@/components/triage'
 
 // Component to render text with clickable links (handles HTML links and plain URLs)
 function RichText({ text }: { text: string }) {
@@ -134,6 +135,8 @@ interface DetailPanelRedesignProps {
   familyMembers?: FamilyMember[]
   eventAssignedToAll?: string[]
   onUpdateEventAssignment?: (googleEventId: string, memberIds: string[]) => void
+  // Quick action support for linked tasks
+  getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
 }
 
 function ActionIcon({ type }: { type: DetectedAction['icon'] }) {
@@ -347,9 +350,13 @@ interface LinkedTaskRowProps {
   task: Task
   onToggle?: (taskId: string) => void
   onDelete?: (taskId: string) => void
+  // Quick action props
+  onUpdate?: (taskId: string, updates: Partial<Task>) => void
+  getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
+  familyMembers?: FamilyMember[]
 }
 
-function LinkedTaskRow({ task, onToggle, onDelete }: LinkedTaskRowProps) {
+function LinkedTaskRow({ task, onToggle, onDelete, onUpdate, getScheduleItemsForDate, familyMembers = [] }: LinkedTaskRowProps) {
   return (
     <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-neutral-50 group transition-colors">
       <button
@@ -370,6 +377,26 @@ function LinkedTaskRow({ task, onToggle, onDelete }: LinkedTaskRowProps) {
       <span className={`flex-1 text-sm ${task.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>
         {task.title}
       </span>
+
+      {/* Quick Actions */}
+      {onUpdate && (
+        <TaskQuickActions
+          task={task}
+          onSchedule={(date, isAllDay) => {
+            onUpdate(task.id, { scheduledFor: date, isAllDay })
+          }}
+          getScheduleItemsForDate={getScheduleItemsForDate}
+          onContextChange={(context) => {
+            onUpdate(task.id, { context })
+          }}
+          familyMembers={familyMembers}
+          onAssign={(memberId) => {
+            onUpdate(task.id, { assignedTo: memberId ?? undefined })
+          }}
+          size="sm"
+          className="opacity-0 group-hover:opacity-100 transition-opacity"
+        />
+      )}
 
       {task.scheduledFor ? (
         <span className="text-xs text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full">
@@ -476,6 +503,7 @@ export function DetailPanelRedesign({
   familyMembers = [],
   eventAssignedToAll = [],
   onUpdateEventAssignment,
+  getScheduleItemsForDate,
 }: DetailPanelRedesignProps) {
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -1178,6 +1206,25 @@ export function DetailPanelRedesign({
                       <span className={`flex-1 text-sm ${subtask.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>
                         {subtask.title}
                       </span>
+                      {/* Quick Actions */}
+                      {onUpdate && (
+                        <TaskQuickActions
+                          task={subtask}
+                          onSchedule={(date, isAllDay) => {
+                            onUpdate(subtask.id, { scheduledFor: date, isAllDay })
+                          }}
+                          getScheduleItemsForDate={getScheduleItemsForDate}
+                          onContextChange={(context) => {
+                            onUpdate(subtask.id, { context })
+                          }}
+                          familyMembers={familyMembers}
+                          onAssign={(memberId) => {
+                            onUpdate(subtask.id, { assignedTo: memberId ?? undefined })
+                          }}
+                          size="sm"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        />
+                      )}
                       <button className="opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-red-500 transition-all p-1">
                         <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
                           <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -1634,6 +1681,9 @@ export function DetailPanelRedesign({
                       task={task}
                       onToggle={onToggleLinkedTask}
                       onDelete={onDeleteLinkedTask}
+                      onUpdate={onUpdate}
+                      getScheduleItemsForDate={getScheduleItemsForDate}
+                      familyMembers={familyMembers}
                     />
                   ))}
                 </div>
@@ -1667,6 +1717,9 @@ export function DetailPanelRedesign({
                       task={task}
                       onToggle={onToggleLinkedTask}
                       onDelete={onDeleteLinkedTask}
+                      onUpdate={onUpdate}
+                      getScheduleItemsForDate={getScheduleItemsForDate}
+                      familyMembers={familyMembers}
                     />
                   ))}
                 </div>
