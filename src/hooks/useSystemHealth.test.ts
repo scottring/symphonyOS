@@ -149,15 +149,27 @@ describe('useSystemHealth', () => {
   })
 
   describe('score calculation', () => {
-    it('gives 100 score when all tasks have homes', () => {
+    it('gives 100 score when all tasks have homes and assignments', () => {
       const tasks = [
-        createTask({ scheduledFor: new Date('2024-06-20') }),
-        createTask({ deferredUntil: new Date('2024-06-21') }),
+        createTask({ scheduledFor: new Date('2024-06-20'), assignedTo: 'member-1' }),
+        createTask({ deferredUntil: new Date('2024-06-21'), assignedTo: 'member-1' }),
       ]
 
       const { result } = renderHook(() => useSystemHealth(tasks))
 
       expect(result.current.score).toBe(100)
+    })
+
+    it('gives 50% credit for tasks with homes but no assignment', () => {
+      const tasks = [
+        createTask({ scheduledFor: new Date('2024-06-20') }), // No assignedTo
+      ]
+
+      const { result } = renderHook(() => useSystemHealth(tasks))
+
+      // Task has temporal home but no assignment = 50% credit
+      expect(result.current.score).toBe(50)
+      expect(result.current.unassignedItems).toBe(1)
     })
 
     it('reduces score based on inbox items without homes', () => {
@@ -239,8 +251,9 @@ describe('useSystemHealth', () => {
 
   describe('health color', () => {
     it('returns excellent for score >= 90', () => {
+      // Task with both scheduledFor AND assignedTo gets full credit
       const tasks = [
-        createTask({ scheduledFor: new Date('2024-06-20') }),
+        createTask({ scheduledFor: new Date('2024-06-20'), assignedTo: 'member-1' }),
       ]
 
       const { result } = renderHook(() => useSystemHealth(tasks))

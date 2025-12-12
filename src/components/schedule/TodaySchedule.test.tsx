@@ -486,7 +486,9 @@ describe('TodaySchedule', () => {
 
       render(<TodaySchedule {...defaultProps} tasks={tasks} projectsMap={projectsMap} />)
 
-      expect(screen.getByText('Test Project')).toBeInTheDocument()
+      // Project name now appears in both tooltip and context label
+      const projectNameElements = screen.getAllByText('Test Project')
+      expect(projectNameElements.length).toBeGreaterThan(0)
     })
   })
 
