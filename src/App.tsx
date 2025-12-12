@@ -61,7 +61,7 @@ function App() {
   // Onboarding state
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null)
   const [onboardingLoading, setOnboardingLoading] = useState(true)
-  const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, updateEventAssignmentAll, updateRecipeUrl, getNote, notes: eventNotesMap } = useEventNotes()
+  const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, updateEventAssignmentAll, updateRecipeUrl, updateEventProject, getNote, notes: eventNotesMap } = useEventNotes()
   const { contacts, contactsMap, addContact, updateContact, deleteContact, searchContacts } = useContacts()
   const { projects, projectsMap, addProject, updateProject, deleteProject, searchProjects, recalculateProjectStatus } = useProjects()
   const {
@@ -478,6 +478,14 @@ function App() {
     const eventId = selectedItem.originalEvent.google_event_id || selectedItem.originalEvent.id
     const eventNote = eventNotesMap.get(eventId)
     return eventNote?.assignedToAll ?? []
+  }, [selectedItem, eventNotesMap])
+
+  // Get linked project for selected event
+  const selectedEventProjectId = useMemo(() => {
+    if (!selectedItem?.originalEvent) return null
+    const eventId = selectedItem.originalEvent.google_event_id || selectedItem.originalEvent.id
+    const eventNote = eventNotesMap.get(eventId)
+    return eventNote?.projectId ?? null
   }, [selectedItem, eventNotesMap])
 
   // Get attachments for selected item
@@ -938,6 +946,8 @@ function App() {
             familyMembers={familyMembers}
             eventAssignedToAll={selectedEventAssignedToAll}
             onUpdateEventAssignment={updateEventAssignmentAll}
+            eventProjectId={selectedEventProjectId}
+            onUpdateEventProject={updateEventProject}
           />
         )
       }

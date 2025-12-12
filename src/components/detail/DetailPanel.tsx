@@ -4,7 +4,7 @@ import type { Task, TaskLink } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
 import type { ActionableInstance } from '@/types/actionable'
-import { formatTime, formatTimeRange } from '@/lib/timeUtils'
+import { formatTimeRangeWithDate, formatTimeWithDate } from '@/lib/timeUtils'
 import { detectActions, type DetectedAction } from '@/lib/actionDetection'
 import { ContactCard } from './ContactCard'
 import { ProjectCard } from './ProjectCard'
@@ -628,10 +628,13 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
     onUpdate(item.originalTask.id, { links: newLinks.length > 0 ? newLinks : undefined })
   }
 
+  // Show date context for both tasks and events (e.g., "Today 3pm", "Tomorrow 1p|3p")
   const timeDisplay = item.startTime
     ? item.endTime
-      ? formatTimeRange(item.startTime, item.endTime, item.allDay)
-      : formatTime(item.startTime)
+      ? formatTimeRangeWithDate(item.startTime, item.endTime, item.allDay)
+      : !item.allDay
+        ? formatTimeWithDate(item.startTime)
+        : 'All day'
     : 'Unscheduled'
 
   // Get phone number from contact if available, otherwise from item

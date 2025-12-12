@@ -147,6 +147,55 @@ export function formatTimeRange(start: Date, end: Date, allDay?: boolean): strin
 }
 
 /**
+ * Format a time range with date context for display.
+ * Shows relative context like formatTimeWithDate but for ranges:
+ * - "Today 1p|3p"
+ * - "Tomorrow 9a|12p"
+ * - "Mon 2p|4p" (for this week)
+ * - "Dec 15 1p|3p" (for further out)
+ */
+export function formatTimeRangeWithDate(start: Date, end: Date, allDay?: boolean): string {
+  if (allDay) return 'All day'
+  if (!isValidDate(start) || !isValidDate(end)) return ''
+
+  const now = getCurrentTime()
+  const today = new Date(now)
+  today.setHours(0, 0, 0, 0)
+
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+
+  const dateStart = new Date(start)
+  dateStart.setHours(0, 0, 0, 0)
+
+  const timeRange = `${formatTime(start)}|${formatTime(end)}`
+
+  // Today
+  if (dateStart.getTime() === today.getTime()) {
+    return `Today ${timeRange}`
+  }
+
+  // Tomorrow
+  if (dateStart.getTime() === tomorrow.getTime()) {
+    return `Tomorrow ${timeRange}`
+  }
+
+  // Calculate days difference
+  const diffMs = dateStart.getTime() - today.getTime()
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+  // Within this week (next 6 days) - show day name
+  if (diffDays > 0 && diffDays <= 6) {
+    const dayName = start.toLocaleDateString('en-US', { weekday: 'short' })
+    return `${dayName} ${timeRange}`
+  }
+
+  // Past or further out - show short date
+  const shortDate = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return `${shortDate} ${timeRange}`
+}
+
+/**
  * Get the time of day for a given date.
  * Morning: before 12pm
  * Afternoon: 12pm - 5pm
