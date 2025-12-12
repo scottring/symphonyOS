@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import type { Project, ProjectStatus } from '@/types/project'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
@@ -84,41 +84,8 @@ export function ProjectViewRedesign({
     return calculateProjectStatus(projectTasks)
   }, [projectTasks])
 
-  // Track previous calculated status to only auto-update when task completion changes
-  // (not when user manually changes status)
-  const prevCalculatedStatusRef = useRef<ProjectStatus | null>(null)
-
-  // Auto-update project status when TASK COMPLETION changes (not manual status changes)
-  // Only auto-update from not_started or in_progress (respect manual on_hold)
-  useEffect(() => {
-    // Don't auto-update manually set on_hold status
-    if (project.status === 'on_hold') {
-      prevCalculatedStatusRef.current = calculatedStatus
-      return
-    }
-
-    // Only auto-update when the calculated status CHANGES due to task completion
-    // Skip on first render (prevCalculatedStatusRef is null)
-    const prevCalculated = prevCalculatedStatusRef.current
-    prevCalculatedStatusRef.current = calculatedStatus
-
-    if (prevCalculated === null) {
-      // First render - don't auto-update, just record current calculated status
-      return
-    }
-
-    if (prevCalculated === calculatedStatus) {
-      // Calculated status hasn't changed - this was likely a manual status change
-      // Respect the user's choice
-      return
-    }
-
-    // Calculated status changed (tasks were completed/uncompleted)
-    // Auto-update to match the new calculated status
-    if (calculatedStatus !== project.status) {
-      onUpdateProject(project.id, { status: calculatedStatus })
-    }
-  }, [calculatedStatus, project.status, project.id, onUpdateProject])
+  // Auto-update disabled - user has full manual control over project status
+  // The calculatedStatus is still available for display purposes if needed
 
   const statusConfig: Record<ProjectStatus, { label: string; color: string; bg: string }> = {
     not_started: { label: 'Not Started', color: 'text-neutral-600', bg: 'bg-neutral-100' },
