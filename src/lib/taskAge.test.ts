@@ -9,7 +9,6 @@ import {
   isTaskAging,
   isTaskStale,
   getAgeIndicatorClasses,
-  type TaskAgeCategory,
 } from './taskAge'
 
 describe('taskAge', () => {
