@@ -320,31 +320,48 @@ interface DetailRowProps {
   icon: React.ReactNode
   label: string
   value: string | null | undefined
-  onClick: () => void
+  onClick?: () => void
   actions?: React.ReactNode
+  valueClassName?: string
 }
 
-function DetailRow({ icon, label, value, onClick, actions }: DetailRowProps) {
-  return (
-    <button
-      onClick={onClick}
-      className="w-full flex items-center gap-3 p-3 -mx-3 rounded-lg
-                 hover:bg-neutral-50 text-left group transition-colors"
-    >
+function DetailRow({ icon, label, value, onClick, actions, valueClassName }: DetailRowProps) {
+  const content = (
+    <>
       <span className="text-neutral-400">{icon}</span>
       <span className="text-sm text-neutral-500 w-20">{label}</span>
-      <span className={`flex-1 text-sm ${value ? 'text-neutral-900' : 'text-neutral-400'}`}>
+      <span className={`flex-1 text-sm ${valueClassName || (value ? 'text-neutral-900' : 'text-neutral-400')}`}>
         {value || 'None'}
       </span>
       {actions}
-      <svg
-        className="w-4 h-4 text-neutral-300 opacity-0 group-hover:opacity-100 transition-opacity"
-        viewBox="0 0 20 20"
-        fill="currentColor"
+      {onClick && (
+        <svg
+          className="w-4 h-4 text-neutral-300 opacity-0 group-hover:opacity-100 transition-opacity"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+        </svg>
+      )}
+    </>
+  )
+
+  if (onClick) {
+    return (
+      <button
+        onClick={onClick}
+        className="w-full flex items-center gap-3 p-3 -mx-3 rounded-lg
+                   hover:bg-neutral-50 text-left group transition-colors"
       >
-        <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-      </svg>
-    </button>
+        {content}
+      </button>
+    )
+  }
+
+  return (
+    <div className="w-full flex items-center gap-3 p-3 -mx-3 rounded-lg">
+      {content}
+    </div>
   )
 }
 
@@ -1540,6 +1557,34 @@ export function DetailPanelRedesign({
                   }
                   onClick={() => setShowTimePicker(true)}
                 />
+
+                {/* Deferred Row - only show if task is deferred */}
+                {item.originalTask?.deferredUntil && (
+                  <DetailRow
+                    icon={
+                      <svg className="w-4 h-4 text-amber-500" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                      </svg>
+                    }
+                    label="Deferred until"
+                    value={item.originalTask.deferredUntil.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    valueClassName="text-amber-600"
+                  />
+                )}
+
+                {/* Someday Row - only show if task is someday */}
+                {item.originalTask?.isSomeday && !item.originalTask?.scheduledFor && !item.originalTask?.deferredUntil && (
+                  <DetailRow
+                    icon={
+                      <svg className="w-4 h-4 text-purple-500" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
+                      </svg>
+                    }
+                    label="Status"
+                    value="Someday/Maybe"
+                    valueClassName="text-purple-600"
+                  />
+                )}
 
                 {/* Project Row */}
                 <DetailRow
