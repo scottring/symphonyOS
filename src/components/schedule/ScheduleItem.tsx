@@ -306,6 +306,16 @@ export function ScheduleItem({
           </button>
         )}
 
+        {/* Push button - desktop only, on hover, shows before assignee badges */}
+        {isTask && onPush && (
+          <div
+            className="hidden md:block shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <PushDropdown onPush={onPush} size="sm" showTodayOption={isOverdue} />
+          </div>
+        )}
+
         {/* Assignee avatar - use multi-select when onAssignAll is provided */}
         {familyMembers.length > 0 && onAssignAll ? (
           <div
@@ -331,16 +341,6 @@ export function ScheduleItem({
               onSelect={onAssign}
               size="sm"
             />
-          </div>
-        )}
-
-        {/* Push button - desktop only, on hover, absolutely positioned to not affect layout */}
-        {isTask && onPush && (
-          <div
-            className="hidden md:block absolute right-8 opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <PushDropdown onPush={onPush} size="sm" showTodayOption={isOverdue} />
           </div>
         )}
       </div>
