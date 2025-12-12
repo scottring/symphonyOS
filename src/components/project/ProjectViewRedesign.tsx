@@ -1,9 +1,9 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import type { Project, ProjectStatus } from '@/types/project'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
-import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
+import type { EventNote } from '@/hooks/useEventNotes'
 import { formatTimeWithDate } from '@/lib/timeUtils'
 import { TaskQuickActions, type ScheduleContextItem } from '@/components/triage'
 import { calculateProjectStatus } from '@/hooks/useProjects'
@@ -23,8 +23,8 @@ interface ProjectViewProps {
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void
   familyMembers?: FamilyMember[]
   getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
-  // Linked calendar events
-  linkedEvents?: CalendarEvent[]
+  // Linked calendar events (stored as event notes with event metadata)
+  linkedEvents?: EventNote[]
   // Pin props (available but not used in redesign yet)
   isPinned?: boolean
   canPin?: boolean
@@ -598,14 +598,14 @@ export function ProjectViewRedesign({
                 <div className="pb-6 border-b border-neutral-200/60">
                   <h3 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3">Linked Events</h3>
                   <div className="space-y-2">
-                    {linkedEvents.map((event) => {
-                      const startTime = event.start_time || event.startTime
-                      const isAllDay = event.all_day || event.allDay
-                      const eventDate = startTime ? new Date(startTime) : null
+                    {linkedEvents
+                      .filter(note => note.eventTitle) // Only show events that have title stored
+                      .map((note) => {
+                      const eventDate = note.eventStartTime
 
                       return (
                         <div
-                          key={event.id}
+                          key={note.id}
                           className="flex items-start gap-2 p-2 -mx-2 rounded-lg hover:bg-neutral-50 transition-colors"
                         >
                           <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0 mt-0.5">
@@ -614,13 +614,10 @@ export function ProjectViewRedesign({
                             </svg>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-neutral-800 truncate">{event.title}</p>
+                            <p className="text-sm font-medium text-neutral-800 truncate">{note.eventTitle}</p>
                             {eventDate && (
                               <p className="text-xs text-neutral-500">
-                                {isAllDay
-                                  ? eventDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-                                  : eventDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-                                }
+                                {eventDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                               </p>
                             )}
                           </div>

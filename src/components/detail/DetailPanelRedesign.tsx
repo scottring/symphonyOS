@@ -137,7 +137,7 @@ interface DetailPanelRedesignProps {
   onUpdateEventAssignment?: (googleEventId: string, memberIds: string[]) => void
   // Event project linking
   eventProjectId?: string | null
-  onUpdateEventProject?: (googleEventId: string, projectId: string | null) => void
+  onUpdateEventProject?: (googleEventId: string, projectId: string | null, eventTitle?: string | null, eventStartTime?: Date | null) => void
   // Quick action support for linked tasks
   getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
 }
@@ -928,7 +928,10 @@ export function DetailPanelRedesign({
   const handleLinkEventProject = (selectedProject: Project) => {
     if (isEvent && item.originalEvent && onUpdateEventProject) {
       const eventId = item.originalEvent.google_event_id || item.originalEvent.id
-      onUpdateEventProject(eventId, selectedProject.id)
+      const eventTitle = item.originalEvent.title || item.title
+      const startTimeStr = item.originalEvent.start_time || item.originalEvent.startTime
+      const eventStartTime = startTimeStr ? new Date(startTimeStr) : null
+      onUpdateEventProject(eventId, selectedProject.id, eventTitle, eventStartTime)
     }
     setShowEventProjectPicker(false)
     setProjectSearchQuery('')
@@ -941,7 +944,10 @@ export function DetailPanelRedesign({
     setIsCreatingProjectLoading(false)
     if (createdProject) {
       const eventId = item.originalEvent.google_event_id || item.originalEvent.id
-      onUpdateEventProject(eventId, createdProject.id)
+      const eventTitle = item.originalEvent.title || item.title
+      const startTimeStr = item.originalEvent.start_time || item.originalEvent.startTime
+      const eventStartTime = startTimeStr ? new Date(startTimeStr) : null
+      onUpdateEventProject(eventId, createdProject.id, eventTitle, eventStartTime)
       setIsCreatingProject(false)
       setNewProjectName('')
       setShowEventProjectPicker(false)
