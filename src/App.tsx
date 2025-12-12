@@ -971,10 +971,31 @@ function App() {
             onOpenProject={handleOpenProject}
             familyMembers={familyMembers}
             onAssignTask={(taskId, memberId) => {
+              const task = tasks.find(t => t.id === taskId)
+              const prevAssignedTo = task?.assignedTo
+              const taskTitle = task?.title || 'Task'
               updateTask(taskId, { assignedTo: memberId ?? undefined })
+
+              const memberName = memberId ? familyMembers.find(m => m.id === memberId)?.name : null
+              const message = memberName ? `Assigned "${taskTitle}" to ${memberName}` : `Unassigned "${taskTitle}"`
+              undo.pushAction(message, () => {
+                updateTask(taskId, { assignedTo: prevAssignedTo ?? undefined })
+              })
             }}
             onAssignTaskAll={(taskId, memberIds) => {
+              const task = tasks.find(t => t.id === taskId)
+              const prevAssignedToAll = task?.assignedToAll || []
+              const prevAssignedTo = task?.assignedTo
+              const taskTitle = task?.title || 'Task'
               updateTask(taskId, { assignedToAll: memberIds, assignedTo: memberIds[0] ?? undefined })
+
+              const memberNames = memberIds.map(id => familyMembers.find(m => m.id === id)?.name).filter(Boolean)
+              const message = memberIds.length > 0
+                ? `Assigned "${taskTitle}" to ${memberNames.join(', ')}`
+                : `Unassigned "${taskTitle}"`
+              undo.pushAction(message, () => {
+                updateTask(taskId, { assignedToAll: prevAssignedToAll, assignedTo: prevAssignedTo ?? undefined })
+              })
             }}
             onAssignEvent={(eventId, memberId) => {
               updateEventAssignment(eventId, memberId)
