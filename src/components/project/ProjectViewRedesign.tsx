@@ -1,8 +1,9 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import type { Project, ProjectStatus } from '@/types/project'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
+import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { formatTimeWithDate } from '@/lib/timeUtils'
 import { TaskQuickActions, type ScheduleContextItem } from '@/components/triage'
 import { calculateProjectStatus } from '@/hooks/useProjects'
@@ -22,6 +23,8 @@ interface ProjectViewProps {
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void
   familyMembers?: FamilyMember[]
   getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
+  // Linked calendar events
+  linkedEvents?: CalendarEvent[]
   // Pin props (available but not used in redesign yet)
   isPinned?: boolean
   canPin?: boolean
@@ -43,6 +46,7 @@ export function ProjectViewRedesign({
   onUpdateTask,
   familyMembers = [],
   getScheduleItemsForDate,
+  linkedEvents = [],
   isPinned: _isPinned,
   canPin: _canPin,
   onPin: _onPin,
@@ -80,24 +84,38 @@ export function ProjectViewRedesign({
     return calculateProjectStatus(projectTasks)
   }, [projectTasks])
 
-  // Auto-update project status when it should change
+  // Track previous calculated status to only auto-update when task completion changes
+  // (not when user manually changes status)
+  const prevCalculatedStatusRef = useRef<ProjectStatus | null>(null)
+
+  // Auto-update project status when TASK COMPLETION changes (not manual status changes)
   // Only auto-update from not_started or in_progress (respect manual on_hold)
-  // Exception: if project is 'completed' but tasks are incomplete, downgrade it
   useEffect(() => {
     // Don't auto-update manually set on_hold status
     if (project.status === 'on_hold') {
+      prevCalculatedStatusRef.current = calculatedStatus
       return
     }
 
-    // If project is 'completed' but calculated says otherwise, downgrade it
-    // (This handles the case where a user adds/uncompletes tasks on a completed project)
-    if (project.status === 'completed' && calculatedStatus !== 'completed') {
-      onUpdateProject(project.id, { status: calculatedStatus })
+    // Only auto-update when the calculated status CHANGES due to task completion
+    // Skip on first render (prevCalculatedStatusRef is null)
+    const prevCalculated = prevCalculatedStatusRef.current
+    prevCalculatedStatusRef.current = calculatedStatus
+
+    if (prevCalculated === null) {
+      // First render - don't auto-update, just record current calculated status
       return
     }
 
-    // For not_started and in_progress, always auto-update to calculated status
-    if (project.status !== 'completed' && calculatedStatus !== project.status) {
+    if (prevCalculated === calculatedStatus) {
+      // Calculated status hasn't changed - this was likely a manual status change
+      // Respect the user's choice
+      return
+    }
+
+    // Calculated status changed (tasks were completed/uncompleted)
+    // Auto-update to match the new calculated status
+    if (calculatedStatus !== project.status) {
       onUpdateProject(project.id, { status: calculatedStatus })
     }
   }, [calculatedStatus, project.status, project.id, onUpdateProject])
@@ -604,6 +622,44 @@ export function ProjectViewRedesign({
                   </div>
                   <div className="text-sm text-neutral-500">
                     {completedCount} of {totalCount} tasks complete
+                  </div>
+                </div>
+              )}
+
+              {/* Linked Events */}
+              {linkedEvents.length > 0 && (
+                <div className="pb-6 border-b border-neutral-200/60">
+                  <h3 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3">Linked Events</h3>
+                  <div className="space-y-2">
+                    {linkedEvents.map((event) => {
+                      const startTime = event.start_time || event.startTime
+                      const isAllDay = event.all_day || event.allDay
+                      const eventDate = startTime ? new Date(startTime) : null
+
+                      return (
+                        <div
+                          key={event.id}
+                          className="flex items-start gap-2 p-2 -mx-2 rounded-lg hover:bg-neutral-50 transition-colors"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0 mt-0.5">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-neutral-800 truncate">{event.title}</p>
+                            {eventDate && (
+                              <p className="text-xs text-neutral-500">
+                                {isAllDay
+                                  ? eventDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                                  : eventDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+                                }
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )}
