@@ -3,6 +3,7 @@ import type { Project, ProjectStatus } from '@/types/project'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import { PinButton } from '@/components/pins'
+import { formatTimeWithDate } from '@/lib/timeUtils'
 
 interface ProjectViewProps {
   project: Project
@@ -132,12 +133,15 @@ export function ProjectView({
     }
   }
 
-  const formatDate = (date: Date | undefined) => {
+  const formatTaskDate = (date: Date | undefined, isAllDay?: boolean) => {
     if (!date) return null
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    })
+    if (isAllDay) {
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      })
+    }
+    return formatTimeWithDate(date)
   }
 
   return (
@@ -435,10 +439,10 @@ export function ProjectView({
                     </button>
 
                     {/* Date */}
-                    <div className="w-12 shrink-0">
+                    <div className="w-20 shrink-0">
                       {task.scheduledFor ? (
                         <span className="text-xs text-neutral-400 font-medium">
-                          {formatDate(task.scheduledFor)}
+                          {formatTaskDate(task.scheduledFor, task.isAllDay)}
                         </span>
                       ) : (
                         <span className="text-xs text-neutral-300">—</span>
