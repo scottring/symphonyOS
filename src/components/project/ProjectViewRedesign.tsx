@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { Project, ProjectStatus } from '@/types/project'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
+import { formatTimeWithDate } from '@/lib/timeUtils'
 
 interface ProjectViewProps {
   project: Project
@@ -111,9 +112,12 @@ export function ProjectViewRedesign({
     }
   }
 
-  const formatDate = (date: Date | undefined) => {
+  const formatTaskDate = (date: Date | undefined, isAllDay?: boolean) => {
     if (!date) return null
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    if (isAllDay) {
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    }
+    return formatTimeWithDate(date)
   }
 
   return (
@@ -401,9 +405,9 @@ export function ProjectViewRedesign({
                         </button>
 
                         {/* Date */}
-                        <div className="w-14 shrink-0">
+                        <div className="w-20 shrink-0">
                           {task.scheduledFor ? (
-                            <span className="text-xs text-neutral-400 font-medium">{formatDate(task.scheduledFor)}</span>
+                            <span className="text-xs text-neutral-400 font-medium">{formatTaskDate(task.scheduledFor, task.isAllDay)}</span>
                           ) : (
                             <span className="text-xs text-neutral-300">—</span>
                           )}
