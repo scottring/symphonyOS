@@ -315,6 +315,8 @@ interface TodayScheduleProps {
   onSelectAssignee?: (id: string | null) => void
   assigneesWithTasks?: FamilyMember[]
   hasUnassignedTasks?: boolean
+  // Parent task navigation (for subtasks shown on timeline)
+  onOpenTask?: (taskId: string) => void
 }
 
 function LoadingSkeleton() {
@@ -392,10 +394,20 @@ export function TodaySchedule({
   onSelectAssignee,
   assigneesWithTasks = [],
   hasUnassignedTasks = false,
+  onOpenTask,
 }: TodayScheduleProps) {
   void _onOpenPlanning // Reserved - planning now handled by ModeToggle
   void _onCreateTask // Reserved - was used by ReviewSection
   const isMobile = useMobile()
+
+  // Create a map for efficient task lookup by ID (for parent task names)
+  const tasksMap = useMemo(() => {
+    const map = new Map<string, Task>()
+    for (const task of tasks) {
+      map.set(task.id, task)
+    }
+    return map
+  }, [tasks])
 
   // Helper function to check if an item matches the assignee filter
   const matchesAssigneeFilter = (assignedTo: string | null | undefined): boolean => {
@@ -792,6 +804,8 @@ export function TodaySchedule({
                 {items.map((item) => {
                   const contactName = item.contactId && contactsMap?.get(item.contactId)?.name
                   const projectName = item.projectId && projectsMap?.get(item.projectId)?.name
+                  const parentTaskId = item.parentTaskId
+                  const parentTaskName = parentTaskId ? tasksMap.get(parentTaskId)?.title : undefined
                   const taskId = item.id.startsWith('task-') ? item.id.replace('task-', '') : null
 
                   // Use SwipeableCard on mobile for better touch interactions
@@ -877,6 +891,9 @@ export function TodaySchedule({
                       contactName={contactName || undefined}
                       projectName={projectName || undefined}
                       projectId={item.projectId || undefined}
+                      parentTaskName={parentTaskName}
+                      parentTaskId={parentTaskId}
+                      onOpenParentTask={onOpenTask}
                       familyMembers={familyMembers}
                       assignedTo={item.assignedTo}
                       onAssign={

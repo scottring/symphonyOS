@@ -139,17 +139,18 @@ describe('InboxTriageModal', () => {
     )
   })
 
-  it('shows Create Project button in footer', () => {
+  it('shows Create Project button prominently', () => {
     render(<InboxTriageModal {...defaultProps} />)
-    expect(screen.getByText('Create Project')).toBeInTheDocument()
+    expect(screen.getByText('Create project from this task')).toBeInTheDocument()
   })
 
-  it('calls onConvertToProject when Create Project is clicked', () => {
-    const onConvertToProject = vi.fn()
-    render(<InboxTriageModal {...defaultProps} onConvertToProject={onConvertToProject} />)
+  it('opens create project modal when Create Project button is clicked', () => {
+    render(<InboxTriageModal {...defaultProps} />)
 
-    fireEvent.click(screen.getByText('Create Project'))
-    expect(onConvertToProject).toHaveBeenCalledWith('Test inbox item', 'family')
+    fireEvent.click(screen.getByText('Create project from this task'))
+    // The modal should open - check for the project name input
+    expect(screen.getByPlaceholderText('Project name')).toBeInTheDocument()
+    expect(screen.getByText('Add at least one task to get started')).toBeInTheDocument()
   })
 
   it('toggles family member selection', () => {

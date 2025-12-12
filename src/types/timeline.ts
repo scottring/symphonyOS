@@ -18,6 +18,7 @@ export interface TimelineItem {
   phoneNumber?: string
   contactId?: string // Linked contact
   projectId?: string // Linked project
+  parentTaskId?: string // Parent task ID for subtasks
   assignedTo?: string | null // Family member assignment
   category?: TaskCategory // Type of task: task, chore, errand, event, activity
   // Subtask support
@@ -53,6 +54,7 @@ export function taskToTimelineItem(task: Task): TimelineItem {
     phoneNumber: task.phoneNumber,
     contactId: task.contactId,
     projectId: task.projectId,
+    parentTaskId: task.parentTaskId,
     assignedTo: task.assignedTo,
     category: task.category,
     allDay: task.isAllDay,

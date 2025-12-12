@@ -17,6 +17,9 @@ interface ScheduleItemProps {
   contactName?: string
   projectName?: string
   projectId?: string
+  parentTaskName?: string
+  parentTaskId?: string
+  onOpenParentTask?: (taskId: string) => void
   // Family member assignment
   familyMembers?: FamilyMember[]
   assignedTo?: string | null
@@ -49,6 +52,9 @@ export function ScheduleItem({
   contactName,
   projectName,
   projectId,
+  parentTaskName,
+  parentTaskId,
+  onOpenParentTask,
   familyMembers = [],
   assignedTo,
   onAssign,
@@ -348,6 +354,26 @@ export function ScheduleItem({
             </svg>
             <span className="truncate">{contactName}</span>
           </span>
+        </div>
+      )}
+
+      {/* Parent task or project context - shows relationship below title */}
+      {(parentTaskName || projectName) && (
+        <div className="flex items-center gap-1 mt-1 ml-[5.75rem] text-xs text-neutral-400">
+          <span className="font-mono">└</span>
+          {parentTaskName && parentTaskId ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onOpenParentTask?.(parentTaskId)
+              }}
+              className="hover:text-neutral-600 hover:underline truncate max-w-[200px]"
+            >
+              {parentTaskName}
+            </button>
+          ) : projectName ? (
+            <span className="truncate max-w-[200px]">{projectName}</span>
+          ) : null}
         </div>
       )}
     </div>
