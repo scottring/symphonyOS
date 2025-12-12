@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useCallback, Suspense } from 'react'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useAuth } from '@/hooks/useAuth'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
-import { useEventNotes } from '@/hooks/useEventNotes'
+import { useEventNotes, type EventNote } from '@/hooks/useEventNotes'
 import { useContacts } from '@/hooks/useContacts'
 import { useProjects } from '@/hooks/useProjects'
 import { useRoutines } from '@/hooks/useRoutines'
@@ -538,35 +538,21 @@ function App() {
     return projectsMap.get(selectedProjectId) ?? null
   }, [selectedProjectId, projectsMap])
 
-  // Linked calendar events for selected project
-  const [linkedEventsForProject, setLinkedEventsForProject] = useState<typeof events>([])
+  // Linked event notes for selected project (stored with event metadata)
+  const [linkedEventsForProject, setLinkedEventsForProject] = useState<EventNote[]>([])
 
-  // Fetch linked events when project changes
+  // Fetch linked event notes when project changes
   useEffect(() => {
     if (!selectedProjectId) {
       setLinkedEventsForProject([])
       return
     }
 
-    // Get event notes linked to this project, then match with calendar events
+    // Get event notes linked to this project - they contain event title and start time
     getEventNotesForProject(selectedProjectId).then((eventNotes) => {
-      if (eventNotes.length === 0) {
-        setLinkedEventsForProject([])
-        return
-      }
-
-      // Get the google event IDs that are linked to this project
-      const linkedEventIds = new Set(eventNotes.map(n => n.googleEventId))
-
-      // Filter calendar events to only those linked to this project
-      const linked = events.filter(e => {
-        const eventId = e.google_event_id || e.id
-        return linkedEventIds.has(eventId)
-      })
-
-      setLinkedEventsForProject(linked)
+      setLinkedEventsForProject(eventNotes)
     })
-  }, [selectedProjectId, events, getEventNotesForProject])
+  }, [selectedProjectId, getEventNotesForProject])
 
   // Get routine for routine view
   const selectedRoutine = useMemo(() => {
