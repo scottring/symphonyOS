@@ -461,6 +461,37 @@ export function useEventNotes() {
     }
   }, [user, notes])
 
+  // Get event notes linked to a specific project
+  const getEventNotesForProject = useCallback(async (projectId: string): Promise<EventNote[]> => {
+    if (!user) return []
+
+    const { data, error: fetchError } = await supabase
+      .from('event_notes')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('project_id', projectId)
+
+    if (fetchError) {
+      setError(fetchError.message)
+      return []
+    }
+
+    if (data && data.length > 0) {
+      const eventNotes = (data as DbEventNote[]).map(dbNoteToEventNote)
+      // Update cache
+      setNotes((prev) => {
+        const newMap = new Map(prev)
+        for (const note of eventNotes) {
+          newMap.set(note.googleEventId, note)
+        }
+        return newMap
+      })
+      return eventNotes
+    }
+
+    return []
+  }, [user])
+
   return {
     notes,
     loading,
@@ -475,5 +506,6 @@ export function useEventNotes() {
     autoDetectRecipes,
     deleteNote,
     getNote,
+    getEventNotesForProject,
   }
 }

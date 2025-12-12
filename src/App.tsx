@@ -62,7 +62,7 @@ function App() {
   // Onboarding state
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null)
   const [onboardingLoading, setOnboardingLoading] = useState(true)
-  const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, updateEventAssignmentAll, updateRecipeUrl, updateEventProject, getNote, notes: eventNotesMap } = useEventNotes()
+  const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, updateEventAssignmentAll, updateRecipeUrl, updateEventProject, getNote, getEventNotesForProject, notes: eventNotesMap } = useEventNotes()
   const { contacts, contactsMap, addContact, updateContact, deleteContact, searchContacts } = useContacts()
   const { projects, projectsMap, addProject, updateProject, deleteProject, searchProjects, recalculateProjectStatus } = useProjects()
   const {
@@ -537,6 +537,36 @@ function App() {
     if (!selectedProjectId) return null
     return projectsMap.get(selectedProjectId) ?? null
   }, [selectedProjectId, projectsMap])
+
+  // Linked calendar events for selected project
+  const [linkedEventsForProject, setLinkedEventsForProject] = useState<typeof events>([])
+
+  // Fetch linked events when project changes
+  useEffect(() => {
+    if (!selectedProjectId) {
+      setLinkedEventsForProject([])
+      return
+    }
+
+    // Get event notes linked to this project, then match with calendar events
+    getEventNotesForProject(selectedProjectId).then((eventNotes) => {
+      if (eventNotes.length === 0) {
+        setLinkedEventsForProject([])
+        return
+      }
+
+      // Get the google event IDs that are linked to this project
+      const linkedEventIds = new Set(eventNotes.map(n => n.googleEventId))
+
+      // Filter calendar events to only those linked to this project
+      const linked = events.filter(e => {
+        const eventId = e.google_event_id || e.id
+        return linkedEventIds.has(eventId)
+      })
+
+      setLinkedEventsForProject(linked)
+    })
+  }, [selectedProjectId, events, getEventNotesForProject])
 
   // Get routine for routine view
   const selectedRoutine = useMemo(() => {
@@ -1210,6 +1240,7 @@ function App() {
             onUpdateTask={handleUpdateTaskWithToast}
             familyMembers={familyMembers}
             selectedTaskId={selectedItemId}
+            linkedEvents={linkedEventsForProject}
             isPinned={pinnedItems.isPinned('project', selectedProject.id)}
             canPin={pinnedItems.canPin()}
             onPin={() => pinnedItems.pin('project', selectedProject.id)}
