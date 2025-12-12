@@ -1,3 +1,10 @@
+export interface BlockedTime {
+  name: string           // "Work", "School", "Gym"
+  days: string[]         // ['mon', 'tue', 'wed', 'thu', 'fri']
+  start: string          // "07:00" (24h format)
+  end: string            // "18:00" (24h format)
+}
+
 export interface FamilyMember {
   id: string
   user_id: string
@@ -9,6 +16,7 @@ export interface FamilyMember {
   display_order: number
   created_at: string
   auth_user_id?: string | null // Links to auth.users for users with accounts
+  blocked_times?: BlockedTime[] // Recurring unavailable times (work, school, etc.)
 }
 
 // ============================================================================

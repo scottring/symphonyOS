@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import type { FamilyMember } from '@/types/family'
+import type { FamilyMember, BlockedTime } from '@/types/family'
 import type { Task } from '@/types/task'
 
 // ============================================================================
@@ -81,6 +81,24 @@ function getTimePosition(time: Date, startTime: Date, endTime: Date): number {
   const totalMs = endTime.getTime() - startTime.getTime()
   const elapsedMs = time.getTime() - startTime.getTime()
   return Math.max(0, Math.min(100, (elapsedMs / totalMs) * 100))
+}
+
+const DAY_MAP: Record<number, string> = {
+  0: 'sun', 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri', 6: 'sat'
+}
+
+function isMemberBlocked(member: FamilyMember, hour: Date): boolean {
+  const blockedTimes = member.blocked_times || []
+  if (blockedTimes.length === 0) return false
+
+  const dayOfWeek = DAY_MAP[hour.getDay()]
+  const hourOfDay = hour.getHours()
+  const timeStr = `${hourOfDay.toString().padStart(2, '0')}:00`
+
+  return blockedTimes.some((block: BlockedTime) => {
+    if (!block.days.includes(dayOfWeek)) return false
+    return timeStr >= block.start && timeStr < block.end
+  })
 }
 
 // ============================================================================
@@ -197,6 +215,30 @@ export function TimelineCompanion({
 
     return convergences
   }, [timelineEvents, activeMembers])
+
+  // Find "everyone free" slots - times where ALL active members are available
+  const everyoneFreeSlots = useMemo((): Date[] => {
+    if (activeMembers.length < 2) return [] // Need at least 2 members to show "everyone free"
+
+    const activeMemberObjects = familyMembers.filter(m => activeMembers.includes(m.id))
+
+    return hours.filter(hour => {
+      // Check each active member
+      return activeMemberObjects.every(member => {
+        // Check if blocked by recurring schedule (work, school, etc.)
+        if (isMemberBlocked(member, hour)) return false
+
+        // Check if has an event at this hour
+        const hasEvent = timelineEvents.some(event => {
+          if (event.memberId !== member.id) return false
+          const eventHour = event.start.getHours()
+          return eventHour === hour.getHours()
+        })
+
+        return !hasEvent
+      })
+    })
+  }, [hours, activeMembers, familyMembers, timelineEvents])
 
   // Trigger entrance animation
   useEffect(() => {
@@ -495,6 +537,31 @@ export function TimelineCompanion({
                         </div>
                       </div>
 
+                      {/* Blocked time indicators (work hours, etc.) */}
+                      {hours.map((hour, hourIdx) => {
+                        if (!isMemberBlocked(member, hour)) return null
+                        return (
+                          <div
+                            key={`blocked-${hourIdx}`}
+                            className="absolute left-0 right-0 pointer-events-none"
+                            style={{ top: hourIdx * 64, height: 64 }}
+                          >
+                            <div
+                              className="absolute inset-x-1 inset-y-1 rounded-lg opacity-40"
+                              style={{
+                                background: `repeating-linear-gradient(
+                                  -45deg,
+                                  hsl(${color.h}, ${color.s * 0.3}%, ${color.l + 20}%),
+                                  hsl(${color.h}, ${color.s * 0.3}%, ${color.l + 20}%) 4px,
+                                  hsl(${color.h}, ${color.s * 0.2}%, ${color.l + 30}%) 4px,
+                                  hsl(${color.h}, ${color.s * 0.2}%, ${color.l + 30}%) 8px
+                                )`,
+                              }}
+                            />
+                          </div>
+                        )
+                      })}
+
                       {/* Events in this lane */}
                       {memberEvents.map((event, eventIdx) => {
                         const topPos = getTimePosition(event.start, startTime, endTime)
@@ -549,24 +616,52 @@ export function TimelineCompanion({
                 return null
               })()}
 
-              {/* Clickable time slots */}
-              {hours.map((hour, idx) => (
-                <button
-                  key={`slot-${idx}`}
-                  className="absolute left-0 right-0 h-16 opacity-0 hover:opacity-100
-                    transition-opacity cursor-pointer group"
-                  style={{ top: idx * 64 }}
-                  onClick={() => handleTimeClick(hour)}
-                >
-                  <div className="absolute inset-x-1 inset-y-1 rounded-xl
-                    bg-primary-500/5 border border-primary-200/50 border-dashed
-                    flex items-center justify-center">
-                    <span className="text-xs font-medium text-primary-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                      Schedule at {formatHour(hour)}
-                    </span>
+              {/* "Everyone free" highlights */}
+              {everyoneFreeSlots.map((hour) => {
+                const idx = hours.findIndex(h => h.getHours() === hour.getHours())
+                if (idx === -1) return null
+                return (
+                  <div
+                    key={`free-${idx}`}
+                    className="absolute left-0 right-0 pointer-events-none animate-free-slot-glow"
+                    style={{ top: idx * 64, height: 64 }}
+                  >
+                    <div className="absolute inset-x-1 inset-y-1 rounded-xl
+                      bg-gradient-to-r from-emerald-100/40 via-emerald-50/30 to-emerald-100/40
+                      border border-emerald-300/40 border-dashed">
+                      <div className="absolute top-1 right-2 flex items-center gap-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="text-[10px] font-medium text-emerald-600">Everyone free</span>
+                      </div>
+                    </div>
                   </div>
-                </button>
-              ))}
+                )
+              })}
+
+              {/* Clickable time slots */}
+              {hours.map((hour, idx) => {
+                const isFreeSlot = everyoneFreeSlots.some(h => h.getHours() === hour.getHours())
+                return (
+                  <button
+                    key={`slot-${idx}`}
+                    className={`absolute left-0 right-0 h-16 transition-opacity cursor-pointer group
+                      ${isFreeSlot ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`}
+                    style={{ top: idx * 64 }}
+                    onClick={() => handleTimeClick(hour)}
+                  >
+                    <div className={`absolute inset-x-1 inset-y-1 rounded-xl
+                      flex items-center justify-center
+                      ${isFreeSlot
+                        ? 'bg-emerald-500/10 border border-emerald-300/60'
+                        : 'bg-primary-500/5 border border-primary-200/50 border-dashed'}`}>
+                      <span className={`text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity
+                        ${isFreeSlot ? 'text-emerald-600' : 'text-primary-600'}`}>
+                        {isFreeSlot ? `Family time at ${formatHour(hour)}` : `Schedule at ${formatHour(hour)}`}
+                      </span>
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           </div>
 
@@ -588,12 +683,22 @@ export function TimelineCompanion({
           )}
         </div>
 
-        {/* Convergence legend (if any convergences) */}
-        {convergencePoints.length > 0 && (
+        {/* Legend (convergences + everyone free) */}
+        {(convergencePoints.length > 0 || everyoneFreeSlots.length > 0) && (
           <div className="px-5 py-3 border-t border-neutral-100 bg-gradient-to-t from-neutral-50/50 to-transparent">
-            <div className="flex items-center gap-2 text-xs text-neutral-500">
-              <div className="w-3 h-3 rounded-full bg-gradient-to-br from-primary-200 to-sage-200" />
-              <span>{convergencePoints.length} moment{convergencePoints.length !== 1 ? 's' : ''} together</span>
+            <div className="flex items-center gap-4 text-xs text-neutral-500">
+              {everyoneFreeSlots.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-emerald-400" />
+                  <span>{everyoneFreeSlots.length} slot{everyoneFreeSlots.length !== 1 ? 's' : ''} everyone free</span>
+                </div>
+              )}
+              {convergencePoints.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-primary-200 to-sage-200" />
+                  <span>{convergencePoints.length} moment{convergencePoints.length !== 1 ? 's' : ''} together</span>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -663,6 +768,21 @@ export function TimelineCompanion({
 
         .animate-convergence-ripple {
           animation: convergence-ripple 3s ease-in-out infinite;
+        }
+
+        @keyframes free-slot-glow {
+          from {
+            opacity: 0;
+            transform: scaleX(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scaleX(1);
+          }
+        }
+
+        .animate-free-slot-glow {
+          animation: free-slot-glow 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
         }
       `}</style>
     </div>,
