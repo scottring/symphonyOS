@@ -44,6 +44,8 @@ export interface SystemHealthInput {
   tasks: Task[]
   projects?: Project[]
   routines?: Routine[]
+  /** Project IDs that have linked calendar events (these aren't "empty") */
+  projectsWithLinkedEvents?: Set<string>
 }
 
 /**
@@ -60,7 +62,7 @@ export function useSystemHealth(tasksOrInput: Task[] | SystemHealthInput): Syste
       ? { tasks: tasksOrInput }
       : tasksOrInput
 
-    const { tasks, projects = [], routines = [] } = input
+    const { tasks, projects = [], routines = [], projectsWithLinkedEvents = new Set() } = input
 
     // Filter to incomplete tasks only
     const incompleteTasks = tasks.filter(t => !t.completed)
@@ -87,8 +89,9 @@ export function useSystemHealth(tasksOrInput: Task[] | SystemHealthInput): Syste
     const unassignedRoutines = activeRoutines.filter(r => !r.assigned_to && !r.assigned_to_all?.length)
     const unassignedItems = unassignedTasks.length + unassignedRoutines.length
 
-    // Count empty projects (not_started or in_progress with zero associated incomplete tasks)
+    // Count empty projects (not_started or in_progress with zero associated incomplete tasks AND no linked events)
     // Projects that are on_hold or completed don't count as "empty" - they're intentionally paused or done
+    // Projects with linked calendar events have a clear next action (the scheduled event)
     const activeProjects = projects.filter(p => p.status !== 'completed' && p.status !== 'on_hold')
     const projectTaskCounts = new Map<string, number>()
     for (const task of incompleteTasks) {
@@ -96,7 +99,9 @@ export function useSystemHealth(tasksOrInput: Task[] | SystemHealthInput): Syste
         projectTaskCounts.set(task.projectId, (projectTaskCounts.get(task.projectId) || 0) + 1)
       }
     }
-    const emptyProjects = activeProjects.filter(p => !projectTaskCounts.has(p.id)).length
+    const emptyProjects = activeProjects.filter(p =>
+      !projectTaskCounts.has(p.id) && !projectsWithLinkedEvents.has(p.id)
+    ).length
 
     // Calculate score
     const totalItems = incompleteTasks.length

@@ -79,6 +79,7 @@ interface ClarityIndicatorProps {
   tasks: Task[]
   projects: Project[]
   familyMembers: FamilyMember[]
+  projectsWithLinkedEvents?: Set<string>
   onScrollToInbox?: () => void
   onOpenProject?: (projectId: string) => void
   onAssignTaskAll?: (taskId: string, memberIds: string[]) => void
@@ -88,19 +89,20 @@ function ClarityIndicator({
   tasks,
   projects,
   familyMembers,
+  projectsWithLinkedEvents = new Set(),
   onScrollToInbox,
   onOpenProject,
   onAssignTaskAll,
 }: ClarityIndicatorProps) {
   const [isExpanded, setIsExpanded] = useState(false)
-  const metrics = useSystemHealth({ tasks, projects })
+  const metrics = useSystemHealth({ tasks, projects, projectsWithLinkedEvents })
 
   // Get unassigned tasks for inline display
   const unassignedTasks = useMemo(() => {
     return tasks.filter(t => !t.completed && !t.assignedTo && !t.assignedToAll?.length)
   }, [tasks])
 
-  // Get empty projects for inline display
+  // Get empty projects for inline display (exclude projects with linked events)
   const emptyProjectsList = useMemo(() => {
     const incompleteTasks = tasks.filter(t => !t.completed)
     const projectTaskCounts = new Map<string, number>()
@@ -109,8 +111,13 @@ function ClarityIndicator({
         projectTaskCounts.set(task.projectId, (projectTaskCounts.get(task.projectId) || 0) + 1)
       }
     }
-    return projects.filter(p => p.status !== 'completed' && !projectTaskCounts.has(p.id))
-  }, [tasks, projects])
+    return projects.filter(p =>
+      p.status !== 'completed' &&
+      p.status !== 'on_hold' &&
+      !projectTaskCounts.has(p.id) &&
+      !projectsWithLinkedEvents.has(p.id)
+    )
+  }, [tasks, projects, projectsWithLinkedEvents])
 
   if (tasks.length === 0) return null
 
@@ -591,6 +598,19 @@ export function TodaySchedule({
     return map
   }, [tasks])
 
+  // Compute set of project IDs that have linked calendar events
+  const projectsWithLinkedEvents = useMemo(() => {
+    const projectIds = new Set<string>()
+    if (eventNotesMap) {
+      for (const note of eventNotesMap.values()) {
+        if (note.projectId) {
+          projectIds.add(note.projectId)
+        }
+      }
+    }
+    return projectIds
+  }, [eventNotesMap])
+
   // Helper function to check if an item matches the assignee filter
   const matchesAssigneeFilter = (assignedTo: string | null | undefined): boolean => {
     if (selectedAssignee === null || selectedAssignee === undefined) return true // "All" or not specified - show everything
@@ -934,6 +954,7 @@ export function TodaySchedule({
               tasks={tasks}
               projects={projects}
               familyMembers={familyMembers}
+              projectsWithLinkedEvents={projectsWithLinkedEvents}
               onScrollToInbox={scrollToInbox}
               onOpenProject={onOpenProject}
               onAssignTaskAll={onAssignTaskAll}
