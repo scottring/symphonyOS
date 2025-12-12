@@ -8,7 +8,6 @@ import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
 import { useHomeView } from '@/hooks/useHomeView'
 import { useMobile } from '@/hooks/useMobile'
-import { useBadgeVisibility } from '@/hooks/useBadgeVisibility'
 import { HomeViewSwitcher } from './HomeViewSwitcher'
 import { WeekView } from './WeekView'
 import { CascadingRiverView } from './CascadingRiverView'
@@ -101,7 +100,6 @@ export function HomeView({
 }: HomeViewProps) {
   const { currentView, setCurrentView } = useHomeView()
   const isMobile = useMobile()
-  const { showInboxBadge } = useBadgeVisibility()
 
   // Assignee filter state - now supports multi-select
   // Empty array = "All", single id = single filter, multiple ids = river view
@@ -155,23 +153,6 @@ export function HomeView({
     return false
   }, [tasks, events, routines, eventNotesMap])
 
-  // Inbox count for Today badge
-  const inboxCount = useMemo(() => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    return tasks.filter(task => {
-      if (task.completed) return false
-      if (!task.scheduledFor) {
-        if (task.deferredUntil) {
-          const deferredDate = new Date(task.deferredUntil)
-          deferredDate.setHours(0, 0, 0, 0)
-          return deferredDate <= today
-        }
-        return true
-      }
-      return false
-    }).length
-  }, [tasks])
 
   // Week view state
   const [weekStart, setWeekStart] = useState(() => {
@@ -302,7 +283,6 @@ export function HomeView({
           <HomeViewSwitcher
             currentView={currentView}
             onViewChange={handleViewChange}
-            inboxCount={showInboxBadge ? inboxCount : 0}
             selectedAssignees={selectedAssignees}
             onSelectAssignees={setSelectedAssignees}
             assigneesWithTasks={familyMembers}
