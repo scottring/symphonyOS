@@ -598,13 +598,19 @@ export function TodaySchedule({
     return map
   }, [tasks])
 
-  // Compute set of project IDs that have linked calendar events
+  // Compute set of project IDs that have linked FUTURE calendar events
+  // Past events don't count - the project needs a clear next action
   const projectsWithLinkedEvents = useMemo(() => {
     const projectIds = new Set<string>()
     if (eventNotesMap) {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
       for (const note of eventNotesMap.values()) {
-        if (note.projectId) {
-          projectIds.add(note.projectId)
+        if (note.projectId && note.eventStartTime) {
+          // Only count if event is today or in the future
+          if (note.eventStartTime >= today) {
+            projectIds.add(note.projectId)
+          }
         }
       }
     }
