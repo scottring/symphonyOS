@@ -266,3 +266,55 @@ export function formatRelativeTime(date: Date): string {
 
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
+
+/**
+ * Format a time with date context for display.
+ * Shows relative context:
+ * - "Today 3pm"
+ * - "Tomorrow 3pm"
+ * - "Mon 3pm" (for this week)
+ * - "Dec 15 3pm" (for further out)
+ * - "3pm" if skipDateForToday is true and date is today
+ */
+export function formatTimeWithDate(date: Date, options?: { skipDateForToday?: boolean }): string {
+  if (!isValidDate(date)) return ''
+
+  const now = getCurrentTime()
+  const today = new Date(now)
+  today.setHours(0, 0, 0, 0)
+
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+
+  const dateStart = new Date(date)
+  dateStart.setHours(0, 0, 0, 0)
+
+  const time = formatTime(date)
+
+  // Today
+  if (dateStart.getTime() === today.getTime()) {
+    if (options?.skipDateForToday) {
+      return time
+    }
+    return `Today ${time}`
+  }
+
+  // Tomorrow
+  if (dateStart.getTime() === tomorrow.getTime()) {
+    return `Tomorrow ${time}`
+  }
+
+  // Calculate days difference
+  const diffMs = dateStart.getTime() - today.getTime()
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+  // Within this week (next 6 days) - show day name
+  if (diffDays > 0 && diffDays <= 6) {
+    const dayName = date.toLocaleDateString('en-US', { weekday: 'short' })
+    return `${dayName} ${time}`
+  }
+
+  // Past or further out - show short date
+  const shortDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return `${shortDate} ${time}`
+}
