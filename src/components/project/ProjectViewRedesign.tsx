@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef, useEffect } from 'react'
 import type { Project, ProjectStatus } from '@/types/project'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
 import type { EventNote } from '@/hooks/useEventNotes'
+import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { formatTimeWithDate } from '@/lib/timeUtils'
 import { TaskQuickActions, type ScheduleContextItem } from '@/components/triage'
 import { calculateProjectStatus } from '@/hooks/useProjects'
@@ -25,6 +26,10 @@ interface ProjectViewProps {
   getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
   // Linked calendar events (stored as event notes with event metadata)
   linkedEvents?: EventNote[]
+  // Available calendar events for linking
+  availableEvents?: CalendarEvent[]
+  onLinkEvent?: (googleEventId: string, title: string, startTime: Date) => void
+  onUnlinkEvent?: (googleEventId: string) => void
   // Pin props (available but not used in redesign yet)
   isPinned?: boolean
   canPin?: boolean
@@ -47,6 +52,9 @@ export function ProjectViewRedesign({
   familyMembers = [],
   getScheduleItemsForDate,
   linkedEvents = [],
+  availableEvents = [],
+  onLinkEvent,
+  onUnlinkEvent,
   isPinned: _isPinned,
   canPin: _canPin,
   onPin: _onPin,
@@ -58,6 +66,9 @@ export function ProjectViewRedesign({
   const [editNotes, setEditNotes] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [showEventSelector, setShowEventSelector] = useState(false)
+  const [eventSearchQuery, setEventSearchQuery] = useState('')
+  const eventSelectorRef = useRef<HTMLDivElement>(null)
   const [showStatusDropdown, setShowStatusDropdown] = useState(false)
 
   const projectTasks = useMemo(() => {
@@ -86,6 +97,55 @@ export function ProjectViewRedesign({
 
   // Auto-update disabled - user has full manual control over project status
   // The calculatedStatus is still available for display purposes if needed
+
+  // Filter available events: exclude already linked ones, filter by search, sort by date
+  const linkedEventIds = useMemo(() => new Set(linkedEvents.map(e => e.googleEventId)), [linkedEvents])
+
+  const filteredAvailableEvents = useMemo(() => {
+    const query = eventSearchQuery.toLowerCase().trim()
+    return availableEvents
+      .filter(event => {
+        // Exclude already linked events
+        const eventId = event.google_event_id || event.id
+        if (linkedEventIds.has(eventId)) return false
+        // Filter by search query
+        if (query && !event.title.toLowerCase().includes(query)) return false
+        return true
+      })
+      .sort((a, b) => {
+        // Sort by start time
+        const aTime = a.start_time || a.startTime || ''
+        const bTime = b.start_time || b.startTime || ''
+        return new Date(aTime).getTime() - new Date(bTime).getTime()
+      })
+      .slice(0, 20) // Limit to 20 events
+  }, [availableEvents, linkedEventIds, eventSearchQuery])
+
+  // Click outside handler for event selector
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (eventSelectorRef.current && !eventSelectorRef.current.contains(event.target as Node)) {
+        setShowEventSelector(false)
+        setEventSearchQuery('')
+      }
+    }
+
+    if (showEventSelector) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showEventSelector])
+
+  // Handle linking an event
+  const handleLinkEvent = (event: CalendarEvent) => {
+    if (!onLinkEvent) return
+    const eventId = event.google_event_id || event.id
+    const startTimeStr = event.start_time || event.startTime || ''
+    const startTime = startTimeStr ? new Date(startTimeStr) : new Date()
+    onLinkEvent(eventId, event.title, startTime)
+    setShowEventSelector(false)
+    setEventSearchQuery('')
+  }
 
   const statusConfig: Record<ProjectStatus, { label: string; color: string; bg: string }> = {
     not_started: { label: 'Not Started', color: 'text-neutral-600', bg: 'bg-neutral-100' },
@@ -594,9 +654,80 @@ export function ProjectViewRedesign({
               )}
 
               {/* Linked Events */}
-              {linkedEvents.length > 0 && (
-                <div className="pb-6 border-b border-neutral-200/60">
-                  <h3 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3">Linked Events</h3>
+              <div className="pb-6 border-b border-neutral-200/60">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Linked Events</h3>
+                  {onLinkEvent && availableEvents.length > 0 && (
+                    <div className="relative" ref={eventSelectorRef}>
+                      <button
+                        onClick={() => setShowEventSelector(!showEventSelector)}
+                        className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                        </svg>
+                        Link event
+                      </button>
+
+                      {/* Event Selector Dropdown */}
+                      {showEventSelector && (
+                        <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl shadow-lg border border-neutral-200 z-20 overflow-hidden">
+                          {/* Search Input */}
+                          <div className="p-2 border-b border-neutral-100">
+                            <input
+                              type="text"
+                              value={eventSearchQuery}
+                              onChange={(e) => setEventSearchQuery(e.target.value)}
+                              placeholder="Search events..."
+                              className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50
+                                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                              autoFocus
+                            />
+                          </div>
+
+                          {/* Events List */}
+                          <div className="max-h-64 overflow-y-auto">
+                            {filteredAvailableEvents.length === 0 ? (
+                              <div className="p-4 text-center text-sm text-neutral-500">
+                                {eventSearchQuery ? 'No matching events' : 'No upcoming events to link'}
+                              </div>
+                            ) : (
+                              filteredAvailableEvents.map((event) => {
+                                const eventId = event.google_event_id || event.id
+                                const startTimeStr = event.start_time || event.startTime || ''
+                                const eventDate = startTimeStr ? new Date(startTimeStr) : null
+
+                                return (
+                                  <button
+                                    key={eventId}
+                                    onClick={() => handleLinkEvent(event)}
+                                    className="w-full px-3 py-2.5 flex items-start gap-2 hover:bg-neutral-50 transition-colors text-left"
+                                  >
+                                    <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0 mt-0.5">
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                                      </svg>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium text-neutral-800 truncate">{event.title}</p>
+                                      {eventDate && (
+                                        <p className="text-xs text-neutral-500">
+                                          {eventDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </button>
+                                )
+                              })
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {linkedEvents.length > 0 ? (
                   <div className="space-y-2">
                     {linkedEvents
                       .filter(note => note.eventTitle) // Only show events that have title stored
@@ -606,7 +737,7 @@ export function ProjectViewRedesign({
                       return (
                         <div
                           key={note.id}
-                          className="flex items-start gap-2 p-2 -mx-2 rounded-lg hover:bg-neutral-50 transition-colors"
+                          className="group flex items-start gap-2 p-2 -mx-2 rounded-lg hover:bg-neutral-50 transition-colors"
                         >
                           <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0 mt-0.5">
                             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
@@ -621,12 +752,25 @@ export function ProjectViewRedesign({
                               </p>
                             )}
                           </div>
+                          {onUnlinkEvent && (
+                            <button
+                              onClick={() => onUnlinkEvent(note.googleEventId)}
+                              className="opacity-0 group-hover:opacity-100 p-1 text-neutral-400 hover:text-red-500 transition-all"
+                              aria-label="Unlink event"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                          )}
                         </div>
                       )
                     })}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <p className="text-sm text-neutral-400 italic">No linked events</p>
+                )}
+              </div>
 
               {/* Notes */}
               <div>

@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, Suspense } from 'react'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useAuth } from '@/hooks/useAuth'
-import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
+import { useGoogleCalendar, type CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { useEventNotes, type EventNote } from '@/hooks/useEventNotes'
 import { useContacts } from '@/hooks/useContacts'
 import { useProjects } from '@/hooks/useProjects'
@@ -541,6 +541,9 @@ function App() {
   // Linked event notes for selected project (stored with event metadata)
   const [linkedEventsForProject, setLinkedEventsForProject] = useState<EventNote[]>([])
 
+  // Available calendar events for linking to project
+  const [availableEventsForProject, setAvailableEventsForProject] = useState<CalendarEvent[]>([])
+
   // Fetch linked event notes when project changes
   useEffect(() => {
     if (!selectedProjectId) {
@@ -553,6 +556,42 @@ function App() {
       setLinkedEventsForProject(eventNotes)
     })
   }, [selectedProjectId, getEventNotesForProject])
+
+  // Fetch upcoming events when viewing a project (for linking)
+  useEffect(() => {
+    if (!selectedProjectId || !isConnected) {
+      setAvailableEventsForProject([])
+      return
+    }
+
+    // Fetch next 30 days of events for linking
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const thirtyDaysLater = new Date(today)
+    thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30)
+
+    fetchEvents(today, thirtyDaysLater).then((fetchedEvents) => {
+      setAvailableEventsForProject(fetchedEvents)
+    })
+  }, [selectedProjectId, isConnected, fetchEvents])
+
+  // Handle linking a calendar event to the current project
+  const handleLinkEventToProject = useCallback(async (googleEventId: string, title: string, startTime: Date) => {
+    if (!selectedProjectId) return
+    await updateEventProject(googleEventId, selectedProjectId, title, startTime)
+    // Refresh linked events
+    const eventNotes = await getEventNotesForProject(selectedProjectId)
+    setLinkedEventsForProject(eventNotes)
+  }, [selectedProjectId, updateEventProject, getEventNotesForProject])
+
+  // Handle unlinking a calendar event from the current project
+  const handleUnlinkEventFromProject = useCallback(async (googleEventId: string) => {
+    if (!selectedProjectId) return
+    await updateEventProject(googleEventId, null)
+    // Refresh linked events
+    const eventNotes = await getEventNotesForProject(selectedProjectId)
+    setLinkedEventsForProject(eventNotes)
+  }, [selectedProjectId, updateEventProject, getEventNotesForProject])
 
   // Get routine for routine view
   const selectedRoutine = useMemo(() => {
@@ -1227,6 +1266,9 @@ function App() {
             familyMembers={familyMembers}
             selectedTaskId={selectedItemId}
             linkedEvents={linkedEventsForProject}
+            availableEvents={availableEventsForProject}
+            onLinkEvent={handleLinkEventToProject}
+            onUnlinkEvent={handleUnlinkEventFromProject}
             isPinned={pinnedItems.isPinned('project', selectedProject.id)}
             canPin={pinnedItems.canPin()}
             onPin={() => pinnedItems.pin('project', selectedProject.id)}
