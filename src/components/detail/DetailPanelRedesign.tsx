@@ -5,7 +5,7 @@ import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
 import type { ActionableInstance, Routine, PrepFollowupTemplate } from '@/types/actionable'
 import type { Attachment, AttachmentEntityType } from '@/types/attachment'
-import { formatTime, formatTimeRange } from '@/lib/timeUtils'
+import { formatTime, formatTimeRange, formatTimeWithDate } from '@/lib/timeUtils'
 import { detectActions, type DetectedAction } from '@/lib/actionDetection'
 import { ActionableActions } from './ActionableActions'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
@@ -978,10 +978,14 @@ export function DetailPanelRedesign({
     onUpdate(item.originalTask.id, { links: newLinks.length > 0 ? newLinks : undefined })
   }
 
+  // For tasks, show date context (e.g., "Today 3pm", "Tomorrow 3pm")
+  // For events, use the standard time/range format
   const timeDisplay = item.startTime
     ? item.endTime
       ? formatTimeRange(item.startTime, item.endTime, item.allDay)
-      : formatTime(item.startTime)
+      : isTask && !item.allDay
+        ? formatTimeWithDate(item.startTime)
+        : formatTime(item.startTime)
     : 'Unscheduled'
 
   const phoneNumber = contact?.phone || item.phoneNumber
