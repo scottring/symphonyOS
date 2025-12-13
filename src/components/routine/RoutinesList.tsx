@@ -319,22 +319,24 @@ export function RoutinesList({ routines, contacts = [], familyMembers = [], onSe
       <button
         key={routine.id}
         onClick={() => onSelectRoutine(routine)}
-        className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left ${
+        className={`group w-full flex items-center gap-4 p-5 rounded-2xl transition-all duration-200 ease-out text-left ${
           isPaused
-            ? 'bg-neutral-50 border-neutral-100 hover:border-neutral-200 hover:shadow-sm opacity-60'
-            : 'bg-white border-neutral-100 hover:border-amber-200 hover:shadow-sm'
+            ? 'bg-neutral-100/50 hover:bg-neutral-100 opacity-60'
+            : 'bg-white/60 backdrop-blur-sm hover:bg-white hover:shadow-md'
         }`}
       >
-        {/* Circular indicator */}
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-          isPaused ? 'bg-neutral-200' : 'bg-amber-100'
+        {/* Circular indicator - refined design */}
+        <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200 ${
+          isPaused
+            ? 'bg-neutral-200'
+            : 'bg-amber-50 group-hover:bg-amber-100'
         }`}>
           {isPaused ? (
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           ) : (
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
           )}
@@ -351,7 +353,12 @@ export function RoutinesList({ routines, contacts = [], familyMembers = [], onSe
         )}
 
         {/* Chevron */}
-        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-neutral-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="w-5 h-5 text-neutral-300 flex-shrink-0 transition-all duration-200 group-hover:text-neutral-500 group-hover:translate-x-0.5"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
           <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
         </svg>
       </button>
@@ -359,35 +366,42 @@ export function RoutinesList({ routines, contacts = [], familyMembers = [], onSe
   }
 
   return (
-    <div className="h-full overflow-auto">
-      <div className="p-6 max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-semibold text-neutral-800">Routines</h1>
-          <button
-            onClick={onCreateRoutine}
-            className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg font-medium
-                       hover:bg-amber-600 active:bg-amber-700 transition-colors"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-            </svg>
-            New Routine
-          </button>
-        </div>
+    <div className="h-full overflow-auto bg-bg-base">
+      <div className="px-6 py-8 md:px-10 md:py-10 max-w-3xl mx-auto">
+        {/* Header - Editorial style */}
+        <header className="mb-10 animate-fade-in-up">
+          <div className="flex items-end justify-between mb-2">
+            <h1 className="font-display text-4xl md:text-5xl text-neutral-900 tracking-tight leading-none">
+              Routines
+            </h1>
+            <button
+              onClick={onCreateRoutine}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-amber-500
+                         hover:bg-amber-600 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+              </svg>
+              New Routine
+            </button>
+          </div>
+          <p className="text-neutral-500 mt-2">
+            <span className="font-semibold text-neutral-700">{routines.length}</span> routine{routines.length !== 1 ? 's' : ''}
+          </p>
+        </header>
 
         {/* Sort and Group Controls */}
         {routines.length > 0 && (
-          <div className="flex items-center gap-4 mb-6">
+          <div className="flex flex-wrap items-center gap-4 mb-8 p-4 rounded-xl bg-white/40 backdrop-blur-sm">
             <div className="flex items-center gap-2">
-              <label htmlFor="sort-select" className="text-sm text-neutral-500">Sort:</label>
+              <label htmlFor="sort-select" className="text-sm text-neutral-500 font-medium">Sort:</label>
               <select
                 id="sort-select"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="text-sm bg-white border border-neutral-200 rounded-lg px-3 py-1.5
+                className="text-sm bg-white border border-neutral-200 rounded-lg px-3 py-2
                            text-neutral-700 hover:border-neutral-300 focus:outline-none focus:ring-2
-                           focus:ring-amber-500 focus:border-transparent cursor-pointer"
+                           focus:ring-amber-500/20 focus:border-amber-400 cursor-pointer transition-all duration-200"
               >
                 {SORT_OPTIONS.map(option => (
                   <option key={option.value} value={option.value}>{option.label}</option>
@@ -396,14 +410,14 @@ export function RoutinesList({ routines, contacts = [], familyMembers = [], onSe
             </div>
 
             <div className="flex items-center gap-2">
-              <label htmlFor="group-select" className="text-sm text-neutral-500">Group:</label>
+              <label htmlFor="group-select" className="text-sm text-neutral-500 font-medium">Group:</label>
               <select
                 id="group-select"
                 value={groupBy}
                 onChange={(e) => setGroupBy(e.target.value as GroupOption)}
-                className="text-sm bg-white border border-neutral-200 rounded-lg px-3 py-1.5
+                className="text-sm bg-white border border-neutral-200 rounded-lg px-3 py-2
                            text-neutral-700 hover:border-neutral-300 focus:outline-none focus:ring-2
-                           focus:ring-amber-500 focus:border-transparent cursor-pointer"
+                           focus:ring-amber-500/20 focus:border-amber-400 cursor-pointer transition-all duration-200"
               >
                 {GROUP_OPTIONS.map(option => (
                   <option key={option.value} value={option.value}>{option.label}</option>
@@ -415,20 +429,20 @@ export function RoutinesList({ routines, contacts = [], familyMembers = [], onSe
 
         {/* Empty state */}
         {routines.length === 0 && (
-          <div className="text-center py-16">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-100 flex items-center justify-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <div className="text-center py-16 animate-fade-in-up">
+            <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-amber-50 flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             </div>
-            <h2 className="text-lg font-semibold text-neutral-800 mb-2">No routines yet</h2>
+            <p className="font-display text-xl text-neutral-700 mb-2">No routines yet</p>
             <p className="text-neutral-500 mb-6">
               Routines are recurring tasks that repeat on a schedule.
             </p>
             <button
               onClick={onCreateRoutine}
-              className="px-4 py-2 bg-amber-500 text-white rounded-lg font-medium
-                         hover:bg-amber-600 transition-colors"
+              className="px-5 py-2.5 bg-amber-500 text-white rounded-xl font-semibold
+                         hover:bg-amber-600 transition-all duration-200 shadow-sm hover:shadow-md"
             >
               Create your first routine
             </button>
@@ -437,14 +451,25 @@ export function RoutinesList({ routines, contacts = [], familyMembers = [], onSe
 
         {/* Active Routines */}
         {activeRoutines.length > 0 && (
-          <div className="mb-8">
+          <div className="mb-10">
             {/* When not grouped, show simple list */}
             {!processedActiveRoutines.grouped && (
               <>
-                <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">
-                  Active ({activeRoutines.length})
-                </h2>
-                <div className="space-y-2">
+                <div className="flex items-center gap-3 mb-5">
+                  <span className="text-amber-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
+                    </svg>
+                  </span>
+                  <h2 className="time-group-header flex items-center gap-3">
+                    Active
+                    <span className="inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1.5 bg-amber-50 text-amber-600 rounded-md text-xs font-semibold">
+                      {activeRoutines.length}
+                    </span>
+                    <span className="flex-1 h-px bg-gradient-to-r from-neutral-200 to-transparent min-w-[40px]" />
+                  </h2>
+                </div>
+                <div className="space-y-2 stagger-in">
                   {processedActiveRoutines.routines.map(routine => renderRoutineCard(routine))}
                 </div>
               </>
@@ -453,15 +478,26 @@ export function RoutinesList({ routines, contacts = [], familyMembers = [], onSe
             {/* When grouped, show sections */}
             {processedActiveRoutines.grouped && (
               <>
-                <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">
-                  Active ({activeRoutines.length})
-                </h2>
-                <div className="space-y-6">
+                <div className="flex items-center gap-3 mb-5">
+                  <span className="text-amber-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
+                    </svg>
+                  </span>
+                  <h2 className="time-group-header flex items-center gap-3">
+                    Active
+                    <span className="inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1.5 bg-amber-50 text-amber-600 rounded-md text-xs font-semibold">
+                      {activeRoutines.length}
+                    </span>
+                    <span className="flex-1 h-px bg-gradient-to-r from-neutral-200 to-transparent min-w-[40px]" />
+                  </h2>
+                </div>
+                <div className="space-y-8">
                   {processedActiveRoutines.sortedKeys.map(groupKey => {
                     const groupRoutines = processedActiveRoutines.groups.get(groupKey) || []
                     return (
                       <div key={groupKey}>
-                        <h3 className="text-xs font-medium text-neutral-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                        <h3 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3 flex items-center gap-2">
                           {groupBy === 'assignee' && groupKey !== 'Unassigned' && (
                             <AssigneeAvatar
                               member={familyMembers.find(m => m.name === groupKey)}
@@ -486,9 +522,21 @@ export function RoutinesList({ routines, contacts = [], familyMembers = [], onSe
         {/* Reference Routines (paused) */}
         {referenceRoutines.length > 0 && (
           <div>
-            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">
-              Paused ({referenceRoutines.length})
-            </h2>
+            <div className="flex items-center gap-3 mb-5">
+              <span className="text-neutral-400">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M10 9v6M14 9v6" />
+                </svg>
+              </span>
+              <h2 className="time-group-header flex items-center gap-3">
+                Paused
+                <span className="inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1.5 bg-neutral-100 text-neutral-500 rounded-md text-xs font-semibold">
+                  {referenceRoutines.length}
+                </span>
+                <span className="flex-1 h-px bg-gradient-to-r from-neutral-200 to-transparent min-w-[40px]" />
+              </h2>
+            </div>
             <div className="space-y-2">
               {referenceRoutines.map(routine => renderRoutineCard(routine, true))}
             </div>

@@ -72,14 +72,28 @@ export function InboxSection({
     : tasks
 
   return (
-    <div className="mb-8">
-      <h2 className="font-display text-sm tracking-wide text-neutral-500 uppercase mb-4 flex items-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 2h10v7h-2l-1 2H8l-1-2H5V5z" clipRule="evenodd" />
-        </svg>
-        Inbox ({tasks.length})
-      </h2>
-      <div className="space-y-3">
+    <div className="mb-10 mt-12">
+      {/* Section header - refined editorial style */}
+      <div className="flex items-center gap-3 mb-5">
+        {/* Icon */}
+        <span className="text-neutral-400">
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 12h-6l-2 3h-4l-2-3H2" />
+            <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+          </svg>
+        </span>
+
+        {/* Label with decorative line */}
+        <h2 className="time-group-header flex items-center gap-3">
+          Inbox
+          <span className="inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1.5 bg-neutral-100 text-neutral-500 rounded-md text-xs font-semibold">
+            {tasks.length}
+          </span>
+          <span className="flex-1 h-px bg-gradient-to-r from-neutral-200 to-transparent min-w-[40px]" />
+        </h2>
+      </div>
+
+      <div className="space-y-2">
         {/* Show TriageCard for recently created task at the top */}
         {recentlyCreatedTask && onTriageCardCollapse && (
           <TriageCard

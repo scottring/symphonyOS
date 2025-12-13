@@ -33,10 +33,10 @@
 
 **[Open multiple tabs/apps chaotically]**
 - Google Calendar
-- Apple Notes
-- Todoist
+- Notion
+- Reminders
 - Email with recipe
-- Text thread with partner about dinner
+- Text thread with wife about dinner
 
 "Sound familiar? Tasks in one place, events in another, that recipe you saved somewhere, the kids' schedule... and you're the only one who knows where it all is."
 

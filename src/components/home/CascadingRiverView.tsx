@@ -8,6 +8,17 @@ import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
 import { FAMILY_COLORS, type FamilyMemberColor } from '@/types/family'
 import { DateNavigator } from '@/components/schedule/DateNavigator'
+import {
+  DndContext,
+  DragOverlay,
+  useDraggable,
+  useDroppable,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core'
 
 // =============================================================================
 // TYPES
@@ -40,6 +51,9 @@ interface CascadingRiverViewProps {
   onCompleteEvent?: (eventId: string, completed: boolean) => void
   onSkipEvent?: (eventId: string) => void
   onPushEvent?: (eventId: string, date: Date) => void
+  // Reschedule handlers for drag-and-drop
+  onRescheduleTask?: (taskId: string, newTime: Date) => void
+  onRescheduleRoutine?: (routineId: string, newTime: Date) => void
 }
 
 interface TimelineEvent {
@@ -51,9 +65,12 @@ interface TimelineEvent {
   isAllDay: boolean
   type: 'task' | 'event' | 'routine'
   assignedTo?: string | null
+  assignedToAll?: string[] // For shared items (multiple assignees)
   completed?: boolean
   projectId?: string | null
   contactId?: string | null
+  isDraggable: boolean // Tasks and routines are draggable, events are not
+  isShared?: boolean // True if assigned to multiple people
 }
 
 interface ConvergenceZone {
@@ -281,14 +298,151 @@ function TimeMarkers({ currentMinutes, width }: TimeMarkersProps) {
 }
 
 // =============================================================================
-// EVENT CARD (Interactive)
+// EVENT CARD CONTENT (Shared between regular and draggable)
 // =============================================================================
 
-interface EventCardProps {
+interface EventCardContentProps {
   event: TimelineEvent
   memberColor: string
-  x: number
-  y: number
+  isConverged: boolean
+  isSelected: boolean
+  isDragging?: boolean
+  onSelect: () => void
+  onToggleComplete: () => void
+  projectName?: string
+  contactName?: string
+}
+
+function EventCardContent({
+  event,
+  memberColor,
+  isConverged,
+  isSelected,
+  isDragging,
+  onSelect,
+  onToggleComplete,
+  projectName,
+  contactName,
+}: EventCardContentProps) {
+  const colors = STREAM_COLORS[memberColor] || STREAM_COLORS.blue
+
+  return (
+    <div
+      onClick={onSelect}
+      className={`
+        px-3 py-2 rounded-xl border backdrop-blur-sm transition-all duration-200
+        ${event.isDraggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} group
+        ${isSelected ? 'ring-2 ring-primary-400 ring-offset-2' : ''}
+        ${event.completed ? 'opacity-60' : ''}
+        ${isConverged ? 'bg-primary-50/95 border-primary-200' : 'bg-white/95 border-neutral-200'}
+        ${isDragging ? 'shadow-2xl scale-105 ring-2 ring-primary-400' : ''}
+      `}
+      style={{
+        boxShadow: isDragging
+          ? '0 20px 40px rgba(0,0,0,0.2)'
+          : isConverged
+          ? `0 4px 12px ${colors.glow}25, 0 0 0 1px ${colors.glow}15`
+          : '0 2px 8px hsl(32, 20%, 20%, 0.1)',
+      }}
+    >
+      <div className="flex items-start gap-2">
+        {/* Drag handle indicator for draggable items */}
+        {event.isDraggable && (
+          <div className="flex flex-col gap-0.5 mr-1 opacity-30 group-hover:opacity-60 transition-opacity">
+            <div className="w-1 h-1 rounded-full bg-neutral-400" />
+            <div className="w-1 h-1 rounded-full bg-neutral-400" />
+            <div className="w-1 h-1 rounded-full bg-neutral-400" />
+          </div>
+        )}
+
+        {/* Checkbox */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggleComplete()
+          }}
+          className={`
+            mt-0.5 w-5 h-5 rounded-md border-2 flex-shrink-0 flex items-center justify-center
+            transition-all duration-200
+            ${event.completed
+              ? 'bg-primary-500 border-primary-500'
+              : 'border-neutral-300 hover:border-primary-400'
+            }
+          `}
+        >
+          {event.completed && (
+            <svg className="w-3 h-3 text-white" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+          )}
+        </button>
+
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-medium truncate ${event.completed ? 'line-through text-neutral-500' : 'text-neutral-800'}`}>
+            {event.title}
+          </p>
+          <div className="flex items-center gap-2 mt-0.5">
+            {event.startTime && !event.isAllDay && (
+              <span className="text-xs text-neutral-500" style={{ fontFamily: 'var(--font-family-display)', fontStyle: 'italic' }}>
+                {formatTime(getMinutesFromMidnight(event.startTime))}
+              </span>
+            )}
+            {projectName && (
+              <span className="text-xs text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded-md truncate max-w-[100px]">
+                {projectName}
+              </span>
+            )}
+            {contactName && (
+              <span className="text-xs text-neutral-500 truncate">@{contactName}</span>
+            )}
+          </div>
+        </div>
+
+        {/* Shared indicator (chain icon) */}
+        {event.isShared && (
+          <div
+            className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 bg-purple-100 text-purple-600"
+            title={`Shared with ${(event.assignedToAll?.length || 0)} people`}
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            </svg>
+          </div>
+        )}
+
+        {/* Type indicator */}
+        <div className={`
+          w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0
+          ${event.type === 'routine' ? 'bg-amber-100 text-amber-600' :
+            event.type === 'event' ? 'bg-blue-100 text-blue-600' :
+            'bg-neutral-100 text-neutral-500'}
+        `}>
+          {event.type === 'routine' ? (
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          ) : event.type === 'event' ? (
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          ) : (
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// =============================================================================
+// DRAGGABLE EVENT CARD
+// =============================================================================
+
+interface DraggableEventCardProps {
+  event: TimelineEvent
+  memberColor: string
   isConverged: boolean
   isSelected: boolean
   onSelect: () => void
@@ -297,107 +451,155 @@ interface EventCardProps {
   contactName?: string
 }
 
-function EventCard({
+function DraggableEventCard({
   event,
   memberColor,
-  x,
-  y,
   isConverged,
   isSelected,
   onSelect,
   onToggleComplete,
   projectName,
   contactName,
-}: EventCardProps) {
-  const colors = STREAM_COLORS[memberColor] || STREAM_COLORS.blue
+}: DraggableEventCardProps) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: event.prefixedId,
+    data: { event },
+    disabled: !event.isDraggable,
+  })
+
+  const style = transform
+    ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+        zIndex: isDragging ? 1000 : undefined,
+      }
+    : undefined
 
   return (
-    <g transform={`translate(${x}, ${y})`}>
-      <foreignObject x={0} y={-20} width={260} height={56}>
-        <div
-          onClick={onSelect}
-          className={`
-            px-3 py-2 rounded-xl border backdrop-blur-sm transition-all duration-200
-            cursor-pointer group
-            ${isSelected ? 'ring-2 ring-primary-400 ring-offset-2' : ''}
-            ${event.completed ? 'opacity-60' : ''}
-            ${isConverged ? 'bg-primary-50/95 border-primary-200' : 'bg-white/95 border-neutral-200'}
-          `}
-          style={{
-            boxShadow: isConverged
-              ? `0 4px 12px ${colors.glow}25, 0 0 0 1px ${colors.glow}15`
-              : '0 2px 8px hsl(32, 20%, 20%, 0.1)',
-          }}
-        >
-          <div className="flex items-start gap-2">
-            {/* Checkbox */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onToggleComplete()
-              }}
-              className={`
-                mt-0.5 w-5 h-5 rounded-md border-2 flex-shrink-0 flex items-center justify-center
-                transition-all duration-200
-                ${event.completed
-                  ? 'bg-primary-500 border-primary-500'
-                  : 'border-neutral-300 hover:border-primary-400'
-                }
-              `}
-            >
-              {event.completed && (
-                <svg className="w-3 h-3 text-white" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-              )}
-            </button>
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...(event.isDraggable ? { ...listeners, ...attributes } : {})}
+    >
+      <EventCardContent
+        event={event}
+        memberColor={memberColor}
+        isConverged={isConverged}
+        isSelected={isSelected}
+        isDragging={isDragging}
+        onSelect={onSelect}
+        onToggleComplete={onToggleComplete}
+        projectName={projectName}
+        contactName={contactName}
+      />
+    </div>
+  )
+}
 
-            <div className="flex-1 min-w-0">
-              <p className={`text-sm font-medium truncate ${event.completed ? 'line-through text-neutral-500' : 'text-neutral-800'}`}>
-                {event.title}
-              </p>
-              <div className="flex items-center gap-2 mt-0.5">
-                {event.startTime && !event.isAllDay && (
-                  <span className="text-xs text-neutral-500" style={{ fontFamily: 'var(--font-family-display)', fontStyle: 'italic' }}>
-                    {formatTime(getMinutesFromMidnight(event.startTime))}
-                  </span>
-                )}
-                {projectName && (
-                  <span className="text-xs text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded-md truncate max-w-[100px]">
-                    {projectName}
-                  </span>
-                )}
-                {contactName && (
-                  <span className="text-xs text-neutral-500 truncate">@{contactName}</span>
-                )}
-              </div>
-            </div>
+// =============================================================================
+// COLUMN DROP ZONE (for reassigning items between members)
+// =============================================================================
 
-            {/* Type indicator */}
-            <div className={`
-              w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0
-              ${event.type === 'routine' ? 'bg-amber-100 text-amber-600' :
-                event.type === 'event' ? 'bg-blue-100 text-blue-600' :
-                'bg-neutral-100 text-neutral-500'}
-            `}>
-              {event.type === 'routine' ? (
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              ) : event.type === 'event' ? (
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              ) : (
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-              )}
-            </div>
-          </div>
+interface ColumnDropZoneProps {
+  memberId: string
+  memberName: string
+  memberColor: string
+  left: number
+  width: number
+  height: number
+  isDragging: boolean
+}
+
+function ColumnDropZone({ memberId, memberName, memberColor, left, width, height, isDragging }: ColumnDropZoneProps) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `column-${memberId}`,
+    data: { memberId, type: 'column' },
+  })
+
+  const colors = STREAM_COLORS[memberColor] || STREAM_COLORS.blue
+
+  if (!isDragging) return null
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`
+        absolute top-[30px] transition-all duration-200 rounded-xl
+      `}
+      style={{
+        left,
+        width,
+        height: height - 30,
+        backgroundColor: isOver ? colors.fill : 'transparent',
+        outline: isOver ? `2px solid ${colors.stroke}` : 'none',
+        outlineOffset: isOver ? '2px' : '0',
+      }}
+    >
+      {isOver && (
+        <div className="absolute inset-x-0 top-4 flex justify-center">
+          <span
+            className="text-sm font-semibold px-3 py-1.5 rounded-full shadow-lg"
+            style={{
+              backgroundColor: colors.stroke,
+              color: 'white',
+            }}
+          >
+            Assign to {memberName}
+          </span>
         </div>
-      </foreignObject>
-    </g>
+      )}
+    </div>
+  )
+}
+
+// =============================================================================
+// TIME SLOT DROP ZONE (for rescheduling within a column)
+// =============================================================================
+
+const SLOT_HEIGHT = HOUR_HEIGHT / 4 // 15-minute slots = 1/4 of hour height
+
+interface TimeSlotDropZoneProps {
+  minutes: number // Minutes from midnight (e.g., 540 = 9:00 AM)
+  memberId: string
+  left: number
+  width: number
+  top: number
+  isDragging: boolean
+}
+
+function TimeSlotDropZone({ minutes, memberId, left, width, top, isDragging }: TimeSlotDropZoneProps) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `timeslot-${memberId}-${minutes}`,
+    data: { minutes, memberId, type: 'timeslot' },
+  })
+
+  if (!isDragging) return null
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`
+        absolute transition-all duration-150
+        ${isOver
+          ? 'bg-primary-100/80 border-2 border-dashed border-primary-400'
+          : 'border border-dashed border-transparent hover:border-neutral-200'
+        }
+        rounded-lg
+      `}
+      style={{
+        left: left + 4,
+        width: width - 8,
+        top: top + 30,
+        height: SLOT_HEIGHT,
+      }}
+    >
+      {isOver && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-xs font-semibold text-primary-600 bg-white/90 px-2 py-1 rounded-full shadow-sm">
+            {formatTime(minutes)}
+          </span>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -540,6 +742,7 @@ export function CascadingRiverView({
   selectedItemId,
   onSelectItem,
   onToggleTask,
+  onUpdateTask,
   viewedDate,
   onDateChange,
   contactsMap,
@@ -547,13 +750,28 @@ export function CascadingRiverView({
   eventNotesMap,
   familyMembers,
   selectedAssignees,
+  onAssignTask,
+  onAssignRoutine,
   onCompleteRoutine,
   onCompleteEvent,
+  onPushRoutine,
+  onRescheduleTask,
+  onRescheduleRoutine,
 }: CascadingRiverViewProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [svgWidth, setSvgWidth] = useState(800)
   const [isAnimating, setIsAnimating] = useState(true)
+  const [activeId, setActiveId] = useState<string | null>(null)
+
+  // DnD sensors - require a small movement to start dragging (prevents accidental drags)
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  )
 
   // Track container width
   useEffect(() => {
@@ -605,7 +823,7 @@ export function CascadingRiverView({
     const endOfDay = new Date(viewedDate)
     endOfDay.setHours(23, 59, 59, 999)
 
-    // Tasks
+    // Tasks - draggable
     for (const task of tasks) {
       if (!task.assignedTo || !selectedAssignees.includes(task.assignedTo)) continue
       if (!task.scheduledFor) continue
@@ -625,14 +843,16 @@ export function CascadingRiverView({
         completed: task.completed,
         projectId: task.projectId,
         contactId: task.contactId,
+        isDraggable: true, // Tasks can be dragged to reschedule
       })
     }
 
-    // Calendar events
+    // Calendar events - NOT draggable (from Google Calendar)
+    // Create duplicate entries for shared events (one per assigned member)
     for (const event of events) {
       const startStr = event.start_time || event.startTime
       const isAllDay = event.all_day || event.allDay
-      if (!startStr || isAllDay) continue
+      if (!startStr) continue // Skip if no start time
 
       const startDate = new Date(startStr)
       if (startDate < startOfDay || startDate > endOfDay) continue
@@ -640,26 +860,68 @@ export function CascadingRiverView({
       const eventId = event.google_event_id || event.id
       const eventNote = eventNotesMap?.get(eventId)
       const assignedTo = eventNote?.assignedTo
-
-      if (!assignedTo || !selectedAssignees.includes(assignedTo)) continue
+      const assignedToAll = eventNote?.assignedToAll || []
 
       const instance = eventStatusMap.get(eventId)
       const endStr = event.end_time || event.endTime
 
-      result.push({
-        id: eventId,
-        prefixedId: `event-${eventId}`,
-        title: event.title,
-        startTime: startDate,
-        endTime: endStr ? new Date(endStr) : undefined,
-        isAllDay: false,
-        type: 'event',
-        assignedTo,
-        completed: instance?.status === 'completed',
-      })
+      // Determine all members this event should show for
+      const relevantMembers: string[] = []
+
+      // Single assignment
+      if (assignedTo && selectedAssignees.includes(assignedTo)) {
+        relevantMembers.push(assignedTo)
+      }
+
+      // Multi-assignment (shared event)
+      for (const memberId of assignedToAll) {
+        if (selectedAssignees.includes(memberId) && !relevantMembers.includes(memberId)) {
+          relevantMembers.push(memberId)
+        }
+      }
+
+      const isShared = relevantMembers.length > 1 || assignedToAll.length > 1
+      const isUnassigned = relevantMembers.length === 0
+
+      // Create an entry for each relevant member (or one unassigned entry)
+      if (isUnassigned) {
+        // Unassigned events show once in center
+        result.push({
+          id: eventId,
+          prefixedId: `event-${eventId}`,
+          title: event.title,
+          startTime: startDate,
+          endTime: endStr ? new Date(endStr) : undefined,
+          isAllDay: isAllDay || false,
+          type: 'event',
+          assignedTo: null,
+          assignedToAll: [],
+          completed: instance?.status === 'completed',
+          isDraggable: false,
+          isShared: false,
+        })
+      } else {
+        // Create duplicate for each assigned member
+        for (const memberId of relevantMembers) {
+          result.push({
+            id: eventId,
+            prefixedId: `event-${eventId}-${memberId}`, // Unique ID per member
+            title: event.title,
+            startTime: startDate,
+            endTime: endStr ? new Date(endStr) : undefined,
+            isAllDay: isAllDay || false,
+            type: 'event',
+            assignedTo: memberId,
+            assignedToAll: relevantMembers,
+            completed: instance?.status === 'completed',
+            isDraggable: false,
+            isShared,
+          })
+        }
+      }
     }
 
-    // Routines
+    // Routines - draggable
     for (const routine of routines) {
       if (!routine.assigned_to || !selectedAssignees.includes(routine.assigned_to)) continue
       if (routine.show_on_timeline === false) continue
@@ -680,6 +942,7 @@ export function CascadingRiverView({
         type: 'routine',
         assignedTo: routine.assigned_to,
         completed: instance?.status === 'completed',
+        isDraggable: true, // Routines can be dragged to reschedule (for today only)
       })
     }
 
@@ -798,15 +1061,19 @@ export function CascadingRiverView({
     return familyMembers.filter(m => selectedAssignees.includes(m.id))
   }, [familyMembers, selectedAssignees])
 
-  // Stream configurations
+  // Stream/column configurations with boundaries for drag-drop
   const streamConfigs = useMemo(() => {
-    const usableWidth = svgWidth - 120
-    const spacing = usableWidth / (selectedMembers.length + 1)
+    const leftMargin = 80
+    const rightMargin = 20
+    const usableWidth = svgWidth - leftMargin - rightMargin
+    const columnWidth = usableWidth / Math.max(selectedMembers.length, 1)
 
-    return selectedMembers.map((member, i): StreamConfig => ({
+    return selectedMembers.map((member, i): StreamConfig & { columnLeft: number; columnWidth: number } => ({
       memberId: member.id,
       color: member.color || 'blue',
-      baseX: 80 + spacing * (i + 1),
+      baseX: leftMargin + columnWidth * i + columnWidth / 2, // Center of column
+      columnLeft: leftMargin + columnWidth * i,
+      columnWidth,
       events: timelineEvents.filter(e => e.assignedTo === member.id),
       convergenceZones,
     }))
@@ -822,6 +1089,80 @@ export function CascadingRiverView({
       onCompleteEvent(event.id, !event.completed)
     }
   }, [onToggleTask, onCompleteRoutine, onCompleteEvent])
+
+  // Drag handlers
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveId(event.active.id as string)
+  }, [])
+
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event
+    setActiveId(null)
+
+    if (!over) return
+
+    const draggedItem = timelineEvents.find(e => e.prefixedId === active.id)
+    if (!draggedItem || !draggedItem.isDraggable) return
+
+    const overData = over.data.current as { type?: string; memberId?: string; minutes?: number } | undefined
+
+    // Handle column drop (reassignment)
+    if (overData?.type === 'column' && overData.memberId) {
+      const newMemberId = overData.memberId
+
+      // Only reassign if dropping on a different member
+      if (newMemberId !== draggedItem.assignedTo) {
+        if (draggedItem.type === 'task' && onAssignTask) {
+          onAssignTask(draggedItem.id, newMemberId)
+        } else if (draggedItem.type === 'routine' && onAssignRoutine) {
+          onAssignRoutine(draggedItem.id, newMemberId)
+        }
+      }
+      return
+    }
+
+    // Handle time slot drop (rescheduling + optional reassignment)
+    if (overData?.type === 'timeslot' && overData.minutes !== undefined) {
+      const minutes = overData.minutes
+      const newTime = new Date(viewedDate)
+      newTime.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0)
+
+      // Check if also reassigning (dropped in different member's column)
+      const newMemberId = overData.memberId
+      const isReassigning = newMemberId && newMemberId !== draggedItem.assignedTo
+
+      if (draggedItem.type === 'task') {
+        // Reassign if needed
+        if (isReassigning && onAssignTask) {
+          onAssignTask(draggedItem.id, newMemberId)
+        }
+        // Reschedule
+        if (onRescheduleTask) {
+          onRescheduleTask(draggedItem.id, newTime)
+        } else if (onUpdateTask) {
+          onUpdateTask(draggedItem.id, { scheduledFor: newTime })
+        }
+      } else if (draggedItem.type === 'routine') {
+        // Reassign if needed
+        if (isReassigning && onAssignRoutine) {
+          onAssignRoutine(draggedItem.id, newMemberId)
+        }
+        // Reschedule
+        if (onRescheduleRoutine) {
+          onRescheduleRoutine(draggedItem.id, newTime)
+        } else if (onPushRoutine) {
+          onPushRoutine(draggedItem.id, newTime)
+        }
+      }
+    }
+  }, [timelineEvents, viewedDate, onRescheduleTask, onRescheduleRoutine, onUpdateTask, onPushRoutine, onAssignTask, onAssignRoutine])
+
+  // Get the currently dragged item for overlay
+  const activeItem = useMemo(() => {
+    if (!activeId) return null
+    return timelineEvents.find(e => e.prefixedId === activeId) || null
+  }, [activeId, timelineEvents])
 
   // Check if today
   const isToday = useMemo(() => {
@@ -841,176 +1182,354 @@ export function CascadingRiverView({
     })
   }
 
-  // Card placement: position cards next to their stream
-  const getCardX = (event: TimelineEvent): number => {
+  // Card placement: fit cards within their column with padding
+  const CARD_PADDING = 8 // Padding on each side of card within column
+
+  const getCardLayout = (event: TimelineEvent): { x: number; width: number } => {
+    // Unassigned events (calendar events without assignment) go in the center
+    if (!event.assignedTo) {
+      const centerWidth = Math.min(200, svgWidth / 3)
+      return {
+        x: svgWidth / 2 - centerWidth / 2,
+        width: centerWidth,
+      }
+    }
     const config = streamConfigs.find(c => c.memberId === event.assignedTo)
-    if (!config) return 100
-    // Place card to the right of the stream line
-    return config.baseX + 20
+    if (!config) {
+      return { x: svgWidth / 2 - 100, width: 200 }
+    }
+    // Card fills the column with padding
+    return {
+      x: config.columnLeft + CARD_PADDING,
+      width: config.columnWidth - CARD_PADDING * 2,
+    }
   }
 
+  // Calculate duration in pixels for multi-hour events
+  const getEventDuration = (event: TimelineEvent): number | null => {
+    if (!event.endTime || event.isAllDay) return null
+    const startMinutes = getMinutesFromMidnight(event.startTime)
+    const endMinutes = getMinutesFromMidnight(event.endTime)
+    const durationMinutes = endMinutes - startMinutes
+    if (durationMinutes <= 30) return null // Don't show line for short events
+    return (durationMinutes / 60) * HOUR_HEIGHT
+  }
+
+  // Generate time slot drop zones for dragging (15-minute increments)
+  const timeSlots = useMemo(() => {
+    const slots: { minutes: number; y: number }[] = []
+    for (let hour = START_HOUR; hour < END_HOUR; hour++) {
+      for (let quarter = 0; quarter < 4; quarter++) {
+        const minutes = hour * 60 + quarter * 15
+        slots.push({ minutes, y: minutesToY(minutes) })
+      }
+    }
+    return slots
+  }, [])
+
   return (
-    <div className="h-full flex flex-col bg-bg-base">
-      {/* Header */}
-      <div className="flex-shrink-0 px-6 py-4 border-b border-neutral-100">
-        <div className="flex items-center gap-3">
-          <h2 className="font-display text-2xl font-semibold text-neutral-900">
-            {isToday ? `Today is ${formatDate()}` : formatDate()}
-          </h2>
-          <DateNavigator date={viewedDate} onDateChange={onDateChange} showTodayButton={!isToday} />
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="h-full flex flex-col bg-bg-base">
+        {/* Header */}
+        <div className="flex-shrink-0 px-6 py-4 border-b border-neutral-100">
+          <div className="flex items-center gap-3">
+            <h2 className="font-display text-2xl font-semibold text-neutral-900">
+              {isToday ? `Today is ${formatDate()}` : formatDate()}
+            </h2>
+            <DateNavigator date={viewedDate} onDateChange={onDateChange} showTodayButton={!isToday} />
+          </div>
+          <p className="text-sm text-neutral-500 mt-1">
+            Viewing {selectedMembers.map(m => m.name).join(' & ')}
+            {activeId && <span className="ml-2 text-primary-600 font-medium">• Drag to reschedule</span>}
+          </p>
         </div>
-        <p className="text-sm text-neutral-500 mt-1">
-          Viewing {selectedMembers.map(m => m.name).join(' & ')}
-        </p>
-      </div>
 
-      {/* Timeline */}
-      <div ref={containerRef} className="flex-1 overflow-auto">
-        <svg
-          ref={svgRef}
-          className="w-full"
-          style={{ height: TIMELINE_HEIGHT + 60, minWidth: 600 }}
-          viewBox={`0 0 ${svgWidth} ${TIMELINE_HEIGHT + 60}`}
-          preserveAspectRatio="xMidYMin meet"
-        >
-          {/* Gradient definitions */}
-          <defs>
-            {streamConfigs.map(config => {
-              const colors = STREAM_COLORS[config.color] || STREAM_COLORS.blue
-              return (
-                <linearGradient key={`grad-${config.memberId}`} id={`stream-grad-${config.memberId}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor={colors.stroke} stopOpacity={0.1} />
-                  <stop offset="50%" stopColor={colors.stroke} stopOpacity={0.3} />
-                  <stop offset="100%" stopColor={colors.stroke} stopOpacity={0.1} />
-                </linearGradient>
-              )
-            })}
-          </defs>
-
-          <g transform="translate(0, 30)">
-            {/* Time markers */}
-            <TimeMarkers currentMinutes={currentMinutes} width={svgWidth} />
-
-            {/* Free time zones - rendered first (below everything else) */}
-            {freeTimeZones.map(zone => (
-              <FreeTimeZoneDisplay
-                key={`free-${zone.startMinutes}`}
-                zone={zone}
-                width={svgWidth}
+        {/* Timeline */}
+        <div ref={containerRef} className="flex-1 overflow-auto relative">
+          {/* Column drop zones for reassignment */}
+          {streamConfigs.map(config => {
+            const member = selectedMembers.find(m => m.id === config.memberId)
+            return (
+              <ColumnDropZone
+                key={`col-${config.memberId}`}
+                memberId={config.memberId}
+                memberName={member?.name || ''}
+                memberColor={config.color}
+                left={config.columnLeft}
+                width={config.columnWidth}
+                height={TIMELINE_HEIGHT + 60}
+                isDragging={!!activeId}
               />
-            ))}
+            )
+          })}
 
-            {/* Convergence zones - for shared events */}
-            {convergenceZones.map(zone => (
-              <ConvergenceZoneDisplay
-                key={`zone-${zone.startMinutes}`}
-                zone={zone}
-                members={familyMembers}
-                centerX={svgWidth / 2}
+          {/* Time slot drop zones per column (15-minute increments) */}
+          {streamConfigs.map(config =>
+            timeSlots.map(slot => (
+              <TimeSlotDropZone
+                key={`slot-${config.memberId}-${slot.minutes}`}
+                minutes={slot.minutes}
+                memberId={config.memberId}
+                left={config.columnLeft}
+                width={config.columnWidth}
+                top={slot.y}
+                isDragging={!!activeId}
               />
-            ))}
+            ))
+          )}
 
-            {/* Stream paths */}
-            {streamConfigs.map((config, i) => {
-              const colors = STREAM_COLORS[config.color] || STREAM_COLORS.blue
-              const path = generateStreamPath(config, streamConfigs, svgWidth)
-              const member = selectedMembers.find(m => m.id === config.memberId)
-              const memberColors = FAMILY_COLORS[(config.color as FamilyMemberColor) || 'blue'] || FAMILY_COLORS.blue
+          <svg
+            ref={svgRef}
+            className="w-full"
+            style={{ height: TIMELINE_HEIGHT + 60, minWidth: 600 }}
+            viewBox={`0 0 ${svgWidth} ${TIMELINE_HEIGHT + 60}`}
+            preserveAspectRatio="xMidYMin meet"
+          >
+            {/* Gradient definitions */}
+            <defs>
+              {streamConfigs.map(config => {
+                const colors = STREAM_COLORS[config.color] || STREAM_COLORS.blue
+                return (
+                  <linearGradient key={`grad-${config.memberId}`} id={`stream-grad-${config.memberId}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor={colors.stroke} stopOpacity={0.1} />
+                    <stop offset="50%" stopColor={colors.stroke} stopOpacity={0.3} />
+                    <stop offset="100%" stopColor={colors.stroke} stopOpacity={0.1} />
+                  </linearGradient>
+                )
+              })}
+            </defs>
 
-              return (
-                <g key={config.memberId}>
-                  {/* Glow path */}
-                  <path
-                    d={path}
-                    fill="none"
-                    stroke={colors.glow}
-                    strokeWidth={12}
-                    strokeOpacity={0.12}
-                    strokeLinecap="round"
-                    style={{ filter: 'blur(6px)' }}
-                  />
+            <g transform="translate(0, 30)">
 
-                  {/* Main stream path */}
-                  <path
-                    d={path}
-                    fill="none"
-                    stroke={colors.stroke}
-                    strokeWidth={4}
-                    strokeLinecap="round"
-                    className="transition-all duration-500"
-                    style={{
-                      strokeDasharray: isAnimating ? TIMELINE_HEIGHT * 2 : 0,
-                      strokeDashoffset: isAnimating ? TIMELINE_HEIGHT * 2 : 0,
-                      animation: isAnimating ? `stream-draw 1s ease-out ${i * 0.12}s forwards` : 'none',
-                    }}
-                  />
+              {/* Time markers */}
+              <TimeMarkers currentMinutes={currentMinutes} width={svgWidth} />
 
-                  {/* Member avatar at top */}
-                  <foreignObject x={config.baseX - 20} y={-12} width={40} height={40}>
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold
-                                 border-3 border-white shadow-lg ${memberColors.bg} ${memberColors.text}`}
-                      style={{
-                        opacity: isAnimating ? 0 : 1,
-                        animation: isAnimating ? `fade-in-scale 0.4s ease-out ${0.6 + i * 0.1}s forwards` : 'none',
-                      }}
-                    >
-                      {member?.initials || member?.name.charAt(0)}
-                    </div>
-                  </foreignObject>
-                </g>
-              )
-            })}
-
-            {/* Event cards */}
-            {timelineEvents.map(event => {
-              const y = minutesToY(getMinutesFromMidnight(event.startTime))
-              const x = getCardX(event)
-              const member = familyMembers.find(m => m.id === event.assignedTo)
-              const memberColor = member?.color || 'blue'
-              const isConverged = convergenceZones.some(
-                z => z.events.some(e => e.id === event.id) && z.memberIds.length >= 2
-              )
-
-              return (
-                <EventCard
-                  key={event.prefixedId}
-                  event={event}
-                  memberColor={memberColor}
-                  x={x}
-                  y={y}
-                  isConverged={isConverged}
-                  isSelected={selectedItemId === event.prefixedId}
-                  onSelect={() => onSelectItem(event.prefixedId)}
-                  onToggleComplete={() => handleToggleComplete(event)}
-                  projectName={event.projectId ? projectsMap?.get(event.projectId)?.name : undefined}
-                  contactName={event.contactId ? contactsMap?.get(event.contactId)?.name : undefined}
+              {/* Free time zones - rendered first (below everything else) */}
+              {freeTimeZones.map(zone => (
+                <FreeTimeZoneDisplay
+                  key={`free-${zone.startMinutes}`}
+                  zone={zone}
+                  width={svgWidth}
                 />
-              )
-            })}
-          </g>
-        </svg>
+              ))}
+
+              {/* Convergence zones - for shared events */}
+              {convergenceZones.map(zone => (
+                <ConvergenceZoneDisplay
+                  key={`zone-${zone.startMinutes}`}
+                  zone={zone}
+                  members={familyMembers}
+                  centerX={svgWidth / 2}
+                />
+              ))}
+
+              {/* Stream paths */}
+              {streamConfigs.map((config, i) => {
+                const colors = STREAM_COLORS[config.color] || STREAM_COLORS.blue
+                const path = generateStreamPath(config, streamConfigs, svgWidth)
+                const member = selectedMembers.find(m => m.id === config.memberId)
+                const memberColors = FAMILY_COLORS[(config.color as FamilyMemberColor) || 'blue'] || FAMILY_COLORS.blue
+
+                return (
+                  <g key={config.memberId}>
+                    {/* Glow path */}
+                    <path
+                      d={path}
+                      fill="none"
+                      stroke={colors.glow}
+                      strokeWidth={12}
+                      strokeOpacity={0.12}
+                      strokeLinecap="round"
+                      style={{ filter: 'blur(6px)' }}
+                    />
+
+                    {/* Main stream path */}
+                    <path
+                      d={path}
+                      fill="none"
+                      stroke={colors.stroke}
+                      strokeWidth={4}
+                      strokeLinecap="round"
+                      className="transition-all duration-500"
+                      style={{
+                        strokeDasharray: isAnimating ? TIMELINE_HEIGHT * 2 : 0,
+                        strokeDashoffset: isAnimating ? TIMELINE_HEIGHT * 2 : 0,
+                        animation: isAnimating ? `stream-draw 1s ease-out ${i * 0.12}s forwards` : 'none',
+                      }}
+                    />
+
+                    {/* Column divider line */}
+                    {i > 0 && (
+                      <line
+                        x1={config.columnLeft}
+                        y1={-20}
+                        x2={config.columnLeft}
+                        y2={TIMELINE_HEIGHT}
+                        stroke="hsl(38, 20%, 92%)"
+                        strokeWidth={1}
+                        strokeDasharray="4 4"
+                      />
+                    )}
+
+                    {/* Member header with avatar and name */}
+                    <foreignObject x={config.columnLeft} y={-28} width={config.columnWidth} height={45}>
+                      <div
+                        className="flex flex-col items-center justify-center h-full"
+                        style={{
+                          opacity: isAnimating ? 0 : 1,
+                          animation: isAnimating ? `fade-in-scale 0.4s ease-out ${0.6 + i * 0.1}s forwards` : 'none',
+                        }}
+                      >
+                        <div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold
+                                     border-2 border-white shadow-md ${memberColors.bg} ${memberColors.text}`}
+                        >
+                          {member?.initials || member?.name.charAt(0)}
+                        </div>
+                        <span className="text-xs font-medium text-neutral-600 mt-0.5 truncate max-w-full px-1">
+                          {member?.name}
+                        </span>
+                      </div>
+                    </foreignObject>
+                  </g>
+                )
+              })}
+
+              {/* Event cards with duration bars - rendered inside foreignObjects */}
+              {timelineEvents.map(event => {
+                const y = minutesToY(getMinutesFromMidnight(event.startTime))
+                const layout = getCardLayout(event)
+                const member = familyMembers.find(m => m.id === event.assignedTo)
+                const memberColor = member?.color || 'blue'
+                const streamConfig = streamConfigs.find(c => c.memberId === event.assignedTo)
+                const isConverged = convergenceZones.some(
+                  z => z.events.some(e => e.id === event.id) && z.memberIds.length >= 2
+                )
+                const isBeingDragged = activeId === event.prefixedId
+                const durationHeight = getEventDuration(event)
+                const colors = STREAM_COLORS[memberColor] || STREAM_COLORS.blue
+
+                return (
+                  <g key={event.prefixedId} style={{ opacity: isBeingDragged ? 0.3 : 1 }}>
+                    {/* Duration indicator - shows time span for multi-hour events */}
+                    {durationHeight && streamConfig && (
+                      <>
+                        {/* Vertical line with arrow */}
+                        <line
+                          x1={streamConfig.baseX}
+                          y1={y + 20}
+                          x2={streamConfig.baseX}
+                          y2={y + durationHeight - 8}
+                          stroke={colors.stroke}
+                          strokeWidth={2}
+                          opacity={0.6}
+                          strokeDasharray={event.type === 'event' ? 'none' : '4 2'}
+                        />
+                        {/* Arrow head pointing down */}
+                        <path
+                          d={`M ${streamConfig.baseX - 5} ${y + durationHeight - 12}
+                              L ${streamConfig.baseX} ${y + durationHeight - 4}
+                              L ${streamConfig.baseX + 5} ${y + durationHeight - 12}`}
+                          fill="none"
+                          stroke={colors.stroke}
+                          strokeWidth={2}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          opacity={0.7}
+                        />
+                        {/* Horizontal end-time bar */}
+                        <line
+                          x1={streamConfig.baseX - 12}
+                          y1={y + durationHeight}
+                          x2={streamConfig.baseX + 12}
+                          y2={y + durationHeight}
+                          stroke={colors.stroke}
+                          strokeWidth={2}
+                          strokeLinecap="round"
+                          opacity={0.7}
+                        />
+                        {/* End time label */}
+                        {event.endTime && (
+                          <text
+                            x={streamConfig.baseX + 18}
+                            y={y + durationHeight + 4}
+                            className="fill-neutral-400"
+                            style={{ fontSize: '10px', fontFamily: 'var(--font-family-display)', fontStyle: 'italic' }}
+                          >
+                            {formatTime(getMinutesFromMidnight(event.endTime))}
+                          </text>
+                        )}
+                      </>
+                    )}
+
+                    {/* Event card */}
+                    <foreignObject
+                      x={layout.x}
+                      y={y - 20}
+                      width={layout.width}
+                      height={56}
+                    >
+                      <DraggableEventCard
+                        event={event}
+                        memberColor={memberColor}
+                        isConverged={isConverged}
+                        isSelected={selectedItemId === event.prefixedId}
+                        onSelect={() => onSelectItem(event.prefixedId)}
+                        onToggleComplete={() => handleToggleComplete(event)}
+                        projectName={event.projectId ? projectsMap?.get(event.projectId)?.name : undefined}
+                        contactName={event.contactId ? contactsMap?.get(event.contactId)?.name : undefined}
+                      />
+                    </foreignObject>
+                  </g>
+                )
+              })}
+            </g>
+          </svg>
+        </div>
+
+        {/* Drag overlay - shows the dragged item following the cursor */}
+        <DragOverlay>
+          {activeItem && (
+            <div style={{ width: 200 }}>
+              <EventCardContent
+                event={activeItem}
+                memberColor={familyMembers.find(m => m.id === activeItem.assignedTo)?.color || 'blue'}
+                isConverged={false}
+                isSelected={false}
+                isDragging={true}
+                onSelect={() => {}}
+                onToggleComplete={() => {}}
+                projectName={activeItem.projectId ? projectsMap?.get(activeItem.projectId)?.name : undefined}
+                contactName={activeItem.contactId ? contactsMap?.get(activeItem.contactId)?.name : undefined}
+              />
+            </div>
+          )}
+        </DragOverlay>
+
+        {/* Animation styles */}
+        <style>{`
+          @keyframes stream-draw {
+            to {
+              stroke-dashoffset: 0;
+            }
+          }
+
+          @keyframes fade-in-scale {
+            from {
+              opacity: 0;
+              transform: scale(0.8);
+            }
+            to {
+              opacity: 1;
+              transform: scale(1);
+            }
+          }
+        `}</style>
       </div>
-
-      {/* Animation styles */}
-      <style>{`
-        @keyframes stream-draw {
-          to {
-            stroke-dashoffset: 0;
-          }
-        }
-
-        @keyframes fade-in-scale {
-          from {
-            opacity: 0;
-            transform: scale(0.8);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
-        }
-      `}</style>
-    </div>
+    </DndContext>
   )
 }
