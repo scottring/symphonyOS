@@ -30,6 +30,7 @@ import { ListsList, ListView } from '@/components/list'
 import { NotesPage } from '@/components/notes'
 import { CompletedTasksView } from '@/components/history/CompletedTasksView'
 import { Toast } from '@/components/toast'
+import { KidsDemo } from '@/components/kids'
 import {
   ProjectsList,
   ProjectView,
@@ -1404,6 +1405,12 @@ function App() {
             }}
             onFamilyMembersChanged={refetchFamilyMembers}
           />
+        </Suspense>
+      )}
+
+      {activeView === 'kids' && (
+        <Suspense fallback={<LoadingFallback />}>
+          <KidsDemo />
         </Suspense>
       )}
 

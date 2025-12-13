@@ -14,7 +14,7 @@ const FEATURES = {
   lists: false, // Lists feature is not feature-complete yet
 }
 
-export type ViewType = 'home' | 'projects' | 'routines' | 'lists' | 'notes' | 'history' | 'task-detail' | 'contact-detail' | 'settings'
+export type ViewType = 'home' | 'projects' | 'routines' | 'lists' | 'notes' | 'history' | 'task-detail' | 'contact-detail' | 'settings' | 'kids'
 
 interface EntityData {
   tasks: Task[]
@@ -80,6 +80,13 @@ const navItems = [
         <path d="M12 8v4l3 3" />
         <circle cx="12" cy="12" r="10" />
       </svg>
+    ),
+  },
+  {
+    id: 'kids' as const,
+    label: 'Kids Zone',
+    icon: (
+      <span className="text-lg">🌟</span>
     ),
   },
 ]
