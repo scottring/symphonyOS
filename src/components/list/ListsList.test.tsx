@@ -330,6 +330,7 @@ describe('ListsList', () => {
         expect(mockOnAddList).toHaveBeenCalledWith({
           title: 'My New List',
           category: 'other',
+          isTemplate: false,
         })
       })
     })
@@ -354,6 +355,7 @@ describe('ListsList', () => {
         expect(mockOnAddList).toHaveBeenCalledWith({
           title: 'Trimmed Name',
           category: 'other',
+          isTemplate: false,
         })
       })
     })
@@ -521,6 +523,7 @@ describe('ListsList', () => {
         expect(mockOnAddList).toHaveBeenCalledWith({
           title: 'Test',
           category: 'other',
+          isTemplate: false,
         })
       })
     })
@@ -546,6 +549,7 @@ describe('ListsList', () => {
         expect(mockOnAddList).toHaveBeenCalledWith({
           title: 'My Movies',
           category: 'entertainment',
+          isTemplate: false,
         })
       })
     })
@@ -571,6 +575,7 @@ describe('ListsList', () => {
         expect(mockOnAddList).toHaveBeenCalledWith({
           title: 'Enter List',
           category: 'other',
+          isTemplate: false,
         })
       })
     })

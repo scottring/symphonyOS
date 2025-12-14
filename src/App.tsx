@@ -85,17 +85,22 @@ function App() {
   const {
     lists,
     listsByCategory,
+    templates,
     addList,
     updateList,
     deleteList,
     getListById,
     getListsByProject,
+    createFromTemplate,
+    saveAsTemplate,
   } = useLists()
   const {
     items: listItems,
+    checkedCount: listCheckedCount,
     addItem: addListItem,
     updateItem: updateListItem,
     deleteItem: deleteListItem,
+    toggleItem: toggleListItem,
     reorderItems: reorderListItems,
   } = useListItems(selectedListId)
 
@@ -1354,8 +1359,10 @@ function App() {
         <ListsList
           lists={lists}
           listsByCategory={listsByCategory}
+          templates={templates}
           onSelectList={setSelectedListId}
           onAddList={addList}
+          onCreateFromTemplate={createFromTemplate}
         />
       )}
 
@@ -1363,13 +1370,16 @@ function App() {
         <ListView
           list={selectedList}
           items={listItems}
+          checkedCount={listCheckedCount}
           onBack={() => setSelectedListId(null)}
           onUpdateList={updateList}
           onDeleteList={deleteList}
           onAddItem={addListItem}
           onUpdateItem={updateListItem}
           onDeleteItem={deleteListItem}
+          onToggleItem={toggleListItem}
           onReorderItems={reorderListItems}
+          onSaveAsTemplate={() => saveAsTemplate(selectedList.id)}
           isPinned={pinnedItems.isPinned('list', selectedList.id)}
           canPin={pinnedItems.canPin()}
           onPin={() => pinnedItems.pin('list', selectedList.id)}

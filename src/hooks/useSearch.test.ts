@@ -66,6 +66,7 @@ function createMockList(overrides: Partial<List> = {}): List {
     title: 'Test List',
     category: 'other',
     visibility: 'self',
+    isTemplate: false,
     sortOrder: 0,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),

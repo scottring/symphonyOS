@@ -59,6 +59,7 @@ function createMockDbListItem(overrides: Partial<DbListItem> = {}): DbListItem {
     list_id: 'list-1',
     text: 'Test Item',
     note: null,
+    is_checked: false,
     sort_order: 0,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',

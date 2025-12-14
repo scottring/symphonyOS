@@ -7,13 +7,16 @@ import { PinButton } from '@/components/pins'
 interface ListViewProps {
   list: List
   items: ListItem[]
+  checkedCount?: number
   onBack: () => void
   onUpdateList: (listId: string, updates: Partial<List>) => void
   onDeleteList?: (listId: string) => void
   onAddItem?: (item: { text: string; note?: string }) => Promise<ListItem | null>
   onUpdateItem?: (itemId: string, updates: Partial<ListItem>) => void
   onDeleteItem?: (itemId: string) => void
+  onToggleItem?: (itemId: string) => void
   onReorderItems?: (itemIds: string[]) => void
+  onSaveAsTemplate?: () => Promise<List | null>
   isPinned?: boolean
   canPin?: boolean
   onPin?: () => Promise<boolean>
@@ -23,13 +26,16 @@ interface ListViewProps {
 export function ListView({
   list,
   items,
+  checkedCount = 0,
   onBack,
   onUpdateList,
   onDeleteList,
   onAddItem,
   onUpdateItem,
   onDeleteItem,
+  onToggleItem,
   onReorderItems: _onReorderItems,
+  onSaveAsTemplate,
   isPinned,
   canPin,
   onPin,
@@ -45,6 +51,10 @@ export function ListView({
   const [showBulkAdd, setShowBulkAdd] = useState(false)
   const [bulkText, setBulkText] = useState('')
   const [isAddingBulk, setIsAddingBulk] = useState(false)
+  const [isSavingAsTemplate, setIsSavingAsTemplate] = useState(false)
+
+  // Calculate progress
+  const progressPercent = items.length > 0 ? Math.round((checkedCount / items.length) * 100) : 0
 
   const handleEdit = () => {
     setEditTitle(list.title)
@@ -111,6 +121,16 @@ export function ListView({
       setShowBulkAdd(false)
     } finally {
       setIsAddingBulk(false)
+    }
+  }
+
+  const handleSaveAsTemplate = async () => {
+    if (!onSaveAsTemplate) return
+    setIsSavingAsTemplate(true)
+    try {
+      await onSaveAsTemplate()
+    } finally {
+      setIsSavingAsTemplate(false)
     }
   }
 
@@ -235,10 +255,19 @@ export function ListView({
                 </div>
                 <div>
                   <h1 className="text-xl font-semibold text-neutral-800">{list.title}</h1>
-                  <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
                     <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-purple-100 text-purple-700">
                       {getCategoryLabel(list.category)}
                     </span>
+                    {list.isTemplate && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                          <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
+                        </svg>
+                        Template
+                      </span>
+                    )}
                     {list.visibility === 'family' && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-neutral-100 text-neutral-600">
                         <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
@@ -249,8 +278,25 @@ export function ListView({
                     )}
                     <span className="text-sm text-neutral-500">
                       {items.length} item{items.length !== 1 ? 's' : ''}
+                      {!list.isTemplate && items.length > 0 && checkedCount > 0 && (
+                        <span className="ml-1">({checkedCount} done)</span>
+                      )}
                     </span>
                   </div>
+                  {/* Progress bar for non-template lists */}
+                  {!list.isTemplate && items.length > 0 && (
+                    <div className="mt-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="flex-1 h-2 bg-neutral-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-purple-500 rounded-full transition-all duration-300"
+                            style={{ width: `${progressPercent}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-medium text-neutral-500">{progressPercent}%</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-1">
@@ -264,6 +310,28 @@ export function ListView({
                     onUnpin={onUnpin}
                     size="md"
                   />
+                )}
+                {/* Save as Template button (only for non-templates with items) */}
+                {!list.isTemplate && onSaveAsTemplate && items.length > 0 && (
+                  <button
+                    onClick={handleSaveAsTemplate}
+                    disabled={isSavingAsTemplate}
+                    className="p-2 text-neutral-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-50"
+                    aria-label="Save as template"
+                    title="Save as template"
+                  >
+                    {isSavingAsTemplate ? (
+                      <svg className="animate-spin w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                        <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </button>
                 )}
                 <button
                   onClick={handleEdit}
@@ -432,6 +500,8 @@ export function ListView({
                   item={item}
                   onUpdate={onUpdateItem ? (updates) => onUpdateItem(item.id, updates) : undefined}
                   onDelete={onDeleteItem ? () => onDeleteItem(item.id) : undefined}
+                  onToggle={onToggleItem ? () => onToggleItem(item.id) : undefined}
+                  showCheckbox={!list.isTemplate}
                 />
               ))}
             </div>

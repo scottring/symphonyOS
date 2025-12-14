@@ -12,6 +12,7 @@ function dbListToList(dbList: DbList): List {
     visibility: dbList.visibility,
     hiddenFrom: dbList.hidden_from ?? undefined,
     projectId: dbList.project_id ?? undefined,
+    isTemplate: dbList.is_template,
     sortOrder: dbList.sort_order,
     createdAt: new Date(dbList.created_at),
     updatedAt: new Date(dbList.updated_at),
@@ -67,6 +68,7 @@ export function useLists() {
     visibility?: ListVisibility
     hiddenFrom?: string[]
     projectId?: string
+    isTemplate?: boolean
   }) => {
     if (!user) return null
 
@@ -83,6 +85,7 @@ export function useLists() {
       visibility: list.visibility ?? 'self',
       hiddenFrom: list.hiddenFrom,
       projectId: list.projectId,
+      isTemplate: list.isTemplate ?? false,
       sortOrder: maxSortOrder + 1,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -99,6 +102,7 @@ export function useLists() {
         visibility: list.visibility ?? 'self',
         hidden_from: list.hiddenFrom ?? null,
         project_id: list.projectId ?? null,
+        is_template: list.isTemplate ?? false,
         sort_order: maxSortOrder + 1,
       })
       .select()
@@ -135,6 +139,7 @@ export function useLists() {
     if (updates.visibility !== undefined) dbUpdates.visibility = updates.visibility
     if (updates.hiddenFrom !== undefined) dbUpdates.hidden_from = updates.hiddenFrom ?? null
     if (updates.projectId !== undefined) dbUpdates.project_id = updates.projectId ?? null
+    if (updates.isTemplate !== undefined) dbUpdates.is_template = updates.isTemplate
     if (updates.sortOrder !== undefined) dbUpdates.sort_order = updates.sortOrder
 
     const { error: updateError } = await supabase
@@ -228,7 +233,145 @@ export function useLists() {
     return lists.filter((l) => l.projectId === projectId)
   }, [lists])
 
-  // Get lists grouped by category
+  // Save an existing list as a reusable template (copies all items)
+  const saveAsTemplate = useCallback(async (sourceListId: string, templateTitle?: string): Promise<List | null> => {
+    if (!user) return null
+
+    const sourceList = lists.find((l) => l.id === sourceListId)
+    if (!sourceList) return null
+
+    // First, fetch source list items
+    const { data: sourceItems, error: fetchError } = await supabase
+      .from('list_items')
+      .select('*')
+      .eq('list_id', sourceListId)
+      .order('sort_order', { ascending: true })
+
+    if (fetchError) {
+      setError(fetchError.message)
+      return null
+    }
+
+    // Create the template
+    const maxSortOrder = lists.length > 0 ? Math.max(...lists.map((l) => l.sortOrder)) : 0
+    const { data: templateData, error: insertError } = await supabase
+      .from('lists')
+      .insert({
+        user_id: user.id,
+        title: templateTitle || `${sourceList.title} (Template)`,
+        icon: sourceList.icon ?? null,
+        category: sourceList.category,
+        visibility: sourceList.visibility,
+        hidden_from: sourceList.hiddenFrom ?? null,
+        project_id: null,
+        is_template: true,
+        sort_order: maxSortOrder + 1,
+      })
+      .select()
+      .single()
+
+    if (insertError) {
+      setError(insertError.message)
+      return null
+    }
+
+    const template = dbListToList(templateData as DbList)
+    setLists((prev) => [...prev, template])
+
+    // Copy items to the template (all unchecked)
+    if (sourceItems && sourceItems.length > 0) {
+      const templateItems = sourceItems.map((item: { text: string; note: string | null; sort_order: number }, index: number) => ({
+        user_id: user.id,
+        list_id: template.id,
+        text: item.text,
+        note: item.note,
+        is_checked: false,
+        sort_order: index,
+      }))
+
+      const { error: itemsError } = await supabase
+        .from('list_items')
+        .insert(templateItems)
+
+      if (itemsError) {
+        setError(itemsError.message)
+        // Template was created but items failed - still return the template
+      }
+    }
+
+    return template
+  }, [user, lists])
+
+  // Create a new list from a template (copies template items)
+  const createFromTemplate = useCallback(async (templateId: string, newTitle?: string): Promise<List | null> => {
+    if (!user) return null
+
+    const template = lists.find((l) => l.id === templateId)
+    if (!template) return null
+
+    // First, fetch template items
+    const { data: templateItems, error: fetchError } = await supabase
+      .from('list_items')
+      .select('*')
+      .eq('list_id', templateId)
+      .order('sort_order', { ascending: true })
+
+    if (fetchError) {
+      setError(fetchError.message)
+      return null
+    }
+
+    // Create the new list (not a template)
+    const maxSortOrder = lists.length > 0 ? Math.max(...lists.map((l) => l.sortOrder)) : 0
+    const { data: newListData, error: insertError } = await supabase
+      .from('lists')
+      .insert({
+        user_id: user.id,
+        title: newTitle || template.title,
+        icon: template.icon ?? null,
+        category: template.category,
+        visibility: template.visibility,
+        hidden_from: template.hiddenFrom ?? null,
+        project_id: null, // New list from template starts unlinked
+        is_template: false,
+        sort_order: maxSortOrder + 1,
+      })
+      .select()
+      .single()
+
+    if (insertError) {
+      setError(insertError.message)
+      return null
+    }
+
+    const newList = dbListToList(newListData as DbList)
+    setLists((prev) => [...prev, newList])
+
+    // Copy items to the new list (all unchecked)
+    if (templateItems && templateItems.length > 0) {
+      const newItems = templateItems.map((item: { text: string; note: string | null; sort_order: number }, index: number) => ({
+        user_id: user.id,
+        list_id: newList.id,
+        text: item.text,
+        note: item.note,
+        is_checked: false,
+        sort_order: index,
+      }))
+
+      const { error: itemsError } = await supabase
+        .from('list_items')
+        .insert(newItems)
+
+      if (itemsError) {
+        setError(itemsError.message)
+        // List was created but items failed - still return the list
+      }
+    }
+
+    return newList
+  }, [user, lists])
+
+  // Get lists grouped by category (excludes templates)
   const listsByCategory = useMemo(() => {
     const grouped: Record<ListCategory, List[]> = {
       entertainment: [],
@@ -241,11 +384,19 @@ export function useLists() {
     }
 
     for (const list of lists) {
-      grouped[list.category].push(list)
+      if (!list.isTemplate) {
+        grouped[list.category].push(list)
+      }
     }
 
     return grouped
   }, [lists])
+
+  // Get templates only
+  const templates = useMemo(() => lists.filter((l) => l.isTemplate), [lists])
+
+  // Get non-template lists only
+  const regularLists = useMemo(() => lists.filter((l) => !l.isTemplate), [lists])
 
   // Create a lists map for efficient lookup
   const listsMap = useMemo(() => {
@@ -260,6 +411,8 @@ export function useLists() {
     lists,
     listsMap,
     listsByCategory,
+    templates,
+    regularLists,
     loading,
     error,
     addList,
@@ -270,5 +423,7 @@ export function useLists() {
     getListById,
     getListsByCategory,
     getListsByProject,
+    createFromTemplate,
+    saveAsTemplate,
   }
 }

@@ -26,6 +26,7 @@ export interface DbList {
   visibility: ListVisibility
   hidden_from: string[] | null  // User IDs - for gift lists
   project_id: string | null     // Link to a project
+  is_template: boolean          // When true, this is a reusable template
   sort_order: number
   created_at: string
   updated_at: string
@@ -40,6 +41,7 @@ export interface List {
   visibility: ListVisibility
   hiddenFrom?: string[]  // User IDs - for gift lists
   projectId?: string     // Link to a project
+  isTemplate: boolean    // When true, this is a reusable template
   sortOrder: number
   createdAt: Date
   updatedAt: Date
@@ -52,6 +54,7 @@ export interface DbListItem {
   user_id: string
   text: string
   note: string | null
+  is_checked: boolean
   sort_order: number
   created_at: string
   updated_at: string
@@ -63,6 +66,7 @@ export interface ListItem {
   listId: string
   text: string
   note?: string
+  isChecked: boolean
   sortOrder: number
   createdAt: Date
   updatedAt: Date

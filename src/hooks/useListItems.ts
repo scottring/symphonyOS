@@ -9,6 +9,7 @@ function dbListItemToListItem(dbItem: DbListItem): ListItem {
     listId: dbItem.list_id,
     text: dbItem.text,
     note: dbItem.note ?? undefined,
+    isChecked: dbItem.is_checked,
     sortOrder: dbItem.sort_order,
     createdAt: new Date(dbItem.created_at),
     updatedAt: new Date(dbItem.updated_at),
@@ -72,6 +73,7 @@ export function useListItems(listId: string | null) {
       listId,
       text: item.text,
       note: item.note,
+      isChecked: false,
       sortOrder: maxSortOrder + 1,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -117,6 +119,7 @@ export function useListItems(listId: string | null) {
     const dbUpdates: Record<string, unknown> = {}
     if (updates.text !== undefined) dbUpdates.text = updates.text
     if (updates.note !== undefined) dbUpdates.note = updates.note ?? null
+    if (updates.isChecked !== undefined) dbUpdates.is_checked = updates.isChecked
     if (updates.sortOrder !== undefined) dbUpdates.sort_order = updates.sortOrder
 
     const { error: updateError } = await supabase
@@ -188,6 +191,32 @@ export function useListItems(listId: string | null) {
     }
   }, [items])
 
+  // Toggle item checked state
+  const toggleItem = useCallback(async (id: string) => {
+    const item = items.find((i) => i.id === id)
+    if (!item) return
+
+    const newCheckedState = !item.isChecked
+
+    // Optimistic update
+    setItems((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, isChecked: newCheckedState, updatedAt: new Date() } : i))
+    )
+
+    const { error: updateError } = await supabase
+      .from('list_items')
+      .update({ is_checked: newCheckedState })
+      .eq('id', id)
+
+    if (updateError) {
+      // Rollback on error
+      setItems((prev) =>
+        prev.map((i) => (i.id === id ? item : i))
+      )
+      setError(updateError.message)
+    }
+  }, [items])
+
   // Search items by text (case-insensitive)
   const searchItems = useCallback((query: string): ListItem[] => {
     if (!query.trim()) return items
@@ -212,18 +241,23 @@ export function useListItems(listId: string | null) {
     return map
   }, [items])
 
-  // Item count
+  // Item counts
   const itemCount = items.length
+  const checkedCount = useMemo(() => items.filter((i) => i.isChecked).length, [items])
+  const uncheckedCount = useMemo(() => items.filter((i) => !i.isChecked).length, [items])
 
   return {
     items,
     itemsMap,
     itemCount,
+    checkedCount,
+    uncheckedCount,
     loading,
     error,
     addItem,
     updateItem,
     deleteItem,
+    toggleItem,
     reorderItems,
     searchItems,
     getItemById,
