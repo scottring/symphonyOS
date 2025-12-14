@@ -57,6 +57,7 @@ function createMockDbList(overrides: Partial<DbList> = {}): DbList {
     category: 'other',
     visibility: 'self',
     hidden_from: null,
+    project_id: null,
     sort_order: 0,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',

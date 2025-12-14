@@ -11,6 +11,7 @@ function dbListToList(dbList: DbList): List {
     category: dbList.category,
     visibility: dbList.visibility,
     hiddenFrom: dbList.hidden_from ?? undefined,
+    projectId: dbList.project_id ?? undefined,
     sortOrder: dbList.sort_order,
     createdAt: new Date(dbList.created_at),
     updatedAt: new Date(dbList.updated_at),
@@ -65,6 +66,7 @@ export function useLists() {
     category?: ListCategory
     visibility?: ListVisibility
     hiddenFrom?: string[]
+    projectId?: string
   }) => {
     if (!user) return null
 
@@ -80,6 +82,7 @@ export function useLists() {
       category: list.category ?? 'other',
       visibility: list.visibility ?? 'self',
       hiddenFrom: list.hiddenFrom,
+      projectId: list.projectId,
       sortOrder: maxSortOrder + 1,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -95,6 +98,7 @@ export function useLists() {
         category: list.category ?? 'other',
         visibility: list.visibility ?? 'self',
         hidden_from: list.hiddenFrom ?? null,
+        project_id: list.projectId ?? null,
         sort_order: maxSortOrder + 1,
       })
       .select()
@@ -130,6 +134,7 @@ export function useLists() {
     if (updates.category !== undefined) dbUpdates.category = updates.category
     if (updates.visibility !== undefined) dbUpdates.visibility = updates.visibility
     if (updates.hiddenFrom !== undefined) dbUpdates.hidden_from = updates.hiddenFrom ?? null
+    if (updates.projectId !== undefined) dbUpdates.project_id = updates.projectId ?? null
     if (updates.sortOrder !== undefined) dbUpdates.sort_order = updates.sortOrder
 
     const { error: updateError } = await supabase
@@ -218,6 +223,11 @@ export function useLists() {
     return lists.filter((l) => l.category === category)
   }, [lists])
 
+  // Get lists by project ID
+  const getListsByProject = useCallback((projectId: string): List[] => {
+    return lists.filter((l) => l.projectId === projectId)
+  }, [lists])
+
   // Get lists grouped by category
   const listsByCategory = useMemo(() => {
     const grouped: Record<ListCategory, List[]> = {
@@ -259,5 +269,6 @@ export function useLists() {
     searchLists,
     getListById,
     getListsByCategory,
+    getListsByProject,
   }
 }

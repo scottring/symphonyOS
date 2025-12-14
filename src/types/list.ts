@@ -25,6 +25,7 @@ export interface DbList {
   category: ListCategory
   visibility: ListVisibility
   hidden_from: string[] | null  // User IDs - for gift lists
+  project_id: string | null     // Link to a project
   sort_order: number
   created_at: string
   updated_at: string
@@ -38,6 +39,7 @@ export interface List {
   category: ListCategory
   visibility: ListVisibility
   hiddenFrom?: string[]  // User IDs - for gift lists
+  projectId?: string     // Link to a project
   sortOrder: number
   createdAt: Date
   updatedAt: Date

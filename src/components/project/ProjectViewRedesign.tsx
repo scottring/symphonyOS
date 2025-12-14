@@ -3,6 +3,8 @@ import type { Project, ProjectStatus } from '@/types/project'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
+import type { List } from '@/types/list'
+import { getCategoryIcon } from '@/types/list'
 import type { EventNote } from '@/hooks/useEventNotes'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { formatTimeWithDate } from '@/lib/timeUtils'
@@ -46,6 +48,13 @@ interface ProjectViewProps {
   canPin?: boolean
   onPin?: () => Promise<boolean>
   onUnpin?: () => Promise<boolean>
+  // Lists props
+  linkedLists?: List[]
+  allLists?: List[]
+  onLinkList?: (listId: string) => void
+  onUnlinkList?: (listId: string) => void
+  onCreateList?: (title: string, projectId: string) => void
+  onSelectList?: (listId: string) => void
 }
 
 export function ProjectViewRedesign({
@@ -70,6 +79,12 @@ export function ProjectViewRedesign({
   canPin: _canPin,
   onPin: _onPin,
   onUnpin: _onUnpin,
+  linkedLists = [],
+  allLists = [],
+  onLinkList,
+  onUnlinkList,
+  onCreateList,
+  onSelectList,
 }: ProjectViewProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState('')
@@ -81,6 +96,9 @@ export function ProjectViewRedesign({
   const [eventSearchQuery, setEventSearchQuery] = useState('')
   const eventSelectorRef = useRef<HTMLDivElement>(null)
   const [showStatusDropdown, setShowStatusDropdown] = useState(false)
+  const [showListPicker, setShowListPicker] = useState(false)
+  const [newListTitle, setNewListTitle] = useState('')
+  const listPickerRef = useRef<HTMLDivElement>(null)
 
   const projectTasks = useMemo(() => {
     return tasks.filter((t) => t.projectId === project.id)
@@ -105,6 +123,11 @@ export function ProjectViewRedesign({
   const calculatedStatus = useMemo(() => {
     return calculateProjectStatus(projectTasks)
   }, [projectTasks])
+
+  // Lists that are not linked to any project (available to link)
+  const availableLists = useMemo(() => {
+    return allLists.filter((l) => !l.projectId)
+  }, [allLists])
 
   // Auto-update disabled - user has full manual control over project status
   // The calculatedStatus is still available for display purposes if needed
@@ -147,6 +170,21 @@ export function ProjectViewRedesign({
     }
   }, [showEventSelector])
 
+  // Click outside handler for list picker
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (listPickerRef.current && !listPickerRef.current.contains(event.target as Node)) {
+        setShowListPicker(false)
+        setNewListTitle('')
+      }
+    }
+
+    if (showListPicker) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showListPicker])
+
   // Handle linking an event
   const handleLinkEvent = (event: CalendarEvent) => {
     if (!onLinkEvent) return
@@ -156,6 +194,17 @@ export function ProjectViewRedesign({
     onLinkEvent(eventId, event.title, startTime)
     setShowEventSelector(false)
     setEventSearchQuery('')
+  }
+
+  // Handle creating a new list
+  const handleCreateList = (e: React.FormEvent) => {
+    e.preventDefault()
+    const trimmed = newListTitle.trim()
+    if (trimmed && onCreateList) {
+      onCreateList(trimmed, project.id)
+      setNewListTitle('')
+      setShowListPicker(false)
+    }
   }
 
   const statusConfig: Record<ProjectStatus, { label: string; color: string; bg: string; accent: string; glow: string }> = {
@@ -932,6 +981,115 @@ export function ProjectViewRedesign({
                       </svg>
                     </div>
                     <span className="text-sm">No notes added</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Linked Lists - separate card */}
+              <div className="bg-white/70 backdrop-blur-sm rounded-2xl border border-neutral-200/50 p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-[10px] font-bold text-neutral-400 uppercase tracking-[0.15em]">Lists</h3>
+                  {(onLinkList || onCreateList) && (
+                    <div className="relative" ref={listPickerRef}>
+                      <button
+                        onClick={() => setShowListPicker(!showListPicker)}
+                        className="text-xs text-primary-600 hover:text-primary-700 font-semibold flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 rounded-lg hover:bg-primary-100 transition-all duration-200"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                        </svg>
+                        Add
+                      </button>
+
+                      {/* List Picker Dropdown */}
+                      {showListPicker && (
+                        <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-xl border border-neutral-200/80 z-20 overflow-hidden animate-fade-in-scale">
+                          {/* Create new list */}
+                          {onCreateList && (
+                            <form onSubmit={handleCreateList} className="p-3 border-b border-neutral-100">
+                              <input
+                                type="text"
+                                value={newListTitle}
+                                onChange={(e) => setNewListTitle(e.target.value)}
+                                placeholder="Create new list..."
+                                className="w-full px-4 py-2.5 text-sm rounded-xl border border-neutral-200 bg-neutral-50
+                                           focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400 focus:bg-white transition-all duration-200"
+                                autoFocus
+                              />
+                            </form>
+                          )}
+
+                          {/* Link existing list */}
+                          {onLinkList && availableLists.length > 0 && (
+                            <div className="max-h-48 overflow-y-auto">
+                              <div className="px-3 py-2 text-xs font-bold text-neutral-400 uppercase tracking-wide">
+                                Link existing
+                              </div>
+                              {availableLists.map((list) => (
+                                <button
+                                  key={list.id}
+                                  onClick={() => {
+                                    onLinkList(list.id)
+                                    setShowListPicker(false)
+                                  }}
+                                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-neutral-50 flex items-center gap-3"
+                                >
+                                  <span className="text-base">{list.icon || getCategoryIcon(list.category)}</span>
+                                  <span className="truncate font-medium text-neutral-700">{list.title}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+
+                          {onLinkList && availableLists.length === 0 && !onCreateList && (
+                            <div className="px-4 py-6 text-sm text-neutral-400 text-center">
+                              No lists available
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {linkedLists.length > 0 ? (
+                  <div className="space-y-2">
+                    {linkedLists.map((list) => (
+                      <div
+                        key={list.id}
+                        className="group flex items-center gap-3 p-3 -mx-3 rounded-xl hover:bg-neutral-50 transition-all duration-150"
+                      >
+                        <button
+                          onClick={() => onSelectList?.(list.id)}
+                          className="flex-1 flex items-center gap-3 text-left min-w-0"
+                        >
+                          <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 flex-shrink-0">
+                            <span className="text-base">{list.icon || getCategoryIcon(list.category)}</span>
+                          </div>
+                          <span className="text-sm font-medium text-neutral-800 truncate">{list.title}</span>
+                        </button>
+                        {onUnlinkList && (
+                          <button
+                            onClick={() => onUnlinkList(list.id)}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 text-neutral-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all duration-150"
+                            aria-label="Unlink list"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 py-2 text-neutral-400">
+                    <div className="w-8 h-8 rounded-lg bg-neutral-100 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                    </div>
+                    <span className="text-sm">No linked lists</span>
                   </div>
                 )}
               </div>

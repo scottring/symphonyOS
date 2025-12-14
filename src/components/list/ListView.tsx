@@ -42,6 +42,9 @@ export function ListView({
   const [editVisibility, setEditVisibility] = useState<ListVisibility>('self')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [newItemText, setNewItemText] = useState('')
+  const [showBulkAdd, setShowBulkAdd] = useState(false)
+  const [bulkText, setBulkText] = useState('')
+  const [isAddingBulk, setIsAddingBulk] = useState(false)
 
   const handleEdit = () => {
     setEditTitle(list.title)
@@ -85,6 +88,29 @@ export function ListView({
     if (trimmed && onAddItem) {
       await onAddItem({ text: trimmed })
       setNewItemText('')
+    }
+  }
+
+  const handleBulkAdd = async () => {
+    if (!onAddItem || !bulkText.trim()) return
+
+    const lines = bulkText
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+
+    if (lines.length === 0) return
+
+    setIsAddingBulk(true)
+    try {
+      // Add items sequentially to preserve order
+      for (const line of lines) {
+        await onAddItem({ text: line })
+      }
+      setBulkText('')
+      setShowBulkAdd(false)
+    } finally {
+      setIsAddingBulk(false)
     }
   }
 
@@ -292,29 +318,105 @@ export function ListView({
           <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">Items</h2>
 
           {/* Add item input */}
-          {onAddItem && (
-            <form onSubmit={handleAddItem} className="mb-4">
-              <div className="flex items-center gap-2 pl-3 pr-4 py-2 rounded-xl border border-dashed border-neutral-200 bg-neutral-50/50 hover:border-neutral-300 focus-within:border-purple-300 focus-within:bg-white transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-neutral-300" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+          {onAddItem && !showBulkAdd && (
+            <div className="mb-4">
+              <form onSubmit={handleAddItem}>
+                <div className="flex items-center gap-2 pl-3 pr-4 py-2 rounded-xl border border-dashed border-neutral-200 bg-neutral-50/50 hover:border-neutral-300 focus-within:border-purple-300 focus-within:bg-white transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-neutral-300" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                  </svg>
+                  <input
+                    type="text"
+                    value={newItemText}
+                    onChange={(e) => setNewItemText(e.target.value)}
+                    placeholder="Add an item..."
+                    className="flex-1 bg-transparent text-base text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
+                  />
+                  {newItemText.trim() && (
+                    <button
+                      type="submit"
+                      className="px-3 py-1 text-xs font-medium text-white bg-purple-500 rounded-lg hover:bg-purple-600 transition-colors"
+                    >
+                      Add
+                    </button>
+                  )}
+                </div>
+              </form>
+              <button
+                type="button"
+                onClick={() => setShowBulkAdd(true)}
+                className="mt-2 text-xs text-neutral-400 hover:text-purple-600 transition-colors flex items-center gap-1"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" />
                 </svg>
-                <input
-                  type="text"
-                  value={newItemText}
-                  onChange={(e) => setNewItemText(e.target.value)}
-                  placeholder="Add an item..."
-                  className="flex-1 bg-transparent text-base text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
-                />
-                {newItemText.trim() && (
-                  <button
-                    type="submit"
-                    className="px-3 py-1 text-xs font-medium text-white bg-purple-500 rounded-lg hover:bg-purple-600 transition-colors"
-                  >
-                    Add
-                  </button>
-                )}
+                Add multiple items at once
+              </button>
+            </div>
+          )}
+
+          {/* Bulk add mode */}
+          {onAddItem && showBulkAdd && (
+            <div className="mb-4 p-4 bg-purple-50 rounded-xl border border-purple-200">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium text-purple-800">Bulk Add Items</h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBulkAdd(false)
+                    setBulkText('')
+                  }}
+                  className="text-purple-400 hover:text-purple-600 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
               </div>
-            </form>
+              <p className="text-xs text-purple-600 mb-3">
+                Enter one item per line. You can paste a list from anywhere.
+              </p>
+              <textarea
+                value={bulkText}
+                onChange={(e) => setBulkText(e.target.value)}
+                placeholder="Restaurant A&#10;Restaurant B&#10;Restaurant C&#10;..."
+                rows={6}
+                className="w-full px-3 py-2 text-sm rounded-lg border border-purple-200 bg-white
+                           focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent
+                           resize-none font-mono"
+                autoFocus
+              />
+              <div className="flex items-center justify-between mt-3">
+                <span className="text-xs text-purple-500">
+                  {bulkText.split('\n').filter(l => l.trim()).length} items
+                </span>
+                <button
+                  type="button"
+                  onClick={handleBulkAdd}
+                  disabled={!bulkText.trim() || isAddingBulk}
+                  className="px-4 py-2 text-sm font-medium text-white bg-purple-500 rounded-lg
+                             hover:bg-purple-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed
+                             flex items-center gap-2"
+                >
+                  {isAddingBulk ? (
+                    <>
+                      <svg className="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Adding...
+                    </>
+                  ) : (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                      </svg>
+                      Add All Items
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           )}
 
           {items.length === 0 ? (

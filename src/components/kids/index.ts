@@ -1,4 +1,5 @@
 export { KidsChoreTracker } from './KidsChoreTracker'
 export { KidsDemo } from './KidsDemo'
 export { KidsTodayTimeline } from './KidsTodayTimeline'
+export { KidsZone } from './KidsZone'
 export { default } from './KidsChoreTracker'

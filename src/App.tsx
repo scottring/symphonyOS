@@ -30,7 +30,7 @@ import { ListsList, ListView } from '@/components/list'
 import { NotesPage } from '@/components/notes'
 import { CompletedTasksView } from '@/components/history/CompletedTasksView'
 import { Toast } from '@/components/toast'
-import { KidsDemo } from '@/components/kids'
+import { KidsZone } from '@/components/kids'
 import {
   ProjectsList,
   ProjectView,
@@ -89,6 +89,7 @@ function App() {
     updateList,
     deleteList,
     getListById,
+    getListsByProject,
   } = useLists()
   const {
     items: listItems,
@@ -1274,6 +1275,17 @@ function App() {
             canPin={pinnedItems.canPin()}
             onPin={() => pinnedItems.pin('project', selectedProject.id)}
             onUnpin={() => pinnedItems.unpin('project', selectedProject.id)}
+            linkedLists={getListsByProject(selectedProject.id)}
+            allLists={lists}
+            onLinkList={(listId) => updateList(listId, { projectId: selectedProject.id })}
+            onUnlinkList={(listId) => updateList(listId, { projectId: undefined })}
+            onCreateList={async (title, projectId) => {
+              await addList({ title, projectId })
+            }}
+            onSelectList={(listId) => {
+              setSelectedListId(listId)
+              setActiveView('lists')
+            }}
           />
         </Suspense>
       )}
@@ -1410,7 +1422,24 @@ function App() {
 
       {activeView === 'kids' && (
         <Suspense fallback={<LoadingFallback />}>
-          <KidsDemo />
+          <KidsZone
+            tasks={tasks}
+            routines={filteredRoutines}
+            events={filteredEvents}
+            dateInstances={dateInstances}
+            familyMembers={familyMembers}
+            viewedDate={viewedDate}
+            onToggleTask={handleToggleTask}
+            onCompleteRoutine={async (routineId, completed) => {
+              if (completed) {
+                await markDone('routine', routineId, viewedDate)
+              } else {
+                await undoDone('routine', routineId, viewedDate)
+              }
+              refreshDateInstances()
+            }}
+            onBack={() => handleViewChange('home')}
+          />
         </Suspense>
       )}
 

@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import type { Project, ProjectStatus } from '@/types/project'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
+import type { List } from '@/types/list'
+import { getCategoryIcon } from '@/types/list'
 import { PinButton } from '@/components/pins'
 import { formatTimeWithDate } from '@/lib/timeUtils'
 
@@ -21,6 +23,13 @@ interface ProjectViewProps {
   canPin?: boolean
   onPin?: () => Promise<boolean>
   onUnpin?: () => Promise<boolean>
+  // Lists props
+  linkedLists?: List[]
+  allLists?: List[]
+  onLinkList?: (listId: string) => void
+  onUnlinkList?: (listId: string) => void
+  onCreateList?: (title: string, projectId: string) => void
+  onSelectList?: (listId: string) => void
 }
 
 export function ProjectView({
@@ -38,6 +47,12 @@ export function ProjectView({
   canPin,
   onPin,
   onUnpin,
+  linkedLists = [],
+  allLists = [],
+  onLinkList,
+  onUnlinkList,
+  onCreateList,
+  onSelectList,
 }: ProjectViewProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState('')
@@ -45,6 +60,8 @@ export function ProjectView({
   const [editNotes, setEditNotes] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [newListTitle, setNewListTitle] = useState('')
+  const [showListPicker, setShowListPicker] = useState(false)
 
   // Filter tasks for this project
   const projectTasks = useMemo(() => {
@@ -68,6 +85,11 @@ export function ProjectView({
   const completedCount = projectTasks.filter((t) => t.completed).length
   const totalCount = projectTasks.length
   const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0
+
+  // Lists that are not linked to any project (available to link)
+  const availableLists = useMemo(() => {
+    return allLists.filter((l) => !l.projectId)
+  }, [allLists])
 
   const statusLabel = (status: ProjectStatus) => {
     switch (status) {
@@ -134,6 +156,15 @@ export function ProjectView({
     if (trimmed && onAddTask) {
       onAddTask(trimmed, project.id)
       setNewTaskTitle('')
+    }
+  }
+
+  const handleCreateList = (e: React.FormEvent) => {
+    e.preventDefault()
+    const trimmed = newListTitle.trim()
+    if (trimmed && onCreateList) {
+      onCreateList(trimmed, project.id)
+      setNewListTitle('')
     }
   }
 
@@ -500,6 +531,121 @@ export function ProjectView({
                   </div>
                 )
               })}
+            </div>
+          )}
+        </div>
+
+        {/* Linked Lists section */}
+        <div className="mt-8">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide">Lists</h2>
+            {(onLinkList || onCreateList) && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowListPicker(!showListPicker)}
+                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                  </svg>
+                  Add List
+                </button>
+
+                {/* List picker popover */}
+                {showListPicker && (
+                  <div className="absolute right-0 top-full mt-1 w-64 bg-white rounded-xl shadow-lg border border-neutral-200 z-20 overflow-hidden">
+                    {/* Create new list */}
+                    {onCreateList && (
+                      <form onSubmit={handleCreateList} className="p-2 border-b border-neutral-100">
+                        <input
+                          type="text"
+                          value={newListTitle}
+                          onChange={(e) => setNewListTitle(e.target.value)}
+                          placeholder="Create new list..."
+                          className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          autoFocus
+                        />
+                      </form>
+                    )}
+
+                    {/* Link existing list */}
+                    {onLinkList && availableLists.length > 0 && (
+                      <div className="max-h-48 overflow-y-auto">
+                        <div className="px-3 py-2 text-xs font-medium text-neutral-400 uppercase tracking-wide">
+                          Link existing list
+                        </div>
+                        {availableLists.map((list) => (
+                          <button
+                            key={list.id}
+                            onClick={() => {
+                              onLinkList(list.id)
+                              setShowListPicker(false)
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 flex items-center gap-2"
+                          >
+                            <span>{list.icon || getCategoryIcon(list.category)}</span>
+                            <span className="truncate">{list.title}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {onLinkList && availableLists.length === 0 && !onCreateList && (
+                      <div className="px-3 py-4 text-sm text-neutral-400 text-center">
+                        No lists available to link
+                      </div>
+                    )}
+
+                    {/* Close button */}
+                    <button
+                      onClick={() => setShowListPicker(false)}
+                      className="w-full px-3 py-2 text-xs text-neutral-400 hover:text-neutral-600 border-t border-neutral-100"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {linkedLists.length === 0 ? (
+            <div className="text-center py-8 bg-neutral-50/50 rounded-xl border border-dashed border-neutral-200">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 mx-auto text-neutral-300 mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" />
+              </svg>
+              <p className="text-sm text-neutral-400">No lists linked yet</p>
+              <p className="text-xs text-neutral-400 mt-1">Add lists to organize restaurants, activities, packing, etc.</p>
+            </div>
+          ) : (
+            <div className="grid gap-2">
+              {linkedLists.map((list) => (
+                <div
+                  key={list.id}
+                  className="flex items-center gap-3 p-3 bg-white rounded-xl border border-neutral-100 hover:border-neutral-200 hover:shadow-sm transition-all group"
+                >
+                  <button
+                    onClick={() => onSelectList?.(list.id)}
+                    className="flex-1 flex items-center gap-3 text-left"
+                  >
+                    <span className="text-xl">{list.icon || getCategoryIcon(list.category)}</span>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-base font-medium text-neutral-800 truncate block">{list.title}</span>
+                    </div>
+                  </button>
+                  {onUnlinkList && (
+                    <button
+                      onClick={() => onUnlinkList(list.id)}
+                      className="p-1.5 text-neutral-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                      title="Unlink from project"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </div>

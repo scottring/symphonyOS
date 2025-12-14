@@ -11,7 +11,7 @@ import type { Routine } from '@/types/routine'
 // Feature flags for in-progress features
 const FEATURES = {
   notes: false, // Notes feature is built but not production-ready yet
-  lists: false, // Lists feature is not feature-complete yet
+  lists: true, // Lists feature - enabled for trip planning and collections
 }
 
 export type ViewType = 'home' | 'projects' | 'routines' | 'lists' | 'notes' | 'history' | 'task-detail' | 'contact-detail' | 'settings' | 'kids'
