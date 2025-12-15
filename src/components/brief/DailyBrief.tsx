@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import type { DailyBrief as DailyBriefType, DailyBriefItem, DailyBriefActionType } from '@/types/action'
 
 interface DailyBriefProps {
@@ -7,6 +8,8 @@ interface DailyBriefProps {
   onRegenerate?: () => void
   onDismiss?: () => void
   onItemAction?: (item: DailyBriefItem, action: DailyBriefActionType) => void
+  onScheduleTask?: (taskId: string, date: Date) => void
+  onDeferTask?: (taskId: string, date: Date) => void
 }
 
 // Icon components for item types
@@ -183,6 +186,8 @@ export function DailyBrief({
   onRegenerate,
   onDismiss,
   onItemAction,
+  onScheduleTask,
+  onDeferTask,
 }: DailyBriefProps) {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
 
@@ -280,6 +285,16 @@ export function DailyBrief({
               isExpanded={expandedItems.has(item.id)}
               onToggle={() => toggleExpanded(item.id)}
               onAction={(action) => onItemAction?.(item, action)}
+              onSchedule={(date) => {
+                if (item.relatedEntityType === 'task' && item.relatedEntityId) {
+                  onScheduleTask?.(item.relatedEntityId, date)
+                }
+              }}
+              onDefer={(date) => {
+                if (item.relatedEntityType === 'task' && item.relatedEntityId) {
+                  onDeferTask?.(item.relatedEntityId, date)
+                }
+              }}
             />
           ))}
         </div>
@@ -305,11 +320,71 @@ interface DailyBriefItemCardProps {
   isExpanded: boolean
   onToggle: () => void
   onAction: (action: DailyBriefActionType) => void
+  onSchedule?: (date: Date) => void
+  onDefer?: (date: Date) => void
 }
 
-function DailyBriefItemCard({ item, isExpanded, onToggle, onAction }: DailyBriefItemCardProps) {
+function DailyBriefItemCard({ item, isExpanded, onToggle, onAction, onSchedule, onDefer }: DailyBriefItemCardProps) {
   const iconColor = ITEM_TYPE_COLORS[item.type] || 'text-neutral-500'
   const priorityStyle = PRIORITY_STYLES[item.priority] || PRIORITY_STYLES.low
+  const [showSchedulePicker, setShowSchedulePicker] = useState(false)
+  const [showDeferPicker, setShowDeferPicker] = useState(false)
+  const scheduleRef = useRef<HTMLButtonElement>(null)
+  const deferRef = useRef<HTMLButtonElement>(null)
+  const [pickerPosition, setPickerPosition] = useState({ top: 0, left: 0 })
+
+  // Calculate position for popovers
+  const openSchedulePicker = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const rect = scheduleRef.current?.getBoundingClientRect()
+    if (rect) {
+      setPickerPosition({ top: rect.bottom + 4, left: rect.left })
+    }
+    setShowSchedulePicker(true)
+    setShowDeferPicker(false)
+  }
+
+  const openDeferPicker = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const rect = deferRef.current?.getBoundingClientRect()
+    if (rect) {
+      setPickerPosition({ top: rect.bottom + 4, left: rect.left })
+    }
+    setShowDeferPicker(true)
+    setShowSchedulePicker(false)
+  }
+
+  // Close pickers on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('.brief-picker-popover') && !target.closest('.brief-picker-trigger')) {
+        setShowSchedulePicker(false)
+        setShowDeferPicker(false)
+      }
+    }
+    if (showSchedulePicker || showDeferPicker) {
+      document.addEventListener('click', handleClick)
+      return () => document.removeEventListener('click', handleClick)
+    }
+  }, [showSchedulePicker, showDeferPicker])
+
+  const getDate = (daysFromNow: number) => {
+    const date = new Date()
+    date.setDate(date.getDate() + daysFromNow)
+    date.setHours(0, 0, 0, 0)
+    return date
+  }
+
+  const handleScheduleSelect = (date: Date) => {
+    onSchedule?.(date)
+    setShowSchedulePicker(false)
+  }
+
+  const handleDeferSelect = (date: Date) => {
+    onDefer?.(date)
+    setShowDeferPicker(false)
+  }
 
   return (
     <div className={`border-l-4 ${priorityStyle}`}>
@@ -352,22 +427,127 @@ function DailyBriefItemCard({ item, isExpanded, onToggle, onAction }: DailyBrief
           {/* Actions */}
           {item.suggestedActions.length > 0 && (
             <div className="flex flex-wrap gap-2 ml-8">
-              {item.suggestedActions.map((action, idx) => (
-                <button
-                  key={idx}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onAction(action.action)
-                  }}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-                    idx === 0
-                      ? 'bg-primary-600 text-white hover:bg-primary-700'
-                      : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
-                  }`}
-                >
-                  {action.label}
-                </button>
-              ))}
+              {item.suggestedActions.map((action, idx) => {
+                // Handle schedule action with popover
+                if (action.action === 'schedule') {
+                  return (
+                    <div key={idx} className="relative">
+                      <button
+                        ref={scheduleRef}
+                        onClick={openSchedulePicker}
+                        className={`brief-picker-trigger px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                          idx === 0
+                            ? 'bg-primary-600 text-white hover:bg-primary-700'
+                            : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                        }`}
+                      >
+                        {action.label}
+                      </button>
+                      {showSchedulePicker && createPortal(
+                        <div
+                          className="brief-picker-popover fixed z-[100] bg-white rounded-xl border border-neutral-200 shadow-lg p-2 min-w-[160px]"
+                          style={{ top: pickerPosition.top, left: pickerPosition.left }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="space-y-1">
+                            <button
+                              onClick={() => handleScheduleSelect(getDate(0))}
+                              className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+                            >
+                              Today
+                            </button>
+                            <button
+                              onClick={() => handleScheduleSelect(getDate(1))}
+                              className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+                            >
+                              Tomorrow
+                            </button>
+                            <button
+                              onClick={() => handleScheduleSelect(getDate(7))}
+                              className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+                            >
+                              Next Week
+                            </button>
+                          </div>
+                        </div>,
+                        document.body
+                      )}
+                    </div>
+                  )
+                }
+
+                // Handle defer action with popover
+                if (action.action === 'defer') {
+                  return (
+                    <div key={idx} className="relative">
+                      <button
+                        ref={deferRef}
+                        onClick={openDeferPicker}
+                        className={`brief-picker-trigger px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                          idx === 0
+                            ? 'bg-primary-600 text-white hover:bg-primary-700'
+                            : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                        }`}
+                      >
+                        {action.label}
+                      </button>
+                      {showDeferPicker && createPortal(
+                        <div
+                          className="brief-picker-popover fixed z-[100] bg-white rounded-xl border border-neutral-200 shadow-lg p-2 min-w-[160px]"
+                          style={{ top: pickerPosition.top, left: pickerPosition.left }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="space-y-1">
+                            <button
+                              onClick={() => handleDeferSelect(getDate(1))}
+                              className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+                            >
+                              Tomorrow
+                            </button>
+                            <button
+                              onClick={() => handleDeferSelect(getDate(7))}
+                              className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+                            >
+                              Next Week
+                            </button>
+                            <button
+                              onClick={() => handleDeferSelect(getDate(14))}
+                              className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+                            >
+                              In 2 Weeks
+                            </button>
+                            <button
+                              onClick={() => handleDeferSelect(getDate(30))}
+                              className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+                            >
+                              Next Month
+                            </button>
+                          </div>
+                        </div>,
+                        document.body
+                      )}
+                    </div>
+                  )
+                }
+
+                // Regular action button
+                return (
+                  <button
+                    key={idx}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onAction(action.action)
+                    }}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                      idx === 0
+                        ? 'bg-primary-600 text-white hover:bg-primary-700'
+                        : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                    }`}
+                  >
+                    {action.label}
+                  </button>
+                )
+              })}
             </div>
           )}
         </div>

@@ -19,6 +19,8 @@ interface HomeDashboardProps {
   onGenerateBrief: (force?: boolean) => void
   onDismissBrief: () => void
   onBriefItemAction: (item: DailyBriefItem, action: DailyBriefActionType) => void
+  onScheduleTask?: (taskId: string, date: Date) => void
+  onDeferTask?: (taskId: string, date: Date) => void
   onNavigateToSchedule: () => void
   onNavigateToContext: (context: 'work' | 'family' | 'personal') => void
   onNavigateToInbox: () => void
@@ -32,15 +34,6 @@ function getGreeting(): string {
   if (hour < 12) return 'Good morning'
   if (hour < 17) return 'Good afternoon'
   return 'Good evening'
-}
-
-// Get time period for illustration styling
-function getTimePeriod(): 'morning' | 'afternoon' | 'evening' {
-  const hour = new Date().getHours()
-  if (hour < 5) return 'evening'
-  if (hour < 12) return 'morning'
-  if (hour < 17) return 'afternoon'
-  return 'evening'
 }
 
 // Format today's date elegantly
@@ -63,6 +56,8 @@ export function HomeDashboard({
   onGenerateBrief,
   onDismissBrief,
   onBriefItemAction,
+  onScheduleTask,
+  onDeferTask,
   onNavigateToSchedule,
   onNavigateToContext,
   onNavigateToInbox,
@@ -151,101 +146,77 @@ export function HomeDashboard({
 
   const shouldShowBrief = brief && !brief.dismissedAt
   const showBriefSkeleton = (briefLoading || briefGenerating) && !brief
-  const timePeriod = getTimePeriod()
 
   return (
     <div className="min-h-full bg-bg-base">
-      {/* Hero Section with Illustration */}
-      <div className="relative overflow-hidden">
-        {/* Gradient background based on time of day */}
-        <div className={`absolute inset-0 ${
-          timePeriod === 'morning'
-            ? 'bg-gradient-to-br from-amber-50 via-orange-50/30 to-primary-50/20'
-            : timePeriod === 'afternoon'
-            ? 'bg-gradient-to-br from-sky-50 via-primary-50/30 to-accent-50/20'
-            : 'bg-gradient-to-br from-indigo-50 via-purple-50/30 to-primary-50/20'
-        }`} />
+      {/* Hero Section - Clean and Simple */}
+      <div className="max-w-6xl mx-auto px-6 pb-6 md:px-12">
+        <div
+          className={`transition-all duration-500 ease-out ${
+            mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+          }`}
+        >
+          <p className="text-neutral-500 text-sm tracking-wide mb-2">
+            {formatDate()}
+          </p>
+          <div className="flex items-end justify-between gap-6 flex-wrap">
+            <h1 className="font-display text-4xl md:text-5xl text-neutral-900 tracking-tight">
+              {getGreeting()}, {userName}
+            </h1>
 
-        <div className="relative">
-          <div className="max-w-6xl mx-auto px-6 md:px-12">
-            <div className="flex items-center min-h-[320px] md:min-h-[380px]">
-              {/* Left: Greeting & Stats */}
-              <div
-                className={`flex-1 py-12 md:py-16 transition-all duration-700 ease-out ${
-                  mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-                }`}
-              >
-                <p className="text-neutral-500 text-sm tracking-wide uppercase mb-3">
-                  {formatDate()}
+            {/* Clarity Score */}
+            <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-white border border-neutral-200 shadow-sm">
+              <ClarityRing
+                score={clarityMetrics.score}
+                color={clarityMetrics.healthColor}
+                size={44}
+              />
+              <div>
+                <p className="text-sm font-medium text-neutral-800">
+                  {clarityMetrics.score}% Clarity
                 </p>
-                <h1 className="font-display text-5xl md:text-6xl lg:text-7xl text-neutral-900 tracking-tight leading-none">
-                  {getGreeting()}
-                </h1>
-
-                {/* Clarity Score inline */}
-                <div className="mt-6 flex items-center gap-4">
-                  <ClarityRing
-                    score={clarityMetrics.score}
-                    color={clarityMetrics.healthColor}
-                    size={56}
-                  />
-                  <div>
-                    <p className="text-lg font-display text-neutral-800">
-                      {clarityMetrics.score}% Clarity
-                    </p>
-                    <p className="text-sm text-neutral-500">{clarityMetrics.healthStatus}</p>
-                  </div>
-                </div>
-
-                {/* Quick Stats Pills */}
-                <div className="mt-8 flex flex-wrap gap-3">
-                  <button
-                    onClick={onNavigateToSchedule}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 backdrop-blur border border-neutral-200 hover:border-primary-300 hover:bg-white transition-all text-sm"
-                  >
-                    <span className="w-2 h-2 rounded-full bg-primary-500" />
-                    <span className="font-medium text-neutral-700">{stats.todayTasks} tasks</span>
-                  </button>
-
-                  <button
-                    onClick={onNavigateToSchedule}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 backdrop-blur border border-neutral-200 hover:border-accent-300 hover:bg-white transition-all text-sm"
-                  >
-                    <span className="w-2 h-2 rounded-full bg-accent-500" />
-                    <span className="font-medium text-neutral-700">{stats.todayEvents} events</span>
-                  </button>
-
-                  {stats.overdue > 0 && (
-                    <button
-                      onClick={onNavigateToSchedule}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-50/80 backdrop-blur border border-red-200 hover:border-red-300 hover:bg-red-50 transition-all text-sm"
-                    >
-                      <span className="w-2 h-2 rounded-full bg-red-500" />
-                      <span className="font-medium text-red-700">{stats.overdue} overdue</span>
-                    </button>
-                  )}
-
-                  {stats.inbox > 0 && (
-                    <button
-                      onClick={onNavigateToInbox}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-50/80 backdrop-blur border border-amber-200 hover:border-amber-300 hover:bg-amber-50 transition-all text-sm"
-                    >
-                      <span className="w-2 h-2 rounded-full bg-amber-500" />
-                      <span className="font-medium text-amber-700">{stats.inbox} in inbox</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Right: Tree & House Illustration */}
-              <div
-                className={`hidden md:block w-80 lg:w-96 transition-all duration-1000 delay-200 ease-out ${
-                  mounted ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'
-                }`}
-              >
-                <HomeIllustration timePeriod={timePeriod} />
+                <p className="text-xs text-neutral-500">{clarityMetrics.healthStatus}</p>
               </div>
             </div>
+          </div>
+
+          {/* Quick Stats Pills */}
+          <div className="mt-6 flex flex-wrap gap-2">
+            <button
+              onClick={onNavigateToSchedule}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-neutral-200 hover:border-primary-300 hover:bg-primary-50 transition-all text-sm"
+            >
+              <span className="w-2 h-2 rounded-full bg-primary-500" />
+              <span className="text-neutral-700">{stats.todayTasks} tasks today</span>
+            </button>
+
+            <button
+              onClick={onNavigateToSchedule}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-neutral-200 hover:border-accent-300 hover:bg-accent-50 transition-all text-sm"
+            >
+              <span className="w-2 h-2 rounded-full bg-accent-500" />
+              <span className="text-neutral-700">{stats.todayEvents} events</span>
+            </button>
+
+            {stats.overdue > 0 && (
+              <button
+                onClick={onNavigateToSchedule}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-50 border border-red-200 hover:border-red-300 transition-all text-sm"
+              >
+                <span className="w-2 h-2 rounded-full bg-red-500" />
+                <span className="text-red-700">{stats.overdue} overdue</span>
+              </button>
+            )}
+
+            {stats.inbox > 0 && (
+              <button
+                onClick={onNavigateToInbox}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 hover:border-amber-300 transition-all text-sm"
+              >
+                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                <span className="text-amber-700">{stats.inbox} in inbox</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -265,6 +236,8 @@ export function HomeDashboard({
               onRegenerate={() => onGenerateBrief(true)}
               onDismiss={onDismissBrief}
               onItemAction={onBriefItemAction}
+              onScheduleTask={onScheduleTask}
+              onDeferTask={onDeferTask}
             />
           ) : showBriefSkeleton ? (
             <DailyBriefSkeleton />
@@ -411,340 +384,6 @@ export function HomeDashboard({
         </section>
       </div>
     </div>
-  )
-}
-
-/**
- * Beautiful cottage illustration with integrated greeting and clarity score
- * House and tree on the right, greeting text on the left
- * Adapts colors based on time of day
- */
-function HomeIllustration({
-  timePeriod,
-  userName,
-  clarityScore,
-  clarityColor
-}: {
-  timePeriod: 'morning' | 'afternoon' | 'evening'
-  userName: string
-  clarityScore: number
-  clarityColor: 'excellent' | 'good' | 'fair' | 'needsAttention'
-}) {
-  // Time-based greeting
-  const greeting = timePeriod === 'morning'
-    ? 'Good morning'
-    : timePeriod === 'afternoon'
-    ? 'Good afternoon'
-    : 'Good evening'
-
-  // Color schemes for different times
-  const colors = {
-    morning: {
-      skyTop: '#87CEEB',
-      skyBottom: '#B0E0E6',
-      grass: '#4CAF50',
-      grassDark: '#388E3C',
-      clouds: '#FFFFFF',
-      woodLight: '#DEB887',
-      woodDark: '#8B4513',
-      roof: '#607D8B',
-      roofDark: '#455A64',
-      stone: '#9E9E9E',
-      stoneDark: '#757575',
-      glass: '#87CEEB',
-      foliage: '#66BB6A',
-      foliageDark: '#43A047',
-      flowers: '#E91E63',
-      textColor: '#1a1a1a',
-    },
-    afternoon: {
-      skyTop: '#64B5F6',
-      skyBottom: '#90CAF9',
-      grass: '#4CAF50',
-      grassDark: '#388E3C',
-      clouds: '#FFFFFF',
-      woodLight: '#DEB887',
-      woodDark: '#8B4513',
-      roof: '#607D8B',
-      roofDark: '#455A64',
-      stone: '#9E9E9E',
-      stoneDark: '#757575',
-      glass: '#81D4FA',
-      foliage: '#66BB6A',
-      foliageDark: '#43A047',
-      flowers: '#E91E63',
-      textColor: '#1a1a1a',
-    },
-    evening: {
-      skyTop: '#1a237e',
-      skyBottom: '#3949ab',
-      grass: '#2E7D32',
-      grassDark: '#1B5E20',
-      clouds: '#5C6BC0',
-      woodLight: '#A1887F',
-      woodDark: '#5D4037',
-      roof: '#37474F',
-      roofDark: '#263238',
-      stone: '#616161',
-      stoneDark: '#424242',
-      glass: '#FFD54F',
-      foliage: '#2E7D32',
-      foliageDark: '#1B5E20',
-      flowers: '#AD1457',
-      textColor: '#FFFFFF',
-    },
-  }
-
-  const c = colors[timePeriod]
-
-  // Clarity ring colors
-  const ringColors = {
-    excellent: '#22c55e',
-    good: '#84cc16',
-    fair: '#f59e0b',
-    needsAttention: '#f97316',
-  }
-  const ringColor = ringColors[clarityColor]
-
-  // Calculate ring progress
-  const ringRadius = 38
-  const ringStroke = 6
-  const ringCircumference = 2 * Math.PI * ringRadius
-  const ringProgress = (clarityScore / 100) * ringCircumference
-  const ringOffset = ringCircumference - ringProgress
-
-  return (
-    <svg
-      viewBox="0 0 800 400"
-      className="w-full h-auto rounded-2xl shadow-lg"
-      style={{ transition: 'all 0.5s ease' }}
-    >
-      <defs>
-        <linearGradient id="skyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor={c.skyTop} />
-          <stop offset="100%" stopColor={c.skyBottom} />
-        </linearGradient>
-        <linearGradient id="grassGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor={c.grass} />
-          <stop offset="100%" stopColor={c.grassDark} />
-        </linearGradient>
-      </defs>
-
-      {/* Sky */}
-      <rect x="0" y="0" width="800" height="400" fill="url(#skyGrad)" />
-
-      {/* Clouds */}
-      <g fill={c.clouds} opacity="0.9">
-        <ellipse cx="120" cy="60" rx="50" ry="25" />
-        <ellipse cx="160" cy="55" rx="40" ry="20" />
-        <ellipse cx="80" cy="55" rx="35" ry="18" />
-
-        <ellipse cx="350" cy="45" rx="45" ry="22" />
-        <ellipse cx="390" cy="40" rx="35" ry="18" />
-        <ellipse cx="310" cy="42" rx="30" ry="15" />
-
-        <ellipse cx="650" cy="70" rx="55" ry="28" />
-        <ellipse cx="700" cy="65" rx="40" ry="20" />
-        <ellipse cx="600" cy="68" rx="35" ry="18" />
-      </g>
-
-      {/* Ground/Grass */}
-      <path d="M0,280 Q400,260 800,280 L800,400 L0,400 Z" fill="url(#grassGrad)" />
-
-      {/* Path to house */}
-      <path
-        d="M480,400 Q500,350 520,320 Q540,310 560,320"
-        fill="none"
-        stroke={c.stoneDark}
-        strokeWidth="40"
-        strokeLinecap="round"
-      />
-      <path
-        d="M480,400 Q500,350 520,320 Q540,310 560,320"
-        fill="none"
-        stroke={c.stone}
-        strokeWidth="35"
-        strokeLinecap="round"
-      />
-
-      {/* Stone wall */}
-      <g transform="translate(620, 290)">
-        {[0, 30, 60, 90, 120, 150].map((x, i) => (
-          <g key={i}>
-            <rect x={x} y="0" width="28" height="18" rx="3" fill={c.stone} stroke={c.stoneDark} strokeWidth="1" />
-            <rect x={x + 15} y="20" width="28" height="18" rx="3" fill={c.stone} stroke={c.stoneDark} strokeWidth="1" />
-            <rect x={x} y="40" width="28" height="18" rx="3" fill={c.stone} stroke={c.stoneDark} strokeWidth="1" />
-          </g>
-        ))}
-      </g>
-
-      {/* House */}
-      <g transform="translate(500, 120)">
-        {/* Chimney */}
-        <rect x="130" y="20" width="30" height="60" fill={c.stone} />
-        <rect x="128" y="15" width="34" height="8" fill={c.stoneDark} />
-
-        {/* Main wall */}
-        <rect x="20" y="80" width="180" height="120" fill={c.woodLight} stroke={c.woodDark} strokeWidth="2" />
-
-        {/* Wood planks */}
-        {[95, 110, 125, 140, 155, 170, 185].map((y) => (
-          <line key={y} x1="20" y1={y} x2="200" y2={y} stroke={c.woodDark} strokeWidth="1" opacity="0.3" />
-        ))}
-
-        {/* Roof */}
-        <path d="M0,80 L110,10 L220,80 Z" fill={c.roof} />
-        <path d="M0,80 L110,10 L110,80 Z" fill={c.roofDark} opacity="0.3" />
-        <line x1="0" y1="80" x2="220" y2="80" stroke={c.roofDark} strokeWidth="3" />
-
-        {/* Big front window */}
-        <g transform="translate(55, 40)">
-          <rect x="0" y="0" width="110" height="80" fill={c.woodDark} rx="2" />
-          <rect x="5" y="5" width="100" height="70" fill={c.glass} />
-          <line x1="55" y1="5" x2="55" y2="75" stroke={c.woodDark} strokeWidth="4" />
-          <line x1="5" y1="40" x2="105" y2="40" stroke={c.woodDark} strokeWidth="4" />
-          {/* Window frame top */}
-          <path d="M5,5 L55,5 L55,40 L5,40 Z" fill={c.glass} />
-          <path d="M55,5 L105,5 L105,40 L55,40 Z" fill={c.glass} />
-        </g>
-
-        {/* Door */}
-        <rect x="85" y="140" width="50" height="60" fill={c.woodDark} rx="2" />
-        <circle cx="125" cy="175" r="4" fill={c.stoneDark} />
-
-        {/* Flower boxes */}
-        <g transform="translate(40, 125)">
-          <rect x="0" y="0" width="35" height="12" fill={c.woodDark} />
-          <circle cx="8" cy="-5" r="6" fill={c.flowers} />
-          <circle cx="18" cy="-8" r="5" fill={c.flowers} opacity="0.8" />
-          <circle cx="28" cy="-4" r="6" fill={c.flowers} />
-        </g>
-        <g transform="translate(145, 125)">
-          <rect x="0" y="0" width="35" height="12" fill={c.woodDark} />
-          <circle cx="8" cy="-5" r="6" fill={c.flowers} />
-          <circle cx="18" cy="-8" r="5" fill={c.flowers} opacity="0.8" />
-          <circle cx="28" cy="-4" r="6" fill={c.flowers} />
-        </g>
-
-        {/* Stone foundation */}
-        <rect x="15" y="195" width="190" height="15" fill={c.stone} />
-      </g>
-
-      {/* Tree */}
-      <g transform="translate(720, 150)">
-        {/* Trunk */}
-        <path d="M-15,180 Q-25,120 -10,60 Q0,40 10,60 Q25,120 15,180 Z" fill={c.woodDark} />
-
-        {/* Foliage */}
-        <ellipse cx="0" cy="30" rx="60" ry="50" fill={c.foliageDark} />
-        <ellipse cx="-20" cy="10" rx="45" ry="40" fill={c.foliage} />
-        <ellipse cx="25" cy="20" rx="40" ry="35" fill={c.foliage} />
-        <ellipse cx="0" cy="-10" rx="35" ry="30" fill={c.foliage} />
-
-        {/* Leaf details */}
-        <ellipse cx="-30" cy="25" rx="8" ry="12" fill={c.foliageDark} opacity="0.5" />
-        <ellipse cx="35" cy="15" rx="6" ry="10" fill={c.foliageDark} opacity="0.5" />
-        <ellipse cx="5" cy="-5" rx="5" ry="8" fill={c.foliageDark} opacity="0.5" />
-      </g>
-
-      {/* Small bushes */}
-      <g fill={c.foliage}>
-        <ellipse cx="470" cy="340" rx="25" ry="18" />
-        <ellipse cx="495" cy="345" rx="20" ry="15" />
-      </g>
-
-      {/* Sparkle decorations */}
-      <g fill={c.textColor} opacity="0.3">
-        <path d="M750,350 L752,355 L757,355 L753,358 L755,363 L750,360 L745,363 L747,358 L743,355 L748,355 Z" />
-      </g>
-
-      {/* === LEFT SIDE: Greeting and Clarity Score === */}
-
-      {/* Greeting text */}
-      <text
-        x="50"
-        y="140"
-        fontFamily="Fraunces, Georgia, serif"
-        fontSize="42"
-        fontWeight="600"
-        fill={c.textColor}
-      >
-        {greeting},
-      </text>
-      <text
-        x="50"
-        y="195"
-        fontFamily="Fraunces, Georgia, serif"
-        fontSize="48"
-        fontWeight="700"
-        fill={c.textColor}
-      >
-        {userName}
-      </text>
-
-      {/* Clarity Score Ring */}
-      <g transform="translate(120, 300)">
-        {/* Background ring */}
-        <circle
-          cx="0"
-          cy="0"
-          r={ringRadius}
-          fill="none"
-          stroke={c.textColor}
-          strokeWidth={ringStroke}
-          opacity="0.15"
-        />
-        {/* Progress ring */}
-        <circle
-          cx="0"
-          cy="0"
-          r={ringRadius}
-          fill="none"
-          stroke={ringColor}
-          strokeWidth={ringStroke}
-          strokeLinecap="round"
-          strokeDasharray={ringCircumference}
-          strokeDashoffset={ringOffset}
-          transform="rotate(-90)"
-          style={{ transition: 'stroke-dashoffset 0.5s ease' }}
-        />
-        {/* Score text */}
-        <text
-          x="0"
-          y="6"
-          textAnchor="middle"
-          fontFamily="DM Sans, sans-serif"
-          fontSize="22"
-          fontWeight="700"
-          fill={c.textColor}
-        >
-          {clarityScore}
-        </text>
-        <text
-          x="0"
-          y="22"
-          textAnchor="middle"
-          fontFamily="DM Sans, sans-serif"
-          fontSize="10"
-          fill={c.textColor}
-          opacity="0.7"
-        >
-          clarity
-        </text>
-      </g>
-
-      {/* Date label */}
-      <text
-        x="200"
-        y="290"
-        fontFamily="DM Sans, sans-serif"
-        fontSize="14"
-        fill={c.textColor}
-        opacity="0.6"
-      >
-        {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-      </text>
-    </svg>
   )
 }
 

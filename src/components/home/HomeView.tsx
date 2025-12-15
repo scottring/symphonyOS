@@ -131,13 +131,30 @@ export function HomeView({
         onDeleteTask?.(taskId)
         break
       case 'schedule':
+        // Schedule for today and open task detail
+        if (onUpdateTask) {
+          const today = new Date()
+          today.setHours(0, 0, 0, 0)
+          onUpdateTask(taskId, { scheduledFor: today })
+        }
+        onSelectItem(taskId)
+        break
+      case 'defer':
+        // Defer to next week (7 days from now)
+        if (onPushTask) {
+          const nextWeek = new Date()
+          nextWeek.setDate(nextWeek.getDate() + 7)
+          nextWeek.setHours(0, 0, 0, 0)
+          onPushTask(taskId, nextWeek)
+        }
+        break
       case 'open':
         onSelectItem(taskId)
         break
       default:
         console.log('Brief task action:', { taskId, action })
     }
-  }, [onToggleTask, onDeleteTask, onSelectItem])
+  }, [onToggleTask, onDeleteTask, onSelectItem, onUpdateTask, onPushTask])
 
   // Daily Brief hook
   const {
@@ -302,6 +319,16 @@ export function HomeView({
           onGenerateBrief={generateBrief}
           onDismissBrief={dismissBrief}
           onBriefItemAction={handleItemAction}
+          onScheduleTask={(taskId, date) => {
+            if (onUpdateTask) {
+              onUpdateTask(taskId, { scheduledFor: date })
+            }
+          }}
+          onDeferTask={(taskId, date) => {
+            if (onPushTask) {
+              onPushTask(taskId, date)
+            }
+          }}
           onNavigateToSchedule={handleNavigateToSchedule}
           onNavigateToContext={handleNavigateToContext}
           onNavigateToInbox={handleNavigateToInbox}
@@ -432,7 +459,7 @@ export function HomeView({
             />
           </div>
         )}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto pt-16">
           {renderContent()}
         </div>
       </div>
@@ -456,11 +483,11 @@ export function HomeView({
         </div>
       )}
 
-      {/* Main content area */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Main content area - pt-16 to clear floating header */}
+      <div className="flex-1 overflow-y-auto pt-16">
         {/* Context filter header - shown when filtering by Work/Family/Personal */}
         {selectedContext && contextInfo && (
-          <div className="px-4 pt-4 md:px-6 md:pt-6">
+          <div className="px-4 pt-2 md:px-6 md:pt-2">
             <div className={`flex items-center justify-between rounded-xl px-4 py-3 ${contextInfo.color}`}>
               <div className="flex items-center gap-3">
                 <span className="text-xl">{contextInfo.icon}</span>
@@ -486,20 +513,30 @@ export function HomeView({
 
         {/* Daily Brief - shown at top when viewing today */}
         {shouldShowBrief && (
-          <div className="px-4 pt-4 md:px-6 md:pt-6">
+          <div className="px-4 pt-2 md:px-6 md:pt-2">
             <DailyBrief
               brief={brief}
               isGenerating={briefGenerating}
               onRegenerate={() => generateBrief(true)}
               onDismiss={dismissBrief}
               onItemAction={handleItemAction}
+              onScheduleTask={(taskId, date) => {
+                if (onUpdateTask) {
+                  onUpdateTask(taskId, { scheduledFor: date })
+                }
+              }}
+              onDeferTask={(taskId, date) => {
+                if (onPushTask) {
+                  onPushTask(taskId, date)
+                }
+              }}
             />
           </div>
         )}
 
         {/* Brief loading/generating skeleton */}
         {isViewingToday && currentView === 'today' && (briefLoading || briefGenerating) && !brief && (
-          <div className="px-4 pt-4 md:px-6 md:pt-6">
+          <div className="px-4 pt-2 md:px-6 md:pt-2">
             <DailyBriefSkeleton />
           </div>
         )}
