@@ -166,7 +166,7 @@ export function InboxSection({
             onUpdateTask(triageTask.id, updates)
             setTriageTaskId(null)
           }}
-          onConvertToProject={async (name, projectTasks, _domain) => {
+          onConvertToProject={async (name, projectTasks) => {
             // Create project with tasks, then delete the original inbox item
             if (onAddProject) {
               const project = await onAddProject({ name })

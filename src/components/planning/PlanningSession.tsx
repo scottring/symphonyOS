@@ -221,6 +221,7 @@ export function PlanningSession({
   }, [])
 
   // Handle drag over (for debugging)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleDragOver = useCallback((_event: DragOverEvent) => {
     // Can add visual feedback here if needed
   }, [])

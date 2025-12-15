@@ -198,8 +198,10 @@ describe('TodaySchedule', () => {
       // Task should appear in inbox section, not in time sections
       // The Inbox section will contain the task
       expect(screen.getByText('Inbox task')).toBeInTheDocument()
-      // Inbox header shows count, like "Inbox (1)"
-      expect(screen.getByText(/Inbox \(/)).toBeInTheDocument()
+      // Inbox header with count badge
+      expect(screen.getByText('Inbox')).toBeInTheDocument()
+      // Count badge shows number (could be in multiple places)
+      expect(screen.getAllByText('1').length).toBeGreaterThanOrEqual(1)
     })
 
     it('filters tasks to only show for viewed date', () => {
@@ -307,7 +309,7 @@ describe('TodaySchedule', () => {
 
       // Inbox section should render with the task
       expect(screen.getByText('My inbox item')).toBeInTheDocument()
-      expect(screen.getByText(/Inbox \(/)).toBeInTheDocument()
+      expect(screen.getByText('Inbox')).toBeInTheDocument()
     })
 
     it('does not show inbox on non-today dates', () => {
@@ -377,15 +379,19 @@ describe('TodaySchedule', () => {
   })
 
   describe('interactions', () => {
-    it('calls onSelectItem when clicking a task', () => {
+    it('calls onSelectItem when pressing Enter on a task', () => {
       const onSelectItem = vi.fn()
       const tasks = [
-        createMockTask({ id: '1', title: 'Clickable task', scheduledFor: mockToday }),
+        createMockTask({ id: '1', title: 'Keyboard task', scheduledFor: mockToday }),
       ]
 
       render(<TodaySchedule {...defaultProps} tasks={tasks} onSelectItem={onSelectItem} />)
 
-      fireEvent.click(screen.getByText('Clickable task'))
+      // Tasks are selected via keyboard (Enter), not click (to avoid accidental selection)
+      const taskElement = screen.getByText('Keyboard task').closest('[role="button"]')
+      if (taskElement) {
+        fireEvent.keyDown(taskElement, { key: 'Enter' })
+      }
 
       expect(onSelectItem).toHaveBeenCalledWith('task-1')
     })
@@ -443,8 +449,10 @@ describe('TodaySchedule', () => {
         />
       )
 
-      // Inbox section should show count
-      expect(screen.getByText(/Inbox \(2\)/)).toBeInTheDocument()
+      // Inbox section should be visible when there are inbox tasks
+      expect(screen.getByText('Inbox')).toBeInTheDocument()
+      // Count badge shows the number of inbox items (could be in multiple places)
+      expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(1)
     })
   })
 

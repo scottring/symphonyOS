@@ -32,7 +32,7 @@ export function useListItems(listId: string | null) {
     }
 
     // Clear items immediately when listId changes to prevent stale data
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing on dependency change is valid
+     
     setItems([])
 
     async function fetchItems() {

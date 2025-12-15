@@ -28,13 +28,17 @@ describe('ProjectsList', () => {
     it('renders project count', () => {
       render(<ProjectsList projects={mockProjects} onSelectProject={mockOnSelectProject} />)
 
-      expect(screen.getByText('3 projects')).toBeInTheDocument()
+      // Count is in a separate element from text
+      expect(screen.getByText('3')).toBeInTheDocument()
+      expect(screen.getByText(/projects/)).toBeInTheDocument()
     })
 
     it('shows singular "project" for one project', () => {
       render(<ProjectsList projects={[mockProjects[0]]} onSelectProject={mockOnSelectProject} />)
 
-      expect(screen.getByText('1 project')).toBeInTheDocument()
+      // Count is in a separate element from text
+      expect(screen.getByText('1')).toBeInTheDocument()
+      expect(screen.getByText(/project$/)).toBeInTheDocument()
     })
 
     it('renders New button when onAddProject is provided', () => {
@@ -106,13 +110,13 @@ describe('ProjectsList', () => {
       expect(screen.getByText('Completed')).toBeInTheDocument()
     })
 
-    it('applies blue styling for in_progress status', () => {
+    it('applies primary styling for in_progress status', () => {
       const inProgressProject = [createMockProject({ status: 'in_progress' })]
       render(<ProjectsList projects={inProgressProject} onSelectProject={mockOnSelectProject} />)
 
       const badge = screen.getByText('In Progress')
-      expect(badge).toHaveClass('bg-blue-100')
-      expect(badge).toHaveClass('text-blue-700')
+      expect(badge).toHaveClass('bg-primary-50')
+      expect(badge).toHaveClass('text-primary-700')
     })
 
     it('applies neutral styling for not_started status', () => {
@@ -124,13 +128,13 @@ describe('ProjectsList', () => {
       expect(badge).toHaveClass('text-neutral-600')
     })
 
-    it('applies green styling for completed status', () => {
+    it('applies sage styling for completed status', () => {
       const completedProject = [createMockProject({ status: 'completed' })]
       render(<ProjectsList projects={completedProject} onSelectProject={mockOnSelectProject} />)
 
       const badge = screen.getByText('Completed')
-      expect(badge).toHaveClass('bg-green-100')
-      expect(badge).toHaveClass('text-green-700')
+      expect(badge).toHaveClass('bg-sage-50')
+      expect(badge).toHaveClass('text-sage-600')
     })
   })
 
@@ -172,7 +176,10 @@ describe('ProjectsList', () => {
     it('shows project count as 0', () => {
       render(<ProjectsList projects={[]} onSelectProject={mockOnSelectProject} />)
 
-      expect(screen.getByText('0 projects')).toBeInTheDocument()
+      // Count is in a separate element from text
+      expect(screen.getByText('0')).toBeInTheDocument()
+      // "projects" appears in both header count and "No projects yet"
+      expect(screen.getAllByText(/projects/).length).toBeGreaterThanOrEqual(2)
     })
   })
 

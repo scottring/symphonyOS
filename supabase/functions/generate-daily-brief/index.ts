@@ -349,7 +349,7 @@ Return JSON only.`
         jsonText = jsonText.slice(0, -3)
       }
       generatedBrief = JSON.parse(jsonText.trim())
-    } catch (parseError) {
+    } catch {
       console.error('Failed to parse Claude response:', textContent.text)
       // Fallback brief
       generatedBrief = {

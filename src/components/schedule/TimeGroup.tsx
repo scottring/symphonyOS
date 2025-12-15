@@ -87,6 +87,7 @@ export function TimeGroup({
 
   // Reset user override when forceCollapsed changes (e.g., toggling Focus Mode)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on prop change
     setUserOverride(null)
   }, [forceCollapsed])
 

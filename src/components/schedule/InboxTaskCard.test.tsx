@@ -94,7 +94,12 @@ describe('InboxTaskCard', () => {
     it('calls onSelect when clicking title', () => {
       render(<InboxTaskCard {...defaultProps} />)
 
-      fireEvent.click(screen.getByText('Test task'))
+      // The component uses useLongPress which requires mouseDown + mouseUp
+      const card = screen.getByText('Test task').closest('div.group')
+      if (card) {
+        fireEvent.mouseDown(card)
+        fireEvent.mouseUp(card)
+      }
 
       expect(mockOnSelect).toHaveBeenCalled()
     })

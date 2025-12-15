@@ -15,9 +15,9 @@ describe('useHomeView', () => {
   })
 
   describe('initial state', () => {
-    it('defaults to "today" view when no localStorage value', () => {
+    it('defaults to "home" view when no localStorage value', () => {
       const { result } = renderHook(() => useHomeView())
-      expect(result.current.currentView).toBe('today')
+      expect(result.current.currentView).toBe('home')
     })
 
     it('restores view from localStorage', () => {
@@ -32,10 +32,10 @@ describe('useHomeView', () => {
       expect(result.current.currentView).toBe('today')
     })
 
-    it('defaults to "today" if localStorage has invalid value', () => {
+    it('defaults to "home" if localStorage has invalid value', () => {
       localStorage.setItem(STORAGE_KEY, 'invalid-view')
       const { result } = renderHook(() => useHomeView())
-      expect(result.current.currentView).toBe('today')
+      expect(result.current.currentView).toBe('home')
     })
   })
 

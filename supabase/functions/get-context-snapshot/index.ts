@@ -113,7 +113,7 @@ serve(async (req) => {
     const today = now.toISOString().split('T')[0]
     const fourDaysAgo = new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000).toISOString()
     const eightDaysAgo = new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000).toISOString()
-    const weekAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    // Future use: const weekAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
     // Calculate today's date range for calendar events
     const todayStart = `${today}T00:00:00.000Z`
@@ -227,7 +227,7 @@ serve(async (req) => {
     const unassignedItemsWithHome = itemsWithHome - assignedItemsWithHome
     const effectiveItemsWithHome = assignedItemsWithHome + (unassignedItemsWithHome * 0.5)
 
-    let rawScore = totalItems > 0 ? (effectiveItemsWithHome / totalItems) * 100 : 100
+    const rawScore = totalItems > 0 ? (effectiveItemsWithHome / totalItems) * 100 : 100
 
     // Penalties
     const agingPenalty = agingInbox.length * 3

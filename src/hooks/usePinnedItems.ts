@@ -37,6 +37,7 @@ export function usePinnedItems(): UsePinnedItemsReturn {
   // Fetch pins on mount
   useEffect(() => {
     if (!user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing state on auth change
       setPins([])
       return
     }

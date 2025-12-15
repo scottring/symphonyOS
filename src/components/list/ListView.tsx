@@ -34,7 +34,7 @@ export function ListView({
   onUpdateItem,
   onDeleteItem,
   onToggleItem,
-  onReorderItems: _onReorderItems,
+  // onReorderItems - drag-and-drop reordering (not yet implemented)
   onSaveAsTemplate,
   isPinned,
   canPin,

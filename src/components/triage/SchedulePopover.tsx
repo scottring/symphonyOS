@@ -136,6 +136,7 @@ export function SchedulePopover({
   const hasScheduleContext = !!(scheduleItems || getItemsForDate)
 
   // Get items for the selected date
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const itemsForSelectedDate = useMemo(() => {
     if (!selectedDate) return []
     if (getItemsForDate) return getItemsForDate(selectedDate)
@@ -169,6 +170,14 @@ export function SchedulePopover({
   const containerRef = useRef<HTMLDivElement>(null)
   const customTimeInputRef = useRef<HTMLInputElement>(null)
 
+  const handleClose = useCallback(() => {
+    setIsOpen(false)
+    setStep('date')
+    setSelectedDate(null)
+    setShowCustomTime(false)
+    setCustomTimeSearch('')
+  }, [])
+
   // Close on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -180,11 +189,12 @@ export function SchedulePopover({
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [isOpen])
+  }, [isOpen, handleClose])
 
   // Reset state when opening
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on open
       setStep('date')
       setSelectedDate(null)
       setShowCustomTime(false)
@@ -198,14 +208,6 @@ export function SchedulePopover({
       customTimeInputRef.current.focus()
     }
   }, [showCustomTime])
-
-  const handleClose = useCallback(() => {
-    setIsOpen(false)
-    setStep('date')
-    setSelectedDate(null)
-    setShowCustomTime(false)
-    setCustomTimeSearch('')
-  }, [])
 
   const getBaseDate = (daysFromNow: number) => {
     const date = new Date()

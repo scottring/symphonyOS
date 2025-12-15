@@ -116,7 +116,7 @@ export function useSystemHealth(tasksOrInput: Task[] | SystemHealthInput): Syste
 
     // Full credit for assigned items, half credit for unassigned items
     const effectiveItemsWithHome = assignedItemsWithHome + (unassignedItemsWithHome * 0.5)
-    let rawScore = totalItems > 0 ? (effectiveItemsWithHome / totalItems) * 100 : 100
+    const rawScore = totalItems > 0 ? (effectiveItemsWithHome / totalItems) * 100 : 100
 
     // Penalties for aging items (progressive, but not punishing)
     // Aging items (4-7 days): -3 points each

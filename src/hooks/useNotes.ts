@@ -57,6 +57,7 @@ export function useNotes() {
   // Fetch notes on mount and when user changes
   useEffect(() => {
     if (!user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing state on auth change
       setNotes([])
       setLoading(false)
       return

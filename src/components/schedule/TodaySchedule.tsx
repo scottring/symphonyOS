@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useRef } from 'react'
+import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
@@ -7,7 +7,7 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
 import type { ScheduleContextItem } from '@/components/triage'
-import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
+import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem, type TimelineItem } from '@/types/timeline'
 import { groupByDaySection, getTimeOfDay, type DaySection, type TimeOfDay } from '@/lib/timeUtils'
 import { useMobile } from '@/hooks/useMobile'
 import { useBulkSelection } from '@/hooks/useBulkSelection'
@@ -23,7 +23,8 @@ import { WeeklyReview } from '@/components/review/WeeklyReview'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { useSystemHealth } from '@/hooks/useSystemHealth'
 import { MultiAssigneeDropdown } from '@/components/family/MultiAssigneeDropdown'
-import { Pencil, Focus, Inbox } from 'lucide-react'
+import { Pencil, Sparkles, Inbox } from 'lucide-react'
+import { HeroMode } from '@/components/hero'
 
 // Bento box / grid icon for "Organize"
 function BentoIcon({ className }: { className?: string }) {
@@ -387,28 +388,33 @@ function ClarityIndicator({
   )
 }
 
-// Focus Mode toggle
-interface FocusModeToggleProps {
-  enabled: boolean
-  onToggle: () => void
+// Hero Mode toggle - launches immersive single-task view
+interface HeroModeToggleProps {
+  onClick: () => void
+  taskCount: number
 }
 
-function FocusModeToggle({ enabled, onToggle }: FocusModeToggleProps) {
+function HeroModeToggle({ onClick, taskCount }: HeroModeToggleProps) {
+  const hasTasksToFocus = taskCount > 0
+
   return (
     <button
-      onClick={onToggle}
+      onClick={onClick}
+      disabled={!hasTasksToFocus}
       className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
-        enabled
+        hasTasksToFocus
           ? 'text-primary-700 bg-primary-50 hover:bg-primary-100'
-          : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100'
+          : 'text-neutral-400 bg-neutral-50 cursor-not-allowed'
       }`}
-      title={enabled ? 'Focus Mode: Only current time block shown' : 'Focus Mode: Off'}
+      title={hasTasksToFocus ? 'Enter Hero Mode: Focus on one task at a time' : 'No tasks in current time block'}
     >
-      <Focus className={`w-4 h-4 ${enabled ? 'text-primary-600' : ''}`} />
-      <span className="hidden sm:inline">Focus</span>
-      <span className={`w-2 h-2 rounded-full transition-colors ${
-        enabled ? 'bg-primary-500' : 'bg-neutral-300'
-      }`} />
+      <Sparkles className={`w-4 h-4 ${hasTasksToFocus ? 'text-primary-600' : ''}`} />
+      <span className="hidden sm:inline">Hero</span>
+      {hasTasksToFocus && (
+        <span className="w-5 h-5 flex items-center justify-center rounded-full bg-primary-500 text-white text-xs font-bold">
+          {taskCount}
+        </span>
+      )}
     </button>
   )
 }
@@ -692,34 +698,29 @@ export function TodaySchedule({
 
   // Helper function to check if an item matches the assignee filter
   // Supports both single assignment (assignedTo) and multi-assignment (assignedToAll)
-  const matchesAssigneeFilter = (assignedTo: string | null | undefined, assignedToAll?: string[] | null): boolean => {
+  const matchesAssigneeFilter = useCallback((assignedTo: string | null | undefined, assignedToAll?: string[] | null): boolean => {
     if (selectedAssignee === null || selectedAssignee === undefined) return true // "All" or not specified - show everything
     if (selectedAssignee === 'unassigned') return !assignedTo && (!assignedToAll || assignedToAll.length === 0) // Show only unassigned
     // Show items assigned to selected person (either single or multi-assignment)
     return assignedTo === selectedAssignee || (assignedToAll ? assignedToAll.includes(selectedAssignee) : false)
-  }
+  }, [selectedAssignee])
 
   // Weekly review modal state
   const [showWeeklyReview, setShowWeeklyReview] = useState(false)
   // Bulk reschedule dialog state
   const [showBulkRescheduleDialog, setShowBulkRescheduleDialog] = useState(false)
 
-  // Focus Mode state - persisted in localStorage, default ON
-  const [focusMode, setFocusMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('symphony-focus-mode')
-      return saved !== null ? saved === 'true' : true // Default ON
-    }
-    return true
-  })
+  // Hero Mode state - full-screen immersive task view
+  const [heroModeOpen, setHeroModeOpen] = useState(false)
 
-  // Persist focus mode to localStorage
-  const toggleFocusMode = useCallback(() => {
-    setFocusMode(prev => {
-      const newValue = !prev
-      localStorage.setItem('symphony-focus-mode', String(newValue))
-      return newValue
-    })
+  // Open Hero Mode
+  const openHeroMode = useCallback(() => {
+    setHeroModeOpen(true)
+  }, [])
+
+  // Close Hero Mode
+  const closeHeroMode = useCallback(() => {
+    setHeroModeOpen(false)
   }, [])
 
   // Determine current time section (morning/afternoon/evening)
@@ -729,12 +730,14 @@ export function TodaySchedule({
 
   // Exit selection mode when date changes
   const prevViewedDate = useRef(viewedDate)
-  if (prevViewedDate.current.getTime() !== viewedDate.getTime()) {
-    prevViewedDate.current = viewedDate
-    if (bulkSelection.isSelectionMode) {
-      bulkSelection.exitSelectionMode()
+  useEffect(() => {
+    if (prevViewedDate.current.getTime() !== viewedDate.getTime()) {
+      prevViewedDate.current = viewedDate
+      if (bulkSelection.isSelectionMode) {
+        bulkSelection.exitSelectionMode()
+      }
     }
-  }
+  }, [viewedDate, bulkSelection])
 
   // Get selected tasks for bulk action bar
   const selectedTasks = useMemo(() => {
@@ -801,16 +804,10 @@ export function TodaySchedule({
     )
   }, [viewedDate])
 
-  // Map sections to whether they should be collapsed in focus mode
-  const getSectionCollapseState = useCallback((section: DaySection): boolean | undefined => {
-    if (!focusMode || !isToday) return undefined // No forced state when focus mode is off or not today
-
-    // All-day and unscheduled are always shown (not collapsed by focus mode)
-    if (section === 'allday' || section === 'unscheduled') return undefined
-
-    // In focus mode: only current section is expanded
-    return section !== currentTimeSection
-  }, [focusMode, currentTimeSection, isToday])
+  // Map sections to whether they should be collapsed (no longer auto-collapsing, but keeping for TimeGroup API)
+  const getSectionCollapseState = useCallback((_section: DaySection): boolean | undefined => {
+    return undefined // No forced collapse state - user manually collapses if desired
+  }, [])
 
   // Overdue tasks: scheduled for past days, not completed - only shown on today's view
   const overdueTasks = useMemo(() => {
@@ -835,7 +832,7 @@ export function TodaySchedule({
 
       return taskDateLocal < today
     })
-  }, [tasks, isToday, selectedAssignee])
+  }, [tasks, isToday, matchesAssigneeFilter])
 
   // Inbox tasks: needs triage - only shown on today's view
   // Includes: no scheduledFor, OR deferredUntil <= today
@@ -860,7 +857,7 @@ export function TodaySchedule({
       }
       return false
     })
-  }, [tasks, isToday, selectedAssignee])
+  }, [tasks, isToday, matchesAssigneeFilter])
 
   // Filter tasks for the viewed date (only tasks with scheduledFor)
   const filteredTasks = useMemo(() => {
@@ -880,7 +877,7 @@ export function TodaySchedule({
       }
       return false // Unscheduled tasks go to inbox, not here
     })
-  }, [tasks, viewedDate, selectedAssignee])
+  }, [tasks, viewedDate, matchesAssigneeFilter])
 
   // Filter events for the viewed date and deduplicate by title + start time
   const filteredEvents = useMemo(() => {
@@ -1013,9 +1010,54 @@ export function TodaySchedule({
 
     const allItems = [...taskItems, ...eventItems, ...routineItems]
     return groupByDaySection(allItems)
-  }, [filteredTasks, filteredEvents, visibleRoutines, viewedDate, routineStatusMap, eventStatusMap, eventNotesMap, selectedAssignee])
+  }, [filteredTasks, filteredEvents, visibleRoutines, viewedDate, routineStatusMap, eventStatusMap, eventNotesMap, matchesAssigneeFilter])
 
   const sections: DaySection[] = ['allday', 'morning', 'afternoon', 'evening', 'unscheduled']
+
+  // Get tasks for Hero Mode - current time section only, incomplete
+  const heroModeTasks = useMemo(() => {
+    if (!isToday) return []
+
+    // Get items from current time section
+    const currentSectionItems = grouped[currentTimeSection] || []
+
+    // Filter to incomplete items only (tasks and routines)
+    return currentSectionItems.filter((item: TimelineItem) => {
+      if (item.completed) return false
+      if (item.type === 'event') return false // Events aren't actionable in same way
+      return true
+    })
+  }, [isToday, grouped, currentTimeSection])
+
+  // Hero Mode handlers - must be after heroModeTasks is defined
+  const handleHeroComplete = useCallback((taskId: string) => {
+    // Handle both tasks and routines
+    const item = heroModeTasks.find((t: TimelineItem) => t.id === `task-${taskId}` || t.id === `routine-${taskId}`)
+    if (item?.type === 'routine' && onCompleteRoutine) {
+      onCompleteRoutine(taskId, true)
+    } else if (onToggleTask) {
+      onToggleTask(taskId)
+    }
+  }, [heroModeTasks, onToggleTask, onCompleteRoutine])
+
+  const handleHeroDefer = useCallback((taskId: string, date: Date) => {
+    // Handle both tasks and routines
+    const item = heroModeTasks.find((t: TimelineItem) => t.id === `task-${taskId}` || t.id === `routine-${taskId}`)
+    if (item?.type === 'routine' && onPushRoutine) {
+      onPushRoutine(taskId, date)
+    } else if (onPushTask) {
+      onPushTask(taskId, date)
+    }
+  }, [heroModeTasks, onPushTask, onPushRoutine])
+
+  const handleHeroOpenDetail = useCallback((item: TimelineItem) => {
+    // Close hero mode and open detail panel
+    closeHeroMode()
+    if (item.type === 'task' && item.originalTask) {
+      onSelectItem?.(item.originalTask.id)
+    }
+    // Routines don't have detail panel yet, just close hero mode
+  }, [closeHeroMode, onSelectItem])
 
   const formatDate = () => {
     return viewedDate.toLocaleDateString('en-US', {
@@ -1159,11 +1201,11 @@ export function TodaySchedule({
             />
           )}
 
-          {/* Focus Mode toggle */}
+          {/* Hero Mode toggle */}
           {isToday && (
-            <FocusModeToggle
-              enabled={focusMode}
-              onToggle={toggleFocusMode}
+            <HeroModeToggle
+              onClick={openHeroMode}
+              taskCount={heroModeTasks.length}
             />
           )}
 
@@ -1466,6 +1508,18 @@ export function TodaySchedule({
         selectedCount={bulkSelection.selectedIds.size}
         onConfirm={handleBulkRescheduleConfirm}
         onCancel={handleBulkRescheduleCancel}
+      />
+
+      {/* Hero Mode - immersive single-task view */}
+      <HeroMode
+        isOpen={heroModeOpen}
+        tasks={heroModeTasks}
+        projects={projects}
+        contacts={contacts}
+        onClose={closeHeroMode}
+        onComplete={handleHeroComplete}
+        onDefer={handleHeroDefer}
+        onOpenDetail={handleHeroOpenDetail}
       />
 
       {/* Floating Inbox FAB - quick access to inbox */}

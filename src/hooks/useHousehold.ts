@@ -250,6 +250,23 @@ export function useHousehold(): UseHouseholdReturn {
     setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role } : m))
   }, [isOwner])
 
+  // Leave household
+  const leaveHousehold = useCallback(async () => {
+    if (!household || !currentUserId) throw new Error('No household')
+    if (isOwner) throw new Error('Owner cannot leave. Transfer ownership or delete the household.')
+
+    const { error } = await supabase
+      .from('household_members')
+      .delete()
+      .eq('household_id', household.id)
+      .eq('user_id', currentUserId)
+
+    if (error) throw error
+
+    // Create a new personal household
+    await fetchHousehold()
+  }, [household, currentUserId, isOwner, fetchHousehold])
+
   // Accept an invitation (by token)
   const acceptInvitation = useCallback(async (token: string) => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -295,24 +312,7 @@ export function useHousehold(): UseHouseholdReturn {
 
     // Refetch to get the new household
     await fetchHousehold()
-  }, [household, fetchHousehold])
-
-  // Leave household
-  const leaveHousehold = useCallback(async () => {
-    if (!household || !currentUserId) throw new Error('No household')
-    if (isOwner) throw new Error('Owner cannot leave. Transfer ownership or delete the household.')
-
-    const { error } = await supabase
-      .from('household_members')
-      .delete()
-      .eq('household_id', household.id)
-      .eq('user_id', currentUserId)
-
-    if (error) throw error
-
-    // Create a new personal household
-    await fetchHousehold()
-  }, [household, currentUserId, isOwner, fetchHousehold])
+  }, [household, fetchHousehold, leaveHousehold])
 
   return {
     household,

@@ -356,10 +356,11 @@ describe('ContactView', () => {
   })
 
   describe('linked tasks', () => {
-    it('renders linked tasks count', () => {
+    it('renders linked tasks count in History section', () => {
       render(<ContactView {...defaultProps} />)
 
-      expect(screen.getByText('Linked Tasks (2)')).toBeInTheDocument()
+      // The section is called "History" with count appended
+      expect(screen.getByText('History (2)')).toBeInTheDocument()
     })
 
     it('renders linked task titles', () => {

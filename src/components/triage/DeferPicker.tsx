@@ -29,6 +29,7 @@ export function DeferPicker({ deferredUntil, deferCount, onDefer }: DeferPickerP
   // Reset date input when closing
   useEffect(() => {
     if (!isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on close
       setShowDateInput(false)
     }
   }, [isOpen])

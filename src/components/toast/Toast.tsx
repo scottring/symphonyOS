@@ -21,6 +21,7 @@ export function Toast({ toast, onDismiss }: ToastProps) {
 
   useEffect(() => {
     if (toast) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- animation state management
       setIsLeaving(false)
       // Small delay for enter animation
       requestAnimationFrame(() => {

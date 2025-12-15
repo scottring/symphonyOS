@@ -144,7 +144,8 @@ describe('RoutinesList', () => {
         />
       )
 
-      expect(screen.getByText('Active (2)')).toBeInTheDocument()
+      expect(screen.getByText('Active')).toBeInTheDocument()
+      expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(1)
     })
 
     it('displays paused routine count', () => {
@@ -162,7 +163,8 @@ describe('RoutinesList', () => {
         />
       )
 
-      expect(screen.getByText('Paused (2)')).toBeInTheDocument()
+      expect(screen.getByText('Paused')).toBeInTheDocument()
+      expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(1)
     })
 
     it('calls onSelectRoutine when clicking a routine', () => {
@@ -543,8 +545,9 @@ describe('RoutinesList', () => {
         />
       )
 
-      expect(screen.getByText('Active (1)')).toBeInTheDocument()
-      expect(screen.getByText('Paused (1)')).toBeInTheDocument()
+      expect(screen.getByText('Active')).toBeInTheDocument()
+      expect(screen.getByText('Paused')).toBeInTheDocument()
+      expect(screen.getAllByText('1').length).toBeGreaterThanOrEqual(2)
     })
 
     it('applies different styling to paused routines', () => {

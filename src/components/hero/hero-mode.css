@@ -1,0 +1,411 @@
+/* =============================================================================
+   HERO MODE - THE FOCUS SANCTUARY
+   Delightful, meditative task execution experience
+   ============================================================================= */
+
+/* -----------------------------------------------------------------------------
+   CARD ANIMATIONS
+   ----------------------------------------------------------------------------- */
+
+/* Card entrance - floats up with spring physics */
+@keyframes hero-card-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(40px) scale(0.96);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-8px) scale(1.01);
+  }
+  80% {
+    transform: translateY(4px) scale(0.995);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Card exit on complete - shrinks up with rotation */
+@keyframes hero-card-complete {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-20px) scale(1.02) rotate(-2deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-80px) scale(0.8) rotate(-8deg);
+  }
+}
+
+/* Card exit on defer - slides left */
+@keyframes hero-card-defer {
+  0% {
+    opacity: 1;
+    transform: translateX(0) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-120%) rotate(-12deg);
+  }
+}
+
+/* Card exit on skip - flips and fades */
+@keyframes hero-card-skip {
+  0% {
+    opacity: 1;
+    transform: scale(1) rotateY(0deg);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.95) rotateY(90deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.9) rotateY(180deg);
+  }
+}
+
+/* Subtle breathing animation for idle card */
+@keyframes hero-card-breathe {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.003);
+  }
+}
+
+/* Next card entering from right */
+@keyframes hero-card-enter-right {
+  0% {
+    opacity: 0;
+    transform: translateX(60px) scale(0.95);
+  }
+  60% {
+    opacity: 1;
+    transform: translateX(-6px) scale(1.005);
+  }
+  80% {
+    transform: translateX(3px) scale(0.998);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* Animation classes */
+.hero-card-enter {
+  animation: hero-card-enter 500ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.hero-card-enter-right {
+  animation: hero-card-enter-right 450ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.hero-card-complete {
+  animation: hero-card-complete 400ms cubic-bezier(0.55, 0.055, 0.675, 0.19) forwards;
+}
+
+.hero-card-defer {
+  animation: hero-card-defer 350ms cubic-bezier(0.55, 0.055, 0.675, 0.19) forwards;
+}
+
+.hero-card-skip {
+  animation: hero-card-skip 400ms cubic-bezier(0.55, 0.055, 0.675, 0.19) forwards;
+  transform-style: preserve-3d;
+}
+
+.hero-card-breathe {
+  animation: hero-card-breathe 4s ease-in-out infinite;
+}
+
+/* -----------------------------------------------------------------------------
+   CHECKMARK ANIMATION
+   ----------------------------------------------------------------------------- */
+
+@keyframes hero-checkmark-draw {
+  0% {
+    stroke-dashoffset: 100;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+@keyframes hero-checkmark-circle {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.hero-checkmark-path {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+}
+
+.hero-checkmark-animate .hero-checkmark-path {
+  animation: hero-checkmark-draw 400ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
+  animation-delay: 100ms;
+}
+
+.hero-checkmark-circle {
+  transform: scale(0);
+}
+
+.hero-checkmark-animate .hero-checkmark-circle {
+  animation: hero-checkmark-circle 350ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* -----------------------------------------------------------------------------
+   CELEBRATION CONFETTI
+   ----------------------------------------------------------------------------- */
+
+@keyframes hero-confetti-fall {
+  0% {
+    transform: translateY(0) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(720deg) scale(0.5);
+    opacity: 0;
+  }
+}
+
+@keyframes hero-confetti-burst {
+  0% {
+    transform: translate(0, 0) scale(0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+    transform: translate(var(--x), var(--y)) scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--x) * 2), calc(var(--y) * 2 + 100px)) scale(0.5);
+  }
+}
+
+.hero-confetti-particle {
+  position: absolute;
+  pointer-events: none;
+  font-size: 1.5rem;
+}
+
+/* -----------------------------------------------------------------------------
+   PROGRESS DOTS
+   ----------------------------------------------------------------------------- */
+
+@keyframes hero-dot-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 0.8;
+  }
+}
+
+.hero-dot-current {
+  animation: hero-dot-pulse 2s ease-in-out infinite;
+}
+
+@keyframes hero-dot-complete {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.4);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.hero-dot-just-completed {
+  animation: hero-dot-complete 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* -----------------------------------------------------------------------------
+   ACTION BUTTONS
+   ----------------------------------------------------------------------------- */
+
+@keyframes hero-button-press {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.hero-action-button:active {
+  animation: hero-button-press 150ms ease-out;
+}
+
+/* -----------------------------------------------------------------------------
+   BACKGROUND & CONTAINER
+   ----------------------------------------------------------------------------- */
+
+/* Subtle paper grain texture */
+.hero-background {
+  background-color: var(--color-bg-base);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-blend-mode: soft-light;
+}
+
+/* Radial gradient overlay for depth */
+.hero-backdrop {
+  background: radial-gradient(
+    ellipse at center,
+    transparent 0%,
+    var(--color-bg-base) 100%
+  );
+}
+
+/* Card shadow that feels warm and tactile */
+.hero-card-shadow {
+  box-shadow:
+    0 0 0 1px hsl(38 20% 88% / 0.5),
+    0 2px 4px -1px hsl(25 20% 20% / 0.04),
+    0 8px 16px -4px hsl(25 20% 20% / 0.06),
+    0 24px 48px -8px hsl(25 20% 20% / 0.08);
+}
+
+/* Card hover/drag states */
+.hero-card-dragging {
+  box-shadow:
+    0 0 0 1px hsl(38 20% 88% / 0.3),
+    0 4px 8px -2px hsl(25 20% 20% / 0.08),
+    0 16px 32px -8px hsl(25 20% 20% / 0.12),
+    0 32px 64px -12px hsl(25 20% 20% / 0.16);
+  transition: box-shadow 150ms ease-out;
+}
+
+/* Success glow on completion */
+@keyframes hero-success-glow {
+  0% {
+    box-shadow:
+      0 0 0 1px hsl(168 45% 30% / 0.3),
+      0 0 0 0 hsl(168 45% 30% / 0.4);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px hsl(168 45% 30% / 0.5),
+      0 0 40px 10px hsl(168 45% 30% / 0.2);
+  }
+  100% {
+    box-shadow:
+      0 0 0 1px hsl(168 45% 30% / 0),
+      0 0 0 0 hsl(168 45% 30% / 0);
+  }
+}
+
+.hero-card-success {
+  animation: hero-success-glow 600ms ease-out;
+}
+
+/* -----------------------------------------------------------------------------
+   EMPTY STATE
+   ----------------------------------------------------------------------------- */
+
+@keyframes hero-celebrate-bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+.hero-empty-emoji {
+  animation: hero-celebrate-bounce 1s ease-in-out infinite;
+}
+
+/* -----------------------------------------------------------------------------
+   REDUCED MOTION
+   ----------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-card-enter,
+  .hero-card-enter-right,
+  .hero-card-complete,
+  .hero-card-defer,
+  .hero-card-skip,
+  .hero-card-breathe,
+  .hero-checkmark-animate .hero-checkmark-path,
+  .hero-checkmark-animate .hero-checkmark-circle,
+  .hero-dot-current,
+  .hero-dot-just-completed,
+  .hero-action-button:active,
+  .hero-card-success,
+  .hero-empty-emoji {
+    animation: none;
+  }
+
+  .hero-card-enter,
+  .hero-card-enter-right {
+    opacity: 1;
+    transform: none;
+  }
+
+  .hero-card-complete,
+  .hero-card-defer,
+  .hero-card-skip {
+    opacity: 0;
+    transition: opacity 150ms ease-out;
+  }
+
+  .hero-checkmark-animate .hero-checkmark-path {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+
+  .hero-checkmark-animate .hero-checkmark-circle {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   SWIPE FEEDBACK
+   ----------------------------------------------------------------------------- */
+
+/* Right swipe (complete) feedback zone */
+.hero-swipe-complete-zone {
+  background: linear-gradient(90deg, hsl(168 45% 30% / 0.15) 0%, transparent 100%);
+}
+
+/* Left swipe (defer) feedback zone */
+.hero-swipe-defer-zone {
+  background: linear-gradient(270deg, hsl(18 55% 45% / 0.15) 0%, transparent 100%);
+}
+
+/* Down swipe (exit) feedback zone */
+.hero-swipe-exit-zone {
+  background: linear-gradient(180deg, transparent 0%, hsl(0 0% 0% / 0.1) 100%);
+}

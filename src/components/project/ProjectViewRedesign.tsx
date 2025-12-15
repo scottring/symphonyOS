@@ -75,10 +75,8 @@ export function ProjectViewRedesign({
   availableEvents = [],
   onLinkEvent,
   onUnlinkEvent,
-  isPinned: _isPinned,
-  canPin: _canPin,
-  onPin: _onPin,
-  onUnpin: _onUnpin,
+  // Pinning functionality (not yet implemented in redesign)
+  // isPinned, canPin, onPin, onUnpin
   linkedLists = [],
   allLists = [],
   onLinkList,

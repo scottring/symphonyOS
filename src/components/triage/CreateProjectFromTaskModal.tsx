@@ -26,6 +26,7 @@ export function CreateProjectFromTaskModal({
   // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset form on open
       setProjectName(taskTitle)
       setTasks([])
       setNewTaskTitle('')

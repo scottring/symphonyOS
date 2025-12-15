@@ -121,6 +121,29 @@ export function useActions(): UseActionsReturn {
   }, [])
 
   /**
+   * Fetch recent action history
+   */
+  const fetchActionHistory = useCallback(async () => {
+    try {
+      const { data, error: queryError } = await supabase
+        .from('action_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(20)
+
+      if (queryError) {
+        console.error('Fetch action history error:', queryError)
+        return
+      }
+
+      const actions = (data as DbActionLog[]).map(dbActionLogToAction)
+      setRecentActions(actions)
+    } catch (err) {
+      console.error('Fetch action history error:', err)
+    }
+  }, [])
+
+  /**
    * Send an action (SMS or email)
    */
   const sendAction = useCallback(async (
@@ -179,7 +202,7 @@ export function useActions(): UseActionsReturn {
       setIsSending(false)
       return false
     }
-  }, [])
+  }, [fetchActionHistory])
 
   /**
    * Clear pending action
@@ -187,29 +210,6 @@ export function useActions(): UseActionsReturn {
   const clearPendingAction = useCallback(() => {
     setPendingAction(null)
     setError(null)
-  }, [])
-
-  /**
-   * Fetch recent action history
-   */
-  const fetchActionHistory = useCallback(async () => {
-    try {
-      const { data, error: queryError } = await supabase
-        .from('action_logs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(20)
-
-      if (queryError) {
-        console.error('Fetch action history error:', queryError)
-        return
-      }
-
-      const actions = (data as DbActionLog[]).map(dbActionLogToAction)
-      setRecentActions(actions)
-    } catch (err) {
-      console.error('Fetch action history error:', err)
-    }
   }, [])
 
   return {

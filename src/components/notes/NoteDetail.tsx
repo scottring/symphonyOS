@@ -30,12 +30,14 @@ export function NoteDetail({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Reset editing state when note changes
+  // Using note?.id and note?.content as dependencies to avoid unnecessary re-runs when other note properties change
   useEffect(() => {
     setIsEditing(false)
     setShowDeleteConfirm(false)
     if (note) {
       setEditContent(note.content)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note?.id, note?.content])
 
   const handleSave = useCallback(async () => {

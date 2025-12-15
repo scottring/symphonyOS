@@ -66,6 +66,7 @@ export function InboxTriageModal({
   // Reset form when modal opens/closes or task changes
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset form on open
       setCategory(task.category ?? 'task')
       setWhenOption(null)
       setCustomDate('')

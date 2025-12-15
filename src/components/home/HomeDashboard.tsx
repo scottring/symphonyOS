@@ -67,6 +67,7 @@ export function HomeDashboard({
   const { user } = useAuth()
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount animation state
     setMounted(true)
   }, [])
 

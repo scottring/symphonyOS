@@ -54,6 +54,7 @@ export function PlacesAutocomplete({
   // Handle initial query for smart detection
   useEffect(() => {
     if (initialQuery && !value) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- sync state from prop
       setQuery(initialQuery)
       setIsEditing(true)
     }
@@ -62,6 +63,7 @@ export function PlacesAutocomplete({
   // Debounced search
   useEffect(() => {
     if (!query.trim()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing results on empty query
       setResults([])
       return
     }

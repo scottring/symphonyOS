@@ -787,6 +787,7 @@ export function CascadingRiverView({
 
   // Animation on mount/selection change
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- animation state triggered by dependency change
     setIsAnimating(true)
     const timer = setTimeout(() => setIsAnimating(false), 1200)
     return () => clearTimeout(timer)

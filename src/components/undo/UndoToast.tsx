@@ -14,6 +14,7 @@ export function UndoToast({ action, onUndo, onDismiss }: UndoToastProps) {
 
   useEffect(() => {
     if (action) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- animation state management
       setIsLeaving(false)
       // Small delay for enter animation
       requestAnimationFrame(() => {

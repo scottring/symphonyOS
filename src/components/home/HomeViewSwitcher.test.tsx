@@ -3,13 +3,14 @@ import { render, screen } from '@/test/test-utils'
 import { HomeViewSwitcher } from './HomeViewSwitcher'
 
 describe('HomeViewSwitcher', () => {
-  it('renders Day and Week buttons in a segmented control', () => {
+  it('renders Home, Day and Week buttons in a segmented control', () => {
     const onViewChange = vi.fn()
     render(<HomeViewSwitcher currentView="today" onViewChange={onViewChange} />)
 
-    // Two text buttons: Day, Week
+    // Three text buttons: Home, Day, Week
     const buttons = screen.getAllByRole('button')
-    expect(buttons).toHaveLength(2)
+    expect(buttons).toHaveLength(3)
+    expect(screen.getByRole('button', { name: 'Home' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Day' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Week' })).toBeInTheDocument()
   })

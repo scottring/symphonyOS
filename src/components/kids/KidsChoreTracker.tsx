@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import './kids-tracker.css'
 
 // Fun character avatars for kids
@@ -72,6 +72,15 @@ export function KidsChoreTracker({
 
   const avatar = AVATARS.find(a => a.id === selectedAvatar) || AVATARS[0]
 
+  // Pre-generate random values for confetti animation (stable across renders)
+  const confettiStyles = useMemo(() =>
+    [...Array(20)].map((_, i) => ({
+      left: `${(i * 5 + (i * 17) % 100)}%`,
+      animationDelay: `${(i * 0.025)}s`,
+      backgroundColor: ['#FF6B6B', '#4ECDC4', '#FFE66D', '#95E1D3', '#F38181'][i % 5]
+    })), []
+  )
+
   // Calculate completed chores
   const completedCount = chores.filter(c => c.completed).length
   const totalChores = chores.length
@@ -81,6 +90,16 @@ export function KidsChoreTracker({
   const filteredChores = selectedCategory
     ? chores.filter(c => c.category === selectedCategory)
     : chores
+
+  // Trigger celebration animation
+  const triggerCelebration = useCallback((emoji: string) => {
+    setCelebrationEmoji(emoji)
+    setShowConfetti(true)
+    setTimeout(() => {
+      setShowConfetti(false)
+      setCelebrationEmoji('')
+    }, 1500)
+  }, [])
 
   // Toggle chore completion
   const toggleChore = useCallback((choreId: string) => {
@@ -103,17 +122,7 @@ export function KidsChoreTracker({
       })
       return updated
     })
-  }, [])
-
-  // Trigger celebration animation
-  const triggerCelebration = (emoji: string) => {
-    setCelebrationEmoji(emoji)
-    setShowConfetti(true)
-    setTimeout(() => {
-      setShowConfetti(false)
-      setCelebrationEmoji('')
-    }, 1500)
-  }
+  }, [triggerCelebration])
 
   // Check if all chores are done
   useEffect(() => {
@@ -123,7 +132,7 @@ export function KidsChoreTracker({
         triggerCelebration('🎉')
       }, 500)
     }
-  }, [completedCount, totalChores])
+  }, [completedCount, totalChores, triggerCelebration])
 
   return (
     <div className="kids-tracker">
@@ -140,15 +149,11 @@ export function KidsChoreTracker({
       {/* Confetti celebration overlay */}
       {showConfetti && (
         <div className="confetti-container">
-          {[...Array(20)].map((_, i) => (
+          {confettiStyles.map((style, i) => (
             <div
               key={i}
               className="confetti-piece"
-              style={{
-                left: `${Math.random() * 100}%`,
-                animationDelay: `${Math.random() * 0.5}s`,
-                backgroundColor: ['#FF6B6B', '#4ECDC4', '#FFE66D', '#95E1D3', '#F38181'][i % 5]
-              }}
+              style={style}
             />
           ))}
           {celebrationEmoji && (

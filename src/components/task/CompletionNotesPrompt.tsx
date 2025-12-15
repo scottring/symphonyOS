@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 
 interface CompletionNotesPromptProps {
   taskId: string
@@ -20,6 +20,11 @@ export function CompletionNotesPrompt({
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const handleDismiss = useCallback(() => {
+    setIsDismissing(true)
+    setTimeout(onDismiss, 200) // Allow fade-out animation
+  }, [onDismiss])
+
   // Auto-dismiss after timeout
   useEffect(() => {
     if (!isExpanded && autoHideAfter > 0) {
@@ -33,7 +38,7 @@ export function CompletionNotesPrompt({
         clearTimeout(timeoutRef.current)
       }
     }
-  }, [isExpanded, autoHideAfter])
+  }, [isExpanded, autoHideAfter, handleDismiss])
 
   // Focus input when expanded
   useEffect(() => {
@@ -41,11 +46,6 @@ export function CompletionNotesPrompt({
       inputRef.current.focus()
     }
   }, [isExpanded])
-
-  const handleDismiss = () => {
-    setIsDismissing(true)
-    setTimeout(onDismiss, 200) // Allow fade-out animation
-  }
 
   const handleSave = () => {
     if (note.trim()) {

@@ -257,6 +257,14 @@ export function KidsZone({
   const [celebrationEmoji, setCelebrationEmoji] = useState('')
   const [currentTime, setCurrentTime] = useState(new Date())
 
+  // Pre-generate confetti styles (stable across renders)
+  const confettiStyles = useMemo(() =>
+    [...Array(15)].map((_, i) => ({
+      left: `${(i * 7 + (i * 13) % 100)}%`,
+      animationDelay: `${(i * 0.02)}s`,
+    })), []
+  )
+
   // Update current time every minute
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 60000)
@@ -443,14 +451,11 @@ export function KidsZone({
       {/* Confetti */}
       {showConfetti && (
         <div className="confetti-overlay">
-          {[...Array(15)].map((_, i) => (
+          {confettiStyles.map((style, i) => (
             <div
               key={i}
               className="confetti-star"
-              style={{
-                left: `${Math.random() * 100}%`,
-                animationDelay: `${Math.random() * 0.3}s`,
-              }}
+              style={style}
             >
               ⭐
             </div>

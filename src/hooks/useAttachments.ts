@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import {
@@ -39,7 +39,9 @@ export function useAttachments(): UseAttachmentsReturn {
 
   // Use ref for cache lookups to avoid dependency cycle
   const attachmentsRef = useRef(attachments)
-  attachmentsRef.current = attachments
+  useEffect(() => {
+    attachmentsRef.current = attachments
+  }, [attachments])
 
   // Fetch attachments for an entity
   const fetchAttachments = useCallback(

@@ -538,7 +538,7 @@ async function executeTool(
 
       // Fetch routines if date is specified and include_routines is not explicitly false
       const shouldIncludeRoutines = input.date && input.include_routines !== false
-      let routines: Array<{
+      const routines: Array<{
         id: string
         name: string
         time_of_day: string | null

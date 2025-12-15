@@ -35,6 +35,7 @@ export function useNoteTopics() {
   // Fetch topics on mount and when user changes
   useEffect(() => {
     if (!user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing state on auth change
       setTopics([])
       setLoading(false)
       return

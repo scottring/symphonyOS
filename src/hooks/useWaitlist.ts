@@ -89,6 +89,7 @@ export function useWaitlist() {
 
   // Fetch on mount
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch
     fetchWaitlist()
   }, [fetchWaitlist])
 
