@@ -1,11 +1,16 @@
-import type { ReactNode, ReactElement } from 'react'
+import { useState, useEffect, type ReactNode, type ReactElement } from 'react'
 import type { DaySection } from '@/lib/timeUtils'
 import { getDaySectionLabel } from '@/lib/timeUtils'
+import { ChevronRight } from 'lucide-react'
 
 interface TimeGroupProps {
   section: DaySection
   children: ReactNode
   isEmpty?: boolean
+  itemCount?: number
+  isCurrentSection?: boolean
+  defaultCollapsed?: boolean
+  forceCollapsed?: boolean  // For focus mode control
 }
 
 // Section-specific styling with subtle color hints
@@ -65,9 +70,35 @@ const sectionStyles: Record<DaySection, { icon: ReactElement; gradient: string }
   },
 }
 
-export function TimeGroup({ section, children, isEmpty }: TimeGroupProps) {
+export function TimeGroup({
+  section,
+  children,
+  isEmpty,
+  itemCount = 0,
+  isCurrentSection = false,
+  defaultCollapsed = false,
+  forceCollapsed,
+}: TimeGroupProps) {
   const label = getDaySectionLabel(section)
   const style = sectionStyles[section]
+
+  // Track if user has manually overridden the collapse state
+  const [userOverride, setUserOverride] = useState<boolean | null>(null)
+
+  // Reset user override when forceCollapsed changes (e.g., toggling Focus Mode)
+  useEffect(() => {
+    setUserOverride(null)
+  }, [forceCollapsed])
+
+  // Determine actual collapsed state:
+  // 1. User override takes priority (if they clicked to expand/collapse)
+  // 2. Otherwise use forceCollapsed (from Focus Mode)
+  // 3. Fall back to defaultCollapsed
+  const collapsed = userOverride !== null
+    ? userOverride
+    : forceCollapsed !== undefined
+      ? forceCollapsed
+      : defaultCollapsed
 
   if (isEmpty) {
     return null // Don't show empty sections
@@ -78,23 +109,51 @@ export function TimeGroup({ section, children, isEmpty }: TimeGroupProps) {
       {/* Subtle background gradient */}
       <div className={`absolute -inset-x-4 -inset-y-2 rounded-2xl bg-gradient-to-r ${style.gradient} pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
 
-      {/* Section header - refined editorial style */}
-      <div className="flex items-center gap-3 mb-5">
+      {/* Section header - clickable for collapse */}
+      <button
+        onClick={() => setUserOverride(!collapsed)}
+        className="flex items-center gap-3 mb-5 w-full text-left group/header"
+      >
+        {/* Collapse chevron */}
+        <ChevronRight
+          className={`w-4 h-4 text-neutral-300 transition-transform duration-200 ${
+            collapsed ? '' : 'rotate-90'
+          }`}
+        />
+
         {/* Icon */}
-        <span className="text-neutral-400">
+        <span className={`${isCurrentSection ? 'text-primary-500' : 'text-neutral-400'}`}>
           {style.icon}
         </span>
 
         {/* Label with decorative line */}
-        <h3 className="time-group-header flex items-center gap-3">
+        <h3 className={`time-group-header flex items-center gap-3 ${
+          isCurrentSection ? 'text-primary-700' : ''
+        }`}>
           {label}
+          {isCurrentSection && (
+            <span className="text-xs font-medium text-primary-500 bg-primary-50 px-2 py-0.5 rounded-full">
+              Now
+            </span>
+          )}
+          {collapsed && itemCount > 0 && (
+            <span className="text-sm font-normal text-neutral-400">
+              ({itemCount})
+            </span>
+          )}
           <span className="flex-1 h-px bg-gradient-to-r from-neutral-200 to-transparent min-w-[40px]" />
         </h3>
-      </div>
+      </button>
 
-      {/* Items with stagger animation */}
-      <div className="space-y-2 stagger-in">
-        {children}
+      {/* Items with collapse animation */}
+      <div
+        className={`space-y-2 overflow-hidden transition-all duration-300 ease-in-out ${
+          collapsed ? 'max-h-0 opacity-0' : 'max-h-[2000px] opacity-100'
+        }`}
+      >
+        <div className="stagger-in">
+          {children}
+        </div>
       </div>
     </div>
   )

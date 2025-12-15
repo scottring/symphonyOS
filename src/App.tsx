@@ -32,6 +32,9 @@ import { NotesPage } from '@/components/notes'
 import { CompletedTasksView } from '@/components/history/CompletedTasksView'
 import { Toast } from '@/components/toast'
 import { KidsZone } from '@/components/kids'
+import { ChatView } from '@/components/chat'
+import { CopilotProvider, CopilotChat } from '@/components/chat/copilot'
+import { CommandPalette } from '@/components/assistant/CommandPalette'
 import { ActionPreview } from '@/components/action/ActionPreview'
 import {
   ProjectsList,
@@ -54,7 +57,7 @@ import type { ActionableInstance, Routine } from '@/types/actionable'
 import type { LinkedActivityType } from '@/types/task'
 
 function App() {
-  const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, getLinkedTasks, toggleTask, deleteTask, updateTask, pushTask, bulkToggleTasks, bulkDeleteTasks, bulkRestoreTasks } = useSupabaseTasks()
+  const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, getLinkedTasks, toggleTask, deleteTask, updateTask, pushTask, bulkToggleTasks, bulkDeleteTasks, bulkRestoreTasks, bulkRescheduleTasks } = useSupabaseTasks()
   const { user, loading: authLoading, signOut } = useAuth()
   const { isConnected, events, fetchEvents, isFetching: eventsFetching, createEvent, connect: connectCalendar } = useGoogleCalendar()
   const attachments = useAttachments()
@@ -176,6 +179,11 @@ function App() {
   const [creatingRoutine, setCreatingRoutine] = useState(false)
   const [recentlyCreatedTaskId, setRecentlyCreatedTaskId] = useState<string | null>(null)
   const [planningOpen, setPlanningOpen] = useState(false)
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
+  const [useCopilotChat, setUseCopilotChat] = useState(() => {
+    // Persist chat mode preference
+    return localStorage.getItem('symphony-use-copilot-chat') === 'true'
+  })
 
   // Toggle quick add modal
   const openQuickAdd = useCallback(() => setQuickAddOpen(true), [])
@@ -226,10 +234,10 @@ function App() {
   // Global keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd+K for quick capture
+      // Cmd+K for unified command palette (quick capture + AI)
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
-        setQuickAddOpen(true)
+        setCommandPaletteOpen(prev => !prev)
       }
       // Cmd+J for search
       if ((e.metaKey || e.ctrlKey) && e.key === 'j') {
@@ -237,13 +245,13 @@ function App() {
         setSearchOpen(true)
       }
       // Escape to close panel (search modal handles its own escape)
-      if (e.key === 'Escape' && selectedItemId && !searchOpen) {
+      if (e.key === 'Escape' && selectedItemId && !searchOpen && !commandPaletteOpen) {
         setSelectedItemId(null)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedItemId, searchOpen])
+  }, [selectedItemId, searchOpen, commandPaletteOpen])
 
   // Fetch calendar events when connected or date changes
   useEffect(() => {
@@ -1211,6 +1219,29 @@ function App() {
                 })
               }
             }}
+            onBulkReschedule={async (taskIds, date, isAllDay) => {
+              // Save original dates and all-day status for undo
+              const originalStates = new Map<string, { date: Date | undefined; isAllDay: boolean | undefined }>()
+              tasks.forEach((t) => {
+                if (taskIds.includes(t.id)) {
+                  originalStates.set(t.id, { date: t.scheduledFor, isAllDay: t.isAllDay })
+                }
+              })
+
+              await bulkRescheduleTasks(taskIds, date, isAllDay)
+              const count = taskIds.length
+              undo.pushAction(`Rescheduled ${count} task${count !== 1 ? 's' : ''}`, async () => {
+                // Restore original dates and all-day status
+                for (const [taskId, originalState] of originalStates.entries()) {
+                  if (originalState.date) {
+                    await bulkRescheduleTasks([taskId], originalState.date, originalState.isAllDay ?? true)
+                  } else {
+                    // If it had no date, remove the scheduled date
+                    await updateTask(taskId, { scheduledFor: undefined, isAllDay: undefined })
+                  }
+                }
+              })
+            }}
           />
         </div>
       )}
@@ -1533,6 +1564,59 @@ function App() {
         </Suspense>
       )}
 
+      {activeView === 'chat' && (
+        <div className="h-full flex flex-col">
+          {/* Chat Mode Toggle */}
+          <div className="flex items-center justify-end gap-2 px-4 py-2 border-b border-neutral-100 bg-white">
+            <span className="text-xs text-neutral-400">Chat Mode:</span>
+            <button
+              onClick={() => {
+                const newValue = !useCopilotChat
+                setUseCopilotChat(newValue)
+                localStorage.setItem('symphony-use-copilot-chat', String(newValue))
+              }}
+              className={`
+                relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+                ${useCopilotChat ? 'bg-primary-500' : 'bg-neutral-200'}
+              `}
+            >
+              <span
+                className={`
+                  inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform
+                  ${useCopilotChat ? 'translate-x-6' : 'translate-x-1'}
+                `}
+              />
+            </button>
+            <span className={`text-xs font-medium ${useCopilotChat ? 'text-primary-600' : 'text-neutral-500'}`}>
+              {useCopilotChat ? 'Rich UI' : 'Classic'}
+            </span>
+          </div>
+
+          {/* Chat Content */}
+          <div className="flex-1 overflow-hidden">
+            {useCopilotChat ? (
+              <CopilotProvider>
+                <CopilotChat
+                  onNavigateToTask={(taskId) => handleSelectItem(`task-${taskId}`)}
+                />
+              </CopilotProvider>
+            ) : (
+              <ChatView
+                onNavigateToTask={(taskId) => handleSelectItem(`task-${taskId}`)}
+                onNavigateToProject={(projectId) => {
+                  setSelectedProjectId(projectId)
+                  handleViewChange('projects')
+                }}
+                onNavigateToContact={(contactId) => {
+                  setSelectedContactId(contactId)
+                  handleViewChange('contact-detail')
+                }}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Search Modal */}
       <SearchModal
         isOpen={searchOpen}
@@ -1543,6 +1627,15 @@ function App() {
         totalResults={searchTotalResults}
         isSearching={isSearching}
         onSelectResult={handleSearchSelect}
+      />
+
+      {/* Unified Command Palette (⌘+K) - handles both quick capture and AI */}
+      <CommandPalette
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        onCreateTask={async (title) => {
+          await addTask(title, undefined, undefined, undefined, { assignedTo: getCurrentUserMember()?.id })
+        }}
       />
 
       {/* Toast notifications */}

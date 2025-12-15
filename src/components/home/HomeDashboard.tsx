@@ -98,20 +98,24 @@ export function HomeDashboard({
   const stats = useMemo(() => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
+    const todayTime = today.getTime()
+
+    // Helper to convert UTC midnight date to local date value for comparison
+    // scheduled_for is stored as midnight UTC, so we extract UTC date components
+    const getLocalDateValue = (date: Date | string): number => {
+      const d = date instanceof Date ? date : new Date(date)
+      return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()).getTime()
+    }
 
     const incompleteTasks = tasks.filter(t => !t.completed)
     const todayTasks = incompleteTasks.filter(t => {
       if (!t.scheduledFor) return false
-      const scheduled = new Date(t.scheduledFor)
-      scheduled.setHours(0, 0, 0, 0)
-      return scheduled.getTime() === today.getTime()
+      return getLocalDateValue(t.scheduledFor) === todayTime
     })
 
     const overdue = incompleteTasks.filter(t => {
       if (!t.scheduledFor) return false
-      const scheduled = new Date(t.scheduledFor)
-      scheduled.setHours(0, 0, 0, 0)
-      return scheduled.getTime() < today.getTime()
+      return getLocalDateValue(t.scheduledFor) < todayTime
     })
 
     const inbox = incompleteTasks.filter(t => !t.scheduledFor && !t.isSomeday)
@@ -119,9 +123,11 @@ export function HomeDashboard({
     const todayEvents = events.filter(e => {
       const startStr = e.start_time || e.startTime || ''
       if (!startStr) return false
+      // Calendar events may have specific times, not just midnight UTC
       const start = new Date(startStr)
-      start.setHours(0, 0, 0, 0)
-      return start.getTime() === today.getTime()
+      return start.getFullYear() === today.getFullYear() &&
+        start.getMonth() === today.getMonth() &&
+        start.getDate() === today.getDate()
     })
 
     const activeRoutines = routines.filter(r => r.visibility === 'active')

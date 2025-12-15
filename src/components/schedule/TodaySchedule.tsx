@@ -8,7 +8,7 @@ import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
 import type { ScheduleContextItem } from '@/components/triage'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
-import { groupByDaySection, type DaySection } from '@/lib/timeUtils'
+import { groupByDaySection, getTimeOfDay, type DaySection, type TimeOfDay } from '@/lib/timeUtils'
 import { useMobile } from '@/hooks/useMobile'
 import { useBulkSelection } from '@/hooks/useBulkSelection'
 import { TimeGroup } from './TimeGroup'
@@ -18,11 +18,12 @@ import { DateNavigator } from './DateNavigator'
 import { InboxSection } from './InboxSection'
 import { OverdueSection } from './OverdueSection'
 import { BulkActionBar } from './BulkActionBar'
+import { BulkRescheduleDialog } from './BulkRescheduleDialog'
 import { WeeklyReview } from '@/components/review/WeeklyReview'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { useSystemHealth } from '@/hooks/useSystemHealth'
 import { MultiAssigneeDropdown } from '@/components/family/MultiAssigneeDropdown'
-import { Pencil } from 'lucide-react'
+import { Pencil, Focus, Inbox } from 'lucide-react'
 
 // Bento box / grid icon for "Organize"
 function BentoIcon({ className }: { className?: string }) {
@@ -386,6 +387,63 @@ function ClarityIndicator({
   )
 }
 
+// Focus Mode toggle
+interface FocusModeToggleProps {
+  enabled: boolean
+  onToggle: () => void
+}
+
+function FocusModeToggle({ enabled, onToggle }: FocusModeToggleProps) {
+  return (
+    <button
+      onClick={onToggle}
+      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+        enabled
+          ? 'text-primary-700 bg-primary-50 hover:bg-primary-100'
+          : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100'
+      }`}
+      title={enabled ? 'Focus Mode: Only current time block shown' : 'Focus Mode: Off'}
+    >
+      <Focus className={`w-4 h-4 ${enabled ? 'text-primary-600' : ''}`} />
+      <span className="hidden sm:inline">Focus</span>
+      <span className={`w-2 h-2 rounded-full transition-colors ${
+        enabled ? 'bg-primary-500' : 'bg-neutral-300'
+      }`} />
+    </button>
+  )
+}
+
+// Floating Inbox FAB
+interface FloatingInboxFABProps {
+  count: number
+  onClick: () => void
+}
+
+function FloatingInboxFAB({ count, onClick }: FloatingInboxFABProps) {
+  const isOrganizeHours = isOrganizeTime()
+
+  if (count === 0) return null
+
+  return (
+    <button
+      onClick={onClick}
+      className={`fixed bottom-6 right-6 z-40 flex flex-col items-center justify-center w-14 h-14 rounded-2xl shadow-lg transition-all duration-300 hover:scale-105 active:scale-95 ${
+        isOrganizeHours
+          ? 'bg-primary-500 hover:bg-primary-600 text-white animate-pulse-subtle'
+          : 'bg-white hover:bg-neutral-50 text-neutral-600 border border-neutral-200'
+      }`}
+      title={`${count} items in inbox`}
+    >
+      <Inbox className="w-5 h-5" />
+      <span className={`text-xs font-bold mt-0.5 ${
+        isOrganizeHours ? 'text-white' : 'text-neutral-500'
+      }`}>
+        {count}
+      </span>
+    </button>
+  )
+}
+
 // Progress indicator - clickable with expandable explanation
 interface ProgressIndicatorProps {
   completed: number
@@ -507,6 +565,7 @@ interface TodayScheduleProps {
   onBulkComplete?: (taskIds: string[]) => void
   onBulkUncomplete?: (taskIds: string[]) => void
   onBulkDelete?: (taskIds: string[]) => void
+  onBulkReschedule?: (taskIds: string[], date: Date, isAllDay: boolean) => void
 }
 
 function LoadingSkeleton() {
@@ -588,6 +647,7 @@ export function TodaySchedule({
   onBulkComplete,
   onBulkUncomplete,
   onBulkDelete,
+  onBulkReschedule,
 }: TodayScheduleProps) {
   void _onOpenPlanning // Reserved - planning now handled by ModeToggle
   void _onCreateTask // Reserved - was used by ReviewSection
@@ -641,6 +701,31 @@ export function TodaySchedule({
 
   // Weekly review modal state
   const [showWeeklyReview, setShowWeeklyReview] = useState(false)
+  // Bulk reschedule dialog state
+  const [showBulkRescheduleDialog, setShowBulkRescheduleDialog] = useState(false)
+
+  // Focus Mode state - persisted in localStorage, default ON
+  const [focusMode, setFocusMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('symphony-focus-mode')
+      return saved !== null ? saved === 'true' : true // Default ON
+    }
+    return true
+  })
+
+  // Persist focus mode to localStorage
+  const toggleFocusMode = useCallback(() => {
+    setFocusMode(prev => {
+      const newValue = !prev
+      localStorage.setItem('symphony-focus-mode', String(newValue))
+      return newValue
+    })
+  }, [])
+
+  // Determine current time section (morning/afternoon/evening)
+  const currentTimeSection: TimeOfDay = useMemo(() => {
+    return getTimeOfDay(new Date())
+  }, [])
 
   // Exit selection mode when date changes
   const prevViewedDate = useRef(viewedDate)
@@ -688,6 +773,24 @@ export function TodaySchedule({
     }
   }, [onBulkDelete, bulkSelection])
 
+  const handleBulkReschedule = useCallback(() => {
+    if (bulkSelection.selectedIds.size > 0) {
+      setShowBulkRescheduleDialog(true)
+    }
+  }, [bulkSelection])
+
+  const handleBulkRescheduleConfirm = useCallback((date: Date, isAllDay: boolean) => {
+    if (onBulkReschedule && bulkSelection.selectedIds.size > 0) {
+      onBulkReschedule([...bulkSelection.selectedIds], date, isAllDay)
+      bulkSelection.exitSelectionMode()
+      setShowBulkRescheduleDialog(false)
+    }
+  }, [onBulkReschedule, bulkSelection])
+
+  const handleBulkRescheduleCancel = useCallback(() => {
+    setShowBulkRescheduleDialog(false)
+  }, [])
+
   // Check if we're viewing today
   const isToday = useMemo(() => {
     const today = new Date()
@@ -697,6 +800,17 @@ export function TodaySchedule({
       viewedDate.getDate() === today.getDate()
     )
   }, [viewedDate])
+
+  // Map sections to whether they should be collapsed in focus mode
+  const getSectionCollapseState = useCallback((section: DaySection): boolean | undefined => {
+    if (!focusMode || !isToday) return undefined // No forced state when focus mode is off or not today
+
+    // All-day and unscheduled are always shown (not collapsed by focus mode)
+    if (section === 'allday' || section === 'unscheduled') return undefined
+
+    // In focus mode: only current section is expanded
+    return section !== currentTimeSection
+  }, [focusMode, currentTimeSection, isToday])
 
   // Overdue tasks: scheduled for past days, not completed - only shown on today's view
   const overdueTasks = useMemo(() => {
@@ -710,10 +824,16 @@ export function TodaySchedule({
       if (!task.scheduledFor) return false
       if (!matchesAssigneeFilter(task.assignedTo, task.assignedToAll)) return false
 
-      const taskDate = new Date(task.scheduledFor)
-      taskDate.setHours(0, 0, 0, 0)
+      // Parse the scheduled date and extract UTC components to avoid timezone issues
+      // scheduled_for is stored as midnight UTC, so we need to compare the UTC date
+      const taskDateTime = new Date(task.scheduledFor)
+      const taskDateLocal = new Date(
+        taskDateTime.getUTCFullYear(),
+        taskDateTime.getUTCMonth(),
+        taskDateTime.getUTCDate()
+      )
 
-      return taskDate < today
+      return taskDateLocal < today
     })
   }, [tasks, isToday, selectedAssignee])
 
@@ -744,16 +864,19 @@ export function TodaySchedule({
 
   // Filter tasks for the viewed date (only tasks with scheduledFor)
   const filteredTasks = useMemo(() => {
-    const startOfDay = new Date(viewedDate)
-    startOfDay.setHours(0, 0, 0, 0)
-    const endOfDay = new Date(viewedDate)
-    endOfDay.setHours(23, 59, 59, 999)
+    const viewedYear = viewedDate.getFullYear()
+    const viewedMonth = viewedDate.getMonth()
+    const viewedDay = viewedDate.getDate()
 
     return tasks.filter((task) => {
       if (!matchesAssigneeFilter(task.assignedTo, task.assignedToAll)) return false
       if (task.scheduledFor) {
-        const taskDate = new Date(task.scheduledFor)
-        return taskDate >= startOfDay && taskDate <= endOfDay
+        // Extract UTC date components since scheduled_for is stored as midnight UTC
+        const taskDateTime = new Date(task.scheduledFor)
+        const taskYear = taskDateTime.getUTCFullYear()
+        const taskMonth = taskDateTime.getUTCMonth()
+        const taskDay = taskDateTime.getUTCDate()
+        return taskYear === viewedYear && taskMonth === viewedMonth && taskDay === viewedDay
       }
       return false // Unscheduled tasks go to inbox, not here
     })
@@ -1036,6 +1159,14 @@ export function TodaySchedule({
             />
           )}
 
+          {/* Focus Mode toggle */}
+          {isToday && (
+            <FocusModeToggle
+              enabled={focusMode}
+              onToggle={toggleFocusMode}
+            />
+          )}
+
           {/* Progress - centered with flex-1 */}
           {actionableCount > 0 && (
             <ProgressIndicator
@@ -1120,8 +1251,16 @@ export function TodaySchedule({
 
           {sections.map((section) => {
             const items = grouped[section]
+            const isCurrent = isToday && section === currentTimeSection
             return (
-              <TimeGroup key={section} section={section} isEmpty={items.length === 0}>
+              <TimeGroup
+                key={section}
+                section={section}
+                isEmpty={items.length === 0}
+                itemCount={items.length}
+                isCurrentSection={isCurrent}
+                forceCollapsed={getSectionCollapseState(section)}
+              >
                 {items.map((item) => {
                   const contactName = item.contactId && contactsMap?.get(item.contactId)?.name
                   const projectName = item.projectId && projectsMap?.get(item.projectId)?.name
@@ -1314,9 +1453,26 @@ export function TodaySchedule({
           onComplete={handleBulkComplete}
           onUncomplete={handleBulkUncomplete}
           onDelete={handleBulkDelete}
+          onReschedule={handleBulkReschedule}
           onCancel={bulkSelection.exitSelectionMode}
           hasCompletedTasks={hasCompletedSelected}
           hasIncompleteTasks={hasIncompleteSelected}
+        />
+      )}
+
+      {/* Bulk reschedule dialog */}
+      <BulkRescheduleDialog
+        isOpen={showBulkRescheduleDialog}
+        selectedCount={bulkSelection.selectedIds.size}
+        onConfirm={handleBulkRescheduleConfirm}
+        onCancel={handleBulkRescheduleCancel}
+      />
+
+      {/* Floating Inbox FAB - quick access to inbox */}
+      {isToday && (
+        <FloatingInboxFAB
+          count={inboxTasks.length}
+          onClick={scrollToInbox}
         />
       )}
     </div>

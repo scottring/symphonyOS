@@ -1,10 +1,11 @@
-import { Check, RotateCcw, Trash2, X } from 'lucide-react'
+import { Check, RotateCcw, Trash2, X, Calendar } from 'lucide-react'
 
 interface BulkActionBarProps {
   selectedCount: number
   onComplete: () => void
   onUncomplete: () => void
   onDelete: () => void
+  onReschedule: () => void
   onCancel: () => void
   hasCompletedTasks: boolean
   hasIncompleteTasks: boolean
@@ -15,6 +16,7 @@ export function BulkActionBar({
   onComplete,
   onUncomplete,
   onDelete,
+  onReschedule,
   onCancel,
   hasCompletedTasks,
   hasIncompleteTasks,
@@ -50,6 +52,15 @@ export function BulkActionBar({
             Uncomplete
           </button>
         )}
+
+        {/* Reschedule button */}
+        <button
+          onClick={onReschedule}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-600 hover:bg-neutral-500 transition-colors text-sm font-medium"
+        >
+          <Calendar className="w-4 h-4" />
+          Reschedule
+        </button>
 
         {/* Delete button */}
         <button

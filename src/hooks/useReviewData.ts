@@ -32,20 +32,25 @@ export function useReviewData(
       return assignedTo === selectedAssignee // Show items assigned to selected person
     }
 
+    // Helper to convert UTC midnight date to local date value for comparison
+    // scheduled_for is stored as midnight UTC, so we extract UTC date components
+    const getLocalDateValue = (date: Date | string): number => {
+      const d = date instanceof Date ? date : new Date(date)
+      // Create a local date from the UTC date components
+      return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()).getTime()
+    }
+
     const today = new Date(viewedDate)
     today.setHours(0, 0, 0, 0)
-
     const startOfToday = today.getTime()
-    const endOfToday = new Date(today)
-    endOfToday.setHours(23, 59, 59, 999)
-    const endOfTodayTime = endOfToday.getTime()
 
     const tomorrow = new Date(today)
     tomorrow.setDate(tomorrow.getDate() + 1)
     const startOfTomorrow = tomorrow.getTime()
-    const endOfTomorrow = new Date(tomorrow)
-    endOfTomorrow.setHours(23, 59, 59, 999)
-    const endOfTomorrowTime = endOfTomorrow.getTime()
+
+    const dayAfterTomorrow = new Date(tomorrow)
+    dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1)
+    const startOfDayAfter = dayAfterTomorrow.getTime()
 
     // Initialize arrays
     const incompleteTasks: Task[] = []
@@ -60,7 +65,8 @@ export function useReviewData(
       if (task.completed) continue
       if (!matchesAssigneeFilter(task.assignedTo)) continue
 
-      const scheduledTime = task.scheduledFor ? new Date(task.scheduledFor).getTime() : null
+      // Convert scheduled_for (UTC midnight) to local date value for proper comparison
+      const scheduledDateValue = task.scheduledFor ? getLocalDateValue(task.scheduledFor) : null
 
       // Stale deferred (3+ times) - check first as these are highest priority
       if ((task.deferCount ?? 0) >= 3 && !processedIds.has(task.id)) {
@@ -70,21 +76,21 @@ export function useReviewData(
       }
 
       // Overdue (scheduled before today)
-      if (scheduledTime && scheduledTime < startOfToday && !processedIds.has(task.id)) {
+      if (scheduledDateValue && scheduledDateValue < startOfToday && !processedIds.has(task.id)) {
         overdueTasks.push(task)
         processedIds.add(task.id)
         continue
       }
 
       // Incomplete today (scheduled for today, not done)
-      if (scheduledTime && scheduledTime >= startOfToday && scheduledTime <= endOfTodayTime && !processedIds.has(task.id)) {
+      if (scheduledDateValue && scheduledDateValue >= startOfToday && scheduledDateValue < startOfTomorrow && !processedIds.has(task.id)) {
         incompleteTasks.push(task)
         processedIds.add(task.id)
         continue
       }
 
       // Tomorrow preview
-      if (scheduledTime && scheduledTime >= startOfTomorrow && scheduledTime <= endOfTomorrowTime && !processedIds.has(task.id)) {
+      if (scheduledDateValue && scheduledDateValue >= startOfTomorrow && scheduledDateValue < startOfDayAfter && !processedIds.has(task.id)) {
         tomorrowTasks.push(task)
         processedIds.add(task.id)
       }

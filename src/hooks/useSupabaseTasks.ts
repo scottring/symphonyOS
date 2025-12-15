@@ -732,5 +732,48 @@ export function useSupabaseTasks() {
     }
   }, [user])
 
-  return { tasks, loading, error, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, deleteTask, updateTask, scheduleTask, pushTask, bulkToggleTasks, bulkDeleteTasks, bulkRestoreTasks }
+  // Bulk reschedule multiple tasks to a new date
+  const bulkRescheduleTasks = useCallback(async (ids: string[], date: Date, isAllDay?: boolean) => {
+    if (ids.length === 0) return
+
+    // Save original scheduled dates for rollback
+    const originalDates = new Map<string, Date | undefined>()
+    tasks.forEach((t) => {
+      if (ids.includes(t.id)) {
+        originalDates.set(t.id, t.scheduledFor)
+      }
+    })
+
+    // Optimistic update
+    setTasks((prev) =>
+      prev.map((t) =>
+        ids.includes(t.id)
+          ? { ...t, scheduledFor: date, isAllDay: isAllDay ?? t.isAllDay ?? true, deferredUntil: undefined }
+          : t
+      )
+    )
+
+    const { error: updateError } = await supabase
+      .from('tasks')
+      .update({
+        scheduled_for: date.toISOString(),
+        is_all_day: isAllDay ?? null,
+        deferred_until: null, // Clear deferral when rescheduling
+      })
+      .in('id', ids)
+
+    if (updateError) {
+      // Rollback
+      setTasks((prev) =>
+        prev.map((t) =>
+          ids.includes(t.id)
+            ? { ...t, scheduledFor: originalDates.get(t.id), deferredUntil: undefined }
+            : t
+        )
+      )
+      setError(updateError.message)
+    }
+  }, [tasks])
+
+  return { tasks, loading, error, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, deleteTask, updateTask, scheduleTask, pushTask, bulkToggleTasks, bulkDeleteTasks, bulkRestoreTasks, bulkRescheduleTasks }
 }

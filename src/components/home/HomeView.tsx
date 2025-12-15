@@ -62,6 +62,7 @@ interface HomeViewProps {
   onBulkComplete?: (taskIds: string[]) => void
   onBulkUncomplete?: (taskIds: string[]) => void
   onBulkDelete?: (taskIds: string[]) => void
+  onBulkReschedule?: (taskIds: string[], date: Date, isAllDay: boolean) => void
   // Navigation callbacks for HomeDashboard
   onNavigateToContext?: (context: TaskContext) => void
   onNavigateToInbox?: () => void
@@ -113,6 +114,7 @@ export function HomeView({
   onBulkComplete,
   onBulkUncomplete,
   onBulkDelete,
+  onBulkReschedule,
   // Navigation
   onNavigateToContext,
   onNavigateToInbox,
@@ -438,6 +440,7 @@ export function HomeView({
         onBulkComplete={onBulkComplete}
         onBulkUncomplete={onBulkUncomplete}
         onBulkDelete={onBulkDelete}
+        onBulkReschedule={onBulkReschedule}
       />
     )
   }
