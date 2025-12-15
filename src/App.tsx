@@ -18,6 +18,7 @@ import { useAttachments } from '@/hooks/useAttachments'
 import { usePinnedItems } from '@/hooks/usePinnedItems'
 import { useUndo } from '@/hooks/useUndo'
 import { useToast } from '@/hooks/useToast'
+import { useActions } from '@/hooks/useActions'
 import type { PinnableEntityType } from '@/types/pin'
 import { supabase } from '@/lib/supabase'
 import { AppShell } from '@/components/layout/AppShell'
@@ -31,6 +32,7 @@ import { NotesPage } from '@/components/notes'
 import { CompletedTasksView } from '@/components/history/CompletedTasksView'
 import { Toast } from '@/components/toast'
 import { KidsZone } from '@/components/kids'
+import { ActionPreview } from '@/components/action/ActionPreview'
 import {
   ProjectsList,
   ProjectView,
@@ -38,6 +40,7 @@ import {
   RoutineForm,
   RoutineInput,
   TaskView,
+  ContactsList,
   ContactView,
   RecipeViewer,
   CalendarConnect,
@@ -51,7 +54,7 @@ import type { ActionableInstance, Routine } from '@/types/actionable'
 import type { LinkedActivityType } from '@/types/task'
 
 function App() {
-  const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, getLinkedTasks, toggleTask, deleteTask, updateTask, pushTask } = useSupabaseTasks()
+  const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, getLinkedTasks, toggleTask, deleteTask, updateTask, pushTask, bulkToggleTasks, bulkDeleteTasks, bulkRestoreTasks } = useSupabaseTasks()
   const { user, loading: authLoading, signOut } = useAuth()
   const { isConnected, events, fetchEvents, isFetching: eventsFetching, createEvent, connect: connectCalendar } = useGoogleCalendar()
   const attachments = useAttachments()
@@ -59,6 +62,7 @@ function App() {
   const pinnedItems = usePinnedItems()
   const undo = useUndo({ duration: 5000 })
   const { toast, showToast, dismissToast } = useToast()
+  const actions = useActions()
 
   // Onboarding state
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null)
@@ -950,7 +954,12 @@ function App() {
         }
       }}
       quickAddProjects={projects.map(p => ({ id: p.id, name: p.name }))}
-      quickAddContacts={contacts.map(c => ({ id: c.id, name: c.name }))}
+      quickAddContacts={contacts.map(c => ({ id: c.id, name: c.name, phone: c.phone, email: c.email }))}
+      onActionDetected={actions.parseInput}
+      onShowActionPreview={() => {
+        // pendingAction is managed by useActions hook
+        // The hook sets it internally when parseInput succeeds
+      }}
       quickAddOpen={quickAddOpen}
       onOpenQuickAdd={openQuickAdd}
       onCloseQuickAdd={closeQuickAdd}
@@ -1179,6 +1188,29 @@ function App() {
             }}
             onOpenPlanning={() => setPlanningOpen(true)}
             onAddProject={addProject}
+            onBulkComplete={async (taskIds) => {
+              await bulkToggleTasks(taskIds, true)
+              const count = taskIds.length
+              undo.pushAction(`Completed ${count} task${count !== 1 ? 's' : ''}`, async () => {
+                await bulkToggleTasks(taskIds, false)
+              })
+            }}
+            onBulkUncomplete={async (taskIds) => {
+              await bulkToggleTasks(taskIds, false)
+              const count = taskIds.length
+              undo.pushAction(`Uncompleted ${count} task${count !== 1 ? 's' : ''}`, async () => {
+                await bulkToggleTasks(taskIds, true)
+              })
+            }}
+            onBulkDelete={async (taskIds) => {
+              const deletedTasks = await bulkDeleteTasks(taskIds)
+              const count = deletedTasks.length
+              if (count > 0) {
+                undo.pushAction(`Deleted ${count} task${count !== 1 ? 's' : ''}`, async () => {
+                  await bulkRestoreTasks(deletedTasks)
+                })
+              }
+            }}
           />
         </div>
       )}
@@ -1235,13 +1267,50 @@ function App() {
             contact={selectedContactForView}
             onBack={() => {
               setSelectedContactId(null)
-              setActiveView('home')
+              setActiveView('contacts')
             }}
             onUpdate={updateContact}
             onDelete={async (id) => {
               await deleteContact(id)
               setSelectedContactId(null)
-              setActiveView('home')
+              setActiveView('contacts')
+            }}
+            tasks={tasks}
+            onSelectTask={(taskId) => {
+              setSelectedTaskId(taskId)
+              setActiveView('task-detail')
+              setSelectedContactId(null)
+            }}
+            isPinned={pinnedItems.isPinned('contact', selectedContactForView.id)}
+            canPin={pinnedItems.canPin()}
+            onPin={() => pinnedItems.pin('contact', selectedContactForView.id)}
+            onUnpin={() => pinnedItems.unpin('contact', selectedContactForView.id)}
+          />
+        </Suspense>
+      )}
+
+      {activeView === 'contacts' && !selectedContactId && (
+        <Suspense fallback={<LoadingFallback />}>
+          <ContactsList
+            contacts={contacts}
+            onSelectContact={(contactId) => {
+              setSelectedContactId(contactId)
+              setActiveView('contact-detail')
+            }}
+            onAddContact={addContact}
+          />
+        </Suspense>
+      )}
+
+      {activeView === 'contacts' && selectedContactForView && (
+        <Suspense fallback={<LoadingFallback />}>
+          <ContactView
+            contact={selectedContactForView}
+            onBack={() => setSelectedContactId(null)}
+            onUpdate={updateContact}
+            onDelete={async (id) => {
+              await deleteContact(id)
+              setSelectedContactId(null)
             }}
             tasks={tasks}
             onSelectTask={(taskId) => {
@@ -1552,6 +1621,42 @@ function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Action Preview Modal - for AI-powered SMS/email sending */}
+      {actions.pendingAction && (
+        <ActionPreview
+          action={actions.pendingAction}
+          onSend={async (message, recipient, subject) => {
+            const success = await actions.sendAction(
+              actions.pendingAction!,
+              message,
+              recipient,
+              subject
+            )
+            if (success) {
+              showToast(
+                `${actions.pendingAction!.actionType === 'sms' ? 'Text' : 'Email'} sent to ${recipient.name}!`,
+                'success'
+              )
+            } else {
+              showToast(
+                actions.error || 'Failed to send message',
+                'warning'
+              )
+            }
+          }}
+          onCancel={actions.clearPendingAction}
+          onSaveAsTask={() => {
+            // Save the action as a task instead
+            if (actions.pendingAction?.originalInput) {
+              addTask(actions.pendingAction.originalInput)
+              showToast('Saved as task', 'success')
+            }
+            actions.clearPendingAction()
+          }}
+          isSending={actions.isSending}
+        />
       )}
     </AppShell>
   )

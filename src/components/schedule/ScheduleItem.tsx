@@ -4,7 +4,8 @@ import { formatTime, formatTimeRange } from '@/lib/timeUtils'
 import { getProjectColor } from '@/lib/projectUtils'
 import { PushDropdown, SchedulePopover, type ScheduleContextItem } from '@/components/triage'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
-import { Redo2 } from 'lucide-react'
+import { Redo2, Check } from 'lucide-react'
+import { useLongPress } from '@/hooks/useLongPress'
 
 interface ScheduleItemProps {
   item: TimelineItem
@@ -32,6 +33,11 @@ interface ScheduleItemProps {
   overdueLabel?: string
   // Schedule context for the schedule popover
   getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
+  // Bulk selection mode
+  selectionMode?: boolean
+  multiSelected?: boolean
+  onLongPress?: () => void
+  onToggleSelect?: () => void
 }
 
 // Refined warm amber color tokens for overdue styling
@@ -63,10 +69,30 @@ export function ScheduleItem({
   isOverdue,
   overdueLabel,
   getScheduleItemsForDate,
+  selectionMode,
+  multiSelected,
+  onLongPress,
+  onToggleSelect,
 }: ScheduleItemProps) {
   const isTask = item.type === 'task'
   const isRoutine = item.type === 'routine'
   const isActionable = isTask || isRoutine
+
+  // Long press to enter selection mode (only for tasks)
+  const longPressHandlers = useLongPress({
+    onLongPress: () => {
+      if (isTask && onLongPress) {
+        onLongPress()
+      }
+    },
+    onClick: () => {
+      if (selectionMode && isTask && onToggleSelect) {
+        onToggleSelect()
+      } else {
+        onSelect()
+      }
+    },
+  })
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -76,7 +102,11 @@ export function ScheduleItem({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
-      onSelect()
+      if (selectionMode && isTask && onToggleSelect) {
+        onToggleSelect()
+      } else {
+        onSelect()
+      }
     }
   }
 
@@ -112,7 +142,8 @@ export function ScheduleItem({
 
   return (
     <div
-      onClick={onSelect}
+      {...(isTask ? longPressHandlers : {})}
+      onClick={isTask ? undefined : onSelect}
       onKeyDown={handleKeyDown}
       tabIndex={0}
       role="button"
@@ -124,11 +155,32 @@ export function ScheduleItem({
           ? 'shadow-lg ring-1 ring-primary-200/80 scale-[1.01]'
           : 'hover:shadow-md'
         }
+        ${multiSelected
+          ? 'ring-2 ring-primary-400 bg-primary-50/50'
+          : ''
+        }
       `}
     >
+      {/* Selection checkbox overlay - shown in selection mode for tasks */}
+      {selectionMode && isTask && (
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10">
+          <div
+            className={`
+              w-6 h-6 rounded-full border-2 flex items-center justify-center
+              transition-all duration-150
+              ${multiSelected
+                ? 'bg-primary-500 border-primary-500 text-white'
+                : 'border-neutral-300 bg-white'
+              }
+            `}
+          >
+            {multiSelected && <Check className="w-4 h-4" />}
+          </div>
+        </div>
+      )}
 
       {/* Content wrapper */}
-      <div className="relative px-4 py-3.5">
+      <div className={`relative px-4 py-3.5 ${selectionMode && isTask ? 'pl-12' : ''}`}>
         {/* Left edge indicator - amber for overdue, project color otherwise */}
         {(isOverdue || projectColor) && (
           <div

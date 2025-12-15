@@ -14,7 +14,7 @@ const FEATURES = {
   lists: true, // Lists feature - enabled for trip planning and collections
 }
 
-export type ViewType = 'home' | 'projects' | 'routines' | 'lists' | 'notes' | 'history' | 'task-detail' | 'contact-detail' | 'settings' | 'kids'
+export type ViewType = 'home' | 'projects' | 'routines' | 'contacts' | 'lists' | 'notes' | 'history' | 'task-detail' | 'contact-detail' | 'settings' | 'kids'
 
 interface EntityData {
   tasks: Task[]
@@ -69,6 +69,18 @@ const navItems = [
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
         <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
+      </svg>
+    ),
+  },
+  {
+    id: 'contacts' as const,
+    label: 'Contacts',
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
       </svg>
     ),
   },

@@ -5,7 +5,7 @@ import { formatTime } from '@/lib/timeUtils'
 import { getProjectColor } from '@/lib/projectUtils'
 import { TypeIcon } from './TypeIcon'
 import { AssigneeDropdown } from '@/components/family'
-import { ArrowRightToLine, Redo2, MoreHorizontal } from 'lucide-react'
+import { ArrowRightToLine, Redo2, MoreHorizontal, Check } from 'lucide-react'
 
 interface SwipeableCardProps {
   item: TimelineItem
@@ -18,12 +18,20 @@ interface SwipeableCardProps {
   familyMembers?: FamilyMember[]
   assignedTo?: string | null
   onAssign?: (memberId: string | null) => void
+  // Bulk selection mode
+  selectionMode?: boolean
+  multiSelected?: boolean
+  onLongPress?: () => void
+  onToggleSelect?: () => void
 }
 
 // Swipe thresholds
 const COMPLETE_THRESHOLD = 80
 const ACTION_THRESHOLD = 60
 const RESISTANCE = 0.4
+
+// Long press delay
+const LONG_PRESS_DELAY = 500
 
 export function SwipeableCard({
   item,
@@ -35,6 +43,10 @@ export function SwipeableCard({
   familyMembers = [],
   assignedTo,
   onAssign,
+  selectionMode,
+  multiSelected,
+  onLongPress,
+  onToggleSelect,
 }: SwipeableCardProps) {
   const cardRef = useRef<HTMLDivElement>(null)
   const [translateX, setTranslateX] = useState(0)
@@ -43,6 +55,10 @@ export function SwipeableCard({
   const startX = useRef(0)
   const startY = useRef(0)
   const isHorizontalSwipe = useRef<boolean | null>(null)
+
+  // Long press state
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null)
+  const longPressTriggered = useRef(false)
 
   const isTask = item.type === 'task'
   const isRoutine = item.type === 'routine'
@@ -66,14 +82,42 @@ export function SwipeableCard({
   // Get project color for left edge indicator
   const projectColor = item.projectId ? getProjectColor(item.projectId) : null
 
+  // Clear long press timer
+  const clearLongPressTimer = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }, [])
+
   // Touch handlers
   const handleTouchStart = useCallback((e: TouchEvent) => {
     if (showActions) return
     startX.current = e.touches[0].clientX
     startY.current = e.touches[0].clientY
     isHorizontalSwipe.current = null
+    longPressTriggered.current = false
+
+    // In selection mode, don't enable swipe - just handle taps
+    if (selectionMode) {
+      return
+    }
+
     setIsDragging(true)
-  }, [showActions])
+
+    // Start long press timer for tasks
+    if (isTask && onLongPress) {
+      longPressTimer.current = setTimeout(() => {
+        longPressTriggered.current = true
+        // Haptic feedback
+        if (navigator.vibrate) {
+          navigator.vibrate(50)
+        }
+        onLongPress()
+        setIsDragging(false)
+      }, LONG_PRESS_DELAY)
+    }
+  }, [showActions, selectionMode, isTask, onLongPress])
 
   // Use a ref for the touch move handler to access latest state
   const isDraggingRef = useRef(false)
@@ -87,6 +131,18 @@ export function SwipeableCard({
     if (!card) return
 
     const handleTouchMove = (e: globalThis.TouchEvent) => {
+      // Cancel long press on any movement
+      if (longPressTimer.current) {
+        const currentX = e.touches[0].clientX
+        const currentY = e.touches[0].clientY
+        const diffX = Math.abs(currentX - startX.current)
+        const diffY = Math.abs(currentY - startY.current)
+        if (diffX > 10 || diffY > 10) {
+          clearTimeout(longPressTimer.current)
+          longPressTimer.current = null
+        }
+      }
+
       if (!isDraggingRef.current) return
 
       const currentX = e.touches[0].clientX
@@ -124,6 +180,19 @@ export function SwipeableCard({
   }, [])
 
   const handleTouchEnd = useCallback(() => {
+    clearLongPressTimer()
+
+    // In selection mode, handle tap to toggle selection
+    if (selectionMode && isTask && onToggleSelect && !longPressTriggered.current) {
+      onToggleSelect()
+      return
+    }
+
+    // If long press was triggered, don't do anything else
+    if (longPressTriggered.current) {
+      return
+    }
+
     if (!isDragging) return
     setIsDragging(false)
 
@@ -140,7 +209,12 @@ export function SwipeableCard({
     else {
       setTranslateX(0)
     }
-  }, [isDragging, translateX, isActionable, onComplete])
+  }, [isDragging, translateX, isActionable, onComplete, clearLongPressTimer, selectionMode, isTask, onToggleSelect])
+
+  // Cleanup long press timer on unmount
+  useEffect(() => {
+    return () => clearLongPressTimer()
+  }, [clearLongPressTimer])
 
   const closeActions = useCallback(() => {
     setShowActions(false)
@@ -168,6 +242,24 @@ export function SwipeableCard({
 
   return (
     <div className="relative rounded-2xl">
+      {/* Selection checkbox overlay - shown in selection mode for tasks */}
+      {selectionMode && isTask && (
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 z-20">
+          <div
+            className={`
+              w-6 h-6 rounded-full border-2 flex items-center justify-center
+              transition-all duration-150
+              ${multiSelected
+                ? 'bg-primary-500 border-primary-500 text-white'
+                : 'border-neutral-300 bg-white'
+              }
+            `}
+          >
+            {multiSelected && <Check className="w-4 h-4" />}
+          </div>
+        </div>
+      )}
+
       {/* Complete indicator - appears on RIGHT when swiping LEFT */}
       {translateX < 0 && (
         <div
@@ -230,11 +322,16 @@ export function SwipeableCard({
         onTouchEnd={handleTouchEnd}
         onClick={showActions ? closeActions : undefined}
         className={`
-          relative z-10 px-3 py-2.5 bg-bg-elevated border rounded-2xl
+          relative z-10 py-2.5 bg-bg-elevated border rounded-2xl
+          ${selectionMode && isTask ? 'pl-12 pr-3' : 'px-3'}
           ${!isDragging ? 'transition-transform duration-200 ease-out' : ''}
           ${selected
             ? 'border-primary-200 shadow-md ring-1 ring-primary-200'
             : 'border-neutral-100'
+          }
+          ${multiSelected
+            ? 'ring-2 ring-primary-400 bg-primary-50/50'
+            : ''
           }
           ${item.completed ? 'opacity-60' : ''}
         `}

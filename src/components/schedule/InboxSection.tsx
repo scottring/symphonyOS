@@ -28,6 +28,11 @@ interface InboxSectionProps {
   currentUserId?: string
   // Schedule context for the schedule popover
   getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
+  // Bulk selection mode
+  selectionMode?: boolean
+  selectedIds?: Set<string>
+  onEnterSelectionMode?: (taskId: string) => void
+  onToggleSelect?: (taskId: string) => void
 }
 
 export function InboxSection({
@@ -49,6 +54,10 @@ export function InboxSection({
   onAssignTask,
   currentUserId,
   getScheduleItemsForDate,
+  selectionMode,
+  selectedIds,
+  onEnterSelectionMode,
+  onToggleSelect,
 }: InboxSectionProps) {
   // Suppress unused variable warnings - these are kept in the interface for future use
   void _contacts
@@ -139,6 +148,10 @@ export function InboxSection({
             familyMembers={familyMembers}
             onAssignTask={onAssignTask ? (memberId) => onAssignTask(task.id, memberId) : undefined}
             getScheduleItemsForDate={getScheduleItemsForDate}
+            selectionMode={selectionMode}
+            multiSelected={selectedIds?.has(task.id)}
+            onLongPress={onEnterSelectionMode ? () => onEnterSelectionMode(task.id) : undefined}
+            onToggleSelect={onToggleSelect ? () => onToggleSelect(task.id) : undefined}
           />
         ))}
       </div>

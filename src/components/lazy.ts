@@ -44,7 +44,10 @@ export const TaskViewOriginal = lazy(() =>
   import('./task/TaskView').then(m => ({ default: m.TaskView }))
 )
 
-// Contact view (desktop)
+// Contact views
+export const ContactsList = lazy(() =>
+  import('./contact/ContactsList').then(m => ({ default: m.ContactsList }))
+)
 export const ContactView = lazy(() =>
   import('./contact/ContactViewRedesign').then(m => ({ default: m.ContactViewRedesign }))
 )

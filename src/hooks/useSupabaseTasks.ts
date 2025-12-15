@@ -623,5 +623,114 @@ export function useSupabaseTasks() {
     }
   }, [tasks])
 
-  return { tasks, loading, error, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, deleteTask, updateTask, scheduleTask, pushTask }
+  // Bulk complete/uncomplete multiple tasks
+  const bulkToggleTasks = useCallback(async (ids: string[], completed: boolean) => {
+    if (ids.length === 0) return
+
+    // Save original states for rollback
+    const originalStates = new Map<string, boolean>()
+    tasks.forEach((t) => {
+      if (ids.includes(t.id)) {
+        originalStates.set(t.id, t.completed)
+      }
+    })
+
+    // Optimistic update
+    setTasks((prev) =>
+      prev.map((t) => (ids.includes(t.id) ? { ...t, completed } : t))
+    )
+
+    const { error: updateError } = await supabase
+      .from('tasks')
+      .update({ completed })
+      .in('id', ids)
+
+    if (updateError) {
+      // Rollback
+      setTasks((prev) =>
+        prev.map((t) =>
+          originalStates.has(t.id)
+            ? { ...t, completed: originalStates.get(t.id)! }
+            : t
+        )
+      )
+      setError(updateError.message)
+    }
+  }, [tasks])
+
+  // Bulk delete multiple tasks - returns deleted tasks for undo
+  const bulkDeleteTasks = useCallback(async (ids: string[]): Promise<Task[]> => {
+    if (ids.length === 0) return []
+
+    // Save tasks for rollback/undo
+    const tasksToDelete = tasks.filter((t) => ids.includes(t.id))
+
+    // Optimistic update
+    setTasks((prev) => prev.filter((t) => !ids.includes(t.id)))
+
+    const { error: deleteError } = await supabase
+      .from('tasks')
+      .delete()
+      .in('id', ids)
+
+    if (deleteError) {
+      // Rollback
+      setTasks((prev) => [...prev, ...tasksToDelete])
+      setError(deleteError.message)
+      return []
+    }
+
+    return tasksToDelete
+  }, [tasks])
+
+  // Bulk restore tasks (for undo after delete)
+  const bulkRestoreTasks = useCallback(async (tasksToRestore: Task[]) => {
+    if (!user || tasksToRestore.length === 0) return
+
+    // Optimistic update
+    setTasks((prev) => [...tasksToRestore, ...prev])
+
+    // Convert Task objects to DB format
+    const dbRows = tasksToRestore.map((task) => ({
+      id: task.id,
+      user_id: user.id,
+      title: task.title,
+      completed: task.completed,
+      scheduled_for: task.scheduledFor?.toISOString() ?? null,
+      deferred_until: task.deferredUntil?.toISOString().split('T')[0] ?? null,
+      defer_count: task.deferCount ?? 0,
+      is_all_day: task.isAllDay ?? null,
+      is_someday: task.isSomeday ?? false,
+      context: task.context ?? null,
+      category: task.category ?? 'task',
+      notes: task.notes ?? null,
+      links: task.links ?? null,
+      phone_number: task.phoneNumber ?? null,
+      contact_id: task.contactId ?? null,
+      assigned_to: task.assignedTo ?? null,
+      assigned_to_all: task.assignedToAll ?? null,
+      project_id: task.projectId ?? null,
+      parent_task_id: task.parentTaskId ?? null,
+      linked_event_id: task.linkedEventId ?? null,
+      linked_activity_type: task.linkedTo?.type ?? null,
+      linked_activity_id: task.linkedTo?.id ?? null,
+      link_type: task.linkType ?? null,
+      estimated_duration: task.estimatedDuration ?? null,
+      location: task.location ?? null,
+      location_place_id: task.locationPlaceId ?? null,
+    }))
+
+    const { error: insertError } = await supabase
+      .from('tasks')
+      .insert(dbRows)
+
+    if (insertError) {
+      // Rollback
+      const restoredIds = new Set(tasksToRestore.map((t) => t.id))
+      setTasks((prev) => prev.filter((t) => !restoredIds.has(t.id)))
+      setError(insertError.message)
+    }
+  }, [user])
+
+  return { tasks, loading, error, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, deleteTask, updateTask, scheduleTask, pushTask, bulkToggleTasks, bulkDeleteTasks, bulkRestoreTasks }
 }

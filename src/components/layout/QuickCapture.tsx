@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { parseQuickInput, hasParsedFields, type ParsedQuickInput } from '@/lib/quickInputParser'
+import { detectAction } from '@/lib/actionDetector'
 import type { TaskCategory } from '@/types/task'
+import type { ParsedAction } from '@/types/action'
+import type { Contact } from '@/types/contact'
 
 interface QuickCaptureProps {
   onAdd: (title: string) => void
@@ -12,9 +15,13 @@ interface QuickCaptureProps {
     scheduledFor?: Date
     category?: TaskCategory
   }) => void
+  // Action detection callback - called when input looks like an action (text/email)
+  onActionDetected?: (input: string, contacts: Contact[]) => Promise<ParsedAction | null>
+  // Called when an action is confirmed
+  onShowActionPreview?: (action: ParsedAction) => void
   // Context for parser
   projects?: Array<{ id: string; name: string }>
-  contacts?: Array<{ id: string; name: string }>
+  contacts?: Array<{ id: string; name: string; phone?: string; email?: string }>
   // Existing props
   isOpen?: boolean
   onOpen?: () => void
@@ -25,6 +32,8 @@ interface QuickCaptureProps {
 export function QuickCapture({
   onAdd,
   onAddRich,
+  onActionDetected,
+  onShowActionPreview,
   projects = [],
   contacts = [],
   isOpen: controlledIsOpen,
@@ -37,6 +46,7 @@ export function QuickCapture({
   const isOpen = controlledIsOpen ?? internalIsOpen
 
   const [title, setTitle] = useState('')
+  const [isParsingAction, setIsParsingAction] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Overrides for when user clicks × on a parsed field
@@ -140,9 +150,32 @@ export function QuickCapture({
     doSubmit(false)
   }
 
-  const doSubmit = (useRaw: boolean) => {
+  const doSubmit = async (useRaw: boolean) => {
     const trimmed = title.trim()
     if (!trimmed) return
+
+    // Check for action first (only if not using raw and action detection is enabled)
+    if (!useRaw && onActionDetected && onShowActionPreview) {
+      const detection = detectAction(trimmed)
+      if (detection.isLikelyAction) {
+        setIsParsingAction(true)
+        try {
+          const action = await onActionDetected(trimmed, contacts as Contact[])
+          setIsParsingAction(false)
+
+          if (action?.isAction && action.confidence > 0.5) {
+            // Show action preview instead of creating task
+            onShowActionPreview(action)
+            handleClose()
+            return
+          }
+        } catch (err) {
+          console.error('Action detection error:', err)
+          setIsParsingAction(false)
+          // Fall through to create task on error
+        }
+      }
+    }
 
     if (useRaw || !hasParsedFields(effectiveParsed)) {
       // Plain inbox add (current behavior)
@@ -362,8 +395,9 @@ export function QuickCapture({
                   <button
                     type="button"
                     onClick={() => doSubmit(true)}
+                    disabled={isParsingAction}
                     className="flex-1 touch-target py-3 rounded-xl border border-neutral-200 text-neutral-600 font-medium
-                               hover:bg-neutral-50 transition-colors"
+                               hover:bg-neutral-50 transition-colors disabled:opacity-50"
                   >
                     Add to Inbox
                   </button>
@@ -371,13 +405,23 @@ export function QuickCapture({
 
                 <button
                   type="submit"
-                  disabled={!title.trim()}
+                  disabled={!title.trim() || isParsingAction}
                   className="flex-1 touch-target py-3 rounded-xl bg-primary-500 text-white font-medium
                              hover:bg-primary-600 active:bg-primary-700
                              disabled:opacity-50 disabled:cursor-not-allowed
-                             transition-colors"
+                             transition-colors flex items-center justify-center gap-2"
                 >
-                  {showPreview ? 'Save with Above' : 'Add to Inbox'}
+                  {isParsingAction ? (
+                    <>
+                      <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Processing...
+                    </>
+                  ) : (
+                    showPreview ? 'Save with Above' : 'Add to Inbox'
+                  )}
                 </button>
               </div>
 

@@ -9,6 +9,7 @@ import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { Routine } from '@/types/routine'
+import type { ParsedAction } from '@/types/action'
 
 interface EntityData {
   tasks: Task[]
@@ -38,10 +39,13 @@ interface AppShellProps {
   }) => void
   // Context for QuickCapture parser
   quickAddProjects?: Array<{ id: string; name: string }>
-  quickAddContacts?: Array<{ id: string; name: string }>
+  quickAddContacts?: Array<{ id: string; name: string; phone?: string; email?: string }>
   quickAddOpen?: boolean
   onOpenQuickAdd?: () => void
   onCloseQuickAdd?: () => void
+  // Action detection for AI-powered SMS/email
+  onActionDetected?: (input: string, contacts: Contact[]) => Promise<ParsedAction | null>
+  onShowActionPreview?: (action: ParsedAction) => void
   activeView: ViewType
   onViewChange: (view: ViewType) => void
   onOpenSearch?: () => void
@@ -104,6 +108,8 @@ export function AppShell({
   quickAddOpen = false,
   onOpenQuickAdd,
   onCloseQuickAdd,
+  onActionDetected,
+  onShowActionPreview,
   activeView,
   onViewChange,
   onOpenSearch,
@@ -228,6 +234,8 @@ export function AppShell({
         <QuickCapture
           onAdd={onQuickAdd}
           onAddRich={onQuickAddRich}
+          onActionDetected={onActionDetected}
+          onShowActionPreview={onShowActionPreview}
           projects={quickAddProjects}
           contacts={quickAddContacts}
           isOpen={quickAddOpen}

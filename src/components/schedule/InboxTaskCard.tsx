@@ -5,6 +5,8 @@ import type { ScheduleContextItem } from '@/components/triage'
 import { DeferPicker, SchedulePopover } from '@/components/triage'
 import { AssigneeDropdown } from '@/components/family'
 import { AgeIndicator } from '@/components/health'
+import { useLongPress } from '@/hooks/useLongPress'
+import { Check } from 'lucide-react'
 
 interface InboxTaskCardProps {
   task: Task
@@ -20,6 +22,11 @@ interface InboxTaskCardProps {
   onAssignTask?: (memberId: string | null) => void
   // Schedule context for the schedule popover
   getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
+  // Bulk selection mode
+  selectionMode?: boolean
+  multiSelected?: boolean
+  onLongPress?: () => void
+  onToggleSelect?: () => void
 }
 
 export function InboxTaskCard({
@@ -34,8 +41,28 @@ export function InboxTaskCard({
   familyMembers = [],
   onAssignTask,
   getScheduleItemsForDate,
+  selectionMode,
+  multiSelected,
+  onLongPress,
+  onToggleSelect,
 }: InboxTaskCardProps) {
   const project = projects.find(p => p.id === task.projectId)
+
+  // Long press to enter selection mode
+  const longPressHandlers = useLongPress({
+    onLongPress: () => {
+      if (onLongPress) {
+        onLongPress()
+      }
+    },
+    onClick: () => {
+      if (selectionMode && onToggleSelect) {
+        onToggleSelect()
+      } else {
+        onSelect()
+      }
+    },
+  })
 
   const handleSchedule = (date: Date, isAllDay: boolean) => {
     if (onSchedule) {
@@ -48,10 +75,31 @@ export function InboxTaskCard({
 
   return (
     <div
-      onClick={onSelect}
-      className="group relative bg-white rounded-2xl px-4 py-3.5 cursor-pointer
-                 hover:shadow-md transition-all duration-200 ease-out"
+      {...longPressHandlers}
+      className={`
+        group relative bg-white rounded-2xl py-3.5 cursor-pointer
+        hover:shadow-md transition-all duration-200 ease-out
+        ${selectionMode ? 'pl-12 pr-4' : 'px-4'}
+        ${multiSelected ? 'ring-2 ring-primary-400 bg-primary-50/50' : ''}
+      `}
     >
+      {/* Selection checkbox overlay */}
+      {selectionMode && (
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10">
+          <div
+            className={`
+              w-6 h-6 rounded-full border-2 flex items-center justify-center
+              transition-all duration-150
+              ${multiSelected
+                ? 'bg-primary-500 border-primary-500 text-white'
+                : 'border-neutral-300 bg-white'
+              }
+            `}
+          >
+            {multiSelected && <Check className="w-4 h-4" />}
+          </div>
+        </div>
+      )}
 
       {/* Content wrapper */}
       <div className="relative">

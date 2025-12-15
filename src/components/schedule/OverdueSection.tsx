@@ -16,6 +16,11 @@ interface OverdueSectionProps {
   projectsMap?: Map<string, Project>
   familyMembers?: FamilyMember[]
   onAssignTask?: (taskId: string, memberId: string | null) => void
+  // Bulk selection mode
+  selectionMode?: boolean
+  selectedIds?: Set<string>
+  onEnterSelectionMode?: (taskId: string) => void
+  onToggleSelect?: (taskId: string) => void
 }
 
 // Warm amber color for overdue header
@@ -33,6 +38,10 @@ export function OverdueSection({
   projectsMap,
   familyMembers = [],
   onAssignTask,
+  selectionMode,
+  selectedIds,
+  onEnterSelectionMode,
+  onToggleSelect,
 }: OverdueSectionProps) {
   if (tasks.length === 0) return null
 
@@ -95,6 +104,10 @@ export function OverdueSection({
               }
               isOverdue
               overdueLabel={overdueLabel}
+              selectionMode={selectionMode}
+              multiSelected={selectedIds?.has(taskId)}
+              onLongPress={onEnterSelectionMode ? () => onEnterSelectionMode(taskId) : undefined}
+              onToggleSelect={onToggleSelect ? () => onToggleSelect(taskId) : undefined}
             />
           )
         })}

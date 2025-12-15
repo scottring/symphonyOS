@@ -54,6 +54,10 @@ interface HomeViewProps {
   onOpenPlanning?: () => void
   onCreateTask?: (title: string) => void
   onAddProject?: (project: { name: string }) => Promise<Project | null>
+  // Bulk operations
+  onBulkComplete?: (taskIds: string[]) => void
+  onBulkUncomplete?: (taskIds: string[]) => void
+  onBulkDelete?: (taskIds: string[]) => void
 }
 
 export function HomeView({
@@ -97,6 +101,10 @@ export function HomeView({
   onOpenPlanning,
   onCreateTask,
   onAddProject,
+  // Bulk operations
+  onBulkComplete,
+  onBulkUncomplete,
+  onBulkDelete,
 }: HomeViewProps) {
   const { currentView, setCurrentView } = useHomeView()
   const isMobile = useMobile()
@@ -269,6 +277,10 @@ export function HomeView({
         onSelectAssignee={(id) => setSelectedAssignees(id ? [id] : [])}
         assigneesWithTasks={familyMembers}
         hasUnassignedTasks={hasUnassignedTasks}
+        // Bulk operations
+        onBulkComplete={onBulkComplete}
+        onBulkUncomplete={onBulkUncomplete}
+        onBulkDelete={onBulkDelete}
       />
     )
   }

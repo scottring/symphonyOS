@@ -10,16 +10,19 @@ import type { ScheduleContextItem } from '@/components/triage'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import { groupByDaySection, type DaySection } from '@/lib/timeUtils'
 import { useMobile } from '@/hooks/useMobile'
+import { useBulkSelection } from '@/hooks/useBulkSelection'
 import { TimeGroup } from './TimeGroup'
 import { ScheduleItem } from './ScheduleItem'
 import { SwipeableCard } from './SwipeableCard'
 import { DateNavigator } from './DateNavigator'
 import { InboxSection } from './InboxSection'
 import { OverdueSection } from './OverdueSection'
+import { BulkActionBar } from './BulkActionBar'
 import { WeeklyReview } from '@/components/review/WeeklyReview'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { useSystemHealth } from '@/hooks/useSystemHealth'
 import { MultiAssigneeDropdown } from '@/components/family/MultiAssigneeDropdown'
+import { Pencil } from 'lucide-react'
 
 // Bento box / grid icon for "Organize"
 function BentoIcon({ className }: { className?: string }) {
@@ -500,6 +503,10 @@ interface TodayScheduleProps {
   hasUnassignedTasks?: boolean
   // Parent task navigation (for subtasks shown on timeline)
   onOpenTask?: (taskId: string) => void
+  // Bulk operations
+  onBulkComplete?: (taskIds: string[]) => void
+  onBulkUncomplete?: (taskIds: string[]) => void
+  onBulkDelete?: (taskIds: string[]) => void
 }
 
 function LoadingSkeleton() {
@@ -578,11 +585,17 @@ export function TodaySchedule({
   assigneesWithTasks = [],
   hasUnassignedTasks = false,
   onOpenTask,
+  onBulkComplete,
+  onBulkUncomplete,
+  onBulkDelete,
 }: TodayScheduleProps) {
   void _onOpenPlanning // Reserved - planning now handled by ModeToggle
   void _onCreateTask // Reserved - was used by ReviewSection
   const isMobile = useMobile()
   const inboxSectionRef = useRef<HTMLDivElement>(null)
+
+  // Bulk selection state
+  const bulkSelection = useBulkSelection()
 
   // Scroll to inbox section
   const scrollToInbox = useCallback(() => {
@@ -628,6 +641,53 @@ export function TodaySchedule({
 
   // Weekly review modal state
   const [showWeeklyReview, setShowWeeklyReview] = useState(false)
+
+  // Exit selection mode when date changes
+  const prevViewedDate = useRef(viewedDate)
+  if (prevViewedDate.current.getTime() !== viewedDate.getTime()) {
+    prevViewedDate.current = viewedDate
+    if (bulkSelection.isSelectionMode) {
+      bulkSelection.exitSelectionMode()
+    }
+  }
+
+  // Get selected tasks for bulk action bar
+  const selectedTasks = useMemo(() => {
+    if (!bulkSelection.isSelectionMode) return []
+    return tasks.filter((t) => bulkSelection.selectedIds.has(t.id))
+  }, [tasks, bulkSelection.selectedIds, bulkSelection.isSelectionMode])
+
+  const hasCompletedSelected = selectedTasks.some((t) => t.completed)
+  const hasIncompleteSelected = selectedTasks.some((t) => !t.completed)
+
+  // Bulk action handlers
+  const handleBulkComplete = useCallback(() => {
+    if (onBulkComplete && bulkSelection.selectedIds.size > 0) {
+      const incompleteIds = selectedTasks.filter((t) => !t.completed).map((t) => t.id)
+      if (incompleteIds.length > 0) {
+        onBulkComplete(incompleteIds)
+      }
+      bulkSelection.exitSelectionMode()
+    }
+  }, [onBulkComplete, selectedTasks, bulkSelection])
+
+  const handleBulkUncomplete = useCallback(() => {
+    if (onBulkUncomplete && bulkSelection.selectedIds.size > 0) {
+      const completedIds = selectedTasks.filter((t) => t.completed).map((t) => t.id)
+      if (completedIds.length > 0) {
+        onBulkUncomplete(completedIds)
+      }
+      bulkSelection.exitSelectionMode()
+    }
+  }, [onBulkUncomplete, selectedTasks, bulkSelection])
+
+  const handleBulkDelete = useCallback(() => {
+    if (onBulkDelete && bulkSelection.selectedIds.size > 0) {
+      onBulkDelete([...bulkSelection.selectedIds])
+      bulkSelection.exitSelectionMode()
+    }
+  }, [onBulkDelete, bulkSelection])
+
   // Check if we're viewing today
   const isToday = useMemo(() => {
     const today = new Date()
@@ -937,6 +997,31 @@ export function TodaySchedule({
           </h1>
           {/* Date navigation arrows inline with the day name */}
           <DateNavigator date={viewedDate} onDateChange={onDateChange} showTodayButton={!isToday} />
+
+          {/* Edit button for bulk selection mode (desktop only) */}
+          {!isMobile && onBulkDelete && (
+            <button
+              onClick={() => {
+                if (bulkSelection.isSelectionMode) {
+                  bulkSelection.exitSelectionMode()
+                } else {
+                  bulkSelection.enterSelectionMode()
+                }
+              }}
+              className={`
+                ml-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200
+                ${bulkSelection.isSelectionMode
+                  ? 'bg-primary-100 text-primary-700 hover:bg-primary-200'
+                  : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100'
+                }
+              `}
+            >
+              <span className="flex items-center gap-1.5">
+                <Pencil className="w-4 h-4" />
+                {bulkSelection.isSelectionMode ? 'Done' : 'Edit'}
+              </span>
+            </button>
+          )}
         </div>
 
         {/* Stats row: Organize, Progress (centered), Clarity */}
@@ -1026,6 +1111,10 @@ export function TodaySchedule({
               projectsMap={projectsMap}
               familyMembers={familyMembers}
               onAssignTask={onAssignTask}
+              selectionMode={bulkSelection.isSelectionMode}
+              selectedIds={bulkSelection.selectedIds}
+              onEnterSelectionMode={bulkSelection.enterSelectionMode}
+              onToggleSelect={bulkSelection.toggleSelection}
             />
           )}
 
@@ -1082,6 +1171,10 @@ export function TodaySchedule({
                             ? (memberId) => onAssignRoutine(item.id.replace('routine-', ''), memberId)
                             : undefined
                         }
+                        selectionMode={bulkSelection.isSelectionMode}
+                        multiSelected={item.type === 'task' && taskId ? bulkSelection.isSelected(taskId) : false}
+                        onLongPress={item.type === 'task' && taskId ? () => bulkSelection.enterSelectionMode(taskId) : undefined}
+                        onToggleSelect={item.type === 'task' && taskId ? () => bulkSelection.toggleSelection(taskId) : undefined}
                       />
                     )
                   }
@@ -1156,6 +1249,10 @@ export function TodaySchedule({
                           : undefined
                       }
                       getScheduleItemsForDate={getScheduleItemsForDate}
+                      selectionMode={bulkSelection.isSelectionMode}
+                      multiSelected={item.type === 'task' && taskId ? bulkSelection.isSelected(taskId) : false}
+                      onLongPress={item.type === 'task' && taskId ? () => bulkSelection.enterSelectionMode(taskId) : undefined}
+                      onToggleSelect={item.type === 'task' && taskId ? () => bulkSelection.toggleSelection(taskId) : undefined}
                     />
                   )
                 })}
@@ -1183,6 +1280,10 @@ export function TodaySchedule({
                 familyMembers={familyMembers}
                 onAssignTask={onAssignTask}
                 getScheduleItemsForDate={getScheduleItemsForDate}
+                selectionMode={bulkSelection.isSelectionMode}
+                selectedIds={bulkSelection.selectedIds}
+                onEnterSelectionMode={bulkSelection.enterSelectionMode}
+                onToggleSelect={bulkSelection.toggleSelection}
               />
             </div>
           )}
@@ -1203,6 +1304,19 @@ export function TodaySchedule({
           onPushTask={onPushTask}
           onDeleteTask={onDeleteTask}
           onClose={() => setShowWeeklyReview(false)}
+        />
+      )}
+
+      {/* Bulk action bar - shown when items are selected */}
+      {bulkSelection.isSelectionMode && bulkSelection.selectedIds.size > 0 && (
+        <BulkActionBar
+          selectedCount={bulkSelection.selectedIds.size}
+          onComplete={handleBulkComplete}
+          onUncomplete={handleBulkUncomplete}
+          onDelete={handleBulkDelete}
+          onCancel={bulkSelection.exitSelectionMode}
+          hasCompletedTasks={hasCompletedSelected}
+          hasIncompleteTasks={hasIncompleteSelected}
         />
       )}
     </div>

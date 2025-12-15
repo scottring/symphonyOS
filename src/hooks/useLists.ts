@@ -44,7 +44,7 @@ export function useLists() {
       const { data, error: fetchError } = await supabase
         .from('lists')
         .select('*')
-        .or(`user_id.eq.${user.id},and(visibility.eq.family,not.hidden_from.cs.{${user.id}})`)
+        .or(`user_id.eq.${user.id},and(visibility.eq.family,or(hidden_from.is.null,hidden_from.not.cs.{${user.id}}))`)
         .order('sort_order', { ascending: true })
         .order('title', { ascending: true })
 
