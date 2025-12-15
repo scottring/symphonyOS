@@ -1,17 +1,21 @@
 import { useState, useMemo, useCallback } from 'react'
-import type { Task } from '@/types/task'
+import type { Task, TaskContext } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
+import type { DailyBriefActionType } from '@/types/action'
 import { useHomeView } from '@/hooks/useHomeView'
 import { useMobile } from '@/hooks/useMobile'
+import { useDailyBrief } from '@/hooks/useDailyBrief'
 import { HomeViewSwitcher } from './HomeViewSwitcher'
+import { HomeDashboard } from './HomeDashboard'
 import { WeekView } from './WeekView'
 import { CascadingRiverView } from './CascadingRiverView'
 import { TodaySchedule } from '@/components/schedule/TodaySchedule'
+import { DailyBrief, DailyBriefSkeleton } from '@/components/brief'
 
 interface HomeViewProps {
   tasks: Task[]
@@ -58,6 +62,10 @@ interface HomeViewProps {
   onBulkComplete?: (taskIds: string[]) => void
   onBulkUncomplete?: (taskIds: string[]) => void
   onBulkDelete?: (taskIds: string[]) => void
+  // Navigation callbacks for HomeDashboard
+  onNavigateToContext?: (context: TaskContext) => void
+  onNavigateToInbox?: () => void
+  onNavigateToProjects?: () => void
 }
 
 export function HomeView({
@@ -105,13 +113,61 @@ export function HomeView({
   onBulkComplete,
   onBulkUncomplete,
   onBulkDelete,
+  // Navigation
+  onNavigateToContext,
+  onNavigateToInbox,
+  onNavigateToProjects,
 }: HomeViewProps) {
   const { currentView, setCurrentView } = useHomeView()
   const isMobile = useMobile()
 
+  // Daily Brief handler for task actions
+  const handleBriefTaskAction = useCallback((taskId: string, action: DailyBriefActionType) => {
+    switch (action) {
+      case 'complete':
+        onToggleTask(taskId)
+        break
+      case 'delete':
+        onDeleteTask?.(taskId)
+        break
+      case 'schedule':
+      case 'open':
+        onSelectItem(taskId)
+        break
+      default:
+        console.log('Brief task action:', { taskId, action })
+    }
+  }, [onToggleTask, onDeleteTask, onSelectItem])
+
+  // Daily Brief hook
+  const {
+    brief,
+    isLoading: briefLoading,
+    isGenerating: briefGenerating,
+    generateBrief,
+    dismissBrief,
+    handleItemAction,
+  } = useDailyBrief(handleBriefTaskAction)
+
+  // Check if viewing today
+  const isViewingToday = useMemo(() => {
+    const today = new Date()
+    return (
+      viewedDate.getFullYear() === today.getFullYear() &&
+      viewedDate.getMonth() === today.getMonth() &&
+      viewedDate.getDate() === today.getDate()
+    )
+  }, [viewedDate])
+
+  // Show brief only on today view, when not dismissed
+  const shouldShowBrief = isViewingToday && currentView === 'today' && brief && !brief.dismissedAt
+
   // Assignee filter state - now supports multi-select
   // Empty array = "All", single id = single filter, multiple ids = river view
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
+
+  // Context filter state (work/family/personal)
+  const [selectedContext, setSelectedContext] = useState<TaskContext | null>(null)
 
   // Check if we should show river view (2+ real members selected, not counting 'unassigned')
   const showRiverView = useMemo(() => {
@@ -119,9 +175,10 @@ export function HomeView({
     return realMemberCount >= 2
   }, [selectedAssignees])
 
-  // Reset filter when view changes
+  // Reset filters when view changes
   const handleViewChange = useCallback((view: typeof currentView) => {
     setSelectedAssignees([])
+    setSelectedContext(null) // Clear context filter
     setCurrentView(view)
   }, [setCurrentView])
 
@@ -132,6 +189,23 @@ export function HomeView({
     if (selectedAssignees.length === 1) return selectedAssignees[0] // Single
     return null // Multi-select uses river view, schedule shows all
   }, [selectedAssignees])
+
+  // Filter tasks by context if a context is selected
+  const filteredTasks = useMemo(() => {
+    if (!selectedContext) return tasks
+    return tasks.filter(task => task.context === selectedContext)
+  }, [tasks, selectedContext])
+
+  // Get context display info
+  const contextInfo = useMemo(() => {
+    if (!selectedContext) return null
+    const info = {
+      work: { label: 'Work', color: 'bg-neutral-900 text-white', icon: '💼' },
+      family: { label: 'Family', color: 'bg-accent-400 text-white', icon: '🏠' },
+      personal: { label: 'Personal', color: 'bg-primary-500 text-white', icon: '👤' },
+    }
+    return info[selectedContext]
+  }, [selectedContext])
 
   // Check if there are any unassigned tasks/events/routines for the filter dropdown
   const hasUnassignedTasks = useMemo(() => {
@@ -178,8 +252,64 @@ export function HomeView({
     setCurrentView('today')
   }
 
+  // Navigation handlers for dashboard
+  const handleNavigateToSchedule = useCallback(() => {
+    onDateChange(new Date())
+    setCurrentView('today')
+  }, [onDateChange, setCurrentView])
+
+  const handleNavigateToContext = useCallback((context: TaskContext) => {
+    // Set context filter and switch to today view
+    setSelectedContext(context)
+    setCurrentView('today')
+    // Also reset assignee filter when switching contexts
+    setSelectedAssignees([])
+
+    // Call external handler if provided (for app-level navigation)
+    if (onNavigateToContext) {
+      onNavigateToContext(context)
+    }
+  }, [onNavigateToContext, setCurrentView])
+
+  const handleNavigateToInbox = useCallback(() => {
+    if (onNavigateToInbox) {
+      onNavigateToInbox()
+    } else {
+      // Fallback: navigate to today view
+      setCurrentView('today')
+    }
+  }, [onNavigateToInbox, setCurrentView])
+
+  const handleNavigateToProjects = useCallback(() => {
+    if (onNavigateToProjects) {
+      onNavigateToProjects()
+    }
+  }, [onNavigateToProjects])
+
   // Render the appropriate view
   const renderContent = () => {
+    // Home dashboard view
+    if (currentView === 'home') {
+      return (
+        <HomeDashboard
+          tasks={tasks}
+          events={events}
+          routines={routines}
+          projects={projects}
+          brief={brief}
+          briefLoading={briefLoading}
+          briefGenerating={briefGenerating}
+          onGenerateBrief={generateBrief}
+          onDismissBrief={dismissBrief}
+          onBriefItemAction={handleItemAction}
+          onNavigateToSchedule={handleNavigateToSchedule}
+          onNavigateToContext={handleNavigateToContext}
+          onNavigateToInbox={handleNavigateToInbox}
+          onNavigateToProjects={handleNavigateToProjects}
+        />
+      )
+    }
+
     if (currentView === 'week') {
       return (
         <WeekView
@@ -233,7 +363,7 @@ export function HomeView({
     // Today view uses TodaySchedule
     return (
       <TodaySchedule
-        tasks={tasks}
+        tasks={filteredTasks}
         events={events}
         routines={routines}
         dateInstances={dateInstances}
@@ -285,12 +415,36 @@ export function HomeView({
     )
   }
 
+  // For home view, render without the wrapper chrome
+  if (currentView === 'home') {
+    return (
+      <div className="relative flex flex-col h-full">
+        {/* Header controls - floating in upper right on desktop only */}
+        {!isMobile && (
+          <div className="absolute top-4 right-6 z-20 flex items-center gap-3">
+            <HomeViewSwitcher
+              currentView={currentView}
+              onViewChange={handleViewChange}
+              selectedAssignees={selectedAssignees}
+              onSelectAssignees={setSelectedAssignees}
+              assigneesWithTasks={familyMembers}
+              hasUnassignedTasks={hasUnassignedTasks}
+            />
+          </div>
+        )}
+        <div className="flex-1 overflow-y-auto">
+          {renderContent()}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="relative flex flex-col h-full">
       {/* Header controls - floating in upper right on desktop only */}
       {!isMobile && (
         <div className="absolute top-4 right-6 z-20 flex items-center gap-3">
-          {/* Unified view switcher (Today/Week) with assignee filter */}
+          {/* Unified view switcher (Home/Day/Week) with assignee filter */}
           <HomeViewSwitcher
             currentView={currentView}
             onViewChange={handleViewChange}
@@ -304,6 +458,52 @@ export function HomeView({
 
       {/* Main content area */}
       <div className="flex-1 overflow-y-auto">
+        {/* Context filter header - shown when filtering by Work/Family/Personal */}
+        {selectedContext && contextInfo && (
+          <div className="px-4 pt-4 md:px-6 md:pt-6">
+            <div className={`flex items-center justify-between rounded-xl px-4 py-3 ${contextInfo.color}`}>
+              <div className="flex items-center gap-3">
+                <span className="text-xl">{contextInfo.icon}</span>
+                <div>
+                  <h2 className="font-semibold">{contextInfo.label} Context</h2>
+                  <p className="text-sm opacity-80">
+                    Showing {filteredTasks.filter(t => !t.completed).length} tasks
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedContext(null)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/20 hover:bg-white/30 transition-colors text-sm font-medium"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Clear filter
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Daily Brief - shown at top when viewing today */}
+        {shouldShowBrief && (
+          <div className="px-4 pt-4 md:px-6 md:pt-6">
+            <DailyBrief
+              brief={brief}
+              isGenerating={briefGenerating}
+              onRegenerate={() => generateBrief(true)}
+              onDismiss={dismissBrief}
+              onItemAction={handleItemAction}
+            />
+          </div>
+        )}
+
+        {/* Brief loading/generating skeleton */}
+        {isViewingToday && currentView === 'today' && (briefLoading || briefGenerating) && !brief && (
+          <div className="px-4 pt-4 md:px-6 md:pt-6">
+            <DailyBriefSkeleton />
+          </div>
+        )}
+
         {renderContent()}
       </div>
     </div>

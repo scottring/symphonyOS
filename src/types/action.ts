@@ -146,3 +146,94 @@ export function getSmsSegmentInfo(message: string): {
     isMultiSegment: true,
   }
 }
+
+// =============================================================================
+// Daily Brief Types (Phase 3: Proactive AI)
+// =============================================================================
+
+export type DailyBriefItemType =
+  | 'stale_followup'
+  | 'conflict'
+  | 'deferred_reminder'
+  | 'upcoming_deadline'
+  | 'inbox_reminder'
+  | 'routine_check'
+  | 'ai_suggestion'
+  | 'overdue'
+  | 'empty_project'
+  | 'unassigned'
+  | 'calendar_reminder'
+  | 'proactive_suggestion'
+
+export type DailyBriefActionType =
+  | 'follow_up'
+  | 'mark_resolved'
+  | 'snooze'
+  | 'schedule'
+  | 'defer'
+  | 'delete'
+  | 'open'
+  | 'complete'
+  | 'draft_email'
+  | 'send_note'
+
+// Import and re-export TaskContext from task.ts
+import type { TaskContext } from './task'
+export type { TaskContext }
+
+export type DailyBriefPriority = 'high' | 'medium' | 'low'
+
+export interface DailyBriefSuggestedAction {
+  label: string
+  action: DailyBriefActionType
+}
+
+export interface DailyBriefItem {
+  id: string
+  type: DailyBriefItemType
+  title: string
+  description: string
+  relatedEntityType?: 'task' | 'contact' | 'event' | 'action_log' | 'project'
+  relatedEntityId?: string
+  suggestedActions: DailyBriefSuggestedAction[]
+  priority: DailyBriefPriority
+  context?: TaskContext
+}
+
+export interface DailyBrief {
+  id: string
+  userId: string
+  briefDate: string
+  greeting: string
+  summary: string
+  items: DailyBriefItem[]
+  generatedAt: Date
+  viewedAt?: Date
+  dismissedAt?: Date
+}
+
+export interface DbDailyBrief {
+  id: string
+  user_id: string
+  brief_date: string
+  greeting: string
+  summary: string
+  items: DailyBriefItem[]
+  generated_at: string
+  viewed_at: string | null
+  dismissed_at: string | null
+}
+
+export function dbDailyBriefToDailyBrief(db: DbDailyBrief): DailyBrief {
+  return {
+    id: db.id,
+    userId: db.user_id,
+    briefDate: db.brief_date,
+    greeting: db.greeting,
+    summary: db.summary,
+    items: db.items,
+    generatedAt: new Date(db.generated_at),
+    viewedAt: db.viewed_at ? new Date(db.viewed_at) : undefined,
+    dismissedAt: db.dismissed_at ? new Date(db.dismissed_at) : undefined,
+  }
+}

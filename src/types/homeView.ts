@@ -1,4 +1,4 @@
-export type HomeViewType = 'today' | 'week'
+export type HomeViewType = 'home' | 'today' | 'week'
 
 export interface HomeViewPreference {
   userId: string

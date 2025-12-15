@@ -1,248 +1,440 @@
 # Symphony OS: Product Vision
 
-*Last updated: November 30, 2025*
+*Last updated: December 2025*
 
 ---
 
 ## What Symphony Is
 
-A personal operating system for organizing your life. Desktop for planning, mobile for capture and execution. Covers work, personal, and family — not just family.
+**A personal AI organization that manages your entire life.**
 
-**Core insight:** The problem isn't lack of features. It's that captured information doesn't surface at the right time with the right context.
+Symphony is more than an app — it's a team of AI specialists coordinated by a Life COO, each with deep expertise in their domain (health, work, family, finance, personal growth), all sharing context about your life. Unlike chatbots that forget you exist, Symphony has persistent knowledge of your tasks, calendar, contacts, projects, routines, goals, and history.
+
+**The core insight:** AI assistants fail because they lack context AND specialization. A generic AI can't be an expert nutritionist AND career coach AND family logistics coordinator. Symphony solves both: unified life context with specialized domain expertise.
+
+**The unlock:** When domain-expert AI coaches share context about your full life AND can take action (send texts, schedule things, create plans), you get a personal staff — without hiring anyone.
 
 ---
 
-## The Core Loop
+## The North Star Vision
 
-1. **Capture** — Quick add on mobile, share sheet, email forward → lands in inbox
-2. **Plan** — Weekly session: brain dump, process inbox, AI helps structure, review calendar, assign tasks
-3. **Execute** — Contextual cards surface what you need with all attached context
-4. **Sync** — Family domain reviewed together with Iris weekly
+```
+┌─────────────────────────────────────────────────────────────┐
+│                         You                                  │
+│                          │                                   │
+│                          ▼                                   │
+│               ┌─────────────────────┐                        │
+│               │      Life COO       │                        │
+│               │  (Chief of Staff)   │                        │
+│               │                     │                        │
+│               │  • Sees everything  │                        │
+│               │  • Resolves conflicts│                       │
+│               │  • Enforces priorities│                      │
+│               │  • Morning brief    │                        │
+│               └──────────┬──────────┘                        │
+│                          │                                   │
+│      ┌─────────┬─────────┼─────────┬─────────┐              │
+│      ▼         ▼         ▼         ▼         ▼              │
+│ ┌─────────┐┌─────────┐┌─────────┐┌─────────┐┌─────────┐     │
+│ │ Health  ││  Work   ││ Family  ││ Finance ││ Personal│     │
+│ │ Coach   ││  CEO    ││ Manager ││ Advisor ││ Growth  │     │
+│ └─────────┘└─────────┘└─────────┘└─────────┘└─────────┘     │
+│ • Nutrition • Strategy • Kids     • Budget   • Goals        │
+│ • Exercise  • Projects • Schedule • Tracking • Habits       │
+│ • Sleep     • Decisions• Household• Alerts   • Learning     │
+│ • Meals     • Meetings • Events   • Bills    • Reading      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Example: Life COO Coordination
+
+```
+You: "I have a big presentation Thursday, but I committed to
+     my trainer for a 6am workout that day"
+
+Life COO: "I see the conflict. Let me check with both teams.
+
+Work CEO says: Presentation is high-stakes, determines Q1 budget.
+Health Coach says: You've skipped 2 workouts this week already.
+
+Options:
+1. Move workout to Wednesday evening (you're free 6-7pm)
+   → Preserves Thursday rest, keeps your 3x/week goal
+
+2. Keep Thursday 6am, you've done this before successfully
+   → March 12, April 3 you presented well after morning workouts
+
+3. Skip Thursday, make up Saturday
+   → Health Coach would push back - you're at 1x this week
+
+My recommendation: Option 1. Want me to message your trainer?"
+```
+
+### Example: Health Coach Conversation
+
+```
+You: "I've been stress eating this week"
+
+Health Coach: "I can see you've had a heavy work week - 3 late
+meetings and that presentation prep. Stress eating makes sense.
+
+Looking at your patterns:
+• This happens when you skip lunch (which you did Tue/Wed)
+• Evening snacks were mostly carbs (energy-seeking behavior)
+
+For the rest of this week:
+• I've added 'actual lunch' reminders to your calendar
+• Want me to prep a list of protein-heavy snacks? More satisfying.
+
+For next week when things calm down, let's talk about a reset.
+Don't beat yourself up - surviving a hard week is a win."
+```
+
+---
+
+## Core Principles
+
+### 1. Full Life Context, Shared Across Coaches
+Work bleeds into personal bleeds into family. Every coach sees the full picture (filtered to their domain) so they can give advice that accounts for your whole life:
+- Health Coach knows you have a stressful work week
+- Work CEO knows you're starting a new fitness program
+- Life COO sees everything and coordinates
+
+### 2. Specialized Expertise, Not Generic AI
+Each coach has a distinct persona, expertise, and communication style:
+- Health Coach: Supportive, evidence-based, non-judgmental
+- Work CEO: Strategic, direct, challenges assumptions
+- Life COO: Balances all domains, protects boundaries, sees patterns
+
+### 3. AI That Takes Action
+Coaches can do things, not just talk:
+- Create tasks and schedule them
+- Send messages on your behalf (with approval)
+- Log meals, workouts, metrics
+- Generate plans and track progress
+- Surface conflicts and suggest resolutions
+
+### 4. Human in the Loop
+AI drafts, you approve. Every external action shows a preview. "Save as Task" is always an escape hatch. Coaches advise; you decide.
+
+### 5. Proactive, Not Just Reactive
+Coaches and the Life COO don't wait for you to ask:
+- Morning brief surfaces what matters today
+- Health Coach notices you've skipped workouts
+- Work CEO flags a decision you've been avoiding
+- Life COO spots cross-domain conflicts before they happen
+
+### 6. Capture → Plan → Execute → Review
+The rhythm that makes it work:
+1. **Capture** — Zero friction brain dump. Lands in inbox.
+2. **Plan** — Weekly session with Life COO. Coaches provide domain input.
+3. **Execute** — Contextual surfacing. Right task, right time, right info.
+4. **Review** — Life COO analyzes patterns, coaches suggest adjustments.
+
+---
+
+## Who Symphony Is For
+
+**Primary:** Individuals managing complex, multi-domain lives
+- Professionals with demanding jobs who also want to be great parents
+- People pursuing fitness/health goals while building careers
+- Anyone who feels "I have too many things pulling at me"
+- Those who would benefit from a personal staff but can't afford one
+
+**Not for (yet):**
+- Teams or organizations
+- People who want a simple to-do list
+- Those uncomfortable with AI having deep access to their life data
+
+**Family features** are a bonus, not the core:
+- Share lists with household members
+- Delegate tasks ("Iris handle grocery run")
+- Family calendar overlay
+- But it works great for a single person too
 
 ---
 
 ## Architecture
 
-**User-first with domains:**
-- You are the primary unit (not family)
-- Domains are containers you create (Work, Personal, Family, etc.)
-- Family is just a domain that happens to be shared
-- Everything (tasks, events, meals, projects) lives in a domain
+### Data Model (What Symphony Knows)
 
-**User engagement levels (per-user choice):**
-- Full Planner: Multiple domains, brain dumps, goals, solo planning
-- Domain Planner: Specific domains only, lighter weight
-- Participant: Sees assignments, completes tasks, no planning
+```
+User
+├── Tasks (with context: work/personal/family)
+│   ├── Scheduled (has a date)
+│   ├── Inbox (unprocessed)
+│   └── Someday (no timeline)
+├── Projects (groups of related tasks)
+├── Contacts (people in your life)
+│   ├── Relationships (contractor, colleague, family)
+│   └── Contact info (phone, email)
+├── Calendar Events (synced from Google/Outlook)
+├── Routines (recurring patterns)
+├── Action History (texts sent, emails, completions)
+├── Goals (by domain: health, work, family, finance, personal)
+├── Health Data (meals, exercise, sleep, metrics)
+├── Coach Conversations (per-coach chat history)
+└── Domains (optional containers for sharing)
+```
+
+### AI Layer
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Context Snapshot (Full Life State)                         │
+│  - All tasks, projects, contacts, calendar                  │
+│  - Goals and progress by domain                             │
+│  - Health metrics and logs                                  │
+│  - Recent actions and conversations                         │
+│  - Current time, patterns, history                          │
+└─────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+      ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+      │ Life COO    │ │   Domain    │ │   Action    │
+      │             │ │   Coaches   │ │  Execution  │
+      │ • Briefs    │ │ • Health    │ │ • SMS       │
+      │ • Conflicts │ │ • Work CEO  │ │ • Email     │
+      │ • Priorities│ │ • Family    │ │ • Tasks     │
+      │ • Patterns  │ │ • Finance   │ │ • Calendar  │
+      └─────────────┘ │ • Personal  │ └─────────────┘
+                      └─────────────┘
+```
+
+### Coach Architecture
+
+```typescript
+interface DomainCoach {
+  id: string
+  slug: string                    // 'health', 'work-ceo', 'family'
+  name: string                    // "Health Coach", "Work CEO"
+  description: string             // What this coach helps with
+  systemPrompt: string            // Persona, expertise, constraints
+  contextDomains: ContextDomain[] // What data this coach can see
+  availableActions: ActionType[]  // What this coach can do
+  icon: string
+  color: string
+}
+
+// Life COO is special - sees all, coordinates all
+interface LifeCOO extends DomainCoach {
+  contextDomains: ['all']
+  canResolveConflicts: true
+  canOverrideCoaches: true
+  generatesBriefs: true
+}
+```
+
+### Platform Split
+
+| Platform | Primary Use |
+|----------|-------------|
+| Desktop (≥768px) | Planning sessions, coach conversations, deep work |
+| Mobile (<768px) | Capture, execution, quick triage, brief review |
 
 ---
 
-## MVP (V1): Tasks + Calendar + Execution UI
+## Build Phases
 
-**You can:**
-- Create tasks with attached context (notes, links, files, phone numbers)
-- Assign tasks to a date/time
-- See your Google Calendar events
-- Open the app and see contextual cards for what's now/next with everything you attached
+### Phase 1: Foundation ✓
+- Task CRUD with inbox model
+- Projects and contacts
+- Google Calendar sync
+- Desktop/mobile responsive UI
+- Routines
 
-**You cannot (yet):**
-- AI-assisted planning session
-- Meal planning
-- Collaborative planning with Iris
-- Routines/recurring assignments
-- Inbox/capture flows (share sheet, email forward)
-- Domains (everything is just yours for now)
+### Phase 2: Action Execution (Current)
+- AI parses QuickCapture for actionable requests
+- Send SMS via Twilio
+- Send email via Resend
+- Action preview modal with approval flow
+- Action history logging
+
+### Phase 3: Proactive AI
+- Daily morning brief (Life COO v0)
+- Stale item surfacing
+- Follow-up suggestions after actions
+- Conflict detection
+- Pattern recognition ("Make this a routine?")
+
+### Phase 4: Conversational Interface
+- QuickCapture becomes chat input
+- Multi-turn conversations with context
+- "What did I tell Frank?" queries
+- "Push my afternoon to tomorrow" bulk operations
+- Conversation history persistence
+
+### Phase 5: Domain Coaches
+- Health Coach (nutrition, exercise, sleep, wellness)
+- Work CEO (strategy, projects, decisions, career)
+- Family Manager (logistics, kids, household, events)
+- Coach-specific context filtering
+- Per-coach conversation threads
+- Coach-specific actions (log meal, create project, etc.)
+
+### Phase 6: Life COO
+- Full cross-domain visibility
+- Conflict resolution between coaches
+- Priority enforcement based on stated values
+- Weekly planning facilitation
+- Pattern recognition across domains
+- Boundary protection (work doesn't eat personal time)
+
+### Phase 7: Coach Collaboration
+- Coaches consult each other through Life COO
+- Cross-domain recommendations ("Work CEO suggests lighter week given your health goals")
+- Coordinated planning sessions
+- Handoffs between coaches
+
+### Phase 8: Advanced Intelligence
+- Predictive surfacing (know what you need before you ask)
+- Automated routine optimization
+- Goal progress forecasting
+- Life balance scoring and recommendations
+- Integration with external data (fitness trackers, finance apps)
 
 ---
 
-## Build Sequence
+## Domain Coaches Detail
 
-1. **Week 1:** Task CRUD — create, read, update, delete. Working reliably.
-2. **Week 2:** Context attachments — notes, links, files on tasks
-3. **Week 3:** Google Calendar sync — read events, display alongside tasks
-4. **Week 4:** Execution UI — contextual cards at right time
-5. **Week 5:** Date/time assignment for tasks
+### Health Coach
+**Expertise:** Nutrition, exercise, sleep, wellness, habit formation
+**Personality:** Supportive, evidence-based, non-judgmental, celebrates small wins
+**Context access:** Meals, exercise logs, sleep data, health metrics, health goals, schedule overview
+**Actions:** Log meal, log exercise, create meal plan, set health goal, create health-related task, send reminder
 
-Then later phases.
+### Work CEO
+**Expertise:** Strategy, prioritization, decision-making, career growth, time management
+**Personality:** Direct, strategic, challenges assumptions, focuses on leverage
+**Context access:** Work tasks, work projects, work calendar, professional goals, schedule overview
+**Actions:** Create task, create project, schedule meeting, update goal, create decision log
 
----
+### Family Manager
+**Expertise:** Household logistics, kid activities, family events, delegation
+**Personality:** Organized, practical, anticipates needs, keeps everyone coordinated
+**Context access:** Family calendar, family tasks, household projects, family members, routines
+**Actions:** Create family task, schedule family event, delegate to family member, send family notification
 
-## Later Phases (Not V1)
+### Finance Advisor (Future)
+**Expertise:** Budget awareness, bill tracking, financial goal progress
+**Personality:** Calm, practical, non-alarmist, focused on awareness
+**Context access:** Budget categories, bills, financial goals, spending patterns
+**Actions:** Log expense, set budget alert, update financial goal
 
-- AI-assisted weekly planning (brain dump → structured plan)
-- Inbox + capture flows (share sheet, email forward)
-- Meal planning (prompt-driven, recipes, grocery lists)
-- Collaborative family planning (Sunday sync with Iris)
-- Routines (recurring assignments like school runs)
-- Domains (multi-domain support, sharing)
-- Financial overview (balances only)
+### Personal Growth Coach (Future)
+**Expertise:** Goals, habits, learning, personal projects, reflection
+**Personality:** Encouraging, growth-minded, asks good questions
+**Context access:** Personal goals, habits, reading list, learning projects
+**Actions:** Create personal goal, log habit, add to reading list, schedule reflection time
 
 ---
 
 ## What Symphony Is NOT
 
-- Email client (tasks can reference emails)
-- Code editor (tasks reference work, IDE is separate)
-- Full budgeting tool (balances yes, categorization no)
-- Replacement for Google Calendar (GCal is source of truth)
+- **Email client** — Tasks can reference emails, but we don't replace Gmail
+- **Full calendar app** — Google Calendar is source of truth
+- **Project management tool** — Not for teams, no Gantt charts
+- **Budgeting app** — Awareness only, not full categorization
+- **Autonomous agent** — Always human approval for external actions
+- **Replacement for professionals** — Coaches are AI, not licensed therapists/doctors/advisors
 
 ---
 
-## Key Behaviors
+## Competitive Position
 
-**Google Calendar:** Source of truth. Symphony reads from and writes to GCal, but GCal is the authority.
+| Product | What they have | What they lack |
+|---------|----------------|----------------|
+| Todoist, Things | Tasks | No AI, no calendar, no contacts, no actions |
+| Notion | Everything | Too complex, no AI actions, no unified model |
+| Apple Reminders + Siri | Tasks + voice | No project structure, weak AI, siloed |
+| ChatGPT, Claude | Conversational AI | No persistent state, no life context, no actions |
+| Reclaim.ai | AI scheduling | Only calendar, no tasks/contacts/actions |
+| Motion | AI calendar | No task context, no contact awareness |
+| AI coaching apps | Domain expertise | Siloed, no cross-domain context, can't take action |
 
-**Quick capture:** Symphony mobile. Stuff goes to inbox for processing during planning.
+**Symphony's moat:**
+- Unified life data across all domains
+- Specialized AI coaches with domain expertise
+- Life COO coordination layer
+- Ability to take real action
+- Persistent memory and context
 
-**Inbox model:** Unprocessed captures sit in inbox. During planning, items either become tasks or get attached to existing tasks. If you don't process something, it stays until you do.
-
-**Contextual surfacing (V1):** The system shows you what you explicitly linked, not what it guesses. You set it up well once, it delivers reliably every time. Later phases may add inference.
-
----
-
-## Execution UI: The Card
-
-When it's time to do something, you see a card with:
-- The task/event itself
-- Everything you attached (notes, phone number, links, files)
-- One-tap actions (call, navigate, mark done)
-
-**Example:** "Order blinds from blinds.com — Wednesday"
-Card shows: The task, phone number, your notes (measurements, color choices), link to product page. No searching.
-
----
-
-## Dashboard
-
-**When you open Symphony:**
-- Today-focused: Current/upcoming cards, today's calendar, today's tasks
-- Sections by urgency: Active Now, Coming Up, Later Today
-- Stats at top: Tasks done, focus time
-
-**Other views available:**
-- List view: All tasks, filterable
-- Calendar view: Tasks + events on calendar
-- Project view: Tasks grouped by project
+That combination doesn't exist elsewhere.
 
 ---
 
-## Planning (Future, Not V1)
+## Success Metrics
 
-**Solo planning session:**
-1. Brain Dump — Large text area, freeform input
-2. AI Processing — Parses dump, matches existing, categorizes, surfaces commitments
-3. Review & Adjust — Visual structured output, click to confirm/modify, drag to schedule
-4. Gaps & Goals — AI prompts about neglected projects
-5. Done → Execution Ready
+**It's working when:**
+- You trust it with your whole life (work + personal + family + health all in Symphony)
+- Morning brief is genuinely useful, not annoying
+- You have ongoing conversations with coaches that feel valuable
+- You use "text [person] about [thing]" without thinking
+- Life COO catches conflicts before they become problems
+- You stop carrying mental load — if it's in Symphony, you trust it'll surface
 
-**Family planning (Sunday sync):**
-- You've done solo planning already
-- Sit with Iris, same device
-- Review family domain together
-- Add things, negotiate assignments, spot conflicts
-- Output: Clear family plan for the week
+**Phase 2-3 success:**
+- Daily active use for real tasks
+- At least one AI action (text/email) per week
+- Inbox stays under 20 items
 
----
-
-## Meal Planning (Future, Not V1)
-
-**Input:** Natural language prompt
-- "What should we have for dinner tonight?"
-- "Plan dinners for this week, we're busy Tuesday and Thursday"
-- "We have chicken thighs to use up"
-
-**System knows:**
-- Saved preferences (dietary, kid-friendly)
-- Saved recipes + favorite sources
-- Recent meal history
-- Schedule (busy nights = easy meals)
-- Who cooks when
-
-**Output per meal:**
-- Recipe (stored locally, not just a link)
-- Date assigned
-- Who's cooking
-- Prep strategy (make-ahead, quick, slow cooker)
-- Grocery list generated
-- Recipe surfaces at cooking time
-
----
-
-## Routines (Future, Not V1)
-
-**Track:** Things with assignments that change (who does school run this week), things with time commitments (CrossFit MWF)
-
-**Don't track:** Household tasks that just get done without scheduling (cleaning counters)
+**Phase 5-6 success:**
+- Weekly coach conversations that lead to behavior change
+- Life COO brief reviewed daily
+- Cross-domain conflicts surfaced before they happen
 
 ---
 
 ## Design Language
 
-Preserve from current Symphony:
-
-**Tokens:**
-- Scandinavian-inspired warm neutrals
+**Nordic Journal theme:**
+- Warm cream backgrounds, soft shadows
 - Forest green primary (#3d8b6e)
-- Generous spacing, soft shadows, rounded corners
-- Comfortable typography
+- Fraunces serif for display, DM Sans for body
+- Generous whitespace, rounded corners
+- Feels calm, not clinical
 
-**Components:**
-- Activity cards with type-based color coding
-- Expandable details with checklists, location, context
-- Swipe gestures (right = complete, left = defer)
-- Bottom nav on mobile
-- Stat cards at top of dashboard
+**Coach personality through UI:**
+- Each coach has a distinct color and icon
+- Conversation UI feels personal, not transactional
+- Brief feels like a thoughtful note, not a notification dump
 
-**Simplify:**
-- One card component, not three
-- One dashboard, not V1 + V2
-- Smaller, focused components
+**Key principle:** The AI should feel like a thoughtful team, not a chatbot. Each coach has personality. The Life COO has authority. Responses are concise, contextual, and action-oriented.
 
 ---
 
-## Technical Approach
+## Technical Stack
 
-**Rebuild from scratch:**
-- New Supabase project, clean schema
-- Reuse Google OAuth credentials
-- Schema-first design, fewer tables, clear relationships
-- Test as you go, manual testing with real data
-- Boring technology choices, standard patterns
-- Deploy early, use it as it's built
-
-**Stack (carry forward):**
-- React + TypeScript
-- Vite
-- TailwindCSS
-- Radix UI / shadcn components
-- Supabase (auth, database, edge functions)
-- TanStack Query
+- React 19 + TypeScript (strict)
+- Vite for bundling
+- Tailwind CSS v4
+- Supabase (auth, database, edge functions, realtime)
+- Claude API (Haiku for parsing, Sonnet for coaching conversations)
+- Twilio (SMS)
+- Resend (email)
 - Google Calendar API
-
----
-
-## Success Criteria
-
-**Done looks like:** Life feels organized and smoother. The surfacing works — you planned it ahead, and it shows up when you need it with everything attached. No searching for context.
-
-**MVP success:** You use it daily for real tasks. It's more reliable than the current buggy Symphony. Adding a task and seeing it later actually works every time.
 
 ---
 
 ## Out of Scope (Explicit No)
 
-- JJ Telegram bot integration (separate system, ignore for now)
-- Voice input / transcription (future, not V1)
-- Apple ecosystem integration (Reminders, Notes)
-- Multi-family support
 - Team/organization features
-- Public sharing
+- Public sharing or social features
+- Multi-family support (one household per account)
+- Voice-first interface (text-first, voice optional)
+- Autonomous actions without approval
+- Integration marketplace (curated integrations only)
+- Actual licensed professional advice (medical, legal, financial)
 
 ---
 
-## Reference
+## The Tagline
 
-**Current codebase:** `/Users/scottkaufman/Dropbox/01. Personal Master Folder/30-39 Music, Coding & Creative/38 Coding Projects/sync-family-time`
+**"A personal AI staff for your whole life."**
 
-**Lovable project:** https://lovable.dev/projects/29d140b4-b0e2-46ca-a1a6-77134c85172a
+Or:
 
-**This rebuild:** `/Users/scottkaufman/Dropbox/01. Personal Master Folder/30-39 Music, Coding & Creative/38 Coding Projects/symphony-rebuild`
+**"Your life, orchestrated."**
+
+**"The AI team that knows your life and gets things done."**

@@ -11,16 +11,18 @@ interface UseHomeViewResult {
 export function useHomeView(): UseHomeViewResult {
   // Initialize from localStorage
   const [currentView, setCurrentViewState] = useState<HomeViewType>(() => {
-    if (typeof window === 'undefined') return 'today'
+    if (typeof window === 'undefined') return 'home'
     const stored = localStorage.getItem(STORAGE_KEY)
+    // Valid view types
+    if (stored === 'home' || stored === 'today' || stored === 'week') {
+      return stored
+    }
     // Migrate old 'today-context' and 'review' to 'today'
-    if (stored === 'today' || stored === 'today-context' || stored === 'review') {
+    if (stored === 'today-context' || stored === 'review') {
       return 'today'
     }
-    if (stored === 'week') {
-      return 'week'
-    }
-    return 'today'
+    // Default to home dashboard
+    return 'home'
   })
 
   // Persist view preference
@@ -33,7 +35,7 @@ export function useHomeView(): UseHomeViewResult {
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY && e.newValue) {
-        if (e.newValue === 'today' || e.newValue === 'week') {
+        if (e.newValue === 'home' || e.newValue === 'today' || e.newValue === 'week') {
           setCurrentViewState(e.newValue)
         }
       }
