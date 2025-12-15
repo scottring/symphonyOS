@@ -31,6 +31,10 @@ export function useListItems(listId: string | null) {
       return
     }
 
+    // Clear items immediately when listId changes to prevent stale data
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing on dependency change is valid
+    setItems([])
+
     async function fetchItems() {
       if (!user || !listId) return
 
@@ -193,15 +197,22 @@ export function useListItems(listId: string | null) {
 
   // Toggle item checked state
   const toggleItem = useCallback(async (id: string) => {
-    const item = items.find((i) => i.id === id)
-    if (!item) return
+    // Get current item state using functional update to avoid stale closures
+    let originalItem: ListItem | undefined
+    let newCheckedState: boolean | undefined
 
-    const newCheckedState = !item.isChecked
+    setItems((prev) => {
+      originalItem = prev.find((i) => i.id === id)
+      if (!originalItem) return prev // Item not found, no change
 
-    // Optimistic update
-    setItems((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, isChecked: newCheckedState, updatedAt: new Date() } : i))
-    )
+      newCheckedState = !originalItem.isChecked
+      return prev.map((i) =>
+        i.id === id ? { ...i, isChecked: newCheckedState!, updatedAt: new Date() } : i
+      )
+    })
+
+    // If item wasn't found in state, don't make the API call
+    if (!originalItem || newCheckedState === undefined) return
 
     const { error: updateError } = await supabase
       .from('list_items')
@@ -209,13 +220,13 @@ export function useListItems(listId: string | null) {
       .eq('id', id)
 
     if (updateError) {
-      // Rollback on error
+      // Rollback on error - restore original item
       setItems((prev) =>
-        prev.map((i) => (i.id === id ? item : i))
+        prev.map((i) => (i.id === id ? originalItem! : i))
       )
       setError(updateError.message)
     }
-  }, [items])
+  }, [])
 
   // Search items by text (case-insensitive)
   const searchItems = useCallback((query: string): ListItem[] => {

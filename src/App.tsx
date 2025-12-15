@@ -265,21 +265,26 @@ function App() {
   // Filter events to exclude skipped/completed items
   const filteredEvents = useMemo(() => {
     // Build a map of entity_id -> status for quick lookup
-    const statusMap = new Map<string, string>()
+    // When multiple instances exist, prioritize the one matching today's date
+    const viewedDateStr = `${viewedDate.getFullYear()}-${String(viewedDate.getMonth() + 1).padStart(2, '0')}-${String(viewedDate.getDate()).padStart(2, '0')}`
+    const statusMap = new Map<string, { status: string; date: string }>()
     for (const instance of dateInstances) {
       if (instance.entity_type === 'calendar_event') {
-        statusMap.set(instance.entity_id, instance.status)
+        const existing = statusMap.get(instance.entity_id)
+        if (!existing || instance.date === viewedDateStr) {
+          statusMap.set(instance.entity_id, { status: instance.status, date: instance.date })
+        }
       }
     }
 
     // Filter out events that are skipped (completed events still show but marked done)
     return events.filter((event) => {
       const eventId = event.google_event_id || event.id
-      const status = statusMap.get(eventId)
+      const entry = statusMap.get(eventId)
       // Remove if skipped or deferred
-      return status !== 'skipped' && status !== 'deferred'
+      return entry?.status !== 'skipped' && entry?.status !== 'deferred'
     })
-  }, [events, dateInstances])
+  }, [events, dateInstances, viewedDate])
 
   // Get routines for the viewed date:
   // 1. Routines that normally occur on this date (by recurrence pattern)
@@ -289,17 +294,23 @@ function App() {
     const routinesForDate = getRoutinesForDate(viewedDate)
 
     // Build a map of routine_id -> instance for quick lookup
+    // When multiple instances exist for the same routine (e.g., today's + deferred from yesterday),
+    // prioritize the one that matches today's date
+    const viewedDateStr = `${viewedDate.getFullYear()}-${String(viewedDate.getMonth() + 1).padStart(2, '0')}-${String(viewedDate.getDate()).padStart(2, '0')}`
     const instanceMap = new Map<string, ActionableInstance>()
     for (const instance of dateInstances) {
       if (instance.entity_type === 'routine') {
-        instanceMap.set(instance.entity_id, instance)
+        const existing = instanceMap.get(instance.entity_id)
+        // Prefer instance matching today's date over instances from other dates
+        if (!existing || instance.date === viewedDateStr) {
+          instanceMap.set(instance.entity_id, instance)
+        }
       }
     }
 
     // Find routines that were deferred TO this date
     // These are instances with status='deferred' and deferred_to on this date
     const deferredToThisDate = new Set<string>()
-    const viewedDateStr = viewedDate.toISOString().split('T')[0]
     for (const instance of dateInstances) {
       if (
         instance.entity_type === 'routine' &&

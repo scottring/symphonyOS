@@ -618,10 +618,12 @@ export function TodaySchedule({
   }, [eventNotesMap])
 
   // Helper function to check if an item matches the assignee filter
-  const matchesAssigneeFilter = (assignedTo: string | null | undefined): boolean => {
+  // Supports both single assignment (assignedTo) and multi-assignment (assignedToAll)
+  const matchesAssigneeFilter = (assignedTo: string | null | undefined, assignedToAll?: string[] | null): boolean => {
     if (selectedAssignee === null || selectedAssignee === undefined) return true // "All" or not specified - show everything
-    if (selectedAssignee === 'unassigned') return !assignedTo // Show only unassigned
-    return assignedTo === selectedAssignee // Show items assigned to selected person
+    if (selectedAssignee === 'unassigned') return !assignedTo && (!assignedToAll || assignedToAll.length === 0) // Show only unassigned
+    // Show items assigned to selected person (either single or multi-assignment)
+    return assignedTo === selectedAssignee || (assignedToAll ? assignedToAll.includes(selectedAssignee) : false)
   }
 
   // Weekly review modal state
@@ -646,7 +648,7 @@ export function TodaySchedule({
     return tasks.filter((task) => {
       if (task.completed) return false
       if (!task.scheduledFor) return false
-      if (!matchesAssigneeFilter(task.assignedTo)) return false
+      if (!matchesAssigneeFilter(task.assignedTo, task.assignedToAll)) return false
 
       const taskDate = new Date(task.scheduledFor)
       taskDate.setHours(0, 0, 0, 0)
@@ -665,7 +667,7 @@ export function TodaySchedule({
     return tasks.filter((task) => {
       if (task.completed) return false
       if (task.isSomeday) return false // Someday items are not in inbox
-      if (!matchesAssigneeFilter(task.assignedTo)) return false
+      if (!matchesAssigneeFilter(task.assignedTo, task.assignedToAll)) return false
       // No scheduled date = inbox item
       if (!task.scheduledFor) {
         // If deferred to a future date, don't show yet
@@ -688,7 +690,7 @@ export function TodaySchedule({
     endOfDay.setHours(23, 59, 59, 999)
 
     return tasks.filter((task) => {
-      if (!matchesAssigneeFilter(task.assignedTo)) return false
+      if (!matchesAssigneeFilter(task.assignedTo, task.assignedToAll)) return false
       if (task.scheduledFor) {
         const taskDate = new Date(task.scheduledFor)
         return taskDate >= startOfDay && taskDate <= endOfDay
@@ -726,15 +728,22 @@ export function TodaySchedule({
   }, [events, viewedDate])
 
   // Build instance status map for routines
+  // When multiple instances exist for the same routine (e.g., today's + deferred from yesterday),
+  // prioritize the one that matches today's date
   const routineStatusMap = useMemo(() => {
+    const viewedDateStr = `${viewedDate.getFullYear()}-${String(viewedDate.getMonth() + 1).padStart(2, '0')}-${String(viewedDate.getDate()).padStart(2, '0')}`
     const map = new Map<string, ActionableInstance>()
     for (const instance of dateInstances) {
       if (instance.entity_type === 'routine') {
-        map.set(instance.entity_id, instance)
+        const existing = map.get(instance.entity_id)
+        // Prefer instance matching today's date over instances from other dates
+        if (!existing || instance.date === viewedDateStr) {
+          map.set(instance.entity_id, instance)
+        }
       }
     }
     return map
-  }, [dateInstances])
+  }, [dateInstances, viewedDate])
 
   // Filter to only routines that should show on timeline (default true for backwards compat)
   const visibleRoutines = useMemo(() =>
@@ -743,15 +752,20 @@ export function TodaySchedule({
   )
 
   // Build instance status map for events
+  // When multiple instances exist, prioritize the one matching today's date
   const eventStatusMap = useMemo(() => {
+    const viewedDateStr = `${viewedDate.getFullYear()}-${String(viewedDate.getMonth() + 1).padStart(2, '0')}-${String(viewedDate.getDate()).padStart(2, '0')}`
     const map = new Map<string, ActionableInstance>()
     for (const instance of dateInstances) {
       if (instance.entity_type === 'calendar_event') {
-        map.set(instance.entity_id, instance)
+        const existing = map.get(instance.entity_id)
+        if (!existing || instance.date === viewedDateStr) {
+          map.set(instance.entity_id, instance)
+        }
       }
     }
     return map
-  }, [dateInstances])
+  }, [dateInstances, viewedDate])
 
   const grouped = useMemo(() => {
     const taskItems = filteredTasks.map(taskToTimelineItem)
@@ -778,13 +792,15 @@ export function TodaySchedule({
           const deferredTime = new Date(instance.deferred_to)
           item.startTime = deferredTime
         }
-        return item
+        // Attach assignedToAll for filtering
+        return { item, assignedToAll: eventNote?.assignedToAll }
       })
-      .filter((item) => matchesAssigneeFilter(item.assignedTo))
+      .filter(({ item, assignedToAll }) => matchesAssigneeFilter(item.assignedTo, assignedToAll))
+      .map(({ item }) => item)
 
     // Map and filter routines by assignee
     const routineItems = visibleRoutines
-      .filter((routine) => matchesAssigneeFilter(routine.assigned_to))
+      .filter((routine) => matchesAssigneeFilter(routine.assigned_to, routine.assigned_to_all))
       .map((routine) => {
         const item = routineToTimelineItem(routine, viewedDate)
         const instance = routineStatusMap.get(routine.id)
