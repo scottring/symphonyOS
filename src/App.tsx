@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo, useCallback, Suspense } from 'react'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useAuth } from '@/hooks/useAuth'
-import { useGoogleCalendar, type CalendarEvent } from '@/hooks/useGoogleCalendar'
-import { useEventNotes, type EventNote } from '@/hooks/useEventNotes'
+import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
+import { useEventNotes } from '@/hooks/useEventNotes'
 import { useContacts } from '@/hooks/useContacts'
 import { useProjects } from '@/hooks/useProjects'
 import { useRoutines } from '@/hooks/useRoutines'
@@ -18,7 +18,6 @@ import { useAttachments } from '@/hooks/useAttachments'
 import { usePinnedItems } from '@/hooks/usePinnedItems'
 import { useUndo } from '@/hooks/useUndo'
 import { useToast } from '@/hooks/useToast'
-import { useActions } from '@/hooks/useActions'
 import type { PinnableEntityType } from '@/types/pin'
 import { supabase } from '@/lib/supabase'
 import { AppShell } from '@/components/layout/AppShell'
@@ -29,13 +28,7 @@ import { SearchModal } from '@/components/search/SearchModal'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 import { ListsList, ListView } from '@/components/list'
 import { NotesPage } from '@/components/notes'
-import { CompletedTasksView } from '@/components/history/CompletedTasksView'
 import { Toast } from '@/components/toast'
-import { KidsZone } from '@/components/kids'
-import { ChatView } from '@/components/chat'
-import { CopilotProvider, CopilotChat } from '@/components/chat/copilot'
-import { CommandPalette } from '@/components/assistant/CommandPalette'
-import { ActionPreview } from '@/components/action/ActionPreview'
 import {
   ProjectsList,
   ProjectView,
@@ -43,7 +36,6 @@ import {
   RoutineForm,
   RoutineInput,
   TaskView,
-  ContactsList,
   ContactView,
   RecipeViewer,
   CalendarConnect,
@@ -57,22 +49,20 @@ import type { ActionableInstance, Routine } from '@/types/actionable'
 import type { LinkedActivityType } from '@/types/task'
 
 function App() {
-  const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, getLinkedTasks, toggleTask, deleteTask, updateTask, pushTask, archiveTask, bulkToggleTasks, bulkDeleteTasks, bulkRestoreTasks, bulkRescheduleTasks } = useSupabaseTasks()
+  const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, getLinkedTasks, toggleTask, deleteTask, updateTask, pushTask } = useSupabaseTasks()
   const { user, loading: authLoading, signOut } = useAuth()
   const { isConnected, events, fetchEvents, isFetching: eventsFetching, createEvent, connect: connectCalendar } = useGoogleCalendar()
   const attachments = useAttachments()
-  const { fetchAttachments } = attachments
   const pinnedItems = usePinnedItems()
   const undo = useUndo({ duration: 5000 })
   const { toast, showToast, dismissToast } = useToast()
-  const actions = useActions()
 
   // Onboarding state
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null)
   const [onboardingLoading, setOnboardingLoading] = useState(true)
-  const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, updateEventAssignmentAll, updateRecipeUrl, updateEventProject, getNote, getEventNotesForProject, notes: eventNotesMap } = useEventNotes()
+  const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, updateRecipeUrl, getNote, notes: eventNotesMap } = useEventNotes()
   const { contacts, contactsMap, addContact, updateContact, deleteContact, searchContacts } = useContacts()
-  const { projects, projectsMap, addProject, updateProject, deleteProject, searchProjects, recalculateProjectStatus } = useProjects()
+  const { projects, projectsMap, addProject, updateProject, deleteProject, searchProjects } = useProjects()
   const {
     routines: allRoutines,
     activeRoutines,
@@ -92,22 +82,16 @@ function App() {
   const {
     lists,
     listsByCategory,
-    templates,
     addList,
     updateList,
     deleteList,
     getListById,
-    getListsByProject,
-    createFromTemplate,
-    saveAsTemplate,
   } = useLists()
   const {
     items: listItems,
-    checkedCount: listCheckedCount,
     addItem: addListItem,
     updateItem: updateListItem,
     deleteItem: deleteListItem,
-    toggleItem: toggleListItem,
     reorderItems: reorderListItems,
   } = useListItems(selectedListId)
 
@@ -179,11 +163,6 @@ function App() {
   const [creatingRoutine, setCreatingRoutine] = useState(false)
   const [recentlyCreatedTaskId, setRecentlyCreatedTaskId] = useState<string | null>(null)
   const [planningOpen, setPlanningOpen] = useState(false)
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
-  const [useCopilotChat, setUseCopilotChat] = useState(() => {
-    // Persist chat mode preference
-    return localStorage.getItem('symphony-use-copilot-chat') === 'true'
-  })
 
   // Toggle quick add modal
   const openQuickAdd = useCallback(() => setQuickAddOpen(true), [])
@@ -234,10 +213,10 @@ function App() {
   // Global keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd+K for unified command palette (quick capture + AI)
+      // Cmd+K for quick capture
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
-        setCommandPaletteOpen(prev => !prev)
+        setQuickAddOpen(true)
       }
       // Cmd+J for search
       if ((e.metaKey || e.ctrlKey) && e.key === 'j') {
@@ -245,13 +224,13 @@ function App() {
         setSearchOpen(true)
       }
       // Escape to close panel (search modal handles its own escape)
-      if (e.key === 'Escape' && selectedItemId && !searchOpen && !commandPaletteOpen) {
+      if (e.key === 'Escape' && selectedItemId && !searchOpen) {
         setSelectedItemId(null)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedItemId, searchOpen, commandPaletteOpen])
+  }, [selectedItemId, searchOpen])
 
   // Fetch calendar events when connected or date changes
   useEffect(() => {
@@ -277,26 +256,21 @@ function App() {
   // Filter events to exclude skipped/completed items
   const filteredEvents = useMemo(() => {
     // Build a map of entity_id -> status for quick lookup
-    // When multiple instances exist, prioritize the one matching today's date
-    const viewedDateStr = `${viewedDate.getFullYear()}-${String(viewedDate.getMonth() + 1).padStart(2, '0')}-${String(viewedDate.getDate()).padStart(2, '0')}`
-    const statusMap = new Map<string, { status: string; date: string }>()
+    const statusMap = new Map<string, string>()
     for (const instance of dateInstances) {
       if (instance.entity_type === 'calendar_event') {
-        const existing = statusMap.get(instance.entity_id)
-        if (!existing || instance.date === viewedDateStr) {
-          statusMap.set(instance.entity_id, { status: instance.status, date: instance.date })
-        }
+        statusMap.set(instance.entity_id, instance.status)
       }
     }
 
     // Filter out events that are skipped (completed events still show but marked done)
     return events.filter((event) => {
       const eventId = event.google_event_id || event.id
-      const entry = statusMap.get(eventId)
+      const status = statusMap.get(eventId)
       // Remove if skipped or deferred
-      return entry?.status !== 'skipped' && entry?.status !== 'deferred'
+      return status !== 'skipped' && status !== 'deferred'
     })
-  }, [events, dateInstances, viewedDate])
+  }, [events, dateInstances])
 
   // Get routines for the viewed date:
   // 1. Routines that normally occur on this date (by recurrence pattern)
@@ -306,23 +280,17 @@ function App() {
     const routinesForDate = getRoutinesForDate(viewedDate)
 
     // Build a map of routine_id -> instance for quick lookup
-    // When multiple instances exist for the same routine (e.g., today's + deferred from yesterday),
-    // prioritize the one that matches today's date
-    const viewedDateStr = `${viewedDate.getFullYear()}-${String(viewedDate.getMonth() + 1).padStart(2, '0')}-${String(viewedDate.getDate()).padStart(2, '0')}`
     const instanceMap = new Map<string, ActionableInstance>()
     for (const instance of dateInstances) {
       if (instance.entity_type === 'routine') {
-        const existing = instanceMap.get(instance.entity_id)
-        // Prefer instance matching today's date over instances from other dates
-        if (!existing || instance.date === viewedDateStr) {
-          instanceMap.set(instance.entity_id, instance)
-        }
+        instanceMap.set(instance.entity_id, instance)
       }
     }
 
     // Find routines that were deferred TO this date
     // These are instances with status='deferred' and deferred_to on this date
     const deferredToThisDate = new Set<string>()
+    const viewedDateStr = viewedDate.toISOString().split('T')[0]
     for (const instance of dateInstances) {
       if (
         instance.entity_type === 'routine' &&
@@ -405,7 +373,7 @@ function App() {
     }
 
     generateTemplatedTasks()
-  }, [filteredRoutines, viewedDate, tasksLoading, routinesLoading, getLinkedTasks, addTask, getCurrentUserMember])
+  }, [filteredRoutines, viewedDate, tasksLoading, routinesLoading, getLinkedTasks, addTask])
 
   // Fetch event notes when an event is selected
   useEffect(() => {
@@ -419,12 +387,12 @@ function App() {
   useEffect(() => {
     if (selectedItemId?.startsWith('task-')) {
       const taskId = selectedItemId.replace('task-', '')
-      fetchAttachments('task', taskId)
+      attachments.fetchAttachments('task', taskId)
     } else if (selectedItemId?.startsWith('event-')) {
       const eventId = selectedItemId.replace('event-', '')
-      fetchAttachments('event_note', eventId)
+      attachments.fetchAttachments('event_note', eventId)
     }
-  }, [selectedItemId, fetchAttachments])
+  }, [selectedItemId, attachments.fetchAttachments])
 
   // Batch fetch event notes for all visible events (for info icon display)
   useEffect(() => {
@@ -503,22 +471,6 @@ function App() {
     return eventNote?.recipeUrl ?? null
   }, [selectedItem, eventNotesMap])
 
-  // Get assigned family members for selected event
-  const selectedEventAssignedToAll = useMemo(() => {
-    if (!selectedItem?.originalEvent) return []
-    const eventId = selectedItem.originalEvent.google_event_id || selectedItem.originalEvent.id
-    const eventNote = eventNotesMap.get(eventId)
-    return eventNote?.assignedToAll ?? []
-  }, [selectedItem, eventNotesMap])
-
-  // Get linked project for selected event
-  const selectedEventProjectId = useMemo(() => {
-    if (!selectedItem?.originalEvent) return null
-    const eventId = selectedItem.originalEvent.google_event_id || selectedItem.originalEvent.id
-    const eventNote = eventNotesMap.get(eventId)
-    return eventNote?.projectId ?? null
-  }, [selectedItem, eventNotesMap])
-
   // Get attachments for selected item
   const selectedItemAttachments = useMemo(() => {
     if (!selectedItemId) return []
@@ -567,61 +519,6 @@ function App() {
     if (!selectedProjectId) return null
     return projectsMap.get(selectedProjectId) ?? null
   }, [selectedProjectId, projectsMap])
-
-  // Linked event notes for selected project (stored with event metadata)
-  const [linkedEventsForProject, setLinkedEventsForProject] = useState<EventNote[]>([])
-
-  // Available calendar events for linking to project
-  const [availableEventsForProject, setAvailableEventsForProject] = useState<CalendarEvent[]>([])
-
-  // Fetch linked event notes when project changes
-  useEffect(() => {
-    if (!selectedProjectId) {
-      setLinkedEventsForProject([])
-      return
-    }
-
-    // Get event notes linked to this project - they contain event title and start time
-    getEventNotesForProject(selectedProjectId).then((eventNotes) => {
-      setLinkedEventsForProject(eventNotes)
-    })
-  }, [selectedProjectId, getEventNotesForProject])
-
-  // Fetch upcoming events when viewing a project (for linking)
-  useEffect(() => {
-    if (!selectedProjectId || !isConnected) {
-      setAvailableEventsForProject([])
-      return
-    }
-
-    // Fetch next 30 days of events for linking
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const thirtyDaysLater = new Date(today)
-    thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30)
-
-    fetchEvents(today, thirtyDaysLater).then((fetchedEvents) => {
-      setAvailableEventsForProject(fetchedEvents)
-    })
-  }, [selectedProjectId, isConnected, fetchEvents])
-
-  // Handle linking a calendar event to the current project
-  const handleLinkEventToProject = useCallback(async (googleEventId: string, title: string, startTime: Date) => {
-    if (!selectedProjectId) return
-    await updateEventProject(googleEventId, selectedProjectId, title, startTime)
-    // Refresh linked events
-    const eventNotes = await getEventNotesForProject(selectedProjectId)
-    setLinkedEventsForProject(eventNotes)
-  }, [selectedProjectId, updateEventProject, getEventNotesForProject])
-
-  // Handle unlinking a calendar event from the current project
-  const handleUnlinkEventFromProject = useCallback(async (googleEventId: string) => {
-    if (!selectedProjectId) return
-    await updateEventProject(googleEventId, null)
-    // Refresh linked events
-    const eventNotes = await getEventNotesForProject(selectedProjectId)
-    setLinkedEventsForProject(eventNotes)
-  }, [selectedProjectId, updateEventProject, getEventNotesForProject])
 
   // Get routine for routine view
   const selectedRoutine = useMemo(() => {
@@ -732,12 +629,11 @@ function App() {
     clearSearch()
   }, [clearSearch])
 
-  // Wrapper for toggleTask that auto-unpins completed tasks and recalculates project status
+  // Wrapper for toggleTask that auto-unpins completed tasks
   const handleToggleTask = useCallback(async (taskId: string) => {
     const task = tasks.find(t => t.id === taskId)
     const wasCompleted = task?.completed ?? false
     const taskTitle = task?.title || 'Task'
-    const projectId = task?.projectId
 
     await toggleTask(taskId)
 
@@ -745,22 +641,13 @@ function App() {
     if (!wasCompleted) {
       // Silent unpin - won't error if not pinned
       await pinnedItems.unpin('task', taskId)
-
+      
       // Add undo action
       undo.pushAction(`Completed "${taskTitle}"`, async () => {
         await toggleTask(taskId)
       })
     }
-
-    // Recalculate project status if task belongs to a project
-    if (projectId) {
-      // Get updated tasks for this project (with the toggle applied)
-      const projectTasks = tasks
-        .filter(t => t.projectId === projectId)
-        .map(t => t.id === taskId ? { ...t, completed: !wasCompleted } : t)
-      await recalculateProjectStatus(projectId, projectTasks)
-    }
-  }, [tasks, toggleTask, pinnedItems, undo, recalculateProjectStatus])
+  }, [tasks, toggleTask, pinnedItems, undo])
 
   // Handler for adding linked prep/followup tasks from DetailPanel
   const handleAddLinkedTask = useCallback(async (
@@ -962,12 +849,7 @@ function App() {
         }
       }}
       quickAddProjects={projects.map(p => ({ id: p.id, name: p.name }))}
-      quickAddContacts={contacts.map(c => ({ id: c.id, name: c.name, phone: c.phone, email: c.email }))}
-      onActionDetected={actions.parseInput}
-      onShowActionPreview={() => {
-        // pendingAction is managed by useActions hook
-        // The hook sets it internally when parseInput succeeds
-      }}
+      quickAddContacts={contacts.map(c => ({ id: c.id, name: c.name }))}
       quickAddOpen={quickAddOpen}
       onOpenQuickAdd={openQuickAdd}
       onCloseQuickAdd={closeQuickAdd}
@@ -1034,11 +916,6 @@ function App() {
             onDeleteLinkedTask={handleDeleteLinkedTask}
             routine={selectedItemRoutine}
             onUpdateRoutine={updateRoutine}
-            familyMembers={familyMembers}
-            eventAssignedToAll={selectedEventAssignedToAll}
-            onUpdateEventAssignment={updateEventAssignmentAll}
-            eventProjectId={selectedEventProjectId}
-            onUpdateEventProject={updateEventProject}
           />
         )
       }
@@ -1082,43 +959,13 @@ function App() {
             onOpenProject={handleOpenProject}
             familyMembers={familyMembers}
             onAssignTask={(taskId, memberId) => {
-              const task = tasks.find(t => t.id === taskId)
-              const prevAssignedTo = task?.assignedTo
-              const taskTitle = task?.title || 'Task'
               updateTask(taskId, { assignedTo: memberId ?? undefined })
-
-              const memberName = memberId ? familyMembers.find(m => m.id === memberId)?.name : null
-              const message = memberName ? `Assigned "${taskTitle}" to ${memberName}` : `Unassigned "${taskTitle}"`
-              undo.pushAction(message, () => {
-                updateTask(taskId, { assignedTo: prevAssignedTo ?? undefined })
-              })
-            }}
-            onAssignTaskAll={(taskId, memberIds) => {
-              const task = tasks.find(t => t.id === taskId)
-              const prevAssignedToAll = task?.assignedToAll || []
-              const prevAssignedTo = task?.assignedTo
-              const taskTitle = task?.title || 'Task'
-              updateTask(taskId, { assignedToAll: memberIds, assignedTo: memberIds[0] ?? undefined })
-
-              const memberNames = memberIds.map(id => familyMembers.find(m => m.id === id)?.name).filter(Boolean)
-              const message = memberIds.length > 0
-                ? `Assigned "${taskTitle}" to ${memberNames.join(', ')}`
-                : `Unassigned "${taskTitle}"`
-              undo.pushAction(message, () => {
-                updateTask(taskId, { assignedToAll: prevAssignedToAll, assignedTo: prevAssignedTo ?? undefined })
-              })
             }}
             onAssignEvent={(eventId, memberId) => {
               updateEventAssignment(eventId, memberId)
             }}
-            onAssignEventAll={(eventId, memberIds) => {
-              updateEventAssignmentAll(eventId, memberIds)
-            }}
             onAssignRoutine={(routineId, memberId) => {
               updateRoutine(routineId, { assigned_to: memberId })
-            }}
-            onAssignRoutineAll={(routineId, memberIds) => {
-              updateRoutine(routineId, { assigned_to_all: memberIds, assigned_to: memberIds[0] ?? null })
             }}
             onCompleteRoutine={async (routineId, completed) => {
               const routine = allRoutines.find(r => r.id === routineId)
@@ -1196,53 +1043,6 @@ function App() {
             }}
             onOpenPlanning={() => setPlanningOpen(true)}
             onAddProject={addProject}
-            onBulkComplete={async (taskIds) => {
-              await bulkToggleTasks(taskIds, true)
-              const count = taskIds.length
-              undo.pushAction(`Completed ${count} task${count !== 1 ? 's' : ''}`, async () => {
-                await bulkToggleTasks(taskIds, false)
-              })
-            }}
-            onBulkUncomplete={async (taskIds) => {
-              await bulkToggleTasks(taskIds, false)
-              const count = taskIds.length
-              undo.pushAction(`Uncompleted ${count} task${count !== 1 ? 's' : ''}`, async () => {
-                await bulkToggleTasks(taskIds, true)
-              })
-            }}
-            onBulkDelete={async (taskIds) => {
-              const deletedTasks = await bulkDeleteTasks(taskIds)
-              const count = deletedTasks.length
-              if (count > 0) {
-                undo.pushAction(`Deleted ${count} task${count !== 1 ? 's' : ''}`, async () => {
-                  await bulkRestoreTasks(deletedTasks)
-                })
-              }
-            }}
-            onBulkReschedule={async (taskIds, date, isAllDay) => {
-              // Save original dates and all-day status for undo
-              const originalStates = new Map<string, { date: Date | undefined; isAllDay: boolean | undefined }>()
-              tasks.forEach((t) => {
-                if (taskIds.includes(t.id)) {
-                  originalStates.set(t.id, { date: t.scheduledFor, isAllDay: t.isAllDay })
-                }
-              })
-
-              await bulkRescheduleTasks(taskIds, date, isAllDay)
-              const count = taskIds.length
-              undo.pushAction(`Rescheduled ${count} task${count !== 1 ? 's' : ''}`, async () => {
-                // Restore original dates and all-day status
-                for (const [taskId, originalState] of originalStates.entries()) {
-                  if (originalState.date) {
-                    await bulkRescheduleTasks([taskId], originalState.date, originalState.isAllDay ?? true)
-                  } else {
-                    // If it had no date, remove the scheduled date
-                    await updateTask(taskId, { scheduledFor: undefined, isAllDay: undefined })
-                  }
-                }
-              })
-            }}
-            onArchiveTask={archiveTask}
           />
         </div>
       )}
@@ -1299,50 +1099,13 @@ function App() {
             contact={selectedContactForView}
             onBack={() => {
               setSelectedContactId(null)
-              setActiveView('contacts')
+              setActiveView('home')
             }}
             onUpdate={updateContact}
             onDelete={async (id) => {
               await deleteContact(id)
               setSelectedContactId(null)
-              setActiveView('contacts')
-            }}
-            tasks={tasks}
-            onSelectTask={(taskId) => {
-              setSelectedTaskId(taskId)
-              setActiveView('task-detail')
-              setSelectedContactId(null)
-            }}
-            isPinned={pinnedItems.isPinned('contact', selectedContactForView.id)}
-            canPin={pinnedItems.canPin()}
-            onPin={() => pinnedItems.pin('contact', selectedContactForView.id)}
-            onUnpin={() => pinnedItems.unpin('contact', selectedContactForView.id)}
-          />
-        </Suspense>
-      )}
-
-      {activeView === 'contacts' && !selectedContactId && (
-        <Suspense fallback={<LoadingFallback />}>
-          <ContactsList
-            contacts={contacts}
-            onSelectContact={(contactId) => {
-              setSelectedContactId(contactId)
-              setActiveView('contact-detail')
-            }}
-            onAddContact={addContact}
-          />
-        </Suspense>
-      )}
-
-      {activeView === 'contacts' && selectedContactForView && (
-        <Suspense fallback={<LoadingFallback />}>
-          <ContactView
-            contact={selectedContactForView}
-            onBack={() => setSelectedContactId(null)}
-            onUpdate={updateContact}
-            onDelete={async (id) => {
-              await deleteContact(id)
-              setSelectedContactId(null)
+              setActiveView('home')
             }}
             tasks={tasks}
             onSelectTask={(taskId) => {
@@ -1381,28 +1144,11 @@ function App() {
             onAddTask={(title, projectId) => addTask(title, undefined, projectId, undefined, { assignedTo: getCurrentUserMember()?.id })}
             onSelectTask={handleSelectItem}
             onToggleTask={handleToggleTask}
-            onUpdateTask={handleUpdateTaskWithToast}
-            familyMembers={familyMembers}
             selectedTaskId={selectedItemId}
-            linkedEvents={linkedEventsForProject}
-            availableEvents={availableEventsForProject}
-            onLinkEvent={handleLinkEventToProject}
-            onUnlinkEvent={handleUnlinkEventFromProject}
             isPinned={pinnedItems.isPinned('project', selectedProject.id)}
             canPin={pinnedItems.canPin()}
             onPin={() => pinnedItems.pin('project', selectedProject.id)}
             onUnpin={() => pinnedItems.unpin('project', selectedProject.id)}
-            linkedLists={getListsByProject(selectedProject.id)}
-            allLists={lists}
-            onLinkList={(listId) => updateList(listId, { projectId: selectedProject.id })}
-            onUnlinkList={(listId) => updateList(listId, { projectId: undefined })}
-            onCreateList={async (title, projectId) => {
-              await addList({ title, projectId })
-            }}
-            onSelectList={(listId) => {
-              setSelectedListId(listId)
-              setActiveView('lists')
-            }}
           />
         </Suspense>
       )}
@@ -1471,10 +1217,8 @@ function App() {
         <ListsList
           lists={lists}
           listsByCategory={listsByCategory}
-          templates={templates}
           onSelectList={setSelectedListId}
           onAddList={addList}
-          onCreateFromTemplate={createFromTemplate}
         />
       )}
 
@@ -1482,30 +1226,17 @@ function App() {
         <ListView
           list={selectedList}
           items={listItems}
-          checkedCount={listCheckedCount}
           onBack={() => setSelectedListId(null)}
           onUpdateList={updateList}
           onDeleteList={deleteList}
           onAddItem={addListItem}
           onUpdateItem={updateListItem}
           onDeleteItem={deleteListItem}
-          onToggleItem={toggleListItem}
           onReorderItems={reorderListItems}
-          onSaveAsTemplate={() => saveAsTemplate(selectedList.id)}
           isPinned={pinnedItems.isPinned('list', selectedList.id)}
           canPin={pinnedItems.canPin()}
           onPin={() => pinnedItems.pin('list', selectedList.id)}
           onUnpin={() => pinnedItems.unpin('list', selectedList.id)}
-        />
-      )}
-
-      {activeView === 'history' && (
-        <CompletedTasksView
-          tasks={tasks}
-          contactsMap={contactsMap}
-          projectsMap={projectsMap}
-          onSelectTask={(taskId) => handleSelectItem(`task-${taskId}`)}
-          onBack={() => handleViewChange('home')}
         />
       )}
 
@@ -1542,82 +1273,6 @@ function App() {
         </Suspense>
       )}
 
-      {activeView === 'kids' && (
-        <Suspense fallback={<LoadingFallback />}>
-          <KidsZone
-            tasks={tasks}
-            routines={filteredRoutines}
-            events={filteredEvents}
-            dateInstances={dateInstances}
-            familyMembers={familyMembers}
-            viewedDate={viewedDate}
-            onToggleTask={handleToggleTask}
-            onCompleteRoutine={async (routineId, completed) => {
-              if (completed) {
-                await markDone('routine', routineId, viewedDate)
-              } else {
-                await undoDone('routine', routineId, viewedDate)
-              }
-              refreshDateInstances()
-            }}
-            onBack={() => handleViewChange('home')}
-          />
-        </Suspense>
-      )}
-
-      {activeView === 'chat' && (
-        <div className="h-full flex flex-col">
-          {/* Chat Mode Toggle */}
-          <div className="flex items-center justify-end gap-2 px-4 py-2 border-b border-neutral-100 bg-white">
-            <span className="text-xs text-neutral-400">Chat Mode:</span>
-            <button
-              onClick={() => {
-                const newValue = !useCopilotChat
-                setUseCopilotChat(newValue)
-                localStorage.setItem('symphony-use-copilot-chat', String(newValue))
-              }}
-              className={`
-                relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                ${useCopilotChat ? 'bg-primary-500' : 'bg-neutral-200'}
-              `}
-            >
-              <span
-                className={`
-                  inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform
-                  ${useCopilotChat ? 'translate-x-6' : 'translate-x-1'}
-                `}
-              />
-            </button>
-            <span className={`text-xs font-medium ${useCopilotChat ? 'text-primary-600' : 'text-neutral-500'}`}>
-              {useCopilotChat ? 'Rich UI' : 'Classic'}
-            </span>
-          </div>
-
-          {/* Chat Content */}
-          <div className="flex-1 overflow-hidden">
-            {useCopilotChat ? (
-              <CopilotProvider>
-                <CopilotChat
-                  onNavigateToTask={(taskId) => handleSelectItem(`task-${taskId}`)}
-                />
-              </CopilotProvider>
-            ) : (
-              <ChatView
-                onNavigateToTask={(taskId) => handleSelectItem(`task-${taskId}`)}
-                onNavigateToProject={(projectId) => {
-                  setSelectedProjectId(projectId)
-                  handleViewChange('projects')
-                }}
-                onNavigateToContact={(contactId) => {
-                  setSelectedContactId(contactId)
-                  handleViewChange('contact-detail')
-                }}
-              />
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Search Modal */}
       <SearchModal
         isOpen={searchOpen}
@@ -1628,15 +1283,6 @@ function App() {
         totalResults={searchTotalResults}
         isSearching={isSearching}
         onSelectResult={handleSearchSelect}
-      />
-
-      {/* Unified Command Palette (⌘+K) - handles both quick capture and AI */}
-      <CommandPalette
-        isOpen={commandPaletteOpen}
-        onClose={() => setCommandPaletteOpen(false)}
-        onCreateTask={async (title) => {
-          await addTask(title, undefined, undefined, undefined, { assignedTo: getCurrentUserMember()?.id })
-        }}
       />
 
       {/* Toast notifications */}
@@ -1715,42 +1361,6 @@ function App() {
             </div>
           </div>
         </div>
-      )}
-
-      {/* Action Preview Modal - for AI-powered SMS/email sending */}
-      {actions.pendingAction && (
-        <ActionPreview
-          action={actions.pendingAction}
-          onSend={async (message, recipient, subject) => {
-            const success = await actions.sendAction(
-              actions.pendingAction!,
-              message,
-              recipient,
-              subject
-            )
-            if (success) {
-              showToast(
-                `${actions.pendingAction!.actionType === 'sms' ? 'Text' : 'Email'} sent to ${recipient.name}!`,
-                'success'
-              )
-            } else {
-              showToast(
-                actions.error || 'Failed to send message',
-                'warning'
-              )
-            }
-          }}
-          onCancel={actions.clearPendingAction}
-          onSaveAsTask={() => {
-            // Save the action as a task instead
-            if (actions.pendingAction?.originalInput) {
-              addTask(actions.pendingAction.originalInput)
-              showToast('Saved as task', 'success')
-            }
-            actions.clearPendingAction()
-          }}
-          isSending={actions.isSending}
-        />
       )}
     </AppShell>
   )

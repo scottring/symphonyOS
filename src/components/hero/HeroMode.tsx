@@ -91,15 +91,9 @@ export function HeroMode({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onClose()
-      } else if (e.key === 'Enter' && currentTask) {
-        handleComplete()
-      } else if (e.key === 'ArrowRight' && currentTask) {
-        handleDefer(getTomorrow())
-      } else if (e.key === 'ArrowLeft' && currentIndex > 0) {
-        // Go back to previous task (if possible)
-        setEnterDirection('up')
-        setCurrentIndex(prev => Math.max(0, prev - 1))
       }
+      // Note: We intentionally don't bind arrow keys or Enter to actions
+      // because it's too easy to accidentally trigger them while browsing
     }
 
     document.addEventListener('keydown', handleKeyDown)

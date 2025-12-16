@@ -556,7 +556,7 @@ describe('HeroMode', () => {
   })
 
   describe('keyboard navigation', () => {
-    it('completes task on Enter key', async () => {
+    it('does not complete task on Enter key (safety feature)', async () => {
       const onComplete = vi.fn()
       render(
         <HeroMode
@@ -577,10 +577,11 @@ describe('HeroMode', () => {
         vi.advanceTimersByTime(500)
       })
 
-      expect(onComplete).toHaveBeenCalled()
+      // Enter should NOT trigger complete - too easy to accidentally press
+      expect(onComplete).not.toHaveBeenCalled()
     })
 
-    it('defers task on ArrowRight key', async () => {
+    it('does not defer task on ArrowRight key (safety feature)', async () => {
       const onDefer = vi.fn()
       render(
         <HeroMode
@@ -601,7 +602,8 @@ describe('HeroMode', () => {
         vi.advanceTimersByTime(400)
       })
 
-      expect(onDefer).toHaveBeenCalled()
+      // Arrow keys should NOT trigger defer - too easy to accidentally press
+      expect(onDefer).not.toHaveBeenCalled()
     })
   })
 
