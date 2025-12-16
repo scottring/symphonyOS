@@ -7,7 +7,8 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
 import type { ScheduleContextItem } from '@/components/triage'
-import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem, type TimelineItem } from '@/types/timeline'
+import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
+// import { type TimelineItem } from '@/types/timeline' // Hidden with Hero Mode
 import { groupByDaySection, getTimeOfDay, type DaySection, type TimeOfDay } from '@/lib/timeUtils'
 import { useMobile } from '@/hooks/useMobile'
 import { useBulkSelection } from '@/hooks/useBulkSelection'
@@ -23,8 +24,9 @@ import { WeeklyReview } from '@/components/review/WeeklyReview'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { useSystemHealth } from '@/hooks/useSystemHealth'
 import { MultiAssigneeDropdown } from '@/components/family/MultiAssigneeDropdown'
-import { Pencil, Sparkles, Inbox } from 'lucide-react'
-import { HeroMode } from '@/components/hero'
+import { Pencil, Inbox } from 'lucide-react'
+// import { Sparkles } from 'lucide-react' // Hidden with Hero Mode
+// import { HeroMode } from '@/components/hero' // Hidden for now
 
 // Bento box / grid icon for "Organize"
 function BentoIcon({ className }: { className?: string }) {
@@ -381,7 +383,7 @@ function ClarityIndicator({
   )
 }
 
-// Hero Mode toggle - launches immersive single-task view
+/* Hero Mode toggle - hidden for now, not ready for primetime
 interface HeroModeToggleProps {
   onClick: () => void
   taskCount: number
@@ -411,6 +413,7 @@ function HeroModeToggle({ onClick, taskCount }: HeroModeToggleProps) {
     </button>
   )
 }
+*/
 
 // Floating Inbox FAB
 interface FloatingInboxFABProps {
@@ -700,23 +703,25 @@ export function TodaySchedule({
     return assignedTo === selectedAssignee || (assignedToAll ? assignedToAll.includes(selectedAssignee) : false)
   }, [selectedAssignee])
 
+  // Suppress unused prop warning - onArchiveTask is used by Hero Mode which is hidden for now
+  void onArchiveTask
+
   // Weekly review modal state
   const [showWeeklyReview, setShowWeeklyReview] = useState(false)
   // Bulk reschedule dialog state
   const [showBulkRescheduleDialog, setShowBulkRescheduleDialog] = useState(false)
 
-  // Hero Mode state - full-screen immersive task view
+  /* Hero Mode state - hidden for now, not ready for primetime
   const [heroModeOpen, setHeroModeOpen] = useState(false)
 
-  // Open Hero Mode
   const openHeroMode = useCallback(() => {
     setHeroModeOpen(true)
   }, [])
 
-  // Close Hero Mode
   const closeHeroMode = useCallback(() => {
     setHeroModeOpen(false)
   }, [])
+  */
 
   // Determine current time section (morning/afternoon/evening)
   const currentTimeSection: TimeOfDay = useMemo(() => {
@@ -1009,24 +1014,19 @@ export function TodaySchedule({
 
   const sections: DaySection[] = ['allday', 'morning', 'afternoon', 'evening', 'unscheduled']
 
-  // Get tasks for Hero Mode - current time section only, incomplete
+  /* Hero Mode tasks and handlers - hidden for now, not ready for primetime
   const heroModeTasks = useMemo(() => {
     if (!isToday) return []
-
-    // Get items from current time section
     const currentSectionItems = grouped[currentTimeSection] || []
-
-    // Filter to incomplete items only (tasks and routines)
     return currentSectionItems.filter((item: TimelineItem) => {
       if (item.completed) return false
-      if (item.type === 'event') return false // Events aren't actionable in same way
+      if (item.type === 'event') return false
       return true
     })
   }, [isToday, grouped, currentTimeSection])
 
-  // Hero Mode handlers - must be after heroModeTasks is defined
+  // Hero Mode handlers - hidden for now, not ready for primetime
   const handleHeroComplete = useCallback((taskId: string) => {
-    // Handle both tasks and routines
     const item = heroModeTasks.find((t: TimelineItem) => t.id === `task-${taskId}` || t.id === `routine-${taskId}`)
     if (item?.type === 'routine' && onCompleteRoutine) {
       onCompleteRoutine(taskId, true)
@@ -1036,7 +1036,6 @@ export function TodaySchedule({
   }, [heroModeTasks, onToggleTask, onCompleteRoutine])
 
   const handleHeroDefer = useCallback((taskId: string, date: Date) => {
-    // Handle both tasks and routines
     const item = heroModeTasks.find((t: TimelineItem) => t.id === `task-${taskId}` || t.id === `routine-${taskId}`)
     if (item?.type === 'routine' && onPushRoutine) {
       onPushRoutine(taskId, date)
@@ -1046,24 +1045,21 @@ export function TodaySchedule({
   }, [heroModeTasks, onPushTask, onPushRoutine])
 
   const handleHeroArchive = useCallback((taskId: string) => {
-    // Only tasks can be archived (not routines)
     if (onArchiveTask) {
       onArchiveTask(taskId)
     }
   }, [onArchiveTask])
 
   const handleHeroDelete = useCallback((taskId: string) => {
-    // Only tasks can be deleted from Hero Mode (not routines)
     if (onDeleteTask) {
       onDeleteTask(taskId)
     }
   }, [onDeleteTask])
 
   const handleHeroOpenDetail = useCallback((item: TimelineItem) => {
-    // Open detail panel - Hero Mode stays open in the main content area
-    // Use item.id which already has the correct prefix (task-xxx, routine-xxx)
     onSelectItem?.(item.id)
   }, [onSelectItem])
+  */
 
   const formatDate = () => {
     return viewedDate.toLocaleDateString('en-US', {
@@ -1152,7 +1148,7 @@ export function TodaySchedule({
 
   return (
     <div className="relative min-h-full">
-      {/* Hero Mode - fills the entire main content area when open */}
+      {/* Hero Mode - hidden for now, not ready for primetime
       <HeroMode
         isOpen={heroModeOpen}
         tasks={heroModeTasks}
@@ -1165,9 +1161,10 @@ export function TodaySchedule({
         onDelete={handleHeroDelete}
         onOpenDetail={handleHeroOpenDetail}
       />
+      */}
 
-      {/* Normal schedule content - hidden when Hero Mode is open */}
-      <div className={`px-5 py-6 md:px-10 md:py-10 max-w-[680px] mx-auto ${heroModeOpen ? 'invisible' : ''}`}>
+      {/* Normal schedule content */}
+      <div className="px-5 py-6 md:px-10 md:py-10 max-w-[680px] mx-auto">
       {/* Header - Editorial style with large date */}
       <header className="mb-10 animate-fade-in-up">
         {/* Large editorial date display with inline navigation */}
@@ -1223,13 +1220,14 @@ export function TodaySchedule({
             />
           )}
 
-          {/* Hero Mode toggle */}
+          {/* Hero Mode toggle - hidden for now, not ready for primetime
           {isToday && (
             <HeroModeToggle
               onClick={openHeroMode}
               taskCount={heroModeTasks.length}
             />
           )}
+          */}
 
           {/* Progress - centered with flex-1 */}
           {actionableCount > 0 && (

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import type { Task, TaskContext } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
@@ -6,17 +6,18 @@ import type { FamilyMember } from '@/types/family'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
-import type { DailyBriefActionType } from '@/types/action'
+// Daily Brief disabled for now
+// import type { DailyBriefActionType } from '@/types/action'
+// import { useDailyBrief } from '@/hooks/useDailyBrief'
+// import { useUserPreferences } from '@/hooks/useUserPreferences'
+// import { DailyBriefModal } from '@/components/brief'
 import { useHomeView } from '@/hooks/useHomeView'
 import { useMobile } from '@/hooks/useMobile'
-import { useDailyBrief } from '@/hooks/useDailyBrief'
-import { useUserPreferences } from '@/hooks/useUserPreferences'
 import { HomeViewSwitcher } from './HomeViewSwitcher'
 import { HomeDashboard } from './HomeDashboard'
 import { WeekView } from './WeekView'
 import { CascadingRiverView } from './CascadingRiverView'
 import { TodaySchedule } from '@/components/schedule/TodaySchedule'
-import { DailyBriefModal } from '@/components/brief'
 
 interface HomeViewProps {
   tasks: Task[]
@@ -125,94 +126,58 @@ export function HomeView({
 }: HomeViewProps) {
   const { currentView, setCurrentView } = useHomeView()
   const isMobile = useMobile()
-  const [briefModalOpen, setBriefModalOpen] = useState(false)
+  // const [briefModalOpen, setBriefModalOpen] = useState(false) // Daily Brief disabled
 
-  // Daily Brief handler for task actions
-  const handleBriefTaskAction = useCallback((taskId: string, action: DailyBriefActionType) => {
-    switch (action) {
-      case 'complete':
-        onToggleTask(taskId)
-        break
-      case 'delete':
-        onDeleteTask?.(taskId)
-        break
-      case 'schedule':
-        // Schedule for today and open task detail
-        if (onUpdateTask) {
-          const today = new Date()
-          today.setHours(0, 0, 0, 0)
-          onUpdateTask(taskId, { scheduledFor: today })
-        }
-        onSelectItem(taskId)
-        break
-      case 'defer':
-        // Defer to next week (7 days from now)
-        if (onPushTask) {
-          const nextWeek = new Date()
-          nextWeek.setDate(nextWeek.getDate() + 7)
-          nextWeek.setHours(0, 0, 0, 0)
-          onPushTask(taskId, nextWeek)
-        }
-        break
-      case 'open':
-        onSelectItem(taskId)
-        break
-      default:
-        console.log('Brief task action:', { taskId, action })
-    }
-  }, [onToggleTask, onDeleteTask, onSelectItem, onUpdateTask, onPushTask])
+  // Daily Brief handler for task actions - disabled for now
+  // const handleBriefTaskAction = useCallback((taskId: string, action: DailyBriefActionType) => {
+  //   switch (action) {
+  //     case 'complete': onToggleTask(taskId); break
+  //     case 'delete': onDeleteTask?.(taskId); break
+  //     case 'schedule':
+  //       if (onUpdateTask) { const today = new Date(); today.setHours(0, 0, 0, 0); onUpdateTask(taskId, { scheduledFor: today }) }
+  //       onSelectItem(taskId); break
+  //     case 'defer':
+  //       if (onPushTask) { const nextWeek = new Date(); nextWeek.setDate(nextWeek.getDate() + 7); nextWeek.setHours(0, 0, 0, 0); onPushTask(taskId, nextWeek) }
+  //       break
+  //     case 'open': case 'follow_up': case 'mark_resolved': case 'snooze': case 'draft_email': case 'send_note':
+  //       onSelectItem(taskId); break
+  //     default: onSelectItem(taskId)
+  //   }
+  // }, [onToggleTask, onDeleteTask, onSelectItem, onUpdateTask, onPushTask])
 
-  // Daily Brief hook
-  const {
-    brief,
-    isLoading: briefLoading,
-    isGenerating: briefGenerating,
-    generateBrief,
-    dismissBrief,
-    handleItemAction,
-  } = useDailyBrief(handleBriefTaskAction)
+  // Daily Brief - disabled for now
+  // const handleBriefProjectAction = useCallback((projectId: string, action: DailyBriefActionType) => {
+  //   switch (action) {
+  //     case 'open':
+  //     default:
+  //       onOpenProject?.(projectId)
+  //       break
+  //   }
+  // }, [onOpenProject])
+  // const { brief, isLoading: briefLoading, isGenerating: briefGenerating, generateBrief, dismissBrief, handleItemAction } = useDailyBrief(handleBriefTaskAction, handleBriefProjectAction)
 
-  // User preferences
-  const { preferences } = useUserPreferences()
+  // User preferences - disabled for now (Daily Brief disabled)
+  // const { preferences } = useUserPreferences()
 
-  // Auto-open the brief modal when a brief becomes available on today view
-  useEffect(() => {
-    // Skip if user has disabled auto-show
-    if (!preferences.autoShowDailyBrief) return
+  // Daily Brief auto-open - disabled for now
+  // useEffect(() => {
+  //   if (!preferences.autoShowDailyBrief) return
+  //   if (brief && !brief.dismissedAt && currentView === 'today') {
+  //     const today = new Date()
+  //     const isToday = viewedDate.getFullYear() === today.getFullYear() && viewedDate.getMonth() === today.getMonth() && viewedDate.getDate() === today.getDate()
+  //     if (isToday) setBriefModalOpen(true)
+  //   }
+  // }, [brief, currentView, viewedDate, preferences.autoShowDailyBrief])
 
-    if (brief && !brief.dismissedAt && currentView === 'today') {
-      const today = new Date()
-      const isToday =
-        viewedDate.getFullYear() === today.getFullYear() &&
-        viewedDate.getMonth() === today.getMonth() &&
-        viewedDate.getDate() === today.getDate()
-      if (isToday) {
-        setBriefModalOpen(true)
-      }
-    }
-  }, [brief, currentView, viewedDate, preferences.autoShowDailyBrief])
-
-  const handleOpenBrief = useCallback(() => {
-    if (brief && !brief.dismissedAt) {
-      setBriefModalOpen(true)
-    } else {
-      generateBrief(true)
-    }
-  }, [brief, generateBrief])
-
-  const handleCloseBrief = useCallback(() => {
-    setBriefModalOpen(false)
-  }, [])
-
-  // Check if viewing today
-  const isViewingToday = useMemo(() => {
-    const today = new Date()
-    return (
-      viewedDate.getFullYear() === today.getFullYear() &&
-      viewedDate.getMonth() === today.getMonth() &&
-      viewedDate.getDate() === today.getDate()
-    )
-  }, [viewedDate])
+  // Daily Brief handlers - disabled for now
+  // const handleOpenBrief = useCallback(() => {
+  //   if (brief && !brief.dismissedAt) {
+  //     setBriefModalOpen(true)
+  //   } else {
+  //     generateBrief(true)
+  //   }
+  // }, [brief, generateBrief])
+  // const handleCloseBrief = useCallback(() => setBriefModalOpen(false), [])
 
   // Assignee filter state - now supports multi-select
   // Empty array = "All", single id = single filter, multiple ids = river view
@@ -348,12 +313,10 @@ export function HomeView({
           events={events}
           routines={routines}
           projects={projects}
-          brief={brief}
-          briefLoading={briefLoading}
-          briefGenerating={briefGenerating}
-          onGenerateBrief={generateBrief}
-          onDismissBrief={dismissBrief}
-          onBriefItemAction={handleItemAction}
+          // Daily Brief disabled
+          brief={null}
+          briefLoading={false}
+          briefGenerating={false}
           onScheduleTask={(taskId, date) => {
             if (onUpdateTask) {
               onUpdateTask(taskId, { scheduledFor: date })
@@ -368,7 +331,7 @@ export function HomeView({
           onNavigateToContext={handleNavigateToContext}
           onNavigateToInbox={handleNavigateToInbox}
           onNavigateToProjects={handleNavigateToProjects}
-          autoShowDailyBrief={preferences.autoShowDailyBrief}
+          autoShowDailyBrief={false}
         />
       )
     }
@@ -504,35 +467,17 @@ export function HomeView({
     )
   }
 
-  // Check if brief is available and not dismissed
-  const hasBrief = brief && !brief.dismissedAt
+  // Daily Brief disabled
+  // const hasBrief = brief && !brief.dismissedAt
 
   return (
     <div className="relative flex flex-col h-full">
       {/* Header controls - floating row on desktop only */}
       {!isMobile && (
         <div className="absolute top-4 left-6 right-6 z-20 flex items-center justify-between">
-          {/* Left side - Morning Brief icon (only on today view) */}
+          {/* Left side - placeholder for future features */}
           <div className="flex items-center gap-3">
-            {currentView === 'today' && isViewingToday && (
-              <button
-                onClick={handleOpenBrief}
-                disabled={briefGenerating}
-                className="relative group flex items-center justify-center w-10 h-10 rounded-xl bg-white border border-neutral-200 shadow-sm hover:shadow-md hover:border-primary-300 transition-all disabled:opacity-60"
-                title={hasBrief ? 'View Morning Brief' : 'Generate Morning Brief'}
-              >
-                {(briefLoading || briefGenerating) && !brief ? (
-                  <svg className="w-5 h-5 text-primary-500 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5 text-primary-600 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                  </svg>
-                )}
-              </button>
-            )}
+            {/* Morning Brief disabled for now */}
           </div>
 
           {/* Right side - View switcher with assignee filter */}
@@ -575,25 +520,7 @@ export function HomeView({
           </div>
         )}
 
-        {/* Daily Brief Modal */}
-        <DailyBriefModal
-          isOpen={briefModalOpen}
-          brief={brief}
-          isGenerating={briefGenerating}
-          onRegenerate={() => generateBrief(true)}
-          onDismiss={handleCloseBrief}
-          onItemAction={handleItemAction}
-          onScheduleTask={(taskId, date) => {
-            if (onUpdateTask) {
-              onUpdateTask(taskId, { scheduledFor: date })
-            }
-          }}
-          onDeferTask={(taskId, date) => {
-            if (onPushTask) {
-              onPushTask(taskId, date)
-            }
-          }}
-        />
+        {/* Daily Brief Modal - disabled for now */}
 
         {renderContent()}
       </div>

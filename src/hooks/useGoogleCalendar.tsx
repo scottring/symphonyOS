@@ -15,6 +15,26 @@ export interface CreateEventParams {
   requestId?: string
 }
 
+export interface UpdateEventParams {
+  eventId: string
+  calendarId?: string
+  startTime: Date
+  endTime: Date
+  allDay?: boolean
+  /** Optional timezone (e.g., 'America/New_York'). Defaults to browser timezone. */
+  timeZone?: string
+}
+
+export interface UpdateEventResult {
+  eventId: string
+  htmlLink?: string
+  updated: {
+    startTime: string
+    endTime: string
+    allDay: boolean
+  }
+}
+
 /** Error thrown when calendar needs reconnection due to expired/revoked permissions */
 export class CalendarReconnectError extends Error {
   constructor(message: string = 'Calendar connection expired. Please reconnect.') {
@@ -58,6 +78,7 @@ interface GoogleCalendarContextValue {
   fetchTodayEvents: () => Promise<CalendarEvent[]>
   fetchWeekEvents: () => Promise<CalendarEvent[]>
   createEvent: (params: CreateEventParams) => Promise<CreateEventResult>
+  updateEvent: (params: UpdateEventParams) => Promise<UpdateEventResult>
 }
 
 const GoogleCalendarContext = createContext<GoogleCalendarContextValue | null>(null)
@@ -316,6 +337,53 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     return { id: data.eventId, htmlLink: data.htmlLink }
   }, [isConnected])
 
+  // Update an existing calendar event
+  // Throws CalendarReconnectError if permissions are expired (catch this to show reconnect UI)
+  const updateEvent = useCallback(async (params: UpdateEventParams): Promise<UpdateEventResult> => {
+    if (!isConnected) {
+      throw new Error('Not connected to Google Calendar')
+    }
+
+    // Default to browser timezone if not specified
+    const timeZone = params.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone
+
+    const { data, error } = await supabase.functions.invoke('google-calendar-update-event', {
+      body: {
+        eventId: params.eventId,
+        calendarId: params.calendarId,
+        startTime: params.startTime.toISOString(),
+        endTime: params.endTime.toISOString(),
+        allDay: params.allDay,
+        timeZone,
+      },
+    })
+
+    if (error) throw error
+
+    // Check for auth errors that require reconnection
+    if (data?.error) {
+      const isAuthError =
+        data.error.includes('Unauthorized') ||
+        data.error.includes('invalid_grant') ||
+        data.error.includes('Token has been expired or revoked') ||
+        data.needsReconnect
+
+      if (isAuthError) {
+        setError('Calendar connection expired. Please reconnect.')
+        setIsConnected(false)
+        setNeedsReconnect(true)
+        throw new CalendarReconnectError()
+      }
+      throw new Error(data.error)
+    }
+
+    return {
+      eventId: data.eventId,
+      htmlLink: data.htmlLink,
+      updated: data.updated,
+    }
+  }, [isConnected])
+
   const value: GoogleCalendarContextValue = {
     isConnected,
     needsReconnect,
@@ -329,6 +397,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     fetchTodayEvents,
     fetchWeekEvents,
     createEvent,
+    updateEvent,
   }
 
   return (

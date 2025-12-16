@@ -1,10 +1,11 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine } from '@/types/actionable'
 import type { Project } from '@/types/project'
 import type { DailyBrief as DailyBriefType, DailyBriefItem, DailyBriefActionType } from '@/types/action'
-import { DailyBriefModal } from '@/components/brief/DailyBriefModal'
+// Daily Brief disabled for now
+// import { DailyBriefModal } from '@/components/brief/DailyBriefModal'
 import { useSystemHealth } from '@/hooks/useSystemHealth'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -13,12 +14,12 @@ interface HomeDashboardProps {
   events: CalendarEvent[]
   routines: Routine[]
   projects: Project[]
-  brief: DailyBriefType | null
-  briefLoading: boolean
-  briefGenerating: boolean
-  onGenerateBrief: (force?: boolean) => void
-  onDismissBrief: () => void
-  onBriefItemAction: (item: DailyBriefItem, action: DailyBriefActionType) => void
+  brief?: DailyBriefType | null
+  briefLoading?: boolean
+  briefGenerating?: boolean
+  onGenerateBrief?: (force?: boolean) => void
+  onDismissBrief?: () => void
+  onBriefItemAction?: (item: DailyBriefItem, action: DailyBriefActionType) => void
   onScheduleTask?: (taskId: string, date: Date) => void
   onDeferTask?: (taskId: string, date: Date) => void
   onNavigateToSchedule: () => void
@@ -66,37 +67,23 @@ export function HomeDashboard({
   onNavigateToProjects,
   autoShowDailyBrief = true,
 }: HomeDashboardProps) {
-  void onDismissBrief // Reserved - brief dismissal now handled by modal close
+  // Daily Brief disabled for now
+  void onDismissBrief
+  void onBriefItemAction
+  void brief
+  void briefLoading
+  void briefGenerating
+  void onGenerateBrief
+  void onScheduleTask
+  void onDeferTask
+  void autoShowDailyBrief
+
   const [mounted, setMounted] = useState(false)
-  const [briefModalOpen, setBriefModalOpen] = useState(false)
   const { user } = useAuth()
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- mount animation state
     setMounted(true)
-  }, [])
-
-  // Auto-open the brief modal when a brief becomes available
-  useEffect(() => {
-    // Skip if user has disabled auto-show
-    if (!autoShowDailyBrief) return
-
-    if (brief && !brief.dismissedAt && mounted) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- auto-opening brief
-      setBriefModalOpen(true)
-    }
-  }, [brief, mounted, autoShowDailyBrief])
-
-  const handleOpenBrief = useCallback(() => {
-    if (brief && !brief.dismissedAt) {
-      setBriefModalOpen(true)
-    } else {
-      onGenerateBrief(true)
-    }
-  }, [brief, onGenerateBrief])
-
-  const handleCloseBrief = useCallback(() => {
-    setBriefModalOpen(false)
   }, [])
 
   // Get user's first name
@@ -179,8 +166,9 @@ export function HomeDashboard({
     }
   }, [tasks, events, routines, projects])
 
-  const hasBrief = brief && !brief.dismissedAt
-  const showBriefSkeleton = (briefLoading || briefGenerating) && !brief
+  // Daily Brief disabled for now
+  // const hasBrief = brief && !brief.dismissedAt
+  // const showBriefSkeleton = (briefLoading || briefGenerating) && !brief
 
   return (
     <div className="min-h-full bg-bg-base">
@@ -258,69 +246,7 @@ export function HomeDashboard({
 
       {/* Main Content */}
       <div className="max-w-6xl mx-auto px-6 pb-12 md:px-12">
-        {/* Daily Brief Section - Opens as Modal */}
-        <section
-          className={`-mt-4 transition-all duration-700 delay-300 ease-out ${
-            mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-          }`}
-        >
-          {showBriefSkeleton ? (
-            /* Loading Skeleton */
-            <div className="w-full rounded-2xl border border-primary-200 bg-gradient-to-br from-white to-primary-50/30 p-6 md:p-8 animate-pulse">
-              <div className="flex items-center gap-5">
-                <div className="w-14 h-14 rounded-2xl bg-primary-100" />
-                <div className="flex-1">
-                  <div className="h-6 w-48 bg-primary-100 rounded mb-2" />
-                  <div className="h-4 w-64 bg-primary-50 rounded" />
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* Morning Brief Card - Click to Open Modal */
-            <button
-              onClick={handleOpenBrief}
-              disabled={briefGenerating}
-              className="w-full group relative overflow-hidden rounded-2xl border border-primary-200 bg-gradient-to-br from-white to-primary-50/30 p-6 md:p-8 text-left transition-all hover:shadow-xl hover:border-primary-300 disabled:opacity-60"
-            >
-              <div className="absolute top-0 right-0 w-64 h-64 bg-primary-100/30 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-              <div className="relative flex items-center gap-5">
-                <div className="w-14 h-14 rounded-2xl bg-primary-100 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <svg className="w-7 h-7 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <h2 className="font-display text-xl md:text-2xl text-neutral-900 mb-1">
-                    {hasBrief ? 'Morning Brief' : 'Generate your morning brief'}
-                  </h2>
-                  <p className="text-neutral-500 text-sm md:text-base">
-                    {hasBrief
-                      ? `${brief.items.length} items need your attention`
-                      : 'AI-powered insights about what needs your attention today'}
-                  </p>
-                </div>
-                <div className="hidden sm:flex items-center gap-2 text-primary-600 font-medium">
-                  <span>{hasBrief ? 'View' : 'Start'}</span>
-                  <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                  </svg>
-                </div>
-              </div>
-            </button>
-          )}
-        </section>
-
-        {/* Daily Brief Modal */}
-        <DailyBriefModal
-          isOpen={briefModalOpen}
-          brief={brief}
-          isGenerating={briefGenerating}
-          onRegenerate={() => onGenerateBrief(true)}
-          onDismiss={handleCloseBrief}
-          onItemAction={onBriefItemAction}
-          onScheduleTask={onScheduleTask}
-          onDeferTask={onDeferTask}
-        />
+        {/* Daily Brief Section - Disabled for now */}
 
         {/* Life Contexts - Compact Cards */}
         <section

@@ -16,7 +16,8 @@ interface UseDailyBriefReturn {
 }
 
 export function useDailyBrief(
-  onTaskAction?: (taskId: string, action: DailyBriefActionType) => void
+  onTaskAction?: (taskId: string, action: DailyBriefActionType) => void,
+  onProjectAction?: (projectId: string, action: DailyBriefActionType) => void
 ): UseDailyBriefReturn {
   const [brief, setBrief] = useState<DailyBrief | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -135,15 +136,28 @@ export function useDailyBrief(
     item: DailyBriefItem,
     action: DailyBriefActionType
   ) => {
-    // If it's a task-related item and we have a handler, delegate to it
+    // Handle task-related items
     if (item.relatedEntityType === 'task' && item.relatedEntityId && onTaskAction) {
       onTaskAction(item.relatedEntityId, action)
       return
     }
 
+    // Handle project-related items
+    if (item.relatedEntityType === 'project' && item.relatedEntityId && onProjectAction) {
+      onProjectAction(item.relatedEntityId, action)
+      return
+    }
+
+    // Fallback: if we have any entity ID and a task handler, try to open it as a task
+    // This handles cases where the AI might not set relatedEntityType correctly
+    if (item.relatedEntityId && onTaskAction && action === 'open') {
+      onTaskAction(item.relatedEntityId, action)
+      return
+    }
+
     // Handle other actions here as needed
-    console.log('Brief item action:', { item, action })
-  }, [onTaskAction])
+    console.log('Brief item action (unhandled):', { item, action })
+  }, [onTaskAction, onProjectAction])
 
   // Fetch brief on mount, auto-generate if none exists
   useEffect(() => {

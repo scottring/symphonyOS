@@ -51,7 +51,7 @@ import type { LinkedActivityType } from '@/types/task'
 function App() {
   const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, getLinkedTasks, toggleTask, deleteTask, updateTask, pushTask } = useSupabaseTasks()
   const { user, loading: authLoading, signOut } = useAuth()
-  const { isConnected, events, fetchEvents, isFetching: eventsFetching, createEvent, connect: connectCalendar } = useGoogleCalendar()
+  const { isConnected, events, fetchEvents, isFetching: eventsFetching, createEvent, updateEvent, connect: connectCalendar } = useGoogleCalendar()
   const attachments = useAttachments()
   const pinnedItems = usePinnedItems()
   const undo = useUndo({ duration: 5000 })
@@ -60,7 +60,7 @@ function App() {
   // Onboarding state
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null)
   const [onboardingLoading, setOnboardingLoading] = useState(true)
-  const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, updateRecipeUrl, getNote, notes: eventNotesMap } = useEventNotes()
+  const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, updateEventAssignmentAll, updateRecipeUrl, getNote, notes: eventNotesMap } = useEventNotes()
   const { contacts, contactsMap, addContact, updateContact, deleteContact, searchContacts } = useContacts()
   const { projects, projectsMap, addProject, updateProject, deleteProject, searchProjects } = useProjects()
   const {
@@ -961,11 +961,20 @@ function App() {
             onAssignTask={(taskId, memberId) => {
               updateTask(taskId, { assignedTo: memberId ?? undefined })
             }}
+            onAssignTaskAll={(taskId, memberIds) => {
+              updateTask(taskId, { assignedToAll: memberIds })
+            }}
             onAssignEvent={(eventId, memberId) => {
               updateEventAssignment(eventId, memberId)
             }}
+            onAssignEventAll={(eventId, memberIds) => {
+              updateEventAssignmentAll(eventId, memberIds)
+            }}
             onAssignRoutine={(routineId, memberId) => {
               updateRoutine(routineId, { assigned_to: memberId })
+            }}
+            onAssignRoutineAll={(routineId, memberIds) => {
+              updateRoutine(routineId, { assigned_to_all: memberIds })
             }}
             onCompleteRoutine={async (routineId, completed) => {
               const routine = allRoutines.find(r => r.id === routineId)
@@ -1034,12 +1043,62 @@ function App() {
               const event = events.find(e => (e.google_event_id || e.id) === eventId)
               const eventName = event?.title || 'Event'
 
-              await reschedule('calendar_event', eventId, viewedDate, date)
-              undo.pushAction(`Rescheduled "${eventName}"`, async () => {
-                await undoDone('calendar_event', eventId, viewedDate)
-                refreshDateInstances()
-              })
-              refreshDateInstances()
+              if (!event) {
+                console.error('Event not found:', eventId)
+                return
+              }
+
+              try {
+                // Calculate new start and end times
+                const originalStart = new Date(event.start_time || event.startTime || date)
+                const originalEnd = new Date(event.end_time || event.endTime || date)
+                const wasAllDay = event.all_day ?? event.allDay ?? false
+
+                // If the new date has a specific time (not midnight), treat it as a timed event
+                const isNewTimeSpecific = date.getHours() !== 0 || date.getMinutes() !== 0
+                const newAllDay = !isNewTimeSpecific
+
+                let newStart: Date
+                let newEnd: Date
+
+                if (newAllDay) {
+                  // Moving to all-day: just use the date
+                  newStart = new Date(date)
+                  newStart.setHours(0, 0, 0, 0)
+                  newEnd = new Date(newStart)
+                  newEnd.setDate(newEnd.getDate() + 1)
+                } else if (wasAllDay) {
+                  // Converting from all-day to timed: use selected time, default 1 hour duration
+                  newStart = new Date(date)
+                  newEnd = new Date(date)
+                  newEnd.setHours(newEnd.getHours() + 1)
+                } else {
+                  // Timed to timed: preserve original duration
+                  const durationMs = originalEnd.getTime() - originalStart.getTime()
+                  newStart = new Date(date)
+                  newEnd = new Date(date.getTime() + durationMs)
+                }
+
+                await updateEvent({
+                  eventId,
+                  startTime: newStart,
+                  endTime: newEnd,
+                  allDay: newAllDay,
+                })
+
+                showToast(`Updated "${eventName}"`, 'success')
+
+                // Refresh events from Google Calendar to get the updated data
+                const startOfMonth = new Date(viewedDate)
+                startOfMonth.setDate(1)
+                startOfMonth.setHours(0, 0, 0, 0)
+                const endOfMonth = new Date(startOfMonth)
+                endOfMonth.setMonth(endOfMonth.getMonth() + 2)
+                await fetchEvents(startOfMonth, endOfMonth)
+              } catch (err) {
+                console.error('Failed to update event:', err)
+                showToast(`Failed to update "${eventName}"`, 'warning')
+              }
             }}
             onOpenPlanning={() => setPlanningOpen(true)}
             onAddProject={addProject}

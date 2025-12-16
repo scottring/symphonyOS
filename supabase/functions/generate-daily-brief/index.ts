@@ -27,90 +27,68 @@ interface GeneratedBrief {
   items: DailyBriefItem[]
 }
 
-const SYSTEM_PROMPT = `You are the Life COO for Symphony OS - a personal AI assistant that helps users achieve mental clarity by organizing their life.
+const SYSTEM_PROMPT = `You are the Life COO for Symphony OS - a personal AI assistant that helps families achieve mental clarity by organizing their life together.
 
-Your role is to provide a comprehensive morning brief that:
-1. Shows the day's schedule (calendar events)
-2. Highlights priority tasks by context (Work, Family, Personal)
-3. Offers proactive suggestions with actionable options
-4. Tracks the Clarity Score and suggests improvements
+Your role is to provide a family-friendly morning brief that:
+1. Summarizes the day's schedule for the whole family
+2. Shows what each family member is responsible for
+3. Highlights unassigned items that need an owner
+4. Identifies overdue or stale items needing attention
+5. Reports the Clarity Score and how to improve it
 
-CONTEXT AWARENESS:
-- Work tasks: Professional obligations, deadlines, meetings
-- Family tasks: Household duties, kids activities, shared responsibilities
-- Personal tasks: Self-care, hobbies, personal goals
+FAMILY COLLABORATION:
+This brief is meant to be reviewed together by family members. Focus on:
+- Clear ownership: Who is doing what today
+- Gaps: What tasks need to be assigned
+- Blockers: Overdue items or stale inbox items hurting clarity
+- Calendar coordination: Events that affect the family
 
-FAMILY MEMBERS:
-You know the user's family members. When a task is assigned to a family member, you can offer to send them a reminder note. Use their actual names from the data provided.
+ITEM TYPES (use these):
+- "calendar_reminder": Important event today (include time and who's involved)
+- "upcoming_deadline": Task due today or tomorrow
+- "overdue": Task past its scheduled date
+- "inbox_reminder": Stale inbox items hurting clarity score (8+ days old)
+- "unassigned": Task with no owner assigned
 
-PROACTIVE SUGGESTIONS:
-For tasks that involve communication (calls, emails, follow-ups), offer to:
-- Draft an email (for work contacts)
-- Send a text reminder (for family members)
-
-FORMAT THE BRIEF LIKE AN EXECUTIVE ASSISTANT:
-1. Warm greeting with date and Clarity Score
-2. TODAY'S SCHEDULE section with calendar events
-3. PRIORITY TASKS section organized by context
-4. QUICK WINS section for clarity score improvements
-5. Each item should have actionable suggestions
-
-Item Types:
-- "upcoming_deadline": Tasks due today/tomorrow
-- "inbox_reminder": Inbox items needing attention
-- "overdue": Tasks past due date
-- "empty_project": Projects needing tasks
-- "unassigned": Items needing assignment
-- "calendar_reminder": Important calendar events
-- "proactive_suggestion": AI suggestion to help (draft email, send reminder)
-
-Available Actions:
-- "schedule": Schedule the task for a specific day
-- "defer": Defer to next week
+AVAILABLE ACTIONS (only use these - they work):
+- "schedule": Open date picker to schedule the task
+- "defer": Open date picker to defer to later
 - "complete": Mark as done
-- "open": Open the item for details
-- "delete": Remove the item
-- "draft_email": Open email draft for a contact
-- "send_note": Send SMS to a family member
+- "open": Open task for details/editing
 
-Return a JSON object with:
+FORMAT:
+1. Greeting with day, date, and Clarity Score
+2. Summary sentence about the day (events count, tasks per person, clarity status)
+3. Items list (5-7 max, prioritized by urgency)
+
+IMPORTANT RULES:
+- ALWAYS include relatedEntityId with the exact task ID from the data
+- Use family member names from the provided list
+- For family tasks assigned to someone, mention their name: "Iris: Pick up kids"
+- For unassigned tasks, make that the focus: "Needs owner: [task name]"
+- Prioritize high-impact items that affect clarity score
+
+Return JSON only (no markdown):
 {
-  "greeting": "Good [morning/afternoon/evening], [Name]! It's [Day], [Date]. Your Clarity Score is [X]%.",
-  "summary": "[Brief 1-2 sentence overview of the day - events, priority tasks, and clarity status]",
+  "greeting": "Good [morning/afternoon/evening], [Name]! It's [Day], [Date]. Clarity Score: [X]%.",
+  "summary": "[1-2 sentences: X events today. Y tasks for you, Z for [spouse]. N items need attention.]",
   "items": [
     {
       "id": "unique-id",
-      "type": "upcoming_deadline",
-      "title": "Send quarterly report to PPVIS by 10am",
-      "description": "This is due this morning. Would you like me to help draft the email?",
+      "type": "overdue",
+      "title": "[Task title from data]",
+      "description": "This was scheduled for [date]. Reschedule or complete?",
       "relatedEntityType": "task",
-      "relatedEntityId": "uuid-of-task",
+      "relatedEntityId": "[exact-task-uuid-from-data]",
       "suggestedActions": [
-        { "label": "Draft Email", "action": "draft_email" },
-        { "label": "Mark Complete", "action": "complete" }
+        { "label": "Reschedule", "action": "schedule" },
+        { "label": "Complete", "action": "complete" }
       ],
       "priority": "high",
-      "context": "work"
-    },
-    {
-      "id": "unique-id-2",
-      "type": "proactive_suggestion",
-      "title": "Remind Iris about Ella's pickup at FFG",
-      "description": "Ella needs to be picked up at 3pm. Want me to send Iris a reminder?",
-      "relatedEntityType": "task",
-      "relatedEntityId": "uuid-of-task",
-      "suggestedActions": [
-        { "label": "Send Note to Iris", "action": "send_note" },
-        { "label": "I'll Handle It", "action": "complete" }
-      ],
-      "priority": "medium",
       "context": "family"
     }
   ]
-}
-
-Keep items to 5-7 maximum. Prioritize by urgency and impact. Use actual task names and family member names from the data.
-Respond with JSON only, no markdown code blocks.`
+}`
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -226,81 +204,78 @@ serve(async (req) => {
     const hour = parseInt(dateObj.toLocaleTimeString('en-US', { ...dateFormatOptions, hour: 'numeric', hour12: false }))
     const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
 
-    const userPrompt = `Generate a comprehensive COO-style ${timeOfDay} brief for this user:
+    const userPrompt = `Generate a family ${timeOfDay} brief for:
 
 USER: ${context.user.name}
 DATE: ${dayName}, ${dateStr}
-CURRENT TIME: ${timeStr} (${timeOfDay})
-CLARITY SCORE: ${clarityScore}% (${pointsToGo} points to 100%)
-
-IMPORTANT: It is currently ${timeOfDay}. Use "Good ${timeOfDay}" in your greeting.
+TIME: ${timeStr}
+CLARITY: ${clarityScore}%
 
 === FAMILY MEMBERS ===
-${context.familyMembers?.map((m: { id: string; name: string }) => `- ${m.name} [${m.id}]`).join('\n') || 'No family members configured'}
+${context.familyMembers?.map((m: { id: string; name: string }) => `- ${m.name} [ID: ${m.id}]`).join('\n') || 'No family members'}
 
 === TODAY'S CALENDAR (${context.calendarEvents?.length || 0} events) ===
 ${context.calendarEvents?.map((e: { google_event_id: string; title: string; start_time: string; end_time: string; all_day: boolean }) => {
   const start = new Date(e.start_time)
   const timeDisplay = e.all_day ? 'All day' : start.toLocaleTimeString('en-US', { timeZone: userTimezone, hour: 'numeric', minute: '2-digit' })
-  return `- ${timeDisplay}: "${e.title}" [${e.google_event_id}]`
-}).join('\n') || 'No events scheduled'}
+  return `- ${timeDisplay}: "${e.title}"`
+}).join('\n') || 'No events'}
 
-=== TODAY'S TASKS BY CONTEXT ===
+=== TODAY'S TASKS (by assignment) ===
+${(() => {
+  const allTodayTasks = [
+    ...(context.tasks.todayByContext?.work || []),
+    ...(context.tasks.todayByContext?.family || []),
+    ...(context.tasks.todayByContext?.personal || [])
+  ]
+  const byAssignee = new Map<string, { id: string; title: string; context?: string }[]>()
 
-WORK TASKS (${context.tasks.todayByContext?.work?.length || 0}):
-${context.tasks.todayByContext?.work?.map((t: { id: string; title: string; contact_id?: string; assigned_to?: string }) =>
-  `- [${t.id}] "${t.title}"${t.contact_id ? ' (has contact)' : ''}`
-).join('\n') || 'None'}
+  for (const t of allTodayTasks as { id: string; title: string; assigned_to?: string; context?: string }[]) {
+    const assignee = t.assigned_to
+      ? context.familyMembers?.find((m: { id: string }) => m.id === t.assigned_to)?.name || 'Unknown'
+      : 'UNASSIGNED'
+    if (!byAssignee.has(assignee)) byAssignee.set(assignee, [])
+    byAssignee.get(assignee)!.push(t)
+  }
 
-FAMILY TASKS (${context.tasks.todayByContext?.family?.length || 0}):
-${context.tasks.todayByContext?.family?.map((t: { id: string; title: string; assigned_to?: string }) => {
-  const assignee = t.assigned_to ? context.familyMembers?.find((m: { id: string }) => m.id === t.assigned_to)?.name : null
-  return `- [${t.id}] "${t.title}"${assignee ? ` (assigned to ${assignee})` : ''}`
+  let output = ''
+  for (const [assignee, tasks] of byAssignee.entries()) {
+    output += `\n${assignee}:\n`
+    for (const t of tasks) {
+      output += `  - [${t.id}] "${t.title}" (${t.context || 'no context'})\n`
+    }
+  }
+  return output || 'No tasks scheduled for today'
+})()}
+
+=== OVERDUE TASKS (${context.tasks.overdue?.length || 0}) ===
+${context.tasks.overdue?.map((t: { id: string; title: string; scheduled_for: string; context?: string; assigned_to?: string }) => {
+  const assignee = t.assigned_to
+    ? context.familyMembers?.find((m: { id: string }) => m.id === t.assigned_to)?.name
+    : 'unassigned'
+  return `- [${t.id}] "${t.title}" (was due: ${t.scheduled_for}, ${assignee})`
 }).join('\n') || 'None'}
 
-PERSONAL TASKS (${context.tasks.todayByContext?.personal?.length || 0}):
-${context.tasks.todayByContext?.personal?.map((t: { id: string; title: string }) =>
-  `- [${t.id}] "${t.title}"`
-).join('\n') || 'None'}
+=== UNASSIGNED TASKS (${context.tasks.unassigned?.length || 0}) ===
+${context.tasks.unassigned?.slice(0, 5).map((t: { id: string; title: string; scheduled_for?: string; context?: string }) =>
+  `- [${t.id}] "${t.title}" (${t.scheduled_for ? 'scheduled ' + t.scheduled_for : 'inbox'})`
+).join('\n') || 'All tasks have owners!'}
 
-=== OVERDUE (needs rescheduling) ===
-${context.tasks.overdue?.map((t: { id: string; title: string; scheduled_for: string; context?: string }) =>
-  `- [${t.id}] "${t.title}" (was due: ${t.scheduled_for}) [${t.context || 'no context'}]`
-).join('\n') || 'None - great job staying on track!'}
+=== STALE INBOX (hurting clarity, 8+ days old) ===
+${context.tasks.staleInbox?.map((t: { id: string; title: string; created_at: string }) => {
+  const daysOld = Math.floor((Date.now() - new Date(t.created_at).getTime()) / (1000 * 60 * 60 * 24))
+  return `- [${t.id}] "${t.title}" (${daysOld} days old, -8 points)`
+}).join('\n') || 'None'}
 
-=== INBOX ITEMS NEEDING ATTENTION ===
+=== CLARITY ACTIONS ===
+${clarityActions.length > 0 ? clarityActions.join('\n') : 'At 100% clarity!'}
 
-STALE (8+ days, -8 points each):
-${context.tasks.staleInbox?.map((t: { id: string; title: string; created_at: string; context?: string }) =>
-  `- [${t.id}] "${t.title}" (${Math.floor((Date.now() - new Date(t.created_at).getTime()) / (1000 * 60 * 60 * 24))} days old) [${t.context || 'no context'}]`
-).join('\n') || 'None'}
-
-AGING (4-7 days, -3 points each):
-${context.tasks.agingInbox?.map((t: { id: string; title: string; context?: string }) =>
-  `- [${t.id}] "${t.title}" [${t.context || 'no context'}]`
-).join('\n') || 'None'}
-
-=== CLARITY IMPROVEMENT ACTIONS ===
-${clarityActions.length > 0 ? clarityActions.map((a: string, i: number) => `${i + 1}. ${a}`).join('\n') : 'Already at perfect clarity!'}
-
-=== CONTACTS (for email suggestions) ===
-${context.contacts?.slice(0, 10).map((c: { id: string; name: string; email?: string }) =>
-  `- ${c.name}${c.email ? ` <${c.email}>` : ''} [${c.id}]`
-).join('\n') || 'None'}
-
-INSTRUCTIONS:
-1. Start with a warm greeting including the day, date, and Clarity Score
-2. Summarize the day: number of events, key tasks, and overall status
-3. Include items for:
-   - Important calendar events (type: "calendar_reminder")
-   - Priority tasks due today, especially work deadlines
-   - Family tasks that might need delegation or reminders
-   - Quick wins for clarity score (stale inbox items)
-4. For family tasks assigned to others, offer to "Send Note to [Name]"
-5. For work tasks involving contacts, offer to "Draft Email"
-6. Use actual IDs from the data for relatedEntityId
-7. Keep to 5-7 items maximum, prioritized by urgency
-8. Include "context" field on items (work/family/personal)
+GENERATE THE BRIEF:
+- Greeting: "Good ${timeOfDay}, ${context.user.name}! It's ${dayName}, ${dateStr}. Clarity: ${clarityScore}%."
+- Summary: Mention events count, tasks per person, any urgent issues
+- Items (5-7 max): Prioritize overdue, unassigned, then stale inbox items
+- CRITICAL: Use exact task IDs from brackets [uuid] for relatedEntityId
+- Only use actions: schedule, defer, complete, open
 
 Return JSON only.`
 

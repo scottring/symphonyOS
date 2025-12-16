@@ -128,13 +128,15 @@ serve(async (req) => {
       { data: routines },
       { data: familyMembers },
       { data: calendarEvents },
+      { data: eventNotes },
     ] = await Promise.all([
-      // All incomplete tasks for clarity calculation
+      // All incomplete, non-archived tasks for clarity calculation
       supabase
         .from('tasks')
         .select('*')
         .eq('user_id', user.id)
         .eq('completed', false)
+        .or('archived.is.null,archived.eq.false')
         .order('scheduled_for', { nullsFirst: true }),
 
       // Active projects (not completed, not on_hold)
@@ -181,6 +183,14 @@ serve(async (req) => {
         .gte('start_time', todayStart)
         .lte('start_time', todayEnd)
         .order('start_time', { ascending: true }),
+
+      // Event notes with project links (for determining which projects have future events)
+      supabase
+        .from('event_notes')
+        .select('project_id, event_start_time')
+        .eq('user_id', user.id)
+        .not('project_id', 'is', null)
+        .gte('event_start_time', todayStart),
     ])
 
     // Categorize tasks
@@ -206,7 +216,15 @@ serve(async (req) => {
       !r.assigned_to && (!r.assigned_to_all || r.assigned_to_all.length === 0)
     )
 
-    // Empty projects (active projects with no incomplete tasks)
+    // Build set of project IDs that have linked future calendar events
+    const projectsWithLinkedEvents = new Set<string>()
+    for (const note of (eventNotes || []) as { project_id: string }[]) {
+      if (note.project_id) {
+        projectsWithLinkedEvents.add(note.project_id)
+      }
+    }
+
+    // Empty projects (active projects with no incomplete tasks AND no future linked events)
     const projectTaskCounts = new Map<string, number>()
     for (const task of incompleteTasks) {
       if ((task as { project_id?: string }).project_id) {
@@ -214,7 +232,9 @@ serve(async (req) => {
         projectTaskCounts.set(pid, (projectTaskCounts.get(pid) || 0) + 1)
       }
     }
-    const emptyProjects = (projects || []).filter((p: { id: string }) => !projectTaskCounts.has(p.id))
+    const emptyProjects = (projects || []).filter((p: { id: string }) =>
+      !projectTaskCounts.has(p.id) && !projectsWithLinkedEvents.has(p.id)
+    )
 
     // Calculate clarity score (matching useSystemHealth.ts logic)
     const totalItems = incompleteTasks.length
