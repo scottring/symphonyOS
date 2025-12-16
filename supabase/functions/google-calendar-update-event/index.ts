@@ -162,20 +162,38 @@ serve(async (req) => {
       }
     }
 
-    // Build Google Calendar API PATCH request body
-    interface GoogleEventPatch {
-      start: { dateTime?: string; date?: string; timeZone?: string }
-      end: { dateTime?: string; date?: string; timeZone?: string }
+    // First, GET the existing event to get all its properties
+    const eventUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`
+
+    console.log('Fetching existing event:', eventUrl)
+
+    const getResponse = await fetch(eventUrl, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+
+    if (!getResponse.ok) {
+      const errorData = await getResponse.json()
+      console.error('Failed to fetch event:', errorData)
+      return new Response(JSON.stringify({
+        error: 'Failed to fetch existing event',
+        details: errorData,
+        calendarId,
+        eventId,
+      }), {
+        status: getResponse.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
-    const eventPatch: GoogleEventPatch = {
-      start: {},
-      end: {},
-    }
+    const existingEvent = await getResponse.json()
+    console.log('Existing event:', JSON.stringify(existingEvent, null, 2))
 
     // Use provided timezone or default to America/New_York
     const eventTimeZone = timeZone || 'America/New_York'
 
+    // Modify the start and end times on the existing event
     if (allDay) {
       // For all-day events, use date format (YYYY-MM-DD)
       const startDate = startTime.split('T')[0]
@@ -186,33 +204,38 @@ serve(async (req) => {
       endDateObj.setDate(endDateObj.getDate() + 1)
       const adjustedEndDate = endDateObj.toISOString().split('T')[0]
 
-      eventPatch.start = { date: startDate }
-      eventPatch.end = { date: adjustedEndDate }
+      existingEvent.start = { date: startDate }
+      existingEvent.end = { date: adjustedEndDate }
     } else {
-      // For timed events, use dateTime format with timezone
-      eventPatch.start = { dateTime: startTime, timeZone: eventTimeZone }
-      eventPatch.end = { dateTime: endTime, timeZone: eventTimeZone }
+      // For timed events, use dateTime with timeZone
+      existingEvent.start = { dateTime: startTime, timeZone: eventTimeZone }
+      existingEvent.end = { dateTime: endTime, timeZone: eventTimeZone }
     }
 
-    // Update the event using PATCH (partial update)
-    const updateUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`
+    console.log('Updated event body:', JSON.stringify({ start: existingEvent.start, end: existingEvent.end }))
 
-    console.log('Updating event:', { eventId, calendarId, startTime, endTime, allDay })
-
-    const updateResponse = await fetch(updateUrl, {
-      method: 'PATCH',
+    // Use PUT to replace the entire event (required when changing event type)
+    const updateResponse = await fetch(eventUrl, {
+      method: 'PUT',
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(eventPatch),
+      body: JSON.stringify(existingEvent),
     })
 
     const updateData = await updateResponse.json()
 
     if (updateData.error) {
-      console.error('Google Calendar API error:', updateData.error)
-      return new Response(JSON.stringify({ error: updateData.error.message }), {
+      console.error('Google Calendar API error:', JSON.stringify(updateData.error, null, 2))
+      console.error('Request body start/end was:', JSON.stringify({ start: existingEvent.start, end: existingEvent.end }, null, 2))
+      return new Response(JSON.stringify({
+        error: updateData.error.message || JSON.stringify(updateData.error),
+        details: updateData.error,
+        requestBody: { start: existingEvent.start, end: existingEvent.end },
+        calendarId,
+        eventId,
+      }), {
         status: updateResponse.status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })

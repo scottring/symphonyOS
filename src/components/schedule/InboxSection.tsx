@@ -33,6 +33,9 @@ interface InboxSectionProps {
   selectedIds?: Set<string>
   onEnterSelectionMode?: (taskId: string) => void
   onToggleSelect?: (taskId: string) => void
+  // Calendar integration
+  onAddToCalendar?: (task: Task) => Promise<void>
+  addingToCalendarTaskId?: string | null
 }
 
 export function InboxSection({
@@ -58,6 +61,8 @@ export function InboxSection({
   selectedIds,
   onEnterSelectionMode,
   onToggleSelect,
+  onAddToCalendar,
+  addingToCalendarTaskId,
 }: InboxSectionProps) {
   // Suppress unused variable warnings - these are kept in the interface for future use
   void _contacts
@@ -152,6 +157,8 @@ export function InboxSection({
             multiSelected={selectedIds?.has(task.id)}
             onLongPress={onEnterSelectionMode ? () => onEnterSelectionMode(task.id) : undefined}
             onToggleSelect={onToggleSelect ? () => onToggleSelect(task.id) : undefined}
+            onAddToCalendar={onAddToCalendar ? () => onAddToCalendar(task) : undefined}
+            isAddingToCalendar={addingToCalendarTaskId === task.id}
           />
         ))}
       </div>

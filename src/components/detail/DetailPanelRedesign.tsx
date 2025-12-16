@@ -140,6 +140,9 @@ interface DetailPanelRedesignProps {
   onUpdateEventProject?: (googleEventId: string, projectId: string | null, eventTitle?: string | null, eventStartTime?: Date | null) => void
   // Quick action support for linked tasks
   getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
+  // Calendar integration - create events from tasks
+  onAddToCalendar?: () => Promise<void>
+  isAddingToCalendar?: boolean
 }
 
 function ActionIcon({ type }: { type: DetectedAction['icon'] }) {
@@ -526,6 +529,8 @@ export function DetailPanelRedesign({
   eventProjectId,
   onUpdateEventProject,
   getScheduleItemsForDate,
+  onAddToCalendar,
+  isAddingToCalendar,
 }: DetailPanelRedesignProps) {
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -1205,18 +1210,51 @@ export function DetailPanelRedesign({
               )}
             </div>
 
-            {/* Pin button for tasks - inline in header */}
-            {isTask && item.originalTask && onPin && onUnpin && (
-              <div className="mt-3">
-                <PinButton
-                  entityType="task"
-                  entityId={item.originalTask.id}
-                  isPinned={isPinned}
-                  canPin={canPin}
-                  onPin={() => onPin('task', item.originalTask!.id)}
-                  onUnpin={() => onUnpin('task', item.originalTask!.id)}
-                  onMaxPinsReached={onMaxPinsReached}
-                />
+            {/* Task action buttons - Pin and Add to Calendar */}
+            {isTask && item.originalTask && (
+              <div className="mt-3 flex items-center gap-2">
+                {/* Pin button */}
+                {onPin && onUnpin && (
+                  <PinButton
+                    entityType="task"
+                    entityId={item.originalTask.id}
+                    isPinned={isPinned}
+                    canPin={canPin}
+                    onPin={() => onPin('task', item.originalTask!.id)}
+                    onUnpin={() => onUnpin('task', item.originalTask!.id)}
+                    onMaxPinsReached={onMaxPinsReached}
+                  />
+                )}
+                {/* Add to Calendar button */}
+                {onAddToCalendar && (
+                  <button
+                    onClick={onAddToCalendar}
+                    disabled={isAddingToCalendar}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                      isAddingToCalendar
+                        ? 'bg-primary-50 text-primary-500'
+                        : 'bg-neutral-100 text-neutral-600 hover:bg-primary-50 hover:text-primary-600'
+                    }`}
+                  >
+                    {isAddingToCalendar ? (
+                      <>
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Adding...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11v6m3-3H9" />
+                        </svg>
+                        Add to Calendar
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             )}
           </div>

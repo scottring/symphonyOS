@@ -53,9 +53,10 @@ describe('DeferPicker', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Defer item' }))
 
+      expect(screen.getByText('In 3 hours')).toBeInTheDocument()
+      expect(screen.getByText('In 6 hours')).toBeInTheDocument()
       expect(screen.getByText('Tomorrow')).toBeInTheDocument()
       expect(screen.getByText('Next Week')).toBeInTheDocument()
-      expect(screen.getByText('2 weeks')).toBeInTheDocument()
       expect(screen.getByText('1 month')).toBeInTheDocument()
       expect(screen.getByText('Pick date...')).toBeInTheDocument()
     })
@@ -109,20 +110,36 @@ describe('DeferPicker', () => {
       expect(calledDate.getDay()).toBe(0) // Sunday
     })
 
-    it('calls onDefer with date 14 days out when 2 weeks is clicked', () => {
+    it('calls onDefer with +3 hours when In 3 hours is clicked', () => {
       render(<DeferPicker {...defaultProps} />)
 
       fireEvent.click(screen.getByRole('button', { name: 'Defer item' }))
-      fireEvent.click(screen.getByText('2 weeks'))
+      fireEvent.click(screen.getByText('In 3 hours'))
 
       expect(mockOnDefer).toHaveBeenCalledTimes(1)
       const calledDate = mockOnDefer.mock.calls[0][0]
       expect(calledDate).toBeInstanceOf(Date)
 
-      // Should be 14 days from now
-      const twoWeeks = new Date()
-      twoWeeks.setDate(twoWeeks.getDate() + 14)
-      expect(calledDate.toDateString()).toBe(twoWeeks.toDateString())
+      // Should be approximately 3 hours from now
+      const threeHoursFromNow = new Date()
+      threeHoursFromNow.setHours(threeHoursFromNow.getHours() + 3)
+      expect(Math.abs(calledDate.getTime() - threeHoursFromNow.getTime())).toBeLessThan(30 * 60 * 1000) // Within 30 min
+    })
+
+    it('calls onDefer with +6 hours when In 6 hours is clicked', () => {
+      render(<DeferPicker {...defaultProps} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Defer item' }))
+      fireEvent.click(screen.getByText('In 6 hours'))
+
+      expect(mockOnDefer).toHaveBeenCalledTimes(1)
+      const calledDate = mockOnDefer.mock.calls[0][0]
+      expect(calledDate).toBeInstanceOf(Date)
+
+      // Should be approximately 6 hours from now
+      const sixHoursFromNow = new Date()
+      sixHoursFromNow.setHours(sixHoursFromNow.getHours() + 6)
+      expect(Math.abs(calledDate.getTime() - sixHoursFromNow.getTime())).toBeLessThan(30 * 60 * 1000) // Within 30 min
     })
 
     it('calls onDefer with date 1 month out when 1 month is clicked', () => {

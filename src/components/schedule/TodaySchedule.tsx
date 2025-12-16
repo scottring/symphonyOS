@@ -569,6 +569,9 @@ interface TodayScheduleProps {
   onBulkUncomplete?: (taskIds: string[]) => void
   onBulkDelete?: (taskIds: string[]) => void
   onBulkReschedule?: (taskIds: string[], date: Date, isAllDay: boolean) => void
+  // Calendar integration - create events from tasks
+  onAddToCalendar?: (task: Task) => Promise<void>
+  addingToCalendarTaskId?: string | null
 }
 
 function LoadingSkeleton() {
@@ -652,6 +655,8 @@ export function TodaySchedule({
   onBulkUncomplete,
   onBulkDelete,
   onBulkReschedule,
+  onAddToCalendar,
+  addingToCalendarTaskId,
 }: TodayScheduleProps) {
   void _onOpenPlanning // Reserved - planning now handled by ModeToggle
   void _onCreateTask // Reserved - was used by ReviewSection
@@ -835,11 +840,10 @@ export function TodaySchedule({
   }, [tasks, isToday, matchesAssigneeFilter])
 
   // Inbox tasks: needs triage - only shown on today's view
-  // Includes: no scheduledFor, OR deferredUntil <= today
+  // Includes: no scheduledFor, OR deferredUntil <= now
   const inboxTasks = useMemo(() => {
     if (!isToday) return []
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    const now = new Date()
 
     return tasks.filter((task) => {
       if (task.completed) return false
@@ -847,11 +851,10 @@ export function TodaySchedule({
       if (!matchesAssigneeFilter(task.assignedTo, task.assignedToAll)) return false
       // No scheduled date = inbox item
       if (!task.scheduledFor) {
-        // If deferred to a future date, don't show yet
+        // If deferred to a future time, don't show yet
         if (task.deferredUntil) {
-          const deferredDate = new Date(task.deferredUntil)
-          deferredDate.setHours(0, 0, 0, 0)
-          return deferredDate <= today
+          const deferredTime = new Date(task.deferredUntil)
+          return deferredTime <= now
         }
         return true
       }
@@ -1485,6 +1488,8 @@ export function TodaySchedule({
                 selectedIds={bulkSelection.selectedIds}
                 onEnterSelectionMode={bulkSelection.enterSelectionMode}
                 onToggleSelect={bulkSelection.toggleSelection}
+                onAddToCalendar={onAddToCalendar}
+                addingToCalendarTaskId={addingToCalendarTaskId}
               />
             </div>
           )}

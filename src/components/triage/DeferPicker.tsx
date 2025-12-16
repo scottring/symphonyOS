@@ -63,10 +63,10 @@ export function DeferPicker({ deferredUntil, deferCount, onDefer }: DeferPickerP
     return nextSunday
   }
 
-  const getTwoWeeks = () => {
+  const getHoursFromNow = (hours: number) => {
     const date = new Date()
-    date.setDate(date.getDate() + 14)
-    date.setHours(9, 0, 0, 0)
+    date.setHours(date.getHours() + hours)
+    date.setMinutes(Math.ceil(date.getMinutes() / 30) * 30, 0, 0)
     return date
   }
 
@@ -145,6 +145,18 @@ export function DeferPicker({ deferredUntil, deferCount, onDefer }: DeferPickerP
                 </>
               )}
               <button
+                onClick={() => handleDefer(getHoursFromNow(3))}
+                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
+              >
+                In 3 hours
+              </button>
+              <button
+                onClick={() => handleDefer(getHoursFromNow(6))}
+                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
+              >
+                In 6 hours
+              </button>
+              <button
                 onClick={() => handleDefer(getBaseDate(1))}
                 className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
               >
@@ -163,12 +175,6 @@ export function DeferPicker({ deferredUntil, deferCount, onDefer }: DeferPickerP
               >
                 <span>Next Week</span>
                 <span className="text-xs text-neutral-400">{formatNextSunday()}</span>
-              </button>
-              <button
-                onClick={() => handleDefer(getTwoWeeks())}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
-              >
-                2 weeks
               </button>
               <button
                 onClick={() => handleDefer(getOneMonth())}

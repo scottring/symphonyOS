@@ -156,6 +156,9 @@ function App() {
     scheduledFor?: Date
     category?: 'task' | 'chore' | 'errand' | 'event' | 'activity'
   } | null>(null)
+
+  // Add to calendar state (for inbox task cards)
+  const [addingToCalendarTaskId, setAddingToCalendarTaskId] = useState<string | null>(null)
   const [activeView, setActiveView] = useState<ViewType>('home')
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [selectedRoutineId, setSelectedRoutineId] = useState<string | null>(null)
@@ -698,6 +701,45 @@ function App() {
     return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
   }, [])
 
+  // Handler for adding an inbox task to Google Calendar
+  const handleAddToCalendar = useCallback(async (task: typeof tasks[0]) => {
+    if (!isConnected) {
+      showToast('Please connect Google Calendar in Settings', 'warning')
+      return
+    }
+
+    setAddingToCalendarTaskId(task.id)
+    try {
+      // Default to 1 hour event starting now
+      const startTime = new Date()
+      // Round to the next 15-minute increment
+      startTime.setMinutes(Math.ceil(startTime.getMinutes() / 15) * 15, 0, 0)
+      const endTime = new Date(startTime)
+      endTime.setHours(endTime.getHours() + 1)
+
+      await createEvent({
+        title: task.title,
+        startTime,
+        endTime,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      })
+
+      // Refresh calendar events to show the new event
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const weekLater = new Date(today)
+      weekLater.setDate(weekLater.getDate() + 7)
+      await fetchEvents(today, weekLater)
+
+      showToast('Added to Google Calendar', 'success')
+    } catch (err) {
+      console.error('Failed to add task to calendar:', err)
+      showToast('Failed to add to calendar', 'warning')
+    } finally {
+      setAddingToCalendarTaskId(null)
+    }
+  }, [isConnected, createEvent, fetchEvents, showToast])
+
   // Wrapper for updateTask that shows toast when scheduling to future date
   const handleUpdateTaskWithToast = useCallback(async (
     id: string,
@@ -914,6 +956,10 @@ function App() {
             onAddLinkedTask={handleAddLinkedTask}
             onToggleLinkedTask={handleToggleLinkedTask}
             onDeleteLinkedTask={handleDeleteLinkedTask}
+            onAddToCalendar={selectedItem?.originalTask ? async () => {
+              await handleAddToCalendar(selectedItem.originalTask!)
+            } : undefined}
+            isAddingToCalendar={selectedItem?.originalTask ? addingToCalendarTaskId === selectedItem.originalTask.id : false}
             routine={selectedItemRoutine}
             onUpdateRoutine={updateRoutine}
           />
@@ -1102,6 +1148,8 @@ function App() {
             }}
             onOpenPlanning={() => setPlanningOpen(true)}
             onAddProject={addProject}
+            onAddToCalendar={handleAddToCalendar}
+            addingToCalendarTaskId={addingToCalendarTaskId}
           />
         </div>
       )}

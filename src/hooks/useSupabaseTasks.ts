@@ -475,10 +475,7 @@ export function useSupabaseTasks() {
       dbUpdates.scheduled_for = updates.scheduledFor?.toISOString() ?? null
     }
     if ('deferredUntil' in updates) {
-      // Convert Date to YYYY-MM-DD string for DATE column
-      dbUpdates.deferred_until = updates.deferredUntil
-        ? updates.deferredUntil.toISOString().split('T')[0]
-        : null
+      dbUpdates.deferred_until = updates.deferredUntil?.toISOString() ?? null
     }
     if ('deferCount' in updates) dbUpdates.defer_count = updates.deferCount ?? 0
     if ('isAllDay' in updates) dbUpdates.is_all_day = updates.isAllDay ?? null
@@ -759,7 +756,7 @@ export function useSupabaseTasks() {
       title: task.title,
       completed: task.completed,
       scheduled_for: task.scheduledFor?.toISOString() ?? null,
-      deferred_until: task.deferredUntil?.toISOString().split('T')[0] ?? null,
+      deferred_until: task.deferredUntil?.toISOString() ?? null,
       defer_count: task.deferCount ?? 0,
       is_all_day: task.isAllDay ?? null,
       is_someday: task.isSomeday ?? false,

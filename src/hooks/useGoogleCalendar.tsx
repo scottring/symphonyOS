@@ -347,21 +347,40 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     // Default to browser timezone if not specified
     const timeZone = params.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone
 
+    const requestBody = {
+      eventId: params.eventId,
+      calendarId: params.calendarId,
+      startTime: params.startTime.toISOString(),
+      endTime: params.endTime.toISOString(),
+      allDay: params.allDay,
+      timeZone,
+    }
+    console.log('Updating event with:', requestBody)
+
     const { data, error } = await supabase.functions.invoke('google-calendar-update-event', {
-      body: {
-        eventId: params.eventId,
-        calendarId: params.calendarId,
-        startTime: params.startTime.toISOString(),
-        endTime: params.endTime.toISOString(),
-        allDay: params.allDay,
-        timeZone,
-      },
+      body: requestBody,
     })
 
-    if (error) throw error
+    if (error) {
+      console.error('Supabase function error:', error)
+      // Try to get the response body from the error context
+      if ('context' in error && error.context) {
+        try {
+          const errorBody = await (error.context as Response).json()
+          console.error('Error response body:', errorBody)
+          throw new Error(errorBody.error || error.message)
+        } catch (parseErr) {
+          console.error('Could not parse error response:', parseErr)
+        }
+      }
+      throw error
+    }
+
+    console.log('Update event response:', data)
 
     // Check for auth errors that require reconnection
     if (data?.error) {
+      console.error('Google Calendar API error details:', data)
       const isAuthError =
         data.error.includes('Unauthorized') ||
         data.error.includes('invalid_grant') ||

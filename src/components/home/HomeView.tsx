@@ -66,6 +66,9 @@ interface HomeViewProps {
   onBulkUncomplete?: (taskIds: string[]) => void
   onBulkDelete?: (taskIds: string[]) => void
   onBulkReschedule?: (taskIds: string[], date: Date, isAllDay: boolean) => void
+  // Calendar integration - create events from tasks
+  onAddToCalendar?: (task: Task) => Promise<void>
+  addingToCalendarTaskId?: string | null
   // Navigation callbacks for HomeDashboard
   onNavigateToContext?: (context: TaskContext) => void
   onNavigateToInbox?: () => void
@@ -119,6 +122,9 @@ export function HomeView({
   onBulkUncomplete,
   onBulkDelete,
   onBulkReschedule,
+  // Calendar integration
+  onAddToCalendar,
+  addingToCalendarTaskId,
   // Navigation
   onNavigateToContext,
   onNavigateToInbox,
@@ -439,6 +445,9 @@ export function HomeView({
         onBulkUncomplete={onBulkUncomplete}
         onBulkDelete={onBulkDelete}
         onBulkReschedule={onBulkReschedule}
+        // Calendar integration
+        onAddToCalendar={onAddToCalendar}
+        addingToCalendarTaskId={addingToCalendarTaskId}
       />
     )
   }
