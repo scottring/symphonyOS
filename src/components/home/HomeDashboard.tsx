@@ -1,10 +1,10 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine } from '@/types/actionable'
 import type { Project } from '@/types/project'
 import type { DailyBrief as DailyBriefType, DailyBriefItem, DailyBriefActionType } from '@/types/action'
-import { DailyBrief, DailyBriefSkeleton } from '@/components/brief'
+import { DailyBriefModal } from '@/components/brief/DailyBriefModal'
 import { useSystemHealth } from '@/hooks/useSystemHealth'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -63,12 +63,34 @@ export function HomeDashboard({
   onNavigateToInbox,
   onNavigateToProjects,
 }: HomeDashboardProps) {
+  void onDismissBrief // Reserved - brief dismissal now handled by modal close
   const [mounted, setMounted] = useState(false)
+  const [briefModalOpen, setBriefModalOpen] = useState(false)
   const { user } = useAuth()
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- mount animation state
     setMounted(true)
+  }, [])
+
+  // Auto-open the brief modal when a brief becomes available
+  useEffect(() => {
+    if (brief && !brief.dismissedAt && mounted) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- auto-opening brief
+      setBriefModalOpen(true)
+    }
+  }, [brief, mounted])
+
+  const handleOpenBrief = useCallback(() => {
+    if (brief && !brief.dismissedAt) {
+      setBriefModalOpen(true)
+    } else {
+      onGenerateBrief(true)
+    }
+  }, [brief, onGenerateBrief])
+
+  const handleCloseBrief = useCallback(() => {
+    setBriefModalOpen(false)
   }, [])
 
   // Get user's first name
@@ -151,7 +173,7 @@ export function HomeDashboard({
     }
   }, [tasks, events, routines, projects])
 
-  const shouldShowBrief = brief && !brief.dismissedAt
+  const hasBrief = brief && !brief.dismissedAt
   const showBriefSkeleton = (briefLoading || briefGenerating) && !brief
 
   return (
@@ -230,28 +252,27 @@ export function HomeDashboard({
 
       {/* Main Content */}
       <div className="max-w-6xl mx-auto px-6 pb-12 md:px-12">
-        {/* Daily Brief Section */}
+        {/* Daily Brief Section - Opens as Modal */}
         <section
           className={`-mt-4 transition-all duration-700 delay-300 ease-out ${
             mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
           }`}
         >
-          {shouldShowBrief ? (
-            <DailyBrief
-              brief={brief}
-              isGenerating={briefGenerating}
-              onRegenerate={() => onGenerateBrief(true)}
-              onDismiss={onDismissBrief}
-              onItemAction={onBriefItemAction}
-              onScheduleTask={onScheduleTask}
-              onDeferTask={onDeferTask}
-            />
-          ) : showBriefSkeleton ? (
-            <DailyBriefSkeleton />
+          {showBriefSkeleton ? (
+            /* Loading Skeleton */
+            <div className="w-full rounded-2xl border border-primary-200 bg-gradient-to-br from-white to-primary-50/30 p-6 md:p-8 animate-pulse">
+              <div className="flex items-center gap-5">
+                <div className="w-14 h-14 rounded-2xl bg-primary-100" />
+                <div className="flex-1">
+                  <div className="h-6 w-48 bg-primary-100 rounded mb-2" />
+                  <div className="h-4 w-64 bg-primary-50 rounded" />
+                </div>
+              </div>
+            </div>
           ) : (
-            /* Generate Brief Card */
+            /* Morning Brief Card - Click to Open Modal */
             <button
-              onClick={() => onGenerateBrief(true)}
+              onClick={handleOpenBrief}
               disabled={briefGenerating}
               className="w-full group relative overflow-hidden rounded-2xl border border-primary-200 bg-gradient-to-br from-white to-primary-50/30 p-6 md:p-8 text-left transition-all hover:shadow-xl hover:border-primary-300 disabled:opacity-60"
             >
@@ -264,22 +285,42 @@ export function HomeDashboard({
                 </div>
                 <div className="flex-1">
                   <h2 className="font-display text-xl md:text-2xl text-neutral-900 mb-1">
-                    Generate your daily brief
+                    {hasBrief ? 'Morning Brief' : 'Generate your morning brief'}
                   </h2>
                   <p className="text-neutral-500 text-sm md:text-base">
-                    AI-powered insights about what needs your attention today
+                    {hasBrief
+                      ? `${brief.items.length} items need your attention`
+                      : 'AI-powered insights about what needs your attention today'}
                   </p>
                 </div>
                 <div className="hidden sm:flex items-center gap-2 text-primary-600 font-medium">
-                  <span>Start</span>
+                  <span>{hasBrief ? 'View' : 'Start'}</span>
                   <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                   </svg>
                 </div>
               </div>
+              {/* Item count badge when brief exists */}
+              {hasBrief && brief.items.length > 0 && (
+                <div className="absolute top-4 right-4 w-7 h-7 rounded-full bg-primary-500 text-white text-sm font-bold flex items-center justify-center">
+                  {brief.items.length}
+                </div>
+              )}
             </button>
           )}
         </section>
+
+        {/* Daily Brief Modal */}
+        <DailyBriefModal
+          isOpen={briefModalOpen}
+          brief={brief}
+          isGenerating={briefGenerating}
+          onRegenerate={() => onGenerateBrief(true)}
+          onDismiss={handleCloseBrief}
+          onItemAction={onBriefItemAction}
+          onScheduleTask={onScheduleTask}
+          onDeferTask={onDeferTask}
+        />
 
         {/* Life Contexts - Compact Cards */}
         <section

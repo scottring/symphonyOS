@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import type { Task, TaskContext } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
@@ -15,7 +15,7 @@ import { HomeDashboard } from './HomeDashboard'
 import { WeekView } from './WeekView'
 import { CascadingRiverView } from './CascadingRiverView'
 import { TodaySchedule } from '@/components/schedule/TodaySchedule'
-import { DailyBrief, DailyBriefSkeleton } from '@/components/brief'
+import { DailyBriefModal } from '@/components/brief'
 
 interface HomeViewProps {
   tasks: Task[]
@@ -124,6 +124,7 @@ export function HomeView({
 }: HomeViewProps) {
   const { currentView, setCurrentView } = useHomeView()
   const isMobile = useMobile()
+  const [briefModalOpen, setBriefModalOpen] = useState(false)
 
   // Daily Brief handler for task actions
   const handleBriefTaskAction = useCallback((taskId: string, action: DailyBriefActionType) => {
@@ -170,6 +171,32 @@ export function HomeView({
     handleItemAction,
   } = useDailyBrief(handleBriefTaskAction)
 
+  // Auto-open the brief modal when a brief becomes available on today view
+  useEffect(() => {
+    if (brief && !brief.dismissedAt && currentView === 'today') {
+      const today = new Date()
+      const isToday =
+        viewedDate.getFullYear() === today.getFullYear() &&
+        viewedDate.getMonth() === today.getMonth() &&
+        viewedDate.getDate() === today.getDate()
+      if (isToday) {
+        setBriefModalOpen(true)
+      }
+    }
+  }, [brief, currentView, viewedDate])
+
+  const handleOpenBrief = useCallback(() => {
+    if (brief && !brief.dismissedAt) {
+      setBriefModalOpen(true)
+    } else {
+      generateBrief(true)
+    }
+  }, [brief, generateBrief])
+
+  const handleCloseBrief = useCallback(() => {
+    setBriefModalOpen(false)
+  }, [])
+
   // Check if viewing today
   const isViewingToday = useMemo(() => {
     const today = new Date()
@@ -179,9 +206,6 @@ export function HomeView({
       viewedDate.getDate() === today.getDate()
     )
   }, [viewedDate])
-
-  // Show brief only on today view, when not dismissed
-  const shouldShowBrief = isViewingToday && currentView === 'today' && brief && !brief.dismissedAt
 
   // Assignee filter state - now supports multi-select
   // Empty array = "All", single id = single filter, multiple ids = river view
@@ -472,12 +496,44 @@ export function HomeView({
     )
   }
 
+  // Check if brief is available and not dismissed
+  const hasBrief = brief && !brief.dismissedAt
+
   return (
     <div className="relative flex flex-col h-full">
-      {/* Header controls - floating in upper right on desktop only */}
+      {/* Header controls - floating row on desktop only */}
       {!isMobile && (
-        <div className="absolute top-4 right-6 z-20 flex items-center gap-3">
-          {/* Unified view switcher (Home/Day/Week) with assignee filter */}
+        <div className="absolute top-4 left-6 right-6 z-20 flex items-center justify-between">
+          {/* Left side - Morning Brief icon (only on today view) */}
+          <div className="flex items-center gap-3">
+            {currentView === 'today' && isViewingToday && (
+              <button
+                onClick={handleOpenBrief}
+                disabled={briefGenerating}
+                className="relative group flex items-center justify-center w-10 h-10 rounded-xl bg-white border border-neutral-200 shadow-sm hover:shadow-md hover:border-primary-300 transition-all disabled:opacity-60"
+                title={hasBrief ? 'View Morning Brief' : 'Generate Morning Brief'}
+              >
+                {(briefLoading || briefGenerating) && !brief ? (
+                  <svg className="w-5 h-5 text-primary-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5 text-primary-600 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                )}
+                {/* Badge showing item count */}
+                {hasBrief && brief.items.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary-500 text-white text-[10px] font-bold flex items-center justify-center">
+                    {brief.items.length > 9 ? '9+' : brief.items.length}
+                  </span>
+                )}
+              </button>
+            )}
+          </div>
+
+          {/* Right side - View switcher with assignee filter */}
           <HomeViewSwitcher
             currentView={currentView}
             onViewChange={handleViewChange}
@@ -517,35 +573,25 @@ export function HomeView({
           </div>
         )}
 
-        {/* Daily Brief - shown at top when viewing today */}
-        {shouldShowBrief && (
-          <div className="px-4 pt-2 md:px-6 md:pt-2">
-            <DailyBrief
-              brief={brief}
-              isGenerating={briefGenerating}
-              onRegenerate={() => generateBrief(true)}
-              onDismiss={dismissBrief}
-              onItemAction={handleItemAction}
-              onScheduleTask={(taskId, date) => {
-                if (onUpdateTask) {
-                  onUpdateTask(taskId, { scheduledFor: date })
-                }
-              }}
-              onDeferTask={(taskId, date) => {
-                if (onPushTask) {
-                  onPushTask(taskId, date)
-                }
-              }}
-            />
-          </div>
-        )}
-
-        {/* Brief loading/generating skeleton */}
-        {isViewingToday && currentView === 'today' && (briefLoading || briefGenerating) && !brief && (
-          <div className="px-4 pt-2 md:px-6 md:pt-2">
-            <DailyBriefSkeleton />
-          </div>
-        )}
+        {/* Daily Brief Modal */}
+        <DailyBriefModal
+          isOpen={briefModalOpen}
+          brief={brief}
+          isGenerating={briefGenerating}
+          onRegenerate={() => generateBrief(true)}
+          onDismiss={handleCloseBrief}
+          onItemAction={handleItemAction}
+          onScheduleTask={(taskId, date) => {
+            if (onUpdateTask) {
+              onUpdateTask(taskId, { scheduledFor: date })
+            }
+          }}
+          onDeferTask={(taskId, date) => {
+            if (onPushTask) {
+              onPushTask(taskId, date)
+            }
+          }}
+        />
 
         {renderContent()}
       </div>

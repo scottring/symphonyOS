@@ -661,3 +661,31 @@ body {
 .clarity-good { --clarity-color: var(--color-sage-500); }
 .clarity-fair { --clarity-color: var(--color-warning-500); }
 .clarity-needs-attention { --clarity-color: hsl(25 70% 50%); }
+
+/* =============================================================================
+   DAILY BRIEF MODAL - Three-quarter screen slide-up
+   ============================================================================= */
+
+@keyframes daily-brief-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.daily-brief-modal-enter {
+  animation: daily-brief-slide-up 0.45s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
