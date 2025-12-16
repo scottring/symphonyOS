@@ -14,7 +14,7 @@ const FEATURES = {
   lists: true, // Lists feature - enabled for trip planning and collections
 }
 
-export type ViewType = 'home' | 'projects' | 'routines' | 'contacts' | 'lists' | 'notes' | 'history' | 'task-detail' | 'contact-detail' | 'settings' | 'kids' | 'chat'
+export type ViewType = 'home' | 'projects' | 'routines' | 'contacts' | 'lists' | 'notes' | 'history' | 'task-detail' | 'contact-detail' | 'settings' | 'kids'
 
 interface EntityData {
   tasks: Task[]
@@ -92,25 +92,6 @@ const navItems = [
         <path d="M12 8v4l3 3" />
         <circle cx="12" cy="12" r="10" />
       </svg>
-    ),
-  },
-  {
-    id: 'chat' as const,
-    label: 'Chat',
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-        <circle cx="9" cy="10" r="1" fill="currentColor" />
-        <circle cx="12" cy="10" r="1" fill="currentColor" />
-        <circle cx="15" cy="10" r="1" fill="currentColor" />
-      </svg>
-    ),
-  },
-  {
-    id: 'kids' as const,
-    label: 'Kids Zone',
-    icon: (
-      <span className="text-lg">🌟</span>
     ),
   },
 ]
@@ -298,6 +279,22 @@ export function Sidebar({
               {isExpanded && <span className="text-sm font-medium">Lists</span>}
             </button>
           )}
+
+          {/* Kids Zone */}
+          <button
+            onClick={() => onViewChange('kids')}
+            className={`
+              w-full flex items-center gap-3 rounded-xl transition-all duration-200 mt-1
+              ${isExpanded ? 'px-4 py-3' : 'p-3 justify-center'}
+              ${activeView === 'kids'
+                ? 'bg-amber-50 text-amber-700 shadow-sm'
+                : 'text-neutral-500 hover:bg-white/80 hover:text-neutral-700 hover:shadow-sm'
+              }
+            `}
+          >
+            <span className="text-lg">🌟</span>
+            {isExpanded && <span className="text-sm font-medium">Kids Zone</span>}
+          </button>
 
           {FEATURES.notes && (
             <button
