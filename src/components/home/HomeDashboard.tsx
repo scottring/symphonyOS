@@ -25,6 +25,8 @@ interface HomeDashboardProps {
   onNavigateToContext: (context: 'work' | 'family' | 'personal') => void
   onNavigateToInbox: () => void
   onNavigateToProjects: () => void
+  /** Whether to auto-show the Daily Brief modal */
+  autoShowDailyBrief?: boolean
 }
 
 // Time-based greeting
@@ -62,6 +64,7 @@ export function HomeDashboard({
   onNavigateToContext,
   onNavigateToInbox,
   onNavigateToProjects,
+  autoShowDailyBrief = true,
 }: HomeDashboardProps) {
   void onDismissBrief // Reserved - brief dismissal now handled by modal close
   const [mounted, setMounted] = useState(false)
@@ -75,11 +78,14 @@ export function HomeDashboard({
 
   // Auto-open the brief modal when a brief becomes available
   useEffect(() => {
+    // Skip if user has disabled auto-show
+    if (!autoShowDailyBrief) return
+
     if (brief && !brief.dismissedAt && mounted) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- auto-opening brief
       setBriefModalOpen(true)
     }
-  }, [brief, mounted])
+  }, [brief, mounted, autoShowDailyBrief])
 
   const handleOpenBrief = useCallback(() => {
     if (brief && !brief.dismissedAt) {
@@ -300,12 +306,6 @@ export function HomeDashboard({
                   </svg>
                 </div>
               </div>
-              {/* Item count badge when brief exists */}
-              {hasBrief && brief.items.length > 0 && (
-                <div className="absolute top-4 right-4 w-7 h-7 rounded-full bg-primary-500 text-white text-sm font-bold flex items-center justify-center">
-                  {brief.items.length}
-                </div>
-              )}
             </button>
           )}
         </section>

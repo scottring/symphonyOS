@@ -12,9 +12,6 @@ export interface ScheduleContextItem {
   completed?: boolean
 }
 
-// Alias for internal use
-type ScheduleItem = ScheduleContextItem
-
 interface SchedulePopoverProps {
   value?: Date
   isAllDay?: boolean
@@ -36,64 +33,6 @@ const TIME_PRESETS = [
   { label: '6pm', hour: 18, description: 'Evening' },
 ]
 
-// Generate 5-minute increment options
-function generateTimeOptions(): { value: string; label: string }[] {
-  const options: { value: string; label: string }[] = []
-  for (let hour = 6; hour <= 22; hour++) {
-    for (let minute = 0; minute < 60; minute += 5) {
-      const h = hour.toString().padStart(2, '0')
-      const m = minute.toString().padStart(2, '0')
-      const value = `${h}:${m}`
-      const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour
-      const period = hour >= 12 ? 'pm' : 'am'
-      const label = minute === 0
-        ? `${displayHour}${period}`
-        : `${displayHour}:${m.padStart(2, '0')}${period}`
-      options.push({ value, label })
-    }
-  }
-  return options
-}
-
-const TIME_OPTIONS = generateTimeOptions()
-
-// Group items by time of day section
-type DaySection = 'allday' | 'morning' | 'afternoon' | 'evening'
-
-function getTimeOfDay(date: Date): 'morning' | 'afternoon' | 'evening' {
-  const hour = date.getHours()
-  if (hour < 12) return 'morning'
-  if (hour < 17) return 'afternoon'
-  return 'evening'
-}
-
-function groupItemsBySection(items: ScheduleItem[]): Record<DaySection, ScheduleItem[]> {
-  const groups: Record<DaySection, ScheduleItem[]> = {
-    allday: [],
-    morning: [],
-    afternoon: [],
-    evening: [],
-  }
-
-  for (const item of items) {
-    if (item.allDay || !item.startTime) {
-      groups.allday.push(item)
-    } else {
-      groups[getTimeOfDay(item.startTime)].push(item)
-    }
-  }
-
-  // Sort by time within each section
-  const sortByTime = (a: ScheduleItem, b: ScheduleItem) =>
-    (a.startTime?.getTime() ?? 0) - (b.startTime?.getTime() ?? 0)
-
-  groups.morning.sort(sortByTime)
-  groups.afternoon.sort(sortByTime)
-  groups.evening.sort(sortByTime)
-
-  return groups
-}
-
 function formatTimeCompact(date: Date): string {
   const hours = date.getHours()
   const minutes = date.getMinutes()
@@ -101,20 +40,6 @@ function formatTimeCompact(date: Date): string {
   const displayHour = hours % 12 || 12
   if (minutes === 0) return `${displayHour}${period}`
   return `${displayHour}:${minutes.toString().padStart(2, '0')}${period}`
-}
-
-const SECTION_LABELS: Record<DaySection, string> = {
-  allday: 'All Day',
-  morning: 'Morning',
-  afternoon: 'Afternoon',
-  evening: 'Evening',
-}
-
-// Default time slots for each section when no items exist
-const SECTION_DEFAULT_TIMES: Record<Exclude<DaySection, 'allday'>, number> = {
-  morning: 9,
-  afternoon: 14,
-  evening: 18,
 }
 
 export function SchedulePopover({
@@ -131,6 +56,7 @@ export function SchedulePopover({
   const [step, setStep] = useState<Step>('date')
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [showCustomTime, setShowCustomTime] = useState(false)
+  const [selectedHour, setSelectedHour] = useState<number | null>(null)
 
   // Determine if we should show the schedule context view
   const hasScheduleContext = !!(scheduleItems || getItemsForDate)
@@ -161,21 +87,14 @@ export function SchedulePopover({
     })
   }, [selectedDate, scheduleItems, getItemsForDate])
 
-  // Group items by section
-  const groupedItems = useMemo(() => {
-    return groupItemsBySection(itemsForSelectedDate)
-  }, [itemsForSelectedDate])
-
-  const [customTimeSearch, setCustomTimeSearch] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
-  const customTimeInputRef = useRef<HTMLInputElement>(null)
 
   const handleClose = useCallback(() => {
     setIsOpen(false)
     setStep('date')
     setSelectedDate(null)
     setShowCustomTime(false)
-    setCustomTimeSearch('')
+    setSelectedHour(null)
   }, [])
 
   // Close on outside click
@@ -198,16 +117,9 @@ export function SchedulePopover({
       setStep('date')
       setSelectedDate(null)
       setShowCustomTime(false)
-      setCustomTimeSearch('')
+      setSelectedHour(null)
     }
   }, [isOpen])
-
-  // Focus custom time input when shown
-  useEffect(() => {
-    if (showCustomTime && customTimeInputRef.current) {
-      customTimeInputRef.current.focus()
-    }
-  }, [showCustomTime])
 
   const getBaseDate = (daysFromNow: number) => {
     const date = new Date()
@@ -253,11 +165,10 @@ export function SchedulePopover({
     handleClose()
   }
 
-  const handleCustomTimeSelect = (timeValue: string) => {
-    if (!selectedDate || !timeValue) return
-    const [hours, minutes] = timeValue.split(':').map(Number)
+  const handleMinuteSelect = (minute: number) => {
+    if (!selectedDate || selectedHour === null) return
     const finalDate = new Date(selectedDate)
-    finalDate.setHours(hours, minutes, 0, 0)
+    finalDate.setHours(selectedHour, minute, 0, 0)
     onSchedule(finalDate, false)
     handleClose()
   }
@@ -267,11 +178,12 @@ export function SchedulePopover({
     handleClose()
   }
 
-  // Filter time options based on search
-  const filteredTimeOptions = TIME_OPTIONS.filter(opt =>
-    opt.label.toLowerCase().includes(customTimeSearch.toLowerCase()) ||
-    opt.value.includes(customTimeSearch)
-  )
+  // Format hour for display (12-hour format)
+  const formatHour = (hour: number): string => {
+    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
+    const period = hour >= 12 ? 'pm' : 'am'
+    return `${displayHour}${period}`
+  }
 
   const formatSelectedDateLabel = () => {
     if (!selectedDate) return ''
@@ -386,7 +298,7 @@ export function SchedulePopover({
             </div>
           )}
 
-          {/* Step 2: Pick time - with schedule context if available */}
+          {/* Step 2: Pick time - time picker is primary, schedule context is informational */}
           {step === 'time' && !showCustomTime && (
             <div className="p-3">
               {/* Back button with selected date */}
@@ -409,172 +321,73 @@ export function SchedulePopover({
                 <span>All Day</span>
               </button>
 
-              {/* Schedule context view - shows day structure with gaps */}
-              {hasScheduleContext ? (
-                <div className="space-y-3 max-h-[320px] overflow-y-auto">
-                  {/* Render each section with items and gaps */}
-                  {(['morning', 'afternoon', 'evening'] as const).map((section) => {
-                    const sectionItems = groupedItems[section]
-                    const hasItems = sectionItems.length > 0
-                    const defaultHour = SECTION_DEFAULT_TIMES[section]
-
-                    return (
-                      <div key={section}>
-                        {/* Section header */}
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: '#737373' }}>
-                            {SECTION_LABELS[section]}
-                          </span>
-                          <div className="flex-1 h-px" style={{ backgroundColor: '#e5e5e5' }} />
-                        </div>
-
-                        {hasItems ? (
-                          <div className="space-y-1">
-                            {sectionItems.map((item, idx) => {
-                              const prevItem = idx > 0 ? sectionItems[idx - 1] : null
-                              const showGapBefore = prevItem && item.startTime && prevItem.endTime &&
-                                (item.startTime.getTime() - (prevItem.endTime?.getTime() || prevItem.startTime!.getTime() + 3600000)) > 1800000 // 30+ min gap
-
-                              return (
-                                <div key={item.id}>
-                                  {/* Gap slot before this item */}
-                                  {showGapBefore && prevItem?.endTime && (
-                                    <button
-                                      onClick={() => {
-                                        const gapTime = new Date(prevItem.endTime!)
-                                        handleTimeSelect(gapTime.getHours())
-                                      }}
-                                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs
-                                        text-primary-600 bg-primary-50/50 hover:bg-primary-100
-                                        border border-dashed border-primary-200
-                                        transition-all duration-150 mb-1"
-                                    >
-                                      <span className="w-10 text-right font-medium tabular-nums">
-                                        {formatTimeCompact(prevItem.endTime)}
-                                      </span>
-                                      <span className="flex-1 text-left">Schedule here</span>
-                                    </button>
-                                  )}
-
-                                  {/* Existing item */}
-                                  <div
-                                    className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs
-                                      ${item.completed ? 'opacity-50' : ''}
-                                      bg-neutral-50 text-neutral-600
-                                    `}
-                                  >
-                                    <span className="w-10 text-right font-medium text-neutral-400 tabular-nums">
-                                      {item.startTime ? formatTimeCompact(item.startTime) : '—'}
-                                    </span>
-                                    <span className="flex-1 truncate">{item.title}</span>
-                                    {item.type === 'event' && (
-                                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                                    )}
-                                    {item.type === 'routine' && (
-                                      <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
-                                    )}
-                                  </div>
-                                </div>
-                              )
-                            })}
-
-                            {/* Gap slot at end of section */}
-                            {sectionItems.length > 0 && (
-                              <button
-                                onClick={() => {
-                                  const lastItem = sectionItems[sectionItems.length - 1]
-                                  const endTime = lastItem.endTime || (lastItem.startTime ? new Date(lastItem.startTime.getTime() + 3600000) : null)
-                                  if (endTime) {
-                                    handleTimeSelect(endTime.getHours())
-                                  }
-                                }}
-                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs
-                                  text-primary-600 hover:bg-primary-50
-                                  transition-all duration-150"
-                              >
-                                <span className="w-10 text-right font-medium tabular-nums">
-                                  {(() => {
-                                    const lastItem = sectionItems[sectionItems.length - 1]
-                                    const endTime = lastItem.endTime || (lastItem.startTime ? new Date(lastItem.startTime.getTime() + 3600000) : null)
-                                    return endTime ? formatTimeCompact(endTime) : '—'
-                                  })()}
-                                </span>
-                                <span className="flex-1 text-left opacity-60">+ Schedule after</span>
-                              </button>
-                            )}
-                          </div>
-                        ) : (
-                          /* Empty section - show as available slot */
-                          <button
-                            onClick={() => handleTimeSelect(defaultHour)}
-                            className="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs
-                              text-primary-600 bg-primary-50/30 hover:bg-primary-50
-                              border border-dashed border-primary-200/50
-                              transition-all duration-150"
-                          >
-                            <span className="w-10 text-right font-medium tabular-nums">
-                              {defaultHour > 12 ? `${defaultHour - 12}p` : `${defaultHour}a`}
-                            </span>
-                            <span className="flex-1 text-left">Open - schedule here</span>
-                          </button>
-                        )}
-                      </div>
-                    )
-                  })}
-
-                  {/* Custom time option */}
+              {/* Quick time presets */}
+              <div className="grid grid-cols-4 gap-1.5 mb-3">
+                {TIME_PRESETS.map((preset) => (
                   <button
-                    onClick={() => setShowCustomTime(true)}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs
-                      text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50
-                      transition-all duration-150 mt-2"
+                    key={preset.hour}
+                    onClick={() => handleTimeSelect(preset.hour)}
+                    className="px-2 py-1.5 rounded-lg text-xs font-medium
+                      text-neutral-700 bg-neutral-100 hover:bg-primary-50 hover:text-primary-700
+                      transition-all duration-150"
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>Pick exact time...</span>
+                    {preset.label}
                   </button>
-                </div>
-              ) : (
-                /* Fallback: Original time presets when no schedule context */
-                <>
-                  <div className="grid grid-cols-2 gap-2 mb-2">
-                    {TIME_PRESETS.map((preset) => (
-                      <button
-                        key={preset.hour}
-                        onClick={() => handleTimeSelect(preset.hour)}
-                        className="
-                          flex flex-col items-center px-3 py-2.5 rounded-lg text-sm
-                          text-neutral-800 bg-neutral-100 hover:bg-primary-50 hover:text-primary-700
-                          transition-all duration-150
-                        "
-                      >
-                        <span className="font-semibold">{preset.label}</span>
-                        <span className="text-xs text-neutral-400">{preset.description}</span>
-                      </button>
-                    ))}
+                ))}
+              </div>
+
+              {/* Time picker - primary interface */}
+              <button
+                onClick={() => setShowCustomTime(true)}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
+                  text-primary-700 bg-primary-50 hover:bg-primary-100
+                  border border-primary-200
+                  transition-all duration-150 mb-3"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Pick specific time...</span>
+              </button>
+
+              {/* Schedule context - read-only informational display */}
+              {hasScheduleContext && itemsForSelectedDate.length > 0 && (
+                <div className="border-t border-neutral-100 pt-3 mt-1">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 mb-2">
+                    Already scheduled
                   </div>
-
-                  <button
-                    onClick={() => setShowCustomTime(true)}
-                    className="
-                      w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm
-                      text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50
-                      transition-all duration-150
-                    "
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>Pick exact time...</span>
-                  </button>
-                </>
+                  <div className="space-y-1 max-h-[180px] overflow-y-auto">
+                    {itemsForSelectedDate
+                      .filter(item => !item.allDay)
+                      .sort((a, b) => (a.startTime?.getTime() ?? 0) - (b.startTime?.getTime() ?? 0))
+                      .map((item) => (
+                        <div
+                          key={item.id}
+                          className={`flex items-center gap-2 px-2 py-1 rounded text-xs
+                            ${item.completed ? 'opacity-40' : 'opacity-70'}
+                            text-neutral-500
+                          `}
+                        >
+                          <span className="w-10 text-right font-medium tabular-nums text-neutral-400">
+                            {item.startTime ? formatTimeCompact(item.startTime) : '—'}
+                          </span>
+                          <span className="flex-1 truncate">{item.title}</span>
+                          {item.type === 'event' && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                          )}
+                          {item.type === 'routine' && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                </div>
               )}
             </div>
           )}
 
-          {/* Custom time picker */}
-          {step === 'time' && showCustomTime && (
+          {/* Custom time picker - Step 1: Select hour */}
+          {step === 'time' && showCustomTime && selectedHour === null && (
             <div className="p-3">
               {/* Back button */}
               <button
@@ -585,43 +398,96 @@ export function SchedulePopover({
                 <span className="font-medium">{formatSelectedDateLabel()}</span>
               </button>
 
-              {/* Search/type-ahead input */}
-              <div className="relative mb-2">
-                <input
-                  ref={customTimeInputRef}
-                  type="text"
-                  value={customTimeSearch}
-                  onChange={(e) => setCustomTimeSearch(e.target.value)}
-                  placeholder="Type time (e.g., 2:30pm)"
-                  className="
-                    w-full px-3 py-2 rounded-lg text-sm
-                    border border-neutral-200 bg-white
-                    focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400
-                    transition-all duration-150
-                  "
-                />
+              <div className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">
+                Select hour
               </div>
 
-              {/* Time options list */}
-              <div className="max-h-48 overflow-y-auto rounded-lg border border-neutral-100">
-                {filteredTimeOptions.slice(0, 20).map((option) => (
+              {/* Morning hours (6am - 11am) */}
+              <div className="mb-2">
+                <div className="text-[10px] text-neutral-400 mb-1">Morning</div>
+                <div className="grid grid-cols-6 gap-1">
+                  {[6, 7, 8, 9, 10, 11].map((hour) => (
+                    <button
+                      key={hour}
+                      onClick={() => setSelectedHour(hour)}
+                      className="px-2 py-1.5 rounded text-xs font-medium
+                        text-neutral-700 bg-neutral-100 hover:bg-primary-50 hover:text-primary-700
+                        transition-all duration-150"
+                    >
+                      {formatHour(hour)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Afternoon hours (12pm - 5pm) */}
+              <div className="mb-2">
+                <div className="text-[10px] text-neutral-400 mb-1">Afternoon</div>
+                <div className="grid grid-cols-6 gap-1">
+                  {[12, 13, 14, 15, 16, 17].map((hour) => (
+                    <button
+                      key={hour}
+                      onClick={() => setSelectedHour(hour)}
+                      className="px-2 py-1.5 rounded text-xs font-medium
+                        text-neutral-700 bg-neutral-100 hover:bg-primary-50 hover:text-primary-700
+                        transition-all duration-150"
+                    >
+                      {formatHour(hour)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Evening hours (6pm - 11pm) */}
+              <div>
+                <div className="text-[10px] text-neutral-400 mb-1">Evening</div>
+                <div className="grid grid-cols-6 gap-1">
+                  {[18, 19, 20, 21, 22, 23].map((hour) => (
+                    <button
+                      key={hour}
+                      onClick={() => setSelectedHour(hour)}
+                      className="px-2 py-1.5 rounded text-xs font-medium
+                        text-neutral-700 bg-neutral-100 hover:bg-primary-50 hover:text-primary-700
+                        transition-all duration-150"
+                    >
+                      {formatHour(hour)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Custom time picker - Step 2: Select minute */}
+          {step === 'time' && showCustomTime && selectedHour !== null && (
+            <div className="p-3">
+              {/* Back button */}
+              <button
+                onClick={() => setSelectedHour(null)}
+                className="flex items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-700 mb-3 px-1"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span className="font-medium">Change hour</span>
+              </button>
+
+              <div className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">
+                {formatHour(selectedHour)} — select minutes
+              </div>
+
+              {/* Minute options */}
+              <div className="grid grid-cols-4 gap-2">
+                {[0, 15, 30, 45].map((minute) => (
                   <button
-                    key={option.value}
-                    onClick={() => handleCustomTimeSelect(option.value)}
-                    className="
-                      w-full px-3 py-2 text-sm text-left
-                      text-neutral-700 hover:bg-primary-50 hover:text-primary-700
-                      transition-colors first:rounded-t-lg last:rounded-b-lg
-                    "
+                    key={minute}
+                    onClick={() => handleMinuteSelect(minute)}
+                    className="px-3 py-3 rounded-lg text-sm font-medium
+                      text-neutral-700 bg-neutral-100 hover:bg-primary-50 hover:text-primary-700
+                      transition-all duration-150"
                   >
-                    {option.label}
+                    {formatHour(selectedHour).replace(/[ap]m/, '')}:{minute.toString().padStart(2, '0')}
+                    <span className="text-neutral-400">{selectedHour >= 12 ? 'pm' : 'am'}</span>
                   </button>
                 ))}
-                {filteredTimeOptions.length === 0 && (
-                  <div className="px-3 py-4 text-sm text-neutral-400 text-center">
-                    No matching times
-                  </div>
-                )}
               </div>
             </div>
           )}

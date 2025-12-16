@@ -148,6 +148,7 @@ export function PrepTasksList({
             <label className="text-xs text-neutral-500">Schedule for:</label>
             <input
               type="time"
+              step="300"
               value={`${String(newTaskTime.getHours()).padStart(2, '0')}:${String(newTaskTime.getMinutes()).padStart(2, '0')}`}
               onChange={(e) => {
                 const [hours, minutes] = e.target.value.split(':').map(Number)

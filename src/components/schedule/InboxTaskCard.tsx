@@ -8,6 +8,15 @@ import { AgeIndicator } from '@/components/health'
 import { useLongPress } from '@/hooks/useLongPress'
 import { Check } from 'lucide-react'
 
+// Helper to stop all mouse/touch events from bubbling to parent's longPress handler
+const stopAllPropagation = {
+  onMouseDown: (e: React.MouseEvent) => e.stopPropagation(),
+  onMouseUp: (e: React.MouseEvent) => e.stopPropagation(),
+  onTouchStart: (e: React.TouchEvent) => e.stopPropagation(),
+  onTouchEnd: (e: React.TouchEvent) => e.stopPropagation(),
+  onClick: (e: React.MouseEvent) => e.stopPropagation(),
+}
+
 interface InboxTaskCardProps {
   task: Task
   onDefer: (date: Date | undefined) => void
@@ -112,6 +121,10 @@ export function InboxTaskCard({
                 e.stopPropagation()
                 onUpdate({ completed: !task.completed })
               }}
+              onMouseDown={stopAllPropagation.onMouseDown}
+              onMouseUp={stopAllPropagation.onMouseUp}
+              onTouchStart={stopAllPropagation.onTouchStart}
+              onTouchEnd={stopAllPropagation.onTouchEnd}
               className="touch-target flex items-center justify-center -m-2 p-2 group/check"
             >
               <span
@@ -158,11 +171,14 @@ export function InboxTaskCard({
           </div>
 
           {/* Action buttons - hidden by default, show on hover */}
-          <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200" {...stopAllPropagation}>
             {/* Review button */}
             {onTriage && (
               <button
-                onClick={onTriage}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onTriage()
+                }}
                 className="p-2 rounded-xl text-neutral-300 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200"
                 title="Review"
               >
@@ -191,7 +207,7 @@ export function InboxTaskCard({
 
           {/* Assignee avatar - always visible */}
           {familyMembers.length > 0 && onAssignTask && (
-            <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+            <div className="shrink-0" {...stopAllPropagation}>
               <AssigneeDropdown
                 members={familyMembers}
                 selectedId={task.assignedTo}
@@ -204,14 +220,17 @@ export function InboxTaskCard({
 
         {/* Chips row - desktop only, only show if project exists */}
         {project && (
-          <div className="hidden md:flex items-center gap-2 mt-2 ml-10 flex-wrap">
+          <div className="hidden md:flex items-center gap-2 mt-2 ml-10 flex-wrap" {...stopAllPropagation}>
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50/80 text-blue-700 text-xs font-medium backdrop-blur-sm max-w-[160px]">
               <svg className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
               </svg>
               {onOpenProject ? (
                 <button
-                  onClick={() => onOpenProject(project.id)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onOpenProject(project.id)
+                  }}
                   className="truncate hover:underline transition-colors duration-150"
                 >
                   {project.name}
@@ -220,7 +239,10 @@ export function InboxTaskCard({
                 <span className="truncate">{project.name}</span>
               )}
               <button
-                onClick={() => onUpdate({ projectId: undefined })}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onUpdate({ projectId: undefined })
+                }}
                 className="ml-0.5 hover:text-blue-900 shrink-0 transition-colors duration-150"
               >
                 <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">

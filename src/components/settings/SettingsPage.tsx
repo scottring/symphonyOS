@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
+import { useUserPreferences } from '@/hooks/useUserPreferences'
 import { CalendarSettings } from './CalendarSettings'
 import { WaitlistAdmin } from './WaitlistAdmin'
 import type { FamilyMember } from '@/types/family'
@@ -85,6 +86,7 @@ function generateInitials(name: string): string {
 
 export function SettingsPage({ onBack, onFamilyMembersChanged }: SettingsPageProps) {
   const { members, addMember, updateMember, deleteMember } = useFamilyMembers()
+  const { preferences, updatePreference } = useUserPreferences()
   const [activeTab, setActiveTab] = useState<Tab>('general')
 
   // Add member state
@@ -255,6 +257,40 @@ export function SettingsPage({ onBack, onFamilyMembersChanged }: SettingsPagePro
         {/* Tab Content */}
         {activeTab === 'general' && (
           <div className="space-y-8">
+            {/* Preferences Section */}
+            <section>
+              <h2 className="text-lg font-semibold text-neutral-700 mb-2">Preferences</h2>
+              <p className="text-sm text-neutral-500 mb-6">
+                Customize how Symphony works for you.
+              </p>
+
+              <div className="space-y-4">
+                {/* Auto-show Daily Brief toggle */}
+                <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-neutral-100">
+                  <div className="flex-1 pr-4">
+                    <div className="font-medium text-neutral-700">Auto-show Daily Brief</div>
+                    <div className="text-sm text-neutral-500 mt-0.5">
+                      Automatically show the Daily Brief when you open Symphony each day
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => updatePreference('autoShowDailyBrief', !preferences.autoShowDailyBrief)}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
+                      preferences.autoShowDailyBrief ? 'bg-primary-500' : 'bg-neutral-200'
+                    }`}
+                    role="switch"
+                    aria-checked={preferences.autoShowDailyBrief}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        preferences.autoShowDailyBrief ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            </section>
+
             {/* People Section */}
             <section>
               <h2 className="text-lg font-semibold text-neutral-700 mb-2">People</h2>

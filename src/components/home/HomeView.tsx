@@ -10,6 +10,7 @@ import type { DailyBriefActionType } from '@/types/action'
 import { useHomeView } from '@/hooks/useHomeView'
 import { useMobile } from '@/hooks/useMobile'
 import { useDailyBrief } from '@/hooks/useDailyBrief'
+import { useUserPreferences } from '@/hooks/useUserPreferences'
 import { HomeViewSwitcher } from './HomeViewSwitcher'
 import { HomeDashboard } from './HomeDashboard'
 import { WeekView } from './WeekView'
@@ -171,8 +172,14 @@ export function HomeView({
     handleItemAction,
   } = useDailyBrief(handleBriefTaskAction)
 
+  // User preferences
+  const { preferences } = useUserPreferences()
+
   // Auto-open the brief modal when a brief becomes available on today view
   useEffect(() => {
+    // Skip if user has disabled auto-show
+    if (!preferences.autoShowDailyBrief) return
+
     if (brief && !brief.dismissedAt && currentView === 'today') {
       const today = new Date()
       const isToday =
@@ -183,7 +190,7 @@ export function HomeView({
         setBriefModalOpen(true)
       }
     }
-  }, [brief, currentView, viewedDate])
+  }, [brief, currentView, viewedDate, preferences.autoShowDailyBrief])
 
   const handleOpenBrief = useCallback(() => {
     if (brief && !brief.dismissedAt) {
@@ -361,6 +368,7 @@ export function HomeView({
           onNavigateToContext={handleNavigateToContext}
           onNavigateToInbox={handleNavigateToInbox}
           onNavigateToProjects={handleNavigateToProjects}
+          autoShowDailyBrief={preferences.autoShowDailyBrief}
         />
       )
     }
@@ -522,12 +530,6 @@ export function HomeView({
                   <svg className="w-5 h-5 text-primary-600 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                   </svg>
-                )}
-                {/* Badge showing item count */}
-                {hasBrief && brief.items.length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary-500 text-white text-[10px] font-bold flex items-center justify-center">
-                    {brief.items.length > 9 ? '9+' : brief.items.length}
-                  </span>
                 )}
               </button>
             )}

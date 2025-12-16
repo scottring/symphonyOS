@@ -148,8 +148,8 @@ export function TimeGroup({
 
       {/* Items with collapse animation */}
       <div
-        className={`space-y-2 overflow-hidden transition-all duration-300 ease-in-out ${
-          collapsed ? 'max-h-0 opacity-0' : 'max-h-[2000px] opacity-100'
+        className={`space-y-2 transition-all duration-300 ease-in-out ${
+          collapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[2000px] opacity-100'
         }`}
       >
         <div className="stagger-in">

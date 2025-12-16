@@ -60,7 +60,7 @@ function OrganizeButton({ onClick, inboxCount, isMobile, hasAssigneeFilter }: Or
   return (
     <button
       onClick={onClick}
-      className={`relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
         emphasized
           ? 'text-primary-700 bg-primary-50 hover:bg-primary-100'
           : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100'
@@ -68,13 +68,6 @@ function OrganizeButton({ onClick, inboxCount, isMobile, hasAssigneeFilter }: Or
     >
       <BentoIcon className={`w-5 h-5 ${emphasized ? 'text-primary-600' : ''}`} />
       <span className="hidden sm:inline">Organize</span>
-      {inboxCount > 0 && (
-        <span className={`absolute -top-1.5 -right-1.5 min-w-[1.125rem] h-[1.125rem] px-1 flex items-center justify-center rounded-full text-white text-[10px] font-bold ${
-          emphasized ? 'bg-primary-500' : 'bg-neutral-400'
-        }`}>
-          {inboxCount}
-        </span>
-      )}
     </button>
   )
 }

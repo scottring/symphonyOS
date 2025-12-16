@@ -7,6 +7,15 @@ import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
 import { Redo2, Check } from 'lucide-react'
 import { useLongPress } from '@/hooks/useLongPress'
 
+// Helper to stop all mouse/touch events from bubbling to parent's longPress handler
+const stopAllPropagation = {
+  onMouseDown: (e: React.MouseEvent) => e.stopPropagation(),
+  onMouseUp: (e: React.MouseEvent) => e.stopPropagation(),
+  onTouchStart: (e: React.TouchEvent) => e.stopPropagation(),
+  onTouchEnd: (e: React.TouchEvent) => e.stopPropagation(),
+  onClick: (e: React.MouseEvent) => e.stopPropagation(),
+}
+
 interface ScheduleItemProps {
   item: TimelineItem
   selected?: boolean
@@ -93,11 +102,6 @@ export function ScheduleItem({
       }
     },
   })
-
-  const handleCheckboxClick = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    onToggleComplete()
-  }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -213,7 +217,7 @@ export function ScheduleItem({
           {(isTask && onSchedule) || ((isRoutine || item.type === 'event') && onPush) ? (
             <div
               className="w-14 shrink-0 relative"
-              onClick={(e) => e.stopPropagation()}
+              {...stopAllPropagation}
             >
               <SchedulePopover
                 value={item.startTime ?? undefined}
@@ -288,7 +292,14 @@ export function ScheduleItem({
           <div className="w-6 shrink-0 flex items-center justify-center">
             {isActionable ? (
               <button
-                onClick={handleCheckboxClick}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onToggleComplete()
+                }}
+                onMouseDown={stopAllPropagation.onMouseDown}
+                onMouseUp={stopAllPropagation.onMouseUp}
+                onTouchStart={stopAllPropagation.onTouchStart}
+                onTouchEnd={stopAllPropagation.onTouchEnd}
                 className="touch-target flex items-center justify-center -m-2 p-2 group/check"
                 aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
               >
@@ -356,6 +367,10 @@ export function ScheduleItem({
                 e.stopPropagation()
                 onSkip()
               }}
+              onMouseDown={stopAllPropagation.onMouseDown}
+              onMouseUp={stopAllPropagation.onMouseUp}
+              onTouchStart={stopAllPropagation.onTouchStart}
+              onTouchEnd={stopAllPropagation.onTouchEnd}
               className="shrink-0 p-2 rounded-xl text-neutral-300 hover:text-neutral-600 hover:bg-neutral-100 transition-all duration-200 opacity-0 group-hover:opacity-100"
               title="Skip this time"
               aria-label="Skip this time"
@@ -368,7 +383,7 @@ export function ScheduleItem({
           {isTask && onPush && (
             <div
               className="hidden md:block shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-              onClick={(e) => e.stopPropagation()}
+              {...stopAllPropagation}
             >
               <PushDropdown onPush={onPush} size="sm" showTodayOption={isOverdue} />
             </div>
@@ -378,7 +393,7 @@ export function ScheduleItem({
           {familyMembers.length > 0 && onAssignAll ? (
             <div
               className="shrink-0"
-              onClick={(e) => e.stopPropagation()}
+              {...stopAllPropagation}
             >
               <MultiAssigneeDropdown
                 members={familyMembers}
@@ -391,7 +406,7 @@ export function ScheduleItem({
           ) : familyMembers.length > 0 && onAssign && (
             <div
               className="shrink-0"
-              onClick={(e) => e.stopPropagation()}
+              {...stopAllPropagation}
             >
               <AssigneeDropdown
                 members={familyMembers}
@@ -425,6 +440,10 @@ export function ScheduleItem({
                   e.stopPropagation()
                   onOpenParentTask?.(parentTaskId)
                 }}
+                onMouseDown={stopAllPropagation.onMouseDown}
+                onMouseUp={stopAllPropagation.onMouseUp}
+                onTouchStart={stopAllPropagation.onTouchStart}
+                onTouchEnd={stopAllPropagation.onTouchEnd}
                 className="hover:text-neutral-600 hover:underline truncate max-w-[200px] transition-colors duration-150"
               >
                 {parentTaskName}
