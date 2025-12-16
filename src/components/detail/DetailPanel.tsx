@@ -719,11 +719,19 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
                     if (!item.originalTask || !onUpdate) return
                     const dateValue = e.target.value
                     if (dateValue) {
-                      const existing = item.originalTask.scheduledFor || new Date()
                       const [year, month, day] = dateValue.split('-').map(Number)
-                      const newDate = new Date(existing)
-                      newDate.setFullYear(year, month - 1, day)
-                      onUpdate(item.originalTask.id, { scheduledFor: newDate })
+                      const newDate = new Date(year, month - 1, day)
+                      if (item.originalTask.scheduledFor) {
+                        // Preserve existing time
+                        newDate.setHours(item.originalTask.scheduledFor.getHours(), item.originalTask.scheduledFor.getMinutes(), 0, 0)
+                      } else {
+                        // New schedule - default to all-day (midnight)
+                        newDate.setHours(0, 0, 0, 0)
+                      }
+                      onUpdate(item.originalTask.id, {
+                        scheduledFor: newDate,
+                        isAllDay: !item.originalTask.scheduledFor ? true : item.originalTask.isAllDay
+                      })
                     } else {
                       onUpdate(item.originalTask.id, { scheduledFor: undefined })
                     }
@@ -757,11 +765,9 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
                           key={i}
                           type="button"
                           onClick={() => {
-                            if (!item.originalTask || !onUpdate) return
-                            const existing = item.originalTask.scheduledFor || new Date()
-                            const newDate = new Date(existing)
-                            newDate.setHours(i)
-                            newDate.setSeconds(0)
+                            if (!item.originalTask?.scheduledFor || !onUpdate) return
+                            const newDate = new Date(item.originalTask.scheduledFor)
+                            newDate.setHours(i, newDate.getMinutes(), 0, 0)
                             onUpdate(item.originalTask.id, { scheduledFor: newDate })
                             setShowHourPicker(false)
                           }}
@@ -801,11 +807,9 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
                             key={m}
                             type="button"
                             onClick={() => {
-                              if (!item.originalTask || !onUpdate) return
-                              const existing = item.originalTask.scheduledFor || new Date()
-                              const newDate = new Date(existing)
-                              newDate.setMinutes(m)
-                              newDate.setSeconds(0)
+                              if (!item.originalTask?.scheduledFor || !onUpdate) return
+                              const newDate = new Date(item.originalTask.scheduledFor)
+                              newDate.setMinutes(m, 0, 0)
                               onUpdate(item.originalTask.id, { scheduledFor: newDate })
                               setShowMinutePicker(false)
                             }}

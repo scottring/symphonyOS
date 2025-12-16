@@ -455,11 +455,15 @@ export function TaskView({
                     onChange={(e) => {
                       const dateValue = e.target.value
                       if (dateValue) {
-                        const existing = task.scheduledFor || new Date()
                         const [year, month, day] = dateValue.split('-').map(Number)
-                        const newDate = new Date(existing)
-                        newDate.setFullYear(year, month - 1, day)
-                        // If no existing time and not already all-day, default to all-day
+                        const newDate = new Date(year, month - 1, day)
+                        if (task.scheduledFor) {
+                          // Preserve existing time
+                          newDate.setHours(task.scheduledFor.getHours(), task.scheduledFor.getMinutes(), 0, 0)
+                        } else {
+                          // New schedule - default to all-day (midnight)
+                          newDate.setHours(0, 0, 0, 0)
+                        }
                         const shouldBeAllDay = !task.scheduledFor ? true : task.isAllDay
                         onUpdate(task.id, { scheduledFor: newDate, isAllDay: shouldBeAllDay })
                       } else {
@@ -498,10 +502,9 @@ export function TaskView({
                                 key={i}
                                 type="button"
                                 onClick={() => {
-                                  const existing = task.scheduledFor || new Date()
-                                  const newDate = new Date(existing)
-                                  newDate.setHours(i)
-                                  newDate.setSeconds(0)
+                                  // task.scheduledFor should exist here since this UI only shows when it does
+                                  const newDate = new Date(task.scheduledFor!)
+                                  newDate.setHours(i, newDate.getMinutes(), 0, 0)
                                   onUpdate(task.id, { scheduledFor: newDate })
                                   setShowHourPicker(false)
                                 }}
@@ -541,10 +544,9 @@ export function TaskView({
                                   key={m}
                                   type="button"
                                   onClick={() => {
-                                    const existing = task.scheduledFor || new Date()
-                                    const newDate = new Date(existing)
-                                    newDate.setMinutes(m)
-                                    newDate.setSeconds(0)
+                                    // task.scheduledFor should exist here since this UI only shows when it does
+                                    const newDate = new Date(task.scheduledFor!)
+                                    newDate.setMinutes(m, 0, 0)
                                     onUpdate(task.id, { scheduledFor: newDate })
                                     setShowMinutePicker(false)
                                   }}

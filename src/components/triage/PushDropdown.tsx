@@ -50,6 +50,23 @@ export function PushDropdown({ onPush, size = 'md', showTodayOption = false }: P
     return date
   }
 
+  const getHoursFromNow = (hours: number) => {
+    const date = new Date()
+    date.setHours(date.getHours() + hours)
+    date.setMinutes(Math.ceil(date.getMinutes() / 30) * 30, 0, 0)
+    return date
+  }
+
+  const getThisEvening = () => {
+    const date = new Date()
+    date.setHours(18, 0, 0, 0) // 6pm
+    return date
+  }
+
+  const isBeforeEvening = () => {
+    return new Date().getHours() < 18
+  }
+
   const getTomorrow = () => {
     const date = new Date()
     date.setDate(date.getDate() + 1)
@@ -77,13 +94,6 @@ export function PushDropdown({ onPush, size = 'md', showTodayOption = false }: P
     nextSunday.setDate(today.getDate() + daysUntilSunday)
     nextSunday.setHours(9, 0, 0, 0) // Default to 9am
     return nextSunday
-  }
-
-  const getTwoWeeks = () => {
-    const date = new Date()
-    date.setDate(date.getDate() + 14)
-    date.setHours(9, 0, 0, 0) // Default to 9am
-    return date
   }
 
   const getOneMonth = () => {
@@ -158,6 +168,20 @@ export function PushDropdown({ onPush, size = 'md', showTodayOption = false }: P
                 </button>
               )}
               <button
+                onClick={() => handlePush(getHoursFromNow(3))}
+                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
+              >
+                In 3 hours
+              </button>
+              {isBeforeEvening() && (
+                <button
+                  onClick={() => handlePush(getThisEvening())}
+                  className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
+                >
+                  This evening
+                </button>
+              )}
+              <button
                 onClick={() => handlePush(getTomorrow())}
                 className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
               >
@@ -176,12 +200,6 @@ export function PushDropdown({ onPush, size = 'md', showTodayOption = false }: P
               >
                 <span>Next Week</span>
                 <span className="text-xs text-neutral-400">{formatNextSunday()}</span>
-              </button>
-              <button
-                onClick={() => handlePush(getTwoWeeks())}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
-              >
-                2 weeks
               </button>
               <button
                 onClick={() => handlePush(getOneMonth())}

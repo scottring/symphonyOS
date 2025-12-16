@@ -54,9 +54,11 @@ describe('PushDropdown', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
 
       expect(screen.getByText('Push until')).toBeInTheDocument()
+      expect(screen.getByText('In 3 hours')).toBeInTheDocument()
+      // "This evening" only shows before 6pm (mockToday is noon, so it should show)
+      expect(screen.getByText('This evening')).toBeInTheDocument()
       expect(screen.getByText('Tomorrow')).toBeInTheDocument()
       expect(screen.getByText('Next Week')).toBeInTheDocument()
-      expect(screen.getByText('2 weeks')).toBeInTheDocument()
       expect(screen.getByText('1 month')).toBeInTheDocument()
       expect(screen.getByText('Pick date...')).toBeInTheDocument()
     })
@@ -104,17 +106,44 @@ describe('PushDropdown', () => {
       expect(pushedDate.getHours()).toBe(9) // 9am default
     })
 
-    it('clicking 2 weeks calls onPush with date 14 days ahead', () => {
+    it('clicking In 3 hours calls onPush with date ~3 hours ahead', () => {
       render(<PushDropdown onPush={mockOnPush} />)
 
       fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
-      fireEvent.click(screen.getByText('2 weeks'))
+      fireEvent.click(screen.getByText('In 3 hours'))
 
       expect(mockOnPush).toHaveBeenCalledWith(expect.any(Date))
       const pushedDate = mockOnPush.mock.calls[0][0] as Date
-      expect(pushedDate.getDate()).toBe(29) // Jan 29 (14 days from Jan 15)
-      expect(pushedDate.getMonth()).toBe(0) // January
-      expect(pushedDate.getHours()).toBe(9) // 9am default
+      const now = new Date()
+      // Should be approximately 3 hours from now
+      const hoursDiff = (pushedDate.getTime() - now.getTime()) / (1000 * 60 * 60)
+      expect(hoursDiff).toBeGreaterThanOrEqual(2.5)
+      expect(hoursDiff).toBeLessThanOrEqual(3.5)
+    })
+
+    it('clicking This evening calls onPush with 6pm today (before 6pm)', () => {
+      // mockToday is noon, so "This evening" should be visible
+      render(<PushDropdown onPush={mockOnPush} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
+      fireEvent.click(screen.getByText('This evening'))
+
+      expect(mockOnPush).toHaveBeenCalledWith(expect.any(Date))
+      const pushedDate = mockOnPush.mock.calls[0][0] as Date
+      expect(pushedDate.getHours()).toBe(18) // 6pm
+      expect(pushedDate.getMinutes()).toBe(0)
+    })
+
+    it('hides This evening option after 6pm', () => {
+      // Set time to 11pm UTC (late enough to be after 6pm in any US timezone)
+      vi.setSystemTime(new Date('2024-01-16T03:00:00.000Z'))
+
+      render(<PushDropdown onPush={mockOnPush} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
+
+      expect(screen.getByText('In 3 hours')).toBeInTheDocument()
+      expect(screen.queryByText('This evening')).not.toBeInTheDocument()
     })
 
     it('clicking 1 month calls onPush with date 1 month ahead', () => {

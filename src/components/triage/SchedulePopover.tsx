@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo, useLayoutEffect } from 'react'
 import { CalendarPlus, ChevronLeft } from 'lucide-react'
 
 // Minimal schedule item for display
@@ -88,6 +88,21 @@ export function SchedulePopover({
   }, [selectedDate, scheduleItems, getItemsForDate])
 
   const containerRef = useRef<HTMLDivElement>(null)
+  const popoverRef = useRef<HTMLDivElement>(null)
+  const [anchorRight, setAnchorRight] = useState(false)
+
+  // Detect if popover would overflow viewport and adjust positioning
+  useLayoutEffect(() => {
+    if (isOpen && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect()
+      const popoverWidth = 280 // minWidth of the popover
+      const viewportWidth = window.innerWidth
+      const rightEdge = rect.left + popoverWidth
+
+      // If popover would extend past viewport, anchor to the right instead
+      setAnchorRight(rightEdge > viewportWidth - 16) // 16px buffer
+    }
+  }, [isOpen])
 
   const handleClose = useCallback(() => {
     setIsOpen(false)
@@ -95,6 +110,7 @@ export function SchedulePopover({
     setSelectedDate(null)
     setShowCustomTime(false)
     setSelectedHour(null)
+    setAnchorRight(false)
   }, [])
 
   // Close on outside click
@@ -225,7 +241,8 @@ export function SchedulePopover({
       {/* Popover */}
       {isOpen && (
         <div
-          className="absolute left-0 top-full mt-2 z-50 rounded-xl shadow-xl"
+          ref={popoverRef}
+          className={`absolute top-full mt-2 z-50 rounded-xl shadow-xl ${anchorRight ? 'right-0' : 'left-0'}`}
           style={{
             minWidth: '280px',
             backgroundColor: '#ffffff',

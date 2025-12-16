@@ -569,10 +569,15 @@ export function TaskViewRedesign({
                       onChange={(e) => {
                         const dateValue = e.target.value
                         if (dateValue) {
-                          const existing = task.scheduledFor || new Date()
                           const [year, month, day] = dateValue.split('-').map(Number)
-                          const newDate = new Date(existing)
-                          newDate.setFullYear(year, month - 1, day)
+                          const newDate = new Date(year, month - 1, day)
+                          if (task.scheduledFor) {
+                            // Preserve existing time
+                            newDate.setHours(task.scheduledFor.getHours(), task.scheduledFor.getMinutes(), 0, 0)
+                          } else {
+                            // New schedule - default to all-day (midnight)
+                            newDate.setHours(0, 0, 0, 0)
+                          }
                           const shouldBeAllDay = !task.scheduledFor ? true : task.isAllDay
                           onUpdate(task.id, { scheduledFor: newDate, isAllDay: shouldBeAllDay })
                         } else {

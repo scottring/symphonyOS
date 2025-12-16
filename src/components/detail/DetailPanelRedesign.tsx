@@ -423,7 +423,10 @@ function LinkedTaskRow({ task, onToggle, onDelete, onUpdate, getScheduleItemsFor
 
       {task.scheduledFor ? (
         <span className="text-xs text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full">
-          {task.scheduledFor.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+          {task.isAllDay
+            ? task.scheduledFor.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+            : `${task.scheduledFor.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} ${task.scheduledFor.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
+          }
         </span>
       ) : (
         <button className="text-xs text-primary-600 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1311,6 +1314,15 @@ export function DetailPanelRedesign({
                       <span className={`flex-1 text-sm ${subtask.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>
                         {subtask.title}
                       </span>
+                      {/* Scheduled time display */}
+                      {subtask.scheduledFor && (
+                        <span className="text-xs text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full">
+                          {subtask.isAllDay
+                            ? subtask.scheduledFor.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+                            : `${subtask.scheduledFor.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} ${subtask.scheduledFor.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
+                          }
+                        </span>
+                      )}
                       {/* Quick Actions */}
                       {onUpdate && (
                         <TaskQuickActions
@@ -2346,11 +2358,21 @@ export function DetailPanelRedesign({
                     if (!item.originalTask || !onUpdate) return
                     const dateValue = e.target.value
                     if (dateValue) {
-                      const existing = item.originalTask.scheduledFor || new Date()
                       const [year, month, day] = dateValue.split('-').map(Number)
-                      const newDate = new Date(existing)
-                      newDate.setFullYear(year, month - 1, day)
-                      onUpdate(item.originalTask.id, { scheduledFor: newDate })
+                      // If no existing time, default to all-day (midnight) instead of current time
+                      const existingTime = item.originalTask.scheduledFor
+                      const newDate = new Date(year, month - 1, day)
+                      if (existingTime) {
+                        // Preserve existing time
+                        newDate.setHours(existingTime.getHours(), existingTime.getMinutes(), 0, 0)
+                      } else {
+                        // New schedule - default to all-day
+                        newDate.setHours(0, 0, 0, 0)
+                      }
+                      onUpdate(item.originalTask.id, {
+                        scheduledFor: newDate,
+                        isAllDay: !existingTime ? true : item.originalTask.isAllDay
+                      })
                     } else {
                       onUpdate(item.originalTask.id, { scheduledFor: undefined })
                     }
@@ -2370,10 +2392,11 @@ export function DetailPanelRedesign({
                     if (!item.originalTask || !onUpdate) return
                     const timeValue = e.target.value
                     if (timeValue) {
-                      const existing = item.originalTask.scheduledFor || new Date()
                       const [hours, minutes] = timeValue.split(':').map(Number)
-                      const newDate = new Date(existing)
-                      newDate.setHours(hours, minutes, 0)
+                      // Use existing date or today if no date set
+                      const existingDate = item.originalTask.scheduledFor || new Date()
+                      const newDate = new Date(existingDate)
+                      newDate.setHours(hours, minutes, 0, 0)
                       // When a specific time is set, it's no longer an all-day task
                       onUpdate(item.originalTask.id, { scheduledFor: newDate, isAllDay: false })
                     }
