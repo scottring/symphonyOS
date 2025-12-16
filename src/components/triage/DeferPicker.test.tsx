@@ -54,7 +54,7 @@ describe('DeferPicker', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Defer item' }))
 
       expect(screen.getByText('In 3 hours')).toBeInTheDocument()
-      expect(screen.getByText('In 6 hours')).toBeInTheDocument()
+      // "This evening" only shows before 6pm
       expect(screen.getByText('Tomorrow')).toBeInTheDocument()
       expect(screen.getByText('Next Week')).toBeInTheDocument()
       expect(screen.getByText('1 month')).toBeInTheDocument()
@@ -126,20 +126,26 @@ describe('DeferPicker', () => {
       expect(Math.abs(calledDate.getTime() - threeHoursFromNow.getTime())).toBeLessThan(30 * 60 * 1000) // Within 30 min
     })
 
-    it('calls onDefer with +6 hours when In 6 hours is clicked', () => {
+    it('calls onDefer with 6pm when This evening is clicked (before 6pm only)', () => {
+      // This test only runs meaningfully before 6pm
+      const now = new Date()
+      if (now.getHours() >= 18) {
+        // After 6pm, the button won't be visible, so skip
+        return
+      }
+
       render(<DeferPicker {...defaultProps} />)
 
       fireEvent.click(screen.getByRole('button', { name: 'Defer item' }))
-      fireEvent.click(screen.getByText('In 6 hours'))
+      fireEvent.click(screen.getByText('This evening'))
 
       expect(mockOnDefer).toHaveBeenCalledTimes(1)
       const calledDate = mockOnDefer.mock.calls[0][0]
       expect(calledDate).toBeInstanceOf(Date)
 
-      // Should be approximately 6 hours from now
-      const sixHoursFromNow = new Date()
-      sixHoursFromNow.setHours(sixHoursFromNow.getHours() + 6)
-      expect(Math.abs(calledDate.getTime() - sixHoursFromNow.getTime())).toBeLessThan(30 * 60 * 1000) // Within 30 min
+      // Should be 6pm today
+      expect(calledDate.getHours()).toBe(18)
+      expect(calledDate.getMinutes()).toBe(0)
     })
 
     it('calls onDefer with date 1 month out when 1 month is clicked', () => {

@@ -70,6 +70,16 @@ export function DeferPicker({ deferredUntil, deferCount, onDefer }: DeferPickerP
     return date
   }
 
+  const getThisEvening = () => {
+    const date = new Date()
+    date.setHours(18, 0, 0, 0) // 6pm
+    return date
+  }
+
+  const isBeforeEvening = () => {
+    return new Date().getHours() < 18
+  }
+
   const getOneMonth = () => {
     const date = new Date()
     date.setMonth(date.getMonth() + 1)
@@ -150,12 +160,14 @@ export function DeferPicker({ deferredUntil, deferCount, onDefer }: DeferPickerP
               >
                 In 3 hours
               </button>
-              <button
-                onClick={() => handleDefer(getHoursFromNow(6))}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
-              >
-                In 6 hours
-              </button>
+              {isBeforeEvening() && (
+                <button
+                  onClick={() => handleDefer(getThisEvening())}
+                  className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
+                >
+                  This evening
+                </button>
+              )}
               <button
                 onClick={() => handleDefer(getBaseDate(1))}
                 className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
