@@ -1,13 +1,14 @@
-import { useState } from 'react'
-import { Mail, Loader2, AlertCircle, Plus, X, ChevronDown, ChevronUp } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Mail, Loader2, AlertCircle, Plus, X, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react'
 import { useGmailScan, type FlaggedEmail } from '@/hooks/useGmailScan'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 
 interface EmailScanSectionProps {
   onTaskCreated?: () => void
+  forceCollapsed?: boolean
 }
 
-export function EmailScanSection({ onTaskCreated }: EmailScanSectionProps) {
+export function EmailScanSection({ onTaskCreated, forceCollapsed }: EmailScanSectionProps) {
   const { isConnected, needsReconnect: calendarNeedsReconnect, connect } = useGoogleCalendar()
   const {
     isScanning,
@@ -20,8 +21,21 @@ export function EmailScanSection({ onTaskCreated }: EmailScanSectionProps) {
     clearResults,
   } = useGmailScan()
 
+  // User override for section collapse (separate from internal expand/collapse)
+  const [userSectionOverride, setUserSectionOverride] = useState<boolean | null>(null)
   const [isExpanded, setIsExpanded] = useState(true)
   const [creatingTaskId, setCreatingTaskId] = useState<string | null>(null)
+
+  // Reset user override when forceCollapsed changes (e.g., toggling Focus Mode)
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on prop change
+    setUserSectionOverride(null)
+  }, [forceCollapsed])
+
+  // Determine section collapsed state: user override takes priority
+  const isSectionCollapsed = userSectionOverride !== null
+    ? userSectionOverride
+    : forceCollapsed ?? false
 
   const needsReconnect = calendarNeedsReconnect || gmailNeedsReconnect
 
@@ -92,8 +106,18 @@ export function EmailScanSection({ onTaskCreated }: EmailScanSectionProps) {
 
   return (
     <div className="mb-8 mt-6">
-      {/* Section header */}
-      <div className="flex items-center gap-3 mb-4">
+      {/* Section header - clickable for collapse */}
+      <button
+        onClick={() => setUserSectionOverride(!isSectionCollapsed)}
+        className="flex items-center gap-3 mb-4 w-full text-left group/header"
+      >
+        {/* Collapse chevron */}
+        <ChevronRight
+          className={`w-4 h-4 text-neutral-300 transition-transform duration-200 ${
+            isSectionCollapsed ? '' : 'rotate-90'
+          }`}
+        />
+
         <span className="text-neutral-400">
           <Mail className="w-4 h-4" />
         </span>
@@ -107,11 +131,15 @@ export function EmailScanSection({ onTaskCreated }: EmailScanSectionProps) {
           <span className="flex-1 h-px bg-gradient-to-r from-neutral-200 to-transparent min-w-[40px]" />
         </h2>
 
-        {/* Scan button */}
-        <button
-          onClick={scanEmails}
-          disabled={isScanning}
-          className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 disabled:opacity-50 transition-colors"
+        {/* Scan button - stop propagation to prevent collapse toggle */}
+        <span
+          onClick={(e) => {
+            e.stopPropagation()
+            if (!isScanning) scanEmails()
+          }}
+          className={`flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 transition-colors ${
+            isScanning ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+          }`}
         >
           {isScanning ? (
             <>
@@ -124,63 +152,70 @@ export function EmailScanSection({ onTaskCreated }: EmailScanSectionProps) {
               Scan Emails
             </>
           )}
-        </button>
+        </span>
+      </button>
+
+      {/* Collapsible content */}
+      <div
+        className={`transition-all duration-300 ease-in-out ${
+          isSectionCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[2000px] opacity-100'
+        }`}
+      >
+        {/* Error state */}
+        {error && !needsReconnect && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-red-700 text-sm">
+            {error}
+          </div>
+        )}
+
+        {/* Results */}
+        {scanResult && (
+          <div className="space-y-2">
+            {/* Summary header */}
+            {scanResult.emails.length > 0 ? (
+              <div className="flex items-center justify-between text-sm text-neutral-500 mb-3">
+                <button
+                  onClick={() => setIsExpanded(!isExpanded)}
+                  className="flex items-center gap-1 hover:text-neutral-700 transition-colors"
+                >
+                  {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  {scanResult.emails.length} email{scanResult.emails.length !== 1 ? 's' : ''} need attention
+                </button>
+                <button
+                  onClick={clearResults}
+                  className="text-neutral-400 hover:text-neutral-600 transition-colors"
+                >
+                  Clear
+                </button>
+              </div>
+            ) : (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-green-700 text-sm">
+                {scanResult.summary || `Scanned ${scanResult.total_scanned} emails — nothing needs attention!`}
+              </div>
+            )}
+
+            {/* Email cards */}
+            {isExpanded && scanResult.emails.map((email) => (
+              <EmailCard
+                key={email.gmail_id}
+                email={email}
+                onCreateTask={() => handleCreateTask(email)}
+                onDismiss={() => dismissEmail(email)}
+                isCreating={creatingTaskId === email.gmail_id}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Empty state - prompt to scan */}
+        {!scanResult && !isScanning && !error && (
+          <div className="bg-neutral-50 border border-dashed border-neutral-300 rounded-lg p-4 text-center">
+            <p className="text-neutral-500 text-sm">
+              Tap "Scan Emails" to check for important messages
+            </p>
+          </div>
+        )}
       </div>
-
-      {/* Error state */}
-      {error && !needsReconnect && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-red-700 text-sm">
-          {error}
-        </div>
-      )}
-
-      {/* Results */}
-      {scanResult && (
-        <div className="space-y-2">
-          {/* Summary header */}
-          {scanResult.emails.length > 0 ? (
-            <div className="flex items-center justify-between text-sm text-neutral-500 mb-3">
-              <button
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="flex items-center gap-1 hover:text-neutral-700 transition-colors"
-              >
-                {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                {scanResult.emails.length} email{scanResult.emails.length !== 1 ? 's' : ''} need attention
-              </button>
-              <button
-                onClick={clearResults}
-                className="text-neutral-400 hover:text-neutral-600 transition-colors"
-              >
-                Clear
-              </button>
-            </div>
-          ) : (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-green-700 text-sm">
-              {scanResult.summary || `Scanned ${scanResult.total_scanned} emails — nothing needs attention!`}
-            </div>
-          )}
-
-          {/* Email cards */}
-          {isExpanded && scanResult.emails.map((email) => (
-            <EmailCard
-              key={email.gmail_id}
-              email={email}
-              onCreateTask={() => handleCreateTask(email)}
-              onDismiss={() => dismissEmail(email)}
-              isCreating={creatingTaskId === email.gmail_id}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Empty state - prompt to scan */}
-      {!scanResult && !isScanning && !error && (
-        <div className="bg-neutral-50 border border-dashed border-neutral-300 rounded-lg p-4 text-center">
-          <p className="text-neutral-500 text-sm">
-            Tap "Scan Emails" to check for important messages
-          </p>
-        </div>
-      )}
     </div>
   )
 }

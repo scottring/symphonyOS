@@ -25,7 +25,7 @@ import { WeeklyReview } from '@/components/review/WeeklyReview'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { useSystemHealth } from '@/hooks/useSystemHealth'
 import { MultiAssigneeDropdown } from '@/components/family/MultiAssigneeDropdown'
-import { Pencil, Inbox } from 'lucide-react'
+import { Pencil, Inbox, Target, List } from 'lucide-react'
 // import { Sparkles } from 'lucide-react' // Hidden with Hero Mode
 // import { HeroMode } from '@/components/hero' // Hidden for now
 
@@ -447,6 +447,33 @@ function FloatingInboxFAB({ count, onClick }: FloatingInboxFABProps) {
   )
 }
 
+// Focus mode toggle button
+interface FocusModeToggleProps {
+  isFocusMode: boolean
+  onToggle: () => void
+}
+
+function FocusModeToggle({ isFocusMode, onToggle }: FocusModeToggleProps) {
+  return (
+    <button
+      onClick={onToggle}
+      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+        isFocusMode
+          ? 'text-primary-700 bg-primary-50 hover:bg-primary-100'
+          : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100'
+      }`}
+      title={isFocusMode ? 'Show all sections' : 'Focus on current time block'}
+    >
+      {isFocusMode ? (
+        <Target className="w-4 h-4" />
+      ) : (
+        <List className="w-4 h-4" />
+      )}
+      <span className="hidden sm:inline">{isFocusMode ? 'Focus' : 'All'}</span>
+    </button>
+  )
+}
+
 // Progress indicator - clickable with expandable explanation
 interface ProgressIndicatorProps {
   completed: number
@@ -716,6 +743,10 @@ export function TodaySchedule({
   const [showWeeklyReview, setShowWeeklyReview] = useState(false)
   // Bulk reschedule dialog state
   const [showBulkRescheduleDialog, setShowBulkRescheduleDialog] = useState(false)
+  // Focus mode state - when true, only shows current time section expanded
+  const [isFocusMode, setIsFocusMode] = useState(false)
+  // Inbox collapsed state
+  const [inboxCollapsed, setInboxCollapsed] = useState(false)
 
   /* Hero Mode state - hidden for now, not ready for primetime
   const [heroModeOpen, setHeroModeOpen] = useState(false)
@@ -810,10 +841,22 @@ export function TodaySchedule({
     )
   }, [viewedDate])
 
-  // Map sections to whether they should be collapsed (no longer auto-collapsing, but keeping for TimeGroup API)
-  const getSectionCollapseState = useCallback((_section: DaySection): boolean | undefined => {
-    return undefined // No forced collapse state - user manually collapses if desired
-  }, [])
+  // Map sections to whether they should be collapsed based on focus mode
+  const getSectionCollapseState = useCallback((section: DaySection): boolean | undefined => {
+    if (!isFocusMode) return undefined // No forced collapse - user controls
+    // In focus mode, collapse all sections except the current one
+    // Map DaySection to TimeOfDay for comparison
+    const sectionToTimeOfDay: Record<DaySection, TimeOfDay | null> = {
+      'allday': null,
+      'morning': 'morning',
+      'afternoon': 'afternoon',
+      'evening': 'evening',
+      'unscheduled': null,
+    }
+    const sectionTime = sectionToTimeOfDay[section]
+    // Collapse if not the current time section (allday and unscheduled always collapse in focus mode)
+    return sectionTime !== currentTimeSection
+  }, [isFocusMode, currentTimeSection])
 
   // Overdue tasks: scheduled for past days, not completed - only shown on today's view
   const overdueTasks = useMemo(() => {
@@ -1212,9 +1255,23 @@ export function TodaySchedule({
           )}
         </div>
 
-        {/* Stats row: Organize, Progress (centered), Clarity */}
+        {/* Stats row: Focus, Organize, Progress (centered), Clarity */}
         <div className="flex items-center gap-4 pt-5 border-t border-neutral-200/60">
-          {/* Organize button - left side */}
+          {/* Focus mode toggle - left side */}
+          {isToday && (
+            <FocusModeToggle
+              isFocusMode={isFocusMode}
+              onToggle={() => {
+                setIsFocusMode(!isFocusMode)
+                // When entering focus mode, also collapse inbox
+                if (!isFocusMode) {
+                  setInboxCollapsed(true)
+                }
+              }}
+            />
+          )}
+
+          {/* Organize button */}
           {isToday && (
             <OrganizeButton
               onClick={() => setShowWeeklyReview(true)}
@@ -1296,7 +1353,39 @@ export function TodaySchedule({
         </div>
       ) : (
         <div className="pb-32">
-          {/* Overdue section - at top, only on today's view */}
+          {/* Inbox Section - at top, collapsible, only on today's view */}
+          {isToday && onUpdateTask && onPushTask && (
+            <div ref={inboxSectionRef}>
+              <InboxSection
+                tasks={inboxTasks}
+                onUpdateTask={onUpdateTask}
+                onPushTask={onPushTask}
+                onSelectTask={(taskId) => onSelectItem(`task-${taskId}`)}
+                onDeleteTask={onDeleteTask}
+                projects={projects}
+                contacts={contacts}
+                onSearchContacts={onSearchContacts}
+                onAddContact={onAddContact}
+                onAddProject={onAddProject}
+                recentlyCreatedTaskId={recentlyCreatedTaskId}
+                onTriageCardCollapse={onTriageCardCollapse}
+                onOpenProject={onOpenProject}
+                familyMembers={familyMembers}
+                onAssignTask={onAssignTask}
+                getScheduleItemsForDate={getScheduleItemsForDate}
+                selectionMode={bulkSelection.isSelectionMode}
+                selectedIds={bulkSelection.selectedIds}
+                onEnterSelectionMode={bulkSelection.enterSelectionMode}
+                onToggleSelect={bulkSelection.toggleSelection}
+                onAddToCalendar={onAddToCalendar}
+                addingToCalendarTaskId={addingToCalendarTaskId}
+                collapsed={isFocusMode ? true : inboxCollapsed}
+                onCollapsedChange={setInboxCollapsed}
+              />
+            </div>
+          )}
+
+          {/* Overdue section - after inbox, only on today's view */}
           {isToday && overdueTasks.length > 0 && (
             <OverdueSection
               tasks={overdueTasks}
@@ -1466,37 +1555,7 @@ export function TodaySchedule({
           })}
 
           {/* Email Scanner - only on today's view */}
-          {isToday && <EmailScanSection />}
-
-          {/* Inbox Section - at bottom, only on today's view */}
-          {onUpdateTask && onPushTask && (
-            <div ref={inboxSectionRef}>
-              <InboxSection
-                tasks={inboxTasks}
-                onUpdateTask={onUpdateTask}
-                onPushTask={onPushTask}
-                onSelectTask={(taskId) => onSelectItem(`task-${taskId}`)}
-                onDeleteTask={onDeleteTask}
-                projects={projects}
-                contacts={contacts}
-                onSearchContacts={onSearchContacts}
-                onAddContact={onAddContact}
-                onAddProject={onAddProject}
-                recentlyCreatedTaskId={recentlyCreatedTaskId}
-                onTriageCardCollapse={onTriageCardCollapse}
-                onOpenProject={onOpenProject}
-                familyMembers={familyMembers}
-                onAssignTask={onAssignTask}
-                getScheduleItemsForDate={getScheduleItemsForDate}
-                selectionMode={bulkSelection.isSelectionMode}
-                selectedIds={bulkSelection.selectedIds}
-                onEnterSelectionMode={bulkSelection.enterSelectionMode}
-                onToggleSelect={bulkSelection.toggleSelection}
-                onAddToCalendar={onAddToCalendar}
-                addingToCalendarTaskId={addingToCalendarTaskId}
-              />
-            </div>
-          )}
+          {isToday && <EmailScanSection forceCollapsed={isFocusMode} />}
         </div>
       )}
 

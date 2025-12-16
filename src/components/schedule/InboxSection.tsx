@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
@@ -6,6 +6,7 @@ import type { FamilyMember } from '@/types/family'
 import type { ScheduleContextItem } from '@/components/triage'
 import { InboxTaskCard } from './InboxTaskCard'
 import { TriageCard, InboxTriageModal } from '@/components/triage'
+import { ChevronRight } from 'lucide-react'
 
 interface InboxSectionProps {
   tasks: Task[]
@@ -36,6 +37,9 @@ interface InboxSectionProps {
   // Calendar integration
   onAddToCalendar?: (task: Task) => Promise<void>
   addingToCalendarTaskId?: string | null
+  // Collapsible state
+  collapsed?: boolean
+  onCollapsedChange?: (collapsed: boolean) => void
 }
 
 export function InboxSection({
@@ -63,6 +67,8 @@ export function InboxSection({
   onToggleSelect,
   onAddToCalendar,
   addingToCalendarTaskId,
+  collapsed: externalCollapsed,
+  onCollapsedChange,
 }: InboxSectionProps) {
   // Suppress unused variable warnings - these are kept in the interface for future use
   void _contacts
@@ -72,6 +78,25 @@ export function InboxSection({
   // Triage modal state
   const [triageTaskId, setTriageTaskId] = useState<string | null>(null)
   const triageTask = triageTaskId ? tasks.find(t => t.id === triageTaskId) : null
+
+  // Internal collapsed state with user override capability
+  const [userOverride, setUserOverride] = useState<boolean | null>(null)
+
+  // Reset user override when external collapsed state changes (e.g., toggling Focus Mode)
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on prop change
+    setUserOverride(null)
+  }, [externalCollapsed])
+
+  // Determine actual collapsed state: user override takes priority
+  const isCollapsed = userOverride !== null ? userOverride : (externalCollapsed ?? false)
+
+  const handleToggleCollapse = () => {
+    const newState = !isCollapsed
+    setUserOverride(newState)
+    onCollapsedChange?.(newState)
+  }
+
   // Don't render if no inbox tasks
   if (tasks.length === 0) return null
 
@@ -86,9 +111,19 @@ export function InboxSection({
     : tasks
 
   return (
-    <div className="mb-10 mt-12">
-      {/* Section header - refined editorial style */}
-      <div className="flex items-center gap-3 mb-5">
+    <div className="mb-10 mt-8">
+      {/* Section header - clickable for collapse */}
+      <button
+        onClick={handleToggleCollapse}
+        className="flex items-center gap-3 mb-5 w-full text-left group/header"
+      >
+        {/* Collapse chevron */}
+        <ChevronRight
+          className={`w-4 h-4 text-neutral-300 transition-transform duration-200 ${
+            isCollapsed ? '' : 'rotate-90'
+          }`}
+        />
+
         {/* Icon */}
         <span className="text-neutral-400">
           <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
@@ -105,8 +140,14 @@ export function InboxSection({
           </span>
           <span className="flex-1 h-px bg-gradient-to-r from-neutral-200 to-transparent min-w-[40px]" />
         </h2>
-      </div>
+      </button>
 
+      {/* Items with collapse animation */}
+      <div
+        className={`transition-all duration-300 ease-in-out ${
+          isCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[4000px] opacity-100'
+        }`}
+      >
       <div className="space-y-2">
         {/* Show TriageCard for recently created task at the top */}
         {recentlyCreatedTask && onTriageCardCollapse && (
@@ -134,6 +175,7 @@ export function InboxSection({
             key={task.id}
             task={task}
             onDefer={(date) => {
+              console.log('[InboxSection] onDefer called:', { taskId: task.id, date, dateStr: date?.toISOString() })
               if (date) {
                 // Defer to specified date
                 onPushTask(task.id, date)
@@ -161,6 +203,7 @@ export function InboxSection({
             isAddingToCalendar={addingToCalendarTaskId === task.id}
           />
         ))}
+      </div>
       </div>
 
       {/* Inbox Triage Modal */}

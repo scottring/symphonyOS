@@ -530,28 +530,53 @@ export function useSupabaseTasks() {
   // For scheduled tasks: updates scheduledFor to the new date
   // For inbox tasks: sets deferredUntil to hide until that date
   const pushTask = useCallback(async (id: string, date: Date) => {
+    console.log('[pushTask] called:', { id, date: date.toISOString() })
     const task = tasks.find((t) => t.id === id)
-    if (!task) return
+    if (!task) {
+      console.log('[pushTask] task not found, returning early')
+      return
+    }
 
+    console.log('[pushTask] task found:', { id: task.id, title: task.title, scheduledFor: task.scheduledFor })
     const currentCount = task?.deferCount ?? 0
 
     if (task.scheduledFor) {
-      // Scheduled task: move to new date (preserve time if set, otherwise all-day)
+      // Scheduled task: move to new date
       const newScheduledFor = new Date(date)
-      if (!task.isAllDay && task.scheduledFor) {
-        // Preserve the original time
-        newScheduledFor.setHours(task.scheduledFor.getHours(), task.scheduledFor.getMinutes(), 0, 0)
+      const originalDate = new Date(task.scheduledFor)
+
+      // Check if we're pushing to a different day
+      const isSameDay =
+        newScheduledFor.getFullYear() === originalDate.getFullYear() &&
+        newScheduledFor.getMonth() === originalDate.getMonth() &&
+        newScheduledFor.getDate() === originalDate.getDate()
+
+      // If pushing to a DIFFERENT day and task has a specific time, preserve that time
+      // If pushing to the SAME day (like "This evening"), use the new time
+      if (!isSameDay && !task.isAllDay && task.scheduledFor) {
+        // Preserve the original time when moving to a different day
+        newScheduledFor.setHours(originalDate.getHours(), originalDate.getMinutes(), 0, 0)
       }
+
+      console.log('[pushTask] scheduled task - updating scheduledFor:', {
+        id,
+        from: originalDate.toISOString(),
+        to: newScheduledFor.toISOString(),
+        isSameDay
+      })
+
       await updateTask(id, {
         scheduledFor: newScheduledFor,
         deferCount: currentCount + 1,
       })
     } else {
       // Inbox task: set deferredUntil to hide until that date
+      console.log('[pushTask] inbox task - setting deferredUntil:', { id, deferredUntil: date.toISOString() })
       await updateTask(id, {
         deferredUntil: date,
         deferCount: currentCount + 1,
       })
+      console.log('[pushTask] updateTask completed for inbox task')
     }
   }, [tasks, updateTask])
 
