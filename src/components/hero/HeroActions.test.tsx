@@ -18,7 +18,7 @@ describe('HeroActions', () => {
       expect(screen.getByText('Done')).toBeInTheDocument()
     })
 
-    it('renders Later button', () => {
+    it('renders Defer button', () => {
       render(
         <HeroActions
           onComplete={vi.fn()}
@@ -29,7 +29,7 @@ describe('HeroActions', () => {
       )
 
       expect(screen.getByLabelText('Defer to later')).toBeInTheDocument()
-      expect(screen.getByText('Later')).toBeInTheDocument()
+      expect(screen.getByText('Defer')).toBeInTheDocument()
     })
 
     it('renders Skip button', () => {
@@ -113,8 +113,8 @@ describe('HeroActions', () => {
     })
   })
 
-  describe('Later button and defer options', () => {
-    it('opens defer options popover when Later clicked', async () => {
+  describe('Defer button and defer options', () => {
+    it('opens defer options popover when Defer clicked', async () => {
       const { user } = render(
         <HeroActions
           onComplete={vi.fn()}
@@ -126,13 +126,13 @@ describe('HeroActions', () => {
 
       await user.click(screen.getByLabelText('Defer to later'))
 
-      expect(screen.getByText('Later today')).toBeInTheDocument()
       expect(screen.getByText('Tomorrow')).toBeInTheDocument()
-      expect(screen.getByText('Next week')).toBeInTheDocument()
+      expect(screen.getByText('Next Week')).toBeInTheDocument()
+      expect(screen.getByText('Pick date...')).toBeInTheDocument()
     })
 
-    it('closes defer options on backdrop click', async () => {
-      const { user, container } = render(
+    it('closes defer options on outside click', async () => {
+      const { user } = render(
         <HeroActions
           onComplete={vi.fn()}
           onDefer={vi.fn()}
@@ -142,34 +142,12 @@ describe('HeroActions', () => {
       )
 
       await user.click(screen.getByLabelText('Defer to later'))
-      expect(screen.getByText('Later today')).toBeInTheDocument()
+      expect(screen.getByText('Tomorrow')).toBeInTheDocument()
 
-      // Click the backdrop
-      const backdrop = container.querySelector('.fixed.inset-0.z-10')
-      fireEvent.click(backdrop!)
+      // Click outside (simulate mousedown event on document)
+      fireEvent.mouseDown(document.body)
 
-      expect(screen.queryByText('Later today')).not.toBeInTheDocument()
-    })
-
-    it('calls onDefer with later today date when "Later today" clicked', async () => {
-      const onDefer = vi.fn()
-      const { user } = render(
-        <HeroActions
-          onComplete={vi.fn()}
-          onDefer={onDefer}
-          onMore={vi.fn()}
-          onSkip={vi.fn()}
-        />
-      )
-
-      await user.click(screen.getByLabelText('Defer to later'))
-      await user.click(screen.getByText('Later today'))
-
-      expect(onDefer).toHaveBeenCalledTimes(1)
-      const calledDate = onDefer.mock.calls[0][0] as Date
-      const now = new Date()
-      // Should be about 2 hours from now
-      expect(calledDate.getHours()).toBeGreaterThanOrEqual(now.getHours())
+      expect(screen.queryByText('Pick date...')).not.toBeInTheDocument()
     })
 
     it('calls onDefer with tomorrow date when "Tomorrow" clicked', async () => {
@@ -194,7 +172,7 @@ describe('HeroActions', () => {
       expect(calledDate.getHours()).toBe(9) // Should be 9 AM
     })
 
-    it('calls onDefer with next week date when "Next week" clicked', async () => {
+    it('calls onDefer with next Monday date when "Next Week" clicked', async () => {
       const onDefer = vi.fn()
       const { user } = render(
         <HeroActions
@@ -206,14 +184,13 @@ describe('HeroActions', () => {
       )
 
       await user.click(screen.getByLabelText('Defer to later'))
-      await user.click(screen.getByText('Next week'))
+      await user.click(screen.getByText('Next Week'))
 
       expect(onDefer).toHaveBeenCalledTimes(1)
       const calledDate = onDefer.mock.calls[0][0] as Date
-      const nextWeek = new Date()
-      nextWeek.setDate(nextWeek.getDate() + 7)
-      expect(calledDate.getDate()).toBe(nextWeek.getDate())
-      expect(calledDate.getHours()).toBe(9) // Should be 9 AM
+      // Should be next Monday at 9 AM
+      expect(calledDate.getDay()).toBe(1) // Monday = 1
+      expect(calledDate.getHours()).toBe(9)
     })
 
     it('closes defer options after selection', async () => {
@@ -231,10 +208,27 @@ describe('HeroActions', () => {
 
       await user.click(screen.getByText('Tomorrow'))
 
-      expect(screen.queryByText('Later today')).not.toBeInTheDocument()
+      expect(screen.queryByText('Pick date...')).not.toBeInTheDocument()
     })
 
-    it('shows time hint for Later today option', async () => {
+    it('shows date picker when "Pick date..." clicked', async () => {
+      const { user, container } = render(
+        <HeroActions
+          onComplete={vi.fn()}
+          onDefer={vi.fn()}
+          onMore={vi.fn()}
+          onSkip={vi.fn()}
+        />
+      )
+
+      await user.click(screen.getByLabelText('Defer to later'))
+      await user.click(screen.getByText('Pick date...'))
+
+      expect(screen.getByText('Back')).toBeInTheDocument()
+      expect(container.querySelector('input[type="date"]')).toBeInTheDocument()
+    })
+
+    it('can go back from date picker to options', async () => {
       const { user } = render(
         <HeroActions
           onComplete={vi.fn()}
@@ -245,38 +239,13 @@ describe('HeroActions', () => {
       )
 
       await user.click(screen.getByLabelText('Defer to later'))
+      await user.click(screen.getByText('Pick date...'))
 
-      expect(screen.getByText('In 2 hours')).toBeInTheDocument()
-    })
+      expect(screen.getByText('Back')).toBeInTheDocument()
 
-    it('shows time hint for Tomorrow option', async () => {
-      const { user } = render(
-        <HeroActions
-          onComplete={vi.fn()}
-          onDefer={vi.fn()}
-          onMore={vi.fn()}
-          onSkip={vi.fn()}
-        />
-      )
+      await user.click(screen.getByText('Back'))
 
-      await user.click(screen.getByLabelText('Defer to later'))
-
-      expect(screen.getByText('9:00 AM')).toBeInTheDocument()
-    })
-
-    it('shows time hint for Next week option', async () => {
-      const { user } = render(
-        <HeroActions
-          onComplete={vi.fn()}
-          onDefer={vi.fn()}
-          onMore={vi.fn()}
-          onSkip={vi.fn()}
-        />
-      )
-
-      await user.click(screen.getByLabelText('Defer to later'))
-
-      expect(screen.getByText('Same day, 9:00 AM')).toBeInTheDocument()
+      expect(screen.getByText('Tomorrow')).toBeInTheDocument()
     })
 
     it('toggles defer options popover on multiple clicks', async () => {
@@ -291,11 +260,11 @@ describe('HeroActions', () => {
 
       // First click - open
       await user.click(screen.getByLabelText('Defer to later'))
-      expect(screen.getByText('Later today')).toBeInTheDocument()
+      expect(screen.getByText('Tomorrow')).toBeInTheDocument()
 
       // Second click - close
       await user.click(screen.getByLabelText('Defer to later'))
-      expect(screen.queryByText('Later today')).not.toBeInTheDocument()
+      expect(screen.queryByText('Tomorrow')).not.toBeInTheDocument()
     })
   })
 

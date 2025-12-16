@@ -189,7 +189,7 @@ export function HeroMode({
   const allDone = taskQueue.length === 0 || currentIndex >= taskQueue.length
 
   return (
-    <div className="fixed inset-0 z-50 hero-background">
+    <div className="absolute inset-0 z-30 hero-background">
       {/* Subtle radial backdrop */}
       <div className="absolute inset-0 hero-backdrop" />
 

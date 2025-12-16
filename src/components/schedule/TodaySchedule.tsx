@@ -1051,13 +1051,10 @@ export function TodaySchedule({
   }, [heroModeTasks, onPushTask, onPushRoutine])
 
   const handleHeroOpenDetail = useCallback((item: TimelineItem) => {
-    // Close hero mode and open detail panel
-    closeHeroMode()
-    if (item.type === 'task' && item.originalTask) {
-      onSelectItem?.(item.originalTask.id)
-    }
-    // Routines don't have detail panel yet, just close hero mode
-  }, [closeHeroMode, onSelectItem])
+    // Open detail panel - Hero Mode stays open in the main content area
+    // Use item.id which already has the correct prefix (task-xxx, routine-xxx)
+    onSelectItem?.(item.id)
+  }, [onSelectItem])
 
   const formatDate = () => {
     return viewedDate.toLocaleDateString('en-US', {
@@ -1145,7 +1142,21 @@ export function TodaySchedule({
   }, [tasks, events, visibleRoutines, routineStatusMap])
 
   return (
-    <div className="px-5 py-6 md:px-10 md:py-10 max-w-[680px] mx-auto">
+    <div className="relative min-h-full">
+      {/* Hero Mode - fills the entire main content area when open */}
+      <HeroMode
+        isOpen={heroModeOpen}
+        tasks={heroModeTasks}
+        projects={projects}
+        contacts={contacts}
+        onClose={closeHeroMode}
+        onComplete={handleHeroComplete}
+        onDefer={handleHeroDefer}
+        onOpenDetail={handleHeroOpenDetail}
+      />
+
+      {/* Normal schedule content - hidden when Hero Mode is open */}
+      <div className={`px-5 py-6 md:px-10 md:py-10 max-w-[680px] mx-auto ${heroModeOpen ? 'invisible' : ''}`}>
       {/* Header - Editorial style with large date */}
       <header className="mb-10 animate-fade-in-up">
         {/* Large editorial date display with inline navigation */}
@@ -1510,18 +1521,6 @@ export function TodaySchedule({
         onCancel={handleBulkRescheduleCancel}
       />
 
-      {/* Hero Mode - immersive single-task view */}
-      <HeroMode
-        isOpen={heroModeOpen}
-        tasks={heroModeTasks}
-        projects={projects}
-        contacts={contacts}
-        onClose={closeHeroMode}
-        onComplete={handleHeroComplete}
-        onDefer={handleHeroDefer}
-        onOpenDetail={handleHeroOpenDetail}
-      />
-
       {/* Floating Inbox FAB - quick access to inbox */}
       {isToday && (
         <FloatingInboxFAB
@@ -1529,6 +1528,7 @@ export function TodaySchedule({
           onClick={scrollToInbox}
         />
       )}
+      </div>
     </div>
   )
 }
