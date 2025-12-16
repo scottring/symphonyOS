@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 
@@ -6,9 +6,14 @@ export function CalendarCallback() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
+  const processedRef = useRef(false)
 
   useEffect(() => {
     async function handleCallback() {
+      // Prevent double-processing in React strict mode (OAuth codes are single-use)
+      if (processedRef.current) return
+      processedRef.current = true
+
       const code = searchParams.get('code')
       const errorParam = searchParams.get('error')
 

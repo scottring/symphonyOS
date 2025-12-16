@@ -17,6 +17,7 @@ import { ScheduleItem } from './ScheduleItem'
 import { SwipeableCard } from './SwipeableCard'
 import { DateNavigator } from './DateNavigator'
 import { InboxSection } from './InboxSection'
+import { EmailScanSection } from './EmailScanSection'
 import { OverdueSection } from './OverdueSection'
 import { BulkActionBar } from './BulkActionBar'
 import { BulkRescheduleDialog } from './BulkRescheduleDialog'
@@ -1294,7 +1295,7 @@ export function TodaySchedule({
           )}
         </div>
       ) : (
-        <div>
+        <div className="pb-32">
           {/* Overdue section - at top, only on today's view */}
           {isToday && overdueTasks.length > 0 && (
             <OverdueSection
@@ -1463,6 +1464,9 @@ export function TodaySchedule({
               </TimeGroup>
             )
           })}
+
+          {/* Email Scanner - only on today's view */}
+          {isToday && <EmailScanSection />}
 
           {/* Inbox Section - at bottom, only on today's view */}
           {onUpdateTask && onPushTask && (
