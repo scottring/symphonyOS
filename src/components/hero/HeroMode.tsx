@@ -17,6 +17,8 @@ export interface HeroModeProps {
   onClose: () => void
   onComplete: (taskId: string) => void
   onDefer: (taskId: string, date: Date) => void
+  onArchive: (taskId: string) => void
+  onDelete: (taskId: string) => void
   onOpenDetail: (item: TimelineItem) => void
 }
 
@@ -37,6 +39,8 @@ export function HeroMode({
   onClose,
   onComplete,
   onDefer,
+  onArchive,
+  onDelete,
   onOpenDetail,
 }: HeroModeProps) {
   // Current position in task queue
@@ -147,6 +151,40 @@ export function HeroMode({
       setEnterDirection('right')
     }, 350)
   }, [currentTask, onDefer])
+
+  // Handle archive
+  const handleArchive = useCallback(() => {
+    if (!currentTask) return
+
+    // Trigger exit animation (same as defer - slides away)
+    setExitAnimation('defer')
+
+    // After animation, move to next task
+    setTimeout(() => {
+      const taskId = currentTask.id.replace(/^(task|routine|event)-/, '')
+      onArchive(taskId)
+      setSessionCompletedIds(prev => new Set(prev).add(currentTask.id))
+      setExitAnimation(null)
+      setEnterDirection('right')
+    }, 350)
+  }, [currentTask, onArchive])
+
+  // Handle delete
+  const handleDelete = useCallback(() => {
+    if (!currentTask) return
+
+    // Trigger exit animation (same as defer - slides away)
+    setExitAnimation('defer')
+
+    // After animation, move to next task
+    setTimeout(() => {
+      const taskId = currentTask.id.replace(/^(task|routine|event)-/, '')
+      onDelete(taskId)
+      setSessionCompletedIds(prev => new Set(prev).add(currentTask.id))
+      setExitAnimation(null)
+      setEnterDirection('right')
+    }, 350)
+  }, [currentTask, onDelete])
 
   // Handle skip (move to end of queue for this session)
   const handleSkip = useCallback(() => {
@@ -262,6 +300,10 @@ export function HeroMode({
             onDefer={handleDefer}
             onMore={handleOpenDetail}
             onSkip={handleSkip}
+            onArchive={handleArchive}
+            onDelete={handleDelete}
+            currentScheduledFor={currentTask.originalTask?.scheduledFor}
+            currentIsAllDay={currentTask.allDay}
           />
 
           {/* Progress dots */}

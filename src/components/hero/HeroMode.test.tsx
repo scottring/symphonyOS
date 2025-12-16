@@ -21,17 +21,21 @@ vi.mock('./HeroCard', () => ({
 }))
 
 vi.mock('./HeroActions', () => ({
-  HeroActions: ({ onComplete, onDefer, onMore, onSkip }: {
+  HeroActions: ({ onComplete, onDefer, onMore, onSkip, onArchive, onDelete }: {
     onComplete: () => void
     onDefer: (date: Date) => void
     onMore: () => void
     onSkip: () => void
+    onArchive: () => void
+    onDelete: () => void
   }) => (
     <div data-testid="hero-actions">
       <button data-testid="action-complete" onClick={onComplete}>Done</button>
       <button data-testid="action-defer" onClick={() => onDefer(new Date())}>Later</button>
       <button data-testid="action-more" onClick={onMore}>More</button>
       <button data-testid="action-skip" onClick={onSkip}>Skip</button>
+      <button data-testid="action-archive" onClick={onArchive}>Archive</button>
+      <button data-testid="action-delete" onClick={onDelete}>Delete</button>
     </div>
   ),
 }))
@@ -99,6 +103,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={vi.fn()}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -114,6 +120,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={vi.fn()}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -129,6 +137,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={vi.fn()}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -144,6 +154,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={vi.fn()}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -160,6 +172,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={vi.fn()}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -175,6 +189,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={vi.fn()}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -192,6 +208,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={vi.fn()}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -208,6 +226,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={vi.fn()}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -224,6 +244,8 @@ describe('HeroMode', () => {
           onClose={onClose}
           onComplete={vi.fn()}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -241,6 +263,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={vi.fn()}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -260,6 +284,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={onComplete}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -282,6 +308,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={vi.fn()}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -306,6 +334,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={vi.fn()}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -323,6 +353,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={vi.fn()}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -349,6 +381,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={vi.fn()}
           onDefer={onDefer}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -370,6 +404,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={vi.fn()}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -393,6 +429,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={vi.fn()}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -416,6 +454,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={onComplete}
           onDefer={onDefer}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -441,6 +481,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={vi.fn()}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={onOpenDetail}
         />
       )
@@ -461,6 +503,8 @@ describe('HeroMode', () => {
           onClose={onClose}
           onComplete={vi.fn()}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -479,6 +523,8 @@ describe('HeroMode', () => {
           onClose={onClose}
           onComplete={vi.fn()}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -497,6 +543,8 @@ describe('HeroMode', () => {
           onClose={onClose}
           onComplete={vi.fn()}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -517,6 +565,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={onComplete}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -539,6 +589,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={vi.fn()}
           onDefer={onDefer}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -563,6 +615,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={onComplete}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -585,6 +639,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={vi.fn()}
           onDefer={onDefer}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -613,6 +669,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={vi.fn()}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -631,6 +689,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={vi.fn()}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -652,6 +712,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={vi.fn()}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )
@@ -663,6 +725,8 @@ describe('HeroMode', () => {
           onClose={vi.fn()}
           onComplete={vi.fn()}
           onDefer={vi.fn()}
+          onArchive={vi.fn()}
+          onDelete={vi.fn()}
           onOpenDetail={vi.fn()}
         />
       )

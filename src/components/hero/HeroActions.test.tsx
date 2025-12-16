@@ -1,59 +1,44 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@/test/test-utils'
+import { render, screen } from '@/test/test-utils'
 import { HeroActions } from './HeroActions'
 
 describe('HeroActions', () => {
+  const defaultProps = {
+    onComplete: vi.fn(),
+    onDefer: vi.fn(),
+    onMore: vi.fn(),
+    onSkip: vi.fn(),
+    onArchive: vi.fn(),
+    onDelete: vi.fn(),
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   describe('rendering', () => {
     it('renders Done button', () => {
-      render(
-        <HeroActions
-          onComplete={vi.fn()}
-          onDefer={vi.fn()}
-          onMore={vi.fn()}
-          onSkip={vi.fn()}
-        />
-      )
+      render(<HeroActions {...defaultProps} />)
 
       expect(screen.getByLabelText('Mark task as done')).toBeInTheDocument()
       expect(screen.getByText('Done')).toBeInTheDocument()
     })
 
     it('renders Defer button', () => {
-      render(
-        <HeroActions
-          onComplete={vi.fn()}
-          onDefer={vi.fn()}
-          onMore={vi.fn()}
-          onSkip={vi.fn()}
-        />
-      )
+      render(<HeroActions {...defaultProps} />)
 
       expect(screen.getByLabelText('Defer to later')).toBeInTheDocument()
       expect(screen.getByText('Defer')).toBeInTheDocument()
     })
 
     it('renders Skip button', () => {
-      render(
-        <HeroActions
-          onComplete={vi.fn()}
-          onDefer={vi.fn()}
-          onMore={vi.fn()}
-          onSkip={vi.fn()}
-        />
-      )
+      render(<HeroActions {...defaultProps} />)
 
       expect(screen.getByLabelText('Skip this task')).toBeInTheDocument()
     })
 
     it('renders More button', () => {
-      render(
-        <HeroActions
-          onComplete={vi.fn()}
-          onDefer={vi.fn()}
-          onMore={vi.fn()}
-          onSkip={vi.fn()}
-        />
-      )
+      render(<HeroActions {...defaultProps} />)
 
       expect(screen.getByLabelText('View task details')).toBeInTheDocument()
     })
@@ -62,14 +47,7 @@ describe('HeroActions', () => {
   describe('Done button', () => {
     it('calls onComplete when clicked', async () => {
       const onComplete = vi.fn()
-      const { user } = render(
-        <HeroActions
-          onComplete={onComplete}
-          onDefer={vi.fn()}
-          onMore={vi.fn()}
-          onSkip={vi.fn()}
-        />
-      )
+      const { user } = render(<HeroActions {...defaultProps} onComplete={onComplete} />)
 
       await user.click(screen.getByLabelText('Mark task as done'))
 
@@ -80,14 +58,7 @@ describe('HeroActions', () => {
   describe('Skip button', () => {
     it('calls onSkip when clicked', async () => {
       const onSkip = vi.fn()
-      const { user } = render(
-        <HeroActions
-          onComplete={vi.fn()}
-          onDefer={vi.fn()}
-          onMore={vi.fn()}
-          onSkip={onSkip}
-        />
-      )
+      const { user } = render(<HeroActions {...defaultProps} onSkip={onSkip} />)
 
       await user.click(screen.getByLabelText('Skip this task'))
 
@@ -98,14 +69,7 @@ describe('HeroActions', () => {
   describe('More button', () => {
     it('calls onMore when clicked', async () => {
       const onMore = vi.fn()
-      const { user } = render(
-        <HeroActions
-          onComplete={vi.fn()}
-          onDefer={vi.fn()}
-          onMore={onMore}
-          onSkip={vi.fn()}
-        />
-      )
+      const { user } = render(<HeroActions {...defaultProps} onMore={onMore} />)
 
       await user.click(screen.getByLabelText('View task details'))
 
@@ -113,53 +77,24 @@ describe('HeroActions', () => {
     })
   })
 
-  describe('Defer button and defer options', () => {
-    it('opens defer options popover when Defer clicked', async () => {
-      const { user } = render(
-        <HeroActions
-          onComplete={vi.fn()}
-          onDefer={vi.fn()}
-          onMore={vi.fn()}
-          onSkip={vi.fn()}
-        />
-      )
+  describe('Defer button and triage menu', () => {
+    it('opens triage menu when Defer clicked', async () => {
+      const { user } = render(<HeroActions {...defaultProps} />)
 
       await user.click(screen.getByLabelText('Defer to later'))
 
       expect(screen.getByText('Tomorrow')).toBeInTheDocument()
       expect(screen.getByText('Next Week')).toBeInTheDocument()
+      expect(screen.getByText('2 weeks')).toBeInTheDocument()
+      expect(screen.getByText('1 month')).toBeInTheDocument()
       expect(screen.getByText('Pick date...')).toBeInTheDocument()
+      expect(screen.getByText('Archive')).toBeInTheDocument()
+      expect(screen.getByText('Delete')).toBeInTheDocument()
     })
 
-    it('closes defer options on outside click', async () => {
-      const { user } = render(
-        <HeroActions
-          onComplete={vi.fn()}
-          onDefer={vi.fn()}
-          onMore={vi.fn()}
-          onSkip={vi.fn()}
-        />
-      )
-
-      await user.click(screen.getByLabelText('Defer to later'))
-      expect(screen.getByText('Tomorrow')).toBeInTheDocument()
-
-      // Click outside (simulate mousedown event on document)
-      fireEvent.mouseDown(document.body)
-
-      expect(screen.queryByText('Pick date...')).not.toBeInTheDocument()
-    })
-
-    it('calls onDefer with tomorrow date when "Tomorrow" clicked', async () => {
+    it('calls onDefer with tomorrow date when Tomorrow clicked', async () => {
       const onDefer = vi.fn()
-      const { user } = render(
-        <HeroActions
-          onComplete={vi.fn()}
-          onDefer={onDefer}
-          onMore={vi.fn()}
-          onSkip={vi.fn()}
-        />
-      )
+      const { user } = render(<HeroActions {...defaultProps} onDefer={onDefer} />)
 
       await user.click(screen.getByLabelText('Defer to later'))
       await user.click(screen.getByText('Tomorrow'))
@@ -169,74 +104,53 @@ describe('HeroActions', () => {
       const tomorrow = new Date()
       tomorrow.setDate(tomorrow.getDate() + 1)
       expect(calledDate.getDate()).toBe(tomorrow.getDate())
-      expect(calledDate.getHours()).toBe(9) // Should be 9 AM
     })
 
-    it('calls onDefer with next Monday date when "Next Week" clicked', async () => {
+    it('calls onDefer with next Sunday when Next Week clicked', async () => {
       const onDefer = vi.fn()
-      const { user } = render(
-        <HeroActions
-          onComplete={vi.fn()}
-          onDefer={onDefer}
-          onMore={vi.fn()}
-          onSkip={vi.fn()}
-        />
-      )
+      const { user } = render(<HeroActions {...defaultProps} onDefer={onDefer} />)
 
       await user.click(screen.getByLabelText('Defer to later'))
       await user.click(screen.getByText('Next Week'))
 
       expect(onDefer).toHaveBeenCalledTimes(1)
       const calledDate = onDefer.mock.calls[0][0] as Date
-      // Should be next Monday at 9 AM
-      expect(calledDate.getDay()).toBe(1) // Monday = 1
-      expect(calledDate.getHours()).toBe(9)
+      expect(calledDate.getDay()).toBe(0) // Sunday = 0
     })
 
-    it('closes defer options after selection', async () => {
-      const { user } = render(
-        <HeroActions
-          onComplete={vi.fn()}
-          onDefer={vi.fn()}
-          onMore={vi.fn()}
-          onSkip={vi.fn()}
-        />
-      )
+    it('calls onArchive when Archive clicked', async () => {
+      const onArchive = vi.fn()
+      const { user } = render(<HeroActions {...defaultProps} onArchive={onArchive} />)
 
       await user.click(screen.getByLabelText('Defer to later'))
-      expect(screen.getByText('Tomorrow')).toBeInTheDocument()
+      await user.click(screen.getByText('Archive'))
 
-      await user.click(screen.getByText('Tomorrow'))
-
-      expect(screen.queryByText('Pick date...')).not.toBeInTheDocument()
+      expect(onArchive).toHaveBeenCalledTimes(1)
     })
 
-    it('shows date picker when "Pick date..." clicked', async () => {
-      const { user, container } = render(
-        <HeroActions
-          onComplete={vi.fn()}
-          onDefer={vi.fn()}
-          onMore={vi.fn()}
-          onSkip={vi.fn()}
-        />
-      )
+    it('calls onDelete when Delete clicked', async () => {
+      const onDelete = vi.fn()
+      const { user } = render(<HeroActions {...defaultProps} onDelete={onDelete} />)
+
+      await user.click(screen.getByLabelText('Defer to later'))
+      await user.click(screen.getByText('Delete'))
+
+      expect(onDelete).toHaveBeenCalledTimes(1)
+    })
+
+    it('shows date picker when Pick date... clicked', async () => {
+      const { user } = render(<HeroActions {...defaultProps} />)
 
       await user.click(screen.getByLabelText('Defer to later'))
       await user.click(screen.getByText('Pick date...'))
 
       expect(screen.getByText('Back')).toBeInTheDocument()
-      expect(container.querySelector('input[type="date"]')).toBeInTheDocument()
+      // Date input is rendered in a portal to document.body
+      expect(document.body.querySelector('input[type="date"]')).toBeInTheDocument()
     })
 
     it('can go back from date picker to options', async () => {
-      const { user } = render(
-        <HeroActions
-          onComplete={vi.fn()}
-          onDefer={vi.fn()}
-          onMore={vi.fn()}
-          onSkip={vi.fn()}
-        />
-      )
+      const { user } = render(<HeroActions {...defaultProps} />)
 
       await user.click(screen.getByLabelText('Defer to later'))
       await user.click(screen.getByText('Pick date...'))
@@ -247,37 +161,36 @@ describe('HeroActions', () => {
 
       expect(screen.getByText('Tomorrow')).toBeInTheDocument()
     })
+  })
 
-    it('toggles defer options popover on multiple clicks', async () => {
+  describe('time preservation', () => {
+    it('preserves original scheduled time when deferring', async () => {
+      const onDefer = vi.fn()
+      const originalDate = new Date()
+      originalDate.setHours(14, 30, 0, 0) // 2:30 PM
+
       const { user } = render(
         <HeroActions
-          onComplete={vi.fn()}
-          onDefer={vi.fn()}
-          onMore={vi.fn()}
-          onSkip={vi.fn()}
+          {...defaultProps}
+          onDefer={onDefer}
+          currentScheduledFor={originalDate}
+          currentIsAllDay={false}
         />
       )
 
-      // First click - open
       await user.click(screen.getByLabelText('Defer to later'))
-      expect(screen.getByText('Tomorrow')).toBeInTheDocument()
+      await user.click(screen.getByText('Tomorrow'))
 
-      // Second click - close
-      await user.click(screen.getByLabelText('Defer to later'))
-      expect(screen.queryByText('Tomorrow')).not.toBeInTheDocument()
+      expect(onDefer).toHaveBeenCalledTimes(1)
+      const calledDate = onDefer.mock.calls[0][0] as Date
+      expect(calledDate.getHours()).toBe(14)
+      expect(calledDate.getMinutes()).toBe(30)
     })
   })
 
   describe('accessibility', () => {
     it('all buttons have accessible labels', () => {
-      render(
-        <HeroActions
-          onComplete={vi.fn()}
-          onDefer={vi.fn()}
-          onMore={vi.fn()}
-          onSkip={vi.fn()}
-        />
-      )
+      render(<HeroActions {...defaultProps} />)
 
       expect(screen.getByLabelText('Mark task as done')).toBeInTheDocument()
       expect(screen.getByLabelText('Defer to later')).toBeInTheDocument()

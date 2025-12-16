@@ -526,6 +526,7 @@ interface TodayScheduleProps {
   onUpdateTask?: (id: string, updates: Partial<Task>) => void
   onPushTask?: (id: string, date: Date) => void
   onDeleteTask?: (id: string) => void
+  onArchiveTask?: (id: string) => void
   loading?: boolean
   viewedDate: Date
   onDateChange: (date: Date) => void
@@ -616,6 +617,7 @@ export function TodaySchedule({
   onUpdateTask,
   onPushTask,
   onDeleteTask,
+  onArchiveTask,
   loading,
   viewedDate,
   onDateChange,
@@ -1050,6 +1052,20 @@ export function TodaySchedule({
     }
   }, [heroModeTasks, onPushTask, onPushRoutine])
 
+  const handleHeroArchive = useCallback((taskId: string) => {
+    // Only tasks can be archived (not routines)
+    if (onArchiveTask) {
+      onArchiveTask(taskId)
+    }
+  }, [onArchiveTask])
+
+  const handleHeroDelete = useCallback((taskId: string) => {
+    // Only tasks can be deleted from Hero Mode (not routines)
+    if (onDeleteTask) {
+      onDeleteTask(taskId)
+    }
+  }, [onDeleteTask])
+
   const handleHeroOpenDetail = useCallback((item: TimelineItem) => {
     // Open detail panel - Hero Mode stays open in the main content area
     // Use item.id which already has the correct prefix (task-xxx, routine-xxx)
@@ -1152,6 +1168,8 @@ export function TodaySchedule({
         onClose={closeHeroMode}
         onComplete={handleHeroComplete}
         onDefer={handleHeroDefer}
+        onArchive={handleHeroArchive}
+        onDelete={handleHeroDelete}
         onOpenDetail={handleHeroOpenDetail}
       />
 

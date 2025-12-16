@@ -1,5 +1,6 @@
 export { WhenPicker } from './WhenPicker'
 export { DeferPicker } from './DeferPicker'
+export { TriageMenu } from './TriageMenu'
 export { ContextPicker } from './ContextPicker'
 export { AssignPicker } from './AssignPicker'
 export { PushDropdown } from './PushDropdown'
