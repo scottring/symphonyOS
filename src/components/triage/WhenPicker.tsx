@@ -64,6 +64,54 @@ export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerP
     return date
   }
 
+  const getThisWeekend = () => {
+    const today = new Date()
+    const dayOfWeek = today.getDay()
+    // Days until Saturday: if today is Saturday (6), return today; if Sunday (0), return next Saturday (6 days)
+    const daysUntilSaturday = dayOfWeek === 6 ? 0 : dayOfWeek === 0 ? 6 : 6 - dayOfWeek
+    const saturday = new Date(today)
+    saturday.setDate(today.getDate() + daysUntilSaturday)
+    saturday.setHours(0, 0, 0, 0)
+    return saturday
+  }
+
+  const getNextSunday = () => {
+    const today = new Date()
+    const dayOfWeek = today.getDay()
+    // Days until next Sunday: if today is Sunday (0), go to next Sunday (7 days)
+    const daysUntilSunday = dayOfWeek === 0 ? 7 : 7 - dayOfWeek
+    const nextSunday = new Date(today)
+    nextSunday.setDate(today.getDate() + daysUntilSunday)
+    nextSunday.setHours(0, 0, 0, 0)
+    return nextSunday
+  }
+
+  const getTwoWeeks = () => {
+    const date = new Date()
+    date.setDate(date.getDate() + 14)
+    date.setHours(0, 0, 0, 0)
+    return date
+  }
+
+  const getOneMonth = () => {
+    const date = new Date()
+    date.setMonth(date.getMonth() + 1)
+    date.setHours(0, 0, 0, 0)
+    return date
+  }
+
+  // Format this weekend date for display
+  const formatThisWeekend = () => {
+    const saturday = getThisWeekend()
+    return saturday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
+  // Format next Sunday date for display
+  const formatNextSunday = () => {
+    const nextSunday = getNextSunday()
+    return nextSunday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
   const handleDaySelect = (date: Date) => {
     setSelectedDate(date)
     setStep('time')
@@ -168,10 +216,30 @@ export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerP
                 Tomorrow
               </button>
               <button
-                onClick={() => handleDaySelect(getBaseDate(7))}
+                onClick={() => handleDaySelect(getThisWeekend())}
+                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700 flex justify-between items-center"
+              >
+                <span>This Weekend</span>
+                <span className="text-xs text-neutral-400">{formatThisWeekend()}</span>
+              </button>
+              <button
+                onClick={() => handleDaySelect(getNextSunday())}
+                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700 flex justify-between items-center"
+              >
+                <span>Next Week</span>
+                <span className="text-xs text-neutral-400">{formatNextSunday()}</span>
+              </button>
+              <button
+                onClick={() => handleDaySelect(getTwoWeeks())}
                 className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
               >
-                Next Week
+                2 weeks
+              </button>
+              <button
+                onClick={() => handleDaySelect(getOneMonth())}
+                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+              >
+                1 month
               </button>
               <div className="border-t border-neutral-100 my-1" />
               <button

@@ -54,6 +54,8 @@ describe('WhenPicker', () => {
       expect(screen.getByText('Today')).toBeInTheDocument()
       expect(screen.getByText('Tomorrow')).toBeInTheDocument()
       expect(screen.getByText('Next Week')).toBeInTheDocument()
+      expect(screen.getByText('2 weeks')).toBeInTheDocument()
+      expect(screen.getByText('1 month')).toBeInTheDocument()
       expect(screen.getByText('Pick date...')).toBeInTheDocument()
     })
 
@@ -373,7 +375,7 @@ describe('WhenPicker', () => {
       expect(calledDate.getMonth()).toBe(0) // January
     })
 
-    it('Next Week sets date to 7 days ahead', () => {
+    it('Next Week sets date to next Sunday', () => {
       render(<WhenPicker onChange={mockOnChange} />)
 
       fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
@@ -381,8 +383,35 @@ describe('WhenPicker', () => {
       fireEvent.click(screen.getByText('All Day'))
 
       const calledDate = mockOnChange.mock.calls[0][0] as Date
-      // mockToday is Jan 15, so next week should be Jan 22
-      expect(calledDate.getDate()).toBe(22)
+      // mockToday is Jan 15 (Monday), so next Sunday should be Jan 21
+      expect(calledDate.getDay()).toBe(0) // Sunday
+      expect(calledDate.getDate()).toBe(21)
+    })
+
+    it('2 weeks sets date to 14 days ahead', () => {
+      render(<WhenPicker onChange={mockOnChange} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
+      fireEvent.click(screen.getByText('2 weeks'))
+      fireEvent.click(screen.getByText('All Day'))
+
+      const calledDate = mockOnChange.mock.calls[0][0] as Date
+      // mockToday is Jan 15, so 2 weeks should be Jan 29
+      expect(calledDate.getDate()).toBe(29)
+      expect(calledDate.getMonth()).toBe(0) // January
+    })
+
+    it('1 month sets date to 1 month ahead', () => {
+      render(<WhenPicker onChange={mockOnChange} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
+      fireEvent.click(screen.getByText('1 month'))
+      fireEvent.click(screen.getByText('All Day'))
+
+      const calledDate = mockOnChange.mock.calls[0][0] as Date
+      // mockToday is Jan 15, so 1 month should be Feb 15
+      expect(calledDate.getDate()).toBe(15)
+      expect(calledDate.getMonth()).toBe(1) // February
     })
 
     it('custom date input parses correctly', () => {
@@ -429,8 +458,8 @@ describe('WhenPicker', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
       fireEvent.click(screen.getByText('Next Week'))
 
-      // Back button should show formatted date like "Mon, Jan 22"
-      const backButton = screen.getByRole('button', { name: /Jan 22/ })
+      // Back button should show formatted date like "Sun, Jan 21"
+      const backButton = screen.getByRole('button', { name: /Jan 21/ })
       expect(backButton).toBeInTheDocument()
     })
   })

@@ -37,18 +37,56 @@ export function DeferPicker({ deferredUntil, deferCount, onDefer }: DeferPickerP
   const getBaseDate = (daysFromNow: number) => {
     const date = new Date()
     date.setDate(date.getDate() + daysFromNow)
-    date.setHours(0, 0, 0, 0)
+    date.setHours(9, 0, 0, 0) // Default to 9am
     return date
   }
 
-  const getNextMonday = () => {
+  const getThisWeekend = () => {
     const today = new Date()
     const dayOfWeek = today.getDay()
-    const daysUntilMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek
-    const nextMonday = new Date(today)
-    nextMonday.setDate(today.getDate() + daysUntilMonday)
-    nextMonday.setHours(0, 0, 0, 0)
-    return nextMonday
+    // Days until Saturday: if today is Saturday (6), return today; if Sunday (0), return next Saturday (6 days)
+    const daysUntilSaturday = dayOfWeek === 6 ? 0 : dayOfWeek === 0 ? 6 : 6 - dayOfWeek
+    const saturday = new Date(today)
+    saturday.setDate(today.getDate() + daysUntilSaturday)
+    saturday.setHours(9, 0, 0, 0)
+    return saturday
+  }
+
+  const getNextSunday = () => {
+    const today = new Date()
+    const dayOfWeek = today.getDay()
+    // Days until next Sunday: if today is Sunday (0), go to next Sunday (7 days)
+    const daysUntilSunday = dayOfWeek === 0 ? 7 : 7 - dayOfWeek
+    const nextSunday = new Date(today)
+    nextSunday.setDate(today.getDate() + daysUntilSunday)
+    nextSunday.setHours(9, 0, 0, 0)
+    return nextSunday
+  }
+
+  const getTwoWeeks = () => {
+    const date = new Date()
+    date.setDate(date.getDate() + 14)
+    date.setHours(9, 0, 0, 0)
+    return date
+  }
+
+  const getOneMonth = () => {
+    const date = new Date()
+    date.setMonth(date.getMonth() + 1)
+    date.setHours(9, 0, 0, 0)
+    return date
+  }
+
+  // Format this weekend date for display
+  const formatThisWeekend = () => {
+    const saturday = getThisWeekend()
+    return saturday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
+  // Format next Sunday date for display
+  const formatNextSunday = () => {
+    const nextSunday = getNextSunday()
+    return nextSunday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
 
   const handleDefer = (date: Date | undefined) => {
@@ -108,20 +146,40 @@ export function DeferPicker({ deferredUntil, deferCount, onDefer }: DeferPickerP
               )}
               <button
                 onClick={() => handleDefer(getBaseDate(1))}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
               >
                 Tomorrow
               </button>
               <button
-                onClick={() => handleDefer(getNextMonday())}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+                onClick={() => handleDefer(getThisWeekend())}
+                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700 flex justify-between items-center"
               >
-                Next Week
+                <span>This Weekend</span>
+                <span className="text-xs text-neutral-400">{formatThisWeekend()}</span>
+              </button>
+              <button
+                onClick={() => handleDefer(getNextSunday())}
+                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700 flex justify-between items-center"
+              >
+                <span>Next Week</span>
+                <span className="text-xs text-neutral-400">{formatNextSunday()}</span>
+              </button>
+              <button
+                onClick={() => handleDefer(getTwoWeeks())}
+                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
+              >
+                2 weeks
+              </button>
+              <button
+                onClick={() => handleDefer(getOneMonth())}
+                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
+              >
+                1 month
               </button>
               <div className="border-t border-neutral-100 my-1" />
               <button
                 onClick={() => setShowDateInput(true)}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
               >
                 Pick date...
               </button>

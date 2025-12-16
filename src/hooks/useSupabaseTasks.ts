@@ -13,6 +13,8 @@ interface DbTask {
   defer_count: number | null
   is_all_day: boolean | null
   is_someday: boolean | null
+  archived: boolean | null
+  archived_at: string | null
   context: TaskContext | null
   category: string | null
   notes: string | null
@@ -64,6 +66,8 @@ function dbTaskToTask(dbTask: DbTask): Task {
     deferCount: dbTask.defer_count ?? undefined,
     isAllDay: dbTask.is_all_day ?? undefined,
     isSomeday: dbTask.is_someday ?? undefined,
+    archived: dbTask.archived ?? undefined,
+    archivedAt: dbTask.archived_at ? new Date(dbTask.archived_at) : undefined,
     context: dbTask.context ?? undefined,
     category: (dbTask.category as TaskCategory) ?? 'task',
     notes: dbTask.notes ?? undefined,
@@ -479,6 +483,8 @@ export function useSupabaseTasks() {
     if ('deferCount' in updates) dbUpdates.defer_count = updates.deferCount ?? 0
     if ('isAllDay' in updates) dbUpdates.is_all_day = updates.isAllDay ?? null
     if ('isSomeday' in updates) dbUpdates.is_someday = updates.isSomeday ?? false
+    if ('archived' in updates) dbUpdates.archived = updates.archived ?? false
+    if ('archivedAt' in updates) dbUpdates.archived_at = updates.archivedAt?.toISOString() ?? null
     if ('context' in updates) dbUpdates.context = updates.context ?? null
     if ('category' in updates) dbUpdates.category = updates.category ?? 'task'
     if ('notes' in updates) dbUpdates.notes = updates.notes ?? null
@@ -551,6 +557,62 @@ export function useSupabaseTasks() {
       })
     }
   }, [tasks, updateTask])
+
+  // Archive a task - hides it from normal views
+  const archiveTask = useCallback(async (id: string) => {
+    const task = tasks.find((t) => t.id === id)
+    if (!task) return
+
+    const now = new Date()
+
+    // Optimistic update
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, archived: true, archivedAt: now } : t))
+    )
+
+    const { error: updateError } = await supabase
+      .from('tasks')
+      .update({
+        archived: true,
+        archived_at: now.toISOString(),
+      })
+      .eq('id', id)
+
+    if (updateError) {
+      // Rollback on error
+      setTasks((prev) =>
+        prev.map((t) => (t.id === id ? task : t))
+      )
+      setError(updateError.message)
+    }
+  }, [tasks])
+
+  // Unarchive a task - restores it to normal views
+  const unarchiveTask = useCallback(async (id: string) => {
+    const task = tasks.find((t) => t.id === id)
+    if (!task) return
+
+    // Optimistic update
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, archived: false, archivedAt: undefined } : t))
+    )
+
+    const { error: updateError } = await supabase
+      .from('tasks')
+      .update({
+        archived: false,
+        archived_at: null,
+      })
+      .eq('id', id)
+
+    if (updateError) {
+      // Rollback on error
+      setTasks((prev) =>
+        prev.map((t) => (t.id === id ? task : t))
+      )
+      setError(updateError.message)
+    }
+  }, [tasks])
 
   // Add a prep task linked to an event (e.g., "Defrost chicken" for a dinner event)
   const addPrepTask = useCallback(async (
@@ -701,6 +763,8 @@ export function useSupabaseTasks() {
       defer_count: task.deferCount ?? 0,
       is_all_day: task.isAllDay ?? null,
       is_someday: task.isSomeday ?? false,
+      archived: task.archived ?? false,
+      archived_at: task.archivedAt?.toISOString() ?? null,
       context: task.context ?? null,
       category: task.category ?? 'task',
       notes: task.notes ?? null,
@@ -775,5 +839,5 @@ export function useSupabaseTasks() {
     }
   }, [tasks])
 
-  return { tasks, loading, error, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, deleteTask, updateTask, scheduleTask, pushTask, bulkToggleTasks, bulkDeleteTasks, bulkRestoreTasks, bulkRescheduleTasks }
+  return { tasks, loading, error, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, deleteTask, updateTask, scheduleTask, pushTask, archiveTask, unarchiveTask, bulkToggleTasks, bulkDeleteTasks, bulkRestoreTasks, bulkRescheduleTasks }
 }

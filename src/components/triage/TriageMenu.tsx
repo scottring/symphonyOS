@@ -115,6 +115,18 @@ export function TriageMenu({
     return date
   }
 
+  const getThisWeekend = () => {
+    const today = new Date()
+    const dayOfWeek = today.getDay()
+    // Days until Saturday: if today is Saturday (6), return today; if Sunday (0), return next Saturday (6 days)
+    const daysUntilSaturday = dayOfWeek === 6 ? 0 : dayOfWeek === 0 ? 6 : 6 - dayOfWeek
+    const saturday = new Date(today)
+    saturday.setDate(today.getDate() + daysUntilSaturday)
+    const time = getPreservedTime()
+    saturday.setHours(time.hours, time.minutes, 0, 0)
+    return saturday
+  }
+
   const getNextSunday = () => {
     const today = new Date()
     const dayOfWeek = today.getDay()
@@ -176,6 +188,12 @@ export function TriageMenu({
       : 'p-1.5 rounded-lg transition-colors text-neutral-400 hover:text-amber-600 hover:bg-amber-50'
   const iconClasses = size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'
 
+  // Format this weekend date for display
+  const formatThisWeekend = () => {
+    const saturday = getThisWeekend()
+    return saturday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
   // Format next Sunday date for display
   const formatNextSunday = () => {
     const nextSunday = getNextSunday()
@@ -215,6 +233,13 @@ export function TriageMenu({
                   className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
                 >
                   Tomorrow
+                </button>
+                <button
+                  onClick={() => handleSchedule(getThisWeekend())}
+                  className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700 flex justify-between items-center"
+                >
+                  <span>This Weekend</span>
+                  <span className="text-xs text-neutral-400">{formatThisWeekend()}</span>
                 </button>
                 <button
                   onClick={() => handleSchedule(getNextSunday())}

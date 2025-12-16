@@ -64,8 +64,9 @@ export function useSystemHealth(tasksOrInput: Task[] | SystemHealthInput): Syste
 
     const { tasks, projects = [], routines = [], projectsWithLinkedEvents = new Set() } = input
 
-    // Filter to incomplete tasks only
-    const incompleteTasks = tasks.filter(t => !t.completed)
+    // Filter to incomplete, non-archived tasks only
+    // Archived tasks don't count against clarity - they've been consciously set aside
+    const incompleteTasks = tasks.filter(t => !t.completed && !t.archived)
 
     // Categorize tasks
     const inboxTasks = incompleteTasks.filter(

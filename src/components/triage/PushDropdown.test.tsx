@@ -56,6 +56,8 @@ describe('PushDropdown', () => {
       expect(screen.getByText('Push until')).toBeInTheDocument()
       expect(screen.getByText('Tomorrow')).toBeInTheDocument()
       expect(screen.getByText('Next Week')).toBeInTheDocument()
+      expect(screen.getByText('2 weeks')).toBeInTheDocument()
+      expect(screen.getByText('1 month')).toBeInTheDocument()
       expect(screen.getByText('Pick date...')).toBeInTheDocument()
     })
 
@@ -75,7 +77,7 @@ describe('PushDropdown', () => {
   })
 
   describe('quick push options', () => {
-    it('clicking Tomorrow calls onPush with tomorrow date', () => {
+    it('clicking Tomorrow calls onPush with tomorrow date at 9am', () => {
       render(<PushDropdown onPush={mockOnPush} />)
 
       fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
@@ -85,10 +87,10 @@ describe('PushDropdown', () => {
       const pushedDate = mockOnPush.mock.calls[0][0] as Date
       expect(pushedDate.getDate()).toBe(16) // Jan 16 (tomorrow from Jan 15)
       expect(pushedDate.getMonth()).toBe(0) // January
-      expect(pushedDate.getHours()).toBe(0) // Midnight
+      expect(pushedDate.getHours()).toBe(9) // 9am default
     })
 
-    it('clicking Next Week calls onPush with date 7 days ahead', () => {
+    it('clicking Next Week calls onPush with next Sunday', () => {
       render(<PushDropdown onPush={mockOnPush} />)
 
       fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
@@ -96,8 +98,36 @@ describe('PushDropdown', () => {
 
       expect(mockOnPush).toHaveBeenCalledWith(expect.any(Date))
       const pushedDate = mockOnPush.mock.calls[0][0] as Date
-      expect(pushedDate.getDate()).toBe(22) // Jan 22 (7 days from Jan 15)
+      expect(pushedDate.getDay()).toBe(0) // Sunday
+      expect(pushedDate.getDate()).toBe(21) // Jan 21 (next Sunday from Jan 15 which is Monday)
       expect(pushedDate.getMonth()).toBe(0) // January
+      expect(pushedDate.getHours()).toBe(9) // 9am default
+    })
+
+    it('clicking 2 weeks calls onPush with date 14 days ahead', () => {
+      render(<PushDropdown onPush={mockOnPush} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
+      fireEvent.click(screen.getByText('2 weeks'))
+
+      expect(mockOnPush).toHaveBeenCalledWith(expect.any(Date))
+      const pushedDate = mockOnPush.mock.calls[0][0] as Date
+      expect(pushedDate.getDate()).toBe(29) // Jan 29 (14 days from Jan 15)
+      expect(pushedDate.getMonth()).toBe(0) // January
+      expect(pushedDate.getHours()).toBe(9) // 9am default
+    })
+
+    it('clicking 1 month calls onPush with date 1 month ahead', () => {
+      render(<PushDropdown onPush={mockOnPush} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
+      fireEvent.click(screen.getByText('1 month'))
+
+      expect(mockOnPush).toHaveBeenCalledWith(expect.any(Date))
+      const pushedDate = mockOnPush.mock.calls[0][0] as Date
+      expect(pushedDate.getDate()).toBe(15) // Feb 15 (1 month from Jan 15)
+      expect(pushedDate.getMonth()).toBe(1) // February
+      expect(pushedDate.getHours()).toBe(9) // 9am default
     })
 
     it('closes dropdown after selecting Tomorrow', () => {
@@ -166,7 +196,7 @@ describe('PushDropdown', () => {
       expect(pushedDate.getFullYear()).toBe(2024)
       expect(pushedDate.getMonth()).toBe(1) // February (0-indexed)
       expect(pushedDate.getDate()).toBe(20)
-      expect(pushedDate.getHours()).toBe(0)
+      // Custom date picker sets to midnight
     })
 
     it('closes dropdown after selecting custom date', () => {
@@ -285,10 +315,11 @@ describe('PushDropdown', () => {
       const pushedDate = mockOnPush.mock.calls[0][0] as Date
       expect(pushedDate.getDate()).toBe(1)
       expect(pushedDate.getMonth()).toBe(1) // February
+      expect(pushedDate.getHours()).toBe(9) // 9am default
     })
 
-    it('Next Week correctly handles year boundary', () => {
-      // Set system time to Dec 28
+    it('Next Week correctly finds next Sunday', () => {
+      // Set system time to Dec 28 (a Saturday)
       vi.setSystemTime(new Date('2024-12-28T12:00:00.000Z'))
 
       render(<PushDropdown onPush={mockOnPush} />)
@@ -297,7 +328,26 @@ describe('PushDropdown', () => {
       fireEvent.click(screen.getByText('Next Week'))
 
       const pushedDate = mockOnPush.mock.calls[0][0] as Date
-      expect(pushedDate.getDate()).toBe(4)
+      // Dec 28 is Saturday, next Sunday is Dec 29
+      expect(pushedDate.getDay()).toBe(0) // Sunday
+      expect(pushedDate.getDate()).toBe(29)
+      expect(pushedDate.getMonth()).toBe(11) // December
+      expect(pushedDate.getFullYear()).toBe(2024)
+    })
+
+    it('Next Week handles year boundary from Sunday', () => {
+      // Set system time to Dec 29 (a Sunday)
+      vi.setSystemTime(new Date('2024-12-29T12:00:00.000Z'))
+
+      render(<PushDropdown onPush={mockOnPush} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
+      fireEvent.click(screen.getByText('Next Week'))
+
+      const pushedDate = mockOnPush.mock.calls[0][0] as Date
+      // Dec 29 is Sunday, next Sunday is Jan 5
+      expect(pushedDate.getDay()).toBe(0) // Sunday
+      expect(pushedDate.getDate()).toBe(5)
       expect(pushedDate.getMonth()).toBe(0) // January
       expect(pushedDate.getFullYear()).toBe(2025)
     })

@@ -28,6 +28,7 @@ interface HomeViewProps {
   onUpdateTask?: (id: string, updates: Partial<Task>) => void
   onPushTask?: (id: string, date: Date) => void
   onDeleteTask?: (id: string) => void
+  onArchiveTask?: (id: string) => void
   loading?: boolean
   viewedDate: Date
   onDateChange: (date: Date) => void
@@ -80,6 +81,7 @@ export function HomeView({
   onUpdateTask,
   onPushTask,
   onDeleteTask,
+  onArchiveTask,
   loading,
   viewedDate,
   onDateChange,
@@ -402,6 +404,7 @@ export function HomeView({
         onUpdateTask={onUpdateTask}
         onPushTask={onPushTask}
         onDeleteTask={onDeleteTask}
+        onArchiveTask={onArchiveTask}
         loading={loading}
         viewedDate={viewedDate}
         onDateChange={onDateChange}

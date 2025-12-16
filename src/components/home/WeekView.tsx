@@ -92,7 +92,7 @@ function DayColumn({
     <button
       onClick={onClick}
       className={`
-        flex flex-col min-w-0 p-3 rounded-xl
+        flex flex-col min-w-0 h-full p-3 rounded-xl
         transition-all duration-200
         hover:bg-white hover:shadow-md
         ${day.isToday ? 'bg-white shadow-sm ring-1 ring-primary-200' : 'bg-transparent'}
@@ -355,9 +355,9 @@ export function WeekView({
   }
 
   return (
-    <div className="p-6 md:p-8 animate-fade-in-up">
+    <div className="h-full flex flex-col p-6 md:p-8 animate-fade-in-up">
       {/* Header - pt-8 clears the view switcher icons */}
-      <div className="flex items-center justify-between mb-6 pt-8">
+      <div className="flex items-center justify-between mb-6 pt-8 shrink-0">
         <div>
           <h2 className="font-display text-2xl md:text-3xl font-semibold text-neutral-900">
             Week
@@ -393,8 +393,8 @@ export function WeekView({
         </div>
       </div>
 
-      {/* Week grid */}
-      <div className="grid grid-cols-7 gap-2 md:gap-3">
+      {/* Week grid - flex-1 to fill available vertical space */}
+      <div className="flex-1 grid grid-cols-7 gap-2 md:gap-3 min-h-0">
         {weekDays.map((day) => (
           <DayColumn
             key={day.date.toISOString()}
@@ -405,7 +405,7 @@ export function WeekView({
       </div>
 
       {/* Hint */}
-      <p className="text-center text-xs text-neutral-400 mt-4">
+      <p className="text-center text-xs text-neutral-400 mt-4 shrink-0">
         Click any day to see full details
       </p>
     </div>

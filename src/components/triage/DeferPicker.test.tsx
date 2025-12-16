@@ -55,6 +55,8 @@ describe('DeferPicker', () => {
 
       expect(screen.getByText('Tomorrow')).toBeInTheDocument()
       expect(screen.getByText('Next Week')).toBeInTheDocument()
+      expect(screen.getByText('2 weeks')).toBeInTheDocument()
+      expect(screen.getByText('1 month')).toBeInTheDocument()
       expect(screen.getByText('Pick date...')).toBeInTheDocument()
     })
 
@@ -93,7 +95,7 @@ describe('DeferPicker', () => {
       expect(calledDate.toDateString()).toBe(tomorrow.toDateString())
     })
 
-    it('calls onDefer with next Monday when Next Week is clicked', () => {
+    it('calls onDefer with next Sunday when Next Week is clicked', () => {
       render(<DeferPicker {...defaultProps} />)
 
       fireEvent.click(screen.getByRole('button', { name: 'Defer item' }))
@@ -103,8 +105,40 @@ describe('DeferPicker', () => {
       const calledDate = mockOnDefer.mock.calls[0][0]
       expect(calledDate).toBeInstanceOf(Date)
 
-      // Should be next Monday (day 1)
-      expect(calledDate.getDay()).toBe(1) // Monday
+      // Should be next Sunday (day 0) for weekly planning
+      expect(calledDate.getDay()).toBe(0) // Sunday
+    })
+
+    it('calls onDefer with date 14 days out when 2 weeks is clicked', () => {
+      render(<DeferPicker {...defaultProps} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Defer item' }))
+      fireEvent.click(screen.getByText('2 weeks'))
+
+      expect(mockOnDefer).toHaveBeenCalledTimes(1)
+      const calledDate = mockOnDefer.mock.calls[0][0]
+      expect(calledDate).toBeInstanceOf(Date)
+
+      // Should be 14 days from now
+      const twoWeeks = new Date()
+      twoWeeks.setDate(twoWeeks.getDate() + 14)
+      expect(calledDate.toDateString()).toBe(twoWeeks.toDateString())
+    })
+
+    it('calls onDefer with date 1 month out when 1 month is clicked', () => {
+      render(<DeferPicker {...defaultProps} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Defer item' }))
+      fireEvent.click(screen.getByText('1 month'))
+
+      expect(mockOnDefer).toHaveBeenCalledTimes(1)
+      const calledDate = mockOnDefer.mock.calls[0][0]
+      expect(calledDate).toBeInstanceOf(Date)
+
+      // Should be 1 month from now
+      const oneMonth = new Date()
+      oneMonth.setMonth(oneMonth.getMonth() + 1)
+      expect(calledDate.toDateString()).toBe(oneMonth.toDateString())
     })
 
     it('calls onDefer with undefined when Show Now is clicked', () => {

@@ -30,6 +30,8 @@ export interface Task {
   deferCount?: number // Times this task has been deferred
   isAllDay?: boolean // True = all day task, false/undefined = specific time
   isSomeday?: boolean // True = in someday/maybe list, not in inbox
+  archived?: boolean // True = archived, hidden from normal views
+  archivedAt?: Date // When the task was archived
   context?: TaskContext // Context: work, family, personal
   category?: TaskCategory // What kind of family item (default: 'task')
   notes?: string

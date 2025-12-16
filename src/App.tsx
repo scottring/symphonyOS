@@ -57,7 +57,7 @@ import type { ActionableInstance, Routine } from '@/types/actionable'
 import type { LinkedActivityType } from '@/types/task'
 
 function App() {
-  const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, getLinkedTasks, toggleTask, deleteTask, updateTask, pushTask, bulkToggleTasks, bulkDeleteTasks, bulkRestoreTasks, bulkRescheduleTasks } = useSupabaseTasks()
+  const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, getLinkedTasks, toggleTask, deleteTask, updateTask, pushTask, archiveTask, bulkToggleTasks, bulkDeleteTasks, bulkRestoreTasks, bulkRescheduleTasks } = useSupabaseTasks()
   const { user, loading: authLoading, signOut } = useAuth()
   const { isConnected, events, fetchEvents, isFetching: eventsFetching, createEvent, connect: connectCalendar } = useGoogleCalendar()
   const attachments = useAttachments()
@@ -1242,6 +1242,7 @@ function App() {
                 }
               })
             }}
+            onArchiveTask={archiveTask}
           />
         </div>
       )}

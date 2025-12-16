@@ -376,14 +376,28 @@ function DailyBriefItemCard({ item, isExpanded, onToggle, onAction, onSchedule, 
     return date
   }
 
-  const handleScheduleSelect = (date: Date) => {
+  const handleScheduleSelect = (e: React.MouseEvent, date: Date) => {
+    e.stopPropagation()
     onSchedule?.(date)
     setShowSchedulePicker(false)
   }
 
-  const handleDeferSelect = (date: Date) => {
+  const handleDeferSelect = (e: React.MouseEvent, date: Date) => {
+    e.stopPropagation()
     onDefer?.(date)
     setShowDeferPicker(false)
+  }
+
+  // Get this coming Saturday
+  const getThisWeekend = () => {
+    const today = new Date()
+    const dayOfWeek = today.getDay()
+    // Days until Saturday: if today is Saturday (6), return today; if Sunday (0), return next Saturday (6 days)
+    const daysUntilSaturday = dayOfWeek === 6 ? 0 : dayOfWeek === 0 ? 6 : 6 - dayOfWeek
+    const saturday = new Date(today)
+    saturday.setDate(today.getDate() + daysUntilSaturday)
+    saturday.setHours(0, 0, 0, 0)
+    return saturday
   }
 
   return (
@@ -451,19 +465,25 @@ function DailyBriefItemCard({ item, isExpanded, onToggle, onAction, onSchedule, 
                         >
                           <div className="space-y-1">
                             <button
-                              onClick={() => handleScheduleSelect(getDate(0))}
+                              onClick={(e) => handleScheduleSelect(e, getDate(0))}
                               className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
                             >
                               Today
                             </button>
                             <button
-                              onClick={() => handleScheduleSelect(getDate(1))}
+                              onClick={(e) => handleScheduleSelect(e, getDate(1))}
                               className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
                             >
                               Tomorrow
                             </button>
                             <button
-                              onClick={() => handleScheduleSelect(getDate(7))}
+                              onClick={(e) => handleScheduleSelect(e, getThisWeekend())}
+                              className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+                            >
+                              This Weekend
+                            </button>
+                            <button
+                              onClick={(e) => handleScheduleSelect(e, getDate(7))}
                               className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
                             >
                               Next Week
@@ -499,25 +519,31 @@ function DailyBriefItemCard({ item, isExpanded, onToggle, onAction, onSchedule, 
                         >
                           <div className="space-y-1">
                             <button
-                              onClick={() => handleDeferSelect(getDate(1))}
+                              onClick={(e) => handleDeferSelect(e, getDate(1))}
                               className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
                             >
                               Tomorrow
                             </button>
                             <button
-                              onClick={() => handleDeferSelect(getDate(7))}
+                              onClick={(e) => handleDeferSelect(e, getThisWeekend())}
+                              className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+                            >
+                              This Weekend
+                            </button>
+                            <button
+                              onClick={(e) => handleDeferSelect(e, getDate(7))}
                               className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
                             >
                               Next Week
                             </button>
                             <button
-                              onClick={() => handleDeferSelect(getDate(14))}
+                              onClick={(e) => handleDeferSelect(e, getDate(14))}
                               className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
                             >
                               In 2 Weeks
                             </button>
                             <button
-                              onClick={() => handleDeferSelect(getDate(30))}
+                              onClick={(e) => handleDeferSelect(e, getDate(30))}
                               className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
                             >
                               Next Month

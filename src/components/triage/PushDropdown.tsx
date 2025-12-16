@@ -46,22 +46,63 @@ export function PushDropdown({ onPush, size = 'md', showTodayOption = false }: P
 
   const getToday = () => {
     const date = new Date()
-    date.setHours(0, 0, 0, 0)
+    date.setHours(9, 0, 0, 0) // Default to 9am
     return date
   }
 
   const getTomorrow = () => {
     const date = new Date()
     date.setDate(date.getDate() + 1)
-    date.setHours(0, 0, 0, 0)
+    date.setHours(9, 0, 0, 0) // Default to 9am
     return date
   }
 
-  const getNextWeek = () => {
+  const getThisWeekend = () => {
+    const today = new Date()
+    const dayOfWeek = today.getDay()
+    // Days until Saturday: if today is Saturday (6), return today; if Sunday (0), return next Saturday (6 days)
+    const daysUntilSaturday = dayOfWeek === 6 ? 0 : dayOfWeek === 0 ? 6 : 6 - dayOfWeek
+    const saturday = new Date(today)
+    saturday.setDate(today.getDate() + daysUntilSaturday)
+    saturday.setHours(9, 0, 0, 0) // Default to 9am
+    return saturday
+  }
+
+  const getNextSunday = () => {
+    const today = new Date()
+    const dayOfWeek = today.getDay()
+    // Days until next Sunday: if today is Sunday (0), go to next Sunday (7 days)
+    const daysUntilSunday = dayOfWeek === 0 ? 7 : 7 - dayOfWeek
+    const nextSunday = new Date(today)
+    nextSunday.setDate(today.getDate() + daysUntilSunday)
+    nextSunday.setHours(9, 0, 0, 0) // Default to 9am
+    return nextSunday
+  }
+
+  const getTwoWeeks = () => {
     const date = new Date()
-    date.setDate(date.getDate() + 7)
-    date.setHours(0, 0, 0, 0)
+    date.setDate(date.getDate() + 14)
+    date.setHours(9, 0, 0, 0) // Default to 9am
     return date
+  }
+
+  const getOneMonth = () => {
+    const date = new Date()
+    date.setMonth(date.getMonth() + 1)
+    date.setHours(9, 0, 0, 0) // Default to 9am
+    return date
+  }
+
+  // Format this weekend date for display
+  const formatThisWeekend = () => {
+    const saturday = getThisWeekend()
+    return saturday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
+  // Format next Sunday date for display
+  const formatNextSunday = () => {
+    const nextSunday = getNextSunday()
+    return nextSunday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
 
   const handlePush = (date: Date) => {
@@ -123,10 +164,30 @@ export function PushDropdown({ onPush, size = 'md', showTodayOption = false }: P
                 Tomorrow
               </button>
               <button
-                onClick={() => handlePush(getNextWeek())}
+                onClick={() => handlePush(getThisWeekend())}
+                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700 flex justify-between items-center"
+              >
+                <span>This Weekend</span>
+                <span className="text-xs text-neutral-400">{formatThisWeekend()}</span>
+              </button>
+              <button
+                onClick={() => handlePush(getNextSunday())}
+                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700 flex justify-between items-center"
+              >
+                <span>Next Week</span>
+                <span className="text-xs text-neutral-400">{formatNextSunday()}</span>
+              </button>
+              <button
+                onClick={() => handlePush(getTwoWeeks())}
                 className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
               >
-                Next Week
+                2 weeks
+              </button>
+              <button
+                onClick={() => handlePush(getOneMonth())}
+                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
+              >
+                1 month
               </button>
               <div className="border-t border-neutral-100 my-1" />
               <button
