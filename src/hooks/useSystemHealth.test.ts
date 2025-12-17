@@ -5,11 +5,13 @@ import type { Task } from '@/types/task'
 
 // Helper to create mock tasks
 function createTask(overrides: Partial<Task> = {}): Task {
+  const now = new Date()
   return {
     id: Math.random().toString(36).substring(7),
     title: 'Test Task',
     completed: false,
-    createdAt: new Date(),
+    createdAt: now,
+    updatedAt: now,
     ...overrides,
   }
 }
@@ -149,15 +151,27 @@ describe('useSystemHealth', () => {
   })
 
   describe('score calculation', () => {
-    it('gives 100 score when all tasks have homes', () => {
+    it('gives 100 score when all tasks have homes and assignments', () => {
       const tasks = [
-        createTask({ scheduledFor: new Date('2024-06-20') }),
-        createTask({ deferredUntil: new Date('2024-06-21') }),
+        createTask({ scheduledFor: new Date('2024-06-20'), assignedTo: 'member-1' }),
+        createTask({ deferredUntil: new Date('2024-06-21'), assignedTo: 'member-1' }),
       ]
 
       const { result } = renderHook(() => useSystemHealth(tasks))
 
       expect(result.current.score).toBe(100)
+    })
+
+    it('gives 50% credit for tasks with homes but no assignment', () => {
+      const tasks = [
+        createTask({ scheduledFor: new Date('2024-06-20') }), // No assignedTo
+      ]
+
+      const { result } = renderHook(() => useSystemHealth(tasks))
+
+      // Task has temporal home but no assignment = 50% credit
+      expect(result.current.score).toBe(50)
+      expect(result.current.unassignedItems).toBe(1)
     })
 
     it('reduces score based on inbox items without homes', () => {
@@ -239,8 +253,9 @@ describe('useSystemHealth', () => {
 
   describe('health color', () => {
     it('returns excellent for score >= 90', () => {
+      // Task with both scheduledFor AND assignedTo gets full credit
       const tasks = [
-        createTask({ scheduledFor: new Date('2024-06-20') }),
+        createTask({ scheduledFor: new Date('2024-06-20'), assignedTo: 'member-1' }),
       ]
 
       const { result } = renderHook(() => useSystemHealth(tasks))
@@ -342,6 +357,8 @@ describe('getHealthMessage', () => {
       isInboxZero: true,
       healthColor: 'excellent' as const,
       healthStatus: 'Excellent',
+      unassignedItems: 0,
+      emptyProjects: 0,
     }
 
     expect(getHealthMessage(metrics)).toBe("Inbox zero! Your mind is clear.")
@@ -360,6 +377,8 @@ describe('getHealthMessage', () => {
       isInboxZero: false,
       healthColor: 'excellent' as const,
       healthStatus: 'Excellent',
+      unassignedItems: 0,
+      emptyProjects: 0,
     }
 
     expect(getHealthMessage(metrics)).toBe("Everything has a home. Ready to focus.")
@@ -378,6 +397,8 @@ describe('getHealthMessage', () => {
       isInboxZero: false,
       healthColor: 'good' as const,
       healthStatus: 'Good',
+      unassignedItems: 0,
+      emptyProjects: 0,
     }
 
     expect(getHealthMessage(metrics)).toBe("Looking good. A few items need attention.")
@@ -396,9 +417,31 @@ describe('getHealthMessage', () => {
       isInboxZero: false,
       healthColor: 'fair' as const,
       healthStatus: 'Fair',
+      unassignedItems: 0,
+      emptyProjects: 0,
     }
 
     expect(getHealthMessage(metrics)).toBe("Some items are waiting for decisions.")
+  })
+
+  it('returns empty projects message when empty projects exist', () => {
+    const metrics = {
+      score: 40,
+      itemsWithHome: 1,
+      deferredItems: 0,
+      freshInboxItems: 1,
+      agingItems: 1,
+      staleItems: 0,
+      totalItems: 3,
+      inboxItems: 3,
+      isInboxZero: false,
+      healthColor: 'needsAttention' as const,
+      healthStatus: 'Needs attention',
+      unassignedItems: 0,
+      emptyProjects: 2,
+    }
+
+    expect(getHealthMessage(metrics)).toBe("2 projects need tasks.")
   })
 
   it('returns stale items message when stale items exist', () => {
@@ -414,6 +457,8 @@ describe('getHealthMessage', () => {
       isInboxZero: false,
       healthColor: 'needsAttention' as const,
       healthStatus: 'Needs attention',
+      unassignedItems: 0,
+      emptyProjects: 0,
     }
 
     expect(getHealthMessage(metrics)).toBe("3 items need a home.")
@@ -432,12 +477,14 @@ describe('getHealthMessage', () => {
       isInboxZero: false,
       healthColor: 'needsAttention' as const,
       healthStatus: 'Needs attention',
+      unassignedItems: 0,
+      emptyProjects: 0,
     }
 
     expect(getHealthMessage(metrics)).toBe("1 item needs a home.")
   })
 
-  it('returns default message for low score without stale items', () => {
+  it('returns unassigned message when many items need owners', () => {
     const metrics = {
       score: 30,
       itemsWithHome: 0,
@@ -450,6 +497,28 @@ describe('getHealthMessage', () => {
       isInboxZero: false,
       healthColor: 'needsAttention' as const,
       healthStatus: 'Needs attention',
+      unassignedItems: 5,
+      emptyProjects: 0,
+    }
+
+    expect(getHealthMessage(metrics)).toBe("Some items need owners assigned.")
+  })
+
+  it('returns default message for low score without stale items or unassigned', () => {
+    const metrics = {
+      score: 30,
+      itemsWithHome: 0,
+      deferredItems: 0,
+      freshInboxItems: 5,
+      agingItems: 0,
+      staleItems: 0,
+      totalItems: 5,
+      inboxItems: 5,
+      isInboxZero: false,
+      healthColor: 'needsAttention' as const,
+      healthStatus: 'Needs attention',
+      unassignedItems: 2, // Less than 4, so won't trigger message
+      emptyProjects: 0,
     }
 
     expect(getHealthMessage(metrics)).toBe("A few decisions will bring clarity.")

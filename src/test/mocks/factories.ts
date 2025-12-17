@@ -25,6 +25,7 @@ export function createMockTask(overrides: Partial<Task> = {}): Task {
     title: 'Test Task',
     completed: false,
     createdAt: new Date('2024-01-01T00:00:00Z'),
+    updatedAt: new Date('2024-01-01T00:00:00Z'),
     scheduledFor: undefined,
     deferredUntil: undefined,
     deferCount: undefined,
@@ -94,6 +95,10 @@ export function createMockContact(overrides: Partial<Contact> = {}): Contact {
     phone: undefined,
     email: undefined,
     notes: undefined,
+    category: undefined,
+    birthday: undefined,
+    relationship: undefined,
+    preferences: undefined,
     createdAt: new Date('2024-01-01T00:00:00Z'),
     updatedAt: new Date('2024-01-01T00:00:00Z'),
     ...overrides,
@@ -110,6 +115,10 @@ export function createMockDbContact(overrides: Partial<{
   phone: string | null
   email: string | null
   notes: string | null
+  category: string | null
+  birthday: string | null
+  relationship: string | null
+  preferences: string | null
   created_at: string
   updated_at: string
 }> = {}) {
@@ -120,6 +129,10 @@ export function createMockDbContact(overrides: Partial<{
     phone: null,
     email: null,
     notes: null,
+    category: null,
+    birthday: null,
+    relationship: null,
+    preferences: null,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
     ...overrides,
@@ -135,7 +148,7 @@ export function createMockProject(overrides: Partial<Project> = {}): Project {
     name: 'Test Project',
     notes: undefined,
     parentId: undefined,
-    status: 'active',
+    status: 'in_progress',
     createdAt: new Date('2024-01-01T00:00:00Z'),
     updatedAt: new Date('2024-01-01T00:00:00Z'),
     ...overrides,
@@ -152,7 +165,7 @@ export function createMockDbProject(overrides: Partial<DbProject> = {}): DbProje
     name: 'Test Project',
     notes: null,
     parent_id: null,
-    status: 'active' as ProjectStatus,
+    status: 'in_progress' as ProjectStatus,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
     ...overrides,

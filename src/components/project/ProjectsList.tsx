@@ -49,8 +49,10 @@ export function ProjectsList({ projects, onSelectProject, onAddProject }: Projec
     switch (status) {
       case 'not_started':
         return 'Not Started'
-      case 'active':
-        return 'Active'
+      case 'in_progress':
+        return 'In Progress'
+      case 'on_hold':
+        return 'On Hold'
       case 'completed':
         return 'Completed'
     }
@@ -60,16 +62,18 @@ export function ProjectsList({ projects, onSelectProject, onAddProject }: Projec
     switch (status) {
       case 'not_started':
         return 'bg-neutral-100 text-neutral-600'
-      case 'active':
+      case 'in_progress':
         return 'bg-blue-100 text-blue-700'
+      case 'on_hold':
+        return 'bg-amber-100 text-amber-700'
       case 'completed':
         return 'bg-green-100 text-green-700'
     }
   }
 
-  // Sort: active first, then not_started, then completed
+  // Sort: in_progress first, then not_started, then on_hold, then completed
   const sortedProjects = [...projects].sort((a, b) => {
-    const order: Record<ProjectStatus, number> = { active: 0, not_started: 1, completed: 2 }
+    const order: Record<ProjectStatus, number> = { in_progress: 0, not_started: 1, on_hold: 2, completed: 3 }
     return order[a.status] - order[b.status]
   })
 

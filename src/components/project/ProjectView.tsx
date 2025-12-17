@@ -3,6 +3,7 @@ import type { Project, ProjectStatus } from '@/types/project'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import { PinButton } from '@/components/pins'
+import { formatTimeWithDate } from '@/lib/timeUtils'
 
 interface ProjectViewProps {
   project: Project
@@ -72,8 +73,10 @@ export function ProjectView({
     switch (status) {
       case 'not_started':
         return 'Not Started'
-      case 'active':
-        return 'Active'
+      case 'in_progress':
+        return 'In Progress'
+      case 'on_hold':
+        return 'On Hold'
       case 'completed':
         return 'Completed'
     }
@@ -83,8 +86,10 @@ export function ProjectView({
     switch (status) {
       case 'not_started':
         return 'bg-neutral-100 text-neutral-600'
-      case 'active':
+      case 'in_progress':
         return 'bg-blue-100 text-blue-700'
+      case 'on_hold':
+        return 'bg-amber-100 text-amber-700'
       case 'completed':
         return 'bg-green-100 text-green-700'
     }
@@ -132,12 +137,15 @@ export function ProjectView({
     }
   }
 
-  const formatDate = (date: Date | undefined) => {
+  const formatTaskDate = (date: Date | undefined, isAllDay?: boolean) => {
     if (!date) return null
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    })
+    if (isAllDay) {
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      })
+    }
+    return formatTimeWithDate(date)
   }
 
   return (
@@ -190,14 +198,25 @@ export function ProjectView({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setEditStatus('active')}
+                      onClick={() => setEditStatus('in_progress')}
                       className={`flex-1 py-2 px-3 text-sm font-medium border-l border-neutral-200 transition-colors
-                        ${editStatus === 'active'
+                        ${editStatus === 'in_progress'
                           ? 'bg-blue-100 text-blue-700'
                           : 'bg-white text-neutral-500 hover:bg-neutral-50'
                         }`}
                     >
-                      Active
+                      In Progress
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditStatus('on_hold')}
+                      className={`flex-1 py-2 px-3 text-sm font-medium border-l border-neutral-200 transition-colors
+                        ${editStatus === 'on_hold'
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-white text-neutral-500 hover:bg-neutral-50'
+                        }`}
+                    >
+                      On Hold
                     </button>
                     <button
                       type="button"
@@ -435,10 +454,10 @@ export function ProjectView({
                     </button>
 
                     {/* Date */}
-                    <div className="w-12 shrink-0">
+                    <div className="w-20 shrink-0">
                       {task.scheduledFor ? (
                         <span className="text-xs text-neutral-400 font-medium">
-                          {formatDate(task.scheduledFor)}
+                          {formatTaskDate(task.scheduledFor, task.isAllDay)}
                         </span>
                       ) : (
                         <span className="text-xs text-neutral-300">—</span>

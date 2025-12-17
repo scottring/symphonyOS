@@ -5,7 +5,7 @@ import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
 import type { ActionableInstance, Routine, PrepFollowupTemplate } from '@/types/actionable'
 import type { Attachment, AttachmentEntityType } from '@/types/attachment'
-import { formatTime, formatTimeRange } from '@/lib/timeUtils'
+import { formatTimeWithDate, formatTimeRangeWithDate } from '@/lib/timeUtils'
 import { detectActions, type DetectedAction } from '@/lib/actionDetection'
 import { ActionableActions } from './ActionableActions'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
@@ -18,6 +18,7 @@ import { PinButton } from '@/components/pins'
 import { MultiAssigneeDropdown } from '@/components/family'
 import type { PinnableEntityType } from '@/types/pin'
 import type { FamilyMember } from '@/types/family'
+import { TaskQuickActions, type ScheduleContextItem } from '@/components/triage'
 
 // Component to render text with clickable links (handles HTML links and plain URLs)
 function RichText({ text }: { text: string }) {
@@ -134,6 +135,11 @@ interface DetailPanelRedesignProps {
   familyMembers?: FamilyMember[]
   eventAssignedToAll?: string[]
   onUpdateEventAssignment?: (googleEventId: string, memberIds: string[]) => void
+  // Event project linking
+  eventProjectId?: string | null
+  onUpdateEventProject?: (googleEventId: string, projectId: string | null, eventTitle?: string | null, eventStartTime?: Date | null) => void
+  // Quick action support for linked tasks
+  getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
 }
 
 function ActionIcon({ type }: { type: DetectedAction['icon'] }) {
@@ -347,9 +353,13 @@ interface LinkedTaskRowProps {
   task: Task
   onToggle?: (taskId: string) => void
   onDelete?: (taskId: string) => void
+  // Quick action props
+  onUpdate?: (taskId: string, updates: Partial<Task>) => void
+  getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
+  familyMembers?: FamilyMember[]
 }
 
-function LinkedTaskRow({ task, onToggle, onDelete }: LinkedTaskRowProps) {
+function LinkedTaskRow({ task, onToggle, onDelete, onUpdate, getScheduleItemsForDate, familyMembers = [] }: LinkedTaskRowProps) {
   return (
     <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-neutral-50 group transition-colors">
       <button
@@ -370,6 +380,26 @@ function LinkedTaskRow({ task, onToggle, onDelete }: LinkedTaskRowProps) {
       <span className={`flex-1 text-sm ${task.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>
         {task.title}
       </span>
+
+      {/* Quick Actions */}
+      {onUpdate && (
+        <TaskQuickActions
+          task={task}
+          onSchedule={(date, isAllDay) => {
+            onUpdate(task.id, { scheduledFor: date, isAllDay })
+          }}
+          getScheduleItemsForDate={getScheduleItemsForDate}
+          onContextChange={(context) => {
+            onUpdate(task.id, { context })
+          }}
+          familyMembers={familyMembers}
+          onAssign={(memberId) => {
+            onUpdate(task.id, { assignedTo: memberId ?? undefined })
+          }}
+          size="sm"
+          className="opacity-0 group-hover:opacity-100 transition-opacity"
+        />
+      )}
 
       {task.scheduledFor ? (
         <span className="text-xs text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full">
@@ -476,6 +506,9 @@ export function DetailPanelRedesign({
   familyMembers = [],
   eventAssignedToAll = [],
   onUpdateEventAssignment,
+  eventProjectId,
+  onUpdateEventProject,
+  getScheduleItemsForDate,
 }: DetailPanelRedesignProps) {
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -504,6 +537,8 @@ export function DetailPanelRedesign({
   const [isCreatingProject, setIsCreatingProject] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
   const [isCreatingProjectLoading, setIsCreatingProjectLoading] = useState(false)
+  // Event project picker (for calendar events)
+  const [showEventProjectPicker, setShowEventProjectPicker] = useState(false)
 
   // Links state
   const [showLinks, setShowLinks] = useState(false)
@@ -610,6 +645,12 @@ export function DetailPanelRedesign({
     }
     return projects.slice(0, 5)
   }, [projects, projectSearchQuery, onSearchProjects])
+
+  // Find event's linked project
+  const eventProject = useMemo(() => {
+    if (!eventProjectId) return null
+    return projects.find(p => p.id === eventProjectId) || null
+  }, [eventProjectId, projects])
 
   // Filter prep tasks for current event
   const eventPrepTasks = useMemo(() => {
@@ -883,6 +924,44 @@ export function DetailPanelRedesign({
     }
   }
 
+  // Handler for linking a project to a calendar event
+  const handleLinkEventProject = (selectedProject: Project) => {
+    if (isEvent && item.originalEvent && onUpdateEventProject) {
+      const eventId = item.originalEvent.google_event_id || item.originalEvent.id
+      const eventTitle = item.originalEvent.title || item.title
+      const startTimeStr = item.originalEvent.start_time || item.originalEvent.startTime
+      const eventStartTime = startTimeStr ? new Date(startTimeStr) : null
+      onUpdateEventProject(eventId, selectedProject.id, eventTitle, eventStartTime)
+    }
+    setShowEventProjectPicker(false)
+    setProjectSearchQuery('')
+  }
+
+  const handleCreateAndLinkEventProject = async () => {
+    if (!onAddProject || !newProjectName.trim() || !isEvent || !item.originalEvent || !onUpdateEventProject) return
+    setIsCreatingProjectLoading(true)
+    const createdProject = await onAddProject({ name: newProjectName.trim() })
+    setIsCreatingProjectLoading(false)
+    if (createdProject) {
+      const eventId = item.originalEvent.google_event_id || item.originalEvent.id
+      const eventTitle = item.originalEvent.title || item.title
+      const startTimeStr = item.originalEvent.start_time || item.originalEvent.startTime
+      const eventStartTime = startTimeStr ? new Date(startTimeStr) : null
+      onUpdateEventProject(eventId, createdProject.id, eventTitle, eventStartTime)
+      setIsCreatingProject(false)
+      setNewProjectName('')
+      setShowEventProjectPicker(false)
+      setProjectSearchQuery('')
+    }
+  }
+
+  const handleUnlinkEventProject = () => {
+    if (isEvent && item.originalEvent && onUpdateEventProject) {
+      const eventId = item.originalEvent.google_event_id || item.originalEvent.id
+      onUpdateEventProject(eventId, null)
+    }
+  }
+
   const handleCreateAndLinkContact = async () => {
     if (!onAddContact || !newContactName.trim() || !isTask || !item.originalTask || !onUpdate) return
     setIsCreatingContactLoading(true)
@@ -978,10 +1057,13 @@ export function DetailPanelRedesign({
     onUpdate(item.originalTask.id, { links: newLinks.length > 0 ? newLinks : undefined })
   }
 
+  // Show date context for both tasks and events (e.g., "Today 3pm", "Tomorrow 1p|3p")
   const timeDisplay = item.startTime
     ? item.endTime
-      ? formatTimeRange(item.startTime, item.endTime, item.allDay)
-      : formatTime(item.startTime)
+      ? formatTimeRangeWithDate(item.startTime, item.endTime, item.allDay)
+      : !item.allDay
+        ? formatTimeWithDate(item.startTime)
+        : 'All day'
     : 'Unscheduled'
 
   const phoneNumber = contact?.phone || item.phoneNumber
@@ -1174,6 +1256,25 @@ export function DetailPanelRedesign({
                       <span className={`flex-1 text-sm ${subtask.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>
                         {subtask.title}
                       </span>
+                      {/* Quick Actions */}
+                      {onUpdate && (
+                        <TaskQuickActions
+                          task={subtask}
+                          onSchedule={(date, isAllDay) => {
+                            onUpdate(subtask.id, { scheduledFor: date, isAllDay })
+                          }}
+                          getScheduleItemsForDate={getScheduleItemsForDate}
+                          onContextChange={(context) => {
+                            onUpdate(subtask.id, { context })
+                          }}
+                          familyMembers={familyMembers}
+                          onAssign={(memberId) => {
+                            onUpdate(subtask.id, { assignedTo: memberId ?? undefined })
+                          }}
+                          size="sm"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        />
+                      )}
                       <button className="opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-red-500 transition-all p-1">
                         <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
                           <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -1346,6 +1447,46 @@ export function DetailPanelRedesign({
           </div>
         )}
 
+        {/* Event Project Link */}
+        {isEvent && item.originalEvent && onUpdateEventProject && (
+          <div className="mx-4 mt-4 p-3 bg-neutral-50 rounded-xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-neutral-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                </svg>
+                <span className="text-sm font-medium text-neutral-700">Project</span>
+              </div>
+              {eventProject ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => onOpenProject && onOpenProject(eventProject.id)}
+                    className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                  >
+                    {eventProject.name}
+                  </button>
+                  <button
+                    onClick={handleUnlinkEventProject}
+                    className="p-1 text-neutral-400 hover:text-neutral-600 rounded"
+                    title="Remove project link"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowEventProjectPicker(true)}
+                  className="text-sm text-neutral-500 hover:text-primary-600"
+                >
+                  Add project...
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Quick Actions - Detected actions prominently displayed */}
         {detectedActions.length > 0 && (
           <div className="mx-4 mt-4">
@@ -1383,6 +1524,23 @@ export function DetailPanelRedesign({
             {/* Expanded details */}
             {detailsExpanded && (
               <div className="px-6 pb-6 space-y-1">
+                {/* Scheduled Row */}
+                <DetailRow
+                  icon={
+                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                    </svg>
+                  }
+                  label="Scheduled"
+                  value={item.originalTask?.scheduledFor
+                    ? item.originalTask.isAllDay
+                      ? item.originalTask.scheduledFor.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                      : formatTimeWithDate(item.originalTask.scheduledFor)
+                    : null
+                  }
+                  onClick={() => setShowTimePicker(true)}
+                />
+
                 {/* Project Row */}
                 <DetailRow
                   icon={
@@ -1613,6 +1771,9 @@ export function DetailPanelRedesign({
                       task={task}
                       onToggle={onToggleLinkedTask}
                       onDelete={onDeleteLinkedTask}
+                      onUpdate={onUpdate}
+                      getScheduleItemsForDate={getScheduleItemsForDate}
+                      familyMembers={familyMembers}
                     />
                   ))}
                 </div>
@@ -1646,6 +1807,9 @@ export function DetailPanelRedesign({
                       task={task}
                       onToggle={onToggleLinkedTask}
                       onDelete={onDeleteLinkedTask}
+                      onUpdate={onUpdate}
+                      getScheduleItemsForDate={getScheduleItemsForDate}
+                      familyMembers={familyMembers}
                     />
                   ))}
                 </div>
@@ -1929,6 +2093,109 @@ export function DetailPanelRedesign({
                       <button
                         key={p.id}
                         onClick={() => handleLinkProject(p)}
+                        className="w-full px-4 py-3.5 flex items-center gap-3 active:bg-neutral-50 border-b border-neutral-100"
+                      >
+                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                          <svg className="w-5 h-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 text-left">
+                          <div className="font-medium text-neutral-800">{p.name}</div>
+                          {p.notes && <div className="text-sm text-neutral-500 truncate">{p.notes}</div>}
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-4 py-8 text-center text-neutral-400">
+                      No projects found
+                    </div>
+                  )}
+                </div>
+                {onAddProject && (
+                  <div className="p-4 border-t border-neutral-100">
+                    <button
+                      onClick={() => { setIsCreatingProject(true); setNewProjectName(projectSearchQuery) }}
+                      className="w-full py-3.5 text-base font-semibold text-white bg-primary-600 rounded-xl flex items-center justify-center gap-2"
+                    >
+                      <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                      </svg>
+                      Create New Project
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Event Project Picker Modal (for calendar events) */}
+      {showEventProjectPicker && isEvent && !eventProject && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end">
+          <div className="w-full bg-white rounded-t-3xl max-h-[70vh] flex flex-col safe-area-bottom">
+            <div className="p-4 border-b border-neutral-100">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-display text-lg font-semibold">Link to Project</h3>
+                <button
+                  onClick={() => { setShowEventProjectPicker(false); setProjectSearchQuery(''); setIsCreatingProject(false) }}
+                  className="p-2 text-neutral-400"
+                >
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              {!isCreatingProject ? (
+                <input
+                  type="text"
+                  value={projectSearchQuery}
+                  onChange={(e) => setProjectSearchQuery(e.target.value)}
+                  placeholder="Search projects..."
+                  className="w-full px-4 py-3 text-base rounded-xl border border-neutral-200 bg-neutral-50
+                             focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  autoFocus
+                />
+              ) : (
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    placeholder="New project name..."
+                    className="w-full px-4 py-3 text-base rounded-xl border border-neutral-200 bg-neutral-50
+                               focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    autoFocus
+                    disabled={isCreatingProjectLoading}
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setIsCreatingProject(false); setNewProjectName('') }}
+                      className="flex-1 py-3 text-base font-medium text-neutral-600 bg-neutral-100 rounded-xl"
+                      disabled={isCreatingProjectLoading}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleCreateAndLinkEventProject}
+                      disabled={!newProjectName.trim() || isCreatingProjectLoading}
+                      className="flex-1 py-3 text-base font-semibold text-white bg-primary-600 rounded-xl disabled:opacity-50"
+                    >
+                      {isCreatingProjectLoading ? 'Creating...' : 'Create'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            {!isCreatingProject && (
+              <>
+                <div className="flex-1 overflow-auto">
+                  {filteredProjects.length > 0 ? (
+                    filteredProjects.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => handleLinkEventProject(p)}
                         className="w-full px-4 py-3.5 flex items-center gap-3 active:bg-neutral-50 border-b border-neutral-100"
                       >
                         <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">

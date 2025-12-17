@@ -129,6 +129,24 @@ export function SystemHealthWidget({
                 suffix="(8+ days)"
               />
             )}
+            {metrics.unassignedItems > 0 && (
+              <MetricRow
+                icon={<UserIcon className="w-4 h-4" />}
+                label="Items without owner"
+                value={metrics.unassignedItems}
+                color="text-amber-500"
+                suffix="(50% credit)"
+              />
+            )}
+            {metrics.emptyProjects > 0 && (
+              <MetricRow
+                icon={<FolderIcon className="w-4 h-4" />}
+                label="Empty projects"
+                value={metrics.emptyProjects}
+                color="text-orange-500"
+                suffix="(-5 pts each)"
+              />
+            )}
           </div>
 
           {/* Streaks */}
@@ -286,6 +304,22 @@ function AlertIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+    </svg>
+  )
+}
+
+function UserIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+    </svg>
+  )
+}
+
+function FolderIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
     </svg>
   )
 }

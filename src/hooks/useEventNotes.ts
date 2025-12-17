@@ -10,6 +10,9 @@ export interface EventNote {
   assignedTo?: string | null // Legacy single assignment (for backwards compat)
   assignedToAll?: string[] // Multi-member assignment
   recipeUrl?: string | null
+  projectId?: string | null // Linked project
+  eventTitle?: string | null // Stored event title for display
+  eventStartTime?: Date | null // Stored event start time for display
   createdAt: Date
   updatedAt: Date
 }
@@ -22,6 +25,9 @@ interface DbEventNote {
   assigned_to: string | null
   assigned_to_all: string[] | null
   recipe_url: string | null
+  project_id: string | null
+  event_title: string | null
+  event_start_time: string | null
   created_at: string
   updated_at: string
 }
@@ -34,6 +40,9 @@ function dbNoteToEventNote(dbNote: DbEventNote): EventNote {
     assignedTo: dbNote.assigned_to,
     assignedToAll: dbNote.assigned_to_all || [],
     recipeUrl: dbNote.recipe_url,
+    projectId: dbNote.project_id,
+    eventTitle: dbNote.event_title,
+    eventStartTime: dbNote.event_start_time ? new Date(dbNote.event_start_time) : null,
     createdAt: new Date(dbNote.created_at),
     updatedAt: new Date(dbNote.updated_at),
   }
@@ -400,6 +409,108 @@ export function useEventNotes() {
     }
   }, [user, notes])
 
+  // Update project link for an event (upsert)
+  // Pass eventTitle and eventStartTime to store event metadata for display on project page
+  const updateEventProject = useCallback(async (
+    googleEventId: string,
+    projectId: string | null,
+    eventTitle?: string | null,
+    eventStartTime?: Date | null
+  ) => {
+    if (!user) return
+
+    const existingNote = notes.get(googleEventId)
+
+    // Optimistic update
+    const optimisticNote: EventNote = existingNote
+      ? { ...existingNote, projectId, eventTitle: eventTitle ?? existingNote.eventTitle, eventStartTime: eventStartTime ?? existingNote.eventStartTime, updatedAt: new Date() }
+      : {
+          id: crypto.randomUUID(),
+          googleEventId,
+          notes: null,
+          projectId,
+          eventTitle,
+          eventStartTime,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }
+
+    setNotes((prev) => new Map(prev).set(googleEventId, optimisticNote))
+
+    // Upsert to database - include event metadata if provided
+    const upsertData: Record<string, unknown> = {
+      user_id: user.id,
+      google_event_id: googleEventId,
+      project_id: projectId,
+    }
+    if (eventTitle !== undefined) {
+      upsertData.event_title = eventTitle
+    }
+    if (eventStartTime !== undefined) {
+      upsertData.event_start_time = eventStartTime?.toISOString() ?? null
+    }
+
+    const { data, error: upsertError } = await supabase
+      .from('event_notes')
+      .upsert(upsertData, {
+        onConflict: 'user_id,google_event_id',
+      })
+      .select()
+      .single()
+
+    if (upsertError) {
+      // Rollback on error
+      if (existingNote) {
+        setNotes((prev) => new Map(prev).set(googleEventId, existingNote))
+      } else {
+        setNotes((prev) => {
+          const newMap = new Map(prev)
+          newMap.delete(googleEventId)
+          return newMap
+        })
+      }
+      setError(upsertError.message)
+      return
+    }
+
+    // Update with real data from DB
+    if (data) {
+      const realNote = dbNoteToEventNote(data as DbEventNote)
+      setNotes((prev) => new Map(prev).set(googleEventId, realNote))
+    }
+  }, [user, notes])
+
+  // Get event notes linked to a specific project
+  const getEventNotesForProject = useCallback(async (projectId: string): Promise<EventNote[]> => {
+    if (!user) return []
+
+    const { data, error: fetchError } = await supabase
+      .from('event_notes')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('project_id', projectId)
+
+    if (fetchError) {
+      setError(fetchError.message)
+      return []
+    }
+
+    if (data && data.length > 0) {
+      const eventNotes = (data as DbEventNote[]).map(dbNoteToEventNote)
+      // Update cache
+      setNotes((prev) => {
+        const newMap = new Map(prev)
+        for (const note of eventNotes) {
+          newMap.set(note.googleEventId, note)
+        }
+        return newMap
+      })
+      return eventNotes
+    }
+
+    return []
+  }, [user])
+
   return {
     notes,
     loading,
@@ -410,8 +521,10 @@ export function useEventNotes() {
     updateEventAssignment,
     updateEventAssignmentAll,
     updateRecipeUrl,
+    updateEventProject,
     autoDetectRecipes,
     deleteNote,
     getNote,
+    getEventNotesForProject,
   }
 }

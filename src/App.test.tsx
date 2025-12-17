@@ -43,11 +43,13 @@ vi.mock('@/hooks/useSupabaseTasks', () => ({
 
     const addTask = async (title: string): Promise<string | undefined> => {
       const id = crypto.randomUUID()
+      const now = new Date()
       const newTask: Task = {
         id,
         title,
         completed: false,
-        createdAt: new Date(),
+        createdAt: now,
+        updatedAt: now,
         // Optional fields default to undefined (inbox task)
       }
       setTasks((prev) => [newTask, ...prev])

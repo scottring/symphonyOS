@@ -11,7 +11,7 @@ describe('ProjectCard', () => {
   const mockProject = createMockProject({
     id: 'project-1',
     name: 'Test Project',
-    status: 'active',
+    status: 'in_progress',
     notes: 'Some project notes',
   })
 
@@ -53,11 +53,11 @@ describe('ProjectCard', () => {
   })
 
   describe('status display', () => {
-    it('shows Active badge for active status', () => {
-      const activeProject = createMockProject({ ...mockProject, status: 'active' })
-      render(<ProjectCard project={activeProject} />)
+    it('shows In Progress badge for in_progress status', () => {
+      const inProgressProject = createMockProject({ ...mockProject, status: 'in_progress' })
+      render(<ProjectCard project={inProgressProject} />)
 
-      expect(screen.getByText('Active')).toBeInTheDocument()
+      expect(screen.getByText('In Progress')).toBeInTheDocument()
     })
 
     it('shows Not Started badge for not_started status', () => {
@@ -74,11 +74,11 @@ describe('ProjectCard', () => {
       expect(screen.getByText('Completed')).toBeInTheDocument()
     })
 
-    it('applies blue styling for active status', () => {
-      const activeProject = createMockProject({ ...mockProject, status: 'active' })
-      render(<ProjectCard project={activeProject} />)
+    it('applies blue styling for in_progress status', () => {
+      const inProgressProject = createMockProject({ ...mockProject, status: 'in_progress' })
+      render(<ProjectCard project={inProgressProject} />)
 
-      const badge = screen.getByText('Active')
+      const badge = screen.getByText('In Progress')
       expect(badge).toHaveClass('bg-blue-100')
       expect(badge).toHaveClass('text-blue-700')
     })
@@ -195,23 +195,24 @@ describe('ProjectCard', () => {
       const statusButtons = buttons.filter(
         (btn) =>
           btn.textContent === 'Not Started' ||
-          btn.textContent === 'Active' ||
+          btn.textContent === 'In Progress' ||
+          btn.textContent === 'On Hold' ||
           btn.textContent === 'Completed'
       )
-      expect(statusButtons).toHaveLength(3)
+      expect(statusButtons).toHaveLength(4)
     })
 
     it('pre-selects current status in edit mode', () => {
-      const activeProject = createMockProject({ ...mockProject, status: 'active' })
-      render(<ProjectCard project={activeProject} onUpdate={mockOnUpdate} />)
+      const inProgressProject = createMockProject({ ...mockProject, status: 'in_progress' })
+      render(<ProjectCard project={inProgressProject} onUpdate={mockOnUpdate} />)
 
       fireEvent.click(screen.getByLabelText('Edit project'))
 
-      // Active button should have blue styling
-      const activeButton = screen.getAllByRole('button').find(
-        (btn) => btn.textContent === 'Active'
+      // In Progress button should have blue styling
+      const inProgressButton = screen.getAllByRole('button').find(
+        (btn) => btn.textContent === 'In Progress'
       )
-      expect(activeButton).toHaveClass('bg-blue-100')
+      expect(inProgressButton).toHaveClass('bg-blue-100')
     })
 
     it('cancels edit mode when clicking Cancel', () => {
@@ -236,7 +237,7 @@ describe('ProjectCard', () => {
 
       expect(mockOnUpdate).toHaveBeenCalledWith('project-1', {
         name: 'Updated Project',
-        status: 'active',
+        status: 'in_progress',
         notes: 'Some project notes',
       })
     })
@@ -309,7 +310,7 @@ describe('ProjectCard', () => {
 
   describe('status selection in edit mode', () => {
     it('changes status to not_started when clicking Not Started button', () => {
-      const activeProject = createMockProject({ ...mockProject, status: 'active' })
+      const activeProject = createMockProject({ ...mockProject, status: 'in_progress' })
       render(<ProjectCard project={activeProject} onUpdate={mockOnUpdate} />)
 
       fireEvent.click(screen.getByLabelText('Edit project'))
@@ -329,29 +330,29 @@ describe('ProjectCard', () => {
       )
     })
 
-    it('changes status to active when clicking Active button', () => {
+    it('changes status to in_progress when clicking In Progress button', () => {
       const notStartedProject = createMockProject({ ...mockProject, status: 'not_started' })
       render(<ProjectCard project={notStartedProject} onUpdate={mockOnUpdate} />)
 
       fireEvent.click(screen.getByLabelText('Edit project'))
 
-      // Click Active button
-      const activeButton = screen.getAllByRole('button').find(
-        (btn) => btn.textContent === 'Active'
+      // Click In Progress button
+      const inProgressButton = screen.getAllByRole('button').find(
+        (btn) => btn.textContent === 'In Progress'
       )
-      fireEvent.click(activeButton!)
+      fireEvent.click(inProgressButton!)
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       expect(mockOnUpdate).toHaveBeenCalledWith(
         'project-1',
         expect.objectContaining({
-          status: 'active',
+          status: 'in_progress',
         })
       )
     })
 
     it('changes status to completed when clicking Completed button', () => {
-      const activeProject = createMockProject({ ...mockProject, status: 'active' })
+      const activeProject = createMockProject({ ...mockProject, status: 'in_progress' })
       render(<ProjectCard project={activeProject} onUpdate={mockOnUpdate} />)
 
       fireEvent.click(screen.getByLabelText('Edit project'))

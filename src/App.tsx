@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useCallback, Suspense } from 'react'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useAuth } from '@/hooks/useAuth'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
-import { useEventNotes } from '@/hooks/useEventNotes'
+import { useEventNotes, type EventNote } from '@/hooks/useEventNotes'
 import { useContacts } from '@/hooks/useContacts'
 import { useProjects } from '@/hooks/useProjects'
 import { useRoutines } from '@/hooks/useRoutines'
@@ -28,6 +28,7 @@ import { SearchModal } from '@/components/search/SearchModal'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 import { ListsList, ListView } from '@/components/list'
 import { NotesPage } from '@/components/notes'
+import { CompletedTasksView } from '@/components/history/CompletedTasksView'
 import { Toast } from '@/components/toast'
 import {
   ProjectsList,
@@ -61,9 +62,9 @@ function App() {
   // Onboarding state
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null)
   const [onboardingLoading, setOnboardingLoading] = useState(true)
-  const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, updateEventAssignmentAll, updateRecipeUrl, getNote, notes: eventNotesMap } = useEventNotes()
+  const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, updateEventAssignmentAll, updateRecipeUrl, updateEventProject, getNote, getEventNotesForProject, notes: eventNotesMap } = useEventNotes()
   const { contacts, contactsMap, addContact, updateContact, deleteContact, searchContacts } = useContacts()
-  const { projects, projectsMap, addProject, updateProject, deleteProject, searchProjects } = useProjects()
+  const { projects, projectsMap, addProject, updateProject, deleteProject, searchProjects, recalculateProjectStatus } = useProjects()
   const {
     routines: allRoutines,
     activeRoutines,
@@ -480,6 +481,14 @@ function App() {
     return eventNote?.assignedToAll ?? []
   }, [selectedItem, eventNotesMap])
 
+  // Get linked project for selected event
+  const selectedEventProjectId = useMemo(() => {
+    if (!selectedItem?.originalEvent) return null
+    const eventId = selectedItem.originalEvent.google_event_id || selectedItem.originalEvent.id
+    const eventNote = eventNotesMap.get(eventId)
+    return eventNote?.projectId ?? null
+  }, [selectedItem, eventNotesMap])
+
   // Get attachments for selected item
   const selectedItemAttachments = useMemo(() => {
     if (!selectedItemId) return []
@@ -528,6 +537,22 @@ function App() {
     if (!selectedProjectId) return null
     return projectsMap.get(selectedProjectId) ?? null
   }, [selectedProjectId, projectsMap])
+
+  // Linked event notes for selected project (stored with event metadata)
+  const [linkedEventsForProject, setLinkedEventsForProject] = useState<EventNote[]>([])
+
+  // Fetch linked event notes when project changes
+  useEffect(() => {
+    if (!selectedProjectId) {
+      setLinkedEventsForProject([])
+      return
+    }
+
+    // Get event notes linked to this project - they contain event title and start time
+    getEventNotesForProject(selectedProjectId).then((eventNotes) => {
+      setLinkedEventsForProject(eventNotes)
+    })
+  }, [selectedProjectId, getEventNotesForProject])
 
   // Get routine for routine view
   const selectedRoutine = useMemo(() => {
@@ -638,11 +663,12 @@ function App() {
     clearSearch()
   }, [clearSearch])
 
-  // Wrapper for toggleTask that auto-unpins completed tasks
+  // Wrapper for toggleTask that auto-unpins completed tasks and recalculates project status
   const handleToggleTask = useCallback(async (taskId: string) => {
     const task = tasks.find(t => t.id === taskId)
     const wasCompleted = task?.completed ?? false
     const taskTitle = task?.title || 'Task'
+    const projectId = task?.projectId
 
     await toggleTask(taskId)
 
@@ -650,13 +676,22 @@ function App() {
     if (!wasCompleted) {
       // Silent unpin - won't error if not pinned
       await pinnedItems.unpin('task', taskId)
-      
+
       // Add undo action
       undo.pushAction(`Completed "${taskTitle}"`, async () => {
         await toggleTask(taskId)
       })
     }
-  }, [tasks, toggleTask, pinnedItems, undo])
+
+    // Recalculate project status if task belongs to a project
+    if (projectId) {
+      // Get updated tasks for this project (with the toggle applied)
+      const projectTasks = tasks
+        .filter(t => t.projectId === projectId)
+        .map(t => t.id === taskId ? { ...t, completed: !wasCompleted } : t)
+      await recalculateProjectStatus(projectId, projectTasks)
+    }
+  }, [tasks, toggleTask, pinnedItems, undo, recalculateProjectStatus])
 
   // Handler for adding linked prep/followup tasks from DetailPanel
   const handleAddLinkedTask = useCallback(async (
@@ -928,6 +963,8 @@ function App() {
             familyMembers={familyMembers}
             eventAssignedToAll={selectedEventAssignedToAll}
             onUpdateEventAssignment={updateEventAssignmentAll}
+            eventProjectId={selectedEventProjectId}
+            onUpdateEventProject={updateEventProject}
           />
         )
       }
@@ -971,10 +1008,31 @@ function App() {
             onOpenProject={handleOpenProject}
             familyMembers={familyMembers}
             onAssignTask={(taskId, memberId) => {
+              const task = tasks.find(t => t.id === taskId)
+              const prevAssignedTo = task?.assignedTo
+              const taskTitle = task?.title || 'Task'
               updateTask(taskId, { assignedTo: memberId ?? undefined })
+
+              const memberName = memberId ? familyMembers.find(m => m.id === memberId)?.name : null
+              const message = memberName ? `Assigned "${taskTitle}" to ${memberName}` : `Unassigned "${taskTitle}"`
+              undo.pushAction(message, () => {
+                updateTask(taskId, { assignedTo: prevAssignedTo ?? undefined })
+              })
             }}
             onAssignTaskAll={(taskId, memberIds) => {
+              const task = tasks.find(t => t.id === taskId)
+              const prevAssignedToAll = task?.assignedToAll || []
+              const prevAssignedTo = task?.assignedTo
+              const taskTitle = task?.title || 'Task'
               updateTask(taskId, { assignedToAll: memberIds, assignedTo: memberIds[0] ?? undefined })
+
+              const memberNames = memberIds.map(id => familyMembers.find(m => m.id === id)?.name).filter(Boolean)
+              const message = memberIds.length > 0
+                ? `Assigned "${taskTitle}" to ${memberNames.join(', ')}`
+                : `Unassigned "${taskTitle}"`
+              undo.pushAction(message, () => {
+                updateTask(taskId, { assignedToAll: prevAssignedToAll, assignedTo: prevAssignedTo ?? undefined })
+              })
             }}
             onAssignEvent={(eventId, memberId) => {
               updateEventAssignment(eventId, memberId)
@@ -1165,7 +1223,10 @@ function App() {
             onAddTask={(title, projectId) => addTask(title, undefined, projectId, undefined, { assignedTo: getCurrentUserMember()?.id })}
             onSelectTask={handleSelectItem}
             onToggleTask={handleToggleTask}
+            onUpdateTask={handleUpdateTaskWithToast}
+            familyMembers={familyMembers}
             selectedTaskId={selectedItemId}
+            linkedEvents={linkedEventsForProject}
             isPinned={pinnedItems.isPinned('project', selectedProject.id)}
             canPin={pinnedItems.canPin()}
             onPin={() => pinnedItems.pin('project', selectedProject.id)}
@@ -1258,6 +1319,16 @@ function App() {
           canPin={pinnedItems.canPin()}
           onPin={() => pinnedItems.pin('list', selectedList.id)}
           onUnpin={() => pinnedItems.unpin('list', selectedList.id)}
+        />
+      )}
+
+      {activeView === 'history' && (
+        <CompletedTasksView
+          tasks={tasks}
+          contactsMap={contactsMap}
+          projectsMap={projectsMap}
+          onSelectTask={(taskId) => handleSelectItem(`task-${taskId}`)}
+          onBack={() => handleViewChange('home')}
         />
       )}
 

@@ -13,6 +13,7 @@ interface InboxSectionProps {
   onPushTask: (id: string, date: Date) => void
   onSelectTask: (taskId: string) => void
   onDeleteTask?: (taskId: string) => void
+  onAddTask?: (task: { title: string; projectId?: string }) => Promise<Task | null>
   projects?: Project[]
   contacts?: Contact[]
   onSearchContacts?: (query: string) => Contact[]
@@ -35,6 +36,7 @@ export function InboxSection({
   onPushTask,
   onSelectTask,
   onDeleteTask,
+  onAddTask,
   projects = [],
   contacts: _contacts = [],
   onSearchContacts: _onSearchContacts,
@@ -137,13 +139,23 @@ export function InboxSection({
             onUpdateTask(triageTask.id, updates)
             setTriageTaskId(null)
           }}
-          onConvertToProject={async (name, _domain) => {
-            // Create project and delete the inbox task
+          onConvertToProject={async (name, projectTasks, _domain) => {
+            // Create project with tasks, then delete the original inbox item
             if (onAddProject) {
-              await onAddProject({ name })
-              // Delete the original task - it's now a project
+              const project = await onAddProject({ name })
+              if (project && onAddTask) {
+                // Create all the tasks linked to the new project
+                for (const task of projectTasks) {
+                  await onAddTask({ title: task.title, projectId: project.id })
+                }
+              }
+              // Delete the original inbox task - it's now a project
               if (onDeleteTask) {
                 onDeleteTask(triageTask.id)
+              }
+              // Navigate to the new project
+              if (project && onOpenProject) {
+                onOpenProject(project.id)
               }
             }
             setTriageTaskId(null)

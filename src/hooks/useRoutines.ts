@@ -8,10 +8,13 @@ export interface CreateRoutineInput {
   recurrence_pattern?: RecurrencePattern
   time_of_day?: string // HH:MM format
   visibility?: RoutineVisibility
-  default_assignee?: string | null
+  default_assignee?: string | null  // Used for generating recurring instances
+  assigned_to?: string | null  // Current assignment (if null, uses defaultFallbackAssignee)
   raw_input?: string | null
   prep_task_templates?: PrepFollowupTemplate[]
   followup_task_templates?: PrepFollowupTemplate[]
+  // Fallback assignee if assigned_to is undefined (not null)
+  defaultFallbackAssignee?: string
 }
 
 export interface UpdateRoutineInput {
@@ -74,6 +77,11 @@ export function useRoutines() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
 
+      // Determine effective assigned_to: explicit value takes precedence, then fallback
+      const effectiveAssignedTo = input.assigned_to !== undefined
+        ? input.assigned_to
+        : input.defaultFallbackAssignee ?? null
+
       const { data, error: insertError } = await supabase
         .from('routines')
         .insert({
@@ -84,6 +92,7 @@ export function useRoutines() {
           time_of_day: input.time_of_day || null,
           visibility: input.visibility || 'active',
           default_assignee: input.default_assignee || null,
+          assigned_to: effectiveAssignedTo,
           raw_input: input.raw_input || null,
           prep_task_templates: input.prep_task_templates || [],
           followup_task_templates: input.followup_task_templates || [],

@@ -5,13 +5,14 @@ import type { FamilyMember } from '@/types/family'
 import { FAMILY_COLORS, type FamilyMemberColor } from '@/types/family'
 import { PlacesAutocomplete, type PlaceSelection } from '@/components/location/PlacesAutocomplete'
 import { useDirections } from '@/hooks/useDirections'
+import { CreateProjectFromTaskModal } from './CreateProjectFromTaskModal'
 
 interface InboxTriageModalProps {
   task: Task
   isOpen: boolean
   onClose: () => void
   onProcessAsTask: (updates: Partial<Task>) => void
-  onConvertToProject: (name: string, domain?: TaskContext) => void
+  onConvertToProject: (name: string, tasks: { title: string }[], domain?: TaskContext) => void
   onConvertToNote?: (title: string, content?: string) => void
   onDelete: () => void
   projects: Project[]
@@ -59,6 +60,8 @@ export function InboxTriageModal({
   const [endTime, setEndTime] = useState<string>('')
   // Activity-specific (which kid)
   const [forChildId, setForChildId] = useState<string | null>(null)
+  // Project creation modal
+  const [showCreateProjectModal, setShowCreateProjectModal] = useState(false)
 
   // Reset form when modal opens/closes or task changes
   useEffect(() => {
@@ -169,8 +172,13 @@ export function InboxTriageModal({
     onClose()
   }
 
-  const handleConvertToProject = () => {
-    onConvertToProject(task.title, domain ?? undefined)
+  const handleOpenCreateProjectModal = () => {
+    setShowCreateProjectModal(true)
+  }
+
+  const handleCreateProject = (projectName: string, tasks: { title: string }[]) => {
+    onConvertToProject(projectName, tasks, domain ?? undefined)
+    setShowCreateProjectModal(false)
     onClose()
   }
 
@@ -218,6 +226,31 @@ export function InboxTriageModal({
 
         {/* Content */}
         <div className="p-5 space-y-5">
+          {/* Create Project Button - Prominent Position */}
+          <button
+            onClick={handleOpenCreateProjectModal}
+            className="w-full px-4 py-3 rounded-xl text-left transition-all border-2 border-dashed border-primary-200 bg-primary-50/50 hover:bg-primary-50 hover:border-primary-300 group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center group-hover:bg-primary-200 transition-colors">
+                <svg className="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </svg>
+              </div>
+              <div>
+                <div className="font-medium text-primary-700">Create project from this task</div>
+                <div className="text-xs text-primary-500">Break it down into actionable steps</div>
+              </div>
+            </div>
+          </button>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3">
+            <div className="flex-1 border-t border-neutral-200" />
+            <span className="text-xs text-neutral-400 uppercase tracking-wide">or process as</span>
+            <div className="flex-1 border-t border-neutral-200" />
+          </div>
+
           {/* Category Selection - Primary Action */}
           <div>
             <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">
@@ -458,18 +491,9 @@ export function InboxTriageModal({
 
         {/* Footer */}
         <div className="sticky bottom-0 bg-white border-t border-neutral-100 px-5 py-4">
-          {/* Secondary Actions Row */}
-          <div className="flex items-center gap-2 mb-3 pb-3 border-b border-neutral-100">
-            <button
-              onClick={handleConvertToProject}
-              className="flex-1 px-3 py-2 text-sm text-neutral-600 hover:text-neutral-800 hover:bg-neutral-50 rounded-lg transition-colors flex items-center justify-center gap-1.5"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-              </svg>
-              Create Project
-            </button>
-            {onConvertToNote && (
+          {/* Secondary Actions Row - only shown if we have save as note option */}
+          {onConvertToNote && (
+            <div className="flex items-center gap-2 mb-3 pb-3 border-b border-neutral-100">
               <button
                 onClick={handleConvertToNote}
                 className="flex-1 px-3 py-2 text-sm text-neutral-600 hover:text-neutral-800 hover:bg-neutral-50 rounded-lg transition-colors flex items-center justify-center gap-1.5"
@@ -479,8 +503,8 @@ export function InboxTriageModal({
                 </svg>
                 Save as Note
               </button>
-            )}
-          </div>
+            </div>
+          )}
           {/* Primary Actions Row */}
           <div className="flex gap-3">
             <button
@@ -504,6 +528,14 @@ export function InboxTriageModal({
           </div>
         </div>
       </div>
+
+      {/* Create Project Modal */}
+      <CreateProjectFromTaskModal
+        isOpen={showCreateProjectModal}
+        onClose={() => setShowCreateProjectModal(false)}
+        taskTitle={task.title}
+        onConfirm={handleCreateProject}
+      />
     </div>
   )
 }

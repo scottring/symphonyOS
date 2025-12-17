@@ -1,7 +1,9 @@
-import { useState, useRef, useEffect } from 'react'
-import type { Contact } from '@/types/contact'
+import { useState, useRef, useEffect, useMemo } from 'react'
+import type { Contact, ContactCategory } from '@/types/contact'
+import { getCategoryLabel, getCategoryIcon } from '@/types/contact'
 import type { Task } from '@/types/task'
 import { PinButton } from '@/components/pins'
+import { CategoryPicker } from './CategoryPicker'
 
 interface ContactViewProps {
   contact: Contact
@@ -16,6 +18,32 @@ interface ContactViewProps {
   canPin?: boolean
   onPin?: () => Promise<boolean>
   onUnpin?: () => Promise<boolean>
+}
+
+// Format date for display (e.g., "March 15" or "March 15, 1990")
+function formatBirthday(dateStr: string | undefined): string {
+  if (!dateStr) return ''
+  const date = new Date(dateStr + 'T00:00:00') // Ensure local timezone
+  const month = date.toLocaleDateString('en-US', { month: 'long' })
+  const day = date.getDate()
+  const year = date.getFullYear()
+  // If year is 1900 or earlier, assume no year was intended
+  if (year <= 1900) {
+    return `${month} ${day}`
+  }
+  return `${month} ${day}, ${year}`
+}
+
+// Format completion date
+function formatCompletionDate(date: Date): string {
+  const now = new Date()
+  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
+
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Yesterday'
+  if (diffDays < 7) return `${diffDays} days ago`
+
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 export function ContactView({
@@ -39,17 +67,38 @@ export function ContactView({
   const [localPhone, setLocalPhone] = useState(contact.phone || '')
   const [localEmail, setLocalEmail] = useState(contact.email || '')
   const [localNotes, setLocalNotes] = useState(contact.notes || '')
+  const [localRelationship, setLocalRelationship] = useState(contact.relationship || '')
+  const [localBirthday, setLocalBirthday] = useState(contact.birthday || '')
+  const [localPreferences, setLocalPreferences] = useState(contact.preferences || '')
 
   // Debounce refs
   const phoneDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const emailDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const notesDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const relationshipDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const birthdayDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const preferencesDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Delete confirmation
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
-  // Filter tasks linked to this contact
-  const linkedTasks = tasks.filter((t) => t.contactId === contact.id)
+  // Filter and sort tasks linked to this contact
+  const linkedTasks = useMemo(() => {
+    const filtered = tasks.filter((t) => t.contactId === contact.id)
+    // Sort: incomplete first, then by completion date (most recent first)
+    return filtered.sort((a, b) => {
+      if (a.completed && !b.completed) return 1
+      if (!a.completed && b.completed) return -1
+      // Both completed or both incomplete - sort by updated date
+      return b.updatedAt.getTime() - a.updatedAt.getTime()
+    })
+  }, [tasks, contact.id])
+
+  // Separate active and completed tasks
+  const activeTasks = useMemo(() => linkedTasks.filter(t => !t.completed), [linkedTasks])
+  const completedTasks = useMemo(() => linkedTasks.filter(t => t.completed), [linkedTasks])
+
+  const isFamily = contact.category === 'family'
 
   // Sync state when contact changes
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -58,9 +107,12 @@ export function ContactView({
     setLocalPhone(contact.phone || '')
     setLocalEmail(contact.email || '')
     setLocalNotes(contact.notes || '')
+    setLocalRelationship(contact.relationship || '')
+    setLocalBirthday(contact.birthday || '')
+    setLocalPreferences(contact.preferences || '')
     setIsEditingName(false)
     setShowDeleteConfirm(false)
-  }, [contact.id, contact.name, contact.phone, contact.email, contact.notes])
+  }, [contact.id, contact.name, contact.phone, contact.email, contact.notes, contact.relationship, contact.birthday, contact.preferences])
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Focus name input when editing starts
@@ -77,6 +129,9 @@ export function ContactView({
       if (phoneDebounceRef.current) clearTimeout(phoneDebounceRef.current)
       if (emailDebounceRef.current) clearTimeout(emailDebounceRef.current)
       if (notesDebounceRef.current) clearTimeout(notesDebounceRef.current)
+      if (relationshipDebounceRef.current) clearTimeout(relationshipDebounceRef.current)
+      if (birthdayDebounceRef.current) clearTimeout(birthdayDebounceRef.current)
+      if (preferencesDebounceRef.current) clearTimeout(preferencesDebounceRef.current)
     }
   }, [])
 
@@ -95,6 +150,10 @@ export function ContactView({
       setEditedName(contact.name)
       setIsEditingName(false)
     }
+  }
+
+  const handleCategoryChange = (category: ContactCategory | undefined) => {
+    onUpdate(contact.id, { category })
   }
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,6 +186,36 @@ export function ContactView({
     }, 500)
   }
 
+  const handleRelationshipChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setLocalRelationship(value)
+
+    if (relationshipDebounceRef.current) clearTimeout(relationshipDebounceRef.current)
+    relationshipDebounceRef.current = setTimeout(() => {
+      onUpdate(contact.id, { relationship: value || undefined })
+    }, 500)
+  }
+
+  const handleBirthdayChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setLocalBirthday(value)
+
+    if (birthdayDebounceRef.current) clearTimeout(birthdayDebounceRef.current)
+    birthdayDebounceRef.current = setTimeout(() => {
+      onUpdate(contact.id, { birthday: value || undefined })
+    }, 500)
+  }
+
+  const handlePreferencesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value
+    setLocalPreferences(value)
+
+    if (preferencesDebounceRef.current) clearTimeout(preferencesDebounceRef.current)
+    preferencesDebounceRef.current = setTimeout(() => {
+      onUpdate(contact.id, { preferences: value || undefined })
+    }, 500)
+  }
+
   const handleDelete = async () => {
     await onDelete(contact.id)
     onBack()
@@ -153,14 +242,16 @@ export function ContactView({
           </div>
 
           <div className="flex items-start gap-4">
-            {/* Contact avatar */}
-            <div className="w-14 h-14 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 flex-shrink-0">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-              </svg>
+            {/* Contact avatar with category icon */}
+            <div className="w-14 h-14 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0 text-2xl">
+              {contact.category ? getCategoryIcon(contact.category) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 text-primary-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                </svg>
+              )}
             </div>
 
-            {/* Name */}
+            {/* Name and category badge */}
             <div className="flex-1 min-w-0">
               {isEditingName ? (
                 <input
@@ -182,6 +273,14 @@ export function ContactView({
                 >
                   {contact.name}
                 </h1>
+              )}
+              {/* Category and relationship badge */}
+              {(contact.category || contact.relationship) && (
+                <p className="text-sm text-neutral-500 mt-1">
+                  {getCategoryLabel(contact.category)}
+                  {contact.category && contact.relationship && ' · '}
+                  {contact.relationship}
+                </p>
               )}
             </div>
 
@@ -281,82 +380,149 @@ export function ContactView({
             </div>
           )}
 
-          {/* Phone Field */}
+          {/* Category Picker */}
           <div className="bg-white rounded-xl border border-neutral-100 p-4">
-            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">Phone</h2>
-            <input
-              type="tel"
-              value={localPhone}
-              onChange={handlePhoneChange}
-              placeholder="Add phone number"
-              className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200
-                         focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
+            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">Category</h2>
+            <CategoryPicker value={contact.category} onChange={handleCategoryChange} />
           </div>
 
-          {/* Email Field */}
+          {/* Family-specific fields */}
+          {isFamily && (
+            <div className="bg-white rounded-xl border border-neutral-100 p-4">
+              <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">Details</h2>
+              <div className="space-y-4">
+                {/* Birthday */}
+                <div>
+                  <label className="flex items-center gap-2 text-sm text-neutral-600 mb-1.5">
+                    <span>Birthday</span>
+                    {localBirthday && (
+                      <span className="text-neutral-400">({formatBirthday(localBirthday)})</span>
+                    )}
+                  </label>
+                  <input
+                    type="date"
+                    value={localBirthday}
+                    onChange={handleBirthdayChange}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200
+                               focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                </div>
+                {/* Relationship */}
+                <div>
+                  <label className="block text-sm text-neutral-600 mb-1.5">Relationship</label>
+                  <input
+                    type="text"
+                    value={localRelationship}
+                    onChange={handleRelationshipChange}
+                    placeholder="e.g., Son, Spouse, Mother"
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200
+                               focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Preferences & Facts (show for family, or if preferences exist for other types) */}
+          {(isFamily || contact.preferences) && (
+            <div className="bg-white rounded-xl border border-neutral-100 p-4">
+              <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">
+                {isFamily ? 'Preferences & Facts' : 'Preferences'}
+              </h2>
+              <textarea
+                value={localPreferences}
+                onChange={handlePreferencesChange}
+                placeholder={isFamily
+                  ? "Shoe size, favorite foods, allergies, interests..."
+                  : "Add preferences or facts about this contact..."
+                }
+                rows={4}
+                className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200
+                           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
+                           resize-none"
+              />
+            </div>
+          )}
+
+          {/* Contact Info */}
           <div className="bg-white rounded-xl border border-neutral-100 p-4">
-            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">Email</h2>
-            <input
-              type="email"
-              value={localEmail}
-              onChange={handleEmailChange}
-              placeholder="Add email address"
-              className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200
-                         focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
+            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">Contact Info</h2>
+            <div className="space-y-4">
+              {/* Phone */}
+              <div>
+                <label className="block text-sm text-neutral-600 mb-1.5">Phone</label>
+                <input
+                  type="tel"
+                  value={localPhone}
+                  onChange={handlePhoneChange}
+                  placeholder="Add phone number"
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200
+                             focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+              {/* Email */}
+              <div>
+                <label className="block text-sm text-neutral-600 mb-1.5">Email</label>
+                <input
+                  type="email"
+                  value={localEmail}
+                  onChange={handleEmailChange}
+                  placeholder="Add email address"
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200
+                             focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+            </div>
           </div>
 
-          {/* Notes Field */}
-          <div className="bg-white rounded-xl border border-neutral-100 p-4">
-            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">Notes</h2>
-            <textarea
-              value={localNotes}
-              onChange={handleNotesChange}
-              placeholder="Add notes about this contact..."
-              rows={4}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200
-                         focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
-                         resize-none"
-            />
-          </div>
+          {/* Notes Field (for non-family or general notes) */}
+          {!isFamily && (
+            <div className="bg-white rounded-xl border border-neutral-100 p-4">
+              <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">Notes</h2>
+              <textarea
+                value={localNotes}
+                onChange={handleNotesChange}
+                placeholder="Add notes about this contact..."
+                rows={4}
+                className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200
+                           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
+                           resize-none"
+              />
+            </div>
+          )}
 
-          {/* Linked Tasks */}
+          {/* Task History - Enhanced with notes snippets */}
           <div className="bg-white rounded-xl border border-neutral-100 p-4">
             <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">
-              Linked Tasks {linkedTasks.length > 0 && `(${linkedTasks.length})`}
+              History {linkedTasks.length > 0 && `(${linkedTasks.length})`}
             </h2>
+
             {linkedTasks.length > 0 ? (
-              <ul className="space-y-2">
-                {linkedTasks.map((task) => (
-                  <li key={task.id}>
-                    <button
-                      onClick={() => onSelectTask(task.id)}
-                      className="w-full flex items-center gap-3 p-3 rounded-lg bg-neutral-50 hover:bg-neutral-100 transition-colors text-left"
-                    >
-                      <span
-                        className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center ${
-                          task.completed
-                            ? 'bg-primary-500 border-primary-500 text-white'
-                            : 'border-neutral-300'
-                        }`}
-                      >
-                        {task.completed && (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                        )}
-                      </span>
-                      <span className={`flex-1 text-sm ${task.completed ? 'text-neutral-400 line-through' : 'text-neutral-800'}`}>
-                        {task.title}
-                      </span>
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-neutral-400" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <div className="space-y-4">
+                {/* Active Tasks */}
+                {activeTasks.length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-medium text-neutral-400 uppercase tracking-wide mb-2">Active</h3>
+                    <ul className="space-y-2">
+                      {activeTasks.map((task) => (
+                        <TaskHistoryItem key={task.id} task={task} onSelect={onSelectTask} />
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Completed Tasks */}
+                {completedTasks.length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-medium text-neutral-400 uppercase tracking-wide mb-2">Completed</h3>
+                    <ul className="space-y-2">
+                      {completedTasks.map((task) => (
+                        <TaskHistoryItem key={task.id} task={task} onSelect={onSelectTask} />
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             ) : (
               <p className="text-sm text-neutral-400 text-center py-4">
                 No tasks linked to this contact
@@ -366,5 +532,55 @@ export function ContactView({
         </div>
       </div>
     </div>
+  )
+}
+
+// Task history item component with notes snippet
+function TaskHistoryItem({ task, onSelect }: { task: Task; onSelect: (id: string) => void }) {
+  // Truncate notes to ~50 chars
+  const notesSnippet = task.notes
+    ? (task.notes.length > 50 ? task.notes.slice(0, 50) + '...' : task.notes)
+    : null
+
+  return (
+    <li>
+      <button
+        onClick={() => onSelect(task.id)}
+        className="w-full flex flex-col gap-1 p-3 rounded-lg bg-neutral-50 hover:bg-neutral-100 transition-colors text-left"
+      >
+        <div className="flex items-center gap-3">
+          <span
+            className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center ${
+              task.completed
+                ? 'bg-primary-500 border-primary-500 text-white'
+                : 'border-neutral-300'
+            }`}
+          >
+            {task.completed && (
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+            )}
+          </span>
+          <span className={`flex-1 text-sm ${task.completed ? 'text-neutral-400 line-through' : 'text-neutral-800'}`}>
+            {task.title}
+          </span>
+          {task.completed && (
+            <span className="text-xs text-neutral-400">
+              {formatCompletionDate(task.updatedAt)}
+            </span>
+          )}
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-neutral-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+          </svg>
+        </div>
+        {/* Notes snippet */}
+        {notesSnippet && (
+          <p className="text-xs text-neutral-500 ml-8 italic">
+            "{notesSnippet}"
+          </p>
+        )}
+      </button>
+    </li>
   )
 }

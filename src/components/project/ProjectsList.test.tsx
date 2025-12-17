@@ -8,7 +8,7 @@ describe('ProjectsList', () => {
   const mockOnAddProject = vi.fn()
 
   const mockProjects = [
-    createMockProject({ id: 'project-1', name: 'Active Project', status: 'active' }),
+    createMockProject({ id: 'project-1', name: 'In Progress Project', status: 'in_progress' }),
     createMockProject({ id: 'project-2', name: 'Not Started Project', status: 'not_started' }),
     createMockProject({ id: 'project-3', name: 'Completed Project', status: 'completed' }),
   ]
@@ -58,40 +58,40 @@ describe('ProjectsList', () => {
     it('renders all project names', () => {
       render(<ProjectsList projects={mockProjects} onSelectProject={mockOnSelectProject} />)
 
-      expect(screen.getByText('Active Project')).toBeInTheDocument()
+      expect(screen.getByText('In Progress Project')).toBeInTheDocument()
       expect(screen.getByText('Not Started Project')).toBeInTheDocument()
       expect(screen.getByText('Completed Project')).toBeInTheDocument()
     })
   })
 
   describe('project sorting', () => {
-    it('sorts projects: active first, then not_started, then completed', () => {
+    it('sorts projects: in_progress first, then not_started, then completed', () => {
       const unsortedProjects = [
         createMockProject({ id: 'p1', name: 'Completed', status: 'completed' }),
-        createMockProject({ id: 'p2', name: 'Active', status: 'active' }),
+        createMockProject({ id: 'p2', name: 'In Progress', status: 'in_progress' }),
         createMockProject({ id: 'p3', name: 'Not Started', status: 'not_started' }),
       ]
 
       render(<ProjectsList projects={unsortedProjects} onSelectProject={mockOnSelectProject} />)
 
       const projectButtons = screen.getAllByRole('button').filter(btn =>
-        btn.textContent?.includes('Active') ||
+        btn.textContent?.includes('In Progress') ||
         btn.textContent?.includes('Not Started') ||
         btn.textContent?.includes('Completed')
       )
 
-      // First visible project should be Active
-      expect(projectButtons[0]).toHaveTextContent('Active')
+      // First visible project should be In Progress
+      expect(projectButtons[0]).toHaveTextContent('In Progress')
       expect(projectButtons[1]).toHaveTextContent('Not Started')
       expect(projectButtons[2]).toHaveTextContent('Completed')
     })
   })
 
   describe('status display', () => {
-    it('shows Active status label for active projects', () => {
+    it('shows In Progress status label for in_progress projects', () => {
       render(<ProjectsList projects={mockProjects} onSelectProject={mockOnSelectProject} />)
 
-      expect(screen.getByText('Active')).toBeInTheDocument()
+      expect(screen.getByText('In Progress')).toBeInTheDocument()
     })
 
     it('shows Not Started status label for not_started projects', () => {
@@ -106,11 +106,11 @@ describe('ProjectsList', () => {
       expect(screen.getByText('Completed')).toBeInTheDocument()
     })
 
-    it('applies blue styling for active status', () => {
-      const activeProject = [createMockProject({ status: 'active' })]
-      render(<ProjectsList projects={activeProject} onSelectProject={mockOnSelectProject} />)
+    it('applies blue styling for in_progress status', () => {
+      const inProgressProject = [createMockProject({ status: 'in_progress' })]
+      render(<ProjectsList projects={inProgressProject} onSelectProject={mockOnSelectProject} />)
 
-      const badge = screen.getByText('Active')
+      const badge = screen.getByText('In Progress')
       expect(badge).toHaveClass('bg-blue-100')
       expect(badge).toHaveClass('text-blue-700')
     })
@@ -155,7 +155,7 @@ describe('ProjectsList', () => {
     it('calls onSelectProject with project id when clicking a project', () => {
       render(<ProjectsList projects={mockProjects} onSelectProject={mockOnSelectProject} />)
 
-      fireEvent.click(screen.getByText('Active Project'))
+      fireEvent.click(screen.getByText('In Progress Project'))
 
       expect(mockOnSelectProject).toHaveBeenCalledWith('project-1')
     })

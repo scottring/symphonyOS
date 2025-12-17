@@ -77,7 +77,8 @@ export function ProjectsListRedesign({ projects, tasks = [], onSelectProject, on
   }, [projects, tasks])
 
   // Group by status
-  const activeProjects = projectsWithStats.filter(p => p.status === 'active')
+  const inProgressProjects = projectsWithStats.filter(p => p.status === 'in_progress')
+  const onHoldProjects = projectsWithStats.filter(p => p.status === 'on_hold')
   const notStartedProjects = projectsWithStats.filter(p => p.status === 'not_started')
   const completedProjects = projectsWithStats.filter(p => p.status === 'completed')
 
@@ -284,12 +285,12 @@ export function ProjectsListRedesign({ projects, tasks = [], onSelectProject, on
         {/* Project sections */}
         {hasProjects && (
           <div className="space-y-10">
-            {/* Active projects */}
-            {activeProjects.length > 0 && (
+            {/* In Progress projects */}
+            {inProgressProjects.length > 0 && (
               <section>
-                <SectionHeader title="Active" count={activeProjects.length} />
+                <SectionHeader title="In Progress" count={inProgressProjects.length} />
                 <div className="space-y-3 stagger-in">
-                  {activeProjects.map((project, index) => renderProjectCard(project, index))}
+                  {inProgressProjects.map((project, index) => renderProjectCard(project, index))}
                 </div>
               </section>
             )}
@@ -300,6 +301,16 @@ export function ProjectsListRedesign({ projects, tasks = [], onSelectProject, on
                 <SectionHeader title="Not Started" count={notStartedProjects.length} />
                 <div className="space-y-3 stagger-in">
                   {notStartedProjects.map((project, index) => renderProjectCard(project, index))}
+                </div>
+              </section>
+            )}
+
+            {/* On Hold projects */}
+            {onHoldProjects.length > 0 && (
+              <section>
+                <SectionHeader title="On Hold" count={onHoldProjects.length} />
+                <div className="space-y-3 stagger-in opacity-80">
+                  {onHoldProjects.map((project, index) => renderProjectCard(project, index))}
                 </div>
               </section>
             )}

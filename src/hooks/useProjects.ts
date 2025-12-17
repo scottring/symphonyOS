@@ -1,7 +1,23 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
-import type { Project, DbProject } from '@/types/project'
+import type { Project, DbProject, ProjectStatus } from '@/types/project'
+import type { Task } from '@/types/task'
+
+/**
+ * Calculate what status a project should have based on its tasks.
+ * Returns the calculated status, but callers should respect manual overrides.
+ */
+export function calculateProjectStatus(tasks: Task[]): ProjectStatus {
+  if (tasks.length === 0) return 'not_started'
+
+  const completed = tasks.filter(t => t.completed).length
+  const total = tasks.length
+
+  if (completed === 0) return 'not_started'
+  if (completed === total) return 'completed'
+  return 'in_progress'
+}
 
 function dbProjectToProject(dbProject: DbProject): Project {
   return {
@@ -179,6 +195,28 @@ export function useProjects() {
     return map
   }, [projects])
 
+  /**
+   * Recalculate and update a project's status based on its tasks.
+   * Only auto-updates if current status is 'not_started' or 'in_progress'.
+   * If user has manually set 'on_hold' or 'completed', it won't be overwritten.
+   */
+  const recalculateProjectStatus = useCallback(async (projectId: string, projectTasks: Task[]) => {
+    const project = projects.find((p) => p.id === projectId)
+    if (!project) return
+
+    // Don't auto-update if user has manually set to on_hold or completed
+    if (project.status === 'on_hold' || project.status === 'completed') {
+      return
+    }
+
+    const calculatedStatus = calculateProjectStatus(projectTasks)
+
+    // Only update if status actually changed
+    if (calculatedStatus !== project.status) {
+      await updateProject(projectId, { status: calculatedStatus })
+    }
+  }, [projects, updateProject])
+
   return {
     projects,
     projectsMap,
@@ -191,5 +229,6 @@ export function useProjects() {
     searchProjects,
     getProjectById,
     getChildProjects,
+    recalculateProjectStatus,
   }
 }

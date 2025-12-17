@@ -114,6 +114,9 @@ export function useSearch({ tasks, projects, contacts, routines, lists = [] }: U
           { name: 'email', weight: 1.5 },
           { name: 'phone', weight: 1.5 },
           { name: 'notes', weight: 1 },
+          { name: 'category', weight: 1 },
+          { name: 'preferences', weight: 1 },
+          { name: 'relationship', weight: 0.8 },
         ],
       }),
     [contacts]
@@ -218,14 +221,33 @@ export function useSearch({ tasks, projects, contacts, routines, lists = [] }: U
       item: r.item,
     }))
 
-    const contactsResult: SearchResult[] = contactResults.map((r) => ({
-      type: 'contact' as const,
-      id: r.item.id,
-      title: r.item.name,
-      subtitle: r.item.phone || r.item.email,
-      matchedField: r.matches?.[0]?.key,
-      item: r.item,
-    }))
+    const contactsResult: SearchResult[] = contactResults.map((r) => {
+      // Build subtitle: category + phone/email
+      const parts: string[] = []
+      if (r.item.category) {
+        const categoryLabels: Record<string, string> = {
+          family: 'Family',
+          friend: 'Friend',
+          service_provider: 'Service Provider',
+          professional: 'Professional',
+          school: 'School',
+          medical: 'Medical',
+          other: 'Other',
+        }
+        parts.push(categoryLabels[r.item.category] || r.item.category)
+      }
+      if (r.item.phone) parts.push(r.item.phone)
+      else if (r.item.email) parts.push(r.item.email)
+
+      return {
+        type: 'contact' as const,
+        id: r.item.id,
+        title: r.item.name,
+        subtitle: parts.length > 0 ? parts.join(' · ') : undefined,
+        matchedField: r.matches?.[0]?.key,
+        item: r.item,
+      }
+    })
 
     const routinesResult: SearchResult[] = routineResults.map((r) => ({
       type: 'routine' as const,

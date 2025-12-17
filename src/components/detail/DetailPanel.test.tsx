@@ -32,6 +32,7 @@ const mockTask: TimelineItem = {
     title: 'Test task',
     completed: false,
     createdAt: new Date(),
+    updatedAt: new Date(),
   },
 }
 
@@ -47,6 +48,7 @@ const mockCompletedTask: TimelineItem = {
     title: 'Completed task',
     completed: true,
     createdAt: new Date(),
+    updatedAt: new Date(),
   },
 }
 
@@ -72,7 +74,7 @@ const mockProjects: Project[] = [
   {
     id: 'project-1',
     name: 'Existing Project',
-    status: 'active',
+    status: 'in_progress',
     createdAt: new Date(),
     updatedAt: new Date(),
   },

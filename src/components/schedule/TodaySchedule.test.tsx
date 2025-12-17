@@ -21,6 +21,7 @@ const createMockTask = (overrides: Partial<Task> = {}): Task => ({
   title: 'Test Task',
   completed: false,
   createdAt: new Date('2024-01-01'),
+  updatedAt: new Date('2024-01-01'),
   ...overrides,
 })
 
@@ -80,7 +81,7 @@ const mockContact: Contact = {
 const mockProject: Project = {
   id: 'project-1',
   name: 'Test Project',
-  status: 'active',
+  status: 'in_progress',
   createdAt: new Date(),
   updatedAt: new Date(),
 }
@@ -486,7 +487,9 @@ describe('TodaySchedule', () => {
 
       render(<TodaySchedule {...defaultProps} tasks={tasks} projectsMap={projectsMap} />)
 
-      expect(screen.getByText('Test Project')).toBeInTheDocument()
+      // Project name now appears in both tooltip and context label
+      const projectNameElements = screen.getAllByText('Test Project')
+      expect(projectNameElements.length).toBeGreaterThan(0)
     })
   })
 

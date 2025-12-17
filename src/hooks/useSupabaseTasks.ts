@@ -58,6 +58,7 @@ function dbTaskToTask(dbTask: DbTask): Task {
     title: dbTask.title,
     completed: dbTask.completed,
     createdAt: new Date(dbTask.created_at),
+    updatedAt: new Date(dbTask.updated_at),
     scheduledFor: dbTask.scheduled_for ? new Date(dbTask.scheduled_for) : undefined,
     deferredUntil: dbTask.deferred_until ? new Date(dbTask.deferred_until) : undefined,
     deferCount: dbTask.defer_count ?? undefined,
@@ -159,8 +160,9 @@ export function useSupabaseTasks() {
   interface AddTaskOptions {
     linkedTo?: LinkedActivity
     linkType?: LinkType
-    assignedTo?: string  // Family member ID to assign task to
+    assignedTo?: string | null  // Family member ID to assign task to (null = no assignment, undefined = use default)
     category?: TaskCategory  // What kind of family item
+    defaultAssigneeId?: string  // Default assignee if assignedTo is undefined
   }
 
   const addTask = useCallback(async (
@@ -172,19 +174,27 @@ export function useSupabaseTasks() {
   ): Promise<string | undefined> => {
     if (!user) return undefined
 
+    // Determine assignment: explicit assignedTo takes precedence, then default, then null
+    // This allows callers to explicitly pass null to create unassigned tasks
+    const effectiveAssignedTo = options?.assignedTo !== undefined
+      ? options.assignedTo
+      : options?.defaultAssigneeId ?? null
+
     // Optimistic update
     const tempId = crypto.randomUUID()
+    const now = new Date()
     const optimisticTask: Task = {
       id: tempId,
       title,
       completed: false,
-      createdAt: new Date(),
+      createdAt: now,
+      updatedAt: now,
       contactId,
       projectId,
       scheduledFor,
       linkedTo: options?.linkedTo,
       linkType: options?.linkType,
-      assignedTo: options?.assignedTo,
+      assignedTo: effectiveAssignedTo ?? undefined,
       category: options?.category ?? 'task',
     }
     setTasks((prev) => [optimisticTask, ...prev])
@@ -201,7 +211,7 @@ export function useSupabaseTasks() {
         linked_activity_type: options?.linkedTo?.type ?? null,
         linked_activity_id: options?.linkedTo?.id ?? null,
         link_type: options?.linkType ?? null,
-        assigned_to: options?.assignedTo ?? null,
+        assigned_to: effectiveAssignedTo,
         category: options?.category ?? 'task',
       })
       .select()
@@ -225,22 +235,32 @@ export function useSupabaseTasks() {
   }, [user])
 
   // Add a subtask to a parent task
-  const addSubtask = useCallback(async (parentId: string, title: string): Promise<string | undefined> => {
+  const addSubtask = useCallback(async (
+    parentId: string,
+    title: string,
+    options?: { defaultAssigneeId?: string }
+  ): Promise<string | undefined> => {
     if (!user) return undefined
 
     // Find parent to inherit properties
     const parent = tasks.find((t) => t.id === parentId)
     if (!parent) return undefined
 
+    // Inherit assignedTo from parent, or use default if parent has no assignment
+    const effectiveAssignedTo = parent.assignedTo ?? options?.defaultAssigneeId ?? null
+
     const tempId = crypto.randomUUID()
+    const now = new Date()
     const optimisticSubtask: Task = {
       id: tempId,
       title,
       completed: false,
-      createdAt: new Date(),
+      createdAt: now,
+      updatedAt: now,
       parentTaskId: parentId,
       projectId: parent.projectId,
       contactId: parent.contactId,
+      assignedTo: effectiveAssignedTo ?? undefined,
     }
 
     // Optimistic: add subtask to parent's subtasks array
@@ -261,6 +281,7 @@ export function useSupabaseTasks() {
         parent_task_id: parentId,
         project_id: parent.projectId ?? null,
         contact_id: parent.contactId ?? null,
+        assigned_to: effectiveAssignedTo,
       })
       .select()
       .single()
@@ -541,11 +562,13 @@ export function useSupabaseTasks() {
 
     // Optimistic update
     const tempId = crypto.randomUUID()
+    const now = new Date()
     const optimisticTask: Task = {
       id: tempId,
       title,
       completed: false,
-      createdAt: new Date(),
+      createdAt: now,
+      updatedAt: now,
       scheduledFor,
       linkedEventId,
     }
