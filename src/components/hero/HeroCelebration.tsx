@@ -14,6 +14,7 @@ interface Particle {
   rotation: number
   scale: number
   opacity: number
+  animationDelay: number
 }
 
 /**
@@ -47,6 +48,7 @@ export function HeroCelebration({ show }: HeroCelebrationProps) {
       const angle = (Math.PI * 2 * i) / particleCount + (Math.random() - 0.5) * 0.5
       const speed = 80 + Math.random() * 60
       const emoji = emojis[Math.floor(Math.random() * emojis.length)]
+      const animationDelay = Math.random() * 50 // Precompute random delay
 
       newParticles.push({
         id: idCounter.current++,
@@ -58,9 +60,11 @@ export function HeroCelebration({ show }: HeroCelebrationProps) {
         rotation: Math.random() * 360,
         scale: 0.8 + Math.random() * 0.4,
         opacity: 1,
+        animationDelay,
       })
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Intentional animation trigger
     setParticles(newParticles)
 
     // Clear particles after animation
@@ -76,6 +80,7 @@ export function HeroCelebration({ show }: HeroCelebrationProps) {
 
   useEffect(() => {
     if (show) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Intentional animation trigger
       setShowCheckmark(true)
       const timer = setTimeout(() => setShowCheckmark(false), 800)
       return () => clearTimeout(timer)
@@ -132,7 +137,7 @@ export function HeroCelebration({ show }: HeroCelebrationProps) {
             '--y': `${particle.vy}px`,
             fontSize: `${particle.scale * 1.5}rem`,
             animation: `hero-confetti-burst 800ms cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards`,
-            animationDelay: `${Math.random() * 50}ms`,
+            animationDelay: `${particle.animationDelay}ms`,
           } as React.CSSProperties}
         >
           {particle.emoji}

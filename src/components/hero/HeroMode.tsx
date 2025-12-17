@@ -76,6 +76,7 @@ export function HeroMode({
   // Reset state when opening
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Intentional reset on open
       setCurrentIndex(0)
       setSessionCompletedIds(new Set())
       setExitAnimation(null)
@@ -98,7 +99,7 @@ export function HeroMode({
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, currentTask, currentIndex])
+  }, [isOpen, currentTask, currentIndex, onClose])
 
   // Helper to get tomorrow's date
   const getTomorrow = useCallback(() => {

@@ -29,6 +29,8 @@ interface SwipeableCardProps {
 const COMPLETE_THRESHOLD = 80
 const ACTION_THRESHOLD = 60
 const RESISTANCE = 0.4
+// Dead zone - must move this far before any card movement
+const DEAD_ZONE = 20
 
 // Long press delay
 const LONG_PRESS_DELAY = 500
@@ -131,45 +133,48 @@ export function SwipeableCard({
     if (!card) return
 
     const handleTouchMove = (e: globalThis.TouchEvent) => {
-      // Cancel long press on any movement
-      if (longPressTimer.current) {
-        const currentX = e.touches[0].clientX
-        const currentY = e.touches[0].clientY
-        const diffX = Math.abs(currentX - startX.current)
-        const diffY = Math.abs(currentY - startY.current)
-        if (diffX > 10 || diffY > 10) {
-          clearTimeout(longPressTimer.current)
-          longPressTimer.current = null
-        }
-      }
-
-      if (!isDraggingRef.current) return
-
       const currentX = e.touches[0].clientX
       const currentY = e.touches[0].clientY
       const diffX = currentX - startX.current
       const diffY = currentY - startY.current
+      const absDiffX = Math.abs(diffX)
+      const absDiffY = Math.abs(diffY)
+
+      // Cancel long press on any movement beyond a small threshold
+      if (longPressTimer.current && (absDiffX > 8 || absDiffY > 8)) {
+        clearTimeout(longPressTimer.current)
+        longPressTimer.current = null
+      }
+
+      if (!isDraggingRef.current) return
 
       // Determine swipe direction on first significant movement
+      // Require clear horizontal intent (1.5x more horizontal than vertical)
       if (isHorizontalSwipe.current === null) {
-        if (Math.abs(diffX) > 10 || Math.abs(diffY) > 10) {
-          isHorizontalSwipe.current = Math.abs(diffX) > Math.abs(diffY)
+        if (absDiffX > DEAD_ZONE || absDiffY > DEAD_ZONE) {
+          isHorizontalSwipe.current = absDiffX > absDiffY * 1.5
         }
       }
 
+      // If not a horizontal swipe (or not yet determined), don't move the card
       if (!isHorizontalSwipe.current) return
 
       e.preventDefault()
 
-      let newTranslate = diffX
+      // Calculate translation, subtracting the dead zone so there's no initial jump
+      const effectiveDiff = diffX > 0
+        ? Math.max(0, diffX - DEAD_ZONE)
+        : Math.min(0, diffX + DEAD_ZONE)
 
-      // LEFT swipe (negative) - for completion
-      if (diffX < -COMPLETE_THRESHOLD) {
-        newTranslate = -COMPLETE_THRESHOLD + (diffX + COMPLETE_THRESHOLD) * RESISTANCE
+      let newTranslate = effectiveDiff
+
+      // LEFT swipe (negative) - for completion - apply resistance past threshold
+      if (effectiveDiff < -COMPLETE_THRESHOLD) {
+        newTranslate = -COMPLETE_THRESHOLD + (effectiveDiff + COMPLETE_THRESHOLD) * RESISTANCE
       }
-      // RIGHT swipe (positive) - for action buttons
-      else if (diffX > ACTION_THRESHOLD * 2) {
-        newTranslate = ACTION_THRESHOLD * 2 + (diffX - ACTION_THRESHOLD * 2) * RESISTANCE
+      // RIGHT swipe (positive) - for action buttons - apply resistance past threshold
+      else if (effectiveDiff > ACTION_THRESHOLD * 2) {
+        newTranslate = ACTION_THRESHOLD * 2 + (effectiveDiff - ACTION_THRESHOLD * 2) * RESISTANCE
       }
 
       setTranslateX(newTranslate)
@@ -197,12 +202,13 @@ export function SwipeableCard({
     setIsDragging(false)
 
     // LEFT swipe past threshold - complete (only for actionable items)
-    if (translateX < -COMPLETE_THRESHOLD && isActionable) {
+    // Use a slightly lower threshold (60) since we already subtracted the dead zone
+    if (translateX < -60 && isActionable) {
       onComplete()
       setTranslateX(0)
     }
     // RIGHT swipe past threshold - show action buttons
-    else if (translateX > ACTION_THRESHOLD) {
+    else if (translateX > 40) {
       setShowActions(true)
       setTranslateX(180) // Width of 3 buttons
     }
@@ -241,7 +247,7 @@ export function SwipeableCard({
   const showCompleteIndicator = translateX < -20 && isActionable
 
   return (
-    <div className="relative rounded-2xl">
+    <div className="relative md:rounded-2xl -mx-3 md:mx-0">
       {/* Selection checkbox overlay - shown in selection mode for tasks */}
       {selectionMode && isTask && (
         <div className="absolute left-3 top-1/2 -translate-y-1/2 z-20">
@@ -263,7 +269,7 @@ export function SwipeableCard({
       {/* Complete indicator - appears on RIGHT when swiping LEFT */}
       {translateX < 0 && (
         <div
-          className="absolute inset-y-0 right-0 flex items-center justify-end pr-4 rounded-r-2xl"
+          className="absolute inset-y-0 right-0 flex items-center justify-end pr-4 md:rounded-r-2xl"
           style={{
             width: Math.max(-translateX, 0),
             backgroundColor: completeProgress > 0.8
@@ -290,7 +296,7 @@ export function SwipeableCard({
 
       {/* Action buttons - appear on LEFT when swiping RIGHT */}
       {(translateX > 0 || showActions) && (
-      <div className="absolute inset-y-0 left-0 flex items-stretch overflow-hidden rounded-l-2xl">
+      <div className="absolute inset-y-0 left-0 flex items-stretch overflow-hidden md:rounded-l-2xl">
         <button
           onClick={() => handleAction('tomorrow')}
           className="w-[60px] flex flex-col items-center justify-center gap-1 bg-amber-500 text-white text-xs font-medium active:bg-amber-600"
@@ -322,8 +328,8 @@ export function SwipeableCard({
         onTouchEnd={handleTouchEnd}
         onClick={showActions ? closeActions : undefined}
         className={`
-          relative z-10 py-2.5 bg-bg-elevated border rounded-2xl
-          ${selectionMode && isTask ? 'pl-12 pr-3' : 'px-3'}
+          relative z-10 py-4 bg-bg-elevated border-y md:border md:rounded-2xl touch-pan-y
+          ${selectionMode && isTask ? 'pl-14 pr-4' : 'px-4'}
           ${!isDragging ? 'transition-transform duration-200 ease-out' : ''}
           ${selected
             ? 'border-primary-200 shadow-md ring-1 ring-primary-200'
@@ -335,7 +341,7 @@ export function SwipeableCard({
           }
           ${item.completed ? 'opacity-60' : ''}
         `}
-        style={{ transform: `translateX(${translateX}px)` }}
+        style={{ transform: `translateX(${translateX}px)`, touchAction: 'pan-y' }}
       >
         {/* Project color indicator - left edge */}
         {projectColor && (
@@ -345,22 +351,22 @@ export function SwipeableCard({
           />
         )}
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           {/* Time - compact, left side */}
-          <div className="w-10 shrink-0 text-xs text-neutral-400 font-medium tabular-nums">
+          <div className="w-12 shrink-0 text-sm text-neutral-400 font-medium tabular-nums">
             {timeText || '—'}
           </div>
 
           {/* Type icon - non-interactive indicator */}
-          <div className="w-5 shrink-0 flex items-center justify-center">
+          <div className="w-6 shrink-0 flex items-center justify-center">
             <TypeIcon type={item.type} completed={item.completed} />
           </div>
 
           {/* Title and category */}
-          <div className="flex-1 min-w-0 flex items-center gap-1.5">
+          <div className="flex-1 min-w-0 flex items-center gap-2">
             <span
               className={`
-                text-base font-medium leading-snug truncate
+                text-lg font-medium leading-snug truncate
                 ${item.completed ? 'line-through text-neutral-400' : 'text-neutral-800'}
               `}
             >
@@ -368,7 +374,7 @@ export function SwipeableCard({
             </span>
             {/* Category emoji only on mobile for space */}
             {item.category && item.category !== 'task' && (
-              <span className="shrink-0 text-sm">
+              <span className="shrink-0 text-base">
                 {item.category === 'errand' && '🚗'}
                 {item.category === 'chore' && '🧹'}
                 {item.category === 'event' && '📅'}

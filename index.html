@@ -2,20 +2,26 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Symphony</title>
 
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json" />
 
-    <!-- Theme color for browser chrome -->
-    <meta name="theme-color" content="#2D5A3D" />
+    <!-- Theme color for browser chrome - match background -->
+    <meta name="theme-color" content="#FAF8F5" />
 
-    <!-- iOS PWA settings -->
+    <!-- iOS PWA settings - full screen app mode -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Symphony" />
     <link rel="apple-touch-icon" href="/symphony-logo.jpg" />
+
+    <!-- Prevent phone number detection -->
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Mobile app feel -->
+    <meta name="mobile-web-app-capable" content="yes" />
 
     <!-- Favicon -->
     <link rel="icon" type="image/jpeg" href="/symphony-logo.jpg" />

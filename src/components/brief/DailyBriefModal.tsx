@@ -131,6 +131,7 @@ export function DailyBriefModal({
   // Handle open/close animations
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Intentional animation trigger
       setIsAnimating(true)
       // Expand all items by default for immediate visibility
       if (brief?.items) {

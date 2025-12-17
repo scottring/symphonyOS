@@ -1211,15 +1211,15 @@ export function TodaySchedule({
       */}
 
       {/* Normal schedule content */}
-      <div className="px-5 py-6 md:px-10 md:py-10 max-w-[680px] mx-auto">
+      <div className="px-3 py-4 md:px-10 md:py-10 md:max-w-[680px] md:mx-auto overflow-x-hidden">
       {/* Header - Editorial style with large date */}
-      <header className="mb-10 animate-fade-in-up">
+      <header className="mb-6 md:mb-10 animate-fade-in-up">
         {/* Large editorial date display with inline navigation */}
-        <div className="flex items-end gap-3 mb-6">
-          <h1 className="font-display text-4xl md:text-5xl text-neutral-900 tracking-tight leading-none">
+        <div className="flex flex-wrap items-end gap-2 md:gap-3 mb-4 md:mb-6">
+          <h1 className="font-display text-3xl md:text-5xl text-neutral-900 tracking-tight leading-tight min-w-0">
             {isToday ? (
               <>
-                <span className="text-neutral-400 font-normal text-2xl md:text-3xl block mb-1">Today is</span>
+                <span className="text-neutral-400 font-normal text-xl md:text-3xl block mb-0.5 md:mb-1">Today is</span>
                 {viewedDate.toLocaleDateString('en-US', { weekday: 'long' })}
               </>
             ) : (

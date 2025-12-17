@@ -469,7 +469,7 @@ export function HomeView({
             />
           </div>
         )}
-        <div className="flex-1 overflow-y-auto pt-16">
+        <div className={`flex-1 overflow-y-auto ${isMobile ? '' : 'pt-16'}`}>
           {renderContent()}
         </div>
       </div>
@@ -501,8 +501,8 @@ export function HomeView({
         </div>
       )}
 
-      {/* Main content area - pt-16 to clear floating header */}
-      <div className="flex-1 overflow-y-auto pt-16">
+      {/* Main content area - pt-16 to clear floating header on desktop only */}
+      <div className={`flex-1 overflow-y-auto ${isMobile ? '' : 'pt-16'}`}>
         {/* Context filter header - shown when filtering by Work/Family/Personal */}
         {selectedContext && contextInfo && (
           <div className="px-4 pt-2 md:px-6 md:pt-2">

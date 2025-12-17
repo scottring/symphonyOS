@@ -106,9 +106,9 @@ export function TimeGroup({
   }
 
   return (
-    <div className="mb-10 relative">
-      {/* Subtle background gradient */}
-      <div className={`absolute -inset-x-4 -inset-y-2 rounded-2xl bg-gradient-to-r ${style.gradient} pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
+    <div className="mb-10 relative overflow-hidden">
+      {/* Subtle background gradient - hidden on mobile to prevent overflow */}
+      <div className={`hidden md:block absolute -inset-x-4 -inset-y-2 rounded-2xl bg-gradient-to-r ${style.gradient} pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
 
       {/* Section header - clickable for collapse */}
       <button
@@ -148,7 +148,7 @@ export function TimeGroup({
 
       {/* Items with collapse animation */}
       <div
-        className={`space-y-2 transition-all duration-300 ease-in-out ${
+        className={`md:space-y-2 transition-all duration-300 ease-in-out ${
           collapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[2000px] opacity-100'
         }`}
       >

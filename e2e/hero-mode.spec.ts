@@ -10,7 +10,7 @@ test.describe('Hero Mode', () => {
   test.describe.configure({ mode: 'serial' })
 
   // Skip all tests until auth setup is available
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async () => {
     // TODO: Add auth setup fixture
     // await loginAsTestUser(page)
     // await createTestTasks(page)

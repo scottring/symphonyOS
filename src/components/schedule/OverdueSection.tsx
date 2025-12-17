@@ -3,8 +3,10 @@ import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
 import { ScheduleItem } from './ScheduleItem'
+import { SwipeableCard } from './SwipeableCard'
 import { taskToTimelineItem } from '@/types/timeline'
 import { formatOverdueDate } from '@/lib/timeUtils'
+import { useMobile } from '@/hooks/useMobile'
 
 interface OverdueSectionProps {
   tasks: Task[]
@@ -43,6 +45,8 @@ export function OverdueSection({
   onEnterSelectionMode,
   onToggleSelect,
 }: OverdueSectionProps) {
+  const isMobile = useMobile()
+
   if (tasks.length === 0) return null
 
   // Sort by oldest first (most overdue at top)
@@ -56,25 +60,25 @@ export function OverdueSection({
     <div
       role="region"
       aria-label="Overdue tasks"
-      className="mb-8 animate-fade-in-up"
+      className="mb-8 animate-fade-in-up overflow-hidden"
     >
-      {/* Section header - matches TimeGroup styling */}
+      {/* Section header */}
       <h3
-        className="font-display text-sm tracking-wide uppercase mb-4 flex items-center gap-2"
+        className="font-display text-sm tracking-wide uppercase mb-4 flex items-center gap-2 px-0"
         style={{ color: colors.warning600 }}
       >
-        <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
           <path
             fillRule="evenodd"
             d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
             clipRule="evenodd"
           />
         </svg>
-        Overdue ({tasks.length})
+        <span className="truncate">Overdue ({tasks.length})</span>
       </h3>
 
       {/* Overdue task items */}
-      <div className="space-y-3">
+      <div className="md:space-y-3">
         {sortedTasks.map((task) => {
           const item = taskToTimelineItem(task)
           const taskId = task.id
@@ -84,6 +88,29 @@ export function OverdueSection({
             ? formatOverdueDate(new Date(task.scheduledFor))
             : undefined
 
+          // Use SwipeableCard on mobile for better touch interactions
+          if (isMobile) {
+            return (
+              <SwipeableCard
+                key={task.id}
+                item={item}
+                selected={selectedItemId === `task-${task.id}`}
+                onSelect={() => {}}
+                onComplete={() => onToggleTask(taskId)}
+                onDefer={onPushTask ? (date: Date) => onPushTask(taskId, date) : undefined}
+                onOpenDetail={() => onSelectTask(`task-${task.id}`)}
+                familyMembers={familyMembers}
+                assignedTo={task.assignedTo}
+                onAssign={onAssignTask ? (memberId) => onAssignTask(taskId, memberId) : undefined}
+                selectionMode={selectionMode}
+                multiSelected={selectedIds?.has(taskId)}
+                onLongPress={onEnterSelectionMode ? () => onEnterSelectionMode(taskId) : undefined}
+                onToggleSelect={onToggleSelect ? () => onToggleSelect(taskId) : undefined}
+              />
+            )
+          }
+
+          // Desktop: use ScheduleItem with hover actions
           return (
             <ScheduleItem
               key={task.id}

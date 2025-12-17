@@ -30,7 +30,7 @@ export function HeroProgress({
     // Show dots around current position
     const halfWindow = Math.floor(maxVisibleDots / 2)
     let start = Math.max(0, current - halfWindow)
-    let end = Math.min(total, start + maxVisibleDots)
+    const end = Math.min(total, start + maxVisibleDots)
 
     // Adjust start if we're near the end
     if (end === total) {

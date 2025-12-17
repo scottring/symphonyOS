@@ -376,7 +376,7 @@ function App() {
     }
 
     generateTemplatedTasks()
-  }, [filteredRoutines, viewedDate, tasksLoading, routinesLoading, getLinkedTasks, addTask])
+  }, [filteredRoutines, viewedDate, tasksLoading, routinesLoading, getLinkedTasks, addTask, getCurrentUserMember])
 
   // Fetch event notes when an event is selected
   useEffect(() => {
@@ -395,7 +395,7 @@ function App() {
       const eventId = selectedItemId.replace('event-', '')
       attachments.fetchAttachments('event_note', eventId)
     }
-  }, [selectedItemId, attachments.fetchAttachments])
+  }, [selectedItemId, attachments])
 
   // Batch fetch event notes for all visible events (for info icon display)
   useEffect(() => {

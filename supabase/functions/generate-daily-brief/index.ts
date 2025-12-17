@@ -187,7 +187,6 @@ serve(async (req) => {
 
     // Build the prompt with context
     const clarityScore = context.clarity?.score ?? 100
-    const pointsToGo = 100 - clarityScore
     const clarityActions = context.clarity?.actions || []
 
     // User's timezone - default to America/New_York (EST/EDT)

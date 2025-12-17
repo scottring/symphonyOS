@@ -1,11 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
 import type { ScheduleContextItem } from '@/components/triage'
 import { InboxTaskCard } from './InboxTaskCard'
+import { SwipeableCard } from './SwipeableCard'
 import { TriageCard, InboxTriageModal } from '@/components/triage'
+import { useMobile } from '@/hooks/useMobile'
+import { taskToTimelineItem } from '@/types/timeline'
 import { ChevronRight } from 'lucide-react'
 
 interface InboxSectionProps {
@@ -75,9 +78,19 @@ export function InboxSection({
   void _onSearchContacts
   void _onAddContact
 
+  const isMobile = useMobile()
+
   // Triage modal state
   const [triageTaskId, setTriageTaskId] = useState<string | null>(null)
   const triageTask = triageTaskId ? tasks.find(t => t.id === triageTaskId) : null
+
+  // Handler for completing a task (used by SwipeableCard on mobile)
+  const handleCompleteTask = useCallback((taskId: string) => {
+    const task = tasks.find(t => t.id === taskId)
+    if (task) {
+      onUpdateTask(taskId, { completed: !task.completed })
+    }
+  }, [tasks, onUpdateTask])
 
   // Internal collapsed state with user override capability
   const [userOverride, setUserOverride] = useState<boolean | null>(null)
@@ -111,7 +124,7 @@ export function InboxSection({
     : tasks
 
   return (
-    <div className="mb-10 mt-8">
+    <div className="mb-10 mt-8 overflow-hidden">
       {/* Section header - clickable for collapse */}
       <button
         onClick={handleToggleCollapse}
@@ -148,7 +161,7 @@ export function InboxSection({
           isCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[4000px] opacity-100'
         }`}
       >
-      <div className="space-y-2">
+      <div className="md:space-y-2">
         {/* Show TriageCard for recently created task at the top */}
         {recentlyCreatedTask && onTriageCardCollapse && (
           <TriageCard
@@ -170,39 +183,65 @@ export function InboxSection({
         )}
 
         {/* Show regular cards for other tasks */}
-        {otherTasks.map((task) => (
-          <InboxTaskCard
-            key={task.id}
-            task={task}
-            onDefer={(date) => {
-              console.log('[InboxSection] onDefer called:', { taskId: task.id, date, dateStr: date?.toISOString() })
-              if (date) {
-                // Defer to specified date
-                onPushTask(task.id, date)
-              } else {
-                // Clear deferral - show now
-                onUpdateTask(task.id, { deferredUntil: undefined })
-              }
-            }}
-            onSchedule={(date, isAllDay) => {
-              onUpdateTask(task.id, { scheduledFor: date, isAllDay, deferredUntil: undefined })
-            }}
-            onUpdate={(updates) => onUpdateTask(task.id, updates)}
-            onSelect={() => onSelectTask(task.id)}
-            onTriage={() => setTriageTaskId(task.id)}
-            projects={projects}
-            onOpenProject={onOpenProject}
-            familyMembers={familyMembers}
-            onAssignTask={onAssignTask ? (memberId) => onAssignTask(task.id, memberId) : undefined}
-            getScheduleItemsForDate={getScheduleItemsForDate}
-            selectionMode={selectionMode}
-            multiSelected={selectedIds?.has(task.id)}
-            onLongPress={onEnterSelectionMode ? () => onEnterSelectionMode(task.id) : undefined}
-            onToggleSelect={onToggleSelect ? () => onToggleSelect(task.id) : undefined}
-            onAddToCalendar={onAddToCalendar ? () => onAddToCalendar(task) : undefined}
-            isAddingToCalendar={addingToCalendarTaskId === task.id}
-          />
-        ))}
+        {otherTasks.map((task) => {
+          // Use SwipeableCard on mobile for better touch interactions
+          if (isMobile) {
+            const timelineItem = taskToTimelineItem(task)
+            return (
+              <SwipeableCard
+                key={task.id}
+                item={timelineItem}
+                selected={false}
+                onSelect={() => {}}
+                onComplete={() => handleCompleteTask(task.id)}
+                onDefer={(date: Date) => onPushTask(task.id, date)}
+                onOpenDetail={() => onSelectTask(task.id)}
+                familyMembers={familyMembers}
+                assignedTo={task.assignedTo}
+                onAssign={onAssignTask ? (memberId) => onAssignTask(task.id, memberId) : undefined}
+                selectionMode={selectionMode}
+                multiSelected={selectedIds?.has(task.id)}
+                onLongPress={onEnterSelectionMode ? () => onEnterSelectionMode(task.id) : undefined}
+                onToggleSelect={onToggleSelect ? () => onToggleSelect(task.id) : undefined}
+              />
+            )
+          }
+
+          // Desktop: use InboxTaskCard with hover actions
+          return (
+            <InboxTaskCard
+              key={task.id}
+              task={task}
+              onDefer={(date) => {
+                console.log('[InboxSection] onDefer called:', { taskId: task.id, date, dateStr: date?.toISOString() })
+                if (date) {
+                  // Defer to specified date
+                  onPushTask(task.id, date)
+                } else {
+                  // Clear deferral - show now
+                  onUpdateTask(task.id, { deferredUntil: undefined })
+                }
+              }}
+              onSchedule={(date, isAllDay) => {
+                onUpdateTask(task.id, { scheduledFor: date, isAllDay, deferredUntil: undefined })
+              }}
+              onUpdate={(updates) => onUpdateTask(task.id, updates)}
+              onSelect={() => onSelectTask(task.id)}
+              onTriage={() => setTriageTaskId(task.id)}
+              projects={projects}
+              onOpenProject={onOpenProject}
+              familyMembers={familyMembers}
+              onAssignTask={onAssignTask ? (memberId) => onAssignTask(task.id, memberId) : undefined}
+              getScheduleItemsForDate={getScheduleItemsForDate}
+              selectionMode={selectionMode}
+              multiSelected={selectedIds?.has(task.id)}
+              onLongPress={onEnterSelectionMode ? () => onEnterSelectionMode(task.id) : undefined}
+              onToggleSelect={onToggleSelect ? () => onToggleSelect(task.id) : undefined}
+              onAddToCalendar={onAddToCalendar ? () => onAddToCalendar(task) : undefined}
+              isAddingToCalendar={addingToCalendarTaskId === task.id}
+            />
+          )
+        })}
       </div>
       </div>
 

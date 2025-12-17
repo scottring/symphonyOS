@@ -112,25 +112,23 @@ export function AppShell({
       >
         {/* Mobile header */}
         {isMobile && (
-          <header className="sticky top-0 z-10 bg-bg-elevated/95 backdrop-blur-lg border-b border-neutral-200/50 px-4 py-2"
+          <header className="sticky top-0 z-10 bg-bg-elevated border-b border-neutral-200/50 px-3 py-3"
                   style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.5rem)' }}>
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <img
-                  src={symphonyLogo}
-                  alt="Symphony"
-                  className="w-8 h-8 rounded-lg object-cover"
-                />
-                <span className="font-display text-base font-semibold text-neutral-900">Symphony</span>
-              </div>
+              {/* Logo only - no text */}
+              <img
+                src={symphonyLogo}
+                alt="Symphony"
+                className="w-10 h-10 rounded-xl object-cover"
+              />
               <div className="flex items-center gap-1">
                 {onOpenSearch && (
                   <button
                     onClick={onOpenSearch}
-                    className="p-2.5 rounded-xl text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-all"
+                    className="p-3 rounded-xl text-neutral-400 active:bg-neutral-100 transition-all min-w-[48px] min-h-[48px] flex items-center justify-center"
                     aria-label="Search"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
                     </svg>
                   </button>
@@ -138,10 +136,10 @@ export function AppShell({
                 {onSignOut && (
                   <button
                     onClick={onSignOut}
-                    className="p-2.5 rounded-xl text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-all"
+                    className="p-3 rounded-xl text-neutral-400 active:bg-neutral-100 transition-all min-w-[48px] min-h-[48px] flex items-center justify-center"
                     aria-label="Sign out"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V4a1 1 0 00-1-1H3zm11 4a1 1 0 10-2 0v4a1 1 0 102 0V7z" clipRule="evenodd" />
                       <path d="M7 10a1 1 0 011-1h2a1 1 0 110 2H8a1 1 0 01-1-1z" />
                     </svg>
@@ -206,75 +204,56 @@ export function AppShell({
 
       {/* Mobile bottom navigation */}
       {isMobile && !panelOpen && (
-        <nav className="fixed bottom-0 left-0 right-0 z-40 bg-bg-elevated/95 backdrop-blur-lg border-t border-neutral-200/50"
+        <nav className="fixed bottom-0 left-0 right-0 z-40 bg-bg-elevated border-t border-neutral-200/50"
              style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-          <div className="flex items-center justify-around px-4 py-1.5">
+          <div className="flex items-center justify-around py-2">
             <button
               onClick={() => onViewChange('home')}
               className={`
-                flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-all
+                flex flex-col items-center gap-1 px-6 py-2 rounded-xl transition-all min-w-[72px]
                 ${activeView === 'home'
                   ? 'text-primary-600'
-                  : 'text-neutral-400 hover:text-neutral-600'
+                  : 'text-neutral-400'
                 }
               `}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
               </svg>
-              <span className={`text-[10px] font-medium ${activeView === 'home' ? 'font-semibold' : ''}`}>Home</span>
+              <span className={`text-xs font-medium ${activeView === 'home' ? 'font-semibold' : ''}`}>Today</span>
             </button>
 
             <button
               onClick={() => onViewChange('projects')}
               className={`
-                flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-all
+                flex flex-col items-center gap-1 px-6 py-2 rounded-xl transition-all min-w-[72px]
                 ${activeView === 'projects'
                   ? 'text-blue-600'
-                  : 'text-neutral-400 hover:text-neutral-600'
+                  : 'text-neutral-400'
                 }
               `}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
               </svg>
-              <span className={`text-[10px] font-medium ${activeView === 'projects' ? 'font-semibold' : ''}`}>Projects</span>
+              <span className={`text-xs font-medium ${activeView === 'projects' ? 'font-semibold' : ''}`}>Projects</span>
             </button>
 
             <button
               onClick={() => onViewChange('routines')}
               className={`
-                flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-all
+                flex flex-col items-center gap-1 px-6 py-2 rounded-xl transition-all min-w-[72px]
                 ${activeView === 'routines'
                   ? 'text-amber-600'
-                  : 'text-neutral-400 hover:text-neutral-600'
+                  : 'text-neutral-400'
                 }
               `}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
               </svg>
-              <span className={`text-[10px] font-medium ${activeView === 'routines' ? 'font-semibold' : ''}`}>Routines</span>
+              <span className={`text-xs font-medium ${activeView === 'routines' ? 'font-semibold' : ''}`}>Routines</span>
             </button>
-
-            {/* Lists button hidden - feature not complete
-            <button
-              onClick={() => onViewChange('lists')}
-              className={`
-                flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-all
-                ${activeView === 'lists'
-                  ? 'text-purple-600'
-                  : 'text-neutral-400 hover:text-neutral-600'
-                }
-              `}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
-                <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
-              </svg>
-              <span className={`text-[10px] font-medium ${activeView === 'lists' ? 'font-semibold' : ''}`}>Lists</span>
-            </button>
-            */}
           </div>
         </nav>
       )}

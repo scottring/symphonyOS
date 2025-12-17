@@ -62,7 +62,7 @@ export function useGmailScan(): UseGmailScanReturn {
       if (fetchError) {
         // Try to get the response body from the error context
         // Supabase FunctionsHttpError includes the response context
-        let errorData: { needsReconnect?: boolean; error?: string } | null = null
+        let errorData: { needsReconnect?: boolean; apiNotEnabled?: boolean; error?: string } | null = null
         try {
           // FunctionsHttpError has a context property with the Response
           if ('context' in fetchError && fetchError.context instanceof Response) {
