@@ -104,6 +104,7 @@ const emptyResults: GroupedSearchResults = {
   contacts: [],
   routines: [],
   lists: [],
+  notes: [],
 }
 
 const defaultProps = {

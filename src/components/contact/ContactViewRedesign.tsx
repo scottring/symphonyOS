@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import type { Contact } from '@/types/contact'
 import type { Task } from '@/types/task'
+import type { Note, NoteEntityType } from '@/types/note'
+import { EntityNotesSection } from '@/components/notes/EntityNotesSection'
 
 interface ContactViewProps {
   contact: Contact
@@ -14,6 +16,11 @@ interface ContactViewProps {
   canPin?: boolean
   onPin?: () => Promise<boolean>
   onUnpin?: () => Promise<boolean>
+  // Notes support (linked entity notes)
+  entityNotes?: Note[]
+  entityNotesLoading?: boolean
+  onAddEntityNote?: (content: string, entityType: NoteEntityType, entityId: string) => Promise<void>
+  onNavigateToNote?: (noteId: string) => void
 }
 
 export function ContactViewRedesign({
@@ -28,6 +35,10 @@ export function ContactViewRedesign({
   // canPin,
   // onPin,
   // onUnpin,
+  entityNotes = [],
+  entityNotesLoading = false,
+  onAddEntityNote,
+  onNavigateToNote,
 }: ContactViewProps) {
   // Name editing
   const [isEditingName, setIsEditingName] = useState(false)
@@ -376,6 +387,20 @@ export function ContactViewRedesign({
                            resize-none transition-all"
               />
             </div>
+
+            {/* ========== RELATED NOTES - Linked notes from Second Brain ========== */}
+            {onAddEntityNote && (
+              <div className="pt-8 border-t border-neutral-200/60">
+                <EntityNotesSection
+                  entityType="contact"
+                  entityId={contact.id}
+                  notes={entityNotes}
+                  loading={entityNotesLoading}
+                  onAddNote={onAddEntityNote}
+                  onNavigateToNote={onNavigateToNote}
+                />
+              </div>
+            )}
           </div>
 
           {/* ========== SIDEBAR - Contact Details ========== */}

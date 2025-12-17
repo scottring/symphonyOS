@@ -2,8 +2,10 @@ import { useState, useRef, useEffect } from 'react'
 import type { Task, TaskLink } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
+import type { Note, NoteEntityType } from '@/types/note'
 import { PushDropdown } from '@/components/triage'
 import { CompletionNotesPrompt } from './CompletionNotesPrompt'
+import { EntityNotesSection } from '@/components/notes/EntityNotesSection'
 
 interface TaskViewProps {
   task: Task
@@ -27,6 +29,11 @@ interface TaskViewProps {
   onAddProject?: (project: { name: string }) => Promise<Project | null>
   // Subtask support
   onAddSubtask?: (parentId: string, title: string) => Promise<string | undefined>
+  // Notes support (linked entity notes)
+  entityNotes?: Note[]
+  entityNotesLoading?: boolean
+  onAddEntityNote?: (content: string, entityType: NoteEntityType, entityId: string) => Promise<void>
+  onNavigateToNote?: (noteId: string) => void
 }
 
 export function TaskView({
@@ -47,6 +54,10 @@ export function TaskView({
   onOpenProject,
   onAddProject,
   onAddSubtask,
+  entityNotes = [],
+  entityNotesLoading = false,
+  onAddEntityNote,
+  onNavigateToNote,
 }: TaskViewProps) {
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -1164,6 +1175,20 @@ export function TaskView({
               )
             )}
           </div>
+
+          {/* Related Notes Section (linked entity notes from Second Brain) */}
+          {onAddEntityNote && (
+            <div className="bg-white rounded-xl border border-neutral-100 p-4">
+              <EntityNotesSection
+                entityType="task"
+                entityId={task.id}
+                notes={entityNotes}
+                loading={entityNotesLoading}
+                onAddNote={onAddEntityNote}
+                onNavigateToNote={onNavigateToNote}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>

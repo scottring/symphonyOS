@@ -9,7 +9,7 @@ import type { Routine } from '@/types/routine'
 
 // Feature flags for in-progress features
 const FEATURES = {
-  notes: false, // Notes feature is built but not production-ready yet
+  notes: true, // Notes feature enabled - entity linking in progress
   lists: false, // Lists feature is not feature-complete yet
 }
 

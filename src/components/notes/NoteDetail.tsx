@@ -1,16 +1,26 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
-import type { Note, NoteTopic, NoteEntityLink, UpdateNoteInput } from '@/types/note'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
+import type { Note, NoteTopic, NoteEntityLink, NoteEntityType, UpdateNoteInput } from '@/types/note'
 import { noteTypeLabels, noteTypeDotColors } from '@/types/note'
 import { formatRelativeTime } from '@/lib/timeUtils'
 import { TopicPicker } from './TopicPicker'
+import { EntityLinkPicker } from './EntityLinkPicker'
+import type { Task } from '@/types/task'
+import type { Project } from '@/types/project'
+import type { Contact } from '@/types/contact'
 
 interface NoteDetailProps {
   note: Note | null
   topics: NoteTopic[]
   entityLinks?: NoteEntityLink[]
+  // Entity data for resolving names
+  tasks?: Task[]
+  projects?: Project[]
+  contacts?: Contact[]
   onUpdate: (id: string, updates: UpdateNoteInput) => Promise<void>
   onDelete: (id: string) => Promise<void>
   onAddTopic?: (name: string) => Promise<NoteTopic | null>
+  onAddEntityLink?: (noteId: string, entityType: NoteEntityType, entityId: string) => Promise<void>
+  onRemoveEntityLink?: (linkId: string) => Promise<void>
   onClose?: () => void
 }
 
@@ -18,25 +28,70 @@ export function NoteDetail({
   note,
   topics,
   entityLinks = [],
+  tasks = [],
+  projects = [],
+  contacts = [],
   onUpdate,
   onDelete,
   onAddTopic,
+  onAddEntityLink,
+  onRemoveEntityLink,
   onClose,
 }: NoteDetailProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editContent, setEditContent] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showEntityPicker, setShowEntityPicker] = useState(false)
+  const [removingLinkId, setRemovingLinkId] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Create lookup maps for entity names
+  const entityNameMap = useMemo(() => {
+    const map = new Map<string, { name: string; icon: string }>()
+    for (const task of tasks) {
+      map.set(`task:${task.id}`, { name: task.title, icon: '📋' })
+    }
+    for (const project of projects) {
+      map.set(`project:${project.id}`, { name: project.name, icon: '📁' })
+    }
+    for (const contact of contacts) {
+      map.set(`contact:${contact.id}`, { name: contact.name, icon: '👤' })
+    }
+    return map
+  }, [tasks, projects, contacts])
 
   // Reset editing state when note changes
   useEffect(() => {
     setIsEditing(false)
     setShowDeleteConfirm(false)
+    setShowEntityPicker(false)
     if (note) {
       setEditContent(note.content)
     }
   }, [note?.id, note?.content])
+
+  const handleAddEntityLink = useCallback(
+    async (entityType: NoteEntityType, entityId: string) => {
+      if (!note || !onAddEntityLink) return
+      await onAddEntityLink(note.id, entityType, entityId)
+      setShowEntityPicker(false)
+    },
+    [note, onAddEntityLink]
+  )
+
+  const handleRemoveEntityLink = useCallback(
+    async (linkId: string) => {
+      if (!onRemoveEntityLink) return
+      setRemovingLinkId(linkId)
+      try {
+        await onRemoveEntityLink(linkId)
+      } finally {
+        setRemovingLinkId(null)
+      }
+    },
+    [onRemoveEntityLink]
+  )
 
   const handleSave = useCallback(async () => {
     if (!note || !editContent.trim()) return
@@ -199,23 +254,75 @@ export function NoteDetail({
         )}
 
         {/* Entity links */}
-        {entityLinks.length > 0 && (
-          <div className="mt-8 pt-6 border-t border-neutral-100">
-            <h3 className="text-xs uppercase tracking-wide text-neutral-400 mb-3 font-medium">
-              Linked to
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {entityLinks.map((link) => (
-                <span
-                  key={link.id}
-                  className="px-3 py-1.5 rounded-full text-sm bg-neutral-100 text-neutral-600"
-                >
-                  {link.entityType}: {link.entityId.substring(0, 8)}...
-                </span>
-              ))}
+        <div className="mt-8 pt-6 border-t border-neutral-100">
+          <h3 className="text-xs uppercase tracking-wide text-neutral-400 mb-3 font-medium">
+            Linked to
+          </h3>
+          {entityLinks.length > 0 ? (
+            <div className="space-y-2 mb-3">
+              {entityLinks.map((link) => {
+                const entityInfo = entityNameMap.get(`${link.entityType}:${link.entityId}`)
+                const isRemoving = removingLinkId === link.id
+                return (
+                  <div
+                    key={link.id}
+                    className={`
+                      flex items-center gap-2 px-3 py-2 rounded-lg bg-neutral-50
+                      ${isRemoving ? 'opacity-50' : ''}
+                    `}
+                  >
+                    <span className="text-base">{entityInfo?.icon || '📄'}</span>
+                    <span className="flex-1 text-sm text-neutral-700 truncate">
+                      {entityInfo?.name || `${link.entityType}: ${link.entityId.substring(0, 8)}...`}
+                    </span>
+                    {onRemoveEntityLink && (
+                      <button
+                        onClick={() => handleRemoveEntityLink(link.id)}
+                        disabled={isRemoving}
+                        className="p-1 text-neutral-400 hover:text-red-500 transition-colors disabled:cursor-not-allowed"
+                        aria-label={`Remove ${entityInfo?.name || 'link'}`}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
             </div>
-          </div>
-        )}
+          ) : (
+            <p className="text-sm text-neutral-400 mb-3">No linked items yet</p>
+          )}
+
+          {/* Add link button */}
+          {onAddEntityLink && (
+            <div className="relative">
+              <button
+                onClick={() => setShowEntityPicker(!showEntityPicker)}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50 rounded-lg transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                </svg>
+                Link to task, project, or contact...
+              </button>
+
+              {showEntityPicker && (
+                <div className="absolute bottom-full left-0 mb-2 z-10">
+                  <EntityLinkPicker
+                    tasks={tasks}
+                    projects={projects}
+                    contacts={contacts}
+                    onSelect={handleAddEntityLink}
+                    onClose={() => setShowEntityPicker(false)}
+                    excludeLinks={entityLinks.map((l) => ({ entityType: l.entityType, entityId: l.entityId }))}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Delete confirmation */}

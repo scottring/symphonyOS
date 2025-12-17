@@ -5,9 +5,10 @@ import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { Routine } from '@/types/actionable'
 import type { List } from '@/types/list'
+import type { Note } from '@/types/note'
 import { getCategoryLabel } from '@/types/list'
 
-export type SearchResultType = 'task' | 'project' | 'contact' | 'routine' | 'list'
+export type SearchResultType = 'task' | 'project' | 'contact' | 'routine' | 'list' | 'note'
 
 export interface SearchResult {
   type: SearchResultType
@@ -16,7 +17,7 @@ export interface SearchResult {
   subtitle?: string
   matchedField?: string
   completed?: boolean
-  item: Task | Project | Contact | Routine | List
+  item: Task | Project | Contact | Routine | List | Note
 }
 
 export interface GroupedSearchResults {
@@ -25,6 +26,7 @@ export interface GroupedSearchResults {
   contacts: SearchResult[]
   routines: SearchResult[]
   lists: SearchResult[]
+  notes: SearchResult[]
 }
 
 interface UseSearchProps {
@@ -33,6 +35,7 @@ interface UseSearchProps {
   contacts: Contact[]
   routines: Routine[]
   lists?: List[]
+  notes?: Note[]
 }
 
 const FUSE_OPTIONS = {
@@ -53,7 +56,7 @@ function flattenTasks(tasks: Task[]): Task[] {
   return result
 }
 
-export function useSearch({ tasks, projects, contacts, routines, lists = [] }: UseSearchProps) {
+export function useSearch({ tasks, projects, contacts, routines, lists = [], notes = [] }: UseSearchProps) {
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
@@ -145,6 +148,19 @@ export function useSearch({ tasks, projects, contacts, routines, lists = [] }: U
     [lists]
   )
 
+  const noteFuse = useMemo(
+    () =>
+      new Fuse(notes, {
+        ...FUSE_OPTIONS,
+        keys: [
+          { name: 'content', weight: 2 },
+          { name: 'title', weight: 1.5 },
+          { name: 'topic.name', weight: 1 },
+        ],
+      }),
+    [notes]
+  )
+
   // Get project name helper
   const getProjectName = useCallback(
     (projectId: string | undefined): string | undefined => {
@@ -186,7 +202,7 @@ export function useSearch({ tasks, projects, contacts, routines, lists = [] }: U
   // Search results
   const results = useMemo((): GroupedSearchResults => {
     if (!debouncedQuery.trim()) {
-      return { tasks: [], projects: [], contacts: [], routines: [], lists: [] }
+      return { tasks: [], projects: [], contacts: [], routines: [], lists: [], notes: [] }
     }
 
     const taskResults = taskFuse.search(debouncedQuery)
@@ -194,6 +210,7 @@ export function useSearch({ tasks, projects, contacts, routines, lists = [] }: U
     const contactResults = contactFuse.search(debouncedQuery)
     const routineResults = routineFuse.search(debouncedQuery)
     const listResults = listFuse.search(debouncedQuery)
+    const noteResults = noteFuse.search(debouncedQuery)
 
     // Convert to SearchResult format
     const tasks: SearchResult[] = taskResults.map((r) => ({
@@ -267,14 +284,31 @@ export function useSearch({ tasks, projects, contacts, routines, lists = [] }: U
       item: r.item,
     }))
 
+    const notesResult: SearchResult[] = noteResults.map((r) => {
+      // Get the title or first line of content for display
+      const displayTitle = r.item.title || r.item.content.split('\n')[0].slice(0, 50) + (r.item.content.length > 50 ? '...' : '')
+      // Show topic name as subtitle if available
+      const subtitle = r.item.topic?.name || undefined
+
+      return {
+        type: 'note' as const,
+        id: r.item.id,
+        title: displayTitle,
+        subtitle,
+        matchedField: r.matches?.[0]?.key,
+        item: r.item,
+      }
+    })
+
     return {
       tasks,
       projects: projectsResult,
       contacts: contactsResult,
       routines: routinesResult,
       lists: listsResult,
+      notes: notesResult,
     }
-  }, [debouncedQuery, taskFuse, projectFuse, contactFuse, routineFuse, listFuse, getProjectName])
+  }, [debouncedQuery, taskFuse, projectFuse, contactFuse, routineFuse, listFuse, noteFuse, getProjectName])
 
   // Total result count
   const totalResults =
@@ -282,7 +316,8 @@ export function useSearch({ tasks, projects, contacts, routines, lists = [] }: U
     results.projects.length +
     results.contacts.length +
     results.routines.length +
-    results.lists.length
+    results.lists.length +
+    results.notes.length
 
   // Clear search
   const clearSearch = useCallback(() => {

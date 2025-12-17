@@ -1,5 +1,8 @@
 import { useState, useCallback, useMemo } from 'react'
-import type { Note, NoteTopic, NoteEntityLink } from '@/types/note'
+import type { Note, NoteTopic, NoteEntityLink, NoteEntityType } from '@/types/note'
+import type { Task } from '@/types/task'
+import type { Project } from '@/types/project'
+import type { Contact } from '@/types/contact'
 import { NotesList } from './NotesList'
 import { NotesQuickCapture } from './NotesQuickCapture'
 import { NoteDetail } from './NoteDetail'
@@ -11,6 +14,10 @@ interface NotesPageProps {
   topics: NoteTopic[]
   topicsMap: Map<string, NoteTopic>
   loading: boolean
+  // Entity data for linking UI
+  tasks?: Task[]
+  projects?: Project[]
+  contacts?: Contact[]
   // CRUD
   onAddNote: (content: string, topicId?: string) => Promise<Note | null>
   onUpdateNote: (id: string, updates: { content?: string; topicId?: string | null }) => Promise<void>
@@ -18,6 +25,8 @@ interface NotesPageProps {
   onAddTopic: (name: string) => Promise<NoteTopic | null>
   // Entity links
   getEntityLinks?: (noteId: string) => Promise<NoteEntityLink[]>
+  onAddEntityLink?: (noteId: string, entityType: NoteEntityType, entityId: string) => Promise<void>
+  onRemoveEntityLink?: (linkId: string) => Promise<void>
 }
 
 export function NotesPage({
@@ -26,11 +35,16 @@ export function NotesPage({
   topics,
   topicsMap,
   loading,
+  tasks = [],
+  projects = [],
+  contacts = [],
   onAddNote,
   onUpdateNote,
   onDeleteNote,
   onAddTopic,
   getEntityLinks,
+  onAddEntityLink,
+  onRemoveEntityLink,
 }: NotesPageProps) {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null)
@@ -80,6 +94,29 @@ export function NotesPage({
       return onAddTopic(name)
     },
     [onAddTopic]
+  )
+
+  const handleAddEntityLink = useCallback(
+    async (noteId: string, entityType: NoteEntityType, entityId: string) => {
+      if (!onAddEntityLink) return
+      await onAddEntityLink(noteId, entityType, entityId)
+      // Refetch entity links to update the display
+      if (getEntityLinks && noteId === selectedNoteId) {
+        const links = await getEntityLinks(noteId)
+        setEntityLinks(links)
+      }
+    },
+    [onAddEntityLink, getEntityLinks, selectedNoteId]
+  )
+
+  const handleRemoveEntityLink = useCallback(
+    async (linkId: string) => {
+      if (!onRemoveEntityLink) return
+      await onRemoveEntityLink(linkId)
+      // Update local state immediately
+      setEntityLinks((prev) => prev.filter((l) => l.id !== linkId))
+    },
+    [onRemoveEntityLink]
   )
 
   const totalNotesCount = notes.length
@@ -141,9 +178,14 @@ export function NotesPage({
           note={selectedNote}
           topics={topics}
           entityLinks={entityLinks}
+          tasks={tasks}
+          projects={projects}
+          contacts={contacts}
           onUpdate={onUpdateNote}
           onDelete={onDeleteNote}
           onAddTopic={handleAddTopic}
+          onAddEntityLink={onAddEntityLink ? handleAddEntityLink : undefined}
+          onRemoveEntityLink={onRemoveEntityLink ? handleRemoveEntityLink : undefined}
           onClose={() => setSelectedNoteId(null)}
         />
       </div>
