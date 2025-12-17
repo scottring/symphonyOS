@@ -44,6 +44,7 @@ export function SearchModal({
     if (results.contacts.length > 0) addResults(results.contacts, 'contacts')
     if (results.routines.length > 0) addResults(results.routines, 'routines')
     if (results.lists.length > 0) addResults(results.lists, 'lists')
+    if (results.notes.length > 0) addResults(results.notes, 'notes')
 
     return all
   }, [results, expandedSections])
@@ -153,7 +154,16 @@ export function SearchModal({
       expandedSections.has('routines') ? results.routines.length : MAX_RESULTS_PER_TYPE
     )
 
-    return offset + indexInType // lists
+    if (type === 'lists') {
+      return offset + indexInType
+    }
+
+    offset += Math.min(
+      results.lists.length,
+      expandedSections.has('lists') ? results.lists.length : MAX_RESULTS_PER_TYPE
+    )
+
+    return offset + indexInType // notes
   }
 
   const toggleSection = (section: string) => {
@@ -271,6 +281,7 @@ export function SearchModal({
                 {renderSection('Contacts', results.contacts, 'contacts')}
                 {renderSection('Routines', results.routines, 'routines')}
                 {renderSection('Lists', results.lists, 'lists')}
+                {renderSection('Notes', results.notes, 'notes')}
               </div>
             )}
           </div>

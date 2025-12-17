@@ -4,9 +4,11 @@ import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
 import type { EventNote } from '@/hooks/useEventNotes'
+import type { Note, NoteEntityType } from '@/types/note'
 import { formatTimeWithDate } from '@/lib/timeUtils'
 import { TaskQuickActions, type ScheduleContextItem } from '@/components/triage'
 import { calculateProjectStatus } from '@/hooks/useProjects'
+import { EntityNotesSection } from '@/components/notes/EntityNotesSection'
 
 interface ProjectViewProps {
   project: Project
@@ -30,6 +32,11 @@ interface ProjectViewProps {
   canPin?: boolean
   onPin?: () => Promise<boolean>
   onUnpin?: () => Promise<boolean>
+  // Notes support (linked entity notes)
+  entityNotes?: Note[]
+  entityNotesLoading?: boolean
+  onAddEntityNote?: (content: string, entityType: NoteEntityType, entityId: string) => Promise<void>
+  onNavigateToNote?: (noteId: string) => void
 }
 
 export function ProjectViewRedesign({
@@ -51,6 +58,10 @@ export function ProjectViewRedesign({
   canPin: _canPin,
   onPin: _onPin,
   onUnpin: _onUnpin,
+  entityNotes = [],
+  entityNotesLoading = false,
+  onAddEntityNote,
+  onNavigateToNote,
 }: ProjectViewProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState('')
@@ -637,6 +648,20 @@ export function ProjectViewRedesign({
                   <p className="text-sm text-neutral-400 italic">No notes</p>
                 )}
               </div>
+
+              {/* Related Notes (Second Brain) */}
+              {onAddEntityNote && (
+                <div className="pt-6 border-t border-neutral-200/60">
+                  <EntityNotesSection
+                    entityType="project"
+                    entityId={project.id}
+                    notes={entityNotes}
+                    loading={entityNotesLoading}
+                    onAddNote={onAddEntityNote}
+                    onNavigateToNote={onNavigateToNote}
+                  />
+                </div>
+              )}
             </div>
           </aside>
         </div>

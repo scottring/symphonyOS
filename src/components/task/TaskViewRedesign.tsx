@@ -2,7 +2,9 @@ import { useState, useRef, useEffect } from 'react'
 import type { Task, TaskLink } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
+import type { Note, NoteEntityType } from '@/types/note'
 import { PushDropdown } from '@/components/triage'
+import { EntityNotesSection } from '@/components/notes/EntityNotesSection'
 
 interface TaskViewProps {
   task: Task
@@ -23,6 +25,11 @@ interface TaskViewProps {
   onOpenProject?: (projectId: string) => void
   onAddProject?: (project: { name: string }) => Promise<Project | null>
   onAddSubtask?: (parentId: string, title: string) => Promise<string | undefined>
+  // Notes support (linked entity notes)
+  entityNotes?: Note[]
+  entityNotesLoading?: boolean
+  onAddEntityNote?: (content: string, entityType: NoteEntityType, entityId: string) => Promise<void>
+  onNavigateToNote?: (noteId: string) => void
 }
 
 export function TaskViewRedesign({
@@ -43,6 +50,10 @@ export function TaskViewRedesign({
   onOpenProject,
   onAddProject,
   onAddSubtask,
+  entityNotes = [],
+  entityNotesLoading = false,
+  onAddEntityNote,
+  onNavigateToNote,
 }: TaskViewProps) {
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -529,6 +540,20 @@ export function TaskViewRedesign({
                            resize-none transition-all"
               />
             </div>
+
+            {/* ========== RELATED NOTES - Linked notes from Second Brain ========== */}
+            {onAddEntityNote && (
+              <div className="pt-8 border-t border-neutral-200/60">
+                <EntityNotesSection
+                  entityType="task"
+                  entityId={task.id}
+                  notes={entityNotes}
+                  loading={entityNotesLoading}
+                  onAddNote={onAddEntityNote}
+                  onNavigateToNote={onNavigateToNote}
+                />
+              </div>
+            )}
           </div>
 
           {/* ========== SIDEBAR - Metadata ========== */}

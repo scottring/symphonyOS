@@ -13,6 +13,7 @@ import { useLists } from '@/hooks/useLists'
 import { useListItems } from '@/hooks/useListItems'
 import { useNotes } from '@/hooks/useNotes'
 import { useNoteTopics } from '@/hooks/useNoteTopics'
+import type { Note, NoteEntityType } from '@/types/note'
 import { useSearch, type SearchResult } from '@/hooks/useSearch'
 import { useAttachments } from '@/hooks/useAttachments'
 import { usePinnedItems } from '@/hooks/usePinnedItems'
@@ -106,6 +107,9 @@ function App() {
     updateNote: updateNoteContent,
     deleteNote,
     getEntityLinks,
+    addEntityLink,
+    removeEntityLink,
+    getNotesForEntity,
   } = useNotes()
   const {
     topicsMap,
@@ -134,6 +138,7 @@ function App() {
     contacts,
     routines: allRoutines,
     lists,
+    notes,
   })
 
   // Actionable instances for the viewed date (to filter skipped/completed events)
@@ -554,6 +559,34 @@ function App() {
     })
   }, [selectedProjectId, getEventNotesForProject])
 
+  // Get notes linked to selected project (ProjectView)
+  const [selectedProjectNotes, setSelectedProjectNotes] = useState<Note[]>([])
+  const [selectedProjectNotesLoading, setSelectedProjectNotesLoading] = useState(false)
+
+  useEffect(() => {
+    if (!selectedProject) {
+      setSelectedProjectNotes([])
+      return
+    }
+    setSelectedProjectNotesLoading(true)
+    getNotesForEntity('project', selectedProject.id)
+      .then(setSelectedProjectNotes)
+      .finally(() => setSelectedProjectNotesLoading(false))
+  }, [selectedProject?.id, getNotesForEntity])
+
+  const handleAddProjectNote = useCallback(
+    async (content: string, entityType: NoteEntityType, entityId: string) => {
+      const note = await addNote({ content })
+      if (note) {
+        await addEntityLink(note.id, { entityType, entityId })
+        // Refresh the project notes
+        const updatedNotes = await getNotesForEntity('project', entityId)
+        setSelectedProjectNotes(updatedNotes)
+      }
+    },
+    [addNote, addEntityLink, getNotesForEntity]
+  )
+
   // Get routine for routine view
   const selectedRoutine = useMemo(() => {
     if (!selectedRoutineId) return null
@@ -599,6 +632,34 @@ function App() {
     return contactsMap.get(selectedContactId) ?? null
   }, [selectedContactId, contactsMap])
 
+  // Get notes linked to selected contact (ContactView)
+  const [selectedContactNotes, setSelectedContactNotes] = useState<Note[]>([])
+  const [selectedContactNotesLoading, setSelectedContactNotesLoading] = useState(false)
+
+  useEffect(() => {
+    if (!selectedContactForView) {
+      setSelectedContactNotes([])
+      return
+    }
+    setSelectedContactNotesLoading(true)
+    getNotesForEntity('contact', selectedContactForView.id)
+      .then(setSelectedContactNotes)
+      .finally(() => setSelectedContactNotesLoading(false))
+  }, [selectedContactForView?.id, getNotesForEntity])
+
+  const handleAddContactNote = useCallback(
+    async (content: string, entityType: NoteEntityType, entityId: string) => {
+      const note = await addNote({ content })
+      if (note) {
+        await addEntityLink(note.id, { entityType, entityId })
+        // Refresh the contact notes
+        const updatedNotes = await getNotesForEntity('contact', entityId)
+        setSelectedContactNotes(updatedNotes)
+      }
+    },
+    [addNote, addEntityLink, getNotesForEntity]
+  )
+
   // Handle selecting an item - all types open DetailPanel (unified UX)
   const handleSelectItem = useCallback((itemId: string | null) => {
     if (!itemId) {
@@ -631,6 +692,34 @@ function App() {
     return projectsMap.get(selectedTask.projectId) ?? null
   }, [selectedTask, projectsMap])
 
+  // Get notes linked to selected task (TaskView)
+  const [selectedTaskNotes, setSelectedTaskNotes] = useState<Note[]>([])
+  const [selectedTaskNotesLoading, setSelectedTaskNotesLoading] = useState(false)
+
+  useEffect(() => {
+    if (!selectedTask) {
+      setSelectedTaskNotes([])
+      return
+    }
+    setSelectedTaskNotesLoading(true)
+    getNotesForEntity('task', selectedTask.id)
+      .then(setSelectedTaskNotes)
+      .finally(() => setSelectedTaskNotesLoading(false))
+  }, [selectedTask?.id, getNotesForEntity])
+
+  const handleAddTaskNote = useCallback(
+    async (content: string, entityType: NoteEntityType, entityId: string) => {
+      const note = await addNote({ content })
+      if (note) {
+        await addEntityLink(note.id, { entityType, entityId })
+        // Refresh the task notes
+        const updatedNotes = await getNotesForEntity('task', entityId)
+        setSelectedTaskNotes(updatedNotes)
+      }
+    },
+    [addNote, addEntityLink, getNotesForEntity]
+  )
+
   // Handle search result selection
   const handleSearchSelect = useCallback((result: SearchResult) => {
     setSearchOpen(false)
@@ -653,6 +742,9 @@ function App() {
       case 'list':
         setSelectedListId(result.id)
         setActiveView('lists')
+        break
+      case 'note':
+        setActiveView('notes')
         break
     }
   }, [clearSearch, handleSelectItem, handleOpenProject, handleOpenContact])
@@ -1168,6 +1260,9 @@ function App() {
             onOpenProject={handleOpenProject}
             onAddProject={addProject}
             onAddSubtask={addSubtask}
+            entityNotes={selectedTaskNotes}
+            entityNotesLoading={selectedTaskNotesLoading}
+            onAddEntityNote={handleAddTaskNote}
           />
         </Suspense>
       )}
@@ -1196,6 +1291,9 @@ function App() {
             canPin={pinnedItems.canPin()}
             onPin={() => pinnedItems.pin('contact', selectedContactForView.id)}
             onUnpin={() => pinnedItems.unpin('contact', selectedContactForView.id)}
+            entityNotes={selectedContactNotes}
+            entityNotesLoading={selectedContactNotesLoading}
+            onAddEntityNote={handleAddContactNote}
           />
         </Suspense>
       )}
@@ -1231,6 +1329,9 @@ function App() {
             canPin={pinnedItems.canPin()}
             onPin={() => pinnedItems.pin('project', selectedProject.id)}
             onUnpin={() => pinnedItems.unpin('project', selectedProject.id)}
+            entityNotes={selectedProjectNotes}
+            entityNotesLoading={selectedProjectNotesLoading}
+            onAddEntityNote={handleAddProjectNote}
           />
         </Suspense>
       )}
@@ -1339,6 +1440,9 @@ function App() {
           topics={activeTopics}
           topicsMap={topicsMap}
           loading={notesLoading}
+          tasks={tasks}
+          projects={projects}
+          contacts={contacts}
           onAddNote={async (content, topicId) => {
             return addNote({ content, topicId })
           }}
@@ -1350,6 +1454,10 @@ function App() {
             return addTopic({ name })
           }}
           getEntityLinks={getEntityLinks}
+          onAddEntityLink={async (noteId, entityType, entityId) => {
+            await addEntityLink(noteId, { entityType, entityId })
+          }}
+          onRemoveEntityLink={removeEntityLink}
         />
       )}
 
