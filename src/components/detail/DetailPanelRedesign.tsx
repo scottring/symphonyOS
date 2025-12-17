@@ -19,6 +19,7 @@ import { MultiAssigneeDropdown } from '@/components/family'
 import type { PinnableEntityType } from '@/types/pin'
 import type { FamilyMember } from '@/types/family'
 import { TaskQuickActions, type ScheduleContextItem } from '@/components/triage'
+import { TiptapEditor } from '@/components/notes/TiptapEditor'
 
 // Component to render text with clickable links (handles HTML links and plain URLs)
 function RichText({ text }: { text: string }) {
@@ -517,7 +518,6 @@ export function DetailPanelRedesign({
 
   // Notes editing
   const [localNotes, setLocalNotes] = useState(item?.notes || '')
-  const notesInputRef = useRef<HTMLTextAreaElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Time picker state
@@ -1018,8 +1018,7 @@ export function DetailPanelRedesign({
     }
   }
 
-  const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value
+  const handleNotesChange = (value: string) => {
     setLocalNotes(value)
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
@@ -1364,14 +1363,10 @@ export function DetailPanelRedesign({
               </div>
             )}
 
-            <textarea
-              ref={notesInputRef}
-              value={localNotes}
+            <TiptapEditor
+              content={localNotes}
               onChange={handleNotesChange}
               placeholder="Add notes..."
-              className="w-full p-3 text-sm border border-neutral-200 rounded-lg
-                         focus:ring-2 focus:ring-primary-500 focus:border-transparent
-                         resize-none min-h-[80px] transition-all"
             />
           </div>
         </div>

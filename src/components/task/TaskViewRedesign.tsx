@@ -5,6 +5,7 @@ import type { Project } from '@/types/project'
 import type { Note, NoteEntityType } from '@/types/note'
 import { PushDropdown } from '@/components/triage'
 import { EntityNotesSection } from '@/components/notes/EntityNotesSection'
+import { TiptapEditor } from '@/components/notes/TiptapEditor'
 
 interface TaskViewProps {
   task: Task
@@ -145,8 +146,7 @@ export function TaskViewRedesign({
     }
   }
 
-  const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value
+  const handleNotesChange = (value: string) => {
     setLocalNotes(value)
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
@@ -526,18 +526,13 @@ export function TaskViewRedesign({
               )}
             </div>
 
-            {/* ========== NOTES - Inline, not a card ========== */}
+            {/* ========== NOTES - Rich text editor ========== */}
             <div className="pt-8 border-t border-neutral-200/60">
               <h2 className="font-display text-lg font-medium text-neutral-800 mb-4">Notes</h2>
-              <textarea
-                value={localNotes}
+              <TiptapEditor
+                content={localNotes}
                 onChange={handleNotesChange}
                 placeholder="Add notes, thoughts, or context..."
-                rows={5}
-                className="w-full bg-white/50 text-neutral-700 placeholder:text-neutral-400
-                           rounded-xl border border-neutral-200/60 px-4 py-3
-                           focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400
-                           resize-none transition-all"
               />
             </div>
 
