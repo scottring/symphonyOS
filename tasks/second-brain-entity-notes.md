@@ -401,10 +401,366 @@ const handleAddNote = async (content: string) => {
 
 ---
 
-## Future Enhancements (Not in This Spec)
+---
 
-- **Note types in capture** - Choose quick_capture vs meeting_note when creating
+# Phase 2: Structured Templates
+
+## Overview
+
+Templates are structured notes that auto-populate from calendar events and allow human entry for gaps. Perfect for travel itineraries, event planning, meeting prep, and other scenarios where you need to aggregate information from multiple sources.
+
+**The problem this solves:**
+
+> "I need the hotel info, flight times, and restaurant reservations for my Quebec trip all in one place. Some of it is in calendar events, some I have to enter manually."
+
+**The solution:**
+
+Create a "Travel Itinerary" template for the Quebec Vacation project. It scans calendar events in the trip date range, auto-fills flights and reservations it finds, and provides structured fields for manual entry (confirmation numbers, hotel details, notes).
+
+---
+
+## Template Types
+
+### Travel Itinerary
+
+**Auto-populated from calendar:**
+- Flights (events with "flight" or airline codes in title)
+- Restaurant reservations (events with "dinner", "lunch", "reservation")
+- Activities (other events in date range)
+
+**Manual entry fields:**
+- Hotel name, confirmation number, check-in/out times
+- Car rental details
+- Confirmation numbers for auto-detected events
+- Packing list
+- Notes
+
+**Wireframe:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Quebec Vacation Itinerary                      [Edit] [×]  │
+│  Dec 20 - Dec 27, 2024                                      │
+├─────────────────────────────────────────────────────────────┤
+│  ✈️ FLIGHTS                                                 │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ Outbound: AC 456                                    │ ← auto
+│  │ Dec 20 · 8:30am → 11:45am                          │   │
+│  │ Conf #: [ABCD123_______]                           │ ← manual
+│  ├─────────────────────────────────────────────────────┤   │
+│  │ Return: AC 789                                      │ ← auto
+│  │ Dec 27 · 2:00pm → 5:15pm                           │   │
+│  │ Conf #: [______________]                           │ ← manual
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  🏨 HOTEL                                                   │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ Name: [Fairmont Le Château Frontenac__]            │ ← manual
+│  │ Conf #: [12345__________]                          │ ← manual
+│  │ Check-in: Dec 20, [3:00 PM]                        │   │
+│  │ Check-out: Dec 27, [11:00 AM]                      │   │
+│  │ Address: [1 Rue des Carrières, Quebec City]        │   │
+│  │ Phone: [418-692-3861____]                          │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  🚗 CAR RENTAL                                              │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ [+ Add car rental details]                          │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  🍽️ RESERVATIONS                                           │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ Chez Marie                                          │ ← auto
+│  │ Dec 21 · 7:00pm · 4 people                         │   │
+│  │ Conf #: [789___________]                           │ ← manual
+│  ├─────────────────────────────────────────────────────┤   │
+│  │ [+ Add reservation]                                 │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  📋 ACTIVITIES                                              │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ ☑ Montmorency Falls                    Dec 22      │ ← auto
+│  │ ☐ Old Quebec Walking Tour              Dec 23      │ ← auto
+│  │ [+ Add activity]                                    │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  📝 NOTES                                                   │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ Pack snow boots                                     │   │
+│  │ Iris wants to see the ice hotel                    │   │
+│  │ Kids need passports renewed before trip            │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  🧳 PACKING LIST                                            │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ ☐ Passports                                         │   │
+│  │ ☐ Winter coats                                      │   │
+│  │ ☐ Snow boots                                        │   │
+│  │ ☐ Camera                                            │   │
+│  │ [+ Add item]                                        │   │
+│  └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Future Template Types (not in Phase 2)
+
+- **Meeting Prep** - Attendees, agenda, prep tasks, notes
+- **Event Planning** - Guest list, vendors, timeline, budget
+- **Medical Visit** - Doctor, symptoms, questions, prescriptions
+- **Home Project** - Contractors, materials, timeline, costs
+
+---
+
+## Data Model
+
+### Option A: Structured JSON in Note Content
+
+Templates are notes with `type: 'template'` and structured JSON content.
+
+```typescript
+interface TemplateNote extends Note {
+  type: 'template'
+  templateType: 'travel_itinerary' | 'meeting_prep' | 'event_planning'
+  content: string  // JSON stringified template data
+}
+
+interface TravelItineraryData {
+  dateRange: { start: string; end: string }
+  flights: {
+    direction: 'outbound' | 'return'
+    airline?: string
+    flightNumber?: string
+    departure: { time: string; airport?: string }
+    arrival: { time: string; airport?: string }
+    confirmationNumber?: string
+    calendarEventId?: string  // If auto-populated
+  }[]
+  hotel: {
+    name?: string
+    confirmationNumber?: string
+    checkIn?: string
+    checkOut?: string
+    address?: string
+    phone?: string
+  }
+  carRental?: {
+    company?: string
+    confirmationNumber?: string
+    pickUp?: string
+    dropOff?: string
+  }
+  reservations: {
+    name: string
+    date: string
+    time?: string
+    partySize?: number
+    confirmationNumber?: string
+    calendarEventId?: string
+  }[]
+  activities: {
+    name: string
+    date: string
+    completed: boolean
+    calendarEventId?: string
+  }[]
+  packingList: {
+    item: string
+    packed: boolean
+  }[]
+  notes: string
+}
+```
+
+**Pros:**
+- Uses existing notes table
+- Searchable (content field)
+- Links to entities via existing note_entity_links
+
+**Cons:**
+- JSON parsing overhead
+- Harder to query specific fields
+
+### Option B: Separate Templates Table
+
+New `templates` table with typed columns.
+
+**Pros:**
+- Cleaner queries
+- Type safety at DB level
+
+**Cons:**
+- More schema to maintain
+- Another entity type to manage
+
+**Recommendation:** Option A. Keep templates as a special note type. The flexibility is worth the JSON overhead, and it integrates with existing notes infrastructure.
+
+---
+
+## Implementation Tasks
+
+### Task 8: Add Template Type to Notes
+
+**File:** `src/types/note.ts`
+
+```typescript
+export type NoteType =
+  | 'quick_capture'
+  | 'meeting_note'
+  | 'transcript'
+  | 'voice_memo'
+  | 'general'
+  | 'template'  // NEW
+
+export type TemplateType = 'travel_itinerary'  // Extend later
+
+export interface TemplateData {
+  templateType: TemplateType
+  // Type-specific data (TravelItineraryData, etc.)
+  [key: string]: unknown
+}
+```
+
+---
+
+### Task 9: Create Template Components
+
+**Files to create:**
+
+```
+src/components/templates/TemplateSelector.tsx     # Choose template type
+src/components/templates/TravelItinerary.tsx      # Travel template view/edit
+src/components/templates/TemplateSection.tsx      # Reusable section component
+src/components/templates/FlightSection.tsx        # Flight details
+src/components/templates/HotelSection.tsx         # Hotel details
+src/components/templates/ReservationsSection.tsx  # Reservations list
+src/components/templates/PackingList.tsx          # Packing checklist
+```
+
+---
+
+### Task 10: Calendar Event Scanner
+
+**File:** `src/hooks/useCalendarScanner.ts`
+
+Scans Google Calendar events in a date range and categorizes them.
+
+```typescript
+interface UseCalendarScannerProps {
+  startDate: Date
+  endDate: Date
+  events: CalendarEvent[]
+}
+
+interface ScannedEvents {
+  flights: CalendarEvent[]
+  reservations: CalendarEvent[]
+  activities: CalendarEvent[]
+}
+
+function useCalendarScanner({ startDate, endDate, events }: UseCalendarScannerProps): ScannedEvents {
+  // Filter events in date range
+  // Categorize by title patterns:
+  //   - Flights: contains "flight", airline codes (AC, UA, DL), "✈️"
+  //   - Reservations: contains "dinner", "lunch", "reservation", "🍽️"
+  //   - Activities: everything else
+}
+```
+
+---
+
+### Task 11: Create Template from Project
+
+**File:** `src/components/project/ProjectView.tsx`
+
+Add "Create Itinerary" button on projects.
+
+**Behavior:**
+1. User clicks "Create Itinerary" on Quebec Vacation project
+2. Date range picker appears (or auto-detects from project dates if set)
+3. System scans calendar for events in range
+4. Creates template note with auto-populated data
+5. Links template to project
+6. Opens template for editing
+
+---
+
+### Task 12: Template in ProjectView/NoteDetail
+
+Templates appear in the notes section but render as structured views instead of plain text.
+
+**In ProjectView:**
+```
+NOTES (2)
+┌─────────────────────────────────────────────────┐
+│ 📋 Quebec Vacation Itinerary              [→]   │  ← template (expandable)
+├─────────────────────────────────────────────────┤
+│ Hotel wifi password: chateau2024               │  ← regular note
+└─────────────────────────────────────────────────┘
+```
+
+Click template → expands inline or opens full-page view.
+
+---
+
+## User Flow: Creating a Travel Itinerary
+
+1. User has project "Quebec Vacation"
+2. User has calendar events: flights, restaurant reservation, activities
+3. User opens project in Symphony
+4. Clicks [+ Create Itinerary]
+5. Selects date range: Dec 20-27
+6. System scans calendar, finds:
+   - 2 flights (AC 456, AC 789)
+   - 1 reservation (Chez Marie)
+   - 2 activities (Montmorency Falls, Walking Tour)
+7. Template created with auto-populated data
+8. User fills in gaps:
+   - Flight confirmation numbers
+   - Hotel details
+   - Car rental (not in calendar)
+   - Packing list
+9. Template saved, linked to project
+10. Later: user opens project → sees complete itinerary
+11. Search "quebec hotel" → finds template with hotel details
+
+---
+
+## Phase 2 Testing Checklist
+
+### Template Creation
+- [ ] Can create travel itinerary template from project
+- [ ] Date range picker works
+- [ ] Calendar events are scanned and categorized
+- [ ] Flights auto-populate from calendar
+- [ ] Reservations auto-populate from calendar
+- [ ] Activities auto-populate from calendar
+
+### Template Editing
+- [ ] Can edit all fields (hotel, confirmation numbers, etc.)
+- [ ] Can add items to packing list
+- [ ] Can check off packing items
+- [ ] Can add manual reservations
+- [ ] Can add manual activities
+- [ ] Notes field saves correctly
+
+### Template Display
+- [ ] Template appears in project notes section
+- [ ] Template renders as structured view (not JSON)
+- [ ] Can expand/collapse template sections
+- [ ] Template is searchable
+
+### Integration
+- [ ] Template linked to project
+- [ ] Search finds template content
+- [ ] Template survives note system operations (edit, delete link, etc.)
+
+---
+
+## Future Enhancements (Phase 3+)
+
 - **Voice notes** - Record audio, transcribe, link to entity
-- **Note templates** - Pre-filled templates for common note types
 - **Bi-directional linking** - Note mentions @task or #project, auto-links
 - **Calendar event notes** - Notes linked to Google Calendar events
+- **Email import** - Parse confirmation emails to auto-fill template fields
+- **Template sharing** - Share itinerary with family members
+- **PDF export** - Generate printable itinerary
+- **More template types** - Meeting prep, event planning, medical visits
