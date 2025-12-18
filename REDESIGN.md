@@ -37,25 +37,35 @@ This document explains the **radical redesign** of Symphony OS using the new "Ki
 
 ## 🔄 How to Toggle Themes
 
-### Quick Switch
+### User-Facing Theme Selector (Recommended)
 
-Open [src/config/theme.ts](src/config/theme.ts) and change the `ACTIVE_THEME` constant:
+Users can now switch themes directly from the app:
 
-```typescript
-// For Kinetic Clarity (NEW)
-export const ACTIVE_THEME: ThemeVariant = 'kinetic'
+1. Navigate to **Settings** (gear icon in sidebar)
+2. Go to the **General** tab
+3. Under **Appearance**, choose your preferred theme:
+   - **Nordic Journal** - Editorial calm with warm, confident minimalism
+   - **Kinetic Clarity** - Energized and dynamic with spatial depth
+4. Click to select, and the page will reload with your chosen theme
 
-// For Nordic Journal (ORIGINAL)
-export const ACTIVE_THEME: ThemeVariant = 'nordic'
+Theme preferences are automatically saved to localStorage and persist across sessions.
+
+### Developer Quick Switch (For Testing)
+
+Alternatively, developers can manually set the default theme by editing localStorage:
+
+```javascript
+// In browser console:
+localStorage.setItem('symphony-theme', 'kinetic')  // or 'nordic'
+// Then reload the page
 ```
-
-Save the file and the app will hot-reload with the selected theme.
 
 ### What Happens When You Switch
 
-1. **CSS**: The app loads either `src/kinetic-clarity.css` or `src/index.css`
-2. **Components**: AppShell conditionally renders `SidebarKinetic` or `Sidebar`
+1. **CSS**: The app loads either `src/kinetic-clarity.css` or `src/index.css` based on localStorage
+2. **Components**: AppShell conditionally renders `SidebarKinetic` or `Sidebar` using the `useTheme` hook
 3. **Colors**: All Tailwind classes automatically use the theme's color palette
+4. **Persistence**: Theme choice is saved to localStorage and persists across sessions
 
 ---
 

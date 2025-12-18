@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { CalendarSettings } from './CalendarSettings'
 import { WaitlistAdmin } from './WaitlistAdmin'
+import { ThemeSelector } from './ThemeSelector'
 import type { FamilyMember } from '@/types/family'
 
 interface SettingsPageProps {
@@ -255,6 +256,9 @@ export function SettingsPage({ onBack, onFamilyMembersChanged }: SettingsPagePro
         {/* Tab Content */}
         {activeTab === 'general' && (
           <div className="space-y-8">
+            {/* Theme Selector */}
+            <ThemeSelector />
+
             {/* People Section */}
             <section>
               <h2 className="text-lg font-semibold text-neutral-700 mb-2">People</h2>

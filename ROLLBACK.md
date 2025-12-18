@@ -6,16 +6,14 @@ This document explains how to **completely remove** the Kinetic Clarity redesign
 
 ## ✅ Simple Rollback (Recommended)
 
-**Just toggle the theme back to Nordic**:
+**Just toggle the theme back to Nordic in the app**:
 
-1. Open `src/config/theme.ts`
-2. Change line 10 to:
-   ```typescript
-   export const ACTIVE_THEME: ThemeVariant = 'nordic'
-   ```
-3. Save and reload
+1. Open **Settings** in the sidebar (gear icon)
+2. Go to the **General** tab
+3. Under **Appearance**, click on **Nordic Journal**
+4. The page will reload with the original Nordic Journal design
 
-**That's it!** Your app will use the original Nordic Journal design.
+**That's it!** Your app will use the original Nordic Journal design, and the preference is saved automatically.
 
 ---
 

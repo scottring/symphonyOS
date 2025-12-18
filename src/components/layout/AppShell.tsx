@@ -3,6 +3,7 @@ import { Sidebar, type ViewType } from './Sidebar'
 import { SidebarKinetic } from './SidebarKinetic'
 import { QuickCapture } from './QuickCapture'
 import { useMobile } from '@/hooks/useMobile'
+import { useTheme } from '@/hooks/useTheme'
 import symphonyLogo from '@/assets/symphony-logo.jpg'
 import type { PinnedItem } from '@/types/pin'
 import type { PinnableEntityType } from '@/types/pin'
@@ -10,7 +11,6 @@ import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { Routine } from '@/types/routine'
-import { ACTIVE_THEME } from '@/config/theme'
 
 interface EntityData {
   tasks: Task[]
@@ -81,11 +81,12 @@ export function AppShell({
   onPinRefreshStale,
 }: AppShellProps) {
   const isMobile = useMobile()
+  const { theme } = useTheme()
 
   return (
     <div className="h-screen flex overflow-hidden overflow-x-hidden bg-bg-base w-full max-w-[100vw]">
       {/* Sidebar - hidden on mobile */}
-      {!isMobile && ACTIVE_THEME === 'kinetic' && (
+      {!isMobile && theme === 'kinetic' && (
         <SidebarKinetic
           collapsed={sidebarCollapsed}
           onToggle={onSidebarToggle}
@@ -101,7 +102,7 @@ export function AppShell({
           onPinRefreshStale={onPinRefreshStale}
         />
       )}
-      {!isMobile && ACTIVE_THEME === 'nordic' && (
+      {!isMobile && theme === 'nordic' && (
         <Sidebar
           collapsed={sidebarCollapsed}
           onToggle={onSidebarToggle}

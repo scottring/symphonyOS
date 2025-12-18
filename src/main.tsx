@@ -1,13 +1,19 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { ACTIVE_THEME } from './config/theme'
+
+// Load theme from localStorage, default to Nordic Journal
+const THEME_STORAGE_KEY = 'symphony-theme'
+const savedTheme = localStorage.getItem(THEME_STORAGE_KEY)
+const ACTIVE_THEME = (savedTheme === 'kinetic' || savedTheme === 'nordic') ? savedTheme : 'nordic'
+
 // Conditionally import CSS based on active theme
 if (ACTIVE_THEME === 'kinetic') {
   await import('./kinetic-clarity.css')
 } else {
   await import('./index.css')
 }
+
 import App from './App.tsx'
 import { CalendarCallback } from './pages/CalendarCallback'
 import { JoinHousehold } from './pages/JoinHousehold'
