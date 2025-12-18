@@ -24,7 +24,7 @@ interface InboxSectionProps {
   onOpenProject?: (projectId: string) => void
   // Family member assignment
   familyMembers?: FamilyMember[]
-  onAssignTask?: (taskId: string, memberId: string | null) => void
+  onAssignTaskAll?: (taskId: string, memberIds: string[]) => void
   currentUserId?: string
   // Schedule context for the schedule popover
   getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
@@ -46,7 +46,7 @@ export function InboxSection({
   onTriageCardCollapse,
   onOpenProject,
   familyMembers = [],
-  onAssignTask,
+  onAssignTaskAll,
   currentUserId,
   getScheduleItemsForDate,
 }: InboxSectionProps) {
@@ -95,7 +95,6 @@ export function InboxSection({
             onCollapse={onTriageCardCollapse}
             projects={projects}
             familyMembers={familyMembers}
-            onAssignTask={onAssignTask ? (memberId) => onAssignTask(recentlyCreatedTask.id, memberId) : undefined}
             getScheduleItemsForDate={getScheduleItemsForDate}
           />
         )}
@@ -123,7 +122,7 @@ export function InboxSection({
             projects={projects}
             onOpenProject={onOpenProject}
             familyMembers={familyMembers}
-            onAssignTask={onAssignTask ? (memberId) => onAssignTask(task.id, memberId) : undefined}
+            onAssignTaskAll={onAssignTaskAll ? (memberIds) => onAssignTaskAll(task.id, memberIds) : undefined}
             getScheduleItemsForDate={getScheduleItemsForDate}
           />
         ))}

@@ -3,7 +3,7 @@ import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
 import type { ScheduleContextItem } from '@/components/triage'
 import { DeferPicker, SchedulePopover } from '@/components/triage'
-import { AssigneeDropdown } from '@/components/family'
+import { MultiAssigneeDropdown } from '@/components/family'
 import { AgeIndicator } from '@/components/health'
 
 interface InboxTaskCardProps {
@@ -17,7 +17,7 @@ interface InboxTaskCardProps {
   onOpenProject?: (projectId: string) => void
   // Family member assignment
   familyMembers?: FamilyMember[]
-  onAssignTask?: (memberId: string | null) => void
+  onAssignTaskAll?: (memberIds: string[]) => void
   // Schedule context for the schedule popover
   getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
 }
@@ -32,7 +32,7 @@ export function InboxTaskCard({
   projects = [],
   onOpenProject,
   familyMembers = [],
-  onAssignTask,
+  onAssignTaskAll,
   getScheduleItemsForDate,
 }: InboxTaskCardProps) {
   const project = projects.find(p => p.id === task.projectId)
@@ -135,13 +135,13 @@ export function InboxTaskCard({
           />
         </div>
 
-        {/* Assignee avatar - always visible */}
-        {familyMembers.length > 0 && onAssignTask && (
+        {/* Multi-assignee avatar - always visible */}
+        {familyMembers.length > 0 && onAssignTaskAll && (
           <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-            <AssigneeDropdown
+            <MultiAssigneeDropdown
               members={familyMembers}
-              selectedId={task.assignedTo}
-              onSelect={onAssignTask}
+              selectedIds={task.assignedToAll || []}
+              onSelect={onAssignTaskAll}
               size="sm"
             />
           </div>

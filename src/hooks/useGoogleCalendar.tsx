@@ -37,10 +37,16 @@ export interface CalendarEvent {
   start_time?: string
   end_time?: string
   all_day?: boolean
+  calendar_id?: string
+  calendar_name?: string | null
+  calendar_color?: string | null // Google Calendar color (hex)
   // Camel case (observed in runtime)
   startTime?: string
   endTime?: string
   allDay?: boolean
+  calendarId?: string
+  calendarName?: string | null
+  calendarColor?: string | null
   location?: string | null
 }
 

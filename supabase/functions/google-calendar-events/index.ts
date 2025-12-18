@@ -149,6 +149,7 @@ serve(async (req) => {
       id: string
       summary?: string
       selected?: boolean
+      backgroundColor?: string // Google Calendar color (hex)
     }
     interface GoogleCalendarEvent {
       id: string
@@ -211,6 +212,8 @@ serve(async (req) => {
             all_day: isAllDay,
             location: event.location || null,
             calendar_id: calendar.id,
+            calendar_name: calendar.summary || null,
+            calendar_color: calendar.backgroundColor || null, // Google Calendar color
             updated_at: new Date().toISOString(),
           }
         })

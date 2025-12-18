@@ -19,6 +19,8 @@ import { MultiAssigneeDropdown } from '@/components/family'
 import type { PinnableEntityType } from '@/types/pin'
 import type { FamilyMember } from '@/types/family'
 import { TaskQuickActions, type ScheduleContextItem } from '@/components/triage'
+import { TiptapEditor } from '@/components/notes/TiptapEditor'
+import { NotesEditorModal } from '@/components/notes/NotesEditorModal'
 
 // Component to render text with clickable links (handles HTML links and plain URLs)
 function RichText({ text }: { text: string }) {
@@ -517,7 +519,6 @@ export function DetailPanelRedesign({
 
   // Notes editing
   const [localNotes, setLocalNotes] = useState(item?.notes || '')
-  const notesInputRef = useRef<HTMLTextAreaElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Time picker state
@@ -562,6 +563,9 @@ export function DetailPanelRedesign({
   // Collapsible Details section
   const [detailsExpanded, setDetailsExpanded] = useState(true)
   const directions = useDirections()
+
+  // Full-screen notes editor modal
+  const [showNotesModal, setShowNotesModal] = useState(false)
 
   // Sync local state when item changes
   useEffect(() => {
@@ -1018,8 +1022,7 @@ export function DetailPanelRedesign({
     }
   }
 
-  const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value
+  const handleNotesChange = (value: string) => {
     setLocalNotes(value)
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
@@ -1343,11 +1346,22 @@ export function DetailPanelRedesign({
             </div>
           )}
 
-          {/* Notes - always a textarea, invites input */}
+          {/* Notes - with expand to full-screen option */}
           <div>
-            <h3 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">
-              Notes
-            </h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-neutral-500 uppercase tracking-wide">
+                Notes
+              </h3>
+              <button
+                onClick={() => setShowNotesModal(true)}
+                className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
+                title="Expand to full screen"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M3 4a1 1 0 011-1h4a1 1 0 010 2H6.414l2.293 2.293a1 1 0 11-1.414 1.414L5 6.414V8a1 1 0 01-2 0V4zm9 1a1 1 0 010-2h4a1 1 0 011 1v4a1 1 0 01-2 0V6.414l-2.293 2.293a1 1 0 11-1.414-1.414L13.586 5H12zm-9 7a1 1 0 012 0v1.586l2.293-2.293a1 1 0 111.414 1.414L6.414 15H8a1 1 0 010 2H4a1 1 0 01-1-1v-4zm13-1a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 010-2h1.586l-2.293-2.293a1 1 0 111.414-1.414L15 13.586V12a1 1 0 011-1z" />
+                </svg>
+              </button>
+            </div>
 
             {/* Google Calendar description (read-only, events only) */}
             {isEvent && item.googleDescription && (
@@ -1364,14 +1378,10 @@ export function DetailPanelRedesign({
               </div>
             )}
 
-            <textarea
-              ref={notesInputRef}
-              value={localNotes}
+            <TiptapEditor
+              content={localNotes}
               onChange={handleNotesChange}
               placeholder="Add notes..."
-              className="w-full p-3 text-sm border border-neutral-200 rounded-lg
-                         focus:ring-2 focus:ring-primary-500 focus:border-transparent
-                         resize-none min-h-[80px] transition-all"
             />
           </div>
         </div>
@@ -2314,6 +2324,23 @@ export function DetailPanelRedesign({
           </div>
         </div>
       )}
+
+      {/* Full-screen Notes Editor Modal */}
+      <NotesEditorModal
+        isOpen={showNotesModal}
+        title={item?.title || 'Notes'}
+        content={localNotes}
+        onClose={() => setShowNotesModal(false)}
+        onSave={(content) => {
+          setLocalNotes(content)
+          if (isTask && item.originalTask && onUpdate) {
+            onUpdate(item.originalTask.id, { notes: content || undefined })
+          } else if (isEvent && item.originalEvent && onUpdateEventNote) {
+            const googleEventId = item.originalEvent.google_event_id || item.originalEvent.id
+            onUpdateEventNote(googleEventId, content || null)
+          }
+        }}
+      />
     </div>
   )
 }

@@ -190,6 +190,29 @@ body {
   overflow-x: hidden;
   width: 100%;
   max-width: 100vw;
+  overscroll-behavior-x: none;
+}
+
+/* Mobile: Lock horizontal movement completely */
+@media (max-width: 768px) {
+  html, body {
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+    width: 100%;
+    max-width: 100vw;
+  }
+
+  body {
+    position: relative;
+  }
+
+  #root {
+    width: 100%;
+    min-height: 100vh;
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 /* Display font utility */
@@ -247,24 +270,65 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Mobile: Prevent ALL horizontal scrolling/bouncing */
+@media (max-width: 768px) {
+  * {
+    overscroll-behavior-x: none;
+  }
+
+  /* Lock everything to viewport width */
+  body,
+  #root,
+  #root > *,
+  main,
+  div[class*="flex"],
+  div[class*="grid"] {
+    max-width: 100vw;
+    overflow-x: hidden !important;
+  }
+
+  /* Prevent any margin/padding from pushing content */
+  * {
+    box-sizing: border-box;
+  }
+}
+
 .scroll-container {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
 }
 
 /* =============================================================================
-   MOBILE TEXT SIZES
+   MOBILE TEXT SIZES - Optimized for readability
    ============================================================================= */
 
 @media (max-width: 768px) {
   html {
-    font-size: 16px;
+    font-size: 17px;
+  }
+
+  /* Base text sizes */
+  .text-xs {
+    font-size: 0.8125rem;
+  }
+  .text-sm {
+    font-size: 0.9375rem;
   }
   .text-base {
-    font-size: 1rem;
+    font-size: 1.0625rem;
   }
+  .text-lg {
+    font-size: 1.1875rem;
+  }
+  .text-xl {
+    font-size: 1.375rem;
+  }
+  .text-2xl {
+    font-size: 1.75rem;
+  }
+
   .time-group-header {
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
   }
 }
 
@@ -283,8 +347,33 @@ body {
    ============================================================================= */
 
 .touch-target {
-  min-height: 44px;
-  min-width: 44px;
+  min-height: 48px;
+  min-width: 48px;
+}
+
+/* Mobile-specific touch targets */
+@media (max-width: 768px) {
+  .touch-target {
+    min-height: 52px;
+    min-width: 52px;
+  }
+
+  /* Buttons */
+  button,
+  .btn-primary,
+  .btn-secondary {
+    min-height: 48px;
+    padding: 0.875rem 1.5rem;
+    font-size: 1.0625rem;
+  }
+
+  /* Icon buttons need larger hit areas */
+  button[aria-label],
+  button:has(svg:only-child) {
+    min-height: 48px;
+    min-width: 48px;
+    padding: 0.75rem;
+  }
 }
 
 /* Card - minimal, elegant */
@@ -327,6 +416,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+@media (max-width: 768px) {
+  .checkbox-custom {
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--color-neutral-300);
+  }
 }
 
 .checkbox-custom:hover {
@@ -428,6 +525,25 @@ body {
 @keyframes subtle-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.75; }
+}
+
+/* Flying pill animation for inbox captures */
+@keyframes fly-to-inbox {
+  0% {
+    transform: translate(calc(var(--start-x) - 50%), calc(var(--start-y) - 50%)) scale(1);
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(calc(var(--end-x) - 50%), calc(var(--end-y) - 50%)) scale(0.3);
+    opacity: 0;
+  }
+}
+
+.animate-fly-to-inbox {
+  animation: fly-to-inbox 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 /* Staggered entrance - tighter timing */
@@ -657,3 +773,52 @@ body {
 .clarity-good { --clarity-color: var(--color-sage-500); }
 .clarity-fair { --clarity-color: var(--color-warning-500); }
 .clarity-needs-attention { --clarity-color: hsl(25 70% 50%); }
+
+/* =============================================================================
+   MOBILE SCHEDULE ITEMS - Larger text and interactive elements
+   ============================================================================= */
+
+@media (max-width: 768px) {
+  /* Task/Event cards */
+  [role="button"] {
+    padding: 0.875rem 1rem;
+  }
+
+  /* Schedule item text and icons */
+  .schedule-item-title {
+    font-size: 1.0625rem;
+    line-height: 1.4;
+  }
+
+  /* Time indicators */
+  .schedule-item-time {
+    font-size: 0.9375rem;
+  }
+
+  /* All SVG icons in interactive contexts */
+  svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  /* Larger icons in buttons */
+  button svg,
+  [role="button"] svg {
+    width: 1.375rem;
+    height: 1.375rem;
+  }
+
+  /* Navigation and control icons */
+  nav svg,
+  header svg {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  /* Chip badges (project, contact tags) */
+  .chip,
+  [class*="chip"] {
+    font-size: 0.875rem;
+    padding: 0.375rem 0.75rem;
+  }
+}

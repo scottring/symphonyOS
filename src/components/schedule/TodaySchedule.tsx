@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useRef } from 'react'
+import { useMemo, useState, useCallback, useRef, useEffect, forwardRef } from 'react'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
@@ -14,22 +14,17 @@ import { TimeGroup } from './TimeGroup'
 import { ScheduleItem } from './ScheduleItem'
 import { SwipeableCard } from './SwipeableCard'
 import { DateNavigator } from './DateNavigator'
-import { InboxSection } from './InboxSection'
+import { InboxTaskCard } from './InboxTaskCard'
 import { OverdueSection } from './OverdueSection'
-import { WeeklyReview } from '@/components/review/WeeklyReview'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { useSystemHealth } from '@/hooks/useSystemHealth'
 import { MultiAssigneeDropdown } from '@/components/family/MultiAssigneeDropdown'
 
-// Bento box / grid icon for "Organize"
-function BentoIcon({ className }: { className?: string }) {
+// Inbox icon
+function InboxIcon({ className }: { className?: string }) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      {/* 2x2 grid with rounded corners - bento box style */}
-      <rect x="3" y="3" width="7" height="7" rx="1.5" />
-      <rect x="14" y="3" width="7" height="7" rx="1.5" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" />
-      <rect x="14" y="14" width="7" height="7" rx="1.5" />
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 20 20" fill="currentColor">
+      <path fillRule="evenodd" d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 2h10v7h-2l-1 2H8l-1-2H5V5z" clipRule="evenodd" />
     </svg>
   )
 }
@@ -40,39 +35,42 @@ function isOrganizeTime(): boolean {
   return (hour >= 6 && hour < 9) || (hour >= 18 && hour < 21)
 }
 
-interface OrganizeButtonProps {
+interface InboxButtonProps {
   onClick: () => void
   inboxCount: number
-  isMobile: boolean
-  hasAssigneeFilter: boolean
+  isExpanded: boolean
+  pulse?: boolean
 }
 
-function OrganizeButton({ onClick, inboxCount, isMobile, hasAssigneeFilter }: OrganizeButtonProps) {
-  void isMobile // Not used after layout change
-  void hasAssigneeFilter // Not used after layout change
-  const emphasized = isOrganizeTime() && inboxCount > 0
+const InboxButton = forwardRef<HTMLButtonElement, InboxButtonProps>(
+  function InboxButton({ onClick, inboxCount, isExpanded, pulse }, ref) {
+    const emphasized = isOrganizeTime() && inboxCount > 0
 
-  return (
-    <button
-      onClick={onClick}
-      className={`relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-        emphasized
-          ? 'text-primary-700 bg-primary-50 hover:bg-primary-100'
-          : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100'
-      }`}
-    >
-      <BentoIcon className={`w-5 h-5 ${emphasized ? 'text-primary-600' : ''}`} />
-      <span className="hidden sm:inline">Organize</span>
-      {inboxCount > 0 && (
-        <span className={`absolute -top-1.5 -right-1.5 min-w-[1.125rem] h-[1.125rem] px-1 flex items-center justify-center rounded-full text-white text-[10px] font-bold ${
-          emphasized ? 'bg-primary-500' : 'bg-neutral-400'
-        }`}>
-          {inboxCount}
-        </span>
-      )}
-    </button>
-  )
-}
+    return (
+      <button
+        ref={ref}
+        onClick={onClick}
+        className={`relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+          isExpanded
+            ? 'text-primary-700 bg-primary-100'
+            : emphasized
+            ? 'text-primary-700 bg-primary-50 hover:bg-primary-100'
+            : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100'
+        } ${pulse ? 'animate-pulse ring-2 ring-primary-400 ring-offset-2' : ''}`}
+      >
+        <InboxIcon className={`w-5 h-5 ${isExpanded || emphasized ? 'text-primary-600' : ''}`} />
+        <span className="hidden sm:inline">Inbox</span>
+        {inboxCount > 0 && (
+          <span className={`absolute -top-1.5 -right-1.5 min-w-[1.125rem] h-[1.125rem] px-1 flex items-center justify-center rounded-full text-white text-[10px] font-bold transition-transform ${
+            isExpanded || emphasized ? 'bg-primary-500' : 'bg-neutral-400'
+          } ${pulse ? 'scale-125' : ''}`}>
+            {inboxCount}
+          </span>
+        )}
+      </button>
+    )
+  }
+)
 
 // Inline Clarity indicator - clickable with expandable explanation
 interface ClarityIndicatorProps {
@@ -543,19 +541,19 @@ export function TodaySchedule({
   onToggleTask,
   onUpdateTask,
   onPushTask,
-  onDeleteTask,
+  onDeleteTask: _onDeleteTask,
   loading,
   viewedDate,
   onDateChange,
   contactsMap,
   projectsMap,
   projects = [],
-  contacts = [],
-  onSearchContacts,
-  onAddContact,
+  contacts: _contacts = [],
+  onSearchContacts: _onSearchContacts,
+  onAddContact: _onAddContact,
   eventNotesMap,
-  recentlyCreatedTaskId,
-  onTriageCardCollapse,
+  recentlyCreatedTaskId: _recentlyCreatedTaskId,
+  onTriageCardCollapse: _onTriageCardCollapse,
   onOpenProject,
   familyMembers = [],
   onAssignTask,
@@ -572,7 +570,7 @@ export function TodaySchedule({
   onPushEvent,
   onOpenPlanning: _onOpenPlanning,
   onCreateTask: _onCreateTask,
-  onAddProject,
+  onAddProject: _onAddProject,
   selectedAssignee,
   onSelectAssignee,
   assigneesWithTasks = [],
@@ -581,12 +579,40 @@ export function TodaySchedule({
 }: TodayScheduleProps) {
   void _onOpenPlanning // Reserved - planning now handled by ModeToggle
   void _onCreateTask // Reserved - was used by ReviewSection
+  void _onDeleteTask // Available for future inline inbox delete
+  void _contacts // Available for future inline triage
+  void _onSearchContacts // Available for future inline triage
+  void _onAddContact // Available for future inline triage
+  void _recentlyCreatedTaskId // Available for future triage card
+  void _onTriageCardCollapse // Available for future triage card
+  void _onAddProject // Available for future inline project creation
   const isMobile = useMobile()
-  const inboxSectionRef = useRef<HTMLDivElement>(null)
 
-  // Scroll to inbox section
+  // Hide routines toggle with localStorage persistence
+  const [hideRoutines, setHideRoutines] = useState(() => {
+    const stored = localStorage.getItem('symphony-hide-routines')
+    return stored === 'true'
+  })
+
+  const toggleHideRoutines = useCallback(() => {
+    setHideRoutines(prev => {
+      const newValue = !prev
+      localStorage.setItem('symphony-hide-routines', String(newValue))
+      return newValue
+    })
+  }, [])
+
+  // Flying pill animation for inbox captures
+  const organizeButtonRef = useRef<HTMLButtonElement>(null)
+  const [flyingPill, setFlyingPill] = useState<{
+    title: string
+    sourceRect: { top: number; left: number; width: number; height: number }
+  } | null>(null)
+  const [organizePulse, setOrganizePulse] = useState(false)
+
+  // Open inline inbox (was scroll to inbox)
   const scrollToInbox = useCallback(() => {
-    inboxSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    setShowInlineInbox(true)
   }, [])
 
   // Create a map for efficient task lookup by ID (for parent task names)
@@ -618,8 +644,8 @@ export function TodaySchedule({
     return assignedTo === selectedAssignee // Show items assigned to selected person
   }
 
-  // Weekly review modal state
-  const [showWeeklyReview, setShowWeeklyReview] = useState(false)
+  // Inline inbox collapsed/expanded state
+  const [showInlineInbox, setShowInlineInbox] = useState(false)
   // Check if we're viewing today
   const isToday = useMemo(() => {
     const today = new Date()
@@ -629,6 +655,30 @@ export function TodaySchedule({
       viewedDate.getDate() === today.getDate()
     )
   }, [viewedDate])
+
+  // Listen for inbox add events from QuickCapture (for flying pill animation)
+  useEffect(() => {
+    const handleInboxAdd = (e: CustomEvent<{
+      title: string
+      sourceRect: { top: number; left: number; width: number; height: number }
+    }>) => {
+      // Only animate if we're on today's view and the organize button exists
+      if (!isToday || !organizeButtonRef.current) return
+
+      setFlyingPill(e.detail)
+
+      // After animation completes, trigger pulse, expand inbox, and clear pill
+      setTimeout(() => {
+        setFlyingPill(null)
+        setOrganizePulse(true)
+        setShowInlineInbox(true) // Auto-expand to show where it landed
+        setTimeout(() => setOrganizePulse(false), 600)
+      }, 500) // Match the CSS animation duration
+    }
+
+    window.addEventListener('symphony:inbox-add', handleInboxAdd as EventListener)
+    return () => window.removeEventListener('symphony:inbox-add', handleInboxAdd as EventListener)
+  }, [isToday])
 
   // Overdue tasks: scheduled for past days, not completed - only shown on today's view
   const overdueTasks = useMemo(() => {
@@ -662,11 +712,12 @@ export function TodaySchedule({
       if (!matchesAssigneeFilter(task.assignedTo)) return false
       // No scheduled date = inbox item
       if (!task.scheduledFor) {
-        // If deferred to a future date, don't show yet
+        // If deferred to a future time, don't show yet
         if (task.deferredUntil) {
-          const deferredDate = new Date(task.deferredUntil)
-          deferredDate.setHours(0, 0, 0, 0)
-          return deferredDate <= today
+          const deferredDateTime = new Date(task.deferredUntil)
+          const now = new Date()
+          // Show only if the deferred time has passed
+          return deferredDateTime <= now
         }
         return true
       }
@@ -730,10 +781,10 @@ export function TodaySchedule({
     return map
   }, [dateInstances])
 
-  // Filter to only routines that should show on timeline (default true for backwards compat)
+  // Filter to only routines that should show on timeline (respects both per-routine and global toggle)
   const visibleRoutines = useMemo(() =>
-    routines.filter(r => r.show_on_timeline !== false),
-    [routines]
+    hideRoutines ? [] : routines.filter(r => r.show_on_timeline !== false),
+    [routines, hideRoutines]
   )
 
   // Build instance status map for events
@@ -917,15 +968,16 @@ export function TodaySchedule({
           <DateNavigator date={viewedDate} onDateChange={onDateChange} showTodayButton={!isToday} />
         </div>
 
-        {/* Stats row: Organize, Progress (centered), Clarity */}
+        {/* Stats row: Inbox, Progress (centered), Clarity */}
         <div className="flex items-center gap-4 pt-5 border-t border-neutral-200/60">
-          {/* Organize button - left side */}
+          {/* Inbox button - left side */}
           {isToday && (
-            <OrganizeButton
-              onClick={() => setShowWeeklyReview(true)}
+            <InboxButton
+              ref={organizeButtonRef}
+              onClick={() => setShowInlineInbox(prev => !prev)}
               inboxCount={inboxTasks.length}
-              isMobile={isMobile}
-              hasAssigneeFilter={false}
+              isExpanded={showInlineInbox}
+              pulse={organizePulse}
             />
           )}
 
@@ -948,6 +1000,41 @@ export function TodaySchedule({
             />
           )}
 
+          {/* Routines toggle - only show if there are routines */}
+          {routines.length > 0 && (
+            <button
+              onClick={toggleHideRoutines}
+              className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm transition-all duration-200 ${
+                hideRoutines
+                  ? 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100'
+                  : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100'
+              }`}
+              title={hideRoutines ? 'Show routines' : 'Hide routines'}
+            >
+              {/* Repeat/sync icon for routines */}
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className={`w-4 h-4 ${hideRoutines ? 'opacity-50' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 00-3.7-3.7 48.678 48.678 0 00-7.324 0 4.006 4.006 0 00-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3l-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 003.7 3.7 48.656 48.656 0 007.324 0 4.006 4.006 0 003.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3l-3 3"
+                />
+              </svg>
+              {/* Strikethrough line when hidden */}
+              {hideRoutines && (
+                <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <span className="w-5 h-0.5 bg-neutral-400 rotate-45" />
+                </span>
+              )}
+            </button>
+          )}
+
           {/* Clarity score - right side */}
           {isToday && !loading && tasks.length > 0 && (
             <ClarityIndicator
@@ -962,6 +1049,58 @@ export function TodaySchedule({
           )}
         </div>
       </header>
+
+      {/* Inline collapsible inbox section */}
+      {isToday && showInlineInbox && inboxTasks.length > 0 && onUpdateTask && onPushTask && (
+        <div className="mb-8 animate-fade-in-up">
+          <div className="rounded-2xl border border-neutral-200 bg-neutral-50/50">
+            {/* Inbox header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-200/60 rounded-t-2xl">
+              <div className="flex items-center gap-2 text-sm font-medium text-neutral-700">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-neutral-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 2h10v7h-2l-1 2H8l-1-2H5V5z" clipRule="evenodd" />
+                </svg>
+                Inbox
+                <span className="text-neutral-400">({inboxTasks.length})</span>
+              </div>
+              <button
+                onClick={() => setShowInlineInbox(false)}
+                className="p-1 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-200/50 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+            {/* Inbox items */}
+            <div className="p-3 space-y-2 max-h-[400px] overflow-y-auto rounded-b-2xl">
+              {inboxTasks.map((task) => (
+                <InboxTaskCard
+                  key={task.id}
+                  task={task}
+                  onDefer={(date) => {
+                    if (date) {
+                      onPushTask(task.id, date)
+                    } else {
+                      onUpdateTask(task.id, { deferredUntil: undefined })
+                    }
+                  }}
+                  onSchedule={(date, isAllDay) => {
+                    onUpdateTask(task.id, { scheduledFor: date, isAllDay, deferredUntil: undefined })
+                  }}
+                  onUpdate={(updates) => onUpdateTask(task.id, updates)}
+                  onSelect={() => onSelectItem(`task-${task.id}`)}
+                  projects={projects}
+                  onOpenProject={onOpenProject}
+                  familyMembers={familyMembers}
+                  onAssignTaskAll={onAssignTaskAll ? (memberIds) => onAssignTaskAll(task.id, memberIds) : undefined}
+                  getScheduleItemsForDate={getScheduleItemsForDate}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <LoadingSkeleton />
@@ -1076,6 +1215,9 @@ export function TodaySchedule({
                         } else if (item.type === 'routine' && onCompleteRoutine) {
                           const routineId = item.id.replace('routine-', '')
                           onCompleteRoutine(routineId, !item.completed)
+                        } else if (item.type === 'event' && onCompleteEvent) {
+                          const eventId = item.id.replace('event-', '')
+                          onCompleteEvent(eventId, !item.completed)
                         }
                       }}
                       onPush={
@@ -1141,48 +1283,56 @@ export function TodaySchedule({
             )
           })}
 
-          {/* Inbox Section - at bottom, only on today's view */}
-          {onUpdateTask && onPushTask && (
-            <div ref={inboxSectionRef}>
-              <InboxSection
-                tasks={inboxTasks}
-                onUpdateTask={onUpdateTask}
-                onPushTask={onPushTask}
-                onSelectTask={(taskId) => onSelectItem(`task-${taskId}`)}
-                onDeleteTask={onDeleteTask}
-                projects={projects}
-                contacts={contacts}
-                onSearchContacts={onSearchContacts}
-                onAddContact={onAddContact}
-                onAddProject={onAddProject}
-                recentlyCreatedTaskId={recentlyCreatedTaskId}
-                onTriageCardCollapse={onTriageCardCollapse}
-                onOpenProject={onOpenProject}
-                familyMembers={familyMembers}
-                onAssignTask={onAssignTask}
-                getScheduleItemsForDate={getScheduleItemsForDate}
-              />
-            </div>
-          )}
         </div>
       )}
 
-      {/* Weekly Review Modal */}
-      {showWeeklyReview && onUpdateTask && onPushTask && onDeleteTask && (
-        <WeeklyReview
-          tasks={inboxTasks}
-          projects={projects}
-          contacts={contacts}
-          calendarEvents={events}
-          allTasks={tasks}
-          onSearchContacts={onSearchContacts ?? (() => [])}
-          onAddContact={onAddContact}
-          onUpdateTask={onUpdateTask}
-          onPushTask={onPushTask}
-          onDeleteTask={onDeleteTask}
-          onClose={() => setShowWeeklyReview(false)}
+      {/* Flying pill animation for inbox captures */}
+      {flyingPill && organizeButtonRef.current && (
+        <FlyingPill
+          title={flyingPill.title}
+          sourceRect={flyingPill.sourceRect}
+          targetRef={organizeButtonRef}
         />
       )}
+    </div>
+  )
+}
+
+// Flying pill animation component
+function FlyingPill({
+  title,
+  sourceRect,
+  targetRef,
+}: {
+  title: string
+  sourceRect: { top: number; left: number; width: number; height: number }
+  targetRef: React.RefObject<HTMLButtonElement | null>
+}) {
+  const targetRect = targetRef.current?.getBoundingClientRect()
+  if (!targetRect) return null
+
+  // Calculate the center points
+  const startX = sourceRect.left + sourceRect.width / 2
+  const startY = sourceRect.top + sourceRect.height / 2
+  const endX = targetRect.left + targetRect.width / 2
+  const endY = targetRect.top + targetRect.height / 2
+
+  // CSS custom properties for the animation
+  const style = {
+    '--start-x': `${startX}px`,
+    '--start-y': `${startY}px`,
+    '--end-x': `${endX}px`,
+    '--end-y': `${endY}px`,
+  } as React.CSSProperties
+
+  return (
+    <div
+      className="fixed z-[100] pointer-events-none animate-fly-to-inbox"
+      style={style}
+    >
+      <div className="px-3 py-1.5 bg-primary-500 text-white text-sm font-medium rounded-full shadow-lg whitespace-nowrap max-w-[200px] truncate">
+        {title}
+      </div>
     </div>
   )
 }

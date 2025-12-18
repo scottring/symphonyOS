@@ -144,6 +144,12 @@ export function QuickCapture({
     const trimmed = title.trim()
     if (!trimmed) return
 
+    // Determine if this is going to inbox (for animation)
+    const isInboxAdd = useRaw || !hasParsedFields(effectiveParsed) || !effectiveParsed.dueDate
+
+    // Get input position for animation before any state changes
+    const inputRect = inputRef.current?.getBoundingClientRect()
+
     if (useRaw || !hasParsedFields(effectiveParsed)) {
       // Plain inbox add (current behavior)
       onAdd(trimmed)
@@ -159,6 +165,22 @@ export function QuickCapture({
     } else {
       // Fallback if onAddRich not provided
       onAdd(trimmed)
+    }
+
+    // Dispatch animation event for inbox items
+    if (isInboxAdd && inputRect) {
+      const taskTitle = useRaw ? trimmed : effectiveParsed.title
+      window.dispatchEvent(new CustomEvent('symphony:inbox-add', {
+        detail: {
+          title: taskTitle,
+          sourceRect: {
+            top: inputRect.top,
+            left: inputRect.left,
+            width: inputRect.width,
+            height: inputRect.height,
+          },
+        },
+      }))
     }
 
     // Reset and refocus for rapid entry

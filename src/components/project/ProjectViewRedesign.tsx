@@ -66,7 +66,6 @@ export function ProjectViewRedesign({
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState('')
   const [editStatus, setEditStatus] = useState<ProjectStatus>('not_started')
-  const [editNotes, setEditNotes] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [showStatusDropdown, setShowStatusDropdown] = useState(false)
@@ -108,7 +107,6 @@ export function ProjectViewRedesign({
   const handleEdit = () => {
     setEditName(project.name)
     setEditStatus(project.status)
-    setEditNotes(project.notes || '')
     setIsEditing(true)
   }
 
@@ -118,7 +116,6 @@ export function ProjectViewRedesign({
       onUpdateProject(project.id, {
         name: trimmedName,
         status: editStatus,
-        notes: editNotes.trim() || undefined,
       })
     }
     setIsEditing(false)
@@ -128,7 +125,6 @@ export function ProjectViewRedesign({
     setIsEditing(false)
     setEditName('')
     setEditStatus('not_started')
-    setEditNotes('')
   }
 
   // Direct status change (manual override)
@@ -298,17 +294,6 @@ export function ProjectViewRedesign({
                           </button>
                         ))}
                       </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-neutral-600 mb-1.5">Notes</label>
-                      <textarea
-                        value={editNotes}
-                        onChange={(e) => setEditNotes(e.target.value)}
-                        placeholder="Project notes..."
-                        rows={3}
-                        className="w-full px-3 py-2.5 text-sm rounded-xl border border-neutral-200 bg-white
-                                   focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                      />
                     </div>
                     <div className="flex gap-3 pt-2">
                       <button
@@ -639,19 +624,9 @@ export function ProjectViewRedesign({
                 </div>
               )}
 
-              {/* Notes */}
-              <div>
-                <h3 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3">Notes</h3>
-                {project.notes ? (
-                  <p className="text-sm text-neutral-600 leading-relaxed">{project.notes}</p>
-                ) : (
-                  <p className="text-sm text-neutral-400 italic">No notes</p>
-                )}
-              </div>
-
-              {/* Related Notes (Second Brain) */}
+              {/* Notes (Second Brain) */}
               {onAddEntityNote && (
-                <div className="pt-6 border-t border-neutral-200/60">
+                <div>
                   <EntityNotesSection
                     entityType="project"
                     entityId={project.id}
