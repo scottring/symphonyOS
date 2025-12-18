@@ -306,6 +306,129 @@ textarea::placeholder {
   background-color: hsl(240 80% 55% / 0.15) !important;
 }
 
+/* =============================================================================
+   RICH TEXT EDITOR (Tiptap) OVERRIDES
+   ============================================================================= */
+
+/* Editor toolbar - dark background with visible buttons */
+.ProseMirror + div,
+[class*="editor"] div[class*="toolbar"],
+[class*="editor"] div[class*="menu"] {
+  background-color: var(--color-bg-elevated) !important;
+  border-color: hsl(240 80% 80% / 0.1) !important;
+}
+
+/* Editor buttons */
+.ProseMirror ~ div button,
+[class*="editor"] button {
+  color: hsl(222 15% 75%) !important;
+  background-color: transparent !important;
+}
+
+.ProseMirror ~ div button:hover,
+[class*="editor"] button:hover {
+  background-color: hsl(222 22% 22%) !important;
+  color: hsl(222 15% 95%) !important;
+}
+
+/* Active editor buttons */
+.ProseMirror ~ div button.is-active,
+.ProseMirror ~ div button[class*="active"],
+[class*="editor"] button.is-active,
+[class*="editor"] button[class*="active"] {
+  background-color: hsl(240 80% 55% / 0.2) !important;
+  color: hsl(240 80% 75%) !important;
+}
+
+/* Editor content area */
+.ProseMirror {
+  background-color: var(--color-bg-card) !important;
+  color: hsl(222 15% 90%) !important;
+}
+
+/* =============================================================================
+   PROJECT/CONTACT BADGES & CHIPS
+   ============================================================================= */
+
+/* Project badges with bright backgrounds */
+[class*="badge"],
+[class*="chip"],
+.bg-amber-50,
+.bg-blue-50,
+.bg-green-50,
+.bg-purple-50,
+.bg-pink-50,
+.bg-yellow-50,
+.bg-teal-50,
+.bg-orange-50,
+.bg-red-50,
+.bg-indigo-50 {
+  background-color: hsl(222 22% 20% / 0.5) !important;
+  color: hsl(222 15% 85%) !important;
+  border-color: hsl(240 80% 80% / 0.15) !important;
+}
+
+/* Context-specific badge colors (work/family/personal) */
+.badge-work,
+[class*="work"] [class*="badge"] {
+  background-color: hsl(240 80% 55% / 0.15) !important;
+  border-color: hsl(240 80% 65% / 0.3) !important;
+  color: hsl(240 80% 75%) !important;
+}
+
+.badge-family,
+[class*="family"] [class*="badge"] {
+  background-color: hsl(320 80% 55% / 0.15) !important;
+  border-color: hsl(320 80% 65% / 0.3) !important;
+  color: hsl(320 80% 75%) !important;
+}
+
+.badge-personal,
+[class*="personal"] [class*="badge"] {
+  background-color: hsl(185 85% 48% / 0.15) !important;
+  border-color: hsl(185 85% 58% / 0.3) !important;
+  color: hsl(185 85% 70%) !important;
+}
+
+/* =============================================================================
+   ACCENT COLOR BACKGROUNDS (All bright accent colors → dark with glow)
+   ============================================================================= */
+
+/* Amber/Yellow accents */
+.bg-amber-100,
+.bg-yellow-100 {
+  background-color: hsl(38 95% 20% / 0.2) !important;
+  color: hsl(38 95% 75%) !important;
+}
+
+/* Blue accents */
+.bg-blue-100 {
+  background-color: hsl(220 90% 20% / 0.2) !important;
+  color: hsl(220 90% 75%) !important;
+}
+
+/* Green accents */
+.bg-green-100,
+.bg-teal-100 {
+  background-color: hsl(155 85% 20% / 0.2) !important;
+  color: hsl(155 85% 75%) !important;
+}
+
+/* Purple accents */
+.bg-purple-100,
+.bg-indigo-100 {
+  background-color: hsl(260 90% 20% / 0.2) !important;
+  color: hsl(260 90% 75%) !important;
+}
+
+/* Pink/Red accents */
+.bg-pink-100,
+.bg-red-100,
+.bg-orange-100 {
+  background-color: hsl(0 85% 20% / 0.2) !important;
+  color: hsl(0 85% 75%) !important;
+}
+
 /* Display font utility */
 .font-display {
   font-family: var(--font-family-display);
