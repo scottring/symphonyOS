@@ -310,40 +310,60 @@ textarea::placeholder {
    RICH TEXT EDITOR (Tiptap) OVERRIDES
    ============================================================================= */
 
-/* Editor toolbar - dark background with visible buttons */
-.ProseMirror + div,
-[class*="editor"] div[class*="toolbar"],
-[class*="editor"] div[class*="menu"] {
-  background-color: var(--color-bg-elevated) !important;
-  border-color: hsl(240 80% 80% / 0.1) !important;
-}
-
-/* Editor buttons */
-.ProseMirror ~ div button,
-[class*="editor"] button {
-  color: hsl(222 15% 75%) !important;
-  background-color: transparent !important;
-}
-
-.ProseMirror ~ div button:hover,
-[class*="editor"] button:hover {
-  background-color: hsl(222 22% 22%) !important;
-  color: hsl(222 15% 95%) !important;
-}
-
-/* Active editor buttons */
-.ProseMirror ~ div button.is-active,
-.ProseMirror ~ div button[class*="active"],
-[class*="editor"] button.is-active,
-[class*="editor"] button[class*="active"] {
-  background-color: hsl(240 80% 55% / 0.2) !important;
-  color: hsl(240 80% 75%) !important;
-}
-
 /* Editor content area */
 .ProseMirror {
   background-color: var(--color-bg-card) !important;
   color: hsl(222 15% 90%) !important;
+}
+
+/* Editor toolbar - dark background */
+.ProseMirror + div {
+  background-color: var(--color-bg-elevated) !important;
+  border-color: hsl(240 80% 80% / 0.1) !important;
+}
+
+/* Toolbar wrapper with specific opacity class */
+.bg-neutral-50\/50 {
+  background-color: var(--color-bg-elevated) !important;
+}
+
+/* All toolbar buttons - HIGHLY visible */
+.ProseMirror + div button {
+  color: hsl(222 15% 85%) !important;
+  background-color: transparent !important;
+}
+
+/* Toolbar button hover */
+.ProseMirror + div button:hover {
+  background-color: hsl(222 22% 24%) !important;
+  color: hsl(222 15% 98%) !important;
+}
+
+/* Active/selected buttons (bg-neutral-200 class) */
+.ProseMirror + div button.bg-neutral-200,
+.ProseMirror + div .bg-neutral-200 {
+  background-color: hsl(240 80% 55% / 0.25) !important;
+  color: hsl(240 80% 80%) !important;
+}
+
+/* SVG icons in buttons */
+.ProseMirror + div button svg {
+  color: hsl(222 15% 85%) !important;
+  stroke: hsl(222 15% 85%) !important;
+}
+
+.ProseMirror + div button:hover svg {
+  color: hsl(222 15% 98%) !important;
+  stroke: hsl(222 15% 98%) !important;
+}
+
+/* Text spans in buttons (H1, H2, H3) */
+.ProseMirror + div button span {
+  color: hsl(222 15% 85%) !important;
+}
+
+.ProseMirror + div button:hover span {
+  color: hsl(222 15% 98%) !important;
 }
 
 /* =============================================================================
