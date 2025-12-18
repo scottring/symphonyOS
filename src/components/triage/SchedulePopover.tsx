@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { CalendarPlus, ChevronLeft } from 'lucide-react'
+import { CalendarPlus, ChevronLeft, Sun, Sunrise, CalendarDays, Calendar } from 'lucide-react'
 
 // Minimal schedule item for display
 export interface ScheduleContextItem {
@@ -363,36 +363,55 @@ export function SchedulePopover({
 
               {/* Quick date options */}
               <div className="grid grid-cols-2 gap-2 mb-3">
-                {[
-                  { label: 'Today', date: getBaseDate(0), icon: '☀️' },
-                  { label: 'Tomorrow', date: getBaseDate(1), icon: '🌅' },
-                  { label: 'This Weekend', date: getNextWeekend(), icon: '🎯' },
-                  { label: 'Next Week', date: getNextMonday(), icon: '📅' },
-                  { label: 'Pick date...', date: null, icon: '🗓️', span: true },
-                ].map((option) => (
-                  <button
-                    key={option.label}
-                    onClick={() => {
-                      if (option.date) {
-                        handleDateSelect(option.date)
-                      } else {
-                        // Show date picker
-                        const input = document.getElementById('schedule-date-input') as HTMLInputElement
-                        input?.showPicker?.()
-                        input?.focus()
-                      }
-                    }}
-                    className={`
-                      flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
-                      text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
-                      transition-all duration-150
-                      ${'span' in option && option.span ? 'col-span-2' : ''}
-                    `}
-                  >
-                    <span className="text-base">{option.icon}</span>
-                    <span>{option.label}</span>
-                  </button>
-                ))}
+                <button
+                  onClick={() => handleDateSelect(getBaseDate(0))}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
+                    text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
+                    transition-all duration-150"
+                >
+                  <Sun className="w-4 h-4" />
+                  <span>Today</span>
+                </button>
+                <button
+                  onClick={() => handleDateSelect(getBaseDate(1))}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
+                    text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
+                    transition-all duration-150"
+                >
+                  <Sunrise className="w-4 h-4" />
+                  <span>Tomorrow</span>
+                </button>
+                <button
+                  onClick={() => handleDateSelect(getNextWeekend())}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
+                    text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
+                    transition-all duration-150"
+                >
+                  <CalendarDays className="w-4 h-4" />
+                  <span>This Weekend</span>
+                </button>
+                <button
+                  onClick={() => handleDateSelect(getNextMonday())}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
+                    text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
+                    transition-all duration-150"
+                >
+                  <Calendar className="w-4 h-4" />
+                  <span>Next Week</span>
+                </button>
+                <button
+                  onClick={() => {
+                    const input = document.getElementById('schedule-date-input') as HTMLInputElement
+                    input?.showPicker?.()
+                    input?.focus()
+                  }}
+                  className="col-span-2 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
+                    text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
+                    transition-all duration-150"
+                >
+                  <CalendarDays className="w-4 h-4" />
+                  <span>Pick date...</span>
+                </button>
               </div>
 
               {/* Hidden date input */}

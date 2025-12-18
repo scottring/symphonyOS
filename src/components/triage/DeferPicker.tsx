@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { ArrowRightToLine } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { ArrowRightToLine, Clock, Sunset, Sun, Calendar, CalendarDays, Check } from 'lucide-react'
 
 interface DeferPickerProps {
   deferredUntil?: Date
@@ -80,6 +81,24 @@ export function DeferPicker({ deferredUntil, deferCount, onDefer }: DeferPickerP
     return nextMonday
   }
 
+  const getHoursFromNow = (hours: number) => {
+    const date = new Date()
+    date.setHours(date.getHours() + hours)
+    date.setMinutes(Math.ceil(date.getMinutes() / 30) * 30, 0, 0)
+    return date
+  }
+
+  const getThisEvening = () => {
+    const date = new Date()
+    date.setHours(18, 0, 0, 0) // 6pm
+    return date
+  }
+
+  const isBeforeEvening = () => {
+    const now = new Date()
+    return now.getHours() < 18
+  }
+
   const handleDefer = (date: Date | undefined) => {
     onDefer(date)
     setIsOpen(false)
@@ -116,55 +135,97 @@ export function DeferPicker({ deferredUntil, deferCount, onDefer }: DeferPickerP
         )}
       </button>
 
-      {isOpen && (
+      {isOpen && createPortal(
         <div
           ref={dropdownRef}
           className="fixed z-[100] bg-white rounded-xl border border-neutral-200 shadow-lg p-2 min-w-[160px]"
           style={{ top: dropdownPosition.top, left: dropdownPosition.left }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
         >
           {!showDateInput ? (
-            <div className="space-y-1">
+            <div className="p-1">
               {/* Header */}
-              <div className="text-xs font-medium text-neutral-400 uppercase tracking-wider px-3 pt-1 pb-2">
+              <div className="text-xs font-medium text-neutral-400 uppercase tracking-wider mb-3 px-1">
                 Defer
               </div>
+
               {/* Clear deferral - show now */}
               {hasValue && (
                 <>
                   <button
                     onClick={() => handleDefer(undefined)}
-                    className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-primary-600 font-medium"
+                    className="w-full flex items-center gap-2 px-3 py-2 mb-2 rounded-lg text-sm font-medium
+                      text-primary-600 bg-primary-50 hover:bg-primary-100
+                      transition-all duration-150"
                   >
-                    Show Now
+                    <Check className="w-4 h-4" />
+                    <span>Show Now</span>
                   </button>
-                  <div className="border-t border-neutral-100 my-1" />
+                  <div className="border-t border-neutral-100 mb-3" />
                 </>
               )}
-              <button
-                onClick={() => handleDefer(getBaseDate(1))}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
-              >
-                Tomorrow
-              </button>
-              <button
-                onClick={() => handleDefer(getNextWeekend())}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
-              >
-                This Weekend
-              </button>
-              <button
-                onClick={() => handleDefer(getNextMonday())}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
-              >
-                Next Week
-              </button>
-              <div className="border-t border-neutral-100 my-1" />
-              <button
-                onClick={() => setShowDateInput(true)}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
-              >
-                Pick date...
-              </button>
+
+              {/* Quick defer options in 2-column grid */}
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                <button
+                  onClick={() => handleDefer(getHoursFromNow(3))}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
+                    text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
+                    transition-all duration-150"
+                >
+                  <Clock className="w-4 h-4" />
+                  <span>In 3 hours</span>
+                </button>
+                {isBeforeEvening() && (
+                  <button
+                    onClick={() => handleDefer(getThisEvening())}
+                    className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
+                      text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
+                      transition-all duration-150"
+                  >
+                    <Sunset className="w-4 h-4" />
+                    <span>This evening</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => handleDefer(getBaseDate(1))}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
+                    text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
+                    transition-all duration-150"
+                >
+                  <Sun className="w-4 h-4" />
+                  <span>Tomorrow</span>
+                </button>
+                <button
+                  onClick={() => handleDefer(getNextWeekend())}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
+                    text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
+                    transition-all duration-150"
+                >
+                  <CalendarDays className="w-4 h-4" />
+                  <span>This Weekend</span>
+                </button>
+                <button
+                  onClick={() => handleDefer(getNextMonday())}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
+                    text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
+                    transition-all duration-150"
+                >
+                  <Calendar className="w-4 h-4" />
+                  <span>Next Week</span>
+                </button>
+                <button
+                  onClick={() => setShowDateInput(true)}
+                  className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
+                    text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
+                    transition-all duration-150"
+                >
+                  <CalendarDays className="w-4 h-4" />
+                  <span>Pick date...</span>
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-2">
@@ -187,7 +248,8 @@ export function DeferPicker({ deferredUntil, deferCount, onDefer }: DeferPickerP
               />
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

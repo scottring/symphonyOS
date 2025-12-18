@@ -712,11 +712,12 @@ export function TodaySchedule({
       if (!matchesAssigneeFilter(task.assignedTo)) return false
       // No scheduled date = inbox item
       if (!task.scheduledFor) {
-        // If deferred to a future date, don't show yet
+        // If deferred to a future time, don't show yet
         if (task.deferredUntil) {
-          const deferredDate = new Date(task.deferredUntil)
-          deferredDate.setHours(0, 0, 0, 0)
-          return deferredDate <= today
+          const deferredDateTime = new Date(task.deferredUntil)
+          const now = new Date()
+          // Show only if the deferred time has passed
+          return deferredDateTime <= now
         }
         return true
       }

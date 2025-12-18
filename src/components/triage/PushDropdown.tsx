@@ -64,6 +64,24 @@ export function PushDropdown({ onPush, size = 'md', showTodayOption = false }: P
     return date
   }
 
+  const getHoursFromNow = (hours: number) => {
+    const date = new Date()
+    date.setHours(date.getHours() + hours)
+    date.setMinutes(Math.ceil(date.getMinutes() / 30) * 30, 0, 0)
+    return date
+  }
+
+  const getThisEvening = () => {
+    const date = new Date()
+    date.setHours(18, 0, 0, 0) // 6pm
+    return date
+  }
+
+  const isBeforeEvening = () => {
+    const now = new Date()
+    return now.getHours() < 18
+  }
+
   const handlePush = (date: Date) => {
     onPush(date)
     setIsOpen(false)
@@ -114,6 +132,20 @@ export function PushDropdown({ onPush, size = 'md', showTodayOption = false }: P
                   className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-primary-700 font-medium"
                 >
                   Today
+                </button>
+              )}
+              <button
+                onClick={() => handlePush(getHoursFromNow(3))}
+                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
+              >
+                In 3 hours
+              </button>
+              {isBeforeEvening() && (
+                <button
+                  onClick={() => handlePush(getThisEvening())}
+                  className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
+                >
+                  This evening
                 </button>
               )}
               <button
