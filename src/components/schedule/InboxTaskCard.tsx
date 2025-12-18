@@ -5,6 +5,7 @@ import type { ScheduleContextItem } from '@/components/triage'
 import { DeferPicker, SchedulePopover } from '@/components/triage'
 import { MultiAssigneeDropdown } from '@/components/family'
 import { AgeIndicator } from '@/components/health'
+import { Trash2 } from 'lucide-react'
 
 interface InboxTaskCardProps {
   task: Task
@@ -13,6 +14,7 @@ interface InboxTaskCardProps {
   onUpdate: (updates: Partial<Task>) => void
   onSelect: () => void
   onTriage?: () => void // Open triage modal
+  onDelete?: () => void // Delete the task
   projects?: Project[]
   onOpenProject?: (projectId: string) => void
   // Family member assignment
@@ -29,6 +31,7 @@ export function InboxTaskCard({
   onUpdate,
   onSelect,
   onTriage,
+  onDelete,
   projects = [],
   onOpenProject,
   familyMembers = [],
@@ -133,6 +136,17 @@ export function InboxTaskCard({
             deferCount={task.deferCount}
             onDefer={onDefer}
           />
+
+          {/* Delete button */}
+          {onDelete && (
+            <button
+              onClick={onDelete}
+              className="p-1.5 rounded-lg text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+              title="Delete"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         {/* Multi-assignee avatar - always visible */}

@@ -249,6 +249,15 @@ body {
   border-color: hsl(240 80% 80% / 0.1) !important;
 }
 
+/* Delete button color overrides for dark theme */
+.hover\:text-red-600:hover {
+  color: hsl(0 85% 65%) !important;
+}
+
+.hover\:bg-red-50:hover {
+  background-color: hsl(0 85% 65% / 0.1) !important;
+}
+
 .border-neutral-300 {
   border-color: hsl(240 80% 80% / 0.15) !important;
 }

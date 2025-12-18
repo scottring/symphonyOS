@@ -119,6 +119,7 @@ export function InboxSection({
             onUpdate={(updates) => onUpdateTask(task.id, updates)}
             onSelect={() => onSelectTask(task.id)}
             onTriage={() => setTriageTaskId(task.id)}
+            onDelete={onDeleteTask ? () => onDeleteTask(task.id) : undefined}
             projects={projects}
             onOpenProject={onOpenProject}
             familyMembers={familyMembers}
