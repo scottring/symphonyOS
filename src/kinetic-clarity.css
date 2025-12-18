@@ -69,8 +69,8 @@
   /* Background system */
   --color-bg-base: hsl(222 30% 10%);
   --color-bg-elevated: hsl(222 25% 14%);
-  --color-bg-card: hsl(222 22% 18%);
-  --color-bg-overlay: hsl(222 20% 22%);
+  --color-bg-card: hsl(222 22% 16%);
+  --color-bg-overlay: hsl(222 20% 18%);
 
   /* Glass surfaces */
   --glass-bg: hsl(222 25% 16% / 0.7);
@@ -227,12 +227,19 @@ body {
 }
 
 /* Background color overrides for dark theme */
+.bg-white,
 .bg-neutral-50,
 .bg-neutral-100 {
   background-color: var(--color-bg-elevated) !important;
 }
 
 .bg-neutral-200 {
+  background-color: var(--color-bg-card) !important;
+}
+
+/* Elevated/overlay surfaces - slightly lighter for panels */
+.bg-bg-elevated,
+.bg-bg-overlay {
   background-color: var(--color-bg-card) !important;
 }
 
@@ -244,6 +251,59 @@ body {
 
 .border-neutral-300 {
   border-color: hsl(240 80% 80% / 0.15) !important;
+}
+
+/* Input backgrounds - dark but slightly elevated */
+input,
+textarea,
+select {
+  background-color: var(--color-bg-elevated) !important;
+  color: hsl(222 15% 90%) !important;
+  border-color: hsl(240 80% 80% / 0.1) !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: hsl(222 15% 50%) !important;
+}
+
+/* Card and panel backgrounds */
+.card,
+[class*="card"] {
+  background-color: var(--color-bg-card) !important;
+}
+
+/* Sidebar panels and overlays */
+[class*="panel"],
+[class*="sidebar"],
+[class*="modal"],
+[class*="dropdown"],
+[class*="popover"] {
+  background-color: var(--color-bg-card) !important;
+  color: hsl(222 15% 90%) !important;
+}
+
+/* Primary color text overrides (teal/green from Nordic) */
+.text-primary-500,
+.text-primary-600,
+.text-primary-700 {
+  color: hsl(185 85% 68%) !important;  /* Brighter cyan for visibility */
+}
+
+/* Hover states for neutral backgrounds */
+.hover\:bg-neutral-50:hover,
+.hover\:bg-neutral-100:hover {
+  background-color: hsl(222 22% 20%) !important;
+}
+
+.hover\:text-neutral-700:hover,
+.hover\:text-neutral-800:hover {
+  color: hsl(222 15% 95%) !important;
+}
+
+/* Active/selected states */
+.bg-primary-50 {
+  background-color: hsl(240 80% 55% / 0.15) !important;
 }
 
 /* Display font utility */
