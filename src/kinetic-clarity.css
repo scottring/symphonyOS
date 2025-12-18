@@ -449,6 +449,35 @@ textarea::placeholder {
   color: hsl(0 85% 75%) !important;
 }
 
+/* =============================================================================
+   SORT/GROUP/FILTER BARS & CONTROLS
+   ============================================================================= */
+
+/* Semi-transparent white backgrounds → dark */
+.bg-white\/60,
+.bg-white\/70,
+.bg-white\/80 {
+  background-color: var(--color-bg-elevated) !important;
+  border-color: hsl(240 80% 80% / 0.1) !important;
+}
+
+/* Select dropdowns */
+select.bg-white {
+  background-color: var(--color-bg-elevated) !important;
+  color: hsl(222 15% 90%) !important;
+  border-color: hsl(240 80% 80% / 0.1) !important;
+}
+
+select.bg-white:hover {
+  border-color: hsl(240 80% 80% / 0.2) !important;
+}
+
+/* Gradient overlays → subtle dark glow */
+.bg-gradient-to-b.from-amber-50\/40,
+.from-amber-50\/40 {
+  background: linear-gradient(to bottom, hsl(240 80% 55% / 0.05) 0%, transparent 100%) !important;
+}
+
 /* Display font utility */
 .font-display {
   font-family: var(--font-family-display);
