@@ -471,9 +471,9 @@ export function useSupabaseTasks() {
       dbUpdates.scheduled_for = updates.scheduledFor?.toISOString() ?? null
     }
     if ('deferredUntil' in updates) {
-      // Convert Date to YYYY-MM-DD string for DATE column
+      // Save full timestamp to support time-based deferrals (e.g., "in 3 hours")
       dbUpdates.deferred_until = updates.deferredUntil
-        ? updates.deferredUntil.toISOString().split('T')[0]
+        ? updates.deferredUntil.toISOString()
         : null
     }
     if ('deferCount' in updates) dbUpdates.defer_count = updates.deferCount ?? 0
