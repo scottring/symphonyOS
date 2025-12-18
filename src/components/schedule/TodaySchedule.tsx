@@ -541,7 +541,7 @@ export function TodaySchedule({
   onToggleTask,
   onUpdateTask,
   onPushTask,
-  onDeleteTask: _onDeleteTask,
+  onDeleteTask,
   loading,
   viewedDate,
   onDateChange,
@@ -579,7 +579,7 @@ export function TodaySchedule({
 }: TodayScheduleProps) {
   void _onOpenPlanning // Reserved - planning now handled by ModeToggle
   void _onCreateTask // Reserved - was used by ReviewSection
-  void _onDeleteTask // Available for future inline inbox delete
+  // onDeleteTask is now used for inline inbox delete
   void _contacts // Available for future inline triage
   void _onSearchContacts // Available for future inline triage
   void _onAddContact // Available for future inline triage
@@ -1090,6 +1090,7 @@ export function TodaySchedule({
                   }}
                   onUpdate={(updates) => onUpdateTask(task.id, updates)}
                   onSelect={() => onSelectItem(`task-${task.id}`)}
+                  onDelete={onDeleteTask ? () => onDeleteTask(task.id) : undefined}
                   projects={projects}
                   onOpenProject={onOpenProject}
                   familyMembers={familyMembers}
