@@ -199,6 +199,53 @@ body {
   overflow-x: hidden;
 }
 
+/* =============================================================================
+   TEXT COLOR OVERRIDES FOR DARK THEME
+   Override default dark text colors with light colors for readability
+   ============================================================================= */
+
+.text-neutral-900,
+.text-neutral-800,
+.text-neutral-700 {
+  color: hsl(222 15% 90%) !important;
+}
+
+.text-neutral-600 {
+  color: hsl(222 15% 75%) !important;
+}
+
+.text-neutral-500 {
+  color: hsl(222 15% 60%) !important;
+}
+
+.text-neutral-400 {
+  color: hsl(222 15% 50%) !important;
+}
+
+.text-neutral-300 {
+  color: hsl(222 15% 40%) !important;
+}
+
+/* Background color overrides for dark theme */
+.bg-neutral-50,
+.bg-neutral-100 {
+  background-color: var(--color-bg-elevated) !important;
+}
+
+.bg-neutral-200 {
+  background-color: var(--color-bg-card) !important;
+}
+
+/* Border color overrides for dark theme */
+.border-neutral-100,
+.border-neutral-200 {
+  border-color: hsl(240 80% 80% / 0.1) !important;
+}
+
+.border-neutral-300 {
+  border-color: hsl(240 80% 80% / 0.15) !important;
+}
+
 /* Display font utility */
 .font-display {
   font-family: var(--font-family-display);
