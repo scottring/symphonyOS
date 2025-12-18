@@ -167,12 +167,19 @@ export function SchedulePopover({
 
   const [customTimeSearch, setCustomTimeSearch] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
   const customTimeInputRef = useRef<HTMLInputElement>(null)
+  const triggerRef = useRef<HTMLButtonElement | HTMLDivElement>(null)
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 })
 
-  // Close on outside click
+  // Close on outside click - check both container and dropdown refs
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node
+      const isOutsideContainer = containerRef.current && !containerRef.current.contains(target)
+      const isOutsideDropdown = dropdownRef.current && !dropdownRef.current.contains(target)
+
+      if (isOutsideContainer && isOutsideDropdown) {
         handleClose()
       }
     }
@@ -189,6 +196,17 @@ export function SchedulePopover({
       setSelectedDate(null)
       setShowCustomTime(false)
       setCustomTimeSearch('')
+    }
+  }, [isOpen])
+
+  // Calculate dropdown position when opening
+  useEffect(() => {
+    if (isOpen && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      setDropdownPosition({
+        top: rect.bottom + 8,
+        left: Math.max(8, rect.left), // Ensure it doesn't go off-screen left
+      })
     }
   }, [isOpen])
 
@@ -212,6 +230,18 @@ export function SchedulePopover({
     date.setDate(date.getDate() + daysFromNow)
     date.setHours(0, 0, 0, 0)
     return date
+  }
+
+  const getNextWeekend = () => {
+    const today = new Date()
+    const dayOfWeek = today.getDay()
+    // If today is Sunday (0), go to next Saturday (6 days)
+    // Otherwise, calculate days until next Saturday
+    const daysUntilSaturday = dayOfWeek === 0 ? 6 : 6 - dayOfWeek
+    const nextSaturday = new Date(today)
+    nextSaturday.setDate(today.getDate() + daysUntilSaturday)
+    nextSaturday.setHours(0, 0, 0, 0)
+    return nextSaturday
   }
 
   const getNextMonday = () => {
@@ -289,9 +319,10 @@ export function SchedulePopover({
     <div ref={containerRef} className="relative">
       {/* Trigger */}
       {trigger ? (
-        <div onClick={() => setIsOpen(!isOpen)}>{trigger}</div>
+        <div ref={triggerRef as React.RefObject<HTMLDivElement | null>} onClick={() => setIsOpen(!isOpen)}>{trigger}</div>
       ) : (
         <button
+          ref={triggerRef as React.RefObject<HTMLButtonElement | null>}
           onClick={() => setIsOpen(!isOpen)}
           className={`
             p-1.5 rounded-lg
@@ -311,8 +342,11 @@ export function SchedulePopover({
       {/* Popover */}
       {isOpen && (
         <div
-          className="absolute left-0 top-full mt-2 z-50 animate-fade-in-scale"
+          ref={dropdownRef}
+          className="fixed z-[100] animate-fade-in-scale"
           style={{
+            top: dropdownPosition.top,
+            left: dropdownPosition.left,
             background: 'linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(44 50% 99%) 100%)',
             borderRadius: 'var(--radius-xl)',
             border: '1px solid hsl(38 25% 88%)',
@@ -332,8 +366,9 @@ export function SchedulePopover({
                 {[
                   { label: 'Today', date: getBaseDate(0), icon: '☀️' },
                   { label: 'Tomorrow', date: getBaseDate(1), icon: '🌅' },
+                  { label: 'This Weekend', date: getNextWeekend(), icon: '🎯' },
                   { label: 'Next Week', date: getNextMonday(), icon: '📅' },
-                  { label: 'Pick date...', date: null, icon: '🗓️' },
+                  { label: 'Pick date...', date: null, icon: '🗓️', span: true },
                 ].map((option) => (
                   <button
                     key={option.label}
@@ -347,11 +382,12 @@ export function SchedulePopover({
                         input?.focus()
                       }
                     }}
-                    className="
+                    className={`
                       flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
                       text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
                       transition-all duration-150
-                    "
+                      ${'span' in option && option.span ? 'col-span-2' : ''}
+                    `}
                   >
                     <span className="text-base">{option.icon}</span>
                     <span>{option.label}</span>

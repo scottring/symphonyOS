@@ -28,6 +28,8 @@ export interface TimelineItem {
   location?: string
   allDay?: boolean
   googleDescription?: string // Read-only description from Google Calendar
+  calendarName?: string | null // Name of the source calendar (e.g., "Family", "Work")
+  calendarColor?: string | null // Google Calendar color (hex)
   // Routine-specific
   recurrencePattern?: RecurrencePattern
   // Original data for actions
@@ -77,6 +79,8 @@ export function eventToTimelineItem(event: CalendarEvent): TimelineItem {
   const endTimeStr = event.end_time || event.endTime
   const allDay = event.all_day ?? event.allDay
   const eventId = event.google_event_id || event.id
+  const calendarName = event.calendar_name || event.calendarName
+  const calendarColor = event.calendar_color || event.calendarColor
 
   return {
     id: `event-${eventId}`,
@@ -89,6 +93,8 @@ export function eventToTimelineItem(event: CalendarEvent): TimelineItem {
     // notes will be populated separately from event_notes table
     location: event.location || undefined,
     allDay: allDay,
+    calendarName: calendarName || undefined,
+    calendarColor: calendarColor || undefined,
     originalEvent: event,
   }
 }

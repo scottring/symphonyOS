@@ -11,11 +11,18 @@ export function DeferPicker({ deferredUntil, deferCount, onDefer }: DeferPickerP
   const [isOpen, setIsOpen] = useState(false)
   const [showDateInput, setShowDateInput] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 })
 
-  // Close on outside click
+  // Close on outside click - check both container and dropdown refs
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node
+      const isOutsideContainer = containerRef.current && !containerRef.current.contains(target)
+      const isOutsideDropdown = dropdownRef.current && !dropdownRef.current.contains(target)
+
+      if (isOutsideContainer && isOutsideDropdown) {
         setIsOpen(false)
         setShowDateInput(false)
       }
@@ -33,11 +40,34 @@ export function DeferPicker({ deferredUntil, deferCount, onDefer }: DeferPickerP
     }
   }, [isOpen])
 
+  // Calculate dropdown position when opening
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      setDropdownPosition({
+        top: rect.bottom + 4,
+        left: rect.right - 160, // Align right edge (160px is min-width)
+      })
+    }
+  }, [isOpen])
+
   const getBaseDate = (daysFromNow: number) => {
     const date = new Date()
     date.setDate(date.getDate() + daysFromNow)
     date.setHours(0, 0, 0, 0)
     return date
+  }
+
+  const getNextWeekend = () => {
+    const today = new Date()
+    const dayOfWeek = today.getDay()
+    // If today is Sunday (0), go to next Saturday (6 days)
+    // Otherwise, calculate days until next Saturday
+    const daysUntilSaturday = dayOfWeek === 0 ? 6 : 6 - dayOfWeek
+    const nextSaturday = new Date(today)
+    nextSaturday.setDate(today.getDate() + daysUntilSaturday)
+    nextSaturday.setHours(0, 0, 0, 0)
+    return nextSaturday
   }
 
   const getNextMonday = () => {
@@ -70,6 +100,7 @@ export function DeferPicker({ deferredUntil, deferCount, onDefer }: DeferPickerP
   return (
     <div ref={containerRef} className="relative">
       <button
+        ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
         className={`p-1.5 rounded-lg transition-colors flex items-center gap-0.5 ${
           hasValue
@@ -86,7 +117,11 @@ export function DeferPicker({ deferredUntil, deferCount, onDefer }: DeferPickerP
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-1 z-50 bg-white rounded-xl border border-neutral-200 shadow-lg p-2 min-w-[160px]">
+        <div
+          ref={dropdownRef}
+          className="fixed z-[100] bg-white rounded-xl border border-neutral-200 shadow-lg p-2 min-w-[160px]"
+          style={{ top: dropdownPosition.top, left: dropdownPosition.left }}
+        >
           {!showDateInput ? (
             <div className="space-y-1">
               {/* Header */}
@@ -110,6 +145,12 @@ export function DeferPicker({ deferredUntil, deferCount, onDefer }: DeferPickerP
                 className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
               >
                 Tomorrow
+              </button>
+              <button
+                onClick={() => handleDefer(getNextWeekend())}
+                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+              >
+                This Weekend
               </button>
               <button
                 onClick={() => handleDefer(getNextMonday())}

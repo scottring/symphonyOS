@@ -209,12 +209,64 @@ export function getTimeOfDay(date: Date): TimeOfDay {
 }
 
 /**
+ * Meal keywords and their inferred times.
+ * All-day events with these keywords get placed in the appropriate time section.
+ */
+const MEAL_TIME_INFERENCE: { keywords: string[]; section: TimeOfDay; hour: number; minute: number }[] = [
+  { keywords: ['dinner', 'supper'], section: 'evening', hour: 18, minute: 30 },
+  { keywords: ['lunch'], section: 'afternoon', hour: 12, minute: 0 },
+  { keywords: ['breakfast', 'brunch'], section: 'morning', hour: 8, minute: 0 },
+]
+
+/**
+ * Infer a time section and sort time for an all-day event based on meal keywords.
+ * Returns null if no meal keyword is found.
+ */
+export function inferMealTime(title: string): { section: TimeOfDay; hour: number; minute: number } | null {
+  const lowerTitle = title.toLowerCase()
+  for (const meal of MEAL_TIME_INFERENCE) {
+    if (meal.keywords.some(kw => lowerTitle.includes(kw))) {
+      return { section: meal.section, hour: meal.hour, minute: meal.minute }
+    }
+  }
+  return null
+}
+
+/**
  * Get the day section for a timeline item.
+ * For all-day events with meal keywords (dinner, lunch, breakfast),
+ * places them in the appropriate time section instead of "All Day".
  */
 export function getDaySection(item: TimelineItem): DaySection {
   if (!item.startTime) return 'unscheduled'
-  if (item.allDay) return 'allday'
+
+  // For all-day events, check if it's a meal event that should be placed in a time section
+  if (item.allDay) {
+    const inferred = inferMealTime(item.title)
+    if (inferred) {
+      return inferred.section
+    }
+    return 'allday'
+  }
+
   return getTimeOfDay(item.startTime)
+}
+
+/**
+ * Get a sortable time for an item, considering inferred meal times.
+ * For all-day meal events, returns the inferred time; otherwise uses startTime.
+ */
+function getSortTime(item: TimelineItem): number {
+  if (item.allDay && item.startTime) {
+    const inferred = inferMealTime(item.title)
+    if (inferred) {
+      // Create a time on the same day as startTime but at the inferred hour/minute
+      const sortDate = new Date(item.startTime)
+      sortDate.setHours(inferred.hour, inferred.minute, 0, 0)
+      return sortDate.getTime()
+    }
+  }
+  return item.startTime?.getTime() ?? 0
 }
 
 /**
@@ -236,9 +288,9 @@ export function groupByDaySection(
     groups[section].push(item)
   }
 
-  // Sort each section by start time (except allday which has no meaningful time)
+  // Sort each section by time (using inferred time for meal events)
   const sortByTime = (a: TimelineItem, b: TimelineItem) =>
-    (a.startTime?.getTime() ?? 0) - (b.startTime?.getTime() ?? 0)
+    getSortTime(a) - getSortTime(b)
 
   // Sort allday events alphabetically by title
   groups.allday.sort((a, b) => a.title.localeCompare(b.title))

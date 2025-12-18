@@ -1,10 +1,75 @@
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
-import { formatTime, formatTimeRange } from '@/lib/timeUtils'
+import { formatTime, formatTimeRange, inferMealTime } from '@/lib/timeUtils'
 import { getProjectColor } from '@/lib/projectUtils'
 import { PushDropdown, SchedulePopover, type ScheduleContextItem } from '@/components/triage'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
 import { Redo2 } from 'lucide-react'
+
+// Nordic Journal calendar icon - minimal, elegant design
+// Uses the calendar's Google color with a subtle accent, or falls back to primary teal-forest
+function CalendarIcon({ color, completed }: { color?: string | null; completed?: boolean }) {
+  // Primary forest-teal from design system: hsl(168 45% 30%) ≈ #2a6b5e
+  const primaryColor = '#2a6b5e'
+  const primaryLight = '#e8f4f1' // ~primary-50
+  const completedColor = '#2a6b5e'
+
+  // Use Google Calendar color if provided, otherwise use primary
+  const accentColor = color || primaryColor
+
+  return (
+    <div className="w-5 h-5 relative" title="Calendar event">
+      <svg
+        viewBox="0 0 20 20"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className="w-full h-full"
+      >
+        {/* Calendar outline - clean rounded rectangle */}
+        <rect
+          x="2.5"
+          y="4"
+          width="15"
+          height="13"
+          rx="2"
+          fill={completed ? completedColor : primaryLight}
+          stroke={completed ? completedColor : primaryColor}
+          strokeWidth="1.5"
+          className="transition-colors"
+        />
+        {/* Calendar header line */}
+        <line
+          x1="2.5"
+          y1="7.5"
+          x2="17.5"
+          y2="7.5"
+          stroke={completed ? primaryLight : primaryColor}
+          strokeWidth="1.5"
+          className="transition-colors"
+        />
+        {/* Small color dot showing the calendar's color */}
+        {!completed && color && (
+          <circle
+            cx="10"
+            cy="12"
+            r="2.5"
+            fill={accentColor}
+          />
+        )}
+        {/* Checkmark when completed */}
+        {completed && (
+          <path
+            d="M6.5 11.5L9 14L13.5 9.5"
+            stroke="white"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        )}
+      </svg>
+    </div>
+  )
+}
 
 interface ScheduleItemProps {
   item: TimelineItem
@@ -66,7 +131,8 @@ export function ScheduleItem({
 }: ScheduleItemProps) {
   const isTask = item.type === 'task'
   const isRoutine = item.type === 'routine'
-  const isActionable = isTask || isRoutine
+  const isEvent = item.type === 'event'
+  const isActionable = isTask || isRoutine || isEvent // Events are now checkable
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -82,8 +148,15 @@ export function ScheduleItem({
 
   // Parse time display
   const getTimeDisplay = () => {
-    // All-day items (tasks or events) show "All day"
+    // All-day items - check for meal keyword inference first
     if (item.allDay) {
+      const inferred = inferMealTime(item.title)
+      if (inferred && item.startTime) {
+        // Show inferred time for meal events (e.g., "6:30p" for dinner)
+        const inferredDate = new Date(item.startTime)
+        inferredDate.setHours(inferred.hour, inferred.minute, 0, 0)
+        return { type: 'single' as const, time: formatTime(inferredDate) }
+      }
       return { type: 'allday' as const }
     }
 
@@ -228,9 +301,22 @@ export function ScheduleItem({
           </div>
         )}
 
-        {/* Checkbox/circle - fixed width for alignment */}
+        {/* Checkbox/circle/calendar - fixed width for alignment */}
         <div className="w-5 shrink-0 flex items-center justify-center">
-          {isActionable ? (
+          {isEvent ? (
+            // Calendar events show a calendar icon with the calendar's color
+            <button
+              onClick={handleCheckboxClick}
+              className="touch-target flex items-center justify-center -m-2 p-2"
+              aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
+            >
+              <CalendarIcon
+                color={item.calendarColor}
+                completed={item.completed}
+              />
+            </button>
+          ) : isActionable ? (
+            // Tasks and routines show checkbox (square for tasks, circle for routines)
             <button
               onClick={handleCheckboxClick}
               className="touch-target flex items-center justify-center -m-2 p-2"
@@ -253,9 +339,7 @@ export function ScheduleItem({
                 )}
               </span>
             </button>
-          ) : (
-            <div className="w-2.5 h-2.5 rounded-full bg-primary-500" />
-          )}
+          ) : null}
         </div>
 
         {/* Title */}
