@@ -1,7 +1,13 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import './index.css'
+import { ACTIVE_THEME } from './config/theme'
+// Conditionally import CSS based on active theme
+if (ACTIVE_THEME === 'kinetic') {
+  await import('./kinetic-clarity.css')
+} else {
+  await import('./index.css')
+}
 import App from './App.tsx'
 import { CalendarCallback } from './pages/CalendarCallback'
 import { JoinHousehold } from './pages/JoinHousehold'

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Sidebar, type ViewType } from './Sidebar'
+import { SidebarKinetic } from './SidebarKinetic'
 import { QuickCapture } from './QuickCapture'
 import { useMobile } from '@/hooks/useMobile'
 import symphonyLogo from '@/assets/symphony-logo.jpg'
@@ -9,6 +10,7 @@ import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { Routine } from '@/types/routine'
+import { ACTIVE_THEME } from '@/config/theme'
 
 interface EntityData {
   tasks: Task[]
@@ -83,7 +85,23 @@ export function AppShell({
   return (
     <div className="h-screen flex overflow-hidden overflow-x-hidden bg-bg-base w-full max-w-[100vw]">
       {/* Sidebar - hidden on mobile */}
-      {!isMobile && (
+      {!isMobile && ACTIVE_THEME === 'kinetic' && (
+        <SidebarKinetic
+          collapsed={sidebarCollapsed}
+          onToggle={onSidebarToggle}
+          userEmail={userEmail}
+          onSignOut={onSignOut}
+          activeView={activeView}
+          onViewChange={onViewChange}
+          onOpenSearch={onOpenSearch}
+          pins={pins}
+          entities={entities}
+          onPinNavigate={onPinNavigate}
+          onPinMarkAccessed={onPinMarkAccessed}
+          onPinRefreshStale={onPinRefreshStale}
+        />
+      )}
+      {!isMobile && ACTIVE_THEME === 'nordic' && (
         <Sidebar
           collapsed={sidebarCollapsed}
           onToggle={onSidebarToggle}
