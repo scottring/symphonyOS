@@ -478,6 +478,43 @@ select.bg-white:hover {
   background: linear-gradient(to bottom, hsl(240 80% 55% / 0.05) 0%, transparent 100%) !important;
 }
 
+/* =============================================================================
+   PROGRESS BARS & INDICATORS
+   ============================================================================= */
+
+/* Progress bar track - visible on dark */
+.progress-bar {
+  background: hsl(222 22% 22%) !important;  /* Dark track */
+}
+
+/* Progress bar fill - bright gradient */
+.progress-bar::before {
+  background: var(--gradient-primary) !important;  /* Electric blue → purple */
+  box-shadow: 0 0 8px hsl(240 80% 55% / 0.5) !important;  /* Glow effect */
+}
+
+/* Clarity ring track */
+.clarity-ring-track {
+  stroke: hsl(222 22% 22%) !important;
+}
+
+/* Clarity ring progress - gradient colors */
+.clarity-excellent .clarity-ring-progress {
+  stroke: hsl(185 85% 55%) !important;  /* Cyan */
+}
+
+.clarity-good .clarity-ring-progress {
+  stroke: hsl(240 80% 65%) !important;  /* Electric blue */
+}
+
+.clarity-fair .clarity-ring-progress {
+  stroke: hsl(38 95% 60%) !important;  /* Amber */
+}
+
+.clarity-needs-attention .clarity-ring-progress {
+  stroke: hsl(320 80% 65%) !important;  /* Magenta */
+}
+
 /* Display font utility */
 .font-display {
   font-family: var(--font-family-display);
