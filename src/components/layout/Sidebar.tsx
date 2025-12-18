@@ -27,6 +27,7 @@ interface SidebarProps {
   collapsed: boolean
   onToggle: () => void
   userEmail?: string
+  userName?: string
   onSignOut?: () => void
   activeView: ViewType
   onViewChange: (view: ViewType) => void
@@ -43,6 +44,7 @@ export function Sidebar({
   collapsed,
   onToggle,
   userEmail,
+  userName,
   onSignOut,
   activeView,
   onViewChange,
@@ -64,14 +66,14 @@ export function Sidebar({
     >
       {/* Header with logo */}
       <div className="p-4 flex items-center justify-between">
-        <div className={`flex items-center gap-2.5 ${collapsed ? 'justify-center w-full' : ''}`}>
+        <div className={`flex items-center gap-3 ${collapsed ? 'justify-center w-full' : ''}`}>
           <img
             src={symphonyLogo}
             alt="Symphony"
-            className="w-9 h-9 rounded-lg object-cover"
+            className="w-12 h-12 rounded-lg object-cover"
           />
           {!collapsed && (
-            <span className="font-display text-lg font-semibold tracking-wide text-neutral-800">Symphony</span>
+            <span className="font-display text-2xl font-semibold tracking-wide text-neutral-800">Symphony</span>
           )}
         </div>
         {!collapsed && (
@@ -231,41 +233,38 @@ export function Sidebar({
           <button
             onClick={() => onViewChange('notes')}
             className={`
-              w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200
+              w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-colors duration-150
               ${activeView === 'notes'
-                ? 'bg-teal-50 text-teal-700 font-medium shadow-sm'
-                : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-800'
+                ? 'text-primary-700 bg-primary-50/80'
+                : 'text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700'
               }
               ${collapsed ? 'justify-center' : ''}
             `}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className={`w-5 h-5 ${activeView === 'notes' ? 'text-teal-600' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-[18px] h-[18px]" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
             </svg>
-            {!collapsed && <span>Notes</span>}
+            {!collapsed && <span className="text-sm">Notes</span>}
           </button>
         )}
       </nav>
 
       {/* User section */}
-      {(userEmail || onSignOut) && (
+      {(userEmail || userName || onSignOut) && (
         <div className={`p-3 border-t border-neutral-100 ${collapsed ? 'text-center' : ''}`}>
-          {!collapsed && userEmail && (
-            <p className="text-sm text-neutral-500 truncate mb-2 px-3">{userEmail}</p>
-          )}
           <button
             onClick={() => onViewChange('settings')}
             className={`
-              flex items-center gap-2 px-3 py-2.5 rounded-xl w-full
-              text-sm transition-all
+              flex items-center gap-2.5 px-3 py-2.5 rounded-lg w-full
+              text-sm transition-colors duration-150
               ${activeView === 'settings'
-                ? 'bg-neutral-100 text-neutral-700 font-medium'
-                : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100'
+                ? 'text-primary-700 bg-primary-50/80'
+                : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100/60'
               }
               ${collapsed ? 'justify-center' : ''}
             `}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-[18px] h-[18px]" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
             </svg>
             {!collapsed && <span>Settings</span>}
@@ -274,18 +273,36 @@ export function Sidebar({
             <button
               onClick={onSignOut}
               className={`
-                flex items-center gap-2 px-3 py-2.5 rounded-xl w-full
-                text-sm text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100
-                transition-all
+                flex items-center gap-2.5 px-3 py-2.5 rounded-lg w-full
+                text-sm text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100/60
+                transition-colors duration-150
                 ${collapsed ? 'justify-center' : ''}
               `}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-[18px] h-[18px]" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V4a1 1 0 00-1-1H3zm11 4a1 1 0 10-2 0v4a1 1 0 102 0V7z" clipRule="evenodd" />
                 <path d="M7 10a1 1 0 011-1h2a1 1 0 110 2H8a1 1 0 01-1-1z" />
               </svg>
               {!collapsed && <span>Sign out</span>}
             </button>
+          )}
+          {!collapsed && (userName || userEmail) && (
+            <div className="mt-3 px-3 pt-3 border-t border-neutral-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-[18px] h-[18px] rounded-full bg-primary-500 flex items-center justify-center text-white text-[10px] font-medium shrink-0">
+                  {(userName || userEmail || 'U').charAt(0).toUpperCase()}
+                </div>
+                <p className="text-sm text-neutral-500 truncate">
+                  {(() => {
+                    const hour = new Date().getHours()
+                    const firstName = (userName || userEmail || '').split(' ')[0]
+                    if (hour < 12) return `Good morning, ${firstName}`
+                    if (hour < 18) return `Good afternoon, ${firstName}`
+                    return `Good evening, ${firstName}`
+                  })()}
+                </p>
+              </div>
+            </div>
           )}
         </div>
       )}

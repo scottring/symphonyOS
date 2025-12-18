@@ -28,6 +28,7 @@ interface AppShellProps {
   panelOpen: boolean
   onPanelClose?: () => void
   userEmail?: string
+  userName?: string
   onSignOut?: () => void
   onQuickAdd?: (title: string) => void
   // Rich add with parsed fields (for natural language parser)
@@ -63,6 +64,7 @@ export function AppShell({
   panelOpen,
   onPanelClose,
   userEmail,
+  userName,
   onSignOut,
   onQuickAdd,
   onQuickAddRich,
@@ -107,6 +109,7 @@ export function AppShell({
           collapsed={sidebarCollapsed}
           onToggle={onSidebarToggle}
           userEmail={userEmail}
+          userName={userName}
           onSignOut={onSignOut}
           activeView={activeView}
           onViewChange={onViewChange}

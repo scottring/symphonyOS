@@ -71,6 +71,12 @@ interface CreateEventRequest {
   requestId?: string // Idempotency key to prevent duplicate events
 }
 
+interface UpdateEventRequest {
+  eventId: string  // Google Calendar event ID
+  location?: string | null  // null to remove location
+  calendarId?: string  // Calendar ID (defaults to 'primary')
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -85,14 +91,137 @@ serve(async (req) => {
 
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
     if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
+      return new Response(JSON.stringify({ error: 'Unauthorized', needsReconnect: false }), {
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    const body: CreateEventRequest = await req.json()
-    const { title, description, startTime, endTime, location, allDay, timeZone, requestId } = body
+    const body = await req.json()
+
+    // Check if this is an update request (has eventId) or create request (has title)
+    const isUpdate = 'eventId' in body
+
+    if (isUpdate) {
+      // Handle update request
+      const updateBody: UpdateEventRequest = body
+      const { eventId, location, calendarId = 'primary' } = updateBody
+
+      if (!eventId) {
+        return new Response(JSON.stringify({ error: 'Missing required field: eventId' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const supabaseAdmin = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      )
+
+      // Get user's calendar connection
+      const { data: connection, error: connError } = await supabaseAdmin
+        .from('calendar_connections')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('provider', 'google')
+        .single()
+
+      if (connError || !connection) {
+        return new Response(JSON.stringify({ error: 'No calendar connection found', needsReconnect: true }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      // Check if token needs refresh
+      let accessToken = connection.access_token
+      const expiresAt = new Date(connection.token_expires_at)
+      const now = new Date()
+      const fiveMinutes = 5 * 60 * 1000
+
+      if (expiresAt.getTime() - now.getTime() < fiveMinutes) {
+        try {
+          accessToken = await refreshAccessToken(supabaseAdmin, user.id, connection.refresh_token)
+        } catch (err) {
+          if (err instanceof TokenRefreshError) {
+            return new Response(JSON.stringify({
+              error: err.message,
+              errorCode: 'invalid_grant',
+              needsReconnect: err.shouldDisconnect,
+            }), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            })
+          }
+          throw err
+        }
+      }
+
+      // Update the event using PATCH
+      const updatePatchBody: { location?: string } = {}
+      if (location !== undefined) {
+        updatePatchBody.location = location === null ? '' : location
+      }
+
+      // Use the provided calendarId or default to 'primary'
+      const targetCalendarId = calendarId || 'primary'
+      const apiUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(targetCalendarId)}/events/${encodeURIComponent(eventId)}`
+      
+      console.log('Updating Google Calendar event:', {
+        calendarId: targetCalendarId,
+        eventId,
+        location: updatePatchBody.location,
+        apiUrl,
+      })
+      
+      const updateResponse = await fetch(apiUrl, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatePatchBody),
+      })
+
+      if (!updateResponse.ok) {
+        const errorText = await updateResponse.text()
+        console.error('Google Calendar API error:', updateResponse.status, errorText)
+        
+        let errorMessage = 'Failed to update event location'
+        try {
+          const errorData = JSON.parse(errorText)
+          errorMessage = errorData.error?.message || errorMessage
+        } catch (e) {
+          // If can't parse JSON, use raw text if available
+          if (errorText) {
+            errorMessage = errorText.length > 200 ? errorText.substring(0, 200) + '...' : errorText
+          }
+        }
+        
+        // Return 200 with error in body so client can read it, or return appropriate status
+        return new Response(JSON.stringify({ 
+          error: errorMessage,
+          statusCode: updateResponse.status 
+        }), {
+          status: 200, // Return 200 so Supabase client doesn't throw FunctionsHttpError
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const updateData = await updateResponse.json()
+      return new Response(JSON.stringify({
+        eventId: updateData.id,
+        location: updateData.location || null,
+        htmlLink: updateData.htmlLink,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Handle create request
+    const createBody: CreateEventRequest = body
+    const { title, description, startTime, endTime, location, allDay, timeZone, requestId } = createBody
 
     if (!title || !startTime || !endTime) {
       return new Response(JSON.stringify({ error: 'Missing required fields: title, startTime, endTime' }), {

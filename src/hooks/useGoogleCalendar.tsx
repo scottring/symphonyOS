@@ -50,6 +50,12 @@ export interface CalendarEvent {
   location?: string | null
 }
 
+export interface UpdateEventParams {
+  eventId: string
+  location?: string | null
+  calendarId?: string // Optional calendar ID (defaults to 'primary')
+}
+
 interface GoogleCalendarContextValue {
   isConnected: boolean
   needsReconnect: boolean
@@ -63,6 +69,7 @@ interface GoogleCalendarContextValue {
   fetchTodayEvents: () => Promise<CalendarEvent[]>
   fetchWeekEvents: () => Promise<CalendarEvent[]>
   createEvent: (params: CreateEventParams) => Promise<CreateEventResult>
+  updateEvent: (params: UpdateEventParams) => Promise<void>
 }
 
 const GoogleCalendarContext = createContext<GoogleCalendarContextValue | null>(null)
@@ -321,6 +328,66 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     return { id: data.eventId, htmlLink: data.htmlLink }
   }, [isConnected])
 
+  // Update an existing calendar event
+  // Throws CalendarReconnectError if permissions are expired (catch this to show reconnect UI)
+  const updateEvent = useCallback(async (params: UpdateEventParams): Promise<void> => {
+    if (!isConnected) {
+      throw new Error('Not connected to Google Calendar')
+    }
+
+    // Log the parameters being sent for debugging
+    console.log('Updating event location:', {
+      eventId: params.eventId,
+      calendarId: params.calendarId || 'primary',
+      location: params.location,
+    })
+
+    // Use google-calendar-create-event which handles both create and update requests
+    // It checks for eventId in the body to determine if it's an update
+    const { data, error } = await supabase.functions.invoke('google-calendar-create-event', {
+      body: {
+        eventId: params.eventId,
+        location: params.location,
+        calendarId: params.calendarId || 'primary', // Default to primary if not specified
+      },
+    })
+
+    if (error) {
+      // Log the full error for debugging
+      console.error('Supabase function error:', error)
+      throw error
+    }
+
+    // Check for errors in the response data
+    if (data?.error) {
+      const errorMessage = data.error
+      console.error('Function returned error:', errorMessage, 'Status:', data.statusCode)
+      console.error('Request parameters were:', {
+        eventId: params.eventId,
+        calendarId: params.calendarId || 'primary',
+        location: params.location,
+      })
+      
+      const isAuthError =
+        errorMessage.includes('Unauthorized') ||
+        errorMessage.includes('invalid_grant') ||
+        errorMessage.includes('Token has been expired or revoked') ||
+        errorMessage.includes('No calendar connection found') ||
+        data.needsReconnect
+
+      if (isAuthError) {
+        setError('Calendar connection expired. Please reconnect.')
+        setIsConnected(false)
+        setNeedsReconnect(true)
+        throw new CalendarReconnectError()
+      }
+      throw new Error(errorMessage)
+    }
+
+    // Refresh events after update to show new location
+    await fetchTodayEvents()
+  }, [isConnected, fetchTodayEvents])
+
   const value: GoogleCalendarContextValue = {
     isConnected,
     needsReconnect,
@@ -334,6 +401,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     fetchTodayEvents,
     fetchWeekEvents,
     createEvent,
+    updateEvent,
   }
 
   return (

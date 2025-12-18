@@ -82,6 +82,7 @@ interface DetailPanelRedesignProps {
   onDelete?: (taskId: string) => void
   onToggleComplete?: (taskId: string) => void
   onUpdateEventNote?: (googleEventId: string, notes: string | null) => void
+  onUpdateEventLocation?: (googleEventId: string, location: string | null, calendarId?: string) => void
   // Recipe support
   eventRecipeUrl?: string | null
   onUpdateRecipeUrl?: (googleEventId: string, recipeUrl: string | null) => void
@@ -470,6 +471,7 @@ export function DetailPanelRedesign({
   onDelete,
   onToggleComplete,
   onUpdateEventNote,
+  onUpdateEventLocation,
   eventRecipeUrl,
   onUpdateRecipeUrl,
   onOpenRecipe,
@@ -1705,16 +1707,68 @@ export function DetailPanelRedesign({
           </div>
         )}
 
-        {/* Event Location Display (read-only) */}
-        {isEvent && item.location && (
+        {/* Event Location Editor */}
+        {isEvent && (
           <div className="mx-4 mt-4 p-4 bg-white rounded-2xl shadow-sm border border-neutral-100">
             <div className="flex items-start gap-3">
               <svg className="w-5 h-5 text-neutral-400 mt-0.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
               </svg>
-              <div>
-                <div className="text-xs font-medium text-neutral-400 uppercase tracking-wide mb-1">Location</div>
-                <p className="text-neutral-800">{item.location}</p>
+              <div className="flex-1">
+                <div className="text-xs font-medium text-neutral-400 uppercase tracking-wide mb-2">Location</div>
+                <PlacesAutocomplete
+                  value={item.location ? {
+                    address: item.location,
+                    placeId: undefined,
+                  } : null}
+                  onSelect={(place: PlaceSelection) => {
+                    // Must use google_event_id, not the Symphony UUID
+                    const eventId = item.originalEvent?.google_event_id
+                    const calendarId = item.originalEvent?.calendar_id || item.originalEvent?.calendarId
+                    
+                    console.log('PlacesAutocomplete onSelect - Event data:', {
+                      eventId,
+                      calendarId,
+                      originalEvent: item.originalEvent,
+                      hasGoogleEventId: !!item.originalEvent?.google_event_id,
+                      hasCalendarId: !!calendarId,
+                    })
+                    
+                    if (!eventId) {
+                      console.error('Cannot update location: event missing google_event_id', item.originalEvent)
+                      return
+                    }
+                    if (onUpdateEventLocation) {
+                      // Pass calendarId if available, function will default to 'primary'
+                      onUpdateEventLocation(eventId, place.address, calendarId)
+                    }
+                  }}
+                  onClear={() => {
+                    // Must use google_event_id, not the Symphony UUID
+                    const eventId = item.originalEvent?.google_event_id
+                    const calendarId = item.originalEvent?.calendar_id || item.originalEvent?.calendarId
+                    
+                    console.log('PlacesAutocomplete onClear - Event data:', {
+                      eventId,
+                      calendarId,
+                      originalEvent: item.originalEvent,
+                      hasGoogleEventId: !!item.originalEvent?.google_event_id,
+                      hasCalendarId: !!calendarId,
+                    })
+                    
+                    if (!eventId) {
+                      console.error('Cannot update location: event missing google_event_id', item.originalEvent)
+                      return
+                    }
+                    if (onUpdateEventLocation) {
+                      // Pass calendarId if available, function will default to 'primary'
+                      onUpdateEventLocation(eventId, null, calendarId)
+                    }
+                  }}
+                  onSearch={directions.searchPlaces}
+                  onGetDetails={directions.getPlaceDetails}
+                  placeholder="Add location..."
+                />
               </div>
             </div>
           </div>

@@ -53,7 +53,7 @@ import type { LinkedActivityType } from '@/types/task'
 function App() {
   const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, getLinkedTasks, toggleTask, deleteTask, updateTask, pushTask } = useSupabaseTasks()
   const { user, loading: authLoading, signOut } = useAuth()
-  const { isConnected, events, fetchEvents, isFetching: eventsFetching, createEvent, connect: connectCalendar } = useGoogleCalendar()
+  const { isConnected, events, fetchEvents, isFetching: eventsFetching, createEvent, updateEvent, connect: connectCalendar } = useGoogleCalendar()
   const attachments = useAttachments()
   const { fetchAttachments } = attachments
   const pinnedItems = usePinnedItems()
@@ -925,6 +925,7 @@ function App() {
         else setSelectedItemId(null)
       }}
       userEmail={user.email ?? undefined}
+      userName={getCurrentUserMember()?.name}
       onSignOut={signOut}
       onQuickAdd={async (title) => {
         const taskId = await addTask(title, undefined, undefined, undefined, { assignedTo: getCurrentUserMember()?.id })
@@ -1013,6 +1014,15 @@ function App() {
             onDelete={deleteTask}
             onToggleComplete={handleToggleTask}
             onUpdateEventNote={updateNote}
+            onUpdateEventLocation={async (eventId: string, location: string | null, calendarId?: string) => {
+              try {
+                await updateEvent({ eventId, location, calendarId })
+                showToast('Location updated successfully')
+              } catch (error) {
+                console.error('Failed to update event location:', error)
+                showToast(error instanceof Error ? error.message : 'Failed to update location', 'warning')
+              }
+            }}
             eventRecipeUrl={selectedEventRecipeUrl}
             onUpdateRecipeUrl={updateRecipeUrl}
             onOpenRecipe={setRecipeUrl}
