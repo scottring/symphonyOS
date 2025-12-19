@@ -364,7 +364,7 @@ interface LinkedTaskRowProps {
 
 function LinkedTaskRow({ task, onToggle, onDelete, onUpdate, getScheduleItemsForDate, familyMembers = [] }: LinkedTaskRowProps) {
   return (
-    <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-neutral-50 group transition-colors">
+    <div className="flex items-center gap-2 p-2 rounded-lg hover:bg-neutral-50 group transition-colors">
       <button
         onClick={() => onToggle?.(task.id)}
         className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${
@@ -380,11 +380,11 @@ function LinkedTaskRow({ task, onToggle, onDelete, onUpdate, getScheduleItemsFor
         )}
       </button>
 
-      <span className={`flex-1 text-sm ${task.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>
+      <span className={`flex-1 min-w-0 text-sm ${task.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>
         {task.title}
       </span>
 
-      {/* Quick Actions */}
+      {/* Quick Actions - hidden on mobile */}
       {onUpdate && (
         <TaskQuickActions
           task={task}
@@ -400,16 +400,16 @@ function LinkedTaskRow({ task, onToggle, onDelete, onUpdate, getScheduleItemsFor
             onUpdate(task.id, { assignedTo: memberId ?? undefined })
           }}
           size="sm"
-          className="opacity-0 group-hover:opacity-100 transition-opacity"
+          className="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity"
         />
       )}
 
       {task.scheduledFor ? (
-        <span className="text-xs text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full">
+        <span className="text-xs text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full flex-shrink-0">
           {task.scheduledFor.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
         </span>
       ) : (
-        <button className="text-xs text-primary-600 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button className="hidden md:block text-xs text-primary-600 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
           + Add to Today
         </button>
       )}
@@ -417,7 +417,7 @@ function LinkedTaskRow({ task, onToggle, onDelete, onUpdate, getScheduleItemsFor
       {onDelete && (
         <button
           onClick={() => onDelete(task.id)}
-          className="text-neutral-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+          className="hidden md:block text-neutral-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1 flex-shrink-0"
         >
           <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -1326,7 +1326,7 @@ export function DetailPanelRedesign({
                   {subtasks.map((subtask) => (
                     <div
                       key={subtask.id}
-                      className="flex items-center gap-3 p-2 -mx-2 rounded-lg hover:bg-neutral-50 group transition-colors"
+                      className="flex items-center gap-2 p-2 -mx-2 rounded-lg hover:bg-neutral-50 group transition-colors"
                     >
                       <button
                         onClick={() => onToggleComplete?.(subtask.id)}
@@ -1343,10 +1343,10 @@ export function DetailPanelRedesign({
                           </svg>
                         )}
                       </button>
-                      <span className={`flex-1 text-sm ${subtask.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>
+                      <span className={`flex-1 min-w-0 text-sm ${subtask.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>
                         {subtask.title}
                       </span>
-                      {/* Quick Actions */}
+                      {/* Quick Actions - hidden on mobile */}
                       {onUpdate && (
                         <TaskQuickActions
                           task={subtask}
@@ -1362,10 +1362,10 @@ export function DetailPanelRedesign({
                             onUpdate(subtask.id, { assignedTo: memberId ?? undefined })
                           }}
                           size="sm"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity"
                         />
                       )}
-                      <button className="opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-red-500 transition-all p-1">
+                      <button className="hidden md:block opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-red-500 transition-all p-1 flex-shrink-0">
                         <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
                           <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                         </svg>

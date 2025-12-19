@@ -106,118 +106,116 @@ export function TiptapEditor({
     <div className="border border-neutral-200 rounded-xl overflow-hidden bg-white">
       {/* Toolbar */}
       {editable && (
-        <div className="flex items-center gap-1 px-3 py-2 border-b border-neutral-100 bg-neutral-50/50 flex-wrap">
+        <div className="flex items-center gap-1 px-2 py-1.5 border-b border-neutral-100 bg-neutral-50/50 overflow-x-auto">
           {/* Text formatting */}
-          <div className="flex items-center gap-0.5 pr-2 border-r border-neutral-200">
-            <ToolbarButton
-              onClick={toggleBold}
-              isActive={editor.isActive('bold')}
-              title="Bold (⌘B)"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z" />
-                <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z" />
-              </svg>
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={toggleItalic}
-              isActive={editor.isActive('italic')}
-              title="Italic (⌘I)"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="19" y1="4" x2="10" y2="4" />
-                <line x1="14" y1="20" x2="5" y2="20" />
-                <line x1="15" y1="4" x2="9" y2="20" />
-              </svg>
-            </ToolbarButton>
-          </div>
+          <ToolbarButton
+            onClick={toggleBold}
+            isActive={editor.isActive('bold')}
+            title="Bold (⌘B)"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z" />
+              <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z" />
+            </svg>
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={toggleItalic}
+            isActive={editor.isActive('italic')}
+            title="Italic (⌘I)"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="19" y1="4" x2="10" y2="4" />
+              <line x1="14" y1="20" x2="5" y2="20" />
+              <line x1="15" y1="4" x2="9" y2="20" />
+            </svg>
+          </ToolbarButton>
+
+          <div className="w-px h-5 bg-neutral-200 mx-1 flex-shrink-0" />
 
           {/* Headings */}
-          <div className="flex items-center gap-0.5 px-2 border-r border-neutral-200">
-            <ToolbarButton
-              onClick={() => toggleHeading(1)}
-              isActive={editor.isActive('heading', { level: 1 })}
-              title="Heading 1"
-            >
-              <span className="text-xs font-bold">H1</span>
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() => toggleHeading(2)}
-              isActive={editor.isActive('heading', { level: 2 })}
-              title="Heading 2"
-            >
-              <span className="text-xs font-bold">H2</span>
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() => toggleHeading(3)}
-              isActive={editor.isActive('heading', { level: 3 })}
-              title="Heading 3"
-            >
-              <span className="text-xs font-bold">H3</span>
-            </ToolbarButton>
-          </div>
+          <ToolbarButton
+            onClick={() => toggleHeading(1)}
+            isActive={editor.isActive('heading', { level: 1 })}
+            title="Heading 1"
+          >
+            <span className="text-xs font-bold">H1</span>
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => toggleHeading(2)}
+            isActive={editor.isActive('heading', { level: 2 })}
+            title="Heading 2"
+          >
+            <span className="text-xs font-bold">H2</span>
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => toggleHeading(3)}
+            isActive={editor.isActive('heading', { level: 3 })}
+            title="Heading 3"
+          >
+            <span className="text-xs font-bold">H3</span>
+          </ToolbarButton>
+
+          <div className="w-px h-5 bg-neutral-200 mx-1 flex-shrink-0" />
 
           {/* Lists */}
-          <div className="flex items-center gap-0.5 px-2 border-r border-neutral-200">
-            <ToolbarButton
-              onClick={toggleBulletList}
-              isActive={editor.isActive('bulletList')}
-              title="Bullet list"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="8" y1="6" x2="21" y2="6" />
-                <line x1="8" y1="12" x2="21" y2="12" />
-                <line x1="8" y1="18" x2="21" y2="18" />
-                <line x1="3" y1="6" x2="3.01" y2="6" />
-                <line x1="3" y1="12" x2="3.01" y2="12" />
-                <line x1="3" y1="18" x2="3.01" y2="18" />
-              </svg>
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={toggleOrderedList}
-              isActive={editor.isActive('orderedList')}
-              title="Numbered list"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="10" y1="6" x2="21" y2="6" />
-                <line x1="10" y1="12" x2="21" y2="12" />
-                <line x1="10" y1="18" x2="21" y2="18" />
-                <path d="M4 6h1v4" />
-                <path d="M4 10h2" />
-                <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" />
-              </svg>
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={toggleTaskList}
-              isActive={editor.isActive('taskList')}
-              title="Task list (checkboxes)"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="5" width="6" height="6" rx="1" />
-                <path d="m3 17 2 2 4-4" />
-                <path d="M13 6h8" />
-                <path d="M13 12h8" />
-                <path d="M13 18h8" />
-              </svg>
-            </ToolbarButton>
-          </div>
+          <ToolbarButton
+            onClick={toggleBulletList}
+            isActive={editor.isActive('bulletList')}
+            title="Bullet list"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="8" y1="6" x2="21" y2="6" />
+              <line x1="8" y1="12" x2="21" y2="12" />
+              <line x1="8" y1="18" x2="21" y2="18" />
+              <line x1="3" y1="6" x2="3.01" y2="6" />
+              <line x1="3" y1="12" x2="3.01" y2="12" />
+              <line x1="3" y1="18" x2="3.01" y2="18" />
+            </svg>
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={toggleOrderedList}
+            isActive={editor.isActive('orderedList')}
+            title="Numbered list"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="10" y1="6" x2="21" y2="6" />
+              <line x1="10" y1="12" x2="21" y2="12" />
+              <line x1="10" y1="18" x2="21" y2="18" />
+              <path d="M4 6h1v4" />
+              <path d="M4 10h2" />
+              <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" />
+            </svg>
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={toggleTaskList}
+            isActive={editor.isActive('taskList')}
+            title="Task list (checkboxes)"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="5" width="6" height="6" rx="1" />
+              <path d="m3 17 2 2 4-4" />
+              <path d="M13 6h8" />
+              <path d="M13 12h8" />
+              <path d="M13 18h8" />
+            </svg>
+          </ToolbarButton>
+
+          <div className="w-px h-5 bg-neutral-200 mx-1 flex-shrink-0" />
 
           {/* Table */}
-          <div className="flex items-center gap-0.5 pl-2">
-            <ToolbarButton
-              onClick={insertTable}
-              isActive={editor.isActive('table')}
-              title="Insert table"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <line x1="3" y1="9" x2="21" y2="9" />
-                <line x1="3" y1="15" x2="21" y2="15" />
-                <line x1="9" y1="3" x2="9" y2="21" />
-                <line x1="15" y1="3" x2="15" y2="21" />
-              </svg>
-            </ToolbarButton>
-          </div>
+          <ToolbarButton
+            onClick={insertTable}
+            isActive={editor.isActive('table')}
+            title="Insert table"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <line x1="3" y1="9" x2="21" y2="9" />
+              <line x1="3" y1="15" x2="21" y2="15" />
+              <line x1="9" y1="3" x2="9" y2="21" />
+              <line x1="15" y1="3" x2="15" y2="21" />
+            </svg>
+          </ToolbarButton>
         </div>
       )}
 
