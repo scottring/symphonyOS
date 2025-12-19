@@ -90,7 +90,11 @@ export function useEventNotes() {
 
   // Update or create note for an event (upsert)
   const updateNote = useCallback(async (googleEventId: string, noteText: string | null) => {
-    if (!user) return
+    console.log('[updateNote] Called with:', { googleEventId, noteText: noteText?.substring(0, 50) })
+    if (!user) {
+      console.log('[updateNote] No user, returning early')
+      return
+    }
 
     // Get existing note for rollback
     const existingNote = notes.get(googleEventId)
@@ -109,6 +113,7 @@ export function useEventNotes() {
     setNotes((prev) => new Map(prev).set(googleEventId, optimisticNote))
 
     // Upsert to database
+    console.log('[updateNote] Upserting:', { user_id: user.id, google_event_id: googleEventId, notes: noteText?.substring(0, 50) })
     const { data, error: upsertError } = await supabase
       .from('event_notes')
       .upsert(
@@ -123,6 +128,8 @@ export function useEventNotes() {
       )
       .select()
       .single()
+
+    console.log('[updateNote] Upsert result:', { data, error: upsertError?.message })
 
     if (upsertError) {
       // Rollback on error

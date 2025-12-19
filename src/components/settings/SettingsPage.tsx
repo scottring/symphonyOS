@@ -3,6 +3,7 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { CalendarSettings } from './CalendarSettings'
 import { WaitlistAdmin } from './WaitlistAdmin'
 import { ThemeSelector } from './ThemeSelector'
+import { HomeAddressSettings } from './HomeAddressSettings'
 import type { FamilyMember } from '@/types/family'
 
 interface SettingsPageProps {
@@ -258,6 +259,9 @@ export function SettingsPage({ onBack, onFamilyMembersChanged }: SettingsPagePro
           <div className="space-y-8">
             {/* Theme Selector */}
             <ThemeSelector />
+
+            {/* Home Address */}
+            <HomeAddressSettings />
 
             {/* People Section */}
             <section>

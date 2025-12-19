@@ -76,6 +76,8 @@ export function DirectionsBuilder({
   const [originSearchQuery, setOriginSearchQuery] = useState('')
   const [originSearchResults, setOriginSearchResults] = useState<PlaceAutocompleteResult[]>([])
   const [isSearchingOrigin, setIsSearchingOrigin] = useState(false)
+  const [isGettingLocation, setIsGettingLocation] = useState(false)
+  const [locationError, setLocationError] = useState<string | null>(null)
 
   const [destinationStop] = useState<RouteStop>(() => ({
     id: 'destination',
@@ -114,6 +116,82 @@ export function DirectionsBuilder({
 
   const handleRemoveStop = (stopId: string) => {
     setStops(stops.filter((s) => s.id !== stopId).map((s, i) => ({ ...s, order: i + 1 })))
+  }
+
+  // Handle using current location
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation is not supported by your browser')
+      return
+    }
+
+    setIsGettingLocation(true)
+    setLocationError(null)
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords
+        // Use reverse geocoding to get address from coordinates
+        const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`
+
+        try {
+          const response = await fetch(geocodeUrl)
+          const data = await response.json()
+
+          if (data.results && data.results.length > 0) {
+            const result = data.results[0]
+            const newOrigin: RouteStop = {
+              id: 'origin',
+              name: 'Current Location',
+              address: result.formatted_address,
+              placeId: result.place_id,
+              order: 0,
+            }
+            setOrigin(newOrigin)
+            setShowOriginPicker(false)
+          } else {
+            // Fallback: use coordinates directly
+            const newOrigin: RouteStop = {
+              id: 'origin',
+              name: 'Current Location',
+              address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+              order: 0,
+            }
+            setOrigin(newOrigin)
+            setShowOriginPicker(false)
+          }
+        } catch {
+          // Fallback: use coordinates directly
+          const newOrigin: RouteStop = {
+            id: 'origin',
+            name: 'Current Location',
+            address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+            order: 0,
+          }
+          setOrigin(newOrigin)
+          setShowOriginPicker(false)
+        }
+
+        setIsGettingLocation(false)
+      },
+      (error) => {
+        setIsGettingLocation(false)
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            setLocationError('Location access denied. Please enable location in your browser settings.')
+            break
+          case error.POSITION_UNAVAILABLE:
+            setLocationError('Location information unavailable.')
+            break
+          case error.TIMEOUT:
+            setLocationError('Location request timed out.')
+            break
+          default:
+            setLocationError('Unable to get your location.')
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    )
   }
 
   // Handle origin search
@@ -174,27 +252,89 @@ export function DirectionsBuilder({
       {showOriginPicker && (
         <div className="px-4 py-3 bg-neutral-50 border-b border-neutral-100">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide">Set Home Address</span>
+            <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide">Set Starting Point</span>
             <button
               onClick={() => {
                 setShowOriginPicker(false)
                 setOriginSearchQuery('')
                 setOriginSearchResults([])
+                setLocationError(null)
               }}
               className="text-xs text-neutral-400 hover:text-neutral-600"
             >
               Cancel
             </button>
           </div>
-          <input
-            type="text"
-            value={originSearchQuery}
-            onChange={(e) => handleOriginSearch(e.target.value)}
-            placeholder="Search for your home address..."
-            className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-white
-                       focus:outline-none focus:ring-2 focus:ring-primary-500"
-            autoFocus
-          />
+
+          {/* Quick options: Current Location and Home */}
+          <div className="flex gap-2 mb-3">
+            <button
+              onClick={handleUseCurrentLocation}
+              disabled={isGettingLocation}
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium
+                         bg-white border border-neutral-200 rounded-lg hover:bg-neutral-50
+                         hover:border-primary-300 transition-colors disabled:opacity-50"
+            >
+              {isGettingLocation ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-neutral-300 border-t-primary-500 rounded-full animate-spin" />
+                  <span>Locating...</span>
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-primary-600" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                  </svg>
+                  <span>Current Location</span>
+                </>
+              )}
+            </button>
+            {getSavedHomeLocation() && (
+              <button
+                onClick={() => {
+                  const savedHome = getSavedHomeLocation()
+                  if (savedHome) {
+                    setOrigin({
+                      id: 'origin',
+                      name: 'Home',
+                      address: savedHome.address,
+                      placeId: savedHome.placeId,
+                      order: 0,
+                    })
+                    setShowOriginPicker(false)
+                  }
+                }}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium
+                           bg-white border border-neutral-200 rounded-lg hover:bg-neutral-50
+                           hover:border-primary-300 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-primary-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                </svg>
+                <span>Home</span>
+              </button>
+            )}
+          </div>
+
+          {locationError && (
+            <p className="text-xs text-red-500 mb-2">{locationError}</p>
+          )}
+
+          <div className="relative">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <input
+              type="text"
+              value={originSearchQuery}
+              onChange={(e) => handleOriginSearch(e.target.value)}
+              placeholder="Search for an address..."
+              className="w-full pl-10 pr-3 py-2 text-sm rounded-lg border border-neutral-200 bg-white
+                         focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
           {isSearchingOrigin && (
             <p className="text-xs text-neutral-400 mt-2">Searching...</p>
           )}

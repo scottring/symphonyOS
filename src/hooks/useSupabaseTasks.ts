@@ -148,7 +148,18 @@ export function useSupabaseTasks() {
         return
       }
 
+      // Debug: log raw data from DB to check if notes are present
+      console.log('[fetchTasks] Raw data from DB, tasks with notes:',
+        (data as DbTask[]).filter(t => t.notes).map(t => ({ id: t.id, title: t.title, notes: t.notes }))
+      )
+
       const allTasks = (data as DbTask[]).map(dbTaskToTask)
+
+      // Debug: log converted tasks with notes
+      console.log('[fetchTasks] Converted tasks with notes:',
+        allTasks.filter(t => t.notes).map(t => ({ id: t.id, title: t.title, notes: t.notes }))
+      )
+
       setTasks(nestSubtasks(allTasks))
       setLoading(false)
     }
@@ -454,8 +465,12 @@ export function useSupabaseTasks() {
   }, [tasks])
 
   const updateTask = useCallback(async (id: string, updates: Partial<Task>) => {
+    console.log('[updateTask] Called with:', { id, updates })
     const task = tasks.find((t) => t.id === id)
-    if (!task) return
+    if (!task) {
+      console.log('[updateTask] Task not found!')
+      return
+    }
 
     // Optimistic update
     setTasks((prev) =>
@@ -499,18 +514,26 @@ export function useSupabaseTasks() {
     if ('location' in updates) dbUpdates.location = updates.location ?? null
     if ('locationPlaceId' in updates) dbUpdates.location_place_id = updates.locationPlaceId ?? null
 
-    const { error: updateError } = await supabase
+    console.log('[updateTask] Sending to DB:', { id, dbUpdates })
+    const { data, error: updateError, status, count } = await supabase
       .from('tasks')
       .update(dbUpdates)
       .eq('id', id)
+      .select()
+
+    console.log('[updateTask] DB response:', { data, status, count, error: updateError?.message })
 
     if (updateError) {
-      console.error('Task update failed:', updateError.message)
+      console.error('[updateTask] DB error:', updateError.message)
       // Rollback on error
       setTasks((prev) =>
         prev.map((t) => (t.id === id ? task : t))
       )
       setError(updateError.message)
+    } else if (data && data.length > 0) {
+      console.log('[updateTask] DB update successful, returned notes:', (data[0] as DbTask).notes)
+    } else {
+      console.warn('[updateTask] DB update returned no data!')
     }
   }, [tasks])
 

@@ -55,9 +55,11 @@ export function TiptapEditor({
   })
 
   // Update content when prop changes (e.g., switching notes)
+  // Use emitUpdate: false to prevent triggering onChange when syncing external content
+  // This prevents race conditions where synced content triggers a save with stale/empty data
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
-      editor.commands.setContent(content)
+      editor.commands.setContent(content, { emitUpdate: false })
     }
   }, [content, editor])
 

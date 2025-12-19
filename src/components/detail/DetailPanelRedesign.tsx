@@ -521,7 +521,13 @@ export function DetailPanelRedesign({
 
   // Notes editing
   const [localNotes, setLocalNotes] = useState(item?.notes || '')
+  const [notesHasChanges, setNotesHasChanges] = useState(false)
+  const [notesSaving, setNotesSaving] = useState(false)
+  const [notesSaved, setNotesSaved] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingSaveRef = useRef<(() => void) | null>(null)
+  // Flag to track when we're syncing from external source (not user input)
+  const isSyncingNotesRef = useRef(false)
 
   // Time picker state
   const [showTimePicker, setShowTimePicker] = useState(false)
@@ -570,12 +576,35 @@ export function DetailPanelRedesign({
   const [showNotesModal, setShowNotesModal] = useState(false)
 
   // Sync local state when item changes
+  // CRITICAL: Use syncing flag to prevent TiptapEditor onChange from triggering saves
+  // during external content sync
   useEffect(() => {
+    // Set flag BEFORE updating state to block any onChange calls
+    isSyncingNotesRef.current = true
+
+    // Clear pending debounce when notes sync from external source
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
+      debounceRef.current = null
+    }
+    pendingSaveRef.current = null
+
     setLocalNotes(item?.notes || '')
+    setNotesHasChanges(false)
+    setNotesSaving(false)
+    setNotesSaved(false)
     setShowDeleteConfirm(false)
     setShowTimePicker(false)
     setShowLinks(false)
     setShowLocationPicker(false)
+
+    // Clear syncing flag after a short delay to allow React to finish rendering
+    // This ensures TiptapEditor's setContent completes before we start accepting user input
+    const syncTimeout = setTimeout(() => {
+      isSyncingNotesRef.current = false
+    }, 100)
+
+    return () => clearTimeout(syncTimeout)
   }, [item?.id, item?.notes])
 
   useEffect(() => {
@@ -592,8 +621,14 @@ export function DetailPanelRedesign({
 
   useEffect(() => {
     return () => {
+      // Flush any pending notes save before unmounting
       if (debounceRef.current) {
         clearTimeout(debounceRef.current)
+        debounceRef.current = null
+      }
+      if (pendingSaveRef.current) {
+        pendingSaveRef.current()
+        pendingSaveRef.current = null
       }
     }
   }, [])
@@ -1025,16 +1060,66 @@ export function DetailPanelRedesign({
   }
 
   const handleNotesChange = (value: string) => {
+    // CRITICAL: Ignore onChange calls that happen during external sync
+    // This prevents empty content from being saved when TiptapEditor syncs
+    if (isSyncingNotesRef.current) {
+      return
+    }
+
     setLocalNotes(value)
+    setNotesHasChanges(true)
+    setNotesSaved(false)
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => {
-      if (isTask && item.originalTask && onUpdate) {
-        onUpdate(item.originalTask.id, { notes: value || undefined })
-      } else if (isEvent && item.originalEvent && onUpdateEventNote) {
-        const googleEventId = item.originalEvent.google_event_id || item.originalEvent.id
-        onUpdateEventNote(googleEventId, value || null)
+
+    // Create the save function
+    const saveNotes = async () => {
+      setNotesSaving(true)
+      try {
+        if (isTask && item?.originalTask && onUpdate) {
+          await onUpdate(item.originalTask.id, { notes: value || undefined })
+        } else if (isEvent && item?.originalEvent && onUpdateEventNote) {
+          const googleEventId = item.originalEvent.google_event_id || item.originalEvent.id
+          await onUpdateEventNote(googleEventId, value || null)
+        }
+        setNotesHasChanges(false)
+        setNotesSaved(true)
+        // Clear "Saved" indicator after 2 seconds
+        setTimeout(() => setNotesSaved(false), 2000)
+      } finally {
+        setNotesSaving(false)
+        pendingSaveRef.current = null
       }
-    }, 500)
+    }
+
+    // Store for flush on unmount
+    pendingSaveRef.current = saveNotes
+
+    // Debounced save
+    debounceRef.current = setTimeout(saveNotes, 500)
+  }
+
+  // Manual save function for explicit save button
+  const handleSaveNotes = async () => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
+      debounceRef.current = null
+    }
+    setNotesSaving(true)
+    try {
+      if (isTask && item?.originalTask && onUpdate) {
+        await onUpdate(item.originalTask.id, { notes: localNotes || undefined })
+      } else if (isEvent && item?.originalEvent && onUpdateEventNote) {
+        const googleEventId = item.originalEvent.google_event_id || item.originalEvent.id
+        await onUpdateEventNote(googleEventId, localNotes || null)
+      }
+      setNotesHasChanges(false)
+      setNotesSaved(true)
+      pendingSaveRef.current = null
+      // Clear "Saved" indicator after 2 seconds
+      setTimeout(() => setNotesSaved(false), 2000)
+    } finally {
+      setNotesSaving(false)
+    }
   }
 
   const handleAddLink = (e: React.FormEvent) => {
@@ -1080,7 +1165,7 @@ export function DetailPanelRedesign({
           - Title is largest text, primary focus
           - Inline metadata pills only when populated
           ======================================== */}
-      <div className="p-6 border-b border-neutral-100 bg-white relative safe-area-top">
+      <div className="p-6 border-b border-neutral-100 bg-white relative">
         {/* Close button - top right */}
         <button
           onClick={onClose}
@@ -1212,7 +1297,7 @@ export function DetailPanelRedesign({
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto min-h-0 scroll-container">
         {/* ========================================
             ZONE 2: PRIMARY CONTENT (Subtasks + Notes)
             - Always visible, prominent
@@ -1351,18 +1436,50 @@ export function DetailPanelRedesign({
           {/* Notes - with expand to full-screen option */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-neutral-500 uppercase tracking-wide">
-                Notes
-              </h3>
-              <button
-                onClick={() => setShowNotesModal(true)}
-                className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
-                title="Expand to full screen"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M3 4a1 1 0 011-1h4a1 1 0 010 2H6.414l2.293 2.293a1 1 0 11-1.414 1.414L5 6.414V8a1 1 0 01-2 0V4zm9 1a1 1 0 010-2h4a1 1 0 011 1v4a1 1 0 01-2 0V6.414l-2.293 2.293a1 1 0 11-1.414-1.414L13.586 5H12zm-9 7a1 1 0 012 0v1.586l2.293-2.293a1 1 0 111.414 1.414L6.414 15H8a1 1 0 010 2H4a1 1 0 01-1-1v-4zm13-1a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 010-2h1.586l-2.293-2.293a1 1 0 111.414-1.414L15 13.586V12a1 1 0 011-1z" />
-                </svg>
-              </button>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-medium text-neutral-500 uppercase tracking-wide">
+                  Notes
+                </h3>
+                {/* Save status indicator */}
+                {notesSaving && (
+                  <span className="text-xs text-neutral-400 flex items-center gap-1">
+                    <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Saving...
+                  </span>
+                )}
+                {notesSaved && !notesSaving && (
+                  <span className="text-xs text-primary-600 flex items-center gap-1">
+                    <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    Saved
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1">
+                {/* Save button - shows when there are unsaved changes */}
+                {notesHasChanges && !notesSaving && (
+                  <button
+                    onClick={handleSaveNotes}
+                    className="px-2 py-1 text-xs font-medium text-white bg-primary-600 hover:bg-primary-700 rounded transition-colors"
+                    title="Save notes"
+                  >
+                    Save
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowNotesModal(true)}
+                  className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
+                  title="Expand to full screen"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M3 4a1 1 0 011-1h4a1 1 0 010 2H6.414l2.293 2.293a1 1 0 11-1.414 1.414L5 6.414V8a1 1 0 01-2 0V4zm9 1a1 1 0 010-2h4a1 1 0 011 1v4a1 1 0 01-2 0V6.414l-2.293 2.293a1 1 0 11-1.414-1.414L13.586 5H12zm-9 7a1 1 0 012 0v1.586l2.293-2.293a1 1 0 111.414 1.414L6.414 15H8a1 1 0 010 2H4a1 1 0 01-1-1v-4zm13-1a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 010-2h1.586l-2.293-2.293a1 1 0 111.414-1.414L15 13.586V12a1 1 0 011-1z" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             {/* Google Calendar description (read-only, events only) */}
