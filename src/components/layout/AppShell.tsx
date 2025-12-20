@@ -128,14 +128,14 @@ export function AppShell({
           flex-1 overflow-auto overflow-x-hidden
           transition-all duration-300 ease-in-out
           ${!isMobile && panelOpen ? 'mr-[420px]' : ''}
-          ${isMobile ? 'pb-16' : ''}
+          ${isMobile ? 'pb-14' : ''}
         `}
-        style={isMobile ? { paddingBottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' } : undefined}
+        style={isMobile ? { paddingBottom: 'calc(3rem + env(safe-area-inset-bottom, 0px))' } : undefined}
       >
         {/* Mobile header */}
         {isMobile && (
-          <header className="sticky top-0 z-10 bg-bg-elevated/95 backdrop-blur-lg border-b border-neutral-200/50 px-4 py-2"
-                  style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.5rem)' }}>
+          <header className="sticky top-0 z-10 bg-bg-elevated/95 backdrop-blur-lg border-b border-neutral-200/50 px-4 py-1"
+                  style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <img
@@ -230,7 +230,7 @@ export function AppShell({
       {isMobile && !panelOpen && (
         <nav className="fixed bottom-0 left-0 right-0 z-40 bg-bg-elevated/95 backdrop-blur-lg border-t border-neutral-200/50"
              style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-          <div className="flex items-center justify-around px-4 py-1.5">
+          <div className="flex items-center justify-around px-4 py-1">
             <button
               onClick={() => onViewChange('home')}
               className={`

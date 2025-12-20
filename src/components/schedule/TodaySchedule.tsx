@@ -966,7 +966,7 @@ export function TodaySchedule({
                 <button
                   ref={organizeButtonRef}
                   onClick={() => setShowInlineInbox(prev => !prev)}
-                  className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                  className={`relative flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm font-medium transition-all ${
                     showInlineInbox
                       ? 'text-primary-700 bg-primary-100'
                       : 'text-neutral-600 hover:bg-neutral-100'
@@ -978,9 +978,41 @@ export function TodaySchedule({
                   </span>
                 </button>
               )}
+              {/* Routines toggle */}
+              {routines.length > 0 && (
+                <button
+                  onClick={toggleHideRoutines}
+                  className={`relative p-2 rounded-lg transition-all ${
+                    hideRoutines
+                      ? 'text-neutral-300'
+                      : 'text-neutral-500 hover:bg-neutral-100'
+                  }`}
+                  title={hideRoutines ? 'Show routines' : 'Hide routines'}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 00-3.7-3.7 48.678 48.678 0 00-7.324 0 4.006 4.006 0 00-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3l-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 003.7 3.7 48.656 48.656 0 007.324 0 4.006 4.006 0 003.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3l-3 3"
+                    />
+                  </svg>
+                  {hideRoutines && (
+                    <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <span className="w-5 h-0.5 bg-neutral-400 rotate-45" />
+                    </span>
+                  )}
+                </button>
+              )}
               {/* Progress text */}
               {actionableCount > 0 && (
-                <span className="text-xs text-neutral-500 px-2">
+                <span className="text-xs text-neutral-500 px-1">
                   {completedCount}/{actionableCount}
                 </span>
               )}
