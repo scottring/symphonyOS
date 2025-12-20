@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import type { Contact } from '@/types/contact'
 import type { Task } from '@/types/task'
 import type { Note, NoteEntityType } from '@/types/note'
 import { EntityNotesSection } from '@/components/notes/EntityNotesSection'
+import { UnifiedNotesEditor } from '@/components/notes/UnifiedNotesEditor'
 
 interface ContactViewProps {
   contact: Contact
@@ -48,12 +49,10 @@ export function ContactViewRedesign({
   // Field editing states
   const [localPhone, setLocalPhone] = useState(contact.phone || '')
   const [localEmail, setLocalEmail] = useState(contact.email || '')
-  const [localNotes, setLocalNotes] = useState(contact.notes || '')
 
   // Debounce refs
   const phoneDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const emailDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const notesDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Delete confirmation
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -69,10 +68,9 @@ export function ContactViewRedesign({
     setEditedName(contact.name)
     setLocalPhone(contact.phone || '')
     setLocalEmail(contact.email || '')
-    setLocalNotes(contact.notes || '')
     setIsEditingName(false)
     setShowDeleteConfirm(false)
-  }, [contact.id, contact.name, contact.phone, contact.email, contact.notes])
+  }, [contact.id, contact.name, contact.phone, contact.email])
   /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
@@ -86,7 +84,6 @@ export function ContactViewRedesign({
     return () => {
       if (phoneDebounceRef.current) clearTimeout(phoneDebounceRef.current)
       if (emailDebounceRef.current) clearTimeout(emailDebounceRef.current)
-      if (notesDebounceRef.current) clearTimeout(notesDebounceRef.current)
     }
   }, [])
 
@@ -124,14 +121,9 @@ export function ContactViewRedesign({
     }, 500)
   }
 
-  const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value
-    setLocalNotes(value)
-    if (notesDebounceRef.current) clearTimeout(notesDebounceRef.current)
-    notesDebounceRef.current = setTimeout(() => {
-      onUpdate(contact.id, { notes: value || undefined })
-    }, 500)
-  }
+  const handleNotesChange = useCallback((value: string | null) => {
+    onUpdate(contact.id, { notes: value || undefined })
+  }, [contact.id, onUpdate])
 
   const handleDelete = async () => {
     await onDelete(contact.id)
@@ -376,15 +368,11 @@ export function ContactViewRedesign({
             {/* Notes - Inline */}
             <div className="pt-8 border-t border-neutral-200/60">
               <h2 className="font-display text-lg font-medium text-neutral-800 mb-4">Notes</h2>
-              <textarea
-                value={localNotes}
+              <UnifiedNotesEditor
+                value={contact.notes}
                 onChange={handleNotesChange}
                 placeholder="Add notes about this contact..."
-                rows={5}
-                className="w-full bg-white/50 text-neutral-700 placeholder:text-neutral-400
-                           rounded-xl border border-neutral-200/60 px-4 py-3
-                           focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400
-                           resize-none transition-all"
+                minHeight={150}
               />
             </div>
 

@@ -7,6 +7,7 @@ import { FAMILY_COLORS, type FamilyMemberColor } from '@/types/family'
 import { parseRoutine, parsedRoutineToDb, isValidParsedRoutine } from '@/lib/parseRoutine'
 import { SemanticRoutine } from './SemanticRoutine'
 import { PinButton } from '@/components/pins'
+import { TiptapEditor } from '@/components/notes/TiptapEditor'
 
 interface RoutineFormProps {
   routine: Routine
@@ -228,14 +229,10 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
                 <label className="block text-sm font-medium text-neutral-700 mb-2">
                   Description <span className="text-neutral-400 font-normal">(optional)</span>
                 </label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                <TiptapEditor
+                  content={description}
+                  onChange={setDescription}
                   placeholder="Add notes about this routine..."
-                  rows={3}
-                  className="w-full px-4 py-3 rounded-xl border border-neutral-200 bg-white
-                             text-neutral-800 placeholder:text-neutral-400 resize-none
-                             focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                 />
               </div>
 

@@ -220,10 +220,10 @@ export function TiptapEditor({
       )}
 
       {/* Editor */}
-      <div className={!content && !editor.isFocused ? 'tiptap-empty' : ''}>
+      <div className={`relative ${!content && !editor.isFocused ? 'tiptap-empty' : ''}`}>
         <EditorContent editor={editor} />
         {!content && !editor.isFocused && editable && (
-          <div className="absolute top-[50px] left-4 text-neutral-400 pointer-events-none">
+          <div className="absolute top-3 left-4 text-neutral-400 pointer-events-none">
             {placeholder}
           </div>
         )}

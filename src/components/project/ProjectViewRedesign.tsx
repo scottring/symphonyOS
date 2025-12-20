@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import type { Project, ProjectStatus } from '@/types/project'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
@@ -9,6 +9,7 @@ import { formatTimeWithDate } from '@/lib/timeUtils'
 import { TaskQuickActions, type ScheduleContextItem } from '@/components/triage'
 import { calculateProjectStatus } from '@/hooks/useProjects'
 import { EntityNotesSection } from '@/components/notes/EntityNotesSection'
+import { UnifiedNotesEditor } from '@/components/notes/UnifiedNotesEditor'
 
 interface ProjectViewProps {
   project: Project
@@ -156,6 +157,10 @@ export function ProjectViewRedesign({
     }
     return formatTimeWithDate(date)
   }
+
+  const handleNotesChange = useCallback((value: string | null) => {
+    onUpdateProject(project.id, { notes: value || undefined })
+  }, [project.id, onUpdateProject])
 
   return (
     <div className="h-full overflow-auto bg-[var(--color-bg-base)]">
@@ -483,6 +488,17 @@ export function ProjectViewRedesign({
                   })}
                 </div>
               )}
+            </div>
+
+            {/* Notes - Inline */}
+            <div className="pt-8 border-t border-neutral-200/60">
+              <h2 className="font-display text-lg font-medium text-neutral-800 mb-4">Notes</h2>
+              <UnifiedNotesEditor
+                value={project.notes}
+                onChange={handleNotesChange}
+                placeholder="Add notes about this project..."
+                minHeight={150}
+              />
             </div>
           </div>
 

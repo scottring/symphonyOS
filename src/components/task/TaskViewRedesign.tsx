@@ -1,11 +1,11 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import type { Task, TaskLink } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
 import type { Note, NoteEntityType } from '@/types/note'
 import { PushDropdown } from '@/components/triage'
 import { EntityNotesSection } from '@/components/notes/EntityNotesSection'
-import { TiptapEditor } from '@/components/notes/TiptapEditor'
+import { UnifiedNotesEditor } from '@/components/notes/UnifiedNotesEditor'
 
 interface TaskViewProps {
   task: Task
@@ -61,10 +61,6 @@ export function TaskViewRedesign({
   const [editedTitle, setEditedTitle] = useState(task.title)
   const titleInputRef = useRef<HTMLInputElement>(null)
 
-  // Notes editing
-  const [localNotes, setLocalNotes] = useState(task.notes || '')
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
   // Time picker state
   const [showTimePicker, setShowTimePicker] = useState(false)
 
@@ -100,11 +96,10 @@ export function TaskViewRedesign({
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setEditedTitle(task.title)
-    setLocalNotes(task.notes || '')
     setIsEditingTitle(false)
     setShowDeleteConfirm(false)
     setShowTimePicker(false)
-  }, [task.id, task.title, task.notes])
+  }, [task.id, task.title])
   /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
@@ -113,14 +108,6 @@ export function TaskViewRedesign({
       titleInputRef.current.select()
     }
   }, [isEditingTitle])
-
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current)
-      }
-    }
-  }, [])
 
   const filteredContacts = onSearchContacts && contactSearchQuery
     ? onSearchContacts(contactSearchQuery)
@@ -146,13 +133,9 @@ export function TaskViewRedesign({
     }
   }
 
-  const handleNotesChange = (value: string) => {
-    setLocalNotes(value)
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => {
-      onUpdate(task.id, { notes: value || undefined })
-    }, 500)
-  }
+  const handleNotesChange = useCallback((value: string | null) => {
+    onUpdate(task.id, { notes: value || undefined })
+  }, [task.id, onUpdate])
 
   const handleDelete = () => {
     onDelete(task.id)
@@ -529,10 +512,11 @@ export function TaskViewRedesign({
             {/* ========== NOTES - Rich text editor ========== */}
             <div className="pt-8 border-t border-neutral-200/60">
               <h2 className="font-display text-lg font-medium text-neutral-800 mb-4">Notes</h2>
-              <TiptapEditor
-                content={localNotes}
+              <UnifiedNotesEditor
+                value={task.notes}
                 onChange={handleNotesChange}
                 placeholder="Add notes, thoughts, or context..."
+                minHeight={200}
               />
             </div>
 

@@ -133,7 +133,7 @@ interface DetailPanelRedesignProps {
   onDeleteLinkedTask?: (taskId: string) => void
   // Routine for template management
   routine?: Routine | null
-  onUpdateRoutine?: (routineId: string, updates: { prep_task_templates?: PrepFollowupTemplate[], followup_task_templates?: PrepFollowupTemplate[] }) => Promise<boolean>
+  onUpdateRoutine?: (routineId: string, updates: { description?: string | null, prep_task_templates?: PrepFollowupTemplate[], followup_task_templates?: PrepFollowupTemplate[] }) => Promise<boolean>
   // Family member assignment (for shared events)
   familyMembers?: FamilyMember[]
   eventAssignedToAll?: string[]
@@ -1080,6 +1080,8 @@ export function DetailPanelRedesign({
         } else if (isEvent && item?.originalEvent && onUpdateEventNote) {
           const googleEventId = item.originalEvent.google_event_id || item.originalEvent.id
           await onUpdateEventNote(googleEventId, value || null)
+        } else if (isRoutine && item?.originalRoutine && onUpdateRoutine) {
+          await onUpdateRoutine(item.originalRoutine.id, { description: value || null })
         }
         setNotesHasChanges(false)
         setNotesSaved(true)
@@ -1111,6 +1113,8 @@ export function DetailPanelRedesign({
       } else if (isEvent && item?.originalEvent && onUpdateEventNote) {
         const googleEventId = item.originalEvent.google_event_id || item.originalEvent.id
         await onUpdateEventNote(googleEventId, localNotes || null)
+      } else if (isRoutine && item?.originalRoutine && onUpdateRoutine) {
+        await onUpdateRoutine(item.originalRoutine.id, { description: localNotes || null })
       }
       setNotesHasChanges(false)
       setNotesSaved(true)
@@ -2509,6 +2513,8 @@ export function DetailPanelRedesign({
           } else if (isEvent && item.originalEvent && onUpdateEventNote) {
             const googleEventId = item.originalEvent.google_event_id || item.originalEvent.id
             onUpdateEventNote(googleEventId, content || null)
+          } else if (isRoutine && item.originalRoutine && onUpdateRoutine) {
+            onUpdateRoutine(item.originalRoutine.id, { description: content || null })
           }
         }}
       />
