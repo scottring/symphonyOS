@@ -2,9 +2,11 @@ interface DateNavigatorProps {
   date: Date
   onDateChange: (date: Date) => void
   showTodayButton?: boolean
+  /** Label to show between arrows (e.g., "Saturday") */
+  label?: string
 }
 
-export function DateNavigator({ date, onDateChange, showTodayButton = false }: DateNavigatorProps) {
+export function DateNavigator({ date, onDateChange, showTodayButton = false, label }: DateNavigatorProps) {
   const goToPrevDay = () => {
     const prev = new Date(date)
     prev.setDate(prev.getDate() - 1)
@@ -22,11 +24,11 @@ export function DateNavigator({ date, onDateChange, showTodayButton = false }: D
   }
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-0.5">
       {/* Previous day button */}
       <button
         onClick={goToPrevDay}
-        className="touch-target flex items-center justify-center rounded-lg hover:bg-neutral-100 text-neutral-500 hover:text-neutral-700 transition-colors"
+        className="touch-target flex items-center justify-center rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-neutral-600 transition-colors"
         aria-label="Previous day"
       >
         <svg
@@ -43,8 +45,15 @@ export function DateNavigator({ date, onDateChange, showTodayButton = false }: D
         </svg>
       </button>
 
+      {/* Label between arrows */}
+      {label && (
+        <span className="font-display text-lg text-neutral-900 px-1">
+          {label}
+        </span>
+      )}
+
       {/* Today button - between arrows, only shown when NOT viewing today */}
-      {showTodayButton && (
+      {showTodayButton && !label && (
         <button
           onClick={goToToday}
           className="text-sm font-medium text-primary-600 hover:text-primary-700 bg-primary-50 hover:bg-primary-100 px-2.5 py-1 rounded-lg transition-colors"
@@ -56,7 +65,7 @@ export function DateNavigator({ date, onDateChange, showTodayButton = false }: D
       {/* Next day button */}
       <button
         onClick={goToNextDay}
-        className="touch-target flex items-center justify-center rounded-lg hover:bg-neutral-100 text-neutral-500 hover:text-neutral-700 transition-colors"
+        className="touch-target flex items-center justify-center rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-neutral-600 transition-colors"
         aria-label="Next day"
       >
         <svg

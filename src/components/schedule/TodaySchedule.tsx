@@ -541,7 +541,7 @@ export function TodaySchedule({
   onToggleTask,
   onUpdateTask,
   onPushTask,
-  onDeleteTask,
+  onDeleteTask: _onDeleteTask,
   loading,
   viewedDate,
   onDateChange,
@@ -579,7 +579,7 @@ export function TodaySchedule({
 }: TodayScheduleProps) {
   void _onOpenPlanning // Reserved - planning now handled by ModeToggle
   void _onCreateTask // Reserved - was used by ReviewSection
-  // onDeleteTask is now used for inline inbox delete
+  void _onDeleteTask // Available for future inline delete
   void _contacts // Available for future inline triage
   void _onSearchContacts // Available for future inline triage
   void _onAddContact // Available for future inline triage
@@ -949,153 +949,174 @@ export function TodaySchedule({
   }, [tasks, events, visibleRoutines, routineStatusMap])
 
   return (
-    <div className="px-5 py-6 md:px-10 md:py-10 max-w-[680px] mx-auto">
-      {/* Header - Editorial style with large date */}
-      <header className="mb-10 animate-fade-in-up">
-        {/* Large editorial date display with inline navigation */}
-        <div className="flex items-end gap-3 mb-6">
-          <h1 className="font-display text-4xl md:text-5xl text-neutral-900 tracking-tight leading-none">
-            {isToday ? (
-              <>
-                <span className="text-neutral-400 font-normal text-2xl md:text-3xl block mb-1">Today is</span>
-                {viewedDate.toLocaleDateString('en-US', { weekday: 'long' })}
-              </>
-            ) : (
-              formatDate()
-            )}
-          </h1>
-          {/* Date navigation arrows inline with the day name */}
-          <DateNavigator date={viewedDate} onDateChange={onDateChange} showTodayButton={!isToday} />
-        </div>
-
-        {/* Stats row: Inbox, Progress (centered), Clarity */}
-        <div className="flex items-center gap-4 pt-5 border-t border-neutral-200/60">
-          {/* Inbox button - left side */}
-          {isToday && (
-            <InboxButton
-              ref={organizeButtonRef}
-              onClick={() => setShowInlineInbox(prev => !prev)}
-              inboxCount={inboxTasks.length}
-              isExpanded={showInlineInbox}
-              pulse={organizePulse}
+    <div className="px-4 py-3 md:px-10 md:py-10 max-w-[680px] mx-auto">
+      {/* Header - Compact on mobile, editorial on desktop */}
+      <header className="mb-4 md:mb-10 animate-fade-in-up">
+        {/* Mobile: Compact single-line header */}
+        {isMobile ? (
+          <div className="flex items-center justify-between">
+            <DateNavigator
+              date={viewedDate}
+              onDateChange={onDateChange}
+              label={isToday ? viewedDate.toLocaleDateString('en-US', { weekday: 'long' }) : formatDate()}
             />
-          )}
-
-          {/* Progress - centered with flex-1 */}
-          {actionableCount > 0 && (
-            <ProgressIndicator
-              completed={completedCount}
-              total={actionableCount}
-              percent={progressPercent}
-            />
-          )}
-
-          {/* Assignee filter */}
-          {isMobile && onSelectAssignee && (assigneesWithTasks.length > 0 || hasUnassignedTasks) && (
-            <AssigneeFilter
-              selectedAssignees={selectedAssignee ? [selectedAssignee] : []}
-              onSelectAssignees={(ids) => onSelectAssignee(ids.length > 0 ? ids[0] : null)}
-              assigneesWithTasks={assigneesWithTasks}
-              hasUnassignedTasks={hasUnassignedTasks}
-            />
-          )}
-
-          {/* Routines toggle - only show if there are routines */}
-          {routines.length > 0 && (
-            <button
-              onClick={toggleHideRoutines}
-              className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm transition-all duration-200 ${
-                hideRoutines
-                  ? 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100'
-                  : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100'
-              }`}
-              title={hideRoutines ? 'Show routines' : 'Hide routines'}
-            >
-              {/* Repeat/sync icon for routines */}
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className={`w-4 h-4 ${hideRoutines ? 'opacity-50' : ''}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.5}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 00-3.7-3.7 48.678 48.678 0 00-7.324 0 4.006 4.006 0 00-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3l-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 003.7 3.7 48.656 48.656 0 007.324 0 4.006 4.006 0 003.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3l-3 3"
-                />
-              </svg>
-              {/* Strikethrough line when hidden */}
-              {hideRoutines && (
-                <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <span className="w-5 h-0.5 bg-neutral-400 rotate-45" />
+            <div className="flex items-center gap-1">
+              {/* Inbox button */}
+              {isToday && inboxTasks.length > 0 && (
+                <button
+                  ref={organizeButtonRef}
+                  onClick={() => setShowInlineInbox(prev => !prev)}
+                  className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    showInlineInbox
+                      ? 'text-primary-700 bg-primary-100'
+                      : 'text-neutral-600 hover:bg-neutral-100'
+                  } ${organizePulse ? 'animate-pulse ring-2 ring-primary-400' : ''}`}
+                >
+                  <InboxIcon className="w-4 h-4" />
+                  <span className="min-w-[1.25rem] h-5 px-1.5 flex items-center justify-center rounded-full bg-primary-500 text-white text-xs font-bold">
+                    {inboxTasks.length}
+                  </span>
+                </button>
+              )}
+              {/* Progress text */}
+              {actionableCount > 0 && (
+                <span className="text-xs text-neutral-500 px-2">
+                  {completedCount}/{actionableCount}
                 </span>
               )}
-            </button>
-          )}
+            </div>
+          </div>
+        ) : (
+          /* Desktop: Full editorial header */
+          <>
+            <div className="flex items-end gap-3 mb-6">
+              <h1 className="font-display text-4xl md:text-5xl text-neutral-900 tracking-tight leading-none">
+                {isToday ? (
+                  <>
+                    <span className="text-neutral-400 font-normal text-2xl md:text-3xl block mb-1">Today is</span>
+                    {viewedDate.toLocaleDateString('en-US', { weekday: 'long' })}
+                  </>
+                ) : (
+                  formatDate()
+                )}
+              </h1>
+              <DateNavigator date={viewedDate} onDateChange={onDateChange} showTodayButton={!isToday} />
+            </div>
 
-          {/* Clarity score - right side */}
-          {isToday && !loading && tasks.length > 0 && (
-            <ClarityIndicator
-              tasks={tasks}
-              projects={projects}
-              familyMembers={familyMembers}
-              projectsWithLinkedEvents={projectsWithLinkedEvents}
-              onScrollToInbox={scrollToInbox}
-              onOpenProject={onOpenProject}
-              onAssignTaskAll={onAssignTaskAll}
-            />
-          )}
-        </div>
+            {/* Stats row: Inbox, Progress (centered), Clarity */}
+            <div className="flex items-center gap-4 pt-5 border-t border-neutral-200/60">
+              {/* Inbox button - left side */}
+              {isToday && (
+                <InboxButton
+                  ref={organizeButtonRef}
+                  onClick={() => setShowInlineInbox(prev => !prev)}
+                  inboxCount={inboxTasks.length}
+                  isExpanded={showInlineInbox}
+                  pulse={organizePulse}
+                />
+              )}
+
+              {/* Progress - centered with flex-1 */}
+              {actionableCount > 0 && (
+                <ProgressIndicator
+                  completed={completedCount}
+                  total={actionableCount}
+                  percent={progressPercent}
+                />
+              )}
+
+              {/* Assignee filter */}
+              {onSelectAssignee && (assigneesWithTasks.length > 0 || hasUnassignedTasks) && (
+                <AssigneeFilter
+                  selectedAssignees={selectedAssignee ? [selectedAssignee] : []}
+                  onSelectAssignees={(ids) => onSelectAssignee(ids.length > 0 ? ids[0] : null)}
+                  assigneesWithTasks={assigneesWithTasks}
+                  hasUnassignedTasks={hasUnassignedTasks}
+                />
+              )}
+
+              {/* Routines toggle - only show if there are routines */}
+              {routines.length > 0 && (
+                <button
+                  onClick={toggleHideRoutines}
+                  className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm transition-all duration-200 ${
+                    hideRoutines
+                      ? 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100'
+                      : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100'
+                  }`}
+                  title={hideRoutines ? 'Show routines' : 'Hide routines'}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className={`w-4 h-4 ${hideRoutines ? 'opacity-50' : ''}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 00-3.7-3.7 48.678 48.678 0 00-7.324 0 4.006 4.006 0 00-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3l-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 003.7 3.7 48.656 48.656 0 007.324 0 4.006 4.006 0 003.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3l-3 3"
+                    />
+                  </svg>
+                  {hideRoutines && (
+                    <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <span className="w-5 h-0.5 bg-neutral-400 rotate-45" />
+                    </span>
+                  )}
+                </button>
+              )}
+
+              {/* Clarity score - right side */}
+              {isToday && !loading && tasks.length > 0 && (
+                <ClarityIndicator
+                  tasks={tasks}
+                  projects={projects}
+                  familyMembers={familyMembers}
+                  projectsWithLinkedEvents={projectsWithLinkedEvents}
+                  onScrollToInbox={scrollToInbox}
+                  onOpenProject={onOpenProject}
+                  onAssignTaskAll={onAssignTaskAll}
+                />
+              )}
+            </div>
+          </>
+        )}
       </header>
 
       {/* Inline collapsible inbox section */}
       {isToday && showInlineInbox && inboxTasks.length > 0 && onUpdateTask && onPushTask && (
-        <div className="mb-8 animate-fade-in-up">
-          <div className="rounded-2xl border border-neutral-200 bg-neutral-50/50">
+        <div className="mb-4 md:mb-8 animate-fade-in-up">
+          <div className="rounded-xl md:rounded-2xl border border-neutral-200 bg-neutral-50/50">
             {/* Inbox header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-200/60 rounded-t-2xl">
+            <div className="flex items-center justify-between px-3 py-2 md:px-4 md:py-3 border-b border-neutral-200/60">
               <div className="flex items-center gap-2 text-sm font-medium text-neutral-700">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-neutral-500" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 2h10v7h-2l-1 2H8l-1-2H5V5z" clipRule="evenodd" />
-                </svg>
+                <InboxIcon className="w-4 h-4 text-neutral-500" />
                 Inbox
                 <span className="text-neutral-400">({inboxTasks.length})</span>
               </div>
               <button
                 onClick={() => setShowInlineInbox(false)}
-                className="p-1 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-200/50 transition-colors"
+                className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-200/50 transition-colors"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
                 </svg>
               </button>
             </div>
             {/* Inbox items */}
-            <div className="p-3 space-y-2 max-h-[400px] overflow-y-auto rounded-b-2xl">
+            <div className="p-2 md:p-3 space-y-2 max-h-[50vh] md:max-h-[400px] overflow-y-auto">
               {inboxTasks.map((task) => (
                 <InboxTaskCard
                   key={task.id}
                   task={task}
-                  onDefer={(date) => {
-                    if (date) {
-                      onPushTask(task.id, date)
-                    } else {
-                      onUpdateTask(task.id, { deferredUntil: undefined })
-                    }
-                  }}
-                  onSchedule={(date, isAllDay) => {
-                    onUpdateTask(task.id, { scheduledFor: date, isAllDay, deferredUntil: undefined })
-                  }}
                   onUpdate={(updates) => onUpdateTask(task.id, updates)}
                   onSelect={() => onSelectItem(`task-${task.id}`)}
-                  onDelete={onDeleteTask ? () => onDeleteTask(task.id) : undefined}
                   projects={projects}
                   onOpenProject={onOpenProject}
                   familyMembers={familyMembers}
                   onAssignTaskAll={onAssignTaskAll ? (memberIds) => onAssignTaskAll(task.id, memberIds) : undefined}
-                  getScheduleItemsForDate={getScheduleItemsForDate}
                 />
               ))}
             </div>

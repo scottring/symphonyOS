@@ -104,27 +104,12 @@ export function InboxSection({
           <InboxTaskCard
             key={task.id}
             task={task}
-            onDefer={(date) => {
-              if (date) {
-                // Defer to specified date
-                onPushTask(task.id, date)
-              } else {
-                // Clear deferral - show now
-                onUpdateTask(task.id, { deferredUntil: undefined })
-              }
-            }}
-            onSchedule={(date, isAllDay) => {
-              onUpdateTask(task.id, { scheduledFor: date, isAllDay, deferredUntil: undefined })
-            }}
             onUpdate={(updates) => onUpdateTask(task.id, updates)}
             onSelect={() => onSelectTask(task.id)}
-            onTriage={() => setTriageTaskId(task.id)}
-            onDelete={onDeleteTask ? () => onDeleteTask(task.id) : undefined}
             projects={projects}
             onOpenProject={onOpenProject}
             familyMembers={familyMembers}
             onAssignTaskAll={onAssignTaskAll ? (memberIds) => onAssignTaskAll(task.id, memberIds) : undefined}
-            getScheduleItemsForDate={getScheduleItemsForDate}
           />
         ))}
       </div>

@@ -259,25 +259,16 @@ export function SwipeableCard({
             <TypeIcon type={item.type} completed={item.completed} />
           </div>
 
-          {/* Title and category */}
-          <div className="flex-1 min-w-0 flex items-center gap-1.5">
+          {/* Title */}
+          <div className="flex-1 min-w-0">
             <span
               className={`
-                text-base font-medium leading-snug truncate
+                text-sm font-medium leading-snug line-clamp-2
                 ${item.completed ? 'line-through text-neutral-400' : 'text-neutral-800'}
               `}
             >
               {item.title}
             </span>
-            {/* Category emoji only on mobile for space */}
-            {item.category && item.category !== 'task' && (
-              <span className="shrink-0 text-sm">
-                {item.category === 'errand' && '🚗'}
-                {item.category === 'chore' && '🧹'}
-                {item.category === 'event' && '📅'}
-                {item.category === 'activity' && '⚽'}
-              </span>
-            )}
           </div>
 
           {/* Assignee avatar */}

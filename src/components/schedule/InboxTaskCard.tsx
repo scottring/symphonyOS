@@ -1,153 +1,69 @@
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
-import type { ScheduleContextItem } from '@/components/triage'
-import { DeferPicker, SchedulePopover } from '@/components/triage'
 import { MultiAssigneeDropdown } from '@/components/family'
-import { AgeIndicator } from '@/components/health'
-import { Trash2 } from 'lucide-react'
 
 interface InboxTaskCardProps {
   task: Task
-  onDefer: (date: Date | undefined) => void
-  onSchedule?: (date: Date, isAllDay: boolean) => void
   onUpdate: (updates: Partial<Task>) => void
   onSelect: () => void
-  onTriage?: () => void // Open triage modal
-  onDelete?: () => void // Delete the task
   projects?: Project[]
   onOpenProject?: (projectId: string) => void
-  // Family member assignment
   familyMembers?: FamilyMember[]
   onAssignTaskAll?: (memberIds: string[]) => void
-  // Schedule context for the schedule popover
-  getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
 }
 
 export function InboxTaskCard({
   task,
-  onDefer,
-  onSchedule,
   onUpdate,
   onSelect,
-  onTriage,
-  onDelete,
   projects = [],
   onOpenProject,
   familyMembers = [],
   onAssignTaskAll,
-  getScheduleItemsForDate,
 }: InboxTaskCardProps) {
   const project = projects.find(p => p.id === task.projectId)
-
-  const handleSchedule = (date: Date, isAllDay: boolean) => {
-    if (onSchedule) {
-      onSchedule(date, isAllDay)
-    } else {
-      // Fallback to onUpdate if onSchedule not provided
-      onUpdate({ scheduledFor: date, isAllDay, deferredUntil: undefined })
-    }
-  }
 
   return (
     <div
       onClick={onSelect}
       className="bg-white rounded-xl border border-neutral-100 px-3 py-2.5 shadow-sm cursor-pointer hover:border-primary-200 hover:shadow-md transition-all group"
     >
-      {/* Main row: checkbox | title | actions | avatar */}
-      <div className="flex items-center gap-2.5">
-        {/* Checkbox - fixed width to align with ScheduleItem */}
-        <div className="w-5 shrink-0 flex items-center justify-center">
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onUpdate({ completed: !task.completed })
-            }}
-            className="touch-target flex items-center justify-center -m-2 p-2"
-          >
-            <span
-              className={`
-                w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors
-                ${task.completed
-                  ? 'bg-primary-500 border-primary-500 text-white'
-                  : 'border-neutral-300 hover:border-primary-400'
-                }
-              `}
-            >
-              {task.completed && (
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-            </span>
-          </button>
-        </div>
-
-        {/* Title and category */}
-        <div className="flex-1 flex items-center gap-2 min-w-0">
+      {/* Main row: checkbox | title | avatar */}
+      <div className="flex items-center gap-2">
+        {/* Checkbox */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onUpdate({ completed: !task.completed })
+          }}
+          className="shrink-0 touch-target flex items-center justify-center -m-1 p-1"
+        >
           <span
-            className={`text-left min-w-0 text-base font-medium line-clamp-2 ${
-              task.completed ? 'text-neutral-400 line-through' : 'text-neutral-800'
-            }`}
+            className={`
+              w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors
+              ${task.completed
+                ? 'bg-primary-500 border-primary-500 text-white'
+                : 'border-neutral-300 hover:border-primary-400'
+              }
+            `}
           >
-            {task.title}
-          </span>
-          {/* Category chip - only show for non-task categories */}
-          {task.category && task.category !== 'task' && (
-            <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded text-xs font-medium">
-              {task.category === 'errand' && '🚗'}
-              {task.category === 'chore' && '🧹'}
-              {task.category === 'event' && '📅'}
-              {task.category === 'activity' && '⚽'}
-              <span className="hidden sm:inline">{task.category}</span>
-            </span>
-          )}
-          {/* Age indicator - shows for tasks > 3 days old */}
-          <AgeIndicator createdAt={task.createdAt} size="sm" />
-        </div>
-
-        {/* Action buttons - hidden by default, show on hover */}
-        <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-          {/* Review button */}
-          {onTriage && (
-            <button
-              onClick={onTriage}
-              className="p-1.5 rounded-lg text-neutral-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
-              title="Review"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+            {task.completed && (
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
               </svg>
-            </button>
-          )}
+            )}
+          </span>
+        </button>
 
-          {/* Schedule button */}
-          <SchedulePopover
-            value={task.scheduledFor}
-            isAllDay={task.isAllDay}
-            onSchedule={handleSchedule}
-            onClear={() => onUpdate({ scheduledFor: undefined, isAllDay: undefined })}
-            getItemsForDate={getScheduleItemsForDate}
-          />
-
-          {/* Defer/Later button */}
-          <DeferPicker
-            deferredUntil={task.deferredUntil}
-            deferCount={task.deferCount}
-            onDefer={onDefer}
-          />
-
-          {/* Delete button */}
-          {onDelete && (
-            <button
-              onClick={onDelete}
-              className="p-1.5 rounded-lg text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-              title="Delete"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+        {/* Title - takes all available space, allow 2 lines */}
+        <span
+          className={`flex-1 min-w-0 text-sm leading-snug line-clamp-2 ${
+            task.completed ? 'text-neutral-400 line-through' : 'text-neutral-800'
+          }`}
+        >
+          {task.title}
+        </span>
 
         {/* Multi-assignee avatar - always visible */}
         {familyMembers.length > 0 && onAssignTaskAll && (
