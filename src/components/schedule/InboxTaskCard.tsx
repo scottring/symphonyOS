@@ -2,25 +2,31 @@ import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
 import { MultiAssigneeDropdown } from '@/components/family'
+import { SchedulePopover, DeferPicker } from '@/components/triage'
+import type { ScheduleContextItem } from '@/components/triage'
 
 interface InboxTaskCardProps {
   task: Task
   onUpdate: (updates: Partial<Task>) => void
   onSelect: () => void
+  onDefer: (date: Date | undefined) => void
   projects?: Project[]
   onOpenProject?: (projectId: string) => void
   familyMembers?: FamilyMember[]
   onAssignTaskAll?: (memberIds: string[]) => void
+  getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
 }
 
 export function InboxTaskCard({
   task,
   onUpdate,
   onSelect,
+  onDefer,
   projects = [],
   onOpenProject,
   familyMembers = [],
   onAssignTaskAll,
+  getScheduleItemsForDate,
 }: InboxTaskCardProps) {
   const project = projects.find(p => p.id === task.projectId)
 
@@ -65,17 +71,36 @@ export function InboxTaskCard({
           {task.title}
         </span>
 
-        {/* Multi-assignee avatar - always visible */}
-        {familyMembers.length > 0 && onAssignTaskAll && (
-          <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+        {/* Triage actions: Defer, Schedule, Assign */}
+        <div className="shrink-0 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          {/* Defer button */}
+          <DeferPicker
+            deferredUntil={task.deferredUntil}
+            deferCount={task.deferCount}
+            onDefer={onDefer}
+          />
+
+          {/* Schedule button */}
+          <SchedulePopover
+            value={task.scheduledFor}
+            isAllDay={task.isAllDay}
+            onSchedule={(date, isAllDay) => {
+              onUpdate({ scheduledFor: date, isAllDay, deferredUntil: undefined })
+            }}
+            onClear={() => onUpdate({ scheduledFor: undefined, isAllDay: undefined })}
+            getItemsForDate={getScheduleItemsForDate}
+          />
+
+          {/* Multi-assignee avatar */}
+          {familyMembers.length > 0 && onAssignTaskAll && (
             <MultiAssigneeDropdown
               members={familyMembers}
               selectedIds={task.assignedToAll || []}
               onSelect={onAssignTaskAll}
               size="sm"
             />
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Chips row - desktop only, only show if project exists */}

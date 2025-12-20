@@ -1140,10 +1140,18 @@ export function TodaySchedule({
                   task={task}
                   onUpdate={(updates) => onUpdateTask(task.id, updates)}
                   onSelect={() => onSelectItem(`task-${task.id}`)}
+                  onDefer={(date) => {
+                    if (date) {
+                      onPushTask(task.id, date)
+                    } else {
+                      onUpdateTask(task.id, { deferredUntil: undefined })
+                    }
+                  }}
                   projects={projects}
                   onOpenProject={onOpenProject}
                   familyMembers={familyMembers}
                   onAssignTaskAll={onAssignTaskAll ? (memberIds) => onAssignTaskAll(task.id, memberIds) : undefined}
+                  getScheduleItemsForDate={getScheduleItemsForDate}
                 />
               ))}
             </div>
