@@ -24,16 +24,16 @@ export function DateNavigator({ date, onDateChange, showTodayButton = false, lab
   }
 
   return (
-    <div className="flex items-center gap-0.5">
+    <div className="flex items-center">
       {/* Previous day button */}
       <button
         onClick={goToPrevDay}
-        className="touch-target flex items-center justify-center rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-neutral-600 transition-colors"
+        className="p-1 rounded-md hover:bg-neutral-100 text-neutral-400 hover:text-neutral-600 transition-colors"
         aria-label="Previous day"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          className="w-5 h-5"
+          className="w-4 h-4"
           viewBox="0 0 20 20"
           fill="currentColor"
         >
@@ -47,7 +47,7 @@ export function DateNavigator({ date, onDateChange, showTodayButton = false, lab
 
       {/* Label between arrows */}
       {label && (
-        <span className="font-display text-lg text-neutral-900 px-1">
+        <span className="font-display text-base text-neutral-900 px-0.5">
           {label}
         </span>
       )}
@@ -56,7 +56,7 @@ export function DateNavigator({ date, onDateChange, showTodayButton = false, lab
       {showTodayButton && !label && (
         <button
           onClick={goToToday}
-          className="text-sm font-medium text-primary-600 hover:text-primary-700 bg-primary-50 hover:bg-primary-100 px-2.5 py-1 rounded-lg transition-colors"
+          className="text-xs font-medium text-primary-600 hover:text-primary-700 bg-primary-50 hover:bg-primary-100 px-2 py-0.5 rounded-md transition-colors"
         >
           Today
         </button>
@@ -65,12 +65,12 @@ export function DateNavigator({ date, onDateChange, showTodayButton = false, lab
       {/* Next day button */}
       <button
         onClick={goToNextDay}
-        className="touch-target flex items-center justify-center rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-neutral-600 transition-colors"
+        className="p-1 rounded-md hover:bg-neutral-100 text-neutral-400 hover:text-neutral-600 transition-colors"
         aria-label="Next day"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          className="w-5 h-5"
+          className="w-4 h-4"
           viewBox="0 0 20 20"
           fill="currentColor"
         >

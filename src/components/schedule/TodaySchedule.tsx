@@ -949,49 +949,46 @@ export function TodaySchedule({
   }, [tasks, events, visibleRoutines, routineStatusMap])
 
   return (
-    <div className="px-4 py-3 md:px-10 md:py-10 max-w-[680px] mx-auto">
+    <div className="px-2 py-3 md:px-10 md:py-10 max-w-[680px] mx-auto">
       {/* Header - Compact on mobile, editorial on desktop */}
       <header className="mb-4 md:mb-10 animate-fade-in-up">
         {/* Mobile: Compact single-line header */}
         {isMobile ? (
-          <div className="flex items-center justify-between">
+          <div className="flex items-center">
             <DateNavigator
               date={viewedDate}
               onDateChange={onDateChange}
               label={isToday ? viewedDate.toLocaleDateString('en-US', { weekday: 'long' }) : formatDate()}
             />
-            <div className="flex items-center gap-1">
-              {/* Inbox button */}
+            {/* Spacer */}
+            <div className="flex-1" />
+            {/* Right side controls - unified group */}
+            <div className="flex items-center pr-3">
+              {/* Inbox */}
               {isToday && inboxTasks.length > 0 && (
                 <button
                   ref={organizeButtonRef}
                   onClick={() => setShowInlineInbox(prev => !prev)}
-                  className={`relative flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                    showInlineInbox
-                      ? 'text-primary-700 bg-primary-100'
-                      : 'text-neutral-600 hover:bg-neutral-100'
-                  } ${organizePulse ? 'animate-pulse ring-2 ring-primary-400' : ''}`}
+                  className={`flex items-center gap-0.5 mr-2 transition-all ${
+                    showInlineInbox ? 'text-primary-600' : 'text-neutral-400'
+                  } ${organizePulse ? 'animate-pulse' : ''}`}
                 >
-                  <InboxIcon className="w-4 h-4" />
-                  <span className="min-w-[1.25rem] h-5 px-1.5 flex items-center justify-center rounded-full bg-primary-500 text-white text-xs font-bold">
-                    {inboxTasks.length}
-                  </span>
+                  <InboxIcon className="w-3 h-3" />
+                  <span className="text-[11px] tabular-nums">{inboxTasks.length}</span>
                 </button>
               )}
               {/* Routines toggle */}
               {routines.length > 0 && (
                 <button
                   onClick={toggleHideRoutines}
-                  className={`relative p-2 rounded-lg transition-all ${
-                    hideRoutines
-                      ? 'text-neutral-300'
-                      : 'text-neutral-500 hover:bg-neutral-100'
+                  className={`relative flex items-center mr-2 transition-all ${
+                    hideRoutines ? 'text-neutral-300' : 'text-neutral-400'
                   }`}
                   title={hideRoutines ? 'Show routines' : 'Hide routines'}
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="w-4 h-4"
+                    className="w-3 h-3"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -1005,16 +1002,14 @@ export function TodaySchedule({
                   </svg>
                   {hideRoutines && (
                     <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <span className="w-5 h-0.5 bg-neutral-400 rotate-45" />
+                      <span className="w-3 h-0.5 bg-neutral-300 rotate-45" />
                     </span>
                   )}
                 </button>
               )}
-              {/* Progress text */}
+              {/* Progress */}
               {actionableCount > 0 && (
-                <span className="text-xs text-neutral-500 px-1">
-                  {completedCount}/{actionableCount}
-                </span>
+                <span className="text-[11px] text-neutral-400 tabular-nums">{completedCount}/{actionableCount}</span>
               )}
             </div>
           </div>
