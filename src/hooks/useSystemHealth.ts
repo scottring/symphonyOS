@@ -66,13 +66,25 @@ export function useSystemHealth(tasksOrInput: Task[] | SystemHealthInput): Syste
 
     // Filter to incomplete tasks only
     const incompleteTasks = tasks.filter(t => !t.completed)
+    const now = new Date()
 
     // Categorize tasks
-    const inboxTasks = incompleteTasks.filter(
-      t => !t.scheduledFor && !t.deferredUntil && !t.isSomeday
-    )
+    // Inbox = no schedule, not someday, AND either no defer or defer time has passed
+    const inboxTasks = incompleteTasks.filter(t => {
+      if (t.scheduledFor) return false
+      if (t.isSomeday) return false
+      // If deferred to a future time, not in inbox yet
+      if (t.deferredUntil) {
+        return new Date(t.deferredUntil) <= now
+      }
+      return true
+    })
     const scheduledTasks = incompleteTasks.filter(t => t.scheduledFor)
-    const deferredTasks = incompleteTasks.filter(t => t.deferredUntil)
+    // Deferred = has deferredUntil in the future (past deferrals are inbox items)
+    const deferredTasks = incompleteTasks.filter(t => {
+      if (!t.deferredUntil) return false
+      return new Date(t.deferredUntil) > now
+    })
 
     // Calculate age categories for inbox items
     const freshInboxItems = inboxTasks.filter(t => {
