@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect } from 'react'
-import type { TripMetadata, TravelMode, Location, PackingTemplate, TripSegment, Accommodation, TransportationLogistic, TripEvent } from '@/types/trip'
+import type { TripMetadata, TravelMode, Location, PackingTemplate, TripSegment, Accommodation, TransportationLogistic, TripEvent, PackingItem } from '@/types/trip'
 import { EV_VEHICLES } from '@/types/trip'
 import type { PlaceAutocompleteResult } from '@/types/directions'
 import type { Project } from '@/types/project'
+import { usePacking } from '@/hooks/usePacking'
 import { useDirections } from '@/hooks/useDirections'
 import { SegmentBuilder } from './SegmentBuilder'
 import { AccommodationBuilder } from './AccommodationBuilder'
@@ -12,8 +13,8 @@ import { EventBuilder } from './EventBuilder'
 interface TripCreationModalProps {
   isOpen: boolean
   onClose: () => void
-  onCreateTrip: (name: string, tripMetadata: TripMetadata, packingTemplate?: PackingTemplate) => Promise<Project | null>
-  onUpdateTrip?: (projectId: string, name: string, tripMetadata: TripMetadata, packingTemplate?: PackingTemplate) => Promise<void>
+  onCreateTrip: (name: string, tripMetadata: TripMetadata, packingTemplate?: PackingTemplate, customPackingItems?: PackingItem[]) => Promise<Project | null>
+  onUpdateTrip?: (projectId: string, name: string, tripMetadata: TripMetadata, packingTemplate?: PackingTemplate, customPackingItems?: PackingItem[]) => Promise<void>
   existingProject?: Project // For edit mode
 }
 
@@ -21,6 +22,7 @@ type TripType = 'simple' | 'multi-segment' | 'timeline'
 
 export function TripCreationModal({ isOpen, onClose, onCreateTrip, onUpdateTrip, existingProject }: TripCreationModalProps) {
   const { searchPlaces, getPlaceDetails } = useDirections()
+  const { templates: customTemplates } = usePacking()
 
   // Trip type - default to timeline for new trips
   const [tripType, setTripType] = useState<TripType>('timeline')
@@ -29,7 +31,8 @@ export function TripCreationModal({ isOpen, onClose, onCreateTrip, onUpdateTrip,
   const [tripName, setTripName] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  const [packingTemplate, setPackingTemplate] = useState<PackingTemplate>('weekend')
+  const [packingTemplate, setPackingTemplate] = useState<PackingTemplate | string>('weekend')
+  const [customPackingItems, setCustomPackingItems] = useState<PackingItem[] | undefined>(undefined)
 
   // === SIMPLE TRIP STATE ===
   const [travelMode, setTravelMode] = useState<TravelMode>('driving_ev')
@@ -364,10 +367,10 @@ export function TripCreationModal({ isOpen, onClose, onCreateTrip, onUpdateTrip,
 
         if (isEditMode && existingProject && onUpdateTrip) {
           // Update existing trip
-          await onUpdateTrip(existingProject.id, tripName, tripMetadata, packingTemplate)
+          await onUpdateTrip(existingProject.id, tripName, tripMetadata, packingTemplate as PackingTemplate, customPackingItems)
         } else {
           // Create new trip
-          await onCreateTrip(tripName, tripMetadata, packingTemplate)
+          await onCreateTrip(tripName, tripMetadata, packingTemplate as PackingTemplate, customPackingItems)
         }
 
         // Reset form
@@ -775,16 +778,38 @@ export function TripCreationModal({ isOpen, onClose, onCreateTrip, onUpdateTrip,
             <label className="block text-sm font-medium text-neutral-700 mb-2">Packing List</label>
             <select
               value={packingTemplate}
-              onChange={(e) => setPackingTemplate(e.target.value as PackingTemplate)}
+              onChange={(e) => {
+                const value = e.target.value
+                setPackingTemplate(value)
+
+                // If it's a custom template ID, set the custom items
+                const customTemplate = customTemplates.find(t => t.id === value)
+                if (customTemplate) {
+                  setCustomPackingItems(customTemplate.items)
+                } else {
+                  setCustomPackingItems(undefined)
+                }
+              }}
               className="w-full px-4 py-2 rounded-lg border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
-              <option value="weekend">Weekend Trip</option>
-              <option value="week">Week-Long Trip</option>
-              <option value="ev_road_trip">EV Road Trip</option>
-              <option value="beach">Beach Vacation</option>
-              <option value="ski">Ski Trip</option>
-              <option value="business">Business Trip</option>
-              <option value="camping">Camping</option>
+              <optgroup label="Built-in Templates">
+                <option value="weekend">Weekend Trip</option>
+                <option value="week">Week-Long Trip</option>
+                <option value="ev_road_trip">EV Road Trip</option>
+                <option value="beach">Beach Vacation</option>
+                <option value="ski">Ski Trip</option>
+                <option value="business">Business Trip</option>
+                <option value="camping">Camping</option>
+              </optgroup>
+              {customTemplates.length > 0 && (
+                <optgroup label="Your Templates">
+                  {customTemplates.filter(t => !t.isDefault).map(template => (
+                    <option key={template.id} value={template.id}>
+                      {template.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </div>
 

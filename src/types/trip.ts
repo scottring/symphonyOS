@@ -326,7 +326,8 @@ export interface EVRouteResult {
   totalDuration: number // minutes (including charging time)
   drivingDuration: number // minutes (driving only)
   chargingDuration: number // minutes (charging only)
-  chargingStops: ChargingStop[]
+  chargingStops: ChargingStop[] // Required charging stops
+  availableStations?: ChargingStation[] // All charging stations along route (optional)
   legs: RouteLeg[]
 }
 

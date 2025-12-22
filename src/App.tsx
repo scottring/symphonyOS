@@ -30,6 +30,7 @@ import { LoadingFallback } from '@/components/layout/LoadingFallback'
 import { ListsList, ListView } from '@/components/list'
 import { NotesPage } from '@/components/notes'
 import { CompletedTasksView } from '@/components/history/CompletedTasksView'
+import { PackingTemplateManager } from '@/components/packing/PackingTemplateManager'
 import { Toast } from '@/components/toast'
 import { UndoToast } from '@/components/undo/UndoToast'
 import {
@@ -1427,6 +1428,10 @@ function App() {
             onUnpin={() => pinnedItems.unpin('routine', selectedRoutine.id)}
           />
         </Suspense>
+      )}
+
+      {activeView === 'packing-templates' && (
+        <PackingTemplateManager />
       )}
 
       {activeView === 'lists' && !selectedListId && (

@@ -55,7 +55,7 @@ export async function calculateEVRoute(params: EVRouteParams): Promise<EVRouteRe
   // Find all charging stations along the route
   const availableStations = await findChargersAlongRoute({
     routePoints,
-    searchRadiusMiles: 15,
+    searchRadiusMiles: 25, // Increased radius to find more fast chargers
     minPowerKW: 50, // Fast chargers only for road trips
     networks: preferredNetworks,
   })
@@ -83,6 +83,7 @@ export async function calculateEVRoute(params: EVRouteParams): Promise<EVRouteRe
     drivingDuration,
     chargingDuration,
     chargingStops,
+    availableStations, // Include all available stations along route
     legs,
   }
 }

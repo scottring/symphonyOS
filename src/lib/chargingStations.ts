@@ -5,82 +5,7 @@
  */
 
 import type { ChargingStation, ChargingNetwork } from '@/types/trip'
-
-// Open Charge Map API base URL
-const API_BASE_URL = 'https://api.openchargemap.io/v3/poi/'
-
-// ============================================================================
-// API Types (Open Charge Map response format)
-// ============================================================================
-
-interface OCMLocation {
-  ID: number
-  Title: string
-  AddressInfo: {
-    Title: string
-    AddressLine1: string
-    Town: string
-    StateOrProvince: string
-    Postcode: string
-    Country: {
-      Title: string
-    }
-    Latitude: number
-    Longitude: number
-    Distance: number // Distance from search origin in miles/km
-  }
-  Connections: Array<{
-    ID: number
-    ConnectionTypeID: number
-    StatusTypeID: number
-    LevelID: number
-    PowerKW: number
-    CurrentTypeID: number
-    Quantity: number
-  }>
-  OperatorInfo: {
-    ID: number
-    Title: string
-    WebsiteURL: string
-  }
-  StatusType: {
-    IsOperational: boolean
-    Title: string
-  }
-  NumberOfPoints: number
-}
-
-// ============================================================================
-// Network Mapping
-// ============================================================================
-
-// Map Open Charge Map operator IDs to our ChargingNetwork type
-const NETWORK_MAP: Record<number, ChargingNetwork> = {
-  1: 'Other', // Unknown
-  2: 'ChargePoint',
-  3: 'Blink',
-  23: 'Tesla Supercharger',
-  25: 'Electrify America',
-  35: 'EVgo',
-  // Add more as needed
-}
-
-function mapToChargingNetwork(operatorId: number, operatorTitle: string): ChargingNetwork {
-  // Check if we have a mapped network
-  if (NETWORK_MAP[operatorId]) {
-    return NETWORK_MAP[operatorId]
-  }
-
-  // Try to match by title
-  const title = operatorTitle.toLowerCase()
-  if (title.includes('tesla')) return 'Tesla Supercharger'
-  if (title.includes('electrify america')) return 'Electrify America'
-  if (title.includes('chargepoint')) return 'ChargePoint'
-  if (title.includes('evgo')) return 'EVgo'
-  if (title.includes('blink')) return 'Blink'
-
-  return 'Other'
-}
+import { supabase } from './supabase'
 
 // ============================================================================
 // API Functions
@@ -111,81 +36,67 @@ export async function findChargingStations(params: FindChargersParams): Promise<
   } = params
 
   try {
-    // Build query parameters
-    const queryParams = new URLSearchParams({
-      latitude: latitude.toString(),
-      longitude: longitude.toString(),
-      distance: radiusMiles.toString(),
-      distanceunit: 'Miles',
-      maxresults: maxResults.toString(),
-      compact: 'true',
-      verbose: 'false',
+    // Call our Supabase Edge Function to fetch stations (bypasses CORS)
+    const { data, error } = await supabase.functions.invoke('find-charging-stations', {
+      body: {
+        latitude,
+        longitude,
+        radiusMiles,
+        maxResults,
+        minPowerKW,
+      },
     })
 
-    // Add minimum power filter if specified
-    if (minPowerKW) {
-      queryParams.append('minpowerkw', minPowerKW.toString())
-    }
-
-    const url = `${API_BASE_URL}?${queryParams.toString()}`
-    const response = await fetch(url)
-
-    if (!response.ok) {
-      console.error('Open Charge Map API error:', response.status, response.statusText)
+    if (error) {
+      console.error('Error calling find-charging-stations function:', error)
       return []
     }
 
-    const data: OCMLocation[] = await response.json()
+    const stations: ChargingStation[] = data.stations || []
 
-    // Convert to our ChargingStation format and filter
-    const stations: ChargingStation[] = data
-      .filter((location) => {
-        // Filter operational status
-        if (operationalOnly && !location.StatusType?.IsOperational) {
+    // Log networks for debugging
+    if (stations.length > 0) {
+      const uniqueNetworks = [...new Set(stations.map(s => s.network))]
+      const operationalCount = stations.filter(s => s.available).length
+      console.log(`Received ${stations.length} stations (${operationalCount} operational) with networks:`, uniqueNetworks)
+      console.log(`Filtering by networks:`, networks)
+    }
+
+    // Apply client-side filters
+    const filtered = stations.filter((station) => {
+      // Filter operational status
+      if (operationalOnly && !station.available) {
+        return false
+      }
+
+      // Filter by network if specified
+      if (networks && networks.length > 0) {
+        if (!networks.includes(station.network)) {
           return false
         }
+      }
 
-        // Filter by network if specified
-        if (networks && networks.length > 0) {
-          const network = mapToChargingNetwork(
-            location.OperatorInfo?.ID || 0,
-            location.OperatorInfo?.Title || ''
-          )
-          if (!networks.includes(network)) {
-            return false
-          }
-        }
+      return true
+    })
 
-        return true
-      })
-      .map((location) => {
-        // Find the fastest charger at this location
-        const maxPower = Math.max(...(location.Connections?.map((c) => c.PowerKW || 0) || [0]))
+    // If network filter returned 0 results, fall back to showing all stations
+    // (user's preferred networks may not be available in this area)
+    if (networks && networks.length > 0 && filtered.length === 0 && stations.length > 0) {
+      console.log(`No stations match preferred networks. Trying all networks...`)
 
-        // Get connector types
-        const connectorTypes = location.Connections?.map((c) => `Type ${c.ConnectionTypeID}`) || []
+      // First try operational stations from all networks
+      const allOperational = stations.filter(station => station.available)
+      if (allOperational.length > 0) {
+        console.log(`Showing ${allOperational.length} operational stations from all networks.`)
+        return allOperational
+      }
 
-        return {
-          id: `ocm-${location.ID}`,
-          name: location.AddressInfo?.Title || location.Title || 'Unnamed Station',
-          location: {
-            name: location.AddressInfo?.Title || location.Title,
-            address: formatAddress(location.AddressInfo),
-            lat: location.AddressInfo?.Latitude,
-            lng: location.AddressInfo?.Longitude,
-          },
-          network: mapToChargingNetwork(
-            location.OperatorInfo?.ID || 0,
-            location.OperatorInfo?.Title || ''
-          ),
-          powerKW: maxPower,
-          connectorTypes,
-          available: location.StatusType?.IsOperational || false,
-          distance: location.AddressInfo?.Distance,
-        }
-      })
+      // If no operational stations, show all stations including non-operational
+      console.log(`No operational stations found. Showing all ${stations.length} stations (including non-operational).`)
+      return stations
+    }
 
-    return stations
+    return filtered
   } catch (error) {
     console.error('Error fetching charging stations:', error)
     return []
@@ -204,9 +115,18 @@ export async function findChargersAlongRoute(params: {
 }): Promise<ChargingStation[]> {
   const { routePoints, searchRadiusMiles = 10, minPowerKW, networks } = params
 
+  console.log('findChargersAlongRoute called:', {
+    routePointsCount: routePoints.length,
+    searchRadiusMiles,
+    minPowerKW,
+    networks,
+  })
+
   // Search at key points along the route (every N points to avoid too many API calls)
   const searchInterval = Math.max(1, Math.floor(routePoints.length / 5)) // Max 5 searches
   const searchPoints = routePoints.filter((_, index) => index % searchInterval === 0)
+
+  console.log(`Searching at ${searchPoints.length} points along route`)
 
   const allStations: ChargingStation[] = []
   const seenStationIds = new Set<string>()
@@ -221,6 +141,8 @@ export async function findChargersAlongRoute(params: {
       networks,
     })
 
+    console.log(`Found ${stations.length} stations at point (${point.lat}, ${point.lng})`)
+
     // Deduplicate stations
     for (const station of stations) {
       if (!seenStationIds.has(station.id)) {
@@ -230,6 +152,8 @@ export async function findChargersAlongRoute(params: {
     }
   }
 
+  console.log(`Total unique stations found: ${allStations.length}`)
+
   // Sort by distance if available
   return allStations.sort((a, b) => (a.distance || 0) - (b.distance || 0))
 }
@@ -237,19 +161,6 @@ export async function findChargersAlongRoute(params: {
 // ============================================================================
 // Helper Functions
 // ============================================================================
-
-function formatAddress(addressInfo: OCMLocation['AddressInfo']): string {
-  if (!addressInfo) return ''
-
-  const parts = [
-    addressInfo.AddressLine1,
-    addressInfo.Town,
-    addressInfo.StateOrProvince,
-    addressInfo.Postcode,
-  ].filter(Boolean)
-
-  return parts.join(', ')
-}
 
 /**
  * Calculate distance between two lat/lng points in miles
@@ -287,13 +198,11 @@ export function findClosestStation(
 ): ChargingStation | null {
   if (stations.length === 0) return null
 
-  let closest = stations[0]
-  let minDistance = calculateDistance(point, {
-    lat: closest.location.lat!,
-    lng: closest.location.lng!,
-  })
+  // Find first station with valid coordinates
+  let closest: ChargingStation | null = null
+  let minDistance = Infinity
 
-  for (const station of stations.slice(1)) {
+  for (const station of stations) {
     if (!station.location.lat || !station.location.lng) continue
 
     const distance = calculateDistance(point, {

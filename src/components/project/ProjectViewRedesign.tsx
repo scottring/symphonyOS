@@ -219,7 +219,7 @@ export function ProjectViewRedesign({
                 {onUpdateTripProject && (
                   <button
                     onClick={() => setShowEditTripModal(true)}
-                    className="p-2 text-neutral-300 hover:text-primary-600 rounded-lg transition-colors"
+                    className="p-2 text-neutral-500 hover:text-primary-600 rounded-lg transition-colors hover:bg-neutral-100"
                     aria-label="Edit trip details"
                     title="Edit trip details"
                   >
@@ -252,14 +252,17 @@ export function ProjectViewRedesign({
             </div>
 
             {/* Full-width Trip Itinerary */}
-            <TripItineraryView
-              tripMetadata={project.tripMetadata}
-              tasks={projectTasks}
-              onToggleTask={onToggleTask}
-              onUpdateTripMetadata={onUpdateTripProject}
-              projectId={project.id}
-              projectName={project.name}
-            />
+            {project.tripMetadata && (
+              <TripItineraryView
+                tripMetadata={project.tripMetadata}
+                tasks={projectTasks}
+                onToggleTask={onToggleTask}
+                onUpdateTripMetadata={onUpdateTripProject}
+                projectId={project.id}
+                projectName={project.name}
+                onEditEvent={() => setShowEditTripModal(true)}
+              />
+            )}
           </div>
         ) : (
           /* Two-column layout for regular projects */

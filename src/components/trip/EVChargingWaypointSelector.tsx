@@ -16,6 +16,7 @@ interface EVChargingWaypointSelectorProps {
 export function EVChargingWaypointSelector({ event, onClose, onSelectWaypoints }: EVChargingWaypointSelectorProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [chargingStops, setChargingStops] = useState<ChargingStation[]>([])
+  const [availableStations, setAvailableStations] = useState<ChargingStation[]>([])
   const [selectedStops, setSelectedStops] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
 
@@ -36,9 +37,25 @@ export function EVChargingWaypointSelector({ event, onClose, onSelectWaypoints }
           preferredNetworks: event.evVehicle.preferredNetworks,
         })
 
+        console.log('EV Route calculation result:', {
+          chargingStops: result.chargingStops?.length || 0,
+          availableStations: result.availableStations?.length || 0,
+        })
+
+        // Set required charging stops
         if (result.chargingStops) {
           const stations = result.chargingStops.map(stop => stop.station)
           setChargingStops(stations)
+          // Pre-select required stops
+          setSelectedStops(new Set(stations.map(s => s.id)))
+        }
+
+        // Set available stations (for optional selection when no charging needed)
+        if (result.availableStations) {
+          console.log('Setting available stations:', result.availableStations)
+          setAvailableStations(result.availableStations)
+        } else {
+          console.warn('No available stations returned from calculateEVRoute')
         }
       } catch (err) {
         console.error('Error calculating EV route:', err)
@@ -62,7 +79,9 @@ export function EVChargingWaypointSelector({ event, onClose, onSelectWaypoints }
   }
 
   const handleConfirm = () => {
-    const selected = chargingStops.filter(station => selectedStops.has(station.id))
+    // Use available stations if no required charging stops
+    const stationsToChooseFrom = chargingStops.length > 0 ? chargingStops : availableStations
+    const selected = stationsToChooseFrom.filter(station => selectedStops.has(station.id))
     onSelectWaypoints(selected)
   }
 
@@ -145,18 +164,110 @@ export function EVChargingWaypointSelector({ event, onClose, onSelectWaypoints }
               <p className="text-sm text-neutral-500">{error}</p>
             </div>
           ) : chargingStops.length === 0 ? (
-            <div className="py-12 text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4">
-                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
+            // No required charging, but show available stations
+            availableStations.length > 0 ? (
+              <>
+                <div className="mb-6 p-4 bg-green-50 border border-green-100 rounded-xl">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0">
+                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-green-900 mb-1">No charging required</p>
+                      <p className="text-xs text-green-700">
+                        Your vehicle has enough range for this trip. However, you can optionally add stops for extra margin, rest breaks, or convenience.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <h3 className="font-semibold text-neutral-900 mb-2">
+                    Available Charging Stops ({availableStations.length})
+                  </h3>
+                  <p className="text-sm text-neutral-500">
+                    Select charging stations you'd like to add to your itinerary
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  {availableStations.map((station, index) => {
+                    const isSelected = selectedStops.has(station.id)
+                    return (
+                      <label
+                        key={station.id}
+                        className={`
+                          block p-4 rounded-xl border-2 cursor-pointer transition-all
+                          ${isSelected
+                            ? 'border-green-500 bg-green-50'
+                            : 'border-neutral-200 hover:border-green-300 hover:bg-neutral-50'
+                          }
+                        `}
+                      >
+                        <div className="flex items-start gap-4">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleToggleStation(station.id)}
+                            className="mt-1 w-5 h-5 rounded border-neutral-300 text-green-600
+                                     focus:ring-2 focus:ring-green-500 focus:ring-offset-0 cursor-pointer"
+                          />
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-3 mb-2">
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-semibold text-neutral-900">{station.name}</span>
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-600">
+                                    Option {index + 1}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-neutral-600">
+                                  {station.location.name || station.location.address}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getNetworkColor(station.network)}`}>
+                                {station.network}
+                              </span>
+                              <span className="text-xs text-neutral-500">
+                                {station.powerKW}kW • {station.connectorTypes.join(', ')}
+                              </span>
+                              {station.distance && (
+                                <span className="text-xs text-neutral-500">
+                                  {Math.round(station.distance)} mi from route
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </label>
+                    )
+                  })}
+                </div>
+              </>
+            ) : (
+              // No available stations found
+              <div className="py-12 text-center">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4">
+                  <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <p className="text-neutral-700 font-medium mb-2">No charging needed</p>
+                <p className="text-sm text-neutral-500 mb-4">Your vehicle has enough range for this trip</p>
+                <button
+                  onClick={onClose}
+                  className="px-6 py-2.5 text-sm font-medium text-primary-600 hover:text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors"
+                >
+                  Continue Without Charging
+                </button>
               </div>
-              <p className="text-neutral-700 font-medium mb-2">No charging needed based on range</p>
-              <p className="text-sm text-neutral-500 mb-4">Your vehicle has enough range for this trip</p>
-              <p className="text-xs text-neutral-400">
-                However, you can still add charging stops to account for factors like cold weather, highway speeds, or extra margin.
-              </p>
-            </div>
+            )
           ) : (
             <>
               <div className="mb-6">
@@ -230,7 +341,7 @@ export function EVChargingWaypointSelector({ event, onClose, onSelectWaypoints }
         </div>
 
         {/* Footer */}
-        {!isLoading && !error && chargingStops.length > 0 && (
+        {!isLoading && !error && (chargingStops.length > 0 || availableStations.length > 0) && (
           <div className="border-t border-neutral-200 p-6 bg-neutral-50">
             <div className="flex items-center justify-between gap-4">
               <div className="text-sm text-neutral-600">

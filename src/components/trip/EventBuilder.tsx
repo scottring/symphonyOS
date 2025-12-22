@@ -4,10 +4,11 @@
  */
 
 import { useState, useCallback } from 'react'
-import type { TripEvent, TripEventType, Location } from '@/types/trip'
+import type { TripEvent, TripEventType, Location, DrivingEVEvent, ChargingStation, OtherEvent } from '@/types/trip'
 import type { PlaceAutocompleteResult } from '@/hooks/usePlaceAutocomplete'
 import { usePlaceAutocomplete } from '@/hooks/usePlaceAutocomplete'
 import { EV_VEHICLES } from '@/types/trip'
+import { EVChargingWaypointSelector } from './EVChargingWaypointSelector'
 
 interface EventBuilderProps {
   events: TripEvent[]
@@ -15,6 +16,7 @@ interface EventBuilderProps {
 }
 
 export function EventBuilder({ events, onChange }: EventBuilderProps) {
+  const [selectedEventForCharging, setSelectedEventForCharging] = useState<string | null>(null)
   const handleAddEvent = useCallback(() => {
     const newEvent: TripEvent = {
       id: crypto.randomUUID(),
@@ -61,6 +63,45 @@ export function EventBuilder({ events, onChange }: EventBuilderProps) {
     [events, onChange]
   )
 
+  // Handle adding charging waypoints to timeline
+  const handleSelectWaypoints = useCallback(
+    (waypoints: ChargingStation[], drivingEventId: string) => {
+      // Find the driving_ev event
+      const drivingEvent = events.find(e => e.id === drivingEventId) as DrivingEVEvent | undefined
+      if (!drivingEvent) {
+        console.error('Could not find driving event')
+        return
+      }
+
+      // Convert charging stations to OtherEvent trip events
+      const chargingEvents: OtherEvent[] = waypoints.map((station) => ({
+        id: crypto.randomUUID(),
+        eventType: 'other' as const,
+        description: `⚡ Charge at ${station.name}`,
+        location: station.location,
+        date: drivingEvent.date,
+        time: drivingEvent.time || '08:00',
+        notes: `${station.network} • ${station.powerKW}kW\n${station.connectorTypes.join(', ')}`
+      }))
+
+      // Insert charging events into timeline after the driving event
+      const updatedEvents: TripEvent[] = []
+      for (const event of events) {
+        updatedEvents.push(event)
+        if (event.id === drivingEventId) {
+          updatedEvents.push(...chargingEvents)
+        }
+      }
+
+      // Update events
+      onChange(updatedEvents)
+
+      // Close the modal
+      setSelectedEventForCharging(null)
+    },
+    [events, onChange]
+  )
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -87,6 +128,11 @@ export function EventBuilder({ events, onChange }: EventBuilderProps) {
             onRemove={() => handleRemoveEvent(event.id)}
             onMoveUp={() => handleMoveUp(index)}
             onMoveDown={() => handleMoveDown(index)}
+            onRequestCharging={
+              event.eventType === 'driving_ev'
+                ? () => setSelectedEventForCharging(event.id)
+                : undefined
+            }
           />
         ))}
       </div>
@@ -102,6 +148,15 @@ export function EventBuilder({ events, onChange }: EventBuilderProps) {
         </svg>
         Add Event
       </button>
+
+      {/* EV Charging Waypoint Selector Modal */}
+      {selectedEventForCharging && (
+        <EVChargingWaypointSelector
+          event={events.find(e => e.id === selectedEventForCharging) as DrivingEVEvent}
+          onClose={() => setSelectedEventForCharging(null)}
+          onSelectWaypoints={(waypoints) => handleSelectWaypoints(waypoints, selectedEventForCharging)}
+        />
+      )}
     </div>
   )
 }
@@ -118,9 +173,10 @@ interface EventCardProps {
   onRemove: () => void
   onMoveUp: () => void
   onMoveDown: () => void
+  onRequestCharging?: () => void
 }
 
-function EventCard({ event, index, totalEvents, onUpdate, onRemove, onMoveUp, onMoveDown }: EventCardProps) {
+function EventCard({ event, index, totalEvents, onUpdate, onRemove, onMoveUp, onMoveDown, onRequestCharging }: EventCardProps) {
   const [isExpanded, setIsExpanded] = useState(true)
 
   const eventTypeConfig = EVENT_TYPE_CONFIG[event.eventType]
@@ -258,6 +314,22 @@ function EventCard({ event, index, totalEvents, onUpdate, onRemove, onMoveUp, on
 
           {/* Event-specific fields */}
           <EventSpecificFields event={event} onUpdate={onUpdate} />
+
+          {/* EV Charging Button */}
+          {event.eventType === 'driving_ev' && onRequestCharging && (
+            <div>
+              <button
+                type="button"
+                onClick={onRequestCharging}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-green-700 bg-green-100 hover:bg-green-200 rounded-lg transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Plan Charging Stops
+              </button>
+            </div>
+          )}
 
           {/* Notes */}
           <div>

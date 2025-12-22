@@ -21,14 +21,15 @@ export interface GeneratedTripTasks {
 // ============================================================================
 
 /**
- * Generate packing list tasks from template
+ * Generate packing list tasks from template or custom items
  */
 export function generatePackingTasks(
   projectId: string,
   packingTemplate: PackingTemplate,
-  tripStartDate: string
+  tripStartDate: string,
+  customItems?: PackingItem[]
 ): Partial<Task>[] {
-  const packingItems = getPackingList(packingTemplate)
+  const packingItems = customItems || getPackingList(packingTemplate)
 
   // Schedule packing tasks for 2 days before trip
   const packByDate = new Date(tripStartDate)
@@ -385,9 +386,10 @@ export function generateAllTripTasks(
   packingTemplate: PackingTemplate,
   routeResult: EVRouteResult | null,
   tripStartDate: string,
-  tripMetadata?: TripMetadata
+  tripMetadata?: TripMetadata,
+  customPackingItems?: PackingItem[]
 ): GeneratedTripTasks {
-  const packingTasks = generatePackingTasks(projectId, packingTemplate, tripStartDate)
+  const packingTasks = generatePackingTasks(projectId, packingTemplate, tripStartDate, customPackingItems)
 
   // Unified timeline trip (new format)
   if (tripMetadata?.useUnifiedTimeline && tripMetadata.events) {

@@ -120,7 +120,7 @@ export function useProjects() {
   }, [user])
 
   const addTripProject = useCallback(
-    async (name: string, tripMetadata: TripMetadata, packingTemplate?: PackingTemplate) => {
+    async (name: string, tripMetadata: TripMetadata, packingTemplate?: PackingTemplate, customPackingItems?: import('@/types/trip').PackingItem[]) => {
       if (!user) return null
 
       // Create the project first
@@ -167,7 +167,8 @@ export function useProjects() {
         packingTemplate || 'weekend',
         routeResult,
         tripMetadata.startDate,
-        tripMetadata
+        tripMetadata,
+        customPackingItems
       )
 
       // Insert all tasks in bulk
@@ -236,7 +237,7 @@ export function useProjects() {
   }, [projects])
 
   const updateTripProject = useCallback(
-    async (projectId: string, name: string, tripMetadata: TripMetadata, packingTemplate?: PackingTemplate) => {
+    async (projectId: string, name: string, tripMetadata: TripMetadata, packingTemplate?: PackingTemplate, customPackingItems?: import('@/types/trip').PackingItem[]) => {
       const project = projects.find((p) => p.id === projectId)
       if (!project || !user) return
 
@@ -275,7 +276,8 @@ export function useProjects() {
         packingTemplate || 'weekend',
         null, // No route result for timeline trips
         tripMetadata.startDate,
-        tripMetadata
+        tripMetadata,
+        customPackingItems
       )
 
       // Insert regenerated tasks
