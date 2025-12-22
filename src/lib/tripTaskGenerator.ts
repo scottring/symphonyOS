@@ -4,7 +4,7 @@
  * Supports both simple trips and multi-segment trips
  */
 
-import type { PackingTemplate, EVRouteResult, TripMetadata, TripSegment, Accommodation, TransportationLogistic, TripEvent } from '@/types/trip'
+import type { PackingTemplate, PackingItem, EVRouteResult, TripMetadata, TripSegment, Accommodation, TransportationLogistic, TripEvent } from '@/types/trip'
 import type { Task } from '@/types/task'
 import { getPackingList } from './packingTemplates'
 

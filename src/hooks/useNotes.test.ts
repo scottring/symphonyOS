@@ -89,6 +89,19 @@ vi.mock('@/lib/supabase', () => ({
           }),
         }
       }
+      if (table === 'tasks') {
+        return {
+          select: () => ({
+            eq: () => ({
+              not: () => ({
+                neq: () => ({
+                  order: () => Promise.resolve({ data: [], error: null }),
+                }),
+              }),
+            }),
+          }),
+        }
+      }
       return {}
     },
   },

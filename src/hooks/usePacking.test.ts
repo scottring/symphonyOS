@@ -8,14 +8,12 @@ import type { PackingItem } from '@/types/trip'
 const mockSupabaseData: PackingTemplate[] = []
 
 // Create mock functions
-const mockSelect = vi.fn()
 const mockOrder = vi.fn()
 const mockInsert = vi.fn()
 const mockUpdate = vi.fn()
 const mockDelete = vi.fn()
 const mockSingle = vi.fn()
 const mockGetUser = vi.fn()
-const mockOn = vi.fn()
 const mockSubscribe = vi.fn()
 
 vi.mock('@/hooks/useAuth', () => ({
