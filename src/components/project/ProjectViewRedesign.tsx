@@ -5,11 +5,14 @@ import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
 import type { EventNote } from '@/hooks/useEventNotes'
 import type { Note, NoteEntityType } from '@/types/note'
+import type { TripMetadata } from '@/types/trip'
 import { formatTimeWithDate } from '@/lib/timeUtils'
 import { TaskQuickActions, type ScheduleContextItem } from '@/components/triage'
 import { calculateProjectStatus } from '@/hooks/useProjects'
 import { EntityNotesSection } from '@/components/notes/EntityNotesSection'
 import { UnifiedNotesEditor } from '@/components/notes/UnifiedNotesEditor'
+import { TripCreationModal } from '../trip/TripCreationModal'
+import { TripItineraryView } from '../trip/TripItineraryView'
 
 interface ProjectViewProps {
   project: Project
@@ -17,6 +20,7 @@ interface ProjectViewProps {
   contactsMap: Map<string, Contact>
   onBack: () => void
   onUpdateProject: (projectId: string, updates: Partial<Project>) => void
+  onUpdateTripProject?: (projectId: string, name: string, tripMetadata: TripMetadata) => Promise<void>
   onDeleteProject?: (projectId: string) => void
   onAddTask?: (title: string, projectId: string) => void
   onSelectTask: (taskId: string) => void
@@ -46,6 +50,7 @@ export function ProjectViewRedesign({
   contactsMap,
   onBack,
   onUpdateProject,
+  onUpdateTripProject,
   onDeleteProject,
   onAddTask,
   onSelectTask,
@@ -68,6 +73,7 @@ export function ProjectViewRedesign({
   const [editName, setEditName] = useState('')
   const [editStatus, setEditStatus] = useState<ProjectStatus>('not_started')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showEditTripModal, setShowEditTripModal] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [showStatusDropdown, setShowStatusDropdown] = useState(false)
 
@@ -162,12 +168,15 @@ export function ProjectViewRedesign({
     onUpdateProject(project.id, { notes: value || undefined })
   }, [project.id, onUpdateProject])
 
+  // Trip projects get a completely different, full-width layout
+  const isTripProject = project.type === 'trip' && project.tripMetadata
+
   return (
     <div className="h-full overflow-auto bg-[var(--color-bg-base)]">
       {/* Top accent */}
       <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-blue-50/50 to-transparent pointer-events-none" />
 
-      <div className="relative max-w-6xl mx-auto px-6 py-8">
+      <div className={`relative ${isTripProject ? 'max-w-full' : 'max-w-6xl'} mx-auto px-6 py-8`}>
         {/* Back button */}
         <button
           onClick={onBack}
@@ -185,8 +194,76 @@ export function ProjectViewRedesign({
           Back to projects
         </button>
 
-        {/* Two-column layout */}
-        <div className="flex gap-12 lg:gap-16">
+        {/* Conditional layout: Full-width for trips, Two-column for regular projects */}
+        {isTripProject ? (
+          /* Full-width Trip Layout */
+          <div>
+            {/* Condensed trip header */}
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h1 className="font-display text-3xl font-semibold text-neutral-900 leading-tight">
+                  {project.name}
+                </h1>
+                <div className="flex items-center gap-3 mt-2">
+                  <span className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full ${statusConfig[project.status].bg} ${statusConfig[project.status].color}`}>
+                    {statusConfig[project.status].label}
+                  </span>
+                  {totalCount > 0 && (
+                    <span className="text-sm text-neutral-500">
+                      {completedCount} of {totalCount} tasks complete
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {onUpdateTripProject && (
+                  <button
+                    onClick={() => setShowEditTripModal(true)}
+                    className="p-2 text-neutral-300 hover:text-primary-600 rounded-lg transition-colors"
+                    aria-label="Edit trip details"
+                    title="Edit trip details"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                    </svg>
+                  </button>
+                )}
+                <button
+                  onClick={handleEdit}
+                  className="p-2 text-neutral-300 hover:text-blue-600 rounded-lg transition-colors"
+                  aria-label="Edit project"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                  </svg>
+                </button>
+                {onDeleteProject && (
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="p-2 text-neutral-300 hover:text-red-500 rounded-lg transition-colors"
+                    aria-label="Delete project"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Full-width Trip Itinerary */}
+            <TripItineraryView
+              tripMetadata={project.tripMetadata}
+              tasks={projectTasks}
+              onToggleTask={onToggleTask}
+              onUpdateTripMetadata={onUpdateTripProject}
+              projectId={project.id}
+              projectName={project.name}
+            />
+          </div>
+        ) : (
+          /* Two-column layout for regular projects */
+          <div className="flex gap-12 lg:gap-16">
           {/* ========== MAIN COLUMN - Tasks ========== */}
           <div className="flex-1 min-w-0">
             {/* Project Header */}
@@ -219,6 +296,18 @@ export function ProjectViewRedesign({
 
               {/* Actions */}
               <div className="flex items-center gap-2 mt-4 ml-19">
+                {project.type === 'trip' && project.tripMetadata && onUpdateTripProject && (
+                  <button
+                    onClick={() => setShowEditTripModal(true)}
+                    className="p-2 text-neutral-300 hover:text-primary-600 rounded-lg transition-colors"
+                    aria-label="Edit trip details"
+                    title="Edit trip details"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                    </svg>
+                  </button>
+                )}
                 <button
                   onClick={handleEdit}
                   className="p-2 text-neutral-300 hover:text-blue-600 rounded-lg transition-colors"
@@ -337,158 +426,158 @@ export function ProjectViewRedesign({
               </div>
             )}
 
-            {/* ========== TASKS - The Centerpiece ========== */}
+            {/* ========== TASKS ========== */}
             <div className="mb-10">
-              <h2 className="font-display text-lg font-medium text-neutral-800 mb-5">Tasks</h2>
+                <h2 className="font-display text-lg font-medium text-neutral-800 mb-5">Tasks</h2>
 
-              {/* Add task */}
-              {onAddTask && (
-                <form onSubmit={handleAddTask} className="mb-6">
-                  <div className="flex items-center gap-4 py-3.5 px-4 -mx-4 rounded-xl border-2 border-dashed border-neutral-200
-                                  hover:border-neutral-300 focus-within:border-blue-400 focus-within:bg-white transition-all">
-                    <span className="w-6 h-6 rounded-lg border-2 border-dashed border-neutral-300 flex items-center justify-center flex-shrink-0">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-neutral-300" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                      </svg>
-                    </span>
-                    <input
-                      type="text"
-                      value={newTaskTitle}
-                      onChange={(e) => setNewTaskTitle(e.target.value)}
-                      placeholder="Add a task..."
-                      className="flex-1 bg-transparent text-base text-neutral-700 placeholder:text-neutral-400 focus:outline-none"
-                    />
-                    {newTaskTitle.trim() && (
-                      <button
-                        type="submit"
-                        className="px-4 py-2 text-sm font-medium bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                      >
-                        Add
-                      </button>
-                    )}
-                  </div>
-                </form>
-              )}
-
-              {/* Task list */}
-              {sortedTasks.length === 0 ? (
-                <div className="py-12 text-center">
-                  <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-neutral-100 mb-4">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
-                  </div>
-                  <p className="text-neutral-500 mb-1">No tasks yet</p>
-                  <p className="text-sm text-neutral-400">Add a task above to get started</p>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  {sortedTasks.map((task) => {
-                    const contactName = task.contactId ? contactsMap.get(task.contactId)?.name : undefined
-                    const isSelected = selectedTaskId === `task-${task.id}`
-
-                    return (
-                      <div
-                        key={task.id}
-                        onClick={() => onSelectTask(`task-${task.id}`)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault()
-                            onSelectTask(`task-${task.id}`)
-                          }
-                        }}
-                        className={`
-                          flex items-center gap-4 py-3.5 px-4 -mx-4 rounded-xl cursor-pointer
-                          transition-all duration-150
-                          ${isSelected
-                            ? 'bg-blue-50/70 ring-1 ring-blue-200'
-                            : 'hover:bg-white/60'
-                          }
-                          ${task.completed ? 'opacity-60' : ''}
-                        `}
-                      >
-                        {/* Checkbox */}
+                {/* Add task */}
+                {onAddTask && (
+                  <form onSubmit={handleAddTask} className="mb-6">
+                    <div className="flex items-center gap-4 py-3.5 px-4 -mx-4 rounded-xl border-2 border-dashed border-neutral-200
+                                    hover:border-neutral-300 focus-within:border-blue-400 focus-within:bg-white transition-all">
+                      <span className="w-6 h-6 rounded-lg border-2 border-dashed border-neutral-300 flex items-center justify-center flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-neutral-300" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                        </svg>
+                      </span>
+                      <input
+                        type="text"
+                        value={newTaskTitle}
+                        onChange={(e) => setNewTaskTitle(e.target.value)}
+                        placeholder="Add a task..."
+                        className="flex-1 bg-transparent text-base text-neutral-700 placeholder:text-neutral-400 focus:outline-none"
+                      />
+                      {newTaskTitle.trim() && (
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            onToggleTask(task.id)
-                          }}
-                          className="flex-shrink-0"
-                          aria-label={task.completed ? 'Mark incomplete' : 'Mark complete'}
+                          type="submit"
+                          className="px-4 py-2 text-sm font-medium bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
                         >
-                          <span
-                            className={`
-                              w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all
-                              ${task.completed
-                                ? 'bg-blue-500 border-blue-500 text-white'
-                                : 'border-neutral-300 hover:border-blue-400'
-                              }
-                            `}
-                          >
-                            {task.completed && (
-                              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                              </svg>
-                            )}
-                          </span>
+                          Add
                         </button>
+                      )}
+                    </div>
+                  </form>
+                )}
 
-                        {/* Title */}
-                        <div className="flex-1 min-w-0 flex items-center gap-2">
-                          <span className={`text-base truncate ${task.completed ? 'line-through text-neutral-400' : 'text-neutral-800'}`}>
-                            {task.title}
-                          </span>
-                          {contactName && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-xs font-medium shrink-0">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                              </svg>
-                              {contactName}
+                {/* Task list */}
+                {sortedTasks.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-neutral-100 mb-4">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                    </div>
+                    <p className="text-neutral-500 mb-1">No tasks yet</p>
+                    <p className="text-sm text-neutral-400">Add a task above to get started</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {sortedTasks.map((task) => {
+                      const contactName = task.contactId ? contactsMap.get(task.contactId)?.name : undefined
+                      const isSelected = selectedTaskId === `task-${task.id}`
+
+                      return (
+                        <div
+                          key={task.id}
+                          onClick={() => onSelectTask(`task-${task.id}`)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              onSelectTask(`task-${task.id}`)
+                            }
+                          }}
+                          className={`
+                            flex items-center gap-4 py-3.5 px-4 -mx-4 rounded-xl cursor-pointer
+                            transition-all duration-150
+                            ${isSelected
+                              ? 'bg-blue-50/70 ring-1 ring-blue-200'
+                              : 'hover:bg-white/60'
+                            }
+                            ${task.completed ? 'opacity-60' : ''}
+                          `}
+                        >
+                          {/* Checkbox */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onToggleTask(task.id)
+                            }}
+                            className="flex-shrink-0"
+                            aria-label={task.completed ? 'Mark incomplete' : 'Mark complete'}
+                          >
+                            <span
+                              className={`
+                                w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all
+                                ${task.completed
+                                  ? 'bg-blue-500 border-blue-500 text-white'
+                                  : 'border-neutral-300 hover:border-blue-400'
+                                }
+                              `}
+                            >
+                              {task.completed && (
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </span>
+                          </button>
+
+                          {/* Title */}
+                          <div className="flex-1 min-w-0 flex items-center gap-2">
+                            <span className={`text-base truncate ${task.completed ? 'line-through text-neutral-400' : 'text-neutral-800'}`}>
+                              {task.title}
+                            </span>
+                            {contactName && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-xs font-medium shrink-0">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                                </svg>
+                                {contactName}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Date badge */}
+                          {task.scheduledFor && (
+                            <span className="text-xs text-neutral-400 font-medium shrink-0">
+                              {formatTaskDate(task.scheduledFor, task.isAllDay)}
                             </span>
                           )}
+
+                          {/* Quick Actions */}
+                          {onUpdateTask && (
+                            <TaskQuickActions
+                              task={task}
+                              onSchedule={(date, isAllDay) => {
+                                onUpdateTask(task.id, {
+                                  scheduledFor: date,
+                                  isAllDay,
+                                })
+                              }}
+                              getScheduleItemsForDate={getScheduleItemsForDate}
+                              onContextChange={(context) => {
+                                onUpdateTask(task.id, { context })
+                              }}
+                              familyMembers={familyMembers}
+                              onAssign={(memberId) => {
+                                onUpdateTask(task.id, { assignedTo: memberId ?? undefined })
+                              }}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity"
+                            />
+                          )}
+
+                          {/* Arrow */}
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-neutral-300 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                          </svg>
                         </div>
-
-                        {/* Date badge */}
-                        {task.scheduledFor && (
-                          <span className="text-xs text-neutral-400 font-medium shrink-0">
-                            {formatTaskDate(task.scheduledFor, task.isAllDay)}
-                          </span>
-                        )}
-
-                        {/* Quick Actions */}
-                        {onUpdateTask && (
-                          <TaskQuickActions
-                            task={task}
-                            onSchedule={(date, isAllDay) => {
-                              onUpdateTask(task.id, {
-                                scheduledFor: date,
-                                isAllDay,
-                              })
-                            }}
-                            getScheduleItemsForDate={getScheduleItemsForDate}
-                            onContextChange={(context) => {
-                              onUpdateTask(task.id, { context })
-                            }}
-                            familyMembers={familyMembers}
-                            onAssign={(memberId) => {
-                              onUpdateTask(task.id, { assignedTo: memberId ?? undefined })
-                            }}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          />
-                        )}
-
-                        {/* Arrow */}
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-neutral-300 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
 
             {/* Notes - Inline */}
             <div className="pt-8 border-t border-neutral-200/60">
@@ -656,7 +745,19 @@ export function ProjectViewRedesign({
             </div>
           </aside>
         </div>
+        )}
       </div>
+
+      {/* Trip Edit Modal */}
+      {onUpdateTripProject && project.type === 'trip' && project.tripMetadata && (
+        <TripCreationModal
+          isOpen={showEditTripModal}
+          onClose={() => setShowEditTripModal(false)}
+          onCreateTrip={async () => null} // Not used in edit mode
+          onUpdateTrip={onUpdateTripProject}
+          existingProject={project}
+        />
+      )}
     </div>
   )
 }

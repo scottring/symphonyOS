@@ -66,7 +66,7 @@ function App() {
   const [onboardingLoading, setOnboardingLoading] = useState(true)
   const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, updateEventAssignmentAll, updateRecipeUrl, updateEventProject, getNote, getEventNotesForProject, notes: eventNotesMap } = useEventNotes()
   const { contacts, contactsMap, addContact, updateContact, deleteContact, searchContacts } = useContacts()
-  const { projects, projectsMap, addProject, updateProject, deleteProject, searchProjects, recalculateProjectStatus } = useProjects()
+  const { projects, projectsMap, addProject, addTripProject, updateProject, updateTripProject, deleteProject, searchProjects, recalculateProjectStatus } = useProjects()
   const {
     routines: allRoutines,
     activeRoutines,
@@ -1336,6 +1336,7 @@ function App() {
             tasks={tasks}
             onSelectProject={setSelectedProjectId}
             onAddProject={addProject}
+            onAddTrip={addTripProject}
           />
         </Suspense>
       )}
@@ -1348,6 +1349,7 @@ function App() {
             contactsMap={contactsMap}
             onBack={() => setSelectedProjectId(null)}
             onUpdateProject={handleUpdateProject}
+            onUpdateTripProject={updateTripProject}
             onDeleteProject={deleteProject}
             onAddTask={(title, projectId) => addTask(title, undefined, projectId, undefined, { assignedTo: getCurrentUserMember()?.id })}
             onSelectTask={handleSelectItem}

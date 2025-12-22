@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react'
 import type { Project, ProjectStatus } from '@/types/project'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
+import type { TripMetadata } from '@/types/trip'
 import { PinButton } from '@/components/pins'
 import { formatTimeWithDate } from '@/lib/timeUtils'
+import { TripCreationModal } from '../trip/TripCreationModal'
 
 interface ProjectViewProps {
   project: Project
@@ -11,6 +13,7 @@ interface ProjectViewProps {
   contactsMap: Map<string, Contact>
   onBack: () => void
   onUpdateProject: (projectId: string, updates: Partial<Project>) => void
+  onUpdateTripProject?: (projectId: string, name: string, tripMetadata: TripMetadata) => Promise<void>
   onDeleteProject?: (projectId: string) => void
   onAddTask?: (title: string, projectId: string) => void
   onSelectTask: (taskId: string) => void
@@ -29,6 +32,7 @@ export function ProjectView({
   contactsMap,
   onBack,
   onUpdateProject,
+  onUpdateTripProject,
   onDeleteProject,
   onAddTask,
   onSelectTask,
@@ -44,6 +48,7 @@ export function ProjectView({
   const [editStatus, setEditStatus] = useState<ProjectStatus>('not_started')
   const [editNotes, setEditNotes] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showEditTripModal, setShowEditTripModal] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
 
   // Filter tasks for this project
@@ -297,6 +302,18 @@ export function ProjectView({
                     size="md"
                   />
                 )}
+                {project.type === 'trip' && project.tripMetadata && onUpdateTripProject && (
+                  <button
+                    onClick={() => setShowEditTripModal(true)}
+                    className="p-2 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                    aria-label="Edit trip details"
+                    title="Edit trip details"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                    </svg>
+                  </button>
+                )}
                 <button
                   onClick={handleEdit}
                   className="p-2 text-neutral-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -504,6 +521,17 @@ export function ProjectView({
           )}
         </div>
       </div>
+
+      {/* Trip Edit Modal */}
+      {onUpdateTripProject && project.type === 'trip' && project.tripMetadata && (
+        <TripCreationModal
+          isOpen={showEditTripModal}
+          onClose={() => setShowEditTripModal(false)}
+          onCreateTrip={async () => null} // Not used in edit mode
+          onUpdateTrip={onUpdateTripProject}
+          existingProject={project}
+        />
+      )}
     </div>
   )
 }

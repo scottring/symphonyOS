@@ -1,12 +1,15 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import type { Project } from '@/types/project'
 import type { Task } from '@/types/task'
+import type { TripMetadata, PackingTemplate } from '@/types/trip'
+import { TripCreationModal } from '../trip/TripCreationModal'
 
 interface ProjectsListProps {
   projects: Project[]
   tasks?: Task[]
   onSelectProject: (projectId: string) => void
   onAddProject?: (project: { name: string }) => Promise<Project | null>
+  onAddTrip?: (name: string, tripMetadata: TripMetadata, packingTemplate?: PackingTemplate) => Promise<Project | null>
 }
 
 interface ProjectWithStats extends Project {
@@ -50,11 +53,12 @@ function SectionHeader({ title, count, collapsed, onToggle }: SectionHeaderProps
   )
 }
 
-export function ProjectsListRedesign({ projects, tasks = [], onSelectProject, onAddProject }: ProjectsListProps) {
+export function ProjectsListRedesign({ projects, tasks = [], onSelectProject, onAddProject, onAddTrip }: ProjectsListProps) {
   const [isCreating, setIsCreating] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [completedExpanded, setCompletedExpanded] = useState(false)
+  const [showTripModal, setShowTripModal] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -205,18 +209,35 @@ export function ProjectsListRedesign({ projects, tasks = [], onSelectProject, on
             </p>
           </div>
 
-          {onAddProject && !isCreating && (
-            <button
-              onClick={() => setIsCreating(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-blue-500 text-white rounded-xl font-medium
-                         hover:bg-blue-600 active:bg-blue-700 transition-colors shadow-sm
-                         hover:shadow-md"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-              </svg>
-              New Project
-            </button>
+          {!isCreating && (
+            <div className="flex gap-2">
+              {onAddTrip && (
+                <button
+                  onClick={() => setShowTripModal(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-medium
+                             hover:from-primary-600 hover:to-primary-700 active:from-primary-700 active:to-primary-800 transition-all shadow-sm
+                             hover:shadow-md"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                  </svg>
+                  New Trip
+                </button>
+              )}
+              {onAddProject && (
+                <button
+                  onClick={() => setIsCreating(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-blue-500 text-white rounded-xl font-medium
+                             hover:bg-blue-600 active:bg-blue-700 transition-colors shadow-sm
+                             hover:shadow-md"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                  </svg>
+                  New Project
+                </button>
+              )}
+            </div>
           )}
         </div>
 
@@ -334,6 +355,15 @@ export function ProjectsListRedesign({ projects, tasks = [], onSelectProject, on
           </div>
         )}
       </div>
+
+      {/* Trip Creation Modal */}
+      {onAddTrip && (
+        <TripCreationModal
+          isOpen={showTripModal}
+          onClose={() => setShowTripModal(false)}
+          onCreateTrip={onAddTrip}
+        />
+      )}
     </div>
   )
 }

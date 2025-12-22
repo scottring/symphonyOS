@@ -1,7 +1,7 @@
 import type { DisplayNote, NoteTopic } from '@/types/note'
 import { noteTypeColors } from '@/types/note'
 import { formatRelativeTime } from '@/lib/timeUtils'
-import { stripHtml, htmlToPlainText } from '@/lib/htmlUtils'
+import { htmlToPlainText } from '@/lib/htmlUtils'
 
 interface NoteCardProps {
   note: DisplayNote
