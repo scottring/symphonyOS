@@ -14,7 +14,7 @@ export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerP
   const [isOpen, setIsOpen] = useState(false)
   const [step, setStep] = useState<Step>('day')
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 })
+  const [dropdownPosition, setDropdownPosition] = useState<{ top?: number; bottom?: number; right: number }>({ top: 0, right: 0 })
   const buttonRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -22,10 +22,28 @@ export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerP
   useEffect(() => {
     if (isOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect()
-      setDropdownPosition({
-        top: rect.bottom + 4,
-        right: window.innerWidth - rect.right,
-      })
+
+      // Estimate dropdown height (approximately 250px for day picker, more for time picker)
+      const estimatedHeight = 250
+      const spaceBelow = window.innerHeight - rect.bottom
+      const spaceAbove = rect.top
+
+      // Position above if not enough space below and more space above
+      const shouldPositionAbove = spaceBelow < estimatedHeight && spaceAbove > spaceBelow
+
+      if (shouldPositionAbove) {
+        // Position above: use bottom to anchor to viewport bottom
+        setDropdownPosition({
+          bottom: window.innerHeight - rect.top + 4,
+          right: window.innerWidth - rect.right,
+        })
+      } else {
+        // Position below: use top
+        setDropdownPosition({
+          top: rect.bottom + 4,
+          right: window.innerWidth - rect.right,
+        })
+      }
     }
   }, [isOpen])
 
@@ -146,8 +164,11 @@ export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerP
       {isOpen && createPortal(
         <div
           ref={dropdownRef}
-          className="fixed z-[100] bg-white rounded-xl border border-neutral-200 shadow-lg p-2 min-w-[160px]"
-          style={{ top: dropdownPosition.top, right: dropdownPosition.right }}
+          className="fixed z-[100] bg-white rounded-xl border border-neutral-200 shadow-lg p-2 min-w-[160px] max-h-[90vh] overflow-y-auto"
+          style={{
+            ...(dropdownPosition.top !== undefined ? { top: dropdownPosition.top } : { bottom: dropdownPosition.bottom }),
+            right: dropdownPosition.right
+          }}
           onMouseDown={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}

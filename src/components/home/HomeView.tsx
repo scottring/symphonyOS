@@ -278,14 +278,10 @@ export function HomeView({
       {/* Header controls - floating in upper right on desktop only */}
       {!isMobile && (
         <div className="absolute top-4 right-6 z-20 flex items-center gap-3">
-          {/* Unified view switcher (Today/Week) with assignee filter */}
+          {/* View switcher (Day/Week) */}
           <HomeViewSwitcher
             currentView={currentView}
             onViewChange={handleViewChange}
-            selectedAssignees={selectedAssignees}
-            onSelectAssignees={setSelectedAssignees}
-            assigneesWithTasks={familyMembers}
-            hasUnassignedTasks={hasUnassignedTasks}
           />
         </div>
       )}

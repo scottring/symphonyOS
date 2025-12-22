@@ -14,7 +14,7 @@ export function DeferPicker({ deferredUntil, deferCount, onDefer }: DeferPickerP
   const containerRef = useRef<HTMLDivElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 })
+  const [dropdownPosition, setDropdownPosition] = useState<{ top?: number; bottom?: number; left: number }>({ top: 0, left: 0 })
 
   // Close on outside click - check both container and dropdown refs
   useEffect(() => {
@@ -45,10 +45,28 @@ export function DeferPicker({ deferredUntil, deferCount, onDefer }: DeferPickerP
   useEffect(() => {
     if (isOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect()
-      setDropdownPosition({
-        top: rect.bottom + 4,
-        left: rect.right - 160, // Align right edge (160px is min-width)
-      })
+
+      // Estimate dropdown height (approximately 350px for full grid view)
+      const estimatedHeight = 350
+      const spaceBelow = window.innerHeight - rect.bottom
+      const spaceAbove = rect.top
+
+      // Position above if not enough space below and more space above
+      const shouldPositionAbove = spaceBelow < estimatedHeight && spaceAbove > spaceBelow
+
+      if (shouldPositionAbove) {
+        // Position above: use bottom to anchor to viewport bottom
+        setDropdownPosition({
+          bottom: window.innerHeight - rect.top + 4,
+          left: rect.right - 160, // Align right edge (160px is min-width)
+        })
+      } else {
+        // Position below: use top
+        setDropdownPosition({
+          top: rect.bottom + 4,
+          left: rect.right - 160, // Align right edge (160px is min-width)
+        })
+      }
     }
   }, [isOpen])
 
@@ -138,8 +156,11 @@ export function DeferPicker({ deferredUntil, deferCount, onDefer }: DeferPickerP
       {isOpen && createPortal(
         <div
           ref={dropdownRef}
-          className="fixed z-[100] bg-white rounded-xl border border-neutral-200 shadow-lg p-2 min-w-[160px]"
-          style={{ top: dropdownPosition.top, left: dropdownPosition.left }}
+          className="fixed z-[100] bg-white rounded-xl border border-neutral-200 shadow-lg p-2 min-w-[160px] max-h-[90vh] overflow-y-auto"
+          style={{
+            ...(dropdownPosition.top !== undefined ? { top: dropdownPosition.top } : { bottom: dropdownPosition.bottom }),
+            left: dropdownPosition.left
+          }}
           onMouseDown={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}

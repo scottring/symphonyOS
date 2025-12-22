@@ -1,15 +1,8 @@
 import type { HomeViewType } from '@/types/homeView'
-import type { FamilyMember } from '@/types/family'
-import { AssigneeFilter } from './AssigneeFilter'
 
 interface HomeViewSwitcherProps {
   currentView: HomeViewType
   onViewChange: (view: HomeViewType) => void
-  // Assignee filter props - now multi-select
-  selectedAssignees?: string[]
-  onSelectAssignees?: (ids: string[]) => void
-  assigneesWithTasks?: FamilyMember[]
-  hasUnassignedTasks?: boolean
 }
 
 const views: { value: HomeViewType; label: string }[] = [
@@ -20,13 +13,7 @@ const views: { value: HomeViewType; label: string }[] = [
 export function HomeViewSwitcher({
   currentView,
   onViewChange,
-  selectedAssignees = [],
-  onSelectAssignees,
-  assigneesWithTasks = [],
-  hasUnassignedTasks = false,
 }: HomeViewSwitcherProps) {
-  const showFilter = onSelectAssignees && (assigneesWithTasks.length > 0 || hasUnassignedTasks)
-
   return (
     <div className="inline-flex items-center gap-2">
       {/* Segmented control for Day/Week */}
@@ -54,15 +41,6 @@ export function HomeViewSwitcher({
           )
         })}
       </div>
-      {/* Assignee Filter - multi-select */}
-      {showFilter && (
-        <AssigneeFilter
-          selectedAssignees={selectedAssignees}
-          onSelectAssignees={onSelectAssignees!}
-          assigneesWithTasks={assigneesWithTasks}
-          hasUnassignedTasks={hasUnassignedTasks}
-        />
-      )}
     </div>
   )
 }

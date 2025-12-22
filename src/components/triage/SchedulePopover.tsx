@@ -170,7 +170,7 @@ export function SchedulePopover({
   const dropdownRef = useRef<HTMLDivElement>(null)
   const customTimeInputRef = useRef<HTMLInputElement>(null)
   const triggerRef = useRef<HTMLButtonElement | HTMLDivElement>(null)
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 })
+  const [dropdownPosition, setDropdownPosition] = useState<{ top?: number; bottom?: number; left: number }>({ top: 0, left: 0 })
 
   // Close on outside click - check both container and dropdown refs
   useEffect(() => {
@@ -203,10 +203,28 @@ export function SchedulePopover({
   useEffect(() => {
     if (isOpen && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect()
-      setDropdownPosition({
-        top: rect.bottom + 8,
-        left: Math.max(8, rect.left), // Ensure it doesn't go off-screen left
-      })
+
+      // Estimate dropdown height (approximately 400px for schedule view with context)
+      const estimatedHeight = 450
+      const spaceBelow = window.innerHeight - rect.bottom
+      const spaceAbove = rect.top
+
+      // Position above if not enough space below and more space above
+      const shouldPositionAbove = spaceBelow < estimatedHeight && spaceAbove > spaceBelow
+
+      if (shouldPositionAbove) {
+        // Position above: use bottom to anchor to viewport bottom
+        setDropdownPosition({
+          bottom: window.innerHeight - rect.top + 8,
+          left: Math.max(8, Math.min(rect.left, window.innerWidth - 280 - 8)),
+        })
+      } else {
+        // Position below: use top
+        setDropdownPosition({
+          top: rect.bottom + 8,
+          left: Math.max(8, Math.min(rect.left, window.innerWidth - 280 - 8)),
+        })
+      }
     }
   }, [isOpen])
 
@@ -343,9 +361,9 @@ export function SchedulePopover({
       {isOpen && (
         <div
           ref={dropdownRef}
-          className="fixed z-[100] animate-fade-in-scale"
+          className="fixed z-[100] animate-fade-in-scale max-h-[90vh] overflow-y-auto"
           style={{
-            top: dropdownPosition.top,
+            ...(dropdownPosition.top !== undefined ? { top: dropdownPosition.top } : { bottom: dropdownPosition.bottom }),
             left: dropdownPosition.left,
             background: 'linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(44 50% 99%) 100%)',
             borderRadius: 'var(--radius-xl)',
