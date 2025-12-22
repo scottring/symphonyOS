@@ -8,6 +8,7 @@ import { parseRoutine, parsedRoutineToDb, isValidParsedRoutine } from '@/lib/par
 import { SemanticRoutine } from './SemanticRoutine'
 import { PinButton } from '@/components/pins'
 import { TiptapEditor } from '@/components/notes/TiptapEditor'
+import { TIME_INPUT_LARGE_CLASS } from '@/lib/inputStyles'
 
 interface RoutineFormProps {
   routine: Routine
@@ -295,10 +296,10 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
                 </label>
                 <input
                   type="time"
+                  step="300"
                   value={timeOfDay}
                   onChange={(e) => setTimeOfDay(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-neutral-200 bg-white
-                             text-neutral-800 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  className={`w-full text-neutral-800 ${TIME_INPUT_LARGE_CLASS}`}
                 />
                 {timeOfDay && (
                   <button

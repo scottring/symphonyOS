@@ -1,6 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowRightToLine } from 'lucide-react'
+import {
+  getHoursFromNow,
+  getThisEvening,
+  isBeforeEvening,
+  parseDateInput,
+} from '@/lib/dateHelpers'
+import { DATE_INPUT_CLASS } from '@/lib/inputStyles'
 
 interface PushDropdownProps {
   onPush: (date: Date) => void
@@ -64,24 +71,6 @@ export function PushDropdown({ onPush, size = 'md', showTodayOption = false }: P
     return date
   }
 
-  const getHoursFromNow = (hours: number) => {
-    const date = new Date()
-    date.setHours(date.getHours() + hours)
-    date.setMinutes(Math.ceil(date.getMinutes() / 30) * 30, 0, 0)
-    return date
-  }
-
-  const getThisEvening = () => {
-    const date = new Date()
-    date.setHours(18, 0, 0, 0) // 6pm
-    return date
-  }
-
-  const isBeforeEvening = () => {
-    const now = new Date()
-    return now.getHours() < 18
-  }
-
   const handlePush = (date: Date) => {
     onPush(date)
     setIsOpen(false)
@@ -89,9 +78,8 @@ export function PushDropdown({ onPush, size = 'md', showTodayOption = false }: P
   }
 
   const handleDateInputChange = (dateString: string) => {
-    if (dateString) {
-      const [year, month, day] = dateString.split('-').map(Number)
-      const newDate = new Date(year, month - 1, day, 0, 0, 0)
+    const newDate = parseDateInput(dateString)
+    if (newDate) {
       handlePush(newDate)
     }
   }
@@ -184,8 +172,7 @@ export function PushDropdown({ onPush, size = 'md', showTodayOption = false }: P
                 autoFocus
                 min={new Date().toISOString().split('T')[0]}
                 onChange={(e) => handleDateInputChange(e.target.value)}
-                className="w-full px-2 py-1.5 text-sm rounded-lg border border-neutral-200
-                           focus:outline-none focus:ring-2 focus:ring-amber-500"
+                className={`w-full ${DATE_INPUT_CLASS}`}
               />
             </div>
           )}

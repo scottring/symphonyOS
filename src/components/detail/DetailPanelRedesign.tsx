@@ -283,6 +283,7 @@ function AddLinkedTaskInput({
           />
           <input
             type="time"
+            step="300"
             value={scheduledTime}
             onChange={(e) => setScheduledTime(e.target.value)}
             placeholder="Time"
@@ -2465,6 +2466,7 @@ export function DetailPanelRedesign({
                 <label className="text-sm font-medium text-neutral-500 mb-2 block">Time</label>
                 <input
                   type="time"
+                  step="300"
                   value={item.originalTask?.scheduledFor
                     ? `${item.originalTask.scheduledFor.getHours().toString().padStart(2, '0')}:${item.originalTask.scheduledFor.getMinutes().toString().padStart(2, '0')}`
                     : ''}

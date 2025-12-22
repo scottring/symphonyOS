@@ -8,10 +8,12 @@ import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
 import { useHomeView } from '@/hooks/useHomeView'
 import { useMobile } from '@/hooks/useMobile'
+import { useUndo } from '@/hooks/useUndo'
 import { HomeViewSwitcher } from './HomeViewSwitcher'
 import { WeekView } from './WeekView'
 import { CascadingRiverView } from './CascadingRiverView'
 import { TodaySchedule } from '@/components/schedule/TodaySchedule'
+import { UndoToast } from '@/components/undo/UndoToast'
 
 interface HomeViewProps {
   tasks: Task[]
@@ -100,6 +102,7 @@ export function HomeView({
 }: HomeViewProps) {
   const { currentView, setCurrentView } = useHomeView()
   const isMobile = useMobile()
+  const { currentAction, pushAction, executeUndo, dismiss } = useUndo({ duration: 5000 })
 
   // Assignee filter state - now supports multi-select
   // Empty array = "All", single id = single filter, multiple ids = river view
@@ -170,6 +173,56 @@ export function HomeView({
     setCurrentView('today')
   }
 
+  // Wrap callbacks with undo functionality
+  const handleToggleTaskWithUndo = useCallback((taskId: string) => {
+    const task = tasks.find(t => t.id === taskId)
+    if (!task) return
+
+    const wasCompleted = task.completed
+    onToggleTask(taskId)
+
+    pushAction(
+      wasCompleted ? 'Task marked incomplete' : 'Task completed',
+      () => onToggleTask(taskId)
+    )
+  }, [tasks, onToggleTask, pushAction])
+
+  const handleDeleteTaskWithUndo = useCallback((taskId: string) => {
+    if (!onDeleteTask) return
+
+    const task = tasks.find(t => t.id === taskId)
+    if (!task) return
+
+    onDeleteTask(taskId)
+    pushAction(
+      `Deleted "${task.title}"`,
+      () => {
+        // Note: This would require an onRestoreTask callback
+        // For now, just show the message
+      }
+    )
+  }, [tasks, onDeleteTask, pushAction])
+
+  const handleCompleteRoutineWithUndo = useCallback((routineId: string, completed: boolean) => {
+    if (!onCompleteRoutine) return
+
+    onCompleteRoutine(routineId, completed)
+    pushAction(
+      completed ? 'Routine completed' : 'Routine marked incomplete',
+      () => onCompleteRoutine(routineId, !completed)
+    )
+  }, [onCompleteRoutine, pushAction])
+
+  const handleCompleteEventWithUndo = useCallback((eventId: string, completed: boolean) => {
+    if (!onCompleteEvent) return
+
+    onCompleteEvent(eventId, completed)
+    pushAction(
+      completed ? 'Event completed' : 'Event marked incomplete',
+      () => onCompleteEvent(eventId, !completed)
+    )
+  }, [onCompleteEvent, pushAction])
+
   // Render the appropriate view
   const renderContent = () => {
     if (currentView === 'week') {
@@ -198,10 +251,10 @@ export function HomeView({
           dateInstances={dateInstances}
           selectedItemId={selectedItemId}
           onSelectItem={onSelectItem}
-          onToggleTask={onToggleTask}
+          onToggleTask={handleToggleTaskWithUndo}
           onUpdateTask={onUpdateTask}
           onPushTask={onPushTask}
-          onDeleteTask={onDeleteTask}
+          onDeleteTask={handleDeleteTaskWithUndo}
           viewedDate={viewedDate}
           onDateChange={onDateChange}
           contactsMap={contactsMap}
@@ -212,10 +265,10 @@ export function HomeView({
           onAssignTask={onAssignTask}
           onAssignEvent={onAssignEvent}
           onAssignRoutine={onAssignRoutine}
-          onCompleteRoutine={onCompleteRoutine}
+          onCompleteRoutine={handleCompleteRoutineWithUndo}
           onSkipRoutine={onSkipRoutine}
           onPushRoutine={onPushRoutine}
-          onCompleteEvent={onCompleteEvent}
+          onCompleteEvent={handleCompleteEventWithUndo}
           onSkipEvent={onSkipEvent}
           onPushEvent={onPushEvent}
         />
@@ -231,10 +284,10 @@ export function HomeView({
         dateInstances={dateInstances}
         selectedItemId={selectedItemId}
         onSelectItem={onSelectItem}
-        onToggleTask={onToggleTask}
+        onToggleTask={handleToggleTaskWithUndo}
         onUpdateTask={onUpdateTask}
         onPushTask={onPushTask}
-        onDeleteTask={onDeleteTask}
+        onDeleteTask={handleDeleteTaskWithUndo}
         loading={loading}
         viewedDate={viewedDate}
         onDateChange={onDateChange}
@@ -256,10 +309,10 @@ export function HomeView({
         onAssignEventAll={onAssignEventAll}
         onAssignRoutine={onAssignRoutine}
         onAssignRoutineAll={onAssignRoutineAll}
-        onCompleteRoutine={onCompleteRoutine}
+        onCompleteRoutine={handleCompleteRoutineWithUndo}
         onSkipRoutine={onSkipRoutine}
         onPushRoutine={onPushRoutine}
-        onCompleteEvent={onCompleteEvent}
+        onCompleteEvent={handleCompleteEventWithUndo}
         onSkipEvent={onSkipEvent}
         onPushEvent={onPushEvent}
         onOpenPlanning={onOpenPlanning}
@@ -290,6 +343,13 @@ export function HomeView({
       <div className="flex-1 overflow-y-auto">
         {renderContent()}
       </div>
+
+      {/* Undo toast */}
+      <UndoToast
+        action={currentAction}
+        onUndo={executeUndo}
+        onDismiss={dismiss}
+      />
     </div>
   )
 }

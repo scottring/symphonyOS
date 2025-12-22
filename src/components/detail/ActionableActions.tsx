@@ -240,6 +240,7 @@ export function ActionableActions({
                     <label className="block text-xs text-neutral-500 mb-1">Time</label>
                     <input
                       type="time"
+                      step="300"
                       value={customTime}
                       onChange={(e) => setCustomTime(e.target.value)}
                       className="w-full px-2 py-1.5 text-sm border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"

@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { getBaseDate, parseDateInput, parseTimeInput, formatDateLabel } from '@/lib/dateHelpers'
+import { DATE_INPUT_CLASS, TIME_INPUT_CLASS } from '@/lib/inputStyles'
 
 interface WhenPickerProps {
   value?: Date
@@ -75,22 +77,14 @@ export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerP
     }
   }, [isOpen])
 
-  const getBaseDate = (daysFromNow: number) => {
-    const date = new Date()
-    date.setDate(date.getDate() + daysFromNow)
-    date.setHours(0, 0, 0, 0)
-    return date
-  }
-
   const handleDaySelect = (date: Date) => {
     setSelectedDate(date)
     setStep('time')
   }
 
   const handleDateInputChange = (dateString: string) => {
-    if (dateString) {
-      const [year, month, day] = dateString.split('-').map(Number)
-      const newDate = new Date(year, month - 1, day, 0, 0, 0)
+    const newDate = parseDateInput(dateString)
+    if (newDate) {
       setSelectedDate(newDate)
       setStep('time')
     }
@@ -113,14 +107,14 @@ export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerP
   }
 
   const handleTimeInputChange = (timeString: string) => {
-    if (!selectedDate || !timeString) return
-    const [hours, minutes] = timeString.split(':').map(Number)
-    const finalDate = new Date(selectedDate)
-    finalDate.setHours(hours, minutes, 0, 0)
-    onChange(finalDate, false)
-    setIsOpen(false)
-    setStep('day')
-    setSelectedDate(null)
+    if (!selectedDate) return
+    const finalDate = parseTimeInput(timeString, selectedDate)
+    if (finalDate) {
+      onChange(finalDate, false)
+      setIsOpen(false)
+      setStep('day')
+      setSelectedDate(null)
+    }
   }
 
   const handleClear = () => {
@@ -134,14 +128,7 @@ export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerP
 
   const formatSelectedDateLabel = () => {
     if (!selectedDate) return ''
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-
-    if (selectedDate.getTime() === today.getTime()) return 'Today'
-    if (selectedDate.getTime() === tomorrow.getTime()) return 'Tomorrow'
-    return selectedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    return formatDateLabel(selectedDate)
   }
 
   return (
@@ -231,8 +218,7 @@ export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerP
                 type="date"
                 autoFocus
                 onChange={(e) => handleDateInputChange(e.target.value)}
-                className="w-full px-2 py-1.5 text-sm rounded-lg border border-neutral-200
-                           focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className={`w-full ${DATE_INPUT_CLASS}`}
               />
             </div>
           )}
@@ -297,10 +283,10 @@ export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerP
               </button>
               <input
                 type="time"
+                step="300"
                 autoFocus
                 onChange={(e) => handleTimeInputChange(e.target.value)}
-                className="w-full px-2 py-1.5 text-sm rounded-lg border border-neutral-200
-                           focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className={`w-full ${TIME_INPUT_CLASS}`}
               />
             </div>
           )}

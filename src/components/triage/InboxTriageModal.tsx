@@ -415,6 +415,7 @@ export function InboxTriageModal({
                 </label>
                 <input
                   type="time"
+                  step="300"
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
                   className="w-full px-3 py-2.5 text-sm rounded-lg border border-neutral-200
@@ -427,6 +428,7 @@ export function InboxTriageModal({
                 </label>
                 <input
                   type="time"
+                  step="300"
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
                   className="w-full px-3 py-2.5 text-sm rounded-lg border border-neutral-200

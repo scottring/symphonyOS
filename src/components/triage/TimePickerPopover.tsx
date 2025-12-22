@@ -1,12 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { CalendarPlus, ChevronLeft, Sun, Sunrise, CalendarDays, Calendar } from 'lucide-react'
-import {
-  getBaseDate,
-  getNextWeekend,
-  getNextMonday,
-  parseDateInput,
-  formatDateLabel,
-} from '@/lib/dateHelpers'
+import { ChevronLeft, Clock } from 'lucide-react'
+import { formatTimeCompact, formatDateLabel } from '@/lib/dateHelpers'
 
 // Minimal schedule item for display
 export interface ScheduleContextItem {
@@ -19,44 +13,14 @@ export interface ScheduleContextItem {
   completed?: boolean
 }
 
-// Alias for internal use
-type ScheduleItem = ScheduleContextItem
-
-interface SchedulePopoverProps {
-  value?: Date
+interface TimePickerPopoverProps {
+  date: Date
   isAllDay?: boolean
-  onSchedule: (date: Date, isAllDay: boolean) => void
-  onClear?: () => void
+  onTimeChange: (date: Date, isAllDay: boolean) => void
   trigger?: React.ReactNode
-  // Schedule context for showing what's on the selected day
-  scheduleItems?: ScheduleContextItem[]
+  // Schedule context for showing what's on this day
   getItemsForDate?: (date: Date) => ScheduleContextItem[]
-  // Skip straight to time selection when editing existing scheduled item
-  skipToTime?: boolean
 }
-
-type Step = 'date' | 'time'
-
-// Expanded time presets for quick selection (6am - 10pm in 1-hour increments)
-const TIME_PRESETS = [
-  { label: '6am', hour: 6 },
-  { label: '7am', hour: 7 },
-  { label: '8am', hour: 8 },
-  { label: '9am', hour: 9 },
-  { label: '10am', hour: 10 },
-  { label: '11am', hour: 11 },
-  { label: '12pm', hour: 12 },
-  { label: '1pm', hour: 13 },
-  { label: '2pm', hour: 14 },
-  { label: '3pm', hour: 15 },
-  { label: '4pm', hour: 16 },
-  { label: '5pm', hour: 17 },
-  { label: '6pm', hour: 18 },
-  { label: '7pm', hour: 19 },
-  { label: '8pm', hour: 20 },
-  { label: '9pm', hour: 21 },
-  { label: '10pm', hour: 22 },
-]
 
 // Generate 5-minute increment options
 function generateTimeOptions(): { value: string; label: string }[] {
@@ -80,33 +44,29 @@ function generateTimeOptions(): { value: string; label: string }[] {
 const TIME_OPTIONS = generateTimeOptions()
 
 // Group items by time of day section
-type DaySection = 'allday' | 'morning' | 'afternoon' | 'evening'
+type DaySection = 'morning' | 'afternoon' | 'evening'
 
-function getTimeOfDay(date: Date): 'morning' | 'afternoon' | 'evening' {
+function getTimeOfDay(date: Date): DaySection {
   const hour = date.getHours()
   if (hour < 12) return 'morning'
   if (hour < 17) return 'afternoon'
   return 'evening'
 }
 
-function groupItemsBySection(items: ScheduleItem[]): Record<DaySection, ScheduleItem[]> {
-  const groups: Record<DaySection, ScheduleItem[]> = {
-    allday: [],
+function groupItemsBySection(items: ScheduleContextItem[]): Record<DaySection, ScheduleContextItem[]> {
+  const groups: Record<DaySection, ScheduleContextItem[]> = {
     morning: [],
     afternoon: [],
     evening: [],
   }
 
   for (const item of items) {
-    if (item.allDay || !item.startTime) {
-      groups.allday.push(item)
-    } else {
-      groups[getTimeOfDay(item.startTime)].push(item)
-    }
+    if (item.allDay || !item.startTime) continue
+    groups[getTimeOfDay(item.startTime)].push(item)
   }
 
   // Sort by time within each section
-  const sortByTime = (a: ScheduleItem, b: ScheduleItem) =>
+  const sortByTime = (a: ScheduleContextItem, b: ScheduleContextItem) =>
     (a.startTime?.getTime() ?? 0) - (b.startTime?.getTime() ?? 0)
 
   groups.morning.sort(sortByTime)
@@ -116,86 +76,49 @@ function groupItemsBySection(items: ScheduleItem[]): Record<DaySection, Schedule
   return groups
 }
 
-function formatTimeCompact(date: Date): string {
-  const hours = date.getHours()
-  const minutes = date.getMinutes()
-  const period = hours >= 12 ? 'p' : 'a'
-  const displayHour = hours % 12 || 12
-  if (minutes === 0) return `${displayHour}${period}`
-  return `${displayHour}:${minutes.toString().padStart(2, '0')}${period}`
-}
-
 const SECTION_LABELS: Record<DaySection, string> = {
-  allday: 'All Day',
   morning: 'Morning',
   afternoon: 'Afternoon',
   evening: 'Evening',
 }
 
 // Default time slots for each section when no items exist
-const SECTION_DEFAULT_TIMES: Record<Exclude<DaySection, 'allday'>, number> = {
+const SECTION_DEFAULT_TIMES: Record<DaySection, number> = {
   morning: 9,
   afternoon: 14,
   evening: 18,
 }
 
-export function SchedulePopover({
-  value,
+export function TimePickerPopover({
+  date,
   isAllDay: _isAllDay,
-  onSchedule,
-  onClear,
+  onTimeChange,
   trigger,
-  scheduleItems,
   getItemsForDate,
-  skipToTime = false,
-}: SchedulePopoverProps) {
+}: TimePickerPopoverProps) {
   void _isAllDay // Reserved for visual indicator
   const [isOpen, setIsOpen] = useState(false)
-  const [step, setStep] = useState<Step>('date')
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [showCustomTime, setShowCustomTime] = useState(false)
-
-  // Determine if we should show the schedule context view
-  const hasScheduleContext = !!(scheduleItems || getItemsForDate)
-
-  // Get items for the selected date
-  const itemsForSelectedDate = useMemo(() => {
-    if (!selectedDate) return []
-    if (getItemsForDate) return getItemsForDate(selectedDate)
-    if (!scheduleItems) return []
-
-    // Filter scheduleItems to the selected date
-    const startOfDay = new Date(selectedDate)
-    startOfDay.setHours(0, 0, 0, 0)
-    const endOfDay = new Date(selectedDate)
-    endOfDay.setHours(23, 59, 59, 999)
-
-    return scheduleItems.filter(item => {
-      if (item.allDay) {
-        // For all-day items, check if they fall on this date
-        if (!item.startTime) return false
-        const itemDate = new Date(item.startTime)
-        itemDate.setHours(0, 0, 0, 0)
-        return itemDate.getTime() === startOfDay.getTime()
-      }
-      if (!item.startTime) return false
-      return item.startTime >= startOfDay && item.startTime <= endOfDay
-    })
-  }, [selectedDate, scheduleItems, getItemsForDate])
-
-  // Group items by section
-  const groupedItems = useMemo(() => {
-    return groupItemsBySection(itemsForSelectedDate)
-  }, [itemsForSelectedDate])
-
   const [customTimeSearch, setCustomTimeSearch] = useState('')
+
   const containerRef = useRef<HTMLDivElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const customTimeInputRef = useRef<HTMLInputElement>(null)
   const triggerRef = useRef<HTMLButtonElement | HTMLDivElement>(null)
   const [dropdownPosition, setDropdownPosition] = useState<{ top?: number; bottom?: number; left: number }>({ top: 0, left: 0 })
 
-  // Close on outside click - check both container and dropdown refs
+  // Get items for the date
+  const itemsForDate = useMemo(() => {
+    if (!getItemsForDate) return []
+    return getItemsForDate(date)
+  }, [date, getItemsForDate])
+
+  // Group items by section
+  const groupedItems = useMemo(() => {
+    return groupItemsBySection(itemsForDate)
+  }, [itemsForDate])
+
+  // Close on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as Node
@@ -215,26 +138,18 @@ export function SchedulePopover({
   // Reset state when opening
   useEffect(() => {
     if (isOpen) {
-      // If skipToTime is true and we have an existing value, start on time step
-      if (skipToTime && value) {
-        setStep('time')
-        setSelectedDate(value)
-      } else {
-        setStep('date')
-        setSelectedDate(null)
-      }
       setShowCustomTime(false)
       setCustomTimeSearch('')
     }
-  }, [isOpen, skipToTime, value])
+  }, [isOpen])
 
   // Calculate dropdown position when opening
   useEffect(() => {
     if (isOpen && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect()
 
-      // Estimate dropdown height (approximately 400px for schedule view with context)
-      const estimatedHeight = 450
+      // Estimate dropdown height
+      const estimatedHeight = 400
       const spaceBelow = window.innerHeight - rect.bottom
       const spaceAbove = rect.top
 
@@ -242,13 +157,11 @@ export function SchedulePopover({
       const shouldPositionAbove = spaceBelow < estimatedHeight && spaceAbove > spaceBelow
 
       if (shouldPositionAbove) {
-        // Position above: use bottom to anchor to viewport bottom
         setDropdownPosition({
           bottom: window.innerHeight - rect.top + 8,
           left: Math.max(8, Math.min(rect.left, window.innerWidth - 280 - 8)),
         })
       } else {
-        // Position below: use top
         setDropdownPosition({
           top: rect.bottom + 8,
           left: Math.max(8, Math.min(rect.left, window.innerWidth - 280 - 8)),
@@ -266,49 +179,28 @@ export function SchedulePopover({
 
   const handleClose = useCallback(() => {
     setIsOpen(false)
-    setStep('date')
-    setSelectedDate(null)
     setShowCustomTime(false)
     setCustomTimeSearch('')
   }, [])
 
-  const handleDateSelect = (date: Date) => {
-    setSelectedDate(date)
-    setStep('time')
-  }
-
-  const handleDateInputChange = (dateString: string) => {
-    const newDate = parseDateInput(dateString)
-    if (newDate) {
-      handleDateSelect(newDate)
-    }
-  }
-
   const handleTimeSelect = (hour: number | 'all-day') => {
-    if (!selectedDate) return
-
-    const finalDate = new Date(selectedDate)
+    const finalDate = new Date(date)
     if (hour === 'all-day') {
       finalDate.setHours(0, 0, 0, 0)
-      onSchedule(finalDate, true)
+      onTimeChange(finalDate, true)
     } else {
       finalDate.setHours(hour, 0, 0, 0)
-      onSchedule(finalDate, false)
+      onTimeChange(finalDate, false)
     }
     handleClose()
   }
 
   const handleCustomTimeSelect = (timeValue: string) => {
-    if (!selectedDate || !timeValue) return
+    if (!timeValue) return
     const [hours, minutes] = timeValue.split(':').map(Number)
-    const finalDate = new Date(selectedDate)
+    const finalDate = new Date(date)
     finalDate.setHours(hours, minutes, 0, 0)
-    onSchedule(finalDate, false)
-    handleClose()
-  }
-
-  const handleClear = () => {
-    onClear?.()
+    onTimeChange(finalDate, false)
     handleClose()
   }
 
@@ -317,13 +209,6 @@ export function SchedulePopover({
     opt.label.toLowerCase().includes(customTimeSearch.toLowerCase()) ||
     opt.value.includes(customTimeSearch)
   )
-
-  const formatSelectedDateLabel = () => {
-    if (!selectedDate) return ''
-    return formatDateLabel(selectedDate)
-  }
-
-  const hasValue = value !== undefined
 
   return (
     <div ref={containerRef} className="relative">
@@ -334,18 +219,11 @@ export function SchedulePopover({
         <button
           ref={triggerRef as React.RefObject<HTMLButtonElement | null>}
           onClick={() => setIsOpen(!isOpen)}
-          className={`
-            p-1.5 rounded-lg
-            transition-all duration-200
-            ${hasValue
-              ? 'bg-primary-50 text-primary-600 hover:bg-primary-100'
-              : 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100'
-            }
-          `}
-          title="Schedule"
-          aria-label="Schedule"
+          className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-all duration-200"
+          title="Change time"
+          aria-label="Change time"
         >
-          <CalendarPlus className="w-4 h-4" />
+          <Clock className="w-4 h-4" />
         </button>
       )}
 
@@ -364,116 +242,26 @@ export function SchedulePopover({
             minWidth: '280px',
           }}
         >
-          {/* Step 1: Pick date */}
-          {step === 'date' && (
+          {!showCustomTime ? (
             <div className="p-3">
+              {/* Header with date context */}
               <div className="text-xs font-medium text-neutral-400 uppercase tracking-wider mb-3 px-1">
-                Schedule
+                {formatDateLabel(date)}
               </div>
-
-              {/* Quick date options */}
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <button
-                  onClick={() => handleDateSelect(getBaseDate(0))}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
-                    text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
-                    transition-all duration-150"
-                >
-                  <Sun className="w-4 h-4" />
-                  <span>Today</span>
-                </button>
-                <button
-                  onClick={() => handleDateSelect(getBaseDate(1))}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
-                    text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
-                    transition-all duration-150"
-                >
-                  <Sunrise className="w-4 h-4" />
-                  <span>Tomorrow</span>
-                </button>
-                <button
-                  onClick={() => handleDateSelect(getNextWeekend())}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
-                    text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
-                    transition-all duration-150"
-                >
-                  <CalendarDays className="w-4 h-4" />
-                  <span>This Weekend</span>
-                </button>
-                <button
-                  onClick={() => handleDateSelect(getNextMonday())}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
-                    text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
-                    transition-all duration-150"
-                >
-                  <Calendar className="w-4 h-4" />
-                  <span>Next Week</span>
-                </button>
-                <button
-                  onClick={() => {
-                    const input = document.getElementById('schedule-date-input') as HTMLInputElement
-                    input?.showPicker?.()
-                    input?.focus()
-                  }}
-                  className="col-span-2 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
-                    text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
-                    transition-all duration-150"
-                >
-                  <CalendarDays className="w-4 h-4" />
-                  <span>Pick date...</span>
-                </button>
-              </div>
-
-              {/* Hidden date input */}
-              <input
-                id="schedule-date-input"
-                type="date"
-                className="sr-only"
-                onChange={(e) => handleDateInputChange(e.target.value)}
-              />
-
-              {/* Clear option if value exists */}
-              {hasValue && onClear && (
-                <>
-                  <div className="border-t border-neutral-100 my-2" />
-                  <button
-                    onClick={handleClear}
-                    className="w-full px-3 py-2 text-sm text-left rounded-lg text-danger-500 hover:bg-danger-50 transition-colors"
-                  >
-                    Remove from schedule
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Step 2: Pick time - with schedule context if available */}
-          {step === 'time' && !showCustomTime && (
-            <div className="p-3">
-              {/* Back button with selected date */}
-              <button
-                onClick={() => setStep('date')}
-                className="flex items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-700 mb-3 px-1"
-              >
-                <ChevronLeft className="w-4 h-4" />
-                <span className="font-medium">{formatSelectedDateLabel()}</span>
-              </button>
 
               {/* All day option */}
               <button
                 onClick={() => handleTimeSelect('all-day')}
-                className="
-                  w-full flex items-center gap-2 px-3 py-2 mb-3 rounded-lg text-sm font-medium
+                className="w-full flex items-center gap-2 px-3 py-2 mb-3 rounded-lg text-sm font-medium
                   text-neutral-600 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
-                  transition-all duration-150
-                "
+                  transition-all duration-150"
               >
                 <span className="text-base">🌤️</span>
                 <span>All Day</span>
               </button>
 
               {/* Schedule context view - shows day structure with gaps */}
-              {hasScheduleContext ? (
+              {getItemsForDate ? (
                 <div className="space-y-3 max-h-[320px] overflow-y-auto">
                   {/* Render each section with items and gaps */}
                   {(['morning', 'afternoon', 'evening'] as const).map((section) => {
@@ -592,54 +380,27 @@ export function SchedulePopover({
                       text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50
                       transition-all duration-150 mt-2"
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                    <Clock className="w-3.5 h-3.5" />
                     <span>Pick exact time...</span>
                   </button>
                 </div>
               ) : (
-                /* Fallback: Hourly time grid when no schedule context */
-                <>
-                  {/* Scrollable grid of hourly times */}
-                  <div className="max-h-64 overflow-y-auto mb-2">
-                    <div className="grid grid-cols-3 gap-1.5 p-1">
-                      {TIME_PRESETS.map((preset) => (
-                        <button
-                          key={preset.hour}
-                          onClick={() => handleTimeSelect(preset.hour)}
-                          className="
-                            px-3 py-2 rounded-lg text-sm font-medium
-                            text-neutral-700 bg-neutral-50 hover:bg-primary-100 hover:text-primary-700
-                            transition-all duration-150
-                          "
-                        >
-                          {preset.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
+                /* Fallback: Simple time list when no schedule context */
+                <div>
                   <button
                     onClick={() => setShowCustomTime(true)}
-                    className="
-                      w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs
-                      text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50
-                      transition-all duration-150 border-t border-neutral-100 pt-2
-                    "
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm
+                      text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
+                      transition-all duration-150"
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>Need 5-minute precision?</span>
+                    <Clock className="w-4 h-4" />
+                    <span>Pick time...</span>
                   </button>
-                </>
+                </div>
               )}
             </div>
-          )}
-
-          {/* Custom time picker */}
-          {step === 'time' && showCustomTime && (
+          ) : (
+            /* Custom time picker */
             <div className="p-3">
               {/* Back button */}
               <button
@@ -647,7 +408,7 @@ export function SchedulePopover({
                 className="flex items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-700 mb-3 px-1"
               >
                 <ChevronLeft className="w-4 h-4" />
-                <span className="font-medium">{formatSelectedDateLabel()}</span>
+                <span className="font-medium">{formatDateLabel(date)}</span>
               </button>
 
               {/* Search/type-ahead input */}
@@ -658,12 +419,10 @@ export function SchedulePopover({
                   value={customTimeSearch}
                   onChange={(e) => setCustomTimeSearch(e.target.value)}
                   placeholder="Type time (e.g., 2:30pm)"
-                  className="
-                    w-full px-3 py-2 rounded-lg text-sm
+                  className="w-full px-3 py-2 rounded-lg text-sm
                     border border-neutral-200 bg-white
                     focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400
-                    transition-all duration-150
-                  "
+                    transition-all duration-150"
                 />
               </div>
 
@@ -673,11 +432,9 @@ export function SchedulePopover({
                   <button
                     key={option.value}
                     onClick={() => handleCustomTimeSelect(option.value)}
-                    className="
-                      w-full px-3 py-2 text-sm text-left
+                    className="w-full px-3 py-2 text-sm text-left
                       text-neutral-700 hover:bg-primary-50 hover:text-primary-700
-                      transition-colors first:rounded-t-lg last:rounded-b-lg
-                    "
+                      transition-colors first:rounded-t-lg last:rounded-b-lg"
                   >
                     {option.label}
                   </button>

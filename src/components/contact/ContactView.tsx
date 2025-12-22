@@ -4,6 +4,7 @@ import { getCategoryLabel, getCategoryIcon } from '@/types/contact'
 import type { Task } from '@/types/task'
 import { PinButton } from '@/components/pins'
 import { CategoryPicker } from './CategoryPicker'
+import { DATE_INPUT_CLASS } from '@/lib/inputStyles'
 
 interface ContactViewProps {
   contact: Contact
@@ -403,8 +404,7 @@ export function ContactView({
                     type="date"
                     value={localBirthday}
                     onChange={handleBirthdayChange}
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200
-                               focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className={`w-full ${DATE_INPUT_CLASS}`}
                   />
                 </div>
                 {/* Relationship */}

@@ -250,6 +250,7 @@ export function ScheduleItem({
                 onSchedule(undefined as unknown as Date, false)
               } : undefined}
               getItemsForDate={getScheduleItemsForDate}
+              skipToTime={true}
               trigger={
                 <button
                   className="w-full text-left text-xs font-medium rounded-md px-1 py-0.5 -mx-1 hover:bg-neutral-100 transition-colors cursor-pointer"

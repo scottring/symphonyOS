@@ -1,6 +1,16 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowRightToLine, Clock, Sunset, Sun, Calendar, CalendarDays, Check } from 'lucide-react'
+import {
+  getBaseDate,
+  getNextWeekend,
+  getNextMonday,
+  getHoursFromNow,
+  getThisEvening,
+  isBeforeEvening,
+  parseDateInput,
+} from '@/lib/dateHelpers'
+import { DATE_INPUT_CLASS } from '@/lib/inputStyles'
 
 interface DeferPickerProps {
   deferredUntil?: Date
@@ -70,53 +80,6 @@ export function DeferPicker({ deferredUntil, deferCount, onDefer }: DeferPickerP
     }
   }, [isOpen])
 
-  const getBaseDate = (daysFromNow: number) => {
-    const date = new Date()
-    date.setDate(date.getDate() + daysFromNow)
-    date.setHours(0, 0, 0, 0)
-    return date
-  }
-
-  const getNextWeekend = () => {
-    const today = new Date()
-    const dayOfWeek = today.getDay()
-    // If today is Sunday (0), go to next Saturday (6 days)
-    // Otherwise, calculate days until next Saturday
-    const daysUntilSaturday = dayOfWeek === 0 ? 6 : 6 - dayOfWeek
-    const nextSaturday = new Date(today)
-    nextSaturday.setDate(today.getDate() + daysUntilSaturday)
-    nextSaturday.setHours(0, 0, 0, 0)
-    return nextSaturday
-  }
-
-  const getNextMonday = () => {
-    const today = new Date()
-    const dayOfWeek = today.getDay()
-    const daysUntilMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek
-    const nextMonday = new Date(today)
-    nextMonday.setDate(today.getDate() + daysUntilMonday)
-    nextMonday.setHours(0, 0, 0, 0)
-    return nextMonday
-  }
-
-  const getHoursFromNow = (hours: number) => {
-    const date = new Date()
-    date.setHours(date.getHours() + hours)
-    date.setMinutes(Math.ceil(date.getMinutes() / 30) * 30, 0, 0)
-    return date
-  }
-
-  const getThisEvening = () => {
-    const date = new Date()
-    date.setHours(18, 0, 0, 0) // 6pm
-    return date
-  }
-
-  const isBeforeEvening = () => {
-    const now = new Date()
-    return now.getHours() < 18
-  }
-
   const handleDefer = (date: Date | undefined) => {
     onDefer(date)
     setIsOpen(false)
@@ -124,9 +87,8 @@ export function DeferPicker({ deferredUntil, deferCount, onDefer }: DeferPickerP
   }
 
   const handleDateInputChange = (dateString: string) => {
-    if (dateString) {
-      const [year, month, day] = dateString.split('-').map(Number)
-      const newDate = new Date(year, month - 1, day, 0, 0, 0)
+    const newDate = parseDateInput(dateString)
+    if (newDate) {
       handleDefer(newDate)
     }
   }
@@ -264,8 +226,7 @@ export function DeferPicker({ deferredUntil, deferCount, onDefer }: DeferPickerP
                 autoFocus
                 min={new Date().toISOString().split('T')[0]}
                 onChange={(e) => handleDateInputChange(e.target.value)}
-                className="w-full px-2 py-1.5 text-sm rounded-lg border border-neutral-200
-                           focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className={`w-full ${DATE_INPUT_CLASS}`}
               />
             </div>
           )}
