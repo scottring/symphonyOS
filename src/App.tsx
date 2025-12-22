@@ -31,6 +31,7 @@ import { ListsList, ListView } from '@/components/list'
 import { NotesPage } from '@/components/notes'
 import { CompletedTasksView } from '@/components/history/CompletedTasksView'
 import { Toast } from '@/components/toast'
+import { UndoToast } from '@/components/undo/UndoToast'
 import {
   ProjectsList,
   ProjectView,
@@ -1517,6 +1518,11 @@ function App() {
 
       {/* Toast notifications */}
       <Toast toast={toast} onDismiss={dismissToast} />
+      <UndoToast
+        action={undo.currentAction}
+        onUndo={undo.executeUndo}
+        onDismiss={undo.dismiss}
+      />
 
       {/* Offline banner */}
       {!isOnline && (
