@@ -1,8 +1,14 @@
 // Note type constants
-export type NoteType = 'quick_capture' | 'meeting_note' | 'transcript' | 'voice_memo' | 'general'
-export type NoteSource = 'manual' | 'fathom' | 'voice' | 'import'
+export type NoteType = 'quick_capture' | 'meeting_note' | 'transcript' | 'voice_memo' | 'general' | 'task_note'
+export type NoteSource = 'manual' | 'fathom' | 'voice' | 'import' | 'task'
 export type NoteLinkType = 'related' | 'primary' | 'mentioned'
 export type NoteEntityType = 'event' | 'project' | 'contact' | 'task' | 'routine'
+
+// Display note - unified type for showing both Second Brain notes and task notes
+export interface DisplayNote extends Note {
+  sourceTaskId?: string // If this is from a task note
+  sourceTaskTitle?: string // Task title for display
+}
 
 // ============================================================================
 // Note Topic
@@ -130,6 +136,7 @@ export const noteTypeColors: Record<NoteType, string> = {
   transcript: 'border-l-purple-300',
   voice_memo: 'border-l-amber-300',
   general: 'border-l-neutral-300',
+  task_note: 'border-l-green-300',
 }
 
 export const noteTypeDotColors: Record<NoteType, string> = {
@@ -138,6 +145,7 @@ export const noteTypeDotColors: Record<NoteType, string> = {
   transcript: 'bg-purple-400',
   voice_memo: 'bg-amber-400',
   general: 'bg-neutral-400',
+  task_note: 'bg-green-400',
 }
 
 export const noteTypeLabels: Record<NoteType, string> = {
@@ -146,4 +154,5 @@ export const noteTypeLabels: Record<NoteType, string> = {
   transcript: 'Transcript',
   voice_memo: 'Voice',
   general: '',
+  task_note: 'Task',
 }

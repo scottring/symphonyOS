@@ -1489,6 +1489,7 @@ function App() {
             await addEntityLink(noteId, { entityType, entityId })
           }}
           onRemoveEntityLink={removeEntityLink}
+          onNavigateToTask={(taskId) => handleSelectItem(`task-${taskId}`)}
         />
       )}
 

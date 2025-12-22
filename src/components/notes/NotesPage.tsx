@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react'
-import type { Note, NoteTopic, NoteEntityLink, NoteEntityType } from '@/types/note'
+import type { Note, DisplayNote, NoteTopic, NoteEntityLink, NoteEntityType } from '@/types/note'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
@@ -9,8 +9,8 @@ import { NoteDetail } from './NoteDetail'
 import { TopicFilter } from './TopicFilter'
 
 interface NotesPageProps {
-  notes: Note[]
-  notesByDate: { date: string; label: string; notes: Note[] }[]
+  notes: DisplayNote[]
+  notesByDate: { date: string; label: string; notes: DisplayNote[] }[]
   topics: NoteTopic[]
   topicsMap: Map<string, NoteTopic>
   loading: boolean
@@ -27,6 +27,8 @@ interface NotesPageProps {
   getEntityLinks?: (noteId: string) => Promise<NoteEntityLink[]>
   onAddEntityLink?: (noteId: string, entityType: NoteEntityType, entityId: string) => Promise<void>
   onRemoveEntityLink?: (linkId: string) => Promise<void>
+  // Navigation
+  onNavigateToTask?: (taskId: string) => void
 }
 
 export function NotesPage({
@@ -45,6 +47,7 @@ export function NotesPage({
   getEntityLinks,
   onAddEntityLink,
   onRemoveEntityLink,
+  onNavigateToTask,
 }: NotesPageProps) {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null)
@@ -70,13 +73,21 @@ export function NotesPage({
   // Fetch entity links when note is selected
   const handleSelectNote = useCallback(
     async (noteId: string) => {
+      const note = notes.find((n) => n.id === noteId)
+
+      // If this is a task note, navigate to the task instead
+      if (note?.sourceTaskId && onNavigateToTask) {
+        onNavigateToTask(note.sourceTaskId)
+        return
+      }
+
       setSelectedNoteId(noteId)
       if (getEntityLinks) {
         const links = await getEntityLinks(noteId)
         setEntityLinks(links)
       }
     },
-    [getEntityLinks]
+    [notes, getEntityLinks, onNavigateToTask]
   )
 
   const handleQuickCapture = useCallback(

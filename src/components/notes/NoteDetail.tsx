@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import type { Note, NoteTopic, NoteEntityLink, NoteEntityType, UpdateNoteInput } from '@/types/note'
 import { noteTypeLabels, noteTypeDotColors } from '@/types/note'
 import { formatRelativeTime } from '@/lib/timeUtils'
+import { htmlToPlainText } from '@/lib/htmlUtils'
 import { TopicPicker } from './TopicPicker'
 import { EntityLinkPicker } from './EntityLinkPicker'
 import type { Task } from '@/types/task'
@@ -149,7 +150,12 @@ export function NoteDetail({
   }
 
   const topic = note.topicId ? topics.find((t) => t.id === note.topicId) : undefined
-  const lines = note.content.split('\n')
+
+  // Check if content contains HTML and convert if needed
+  const hasHtml = /<[^>]+>/.test(note.content)
+  const plainContent = hasHtml ? htmlToPlainText(note.content) : note.content
+
+  const lines = plainContent.split('\n')
   const displayTitle = note.title || lines[0] || 'Untitled'
 
   return (
@@ -245,7 +251,7 @@ export function NoteDetail({
           />
         ) : (
           <div className="prose prose-neutral max-w-none">
-            {note.content.split('\n').map((line, i) => (
+            {plainContent.split('\n').map((line, i) => (
               <p key={i} className="text-neutral-700 leading-relaxed">
                 {line || '\u00A0'}
               </p>

@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import type {
   Note,
+  DisplayNote,
   DbNote,
   NoteType,
   NoteSource,
@@ -14,6 +15,7 @@ import type {
   UpdateNoteInput,
   CreateEntityLinkInput,
 } from '@/types/note'
+import type { Task } from '@/types/task'
 
 // ============================================================================
 // Converters
@@ -45,46 +47,92 @@ function dbEntityLinkToEntityLink(dbLink: DbNoteEntityLink): NoteEntityLink {
   }
 }
 
+function taskToDisplayNote(task: Task): DisplayNote {
+  return {
+    id: `task-${task.id}`,
+    content: task.notes || '',
+    type: 'task_note' as NoteType,
+    source: 'task' as NoteSource,
+    createdAt: task.createdAt,
+    updatedAt: task.updatedAt,
+    sourceTaskId: task.id,
+    sourceTaskTitle: task.title,
+  }
+}
+
 // ============================================================================
 // Hook
 // ============================================================================
 export function useNotes() {
   const { user } = useAuth()
   const [notes, setNotes] = useState<Note[]>([])
+  const [taskNotes, setTaskNotes] = useState<DisplayNote[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch notes on mount and when user changes
+  // Fetch notes and task notes on mount and when user changes
   useEffect(() => {
     if (!user) {
+      console.log('[useNotes] No user, setting empty notes and loading=false')
       setNotes([])
+      setTaskNotes([])
       setLoading(false)
       return
     }
 
-    async function fetchNotes() {
+    async function fetchNotesAndTasks() {
       if (!user) return
 
+      console.log('[useNotes] Fetching notes and task notes for user:', user.id)
       setLoading(true)
       setError(null)
 
-      const { data, error: fetchError } = await supabase
+      // Fetch Second Brain notes
+      const { data: notesData, error: notesError } = await supabase
         .from('notes')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
 
-      if (fetchError) {
-        setError(fetchError.message)
+      if (notesError) {
+        console.error('[useNotes] Error fetching notes:', notesError)
+        setError(notesError.message)
         setLoading(false)
         return
       }
 
-      setNotes((data as DbNote[]).map(dbNoteToNote))
+      // Fetch tasks that have notes
+      const { data: tasksData, error: tasksError } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('user_id', user.id)
+        .not('notes', 'is', null)
+        .neq('notes', '')
+        .order('updated_at', { ascending: false })
+
+      if (tasksError) {
+        console.error('[useNotes] Error fetching task notes:', tasksError)
+        // Don't fail completely, just log the error
+      }
+
+      const secondBrainNotes = (notesData as DbNote[]).map(dbNoteToNote)
+      const taskNotesConverted = (tasksData || []).map((task: any) =>
+        taskToDisplayNote({
+          id: task.id,
+          title: task.title,
+          notes: task.notes,
+          createdAt: new Date(task.created_at),
+          updatedAt: new Date(task.updated_at),
+        } as Task)
+      )
+
+      console.log('[useNotes] Successfully fetched', secondBrainNotes.length, 'notes and', taskNotesConverted.length, 'task notes')
+      setNotes(secondBrainNotes)
+      setTaskNotes(taskNotesConverted)
       setLoading(false)
     }
 
-    fetchNotes()
+    fetchNotesAndTasks()
   }, [user])
 
   // ============================================================================
@@ -321,18 +369,24 @@ export function useNotes() {
     [notes]
   )
 
+  // Merge notes and task notes for display
+  const allNotes = useMemo<DisplayNote[]>(() => {
+    const combined = [...notes, ...taskNotes]
+    return combined.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+  }, [notes, taskNotes])
+
   // Create a notes map for efficient lookup
   const notesMap = useMemo(() => {
-    const map = new Map<string, Note>()
-    for (const note of notes) {
+    const map = new Map<string, Note | DisplayNote>()
+    for (const note of allNotes) {
       map.set(note.id, note)
     }
     return map
-  }, [notes])
+  }, [allNotes])
 
   // Group notes by date for list view
   const notesByDate = useMemo(() => {
-    const groups: { date: string; label: string; notes: Note[] }[] = []
+    const groups: { date: string; label: string; notes: DisplayNote[] }[] = []
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const yesterday = new Date(today)
@@ -340,13 +394,13 @@ export function useNotes() {
     const weekAgo = new Date(today)
     weekAgo.setDate(weekAgo.getDate() - 7)
 
-    const todayNotes: Note[] = []
-    const yesterdayNotes: Note[] = []
-    const thisWeekNotes: Note[] = []
-    const olderNotes: Note[] = []
+    const todayNotes: DisplayNote[] = []
+    const yesterdayNotes: DisplayNote[] = []
+    const thisWeekNotes: DisplayNote[] = []
+    const olderNotes: DisplayNote[] = []
 
-    for (const note of notes) {
-      const noteDate = new Date(note.createdAt)
+    for (const note of allNotes) {
+      const noteDate = new Date(note.updatedAt)
       noteDate.setHours(0, 0, 0, 0)
 
       if (noteDate.getTime() === today.getTime()) {
@@ -374,10 +428,10 @@ export function useNotes() {
     }
 
     return groups
-  }, [notes])
+  }, [allNotes])
 
   return {
-    notes,
+    notes: allNotes, // Return merged notes
     notesMap,
     notesByDate,
     loading,

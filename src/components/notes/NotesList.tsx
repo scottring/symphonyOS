@@ -1,8 +1,8 @@
-import type { Note, NoteTopic } from '@/types/note'
+import type { DisplayNote, NoteTopic } from '@/types/note'
 import { NoteCard } from './NoteCard'
 
 interface NotesListProps {
-  notesByDate: { date: string; label: string; notes: Note[] }[]
+  notesByDate: { date: string; label: string; notes: DisplayNote[] }[]
   topicsMap: Map<string, NoteTopic>
   selectedNoteId: string | null
   onSelectNote: (noteId: string) => void
