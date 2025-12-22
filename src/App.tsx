@@ -985,6 +985,26 @@ function App() {
           setRecentlyCreatedTaskId(taskId)
         }
       }}
+      onQuickAddNote={async (data) => {
+        // Find topic by name if specified
+        let topicId: string | undefined
+        if (data.topicName) {
+          const topic = activeTopics.find(t =>
+            t.name.toLowerCase() === data.topicName?.toLowerCase()
+          )
+          topicId = topic?.id
+
+          // If topic doesn't exist, create it
+          if (!topicId) {
+            const newTopic = await addTopic({ name: data.topicName })
+            topicId = newTopic?.id
+          }
+        }
+
+        // Create the note
+        await addNote({ content: data.content, topicId })
+        showToast('Note saved', 'success')
+      }}
       quickAddProjects={projects.map(p => ({ id: p.id, name: p.name }))}
       quickAddContacts={contacts.map(c => ({ id: c.id, name: c.name }))}
       quickAddOpen={quickAddOpen}

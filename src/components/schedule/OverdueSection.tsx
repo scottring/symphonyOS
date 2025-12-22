@@ -3,8 +3,10 @@ import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
 import { ScheduleItem } from './ScheduleItem'
+import { SwipeableCard } from './SwipeableCard'
 import { taskToTimelineItem } from '@/types/timeline'
 import { formatOverdueDate } from '@/lib/timeUtils'
+import { useMobile } from '@/hooks/useMobile'
 
 interface OverdueSectionProps {
   tasks: Task[]
@@ -34,6 +36,8 @@ export function OverdueSection({
   familyMembers = [],
   onAssignTask,
 }: OverdueSectionProps) {
+  const isMobile = useMobile()
+
   if (tasks.length === 0) return null
 
   // Sort by oldest first (most overdue at top)
@@ -75,6 +79,29 @@ export function OverdueSection({
             ? formatOverdueDate(new Date(task.scheduledFor))
             : undefined
 
+          // Use SwipeableCard on mobile for better touch interactions
+          if (isMobile) {
+            return (
+              <SwipeableCard
+                key={task.id}
+                item={item}
+                selected={selectedItemId === `task-${task.id}`}
+                onSelect={() => onSelectTask(`task-${task.id}`)}
+                onComplete={() => onToggleTask(taskId)}
+                onDefer={onPushTask ? (date: Date) => onPushTask(taskId, date) : undefined}
+                familyMembers={familyMembers}
+                assignedTo={task.assignedTo}
+                onAssign={
+                  onAssignTask
+                    ? (memberId) => onAssignTask(taskId, memberId)
+                    : undefined
+                }
+                onOpenDetail={() => onSelectTask(`task-${task.id}`)}
+              />
+            )
+          }
+
+          // Desktop view - use ScheduleItem
           return (
             <ScheduleItem
               key={task.id}

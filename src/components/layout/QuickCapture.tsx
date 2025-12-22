@@ -12,6 +12,11 @@ interface QuickCaptureProps {
     scheduledFor?: Date
     category?: TaskCategory
   }) => void
+  // Note creation
+  onAddNote?: (data: {
+    content: string
+    topicName?: string
+  }) => void
   // Context for parser
   projects?: Array<{ id: string; name: string }>
   contacts?: Array<{ id: string; name: string }>
@@ -25,6 +30,7 @@ interface QuickCaptureProps {
 export function QuickCapture({
   onAdd,
   onAddRich,
+  onAddNote,
   projects = [],
   contacts = [],
   isOpen: controlledIsOpen,
@@ -143,6 +149,19 @@ export function QuickCapture({
   const doSubmit = (useRaw: boolean) => {
     const trimmed = title.trim()
     if (!trimmed) return
+
+    // Handle note creation
+    if (effectiveParsed.isNote && onAddNote) {
+      onAddNote({
+        content: effectiveParsed.noteContent || trimmed,
+        topicName: effectiveParsed.topicName,
+      })
+      // Reset and refocus for rapid entry
+      setTitle('')
+      setOverrides({})
+      inputRef.current?.focus()
+      return
+    }
 
     // Determine if this is going to inbox (for animation)
     const isInboxAdd = useRaw || !hasParsedFields(effectiveParsed) || !effectiveParsed.dueDate
@@ -280,14 +299,36 @@ export function QuickCapture({
               {/* Preview card - only show if fields were parsed */}
               {showPreview && (
                 <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-100 space-y-2">
-                  {/* Title row */}
-                  <div className="flex items-center gap-2 text-neutral-800">
-                    <span className="text-base">📋</span>
-                    <span className="font-medium">"{effectiveParsed.title}"</span>
-                  </div>
+                  {/* Note preview (different from task) */}
+                  {effectiveParsed.isNote ? (
+                    <>
+                      <div className="flex items-center gap-2 text-neutral-800">
+                        <span className="text-base">📝</span>
+                        <span className="font-medium">Note</span>
+                      </div>
+                      <div className="text-sm text-neutral-600 pl-6">
+                        {effectiveParsed.noteContent}
+                      </div>
+                      {effectiveParsed.topicName && (
+                        <div className="flex items-center gap-2 pl-6">
+                          <span className="inline-flex items-center px-2.5 py-1 bg-primary-50 text-primary-700 rounded-full text-xs font-medium border border-primary-100">
+                            {effectiveParsed.topicName}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {/* Title row */}
+                      <div className="flex items-center gap-2 text-neutral-800">
+                        <span className="text-base">📋</span>
+                        <span className="font-medium">"{effectiveParsed.title}"</span>
+                      </div>
+                    </>
+                  )}
 
-                  {/* Project chip */}
-                  {effectiveParsed.projectId && projectName && (
+                  {/* Only show task-related fields if NOT a note */}
+                  {!effectiveParsed.isNote && effectiveParsed.projectId && projectName && (
                     <div className="flex items-center gap-2">
                       <span className="text-base">📁</span>
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium border border-blue-100">
@@ -304,7 +345,7 @@ export function QuickCapture({
                   )}
 
                   {/* Date/time chip */}
-                  {effectiveParsed.dueDate && (
+                  {!effectiveParsed.isNote && effectiveParsed.dueDate && (
                     <div className="flex items-center gap-2">
                       <span className="text-base">
                         {effectiveParsed.dueDate.getHours() !== 0 || effectiveParsed.dueDate.getMinutes() !== 0 ? '🕐' : '📅'}
@@ -323,7 +364,7 @@ export function QuickCapture({
                   )}
 
                   {/* Contact chip */}
-                  {effectiveParsed.contactId && contactName && (
+                  {!effectiveParsed.isNote && effectiveParsed.contactId && contactName && (
                     <div className="flex items-center gap-2">
                       <span className="text-base">👤</span>
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full text-xs font-medium border border-amber-100">
@@ -340,7 +381,7 @@ export function QuickCapture({
                   )}
 
                   {/* Priority chip */}
-                  {effectiveParsed.priority && (
+                  {!effectiveParsed.isNote && effectiveParsed.priority && (
                     <div className="flex items-center gap-2">
                       <span className="text-base">🔥</span>
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${
@@ -354,7 +395,7 @@ export function QuickCapture({
                   )}
 
                   {/* Category chip - only show for non-task categories */}
-                  {effectiveParsed.category && effectiveParsed.category !== 'task' && (
+                  {!effectiveParsed.isNote && effectiveParsed.category && effectiveParsed.category !== 'task' && (
                     <div className="flex items-center gap-2">
                       <span className="text-base">
                         {effectiveParsed.category === 'event' && '📅'}
@@ -379,8 +420,8 @@ export function QuickCapture({
 
               {/* Buttons */}
               <div className="flex gap-3">
-                {/* Only show "Add to Inbox" if there ARE parsed fields */}
-                {showPreview && (
+                {/* Only show "Add to Inbox" if there ARE parsed fields AND it's not a note */}
+                {showPreview && !effectiveParsed.isNote && (
                   <button
                     type="button"
                     onClick={() => doSubmit(true)}
@@ -399,7 +440,7 @@ export function QuickCapture({
                              disabled:opacity-50 disabled:cursor-not-allowed
                              transition-colors"
                 >
-                  {showPreview ? 'Save with Above' : 'Add to Inbox'}
+                  {effectiveParsed.isNote ? 'Save Note' : (showPreview ? 'Save with Above' : 'Add to Inbox')}
                 </button>
               </div>
 

@@ -12,6 +12,9 @@ export interface ParsedQuickInput {
   priority?: 'high' | 'medium' | 'low'
   category?: 'task' | 'chore' | 'errand' | 'event' | 'activity'
   categoryMatch?: string             // What text matched (e.g., "errand:")
+  isNote?: boolean                   // True if this is a note (not a task)
+  noteContent?: string               // Clean note content (without prefix)
+  topicName?: string                 // Topic name if specified with @topic
 }
 
 export interface ParserContext {
@@ -32,6 +35,27 @@ export function parseQuickInput(
 
   // Helper for normalized string comparison
   const normalizeStr = (s: string) => s.toLowerCase().replace(/[.,]/g, '').replace(/\s+/g, ' ').trim()
+
+  // 0a. Check for note prefix FIRST (takes precedence over everything)
+  const notePrefixes = ['note:', 'journal:', 'log:', 'n:']
+  for (const prefix of notePrefixes) {
+    if (workingText.toLowerCase().startsWith(prefix)) {
+      result.isNote = true
+      workingText = workingText.slice(prefix.length).trim()
+
+      // Check for @topic syntax: "note @health: content" or "note @health content"
+      const topicMatch = workingText.match(/^@(\S+):?\s*/)
+      if (topicMatch) {
+        result.topicName = topicMatch[1]
+        workingText = workingText.slice(topicMatch[0].length).trim()
+      }
+
+      // For notes, store the clean content and skip other parsing
+      result.noteContent = workingText
+      result.title = workingText
+      return result
+    }
+  }
 
   // 0. Check for category prefix (must be at start of input)
   const categoryPrefixes: Record<string, ParsedQuickInput['category']> = {
@@ -155,5 +179,5 @@ export function parseQuickInput(
 
 // Helper to check if anything was parsed beyond the title
 export function hasParsedFields(parsed: ParsedQuickInput): boolean {
-  return !!(parsed.projectId || parsed.contactId || parsed.dueDate || parsed.priority || parsed.category)
+  return !!(parsed.projectId || parsed.contactId || parsed.dueDate || parsed.priority || parsed.category || parsed.isNote)
 }

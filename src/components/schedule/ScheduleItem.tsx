@@ -5,6 +5,7 @@ import { getProjectColor } from '@/lib/projectUtils'
 import { PushDropdown, SchedulePopover, type ScheduleContextItem } from '@/components/triage'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
 import { Redo2 } from 'lucide-react'
+import { useMobile } from '@/hooks/useMobile'
 
 // Nordic Journal calendar icon - minimal, elegant design
 // Uses the calendar's Google color with a subtle accent, or falls back to primary teal-forest
@@ -129,6 +130,7 @@ export function ScheduleItem({
   overdueLabel,
   getScheduleItemsForDate,
 }: ScheduleItemProps) {
+  const isMobile = useMobile()
   const isTask = item.type === 'task'
   const isRoutine = item.type === 'routine'
   const isEvent = item.type === 'event'
@@ -301,46 +303,48 @@ export function ScheduleItem({
           </div>
         )}
 
-        {/* Checkbox/circle/calendar - fixed width for alignment */}
-        <div className="w-5 shrink-0 flex items-center justify-center">
-          {isEvent ? (
-            // Calendar events show a calendar icon with the calendar's color
-            <button
-              onClick={handleCheckboxClick}
-              className="touch-target flex items-center justify-center -m-2 p-2"
-              aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
-            >
-              <CalendarIcon
-                color={item.calendarColor}
-                completed={item.completed}
-              />
-            </button>
-          ) : isActionable ? (
-            // Tasks and routines show checkbox (square for tasks, circle for routines)
-            <button
-              onClick={handleCheckboxClick}
-              className="touch-target flex items-center justify-center -m-2 p-2"
-              aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
-            >
-              <span
-                className={`
-                  w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors
-                  ${isRoutine ? 'rounded-full' : ''}
-                  ${item.completed
-                    ? 'bg-primary-500 border-primary-500 text-white'
-                    : 'border-neutral-300 hover:border-primary-400'
-                  }
-                `}
+        {/* Checkbox/circle/calendar - fixed width for alignment, hidden on mobile when overdue */}
+        {!(isMobile && isOverdue) && (
+          <div className="w-5 shrink-0 flex items-center justify-center">
+            {isEvent ? (
+              // Calendar events show a calendar icon with the calendar's color
+              <button
+                onClick={handleCheckboxClick}
+                className="touch-target flex items-center justify-center -m-2 p-2"
+                aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
               >
-                {item.completed && (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                )}
-              </span>
-            </button>
-          ) : null}
-        </div>
+                <CalendarIcon
+                  color={item.calendarColor}
+                  completed={item.completed}
+                />
+              </button>
+            ) : isActionable ? (
+              // Tasks and routines show checkbox (square for tasks, circle for routines)
+              <button
+                onClick={handleCheckboxClick}
+                className="touch-target flex items-center justify-center -m-2 p-2"
+                aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
+              >
+                <span
+                  className={`
+                    w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors
+                    ${isRoutine ? 'rounded-full' : ''}
+                    ${item.completed
+                      ? 'bg-primary-500 border-primary-500 text-white'
+                      : 'border-neutral-300 hover:border-primary-400'
+                    }
+                  `}
+                >
+                  {item.completed && (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </span>
+              </button>
+            ) : null}
+          </div>
+        )}
 
         {/* Title */}
         <div className="flex-1 min-w-0">
@@ -390,10 +394,10 @@ export function ScheduleItem({
           </button>
         )}
 
-        {/* Push button - desktop only, on hover, shows before assignee badges */}
+        {/* Push button - for tasks, always visible on mobile when overdue, hover on desktop */}
         {isTask && onPush && (
           <div
-            className="hidden md:block shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            className={`shrink-0 ${isMobile && isOverdue ? '' : 'hidden md:block opacity-0 group-hover:opacity-100'} transition-opacity`}
             onClick={(e) => e.stopPropagation()}
           >
             <PushDropdown onPush={onPush} size="sm" showTodayOption={isOverdue} />
