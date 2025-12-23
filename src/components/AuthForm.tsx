@@ -52,8 +52,8 @@ export function AuthForm() {
           <h1 className="font-display text-4xl font-semibold text-neutral-900 mb-3 tracking-tight">
             Symphony OS
           </h1>
-          <p className="text-neutral-500 text-lg max-w-xs mx-auto">
-            The family coordination platform
+          <p className="text-neutral-500 text-lg max-w-sm mx-auto">
+            Your personal operating system for life
           </p>
         </div>
 
@@ -141,12 +141,47 @@ export function AuthForm() {
         </div>
 
         {/* Value proposition */}
-        <div className="mt-10 text-center space-y-4">
-          <p className="text-neutral-600 text-sm leading-relaxed max-w-sm mx-auto">
-            For families juggling multiple schedules, work tasks, and the mental load of keeping it all together.
-          </p>
-          <p className="text-neutral-400 text-xs">
-            Plan on desktop. Execute on mobile.
+        <div className="mt-10 text-center space-y-6">
+          <div className="space-y-3 max-w-md mx-auto">
+            <div className="flex items-start gap-3 text-left">
+              <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center shrink-0 mt-0.5">
+                <svg className="w-3.5 h-3.5 text-primary-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-neutral-700 text-sm font-medium">Life is collaborative</p>
+                <p className="text-neutral-500 text-xs mt-0.5">Connect tasks to people. Everyone knows what they're responsible for.</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 text-left">
+              <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center shrink-0 mt-0.5">
+                <svg className="w-3.5 h-3.5 text-primary-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-neutral-700 text-sm font-medium">Context is first-class</p>
+                <p className="text-neutral-500 text-xs mt-0.5">Attach phone numbers, links, notes. Everything you need, right when you need it.</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 text-left">
+              <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center shrink-0 mt-0.5">
+                <svg className="w-3.5 h-3.5 text-primary-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-neutral-700 text-sm font-medium">Right information, right time</p>
+                <p className="text-neutral-500 text-xs mt-0.5">Plan deeply on desktop. Execute effortlessly on mobile.</p>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-neutral-400 text-xs mt-6">
+            Work, Personal, and Family — all equally important
           </p>
         </div>
       </div>
