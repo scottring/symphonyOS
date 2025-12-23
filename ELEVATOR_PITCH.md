@@ -6,7 +6,7 @@
 
 ## 30-Second Version (Networking)
 
-"Symphony is my personal operating system for life — designed for adults managing hectic lives across work, personal, and family.
+"Symphony is your WHOLE Life Operating System — designed for adults managing hectic lives across work, personal, and family.
 
 Symphony does three things beautifully: First, it connects tasks to people, because life is collaborative. Second, it makes context first-class — phone numbers, links, notes attach to tasks and surface when you need them. Third, it brings the right information forward at the right time.
 

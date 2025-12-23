@@ -59,7 +59,7 @@ Before starting the demo, ensure you have:
 **Screen:** Symphony Today view (desktop)
 
 **Script:**
-> "Symphony is your personal operating system for life. It does three things beautifully:
+> "Symphony is your WHOLE Life Operating System. It does three things beautifully:
 >
 > First, it connects your tasks to people — family members, contractors, doctors — because life is collaborative.
 >

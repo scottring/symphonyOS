@@ -53,7 +53,7 @@ export function AuthForm() {
             Symphony OS
           </h1>
           <p className="text-neutral-500 text-lg max-w-sm mx-auto">
-            Your personal operating system for life
+            Your WHOLE Life Operating System
           </p>
         </div>
 
