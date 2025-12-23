@@ -29,6 +29,8 @@ function dbProjectToProject(dbProject: DbProject): Project {
     status: dbProject.status,
     type: dbProject.type ?? undefined,
     notes: dbProject.notes ?? undefined,
+    links: dbProject.links ?? undefined,
+    phoneNumber: dbProject.phone_number ?? undefined,
     parentId: dbProject.parent_id ?? undefined,
     tripMetadata: dbProject.trip_metadata ?? undefined,
     createdAt: new Date(dbProject.created_at),
@@ -76,7 +78,7 @@ export function useProjects() {
     fetchProjects()
   }, [user])
 
-  const addProject = useCallback(async (project: { name: string; notes?: string; parentId?: string }) => {
+  const addProject = useCallback(async (project: { name: string; notes?: string; links?: import('@/types/task').TaskLink[]; phoneNumber?: string; parentId?: string }) => {
     if (!user) return null
 
     // Optimistic update
@@ -86,6 +88,8 @@ export function useProjects() {
       name: project.name,
       status: 'not_started',
       notes: project.notes,
+      links: project.links,
+      phoneNumber: project.phoneNumber,
       parentId: project.parentId,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -98,6 +102,8 @@ export function useProjects() {
         user_id: user.id,
         name: project.name,
         notes: project.notes ?? null,
+        links: project.links ?? null,
+        phone_number: project.phoneNumber ?? null,
         parent_id: project.parentId ?? null,
       })
       .select()
@@ -220,6 +226,8 @@ export function useProjects() {
     if (updates.name !== undefined) dbUpdates.name = updates.name
     if (updates.status !== undefined) dbUpdates.status = updates.status
     if (updates.notes !== undefined) dbUpdates.notes = updates.notes ?? null
+    if (updates.links !== undefined) dbUpdates.links = updates.links ?? null
+    if (updates.phoneNumber !== undefined) dbUpdates.phone_number = updates.phoneNumber ?? null
     if (updates.parentId !== undefined) dbUpdates.parent_id = updates.parentId ?? null
 
     const { error: updateError } = await supabase

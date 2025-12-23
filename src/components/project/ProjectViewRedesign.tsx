@@ -1,18 +1,18 @@
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
 import type { Project, ProjectStatus } from '@/types/project'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
 import type { EventNote } from '@/hooks/useEventNotes'
-import type { Note, NoteEntityType } from '@/types/note'
 import type { TripMetadata } from '@/types/trip'
 import { formatTimeWithDate } from '@/lib/timeUtils'
 import { TaskQuickActions, type ScheduleContextItem } from '@/components/triage'
 import { calculateProjectStatus } from '@/hooks/useProjects'
-import { EntityNotesSection } from '@/components/notes/EntityNotesSection'
 import { UnifiedNotesEditor } from '@/components/notes/UnifiedNotesEditor'
 import { TripCreationModal } from '../trip/TripCreationModal'
 import { TripItineraryView } from '../trip/TripItineraryView'
+import { analyzeLanguage, getCoachingMessage, getExamples } from '@/lib/outcomeLanguage'
+import { CoachingTip } from '@/components/coaching/CoachingTip'
 
 interface ProjectViewProps {
   project: Project
@@ -37,11 +37,6 @@ interface ProjectViewProps {
   canPin?: boolean
   onPin?: () => Promise<boolean>
   onUnpin?: () => Promise<boolean>
-  // Notes support (linked entity notes)
-  entityNotes?: Note[]
-  entityNotesLoading?: boolean
-  onAddEntityNote?: (content: string, entityType: NoteEntityType, entityId: string) => Promise<void>
-  onNavigateToNote?: (noteId: string) => void
 }
 
 export function ProjectViewRedesign({
@@ -64,18 +59,34 @@ export function ProjectViewRedesign({
   canPin: _canPin,
   onPin: _onPin,
   onUnpin: _onUnpin,
-  entityNotes = [],
-  entityNotesLoading = false,
-  onAddEntityNote,
-  onNavigateToNote,
 }: ProjectViewProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState('')
   const [editStatus, setEditStatus] = useState<ProjectStatus>('not_started')
+  const [editPhoneNumber, setEditPhoneNumber] = useState('')
+  const [editLinks, setEditLinks] = useState<string>('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showEditTripModal, setShowEditTripModal] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [showStatusDropdown, setShowStatusDropdown] = useState(false)
+  const [coachingMessage, setCoachingMessage] = useState<string | null>(null)
+  const [coachingExamples, setCoachingExamples] = useState<string[]>([])
+
+  // Analyze project name for vague language patterns
+  useEffect(() => {
+    if (!isEditing || !editName.trim()) {
+      setCoachingMessage(null)
+      setCoachingExamples([])
+      return
+    }
+
+    const analysis = analyzeLanguage(editName)
+    const message = getCoachingMessage(analysis)
+    const examples = getExamples(analysis)
+
+    setCoachingMessage(message)
+    setCoachingExamples(examples)
+  }, [editName, isEditing])
 
   const projectTasks = useMemo(() => {
     return tasks.filter((t) => t.projectId === project.id)
@@ -106,7 +117,7 @@ export function ProjectViewRedesign({
 
   const statusConfig: Record<ProjectStatus, { label: string; color: string; bg: string }> = {
     not_started: { label: 'Not Started', color: 'text-neutral-600', bg: 'bg-neutral-100' },
-    in_progress: { label: 'In Progress', color: 'text-blue-700', bg: 'bg-blue-100' },
+    in_progress: { label: 'In Progress', color: 'text-primary-700', bg: 'bg-primary-100' },
     on_hold: { label: 'On Hold', color: 'text-amber-700', bg: 'bg-amber-100' },
     completed: { label: 'Completed', color: 'text-green-700', bg: 'bg-green-100' },
   }
@@ -114,15 +125,26 @@ export function ProjectViewRedesign({
   const handleEdit = () => {
     setEditName(project.name)
     setEditStatus(project.status)
+    setEditPhoneNumber(project.phoneNumber || '')
+    setEditLinks(project.links?.map(l => l.url).join('\n') || '')
     setIsEditing(true)
   }
 
   const handleSave = () => {
     const trimmedName = editName.trim()
     if (trimmedName) {
+      // Parse links from newline-separated URLs
+      const linksArray = editLinks
+        .split('\n')
+        .map(url => url.trim())
+        .filter(url => url.length > 0)
+        .map(url => ({ url }))
+
       onUpdateProject(project.id, {
         name: trimmedName,
         status: editStatus,
+        phoneNumber: editPhoneNumber.trim() || undefined,
+        links: linksArray.length > 0 ? linksArray : undefined,
       })
     }
     setIsEditing(false)
@@ -132,6 +154,8 @@ export function ProjectViewRedesign({
     setIsEditing(false)
     setEditName('')
     setEditStatus('not_started')
+    setEditPhoneNumber('')
+    setEditLinks('')
   }
 
   // Direct status change (manual override)
@@ -230,7 +254,7 @@ export function ProjectViewRedesign({
                 )}
                 <button
                   onClick={handleEdit}
-                  className="p-2 text-neutral-300 hover:text-blue-600 rounded-lg transition-colors"
+                  className="p-2 text-neutral-300 hover:text-primary-600 rounded-lg transition-colors"
                   aria-label="Edit project"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
@@ -273,7 +297,7 @@ export function ProjectViewRedesign({
             <div className="mb-10">
               <div className="flex items-start gap-5">
                 {/* Project icon */}
-                <div className="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0">
+                <div className="w-14 h-14 rounded-2xl bg-primary-100 flex items-center justify-center text-primary-600 flex-shrink-0">
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
                   </svg>
@@ -313,7 +337,7 @@ export function ProjectViewRedesign({
                 )}
                 <button
                   onClick={handleEdit}
-                  className="p-2 text-neutral-300 hover:text-blue-600 rounded-lg transition-colors"
+                  className="p-2 text-neutral-300 hover:text-primary-600 rounded-lg transition-colors"
                   aria-label="Edit project"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
@@ -360,7 +384,7 @@ export function ProjectViewRedesign({
 
               {/* Edit mode */}
               {isEditing && (
-                <div className="mt-6 p-5 bg-blue-50/80 border border-blue-200/60 rounded-2xl backdrop-blur-sm">
+                <div className="mt-6 p-5 bg-primary-50/80 border border-primary-200/60 rounded-2xl backdrop-blur-sm">
                   <div className="space-y-4">
                     <div>
                       <label className="block text-xs font-medium text-neutral-600 mb-1.5">Name</label>
@@ -369,9 +393,22 @@ export function ProjectViewRedesign({
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
                         className="w-full px-3 py-2.5 text-sm rounded-xl border border-neutral-200 bg-white
-                                   focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                   focus:outline-none focus:ring-2 focus:ring-primary-500"
                         autoFocus
                       />
+                      {/* Coaching Tip - appears when vague language detected */}
+                      {coachingMessage && (
+                        <div className="mt-3">
+                          <CoachingTip
+                            message={coachingMessage}
+                            examples={coachingExamples}
+                            onDismiss={() => {
+                              setCoachingMessage(null)
+                              setCoachingExamples([])
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-neutral-600 mb-1.5">Status</label>
@@ -392,6 +429,28 @@ export function ProjectViewRedesign({
                         ))}
                       </div>
                     </div>
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-600 mb-1.5">Phone Number</label>
+                      <input
+                        type="tel"
+                        value={editPhoneNumber}
+                        onChange={(e) => setEditPhoneNumber(e.target.value)}
+                        placeholder="(555) 123-4567"
+                        className="w-full px-3 py-2.5 text-sm rounded-xl border border-neutral-200 bg-white
+                                   focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-600 mb-1.5">Links (one per line)</label>
+                      <textarea
+                        value={editLinks}
+                        onChange={(e) => setEditLinks(e.target.value)}
+                        placeholder="https://example.com&#10;https://docs.example.com"
+                        rows={3}
+                        className="w-full px-3 py-2.5 text-sm rounded-xl border border-neutral-200 bg-white
+                                   focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+                      />
+                    </div>
                     <div className="flex gap-3 pt-2">
                       <button
                         onClick={handleCancel}
@@ -403,8 +462,8 @@ export function ProjectViewRedesign({
                       <button
                         onClick={handleSave}
                         disabled={!editName.trim()}
-                        className="flex-1 py-2.5 px-4 text-sm font-medium text-white bg-blue-500
-                                   rounded-xl hover:bg-blue-600 transition-colors disabled:opacity-50"
+                        className="flex-1 py-2.5 px-4 text-sm font-medium text-white bg-primary-500
+                                   rounded-xl hover:bg-primary-600 transition-colors disabled:opacity-50"
                       >
                         Save
                       </button>
@@ -419,7 +478,7 @@ export function ProjectViewRedesign({
               <div className="flex items-center gap-4 mb-8">
                 <div className="flex-1 h-2 bg-neutral-200 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-blue-500 rounded-full transition-all duration-500 ease-out"
+                    className="h-full bg-primary-500 rounded-full transition-all duration-500 ease-out"
                     style={{ width: `${progressPercent}%` }}
                   />
                 </div>
@@ -437,7 +496,7 @@ export function ProjectViewRedesign({
                 {onAddTask && (
                   <form onSubmit={handleAddTask} className="mb-6">
                     <div className="flex items-center gap-4 py-3.5 px-4 -mx-4 rounded-xl border-2 border-dashed border-neutral-200
-                                    hover:border-neutral-300 focus-within:border-blue-400 focus-within:bg-white transition-all">
+                                    hover:border-neutral-300 focus-within:border-primary-400 focus-within:bg-white transition-all">
                       <span className="w-6 h-6 rounded-lg border-2 border-dashed border-neutral-300 flex items-center justify-center flex-shrink-0">
                         <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-neutral-300" viewBox="0 0 20 20" fill="currentColor">
                           <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
@@ -453,7 +512,7 @@ export function ProjectViewRedesign({
                       {newTaskTitle.trim() && (
                         <button
                           type="submit"
-                          className="px-4 py-2 text-sm font-medium bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                          className="px-4 py-2 text-sm font-medium bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
                         >
                           Add
                         </button>
@@ -495,7 +554,7 @@ export function ProjectViewRedesign({
                             flex items-center gap-4 py-3.5 px-4 -mx-4 rounded-xl cursor-pointer
                             transition-all duration-150
                             ${isSelected
-                              ? 'bg-blue-50/70 ring-1 ring-blue-200'
+                              ? 'bg-primary-50/70 ring-1 ring-primary-200'
                               : 'hover:bg-white/60'
                             }
                             ${task.completed ? 'opacity-60' : ''}
@@ -514,8 +573,8 @@ export function ProjectViewRedesign({
                               className={`
                                 w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all
                                 ${task.completed
-                                  ? 'bg-blue-500 border-blue-500 text-white'
-                                  : 'border-neutral-300 hover:border-blue-400'
+                                  ? 'bg-primary-500 border-primary-500 text-white'
+                                  : 'border-neutral-300 hover:border-primary-400'
                                 }
                               `}
                             >
@@ -697,6 +756,53 @@ export function ProjectViewRedesign({
                 </div>
               )}
 
+              {/* Project Context (Links & Phone) */}
+              {(project.links?.length || project.phoneNumber) && (
+                <div className="pb-6 border-b border-neutral-200/60">
+                  <h3 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3">Project Context</h3>
+                  <div className="space-y-3">
+                    {/* Phone Number */}
+                    {project.phoneNumber && (
+                      <div>
+                        <div className="text-xs text-neutral-500 mb-1.5">Phone</div>
+                        <a
+                          href={`tel:${project.phoneNumber}`}
+                          className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 font-medium p-2 -mx-2 rounded-lg hover:bg-primary-50 transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                          </svg>
+                          {project.phoneNumber}
+                        </a>
+                      </div>
+                    )}
+
+                    {/* Links */}
+                    {project.links && project.links.length > 0 && (
+                      <div>
+                        <div className="text-xs text-neutral-500 mb-1.5">Links</div>
+                        <div className="space-y-1">
+                          {project.links.map((link, index) => (
+                            <a
+                              key={index}
+                              href={link.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 p-2 -mx-2 rounded-lg hover:bg-primary-50 transition-colors group"
+                            >
+                              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                              <span className="truncate">{link.title || link.url}</span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Linked Events */}
               {linkedEvents.length > 0 && (
                 <div className="pb-6 border-b border-neutral-200/60">
@@ -712,7 +818,7 @@ export function ProjectViewRedesign({
                           key={note.id}
                           className="flex items-start gap-2 p-2 -mx-2 rounded-lg hover:bg-neutral-50 transition-colors"
                         >
-                          <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0 mt-0.5">
+                          <div className="w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center text-primary-600 flex-shrink-0 mt-0.5">
                             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
                               <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
                             </svg>
@@ -729,20 +835,6 @@ export function ProjectViewRedesign({
                       )
                     })}
                   </div>
-                </div>
-              )}
-
-              {/* Notes (Second Brain) */}
-              {onAddEntityNote && (
-                <div>
-                  <EntityNotesSection
-                    entityType="project"
-                    entityId={project.id}
-                    notes={entityNotes}
-                    loading={entityNotesLoading}
-                    onAddNote={onAddEntityNote}
-                    onNavigateToNote={onNavigateToNote}
-                  />
                 </div>
               )}
             </div>

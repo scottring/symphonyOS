@@ -44,6 +44,8 @@ vi.mock('@/lib/supabase', () => ({
           name: data.name || 'New Project',
           type: null,
           notes: data.notes ?? null,
+          links: data.links ?? null,
+          phone_number: data.phone_number ?? null,
           parent_id: data.parent_id ?? null,
           trip_metadata: null,
           status: 'not_started' as ProjectStatus,

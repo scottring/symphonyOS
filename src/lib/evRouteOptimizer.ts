@@ -39,7 +39,7 @@ export async function calculateEVRoute(params: EVRouteParams): Promise<EVRouteRe
     currentBattery,
     minBattery = DEFAULT_MIN_BATTERY,
     maxBattery = DEFAULT_MAX_BATTERY,
-    preferredNetworks,
+    // preferredNetworks, // Not used - showing all networks
   } = params
 
   // Get route from Google Maps
@@ -53,11 +53,12 @@ export async function calculateEVRoute(params: EVRouteParams): Promise<EVRouteRe
   const routePoints = extractRoutePoints(route.legs)
 
   // Find all charging stations along the route
+  // Note: Not filtering by preferredNetworks here - user can filter in UI
   const availableStations = await findChargersAlongRoute({
     routePoints,
     searchRadiusMiles: 25, // Increased radius to find more fast chargers
     minPowerKW: 50, // Fast chargers only for road trips
-    networks: preferredNetworks,
+    // networks: preferredNetworks, // Disabled - show all networks
   })
 
   // Simulate the drive and determine charging stops

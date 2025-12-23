@@ -165,6 +165,8 @@ export function createMockDbProject(overrides: Partial<DbProject> = {}): DbProje
     name: 'Test Project',
     type: null,
     notes: null,
+    links: null,
+    phone_number: null,
     parent_id: null,
     trip_metadata: null,
     status: 'in_progress' as ProjectStatus,

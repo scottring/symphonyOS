@@ -1,0 +1,453 @@
+
+1. FEATURE: Context/Domain Filtering
+Current State ✅
+You already have the foundation:
+TaskContext type: work | family | personal
+ContextPicker component working
+Database column exists
+Design doc started
+What's Missing (for beta)
+A. View Mode Switcher Add a prominent toggle in the header (next to Day/Week):
+
+[All] [Family] [Work] [Personal]
+B. Filtering Logic
+All view: Shows everything (current behavior)
+Family view: Shows only context='family' + context=null/undefined for safety
+Work view: Shows only context='work'
+Personal view: Shows only context='personal' + context=null/undefined
+C. Smart Defaults
+New tasks: Default to personal (safe - nothing leaks to family view unexpectedly)
+Tasks assigned to family members: Auto-set to family
+Calendar events: Default to family (since they're shared)
+D. Projects inherit context Add context field to projects, tasks inherit from their project
+My Recommendation
+For beta launch, implement the minimum:
+✅ View mode toggle (All/Family/Work/Personal)
+✅ Filter tasks/events/routines by context
+✅ Default new tasks to personal
+✅ Auto-set assigned tasks to family
+⏸️ Skip project context inheritance for now (can add post-beta)
+Why this matters for beta: Your vision mentions "Family is just a domain that happens to be shared" - this is the core differentiator. Users need to trust that their private stuff stays private.
+2. VISION / BETA MESSAGING
+Current Vision Issues
+Your VISION.md is too technical and scope-confused. It reads like internal documentation, not user-facing messaging. Also, it says "V1" = minimal features but your current app is way beyond that.
+Recommended Beta Messaging
+Here's how I'd describe Symphony for beta users:
+Symphony: Your Life, Organized The personal operating system that keeps work, family, and personal life in harmony. The Problem We Solve You capture tasks in 5 different apps. Calendar events here, work tasks there, family stuff somewhere else. When it's time to actually DO something, you're frantically searching for the context: "Where did I write those blinds measurements? What was the phone number? Which website?" How Symphony Works
+Capture everything in one place - Tasks, events, notes, links, files. Quick add from anywhere.
+See what matters, when it matters - Context-aware timeline shows only what's relevant right now, with everything attached.
+Your domains, your rules - Keep work private, family shared, personal separate. One app, multiple contexts that don't bleed together.
+Desktop planning, mobile execution - Plan your week on a big screen. Execute on mobile with all the context at your fingertips.
+What Makes Symphony Different
+Context-first: Not just a task list - every task carries its full context (notes, links, files, location)
+Multi-domain: Work/family/personal separation built-in, not bolted on
+Calendar-integrated: Google Calendar is the source of truth, Symphony adds the context layer
+Execution-focused: Shows you exactly what you need, exactly when you need it
+Current Beta Features
+✅ Tasks with rich context (notes, links, files, locations)
+✅ Google Calendar integration
+✅ Projects & contacts
+✅ Routines & recurring tasks
+✅ Family member assignment
+✅ Context filtering (work/family/personal views)
+✅ Mobile + desktop optimized
+✅ Notes & lists
+✅ Trip planning with packing templates
+Who Is This For? Beta users should be people who:
+Manage both personal and family responsibilities
+Feel overwhelmed by scattered information
+Want ONE system that handles all life domains
+Value privacy (work stays separate from family screens)
+Plan on desktop, execute on mobile
+Beta Onboarding Flow
+Welcome screen: "Symphony helps you organize work, family, and personal life - all in one place."
+Calendar connect: "Connect Google Calendar so Symphony can show your day at a glance."
+Add your family: "Add family members so you can assign tasks and see who's doing what."
+Set your contexts: "Tag items as work/family/personal. Switch views anytime." (Show the view toggle)
+Create your first task: Quick tutorial showing how to add context (notes, links, etc.)
+What To Build Before Beta
+Based on where you are, here's what I think you need:
+Must-Have (Blocking beta)
+Context view filtering - The All/Family/Work/Personal toggle
+Better onboarding - Clear explanation of the domain model
+Beta messaging doc - Use the messaging above to create a welcome page
+Nice-to-Have (Can do post-beta)
+Project context inheritance
+AI-assisted planning session
+Meal planning
+Email/share sheet capture
+Want me to implement the context filtering feature now? I can:
+Add the view mode toggle to the header
+Implement the filtering logic
+Set up smart defaults for new tasks
+Update onboarding to explain the concept
+Let me know and I'll build it out!
+I just realized something from your description of the vision. So thank you for this. Please hear me out. The key thing, I think, that's going to make this fly or die is the first paragraph under recommended beta messaging. And the really salient point there is when you said when it's time to actually do something, you're frantically searching for the context. Where did I write those blinds measurements? What was the phone number? Which website? This is the whole key to the app. This is why I built it. This is what I wanted to do better than everyone else. And this is what I still think we're missing. We're not quite hitting the mark here. So let's have a conversation about this.
+You're absolutely right. This is THE thing. Let me hear you out - tell me more about this gap. Questions to sharpen our thinking:
+What happens today when you open Symphony at 2pm and "Call about blinds" is up?
+What do you see?
+What do you have to do to get the phone number / measurements / website?
+How many taps/clicks between "I need to do this" and "I have everything I need"?
+What should happen instead?
+Paint me the picture of the perfect execution moment
+What's on screen without any interaction?
+What's one tap away?
+Where are other apps failing you on this?
+Things (Apple): Great at tasks, but context is...?
+Todoist: Context attachments are...?
+Google Tasks: ?
+What do you end up doing when the app doesn't surface it?
+What kinds of context matter most?
+Phone numbers (tap to call)
+Addresses (tap to navigate)
+Links (tap to open)
+Notes/measurements (just visible?)
+Files/photos (?)
+Something else?
+My hypothesis (tell me if I'm wrong): The current issue is that you've built great capture (can attach all this stuff) and decent planning (can organize/schedule), but the execution cards still require too much interaction. The context is there, but it's not surfaced. You have to:
+Tap the task to open it
+Scroll to find the notes section
+Read through notes to find the measurements
+Copy the phone number
+Switch apps to dial
+Come back, find the link
+Tap the link
+When it should be:
+Glance at card
+See measurements right there
+Tap phone number → auto-dial
+Done
+Am I close? Or is the gap somewhere else? Help me understand what you're seeing vs what you want to see. Screenshots would be great if you have them, or just describe the current vs desired flow.
+I think you're right, but I think we're still missing what I'm going after. So the question... Okay, yeah. So in your first example, it really gets at this problem. You open symphony at 2 p.m. and call about blinds is up. So let's say you've had three different tasks about blinds. One is shop for blinds. One is... And shop for blinds has a sub-task of measure blinds. And the next task, let's say, is purchase blinds. And the next task is install blinds. And you need the measurements in all three of those steps. But when you create a new task, it lacks the context of the previous task. And I know that you can technically get this from using sub-tasks. But I believe that this is a problem that doesn't have an intuitive solution yet. One that is just effortlessly carried forward. It's sort of like... It's sort of like a pull request for your tasks. They're specced out. They include documentation, screenshots, whatever resources you need. And those resources are carried forward until that thing is complete. And the completion may involve several seemingly unrelated tasks or events or steps. So how do we solve this problem?
+OH. Now I get it. This is the real problem. You're not just talking about better execution UI. You're talking about context fragmentation across a workflow of related tasks. The "pull request" metaphor is perfect. In a PR:
+The context (issue, design docs, screenshots) lives at the workflow level
+Multiple commits reference the same context
+Everyone working on it sees the same resources
+The context flows through the lifecycle until it's done
+Your blinds example exposes the gap:
+
+Task 1: Shop for blinds
+  ↳ Subtask: Measure windows
+  📝 Notes: "Living room: 48" x 72", Bedroom: 36" x 60""
+  🔗 Link: blinds.com/product-page
+  ✅ Complete
+
+Task 2: Purchase blinds
+  ❌ Context is ORPHANED - you have to go dig it up
+  
+Task 3: Install blinds  
+  ❌ Context is ORPHANED again
+Current workarounds all suck:
+Subtasks: Only work if everything is under one parent. But "purchase" and "install" aren't really subtasks of "shop" - they're sequential workflow steps.
+Copy-paste context: Manual, error-prone, creates stale copies
+Projects: Help group tasks, but don't surface shared context at execution time
+Notes/links on each task: Duplication, drift, maintenance burden
+The Real Question
+How do we create workflow-scoped context that flows through related tasks without requiring heavy manual linking? Potential approaches:
+A. Project as Context Container (explicit)
+Projects become the context holder
+"Blinds Project" has measurements, links, photos
+All tasks in project auto-show project context
+Pro: Simple mental model
+Con: Forces everything into projects (maybe overkill for simple workflows)
+B. Task Chains (explicit linking)
+"Shop" → "Purchase" → "Install" (like prep/followup but more flexible)
+Context flows forward through the chain
+Pro: Clear lineage
+Con: Requires manual chain creation
+C. Context Inheritance (semi-automatic)
+When you complete "Shop blinds", system prompts:
+"Create next task in this workflow?"
+Auto-carries forward context
+Pro: Feels effortless
+Con: Assumes linear workflows
+D. Shared Context Tags (implicit grouping)
+Create "Blinds" as a topic/tag
+All context lives on the topic, not the tasks
+Tasks tagged "Blinds" all show the same shared context
+Pro: Flexible, works for non-linear workflows
+Con: New concept to learn
+E. AI Context Surfacing (smart)
+When you open "Purchase blinds", AI detects similarity to "Shop blinds"
+Surfaces relevant context automatically
+"FYI: You took measurements in a related task [Show]"
+Pro: Feels magical
+Con: Requires AI, might be wrong
+My gut instinct
+I think the answer is Projects as Context Containers (Option A), but with a twist: Make project context show up prominently during execution, not just in project view.
+
+Timeline card:
+┌─────────────────────────────────────┐
+│ Purchase blinds              [Done] │
+│ Project: Blinds 🏠                  │
+│ ───────────────────────────────────│
+│ 📏 Measurements:                    │
+│   Living: 48" × 72"                 │
+│   Bedroom: 36" × 60"                │
+│                                     │
+│ 🔗 blinds.com/custom-cellular       │
+│ ☎️  1-800-BLINDS                    │
+└─────────────────────────────────────┘
+The key insight: Project context is always visible on tasks in that project, without opening anything. Workflow:
+Create "Blinds" project
+Add "Shop blinds" task → take measurements in project notes
+Add "Purchase blinds" task → measurements auto-show (from project)
+Add "Install blinds" task → measurements still there
+But I want your reaction
+Which approach feels right to you? Or is there a different model I'm missing? The "PR for tasks" metaphor suggests you want:
+Shared context pool
+Multiple "commits" (tasks) reference it
+Stays available until workflow is done
+What's the simplest interaction that would make this work for you?
+I think this sounds right. But I think one thing the system can do is help the user construct language that supports this kind of workflow. So if you have...and it will help them in life as well. So if you have a task that says "talk to Meg at Maryland Energy Administration," it doesn't lend itself towards this kind of chained context that you're talking about. So we need to use language when creating tasks and projects, etc., that encourages the always visible project context that you're talking about.
+EXACTLY. This is brilliant. The system needs to teach users to think in projects through the language it encourages. Your example nails it: ❌ Bad (orphaned task):
+"Talk to Meg at Maryland Energy Administration"
+What's this about?
+Where do I put the context?
+What's the next step?
+Context dies with this task
+✅ Good (project-oriented):
+Project: "Maryland Home Energy Grant"
+Project context: Grant requirements, deadlines, Meg's contact info, documentation checklist
+Task 1: "Call Meg - discuss eligibility"
+Task 2: "Submit application packet"
+Task 3: "Schedule home audit"
+All tasks auto-show project context at execution time
+How the System Can Encourage This
+1. Prompt for Project Creation
+When someone creates a task that sounds like it might need context:
+
+User creates: "Talk to Meg about energy grant"
+
+Symphony suggests:
+┌─────────────────────────────────────────────┐
+│ This looks like it might be part of a       │
+│ larger effort. Create a project?            │
+│                                             │
+│ 📁 Suggested: "Home Energy Grant"          │
+│                                             │
+│ [Create Project] [Just Add Task]           │
+└─────────────────────────────────────────────┘
+2. Smart Task Naming Patterns
+Teach users to name tasks as actions within a context, not standalone items: Pattern: [Verb] + [Object] + [Optional: Context]
+✅ "Research blinds - living room"
+✅ "Call vendor - get quote"
+✅ "Measure windows - before ordering"
+❌ "Blinds" (what about them?)
+❌ "Maryland Energy" (too vague)
+The app could show hints during task creation:
+
+💡 Tip: Start with an action verb
+   Examples: Call, Research, Email, Purchase, Schedule
+3. Project Naming Guidance
+Projects should be outcomes, not just categories: Good project names:
+"Install New Blinds"
+"Maryland Energy Grant Application"
+"Plan Summer Vacation"
+"Fix Basement Water Issue"
+Bad project names:
+"Home Improvement" (too broad)
+"To Do" (not an outcome)
+"Meg" (not a project)
+4. "What's this for?" Onboarding
+During onboarding, teach this pattern explicitly:
+
+───────────────────────────────────────
+Think in Projects
+
+Projects are outcomes you're working toward.
+Tasks are the steps to get there.
+
+When you add a task, ask yourself:
+"Is this part of something bigger?"
+
+If yes → Create a project
+If no → Add as a standalone task
+───────────────────────────────────────
+
+Example:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📁 Project: "Install New Blinds"
+   📝 Context: Measurements, vendor info, budget
+   
+   ✓ Research options
+   ✓ Measure windows  
+   → Purchase blinds ← You are here
+   → Schedule installation
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. AI Project Detection
+When the user has multiple tasks that seem related:
+
+Symphony notices:
+- "Call Meg about energy grant"
+- "Download grant application form"
+- "Schedule home energy audit"
+
+Suggestion:
+┌─────────────────────────────────────────┐
+│ 💡 These tasks seem related.            │
+│ Create "Energy Grant Application"?      │
+│                                         │
+│ [Yes, Create Project] [No Thanks]      │
+└─────────────────────────────────────────┘
+6. Context Prompts During Task Creation
+When adding a task to a project, prompt for context:
+
+Adding task to "Install New Blinds"
+────────────────────────────────────
+Task: Purchase blinds
+
+Will you need any info for this?
+□ Measurements (already in project ✓)
+□ Phone numbers
+□ Website links
+□ Photos/files
+□ Notes
+
+[Add to project]
+The Mental Model Shift
+You're teaching users a fundamental life skill: Old way:
+Random task list
+Each item isolated
+Context scattered across apps
+"Where did I write that down?"
+Symphony way:
+Think in outcomes (projects)
+Tasks are steps toward outcomes
+Context lives with the outcome
+Available whenever you need it
+Linguistic Patterns to Encourage
+Pattern	Example	Why it works
+Verb + Noun	"Call vendor"	Clear action
+Verb + Noun + Context	"Call vendor - blinds quote"	Shows what it's about
+Question format	"What blinds work for living room?"	Research-oriented
+Outcome-oriented	"Get basement waterproofed"	Clear end state
+Anti-patterns	Why they fail
+"Meg"	Who? What about her?
+"Energy stuff"	Vague
+"Follow up"	On what?
+"Important"	Everything is important
+UI Implementation Ideas
+1. Quick Add with Coaching
+
+┌───────────────────────────────────┐
+│ Add Task                          │
+├───────────────────────────────────┤
+│ Research window blinds for...    │
+│                                   │
+│ 💡 Good! Start with action verb   │
+│                                   │
+│ Project: [Select or Create...]   │
+│ ▼ Install New Blinds             │
+│                                   │
+│ [Add Context] [Save]              │
+└───────────────────────────────────┘
+2. Context Preview on Timeline
+
+Today
+─────────────────────────────────
+2p  Purchase blinds
+    📁 Install New Blinds
+    
+    📏 Living: 48" × 72"
+       Bedroom: 36" × 60"
+    🔗 blinds.com/cellular
+    ☎️  1-800-555-1234
+    
+    [Mark Done] [Defer]
+3. Empty Project Prompt
+
+"Install New Blinds" project created!
+
+Add some context so it's available
+when you need it:
+
+□ Measurements
+□ Vendor contacts  
+□ Budget/pricing
+□ Photos/inspiration
+□ Installation notes
+
+[Add Now] [Skip]
+Your Reaction?
+Does this feel like the right direction? Should we build:
+Project context surfacing on timeline cards
+Task creation coaching/hints
+AI project suggestions
+All of the above
+What's the minimum viable version that would prove this concept works?
+Can you ask me questions one at a time so that I'm not overwhelmed with all of these ideas that you come up with? They're great, but I end up missing some of them because I just can't focus on one thing because you're spewing all of these amazing insights at once.
+You're right, sorry. Let me slow down. One question: When you look at your timeline today and see "Purchase blinds" scheduled for 2pm, what's the absolute minimum information that needs to be visible on that card (without opening anything) for you to feel like "yes, I have what I need"?
+In this particular case that you're giving, I would say, "It depends what I've done before for this task." But I would want, I think, at the stage where I'm purchasing, I would want the quote, the price quote from the store I'm buying it from, and a link directly to the purchase. "page if available and/or if not or if yes even the phone number." For the agent I'm working with, the sales agent, SalesRep. I think I'd want these on the card. I'm not sure why they can't just be in the detail view, but I think I see where you're getting at
+Good question. Let me ask you this: If you had to tap the "Purchase blinds" card to see those details (quote, link, phone number), how many extra seconds does that add to your workflow? And does that feel like friction, or is one tap acceptable? I'm trying to understand if the goal is truly "zero clicks to context" or if "one tap to see everything" is good enough.
+I don't think zero clicks to context is necessary do you?
+No, probably not. One tap is totally reasonable. So if one tap is fine, then the real problem we're solving is different: Not: "I have to tap the card" But: "When I tap the card, the context I need isn't there, or I have to hunt for it" Is that more accurate?
+YES
+Perfect. So the fix is: When you tap "Purchase blinds" → detail panel opens → all project context is right there (quote, link, phone number) without scrolling or hunting. Here's my next question: Does your current detail panel already show project information when you open a task? (Like, can you see which project the task belongs to, and is there a way to see project notes/links?)
+you tell me
+Let me check what the detail panel currently shows:
+Read DetailPanelRedesign.tsx
+Grep "project\." (in /Users/scottkaufman/Documents/Developer/symphonyOS/src/components/detail/DetailPanelRedesign.tsx)
+17 lines of output
+Read DetailPanelRedesign.tsx (lines 1271-1320)
+Looking at the code, I can see: Current state:
+Detail panel shows the project NAME as a small badge (line 1275-1283: "📁 Blinds Project")
+You can click it to open the full project view
+But it does NOT show project notes/links/context in the task detail panel
+The gap: When you tap "Purchase blinds", you see:
+✅ Task notes (if any on the task itself)
+✅ Task links (if any)
+✅ Project name badge
+❌ Project notes (measurements, quotes, vendor info)
+❌ Project links
+❌ Project phone numbers
+So the answer to your earlier question is: No, project context isn't surfaced in the task detail panel. Next question: Should we add a "Project Context" section in the detail panel that shows the project's notes/links/files whenever you open a task that belongs to a project?
+I think so. What do you think? And does this get at what we need for isolated, i.e. non-project tasks? Or is that later in the conversation?
+Good question. Let me answer both parts: Part 1: Should we add project context to detail panel? Yes, I think this is the MVP solution. When you open a task with a project, show the project's notes/links/phone numbers right there. Part 2: What about standalone tasks (no project)? This solution does NOT solve that case. Example:
+"Talk to Meg about grant" (no project, has notes with phone number)
+"Submit grant application" (no project, needs those same notes)
+Context is orphaned
+So this gets us halfway there. We'd still need to encourage users to create projects for related work. My next question: Is solving the project case enough for beta, or do we also need to solve standalone task context flow?
+i think PROBABLY we also need to solve standalone task context flow, but i could be convinced otherwise
+Let me help you think through this: If we ONLY solve project context for beta, users would need to:
+Create a project for "Maryland Energy Grant"
+Add "Talk to Meg" task to that project
+Add "Submit application" task to that project
+Project context flows automatically
+Is creating a project for things like "Talk to Meg → Follow up with Meg" too much friction? Or does it actually HELP users organize better? My instinct: If we make project creation really lightweight (one tap, quick name), then "create a project" becomes the solution for standalone context flow. What do you think: Should creating a project be dead simple and encouraged for everything, or are there legitimate cases where related tasks shouldn't be in a project?
+I think it should be dead simple and encouraged for everything, but if we do that, I think it shouldn't be called a project. A project connotates something much larger to people, and I think that that alone causes friction.
+Brilliant point. "Project" does feel too heavy for "talk to Meg about energy grant." So the question is: What should we call these lightweight context containers? Options I can think of:
+Threads (like Slack/email)
+Topics
+Bundles
+Workflows
+Just make "project" feel lighter (but keep the name)
+What feels right to you? Or what term would you naturally use when thinking "these 3 tasks are all about the same thing"?
+not crazy about any of these so maybe "jsut make project feel lighter" is the answer? but i don't think so
+Let me ask it differently: When you have "Talk to Meg about energy grant" and then later "Submit grant application" - what word would you use to describe what connects them? Like, "these tasks are all part of the ____" What's the word that comes to mind naturally?
+Community solar research PROJECT. But I don't think that that example proves the point.
+Interesting - you naturally said "project" even though it's just research. So maybe the word "project" is actually fine, and the issue is just making it feel effortless to create one? Like:
+One tap to create
+No required fields besides name
+No mental overhead
+Can delete easily if it was unnecessary
+Is the problem the word, or is it that creating projects currently feels like too much work?
+For me, the word project is a speed bump mentally. It makes me stop and think about whether I really want to do this or not.
+That's the key insight. The word makes you question "Is this worthy of being called a project?" What about "Topic"? Examples:
+Topic: "Blinds"
+Topic: "Energy Grant"
+Topic: "Meg follow-up"
+Why it might work:
+No implied scale ("big topic" or "small topic" both make sense)
+Natural: "These tasks are all about the same topic"
+Low commitment - topics are casual
+No mental speed bump
+Would "Add to topic" feel lighter than "Add to project"?
+I think we are getting closer. I think what we're saying here is each item that you create in symphony should be... ...the functional equivalent of an objective. So, action oriented items such as clean your room or pick up dad from the train station or buy a Nintendo Switch for Caleb and Ella. I'm not sure quite where I'm going with this.
+I think you're onto something. Let me try to articulate what you might be getting at: Each "thing" in Symphony should be an outcome you're trying to achieve. Examples:
+❌ "Blinds" (not an outcome)
+✅ "Get blinds for living room" (outcome)
+❌ "Meg"
+✅ "Get energy grant approved" (outcome)
+So instead of creating a container called "Blinds Project", you'd create an outcome called "Get blinds installed" - and underneath that are the steps (measure, purchase, install). Is that what you're feeling toward? That the organizing principle should be outcomes/objectives, not projects/topics?
+Ah, yes, I think...let me take it a little bit further. I think each thing in symphony should be an actionable outcome you are trying to achieve. So, let me see if I can use real world examples. So right now my timeline for today looks like this. Unquarantine life stuff. It's very vague and daunting. And I have probably not coincidentally skipped over it three times that's been due. Talk to Meg, Maryland Energy Administration. It's similarly vague even though it says that it's part of the project community solar report together. Walk jacks. That's routine that happens every day. But I guess there could be, especially since it's something that shows up every day, something a little bit more engagement provoking. So walk jacks for 10 minutes. Minimum. Or, and until he poops with a maximum of 20 minutes or 15 minutes. And this, my struggle with how to word this is a perfect example of the system coaching towards these actionable outcome language examples. Let's move on to the next one. 6.55 am kids routine. And that happens every weekday. So we should have something here that is actionable outcome. The next one is feed jacks at 7am, which happens every day obviously. And this could be simply feed jacks and include. This is an example of maybe of contact surfacing. But feed jacks routine in the morning is supposed to include giving him a probiotic and his anti-anxiety medicine. The next one is walk kids to school at 7.20 am. And this is another routine. Obviously it happens every school day. And is a perfect example of where context surfacing is key. So sometimes the kids need permission slips signed or report cards signed that they have to bring back to school. They have to pick up something from school that they forgot there like a sweatshirt in their locker. And this is a place where we would want those kinds of contexts to shine through. The next example is Martha at 8.30 am calendar event. And this is a one-off calendar event. She normally comes on Fridays. So let's look at both of these. The one-time context thing is she's going to clean the house. So what are some things I have to think about? I would like to straighten up as much as possible. This is something I have to pay her for. I do that in Benmo after she's gone. This particular instance I have to give her a Christmas bonus. Also in Benmo. And another thing I always have to do when she's coming is to consider whether it's a good time to get out of the house and exercise. And also that when I'm in the house she is working in a way that I can start in one room and finish. For the bulk of the remaining time in another room so that she can clean without me being in the way. The next one is in the afternoon. The routine of picking up kids from fitness fun and games after school care. And this is an example of a huge opportunity to have structured activities, engagement, etc. with the kids. But it just becomes a chore of walking to school, picking the kids up and walking home with them and asking them the same questions every time that they don't really feel like answering. And I don't really feel like asking. So the actionable objective approach would be really welcome for things like this. Is this helpful to go through all these examples in this way? Is anything emerging? It sort of feels like it.

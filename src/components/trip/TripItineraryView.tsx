@@ -5,11 +5,11 @@
  */
 
 import { useMemo, useState } from 'react'
-import type { TripMetadata, TripEvent, DrivingEVEvent, ChargingStation, OtherEvent, PackingItem, PackingCategory } from '@/types/trip'
+import type { TripMetadata, TripEvent, DrivingEVEvent, ChargingStation, OtherEvent, PackingItem, PackingCategory, HotelEvent, AirbnbEvent, FamilyStayEvent, FlightEvent, TrainEvent, DrivingRentalEvent } from '@/types/trip'
 import type { Task } from '@/types/task'
-import { EVChargingWaypointSelector } from './EVChargingWaypointSelector'
+import { EVRoutePlanner } from './EVRoutePlanner'
 import { usePacking } from '@/hooks/usePacking'
-import { Save } from 'lucide-react'
+import { Save, Plane, Car, Hotel, Zap, Train, Home, Users, MapPin, Check } from 'lucide-react'
 
 interface TripItineraryViewProps {
   tripMetadata: TripMetadata
@@ -80,11 +80,45 @@ export function TripItineraryView({
     return categories
   }, [packingTasks])
 
-  // Format date range compactly
-  const formatDateRange = (startStr: string, endStr: string) => {
-    const start = new Date(startStr)
-    const end = new Date(endStr)
+  // Calculate actual trip date range from events
+  const calculateTripDates = () => {
+    if (!tripMetadata.events || tripMetadata.events.length === 0) {
+      // Fallback to metadata dates - add time to avoid timezone issues
+      const start = new Date(tripMetadata.startDate + 'T12:00:00')
+      const end = new Date(tripMetadata.endDate + 'T12:00:00')
+      return { start, end }
+    }
 
+    // Collect all date strings
+    const dateStrings: string[] = []
+
+    for (const event of tripMetadata.events) {
+      dateStrings.push(event.date)
+
+      // For accommodations, also consider checkout date as it may be the actual end date
+      if (event.eventType === 'hotel' || event.eventType === 'airbnb' || event.eventType === 'family_stay') {
+        const accommodationEvent = event as HotelEvent | AirbnbEvent | FamilyStayEvent
+        dateStrings.push(accommodationEvent.checkOut)
+      }
+    }
+
+    // Also include metadata end date in case it's later than all events
+    dateStrings.push(tripMetadata.endDate)
+
+    // Sort date strings lexicographically (works for ISO dates)
+    dateStrings.sort()
+    const startDateStr = dateStrings[0]
+    const endDateStr = dateStrings[dateStrings.length - 1]
+
+    // Add time component to avoid timezone shifting
+    const start = new Date(startDateStr + 'T12:00:00')
+    const end = new Date(endDateStr + 'T12:00:00')
+
+    return { start, end }
+  }
+
+  // Format date range compactly
+  const formatDateRange = (start: Date, end: Date) => {
     const startMonth = start.toLocaleDateString('en-US', { month: 'short' })
     const endMonth = end.toLocaleDateString('en-US', { month: 'short' })
     const year = start.getFullYear()
@@ -98,6 +132,124 @@ export function TripItineraryView({
     return `${startMonth} ${start.getDate()} - ${endMonth} ${end.getDate()}, ${year}`
   }
 
+  // Helper to extract city name from location (parsing address for city)
+  const extractCityFromLocation = (location: { name: string; address: string }): string => {
+    // Street keywords that indicate this is a street address, not a city name
+    const streetKeywords = ['street', 'st', 'avenue', 'ave', 'road', 'rd', 'drive', 'dr',
+                           'boulevard', 'blvd', 'lane', 'ln', 'way', 'court', 'ct',
+                           'place', 'pl', 'parkway', 'pkwy', 'circle', 'cir']
+
+    const lowerName = (location.name || '').toLowerCase()
+    const hasStreetKeyword = streetKeywords.some(kw => lowerName.includes(kw))
+
+    // Parse from address - most reliable
+    const address = location.address || location.name
+
+    if (address && address.includes(',')) {
+      const parts = address.split(',').map(p => p.trim())
+
+      // Find the city part (skip street addresses, zips, state codes)
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i]
+        const partLower = part.toLowerCase()
+
+        // Skip if contains street keywords
+        if (streetKeywords.some(kw => partLower.includes(kw))) continue
+
+        // Skip if has numbers
+        if (/\d/.test(part)) continue
+
+        // Skip if is state code (2 capital letters)
+        if (/^[A-Z]{2}$/.test(part)) continue
+
+        // This should be the city
+        if (part.length > 2) {
+          return part
+        }
+      }
+    }
+
+    // If name doesn't have street keywords and no numbers, might be city
+    if (location.name && !hasStreetKeyword && !/\d/.test(location.name)) {
+      const isHotel = lowerName.includes('hotel') || lowerName.includes('inn') ||
+                      lowerName.includes('resort') || lowerName.includes('motel')
+
+      if (!isHotel && location.name.length < 40) {
+        return location.name
+      }
+    }
+
+    // Last resort
+    return location.name || 'Unknown'
+  }
+
+  // Generate meaningful trip title from key destinations
+  const generateTripTitle = () => {
+    if (!tripMetadata.events || tripMetadata.events.length === 0) {
+      // Fallback to origin → destination
+      return `${tripMetadata.origin.name || tripMetadata.origin.address} → ${tripMetadata.destination.name || tripMetadata.destination.address}`
+    }
+
+    // Extract unique overnight stay locations (accommodations)
+    const accommodationEvents = tripMetadata.events.filter(e =>
+      e.eventType === 'hotel' || e.eventType === 'airbnb' || e.eventType === 'family_stay'
+    ) as (HotelEvent | AirbnbEvent | FamilyStayEvent)[]
+
+    if (accommodationEvents.length === 0) {
+      // No accommodations - try to extract destinations from transportation events
+      const transportEvents = tripMetadata.events.filter(e =>
+        e.eventType === 'flight' || e.eventType === 'train' ||
+        e.eventType === 'driving_ev' || e.eventType === 'driving_rental'
+      ) as (FlightEvent | TrainEvent | DrivingEVEvent | DrivingRentalEvent)[]
+
+      if (transportEvents.length > 0) {
+        // Get origin from first event and destination from last event
+        const firstEvent = transportEvents[0]
+        const lastEvent = transportEvents[transportEvents.length - 1]
+        const origin = extractCityFromLocation(firstEvent.origin)
+        const destination = extractCityFromLocation(lastEvent.destination)
+
+        if (origin !== destination) {
+          return `${origin} → ${destination}`
+        }
+      }
+
+      // Final fallback
+      return `${tripMetadata.origin.name || tripMetadata.origin.address} → ${tripMetadata.destination.name || tripMetadata.destination.address}`
+    }
+
+    // Build title from accommodation city names
+    const uniqueLocations: string[] = []
+    const seenLocations = new Set<string>()
+
+    // Add origin city
+    const origin = extractCityFromLocation(tripMetadata.origin)
+    uniqueLocations.push(origin)
+    seenLocations.add(origin.toLowerCase())
+
+    // Add each unique accommodation city
+    for (const event of accommodationEvents) {
+      const city = extractCityFromLocation(event.location)
+      const cityKey = city.toLowerCase()
+
+      if (!seenLocations.has(cityKey) && cityKey !== origin.toLowerCase()) {
+        uniqueLocations.push(city)
+        seenLocations.add(cityKey)
+      }
+    }
+
+    // If we have multiple stops, show the route
+    if (uniqueLocations.length > 1) {
+      return uniqueLocations.join(' → ')
+    }
+
+    // Single location - just show it
+    return uniqueLocations[0]
+  }
+
+  const tripDates = calculateTripDates()
+  const tripTitle = generateTripTitle()
+
   const completedPackingCount = packingTasks.filter(t => t.completed).length
   const totalPackingCount = packingTasks.length
 
@@ -110,7 +262,7 @@ export function TripItineraryView({
       e.eventType === 'hotel' || e.eventType === 'airbnb' || e.eventType === 'family_stay'
     ).length
     const chargingStops = events.filter(e =>
-      e.eventType === 'other' && (e as any).description?.includes('⚡')
+      e.eventType === 'other' && ((e as any).description?.includes('EV Charge') || (e as any).description?.includes('⚡'))
     ).length
 
     return { flights, drives, accommodations, chargingStops, total: events.length }
@@ -134,7 +286,7 @@ export function TripItineraryView({
     const chargingEvents: OtherEvent[] = waypoints.map((station) => ({
       id: crypto.randomUUID(),
       eventType: 'other' as const,
-      description: `⚡ Charge at ${station.name}`,
+      description: `EV Charge at ${station.name}`,
       location: station.location,
       date: drivingEvent.date,
       time: drivingEvent.time || '08:00',
@@ -224,16 +376,14 @@ export function TripItineraryView({
             </div>
 
             <h2 className="font-display text-xl font-bold text-neutral-900 leading-tight mb-1">
-              {tripMetadata.origin.name || tripMetadata.origin.address}
-              <span className="text-amber-600 mx-2">→</span>
-              {tripMetadata.destination.name || tripMetadata.destination.address}
+              {tripTitle}
             </h2>
           </div>
 
           <div className="text-right flex-shrink-0">
             <div className="text-xs text-neutral-500 mb-1">Dates</div>
             <div className="text-sm font-semibold text-neutral-900 whitespace-nowrap">
-              {formatDateRange(tripMetadata.startDate, tripMetadata.endDate)}
+              {formatDateRange(tripDates.start, tripDates.end)}
             </div>
           </div>
         </div>
@@ -242,25 +392,25 @@ export function TripItineraryView({
         <div className="flex items-center gap-4 text-xs flex-wrap">
           {tripStats.flights > 0 && (
             <div className="flex items-center gap-1.5">
-              <span className="text-blue-600">✈️</span>
+              <Plane className="w-4 h-4 text-blue-600" />
               <span className="font-medium text-neutral-700">{tripStats.flights} flight{tripStats.flights !== 1 ? 's' : ''}</span>
             </div>
           )}
           {tripStats.drives > 0 && (
             <div className="flex items-center gap-1.5">
-              <span className="text-green-600">🚗</span>
+              <Car className="w-4 h-4 text-green-600" />
               <span className="font-medium text-neutral-700">{tripStats.drives} drive{tripStats.drives !== 1 ? 's' : ''}</span>
             </div>
           )}
           {tripStats.accommodations > 0 && (
             <div className="flex items-center gap-1.5">
-              <span className="text-rose-600">🏨</span>
+              <Hotel className="w-4 h-4 text-rose-600" />
               <span className="font-medium text-neutral-700">{tripStats.accommodations} stay{tripStats.accommodations !== 1 ? 's' : ''}</span>
             </div>
           )}
           {tripStats.chargingStops > 0 && (
             <div className="flex items-center gap-1.5">
-              <span className="text-yellow-600">⚡</span>
+              <Zap className="w-4 h-4 text-yellow-600" />
               <span className="font-medium text-neutral-700">{tripStats.chargingStops} charge{tripStats.chargingStops !== 1 ? 's' : ''}</span>
             </div>
           )}
@@ -333,10 +483,15 @@ export function TripItineraryView({
                     {completedPackingCount}/{totalPackingCount}
                   </span>
                 </div>
-                <div className="text-xs text-emerald-600 font-medium">
-                  {completedPackingCount === totalPackingCount
-                    ? '✓ All packed!'
-                    : `${totalPackingCount - completedPackingCount} items remaining`}
+                <div className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                  {completedPackingCount === totalPackingCount ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>All packed!</span>
+                    </>
+                  ) : (
+                    <span>{totalPackingCount - completedPackingCount} items remaining</span>
+                  )}
                 </div>
               </div>
             )}
@@ -391,9 +546,9 @@ export function TripItineraryView({
         </div>
       </div>
 
-      {/* EV Charging Waypoint Selector Modal */}
+      {/* EV Route Planner Modal */}
       {selectedEventForCharging && tripMetadata.events && (
-        <EVChargingWaypointSelector
+        <EVRoutePlanner
           event={tripMetadata.events.find(e => e.id === selectedEventForCharging) as DrivingEVEvent}
           onClose={() => setSelectedEventForCharging(null)}
           onSelectWaypoints={(waypoints) => handleSelectWaypoints(waypoints, selectedEventForCharging)}
@@ -491,57 +646,61 @@ function CompactEventCard({ event, onRequestCharging, onClick }: CompactEventCar
       case 'flight': {
         const e = event as any
         return {
-          icon: '✈️',
+          icon: <Plane className="w-5 h-5" />,
           title: e.airline && e.flightNumber ? `${e.airline} ${e.flightNumber}` : 'Flight',
           subtitle: `${e.origin?.name || e.origin?.address} → ${e.destination?.name || e.destination?.address}`,
           detail: e.confirmationNumber || null,
           bg: 'bg-blue-50',
           border: 'border-blue-200',
-          accent: 'text-blue-700'
+          accent: 'text-blue-700',
+          iconColor: 'text-blue-600'
         }
       }
       case 'train': {
         const e = event as any
         return {
-          icon: '🚂',
+          icon: <Train className="w-5 h-5" />,
           title: e.line || 'Train',
           subtitle: `${e.origin?.name || e.origin?.address} → ${e.destination?.name || e.destination?.address}`,
           detail: e.trainNumber ? `#${e.trainNumber}` : null,
           bg: 'bg-purple-50',
           border: 'border-purple-200',
-          accent: 'text-purple-700'
+          accent: 'text-purple-700',
+          iconColor: 'text-purple-600'
         }
       }
       case 'driving_ev': {
         const e = event as any
         return {
-          icon: '⚡',
+          icon: <Zap className="w-5 h-5" />,
           title: 'Drive (EV)',
           subtitle: `${e.origin?.name || e.origin?.address} → ${e.destination?.name || e.destination?.address}`,
           detail: e.evVehicle ? `${e.evVehicle.currentBattery}% battery` : null,
           bg: 'bg-green-50',
           border: 'border-green-200',
           accent: 'text-green-700',
+          iconColor: 'text-green-600',
           hasCharging: true
         }
       }
       case 'driving_rental': {
         const e = event as any
         return {
-          icon: '🚗',
+          icon: <Car className="w-5 h-5" />,
           title: 'Drive (Rental)',
           subtitle: `${e.origin?.name || e.origin?.address} → ${e.destination?.name || e.destination?.address}`,
           detail: e.rentalCar?.company || null,
           bg: 'bg-orange-50',
           border: 'border-orange-200',
-          accent: 'text-orange-700'
+          accent: 'text-orange-700',
+          iconColor: 'text-orange-600'
         }
       }
       case 'hotel':
       case 'airbnb':
       case 'family_stay': {
         const e = event as any
-        const icon = event.eventType === 'hotel' ? '🏨' : event.eventType === 'airbnb' ? '🏠' : '👨‍👩‍👧'
+        const icon = event.eventType === 'hotel' ? <Hotel className="w-5 h-5" /> : event.eventType === 'airbnb' ? <Home className="w-5 h-5" /> : <Users className="w-5 h-5" />
         return {
           icon,
           title: e.name,
@@ -549,19 +708,21 @@ function CompactEventCard({ event, onRequestCharging, onClick }: CompactEventCar
           detail: `Check-in ${e.checkIn}`,
           bg: 'bg-rose-50',
           border: 'border-rose-200',
-          accent: 'text-rose-700'
+          accent: 'text-rose-700',
+          iconColor: 'text-rose-600'
         }
       }
       default: {
         const e = event as any
         return {
-          icon: '📍',
+          icon: <MapPin className="w-5 h-5" />,
           title: e.description || event.eventType.replace(/_/g, ' '),
           subtitle: e.location?.name || e.location?.address,
           detail: e.confirmationNumber || null,
           bg: 'bg-neutral-50',
           border: 'border-neutral-200',
-          accent: 'text-neutral-700'
+          accent: 'text-neutral-700',
+          iconColor: 'text-neutral-600'
         }
       }
     }
@@ -578,7 +739,7 @@ function CompactEventCard({ event, onRequestCharging, onClick }: CompactEventCar
     >
       {/* Header: Icon + Date/Time */}
       <div className="flex items-start justify-between mb-2">
-        <div className="text-2xl leading-none">{details.icon}</div>
+        <div className={`${details.iconColor}`}>{details.icon}</div>
         <div className="text-right">
           <div className="text-xs font-bold text-neutral-900">{date}</div>
           {time && <div className="text-xs text-neutral-500">{time}</div>}

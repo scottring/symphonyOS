@@ -561,34 +561,6 @@ function App() {
     })
   }, [selectedProjectId, getEventNotesForProject])
 
-  // Get notes linked to selected project (ProjectView)
-  const [selectedProjectNotes, setSelectedProjectNotes] = useState<Note[]>([])
-  const [selectedProjectNotesLoading, setSelectedProjectNotesLoading] = useState(false)
-
-  useEffect(() => {
-    if (!selectedProject) {
-      setSelectedProjectNotes([])
-      return
-    }
-    setSelectedProjectNotesLoading(true)
-    getNotesForEntity('project', selectedProject.id)
-      .then(setSelectedProjectNotes)
-      .finally(() => setSelectedProjectNotesLoading(false))
-  }, [selectedProject?.id, getNotesForEntity])
-
-  const handleAddProjectNote = useCallback(
-    async (content: string, entityType: NoteEntityType, entityId: string) => {
-      const note = await addNote({ content })
-      if (note) {
-        await addEntityLink(note.id, { entityType, entityId })
-        // Refresh the project notes
-        const updatedNotes = await getNotesForEntity('project', entityId)
-        setSelectedProjectNotes(updatedNotes)
-      }
-    },
-    [addNote, addEntityLink, getNotesForEntity]
-  )
-
   // Get routine for routine view
   const selectedRoutine = useMemo(() => {
     if (!selectedRoutineId) return null
@@ -942,7 +914,7 @@ function App() {
           return // Wait for user to decide in the prompt
         }
 
-        // If it's an event and we have a date, also create in Google Calendar
+        // If it's an event and we have a date, create in Google Calendar only
         if (data.category === 'event' && data.scheduledFor && isConnected) {
           try {
             // Default to 1 hour event
@@ -966,13 +938,15 @@ function App() {
             await fetchEvents(today, weekLater)
 
             showToast('Event added to Google Calendar', 'success')
+            return // Don't create local task - event is in Google Calendar
           } catch (err) {
             console.error('Failed to sync event to Google Calendar:', err)
             showToast('Event created locally (Calendar sync failed)', 'warning')
+            // Fall through to create local task as fallback
           }
         }
 
-        // Always create the task/event locally in Symphony
+        // Create task/event locally for non-events or when calendar not connected
         const taskId = await addTask(
           data.title,
           data.contactId,
@@ -1363,9 +1337,6 @@ function App() {
             canPin={pinnedItems.canPin()}
             onPin={() => pinnedItems.pin('project', selectedProject.id)}
             onUnpin={() => pinnedItems.unpin('project', selectedProject.id)}
-            entityNotes={selectedProjectNotes}
-            entityNotesLoading={selectedProjectNotesLoading}
-            onAddEntityNote={handleAddProjectNote}
           />
         </Suspense>
       )}

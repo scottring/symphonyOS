@@ -120,7 +120,7 @@ export function ProjectsListRedesign({ projects, tasks = [], onSelectProject, on
       <div className="flex items-center gap-2">
         <div className="w-16 h-1.5 bg-neutral-200 rounded-full overflow-hidden">
           <div
-            className="h-full bg-blue-500 rounded-full transition-all duration-500 ease-out"
+            className="h-full bg-primary-500 rounded-full transition-all duration-500 ease-out"
             style={{ width: `${percent}%` }}
           />
         </div>
@@ -140,12 +140,12 @@ export function ProjectsListRedesign({ projects, tasks = [], onSelectProject, on
         key={project.id}
         onClick={() => onSelectProject(project.id)}
         className="w-full flex items-center gap-4 p-5 rounded-2xl bg-white border border-neutral-100
-                   hover:border-blue-200 hover:shadow-md transition-all duration-200 text-left group"
+                   hover:border-primary-200 hover:shadow-md transition-all duration-200 text-left group"
         style={{ animationDelay: `${index * 50}ms` }}
       >
         {/* Folder icon in circle */}
-        <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0
-                        group-hover:bg-blue-200 transition-colors">
+        <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center text-primary-600 flex-shrink-0
+                        group-hover:bg-primary-200 transition-colors">
           <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 20 20" fill="currentColor">
             <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
           </svg>
@@ -153,7 +153,7 @@ export function ProjectsListRedesign({ projects, tasks = [], onSelectProject, on
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <div className="font-medium text-neutral-800 text-base truncate group-hover:text-blue-700 transition-colors">
+          <div className="font-medium text-neutral-800 text-base truncate group-hover:text-primary-700 transition-colors">
             {project.name}
           </div>
           <div className="flex items-center gap-2 mt-1 text-sm text-neutral-500">
@@ -180,7 +180,7 @@ export function ProjectsListRedesign({ projects, tasks = [], onSelectProject, on
         {/* Chevron */}
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          className="w-5 h-5 text-neutral-300 group-hover:text-blue-400 group-hover:translate-x-1 transition-all flex-shrink-0"
+          className="w-5 h-5 text-neutral-300 group-hover:text-primary-400 group-hover:translate-x-1 transition-all flex-shrink-0"
           viewBox="0 0 20 20"
           fill="currentColor"
         >
@@ -194,8 +194,8 @@ export function ProjectsListRedesign({ projects, tasks = [], onSelectProject, on
 
   return (
     <div className="h-full overflow-auto bg-[var(--color-bg-base)]">
-      {/* Subtle blue gradient accent */}
-      <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-blue-50/50 to-transparent pointer-events-none" />
+      {/* Subtle green gradient accent */}
+      <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-primary-50/50 to-transparent pointer-events-none" />
 
       <div className="relative max-w-3xl mx-auto px-6 md:px-8 py-8">
         {/* Header */}
@@ -227,8 +227,8 @@ export function ProjectsListRedesign({ projects, tasks = [], onSelectProject, on
               {onAddProject && (
                 <button
                   onClick={() => setIsCreating(true)}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-blue-500 text-white rounded-xl font-medium
-                             hover:bg-blue-600 active:bg-blue-700 transition-colors shadow-sm
+                  className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-medium
+                             hover:from-primary-600 hover:to-primary-700 active:from-primary-700 active:to-primary-800 transition-all shadow-sm
                              hover:shadow-md"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
@@ -243,7 +243,7 @@ export function ProjectsListRedesign({ projects, tasks = [], onSelectProject, on
 
         {/* Inline project creation form */}
         {isCreating && (
-          <div className="mb-8 p-6 rounded-2xl bg-white border border-blue-200 shadow-lg animate-fade-in-scale">
+          <div className="mb-8 p-6 rounded-2xl bg-white border border-primary-200 shadow-lg animate-fade-in-scale">
             <input
               ref={inputRef}
               type="text"
@@ -253,7 +253,7 @@ export function ProjectsListRedesign({ projects, tasks = [], onSelectProject, on
               placeholder="What's the project?"
               className="w-full px-4 py-3 rounded-xl border border-neutral-200 bg-neutral-50
                          text-neutral-800 placeholder:text-neutral-400 text-2xl font-display
-                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                         focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
                          transition-all"
             />
             <div className="flex justify-end gap-3 mt-4">
@@ -268,7 +268,7 @@ export function ProjectsListRedesign({ projects, tasks = [], onSelectProject, on
                 type="button"
                 onClick={handleCreateProject}
                 disabled={!newProjectName.trim() || isSaving}
-                className="px-5 py-2.5 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-5 py-2.5 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSaving ? 'Creating...' : 'Create Project'}
               </button>
@@ -279,8 +279,8 @@ export function ProjectsListRedesign({ projects, tasks = [], onSelectProject, on
         {/* Empty state */}
         {!hasProjects && (
           <div className="text-center py-16 animate-fade-in-up">
-            <div className="w-20 h-20 rounded-2xl bg-blue-100 flex items-center justify-center mx-auto mb-5">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
+            <div className="w-20 h-20 rounded-2xl bg-primary-100 flex items-center justify-center mx-auto mb-5">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-primary-500" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
               </svg>
             </div>
@@ -291,8 +291,8 @@ export function ProjectsListRedesign({ projects, tasks = [], onSelectProject, on
             {onAddProject && (
               <button
                 onClick={() => setIsCreating(true)}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-500 text-white rounded-xl font-medium
-                           hover:bg-blue-600 transition-colors shadow-sm"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary-500 text-white rounded-xl font-medium
+                           hover:bg-primary-600 transition-colors shadow-sm"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />

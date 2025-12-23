@@ -1,4 +1,5 @@
 import type { TripMetadata } from './trip'
+import type { TaskLink } from './task'
 
 export type ProjectStatus = 'not_started' | 'in_progress' | 'on_hold' | 'completed'
 export type ProjectType = 'general' | 'trip'
@@ -9,6 +10,8 @@ export interface Project {
   status: ProjectStatus
   type?: ProjectType
   notes?: string
+  links?: TaskLink[]
+  phoneNumber?: string
   parentId?: string
   tripMetadata?: TripMetadata
   createdAt: Date
@@ -22,6 +25,8 @@ export interface DbProject {
   status: ProjectStatus
   type: ProjectType | null
   notes: string | null
+  links: TaskLink[] | null
+  phone_number: string | null
   parent_id: string | null
   trip_metadata: TripMetadata | null
   created_at: string

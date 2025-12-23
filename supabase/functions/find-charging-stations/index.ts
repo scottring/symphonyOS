@@ -117,7 +117,7 @@ serve(async (req) => {
       const operatorId = location.OperatorInfo?.ID || 0
       const operatorTitle = location.OperatorInfo?.Title || ''
       const stationName = location.AddressInfo?.Title || location.Title || ''
-      const mappedNetwork = mapToChargingNetwork(operatorId, operatorTitle, stationName)
+      const mappedNetwork = mapToChargingNetwork(operatorId, operatorTitle, stationName, maxPower)
 
       // Log each station's network mapping for debugging
       console.log(`Station "${stationName}": OperatorID=${operatorId}, OperatorTitle="${operatorTitle}" → Network="${mappedNetwork}"`)
@@ -175,14 +175,14 @@ function formatAddress(addressInfo: OCMLocation['AddressInfo']): string {
   return parts.join(', ')
 }
 
-function mapToChargingNetwork(operatorId: number, operatorTitle: string, stationName: string): string {
+function mapToChargingNetwork(operatorId: number, operatorTitle: string, stationName: string, powerKW: number): string {
   // Map Open Charge Map operator IDs to network names
   const NETWORK_MAP: Record<number, string> = {
     1: 'Other',
     2: 'ChargePoint',
     3: 'Blink',
     23: 'Tesla Supercharger',
-    25: 'Electrify America',
+    3259: 'Electrify America', // Correct operator ID for Electrify America
     35: 'EVgo',
   }
 
@@ -191,21 +191,27 @@ function mapToChargingNetwork(operatorId: number, operatorTitle: string, station
     return NETWORK_MAP[operatorId]
   }
 
-  // Try operator title
-  const title = operatorTitle.toLowerCase()
+  // Try operator title (more flexible matching)
+  const title = operatorTitle.toLowerCase().replace(/\s+/g, '') // Remove spaces for flexible matching
   if (title.includes('tesla')) return 'Tesla Supercharger'
-  if (title.includes('electrify america')) return 'Electrify America'
+  if (title.includes('electrify') && title.includes('america')) return 'Electrify America'
   if (title.includes('chargepoint')) return 'ChargePoint'
   if (title.includes('evgo')) return 'EVgo'
   if (title.includes('blink')) return 'Blink'
 
-  // Finally, try station name (many stations include network in the name)
-  const name = stationName.toLowerCase()
+  // Try station name (many stations include network in the name)
+  const name = stationName.toLowerCase().replace(/\s+/g, '') // Remove spaces for flexible matching
   if (name.includes('tesla') || name.includes('supercharger')) return 'Tesla Supercharger'
-  if (name.includes('electrify america')) return 'Electrify America'
+  if (name.includes('electrify') && name.includes('america')) return 'Electrify America'
   if (name.includes('chargepoint')) return 'ChargePoint'
   if (name.includes('evgo')) return 'EVgo'
   if (name.includes('blink')) return 'Blink'
+
+  // Power-based heuristic: Electrify America is known for 350kW ultra-fast chargers
+  // Very few other networks have chargers this powerful
+  if (powerKW >= 350) {
+    return 'Electrify America'
+  }
 
   return 'Other'
 }

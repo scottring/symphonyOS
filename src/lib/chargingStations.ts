@@ -36,19 +36,20 @@ export async function findChargingStations(params: FindChargersParams): Promise<
   } = params
 
   try {
-    // Call our Supabase Edge Function to fetch stations (bypasses CORS)
-    const { data, error } = await supabase.functions.invoke('find-charging-stations', {
+    // Call our Supabase Edge Function to fetch stations from NREL API
+    const { data, error } = await supabase.functions.invoke('find-charging-stations-nrel', {
       body: {
         latitude,
         longitude,
         radiusMiles,
         maxResults,
         minPowerKW,
+        networks, // Pass network filter to NREL
       },
     })
 
     if (error) {
-      console.error('Error calling find-charging-stations function:', error)
+      console.error('Error calling find-charging-stations-nrel function:', error)
       return []
     }
 
