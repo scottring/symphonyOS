@@ -150,8 +150,8 @@ export function AuthForm() {
                 </svg>
               </div>
               <div>
-                <p className="text-neutral-700 text-sm font-medium">Life is collaborative</p>
-                <p className="text-neutral-500 text-xs mt-0.5">Connect tasks to people. Everyone knows what they're responsible for.</p>
+                <p className="text-neutral-700 text-sm font-medium">Built to collaborate</p>
+                <p className="text-neutral-500 text-xs mt-0.5">Collaboration from the very beginning—not a tack-on. Everyone knows what they're responsible for.</p>
               </div>
             </div>
 
@@ -163,7 +163,7 @@ export function AuthForm() {
               </div>
               <div>
                 <p className="text-neutral-700 text-sm font-medium">Context is first-class</p>
-                <p className="text-neutral-500 text-xs mt-0.5">Attach phone numbers, links, notes. Everything you need, right when you need it.</p>
+                <p className="text-neutral-500 text-xs mt-0.5">Attach phone numbers, links, notes. No more searching through emails and attachments.</p>
               </div>
             </div>
 
@@ -174,14 +174,14 @@ export function AuthForm() {
                 </svg>
               </div>
               <div>
-                <p className="text-neutral-700 text-sm font-medium">Right information, right time</p>
-                <p className="text-neutral-500 text-xs mt-0.5">Plan deeply on desktop. Execute effortlessly on mobile.</p>
+                <p className="text-neutral-700 text-sm font-medium">Your whole life</p>
+                <p className="text-neutral-500 text-xs mt-0.5">Work, Personal, Family, House and Home—all equally important.</p>
               </div>
             </div>
           </div>
 
           <p className="text-neutral-400 text-xs mt-6">
-            Work, Personal, and Family — all equally important
+            Built for individuals, designed for sharing
           </p>
         </div>
       </div>

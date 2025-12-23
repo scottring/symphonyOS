@@ -6,9 +6,9 @@
 
 ## 30-Second Version (Networking)
 
-"Symphony is your WHOLE Life Operating System — designed for adults managing hectic lives across work, personal, and family.
+"Symphony is your WHOLE Life Operating System — designed for adults managing complex lives across work, personal, family, and house and home.
 
-Symphony does three things beautifully: First, it connects tasks to people, because life is collaborative. Second, it makes context first-class — phone numbers, links, notes attach to tasks and surface when you need them. Third, it brings the right information forward at the right time.
+Symphony does three things beautifully: First, it's built to collaborate from the very beginning — connecting tasks to people is core functionality, not a tack-on. Second, it makes context first-class — phone numbers, links, notes attach to tasks and surface when you need them. No more searching through emails and attachments and spreadsheets for that one piece of information. Third, it's for your whole life — work, personal, family, house and home all equally important.
 
 You plan deeply when you have time to think. Symphony makes sure everything you attached shows up exactly when you need it."
 
@@ -16,11 +16,11 @@ You plan deeply when you have time to think. Symphony makes sure everything you 
 
 ## 60-Second Version (Coffee Chat)
 
-"Symphony is a personal OS for organizing work, life, and family. Most productivity apps are either work-focused or family-focused, but my life happens in three contexts: professional projects, personal goals, and household management.
+"Symphony is a personal OS for organizing your whole life — work, personal, family, house and home. Most productivity apps are either work-focused or family-focused, but my life happens across all these contexts.
 
-The real innovation is context surfacing. When I plan my week, I attach everything I'll need to tasks: vendor phone numbers, product links, measurement notes. Then when it's time to order that tile or call that contractor, I tap the task and everything is right there. I set it up once, Symphony surfaces it every time.
+The real innovation is context surfacing. When I plan my week, I attach everything I'll need to tasks: vendor phone numbers, product links, measurement notes. Then when it's time to order that tile or call that contractor, I tap the task and everything is right there. No more searching through emails and attachments and spreadsheets for that one piece of information. I set it up once, Symphony surfaces it every time.
 
-It's built single-user first — my work stays private, my personal projects stay private. But family sharing is robust. My wife and I can assign household tasks to each other, plan our week together on Sundays, and each see our own view.
+It's built for individuals, designed for sharing. My work stays private, my personal projects stay private. But family sharing is robust — built in from the beginning, not tacked on. My wife and I can assign household tasks to each other, plan our week together on Sundays, and each see our own view.
 
 I plan deeply on desktop when I have time to think. I capture and execute on mobile when life happens. That's Symphony."
 
@@ -50,13 +50,14 @@ Then on mobile, when it's time to act, you tap 'Order backsplash tile' and every
 
 That's the core value: **set it up once, surfaces every time.**
 
-Your life happens in three domains, and Symphony treats all three equally:
+Your life happens across multiple contexts, and Symphony treats all of them equally:
 
 1. **Work** — Client calls, project deadlines, professional tasks
 2. **Personal** — Health goals, hobbies, learning projects
-3. **Family** — Household tasks, kids' schedules, home projects
+3. **Family** — Household tasks, kids' schedules, coordinating with partner
+4. **House and Home** — Repairs, renovations, maintenance projects
 
-You can filter by domain. Set working hours where only work shows. Have family tasks surface in the evening.
+You can filter by context. Set working hours where only work shows. Have family and home tasks surface in the evening.
 
 **Symphony is built for individuals with robust sharing.**
 
@@ -96,19 +97,19 @@ Symphony is in private beta now. We're focused on getting the core loop perfect:
 
 "Great question. Symphony does three unique things:
 
-First, it treats work, personal, and family as equal domains — your whole life, not just one part of it.
+First, it's built to collaborate from the very beginning — not a tack-on feature. Connecting tasks to people, assigning to family members, sharing context — it's core functionality.
 
-Second, it makes context first-class. A task in Symphony is a container: links, phone numbers, notes, files. When it's time to act, everything surfaces together. You set it up once during planning, it delivers reliably every time.
+Second, it makes context first-class. A task in Symphony is a container: links, phone numbers, notes, files. When it's time to act, everything surfaces together. No more searching through emails and attachments and spreadsheets for that one piece of information. You set it up once during planning, it delivers reliably every time.
 
-Third, it's built for individuals with robust sharing — not a team tool adapted for personal use, and not a family app that treats you as secondary to the household."
+Third, it's for your whole life — work, personal, family, house and home all equally important. Not a team tool adapted for personal use, and not a family app that treats you as secondary to the household. Built for individuals, designed for sharing."
 
 ### "Isn't this just another to-do app?"
 
 "Symphony does something fundamentally different.
 
-It stores **context,** not just tasks. The task title is just the handle. The value is in everything you attach to it — and how Symphony surfaces that context when you need it.
+It stores **context,** not just tasks. The task title is just the handle. The value is in everything you attach to it — and how Symphony surfaces that context when you need it. No more searching through emails and attachments and spreadsheets for that one piece of information.
 
-Symphony handles three domains — work AND personal AND family — with privacy controls for each.
+Symphony handles your whole life — work AND personal AND family AND house and home — with privacy controls for each.
 
 And it's designed around how you actually live: Desktop for deep planning when you have time. Mobile for quick execution when you're in the moment."
 
@@ -131,10 +132,10 @@ If you choose to share family tasks with your household, that's your choice. But
 ## Target Audiences
 
 ### Primary: Professional + Family (You)
-"You have a demanding job, a family, and personal goals. You need one system that handles all three without compromising any of them."
+"You have a demanding job, a family, personal goals, and home projects. You need one system that handles all of them without compromising any."
 
 ### Secondary: Busy Parents (Iris-type users)
-"You manage household logistics, kids' schedules, and home projects. You need robust tools, not dumbed-down 'family organizers.'"
+"You manage household logistics, kids' schedules, home projects, and your own work. You need robust tools, not dumbed-down 'family organizers.'"
 
 ### Tertiary: Solopreneurs / Side-hustlers
 "You blur the lines between personal and professional. You need domain separation without multiple apps."
@@ -143,43 +144,43 @@ If you choose to share family tasks with your household, that's your choice. But
 
 ## The Three Core Benefits (Positive Framing)
 
-For adults managing hectic lives across work, family, and personal domains:
+For adults managing complex lives across work, personal, family, and house and home:
 
-### 1. **Life is Collaborative — Symphony Connects Tasks to People**
+### 1. **Built to Collaborate from the Beginning**
 
-Your to-dos involve others: family members sharing responsibilities, contractors you need to call, doctors you schedule with, coworkers you collaborate with.
+Collaboration isn't a tack-on feature — it's core to how Symphony works. Your to-dos involve others: family members sharing responsibilities, contractors you need to call, doctors you schedule with, coworkers you collaborate with.
 
 **Symphony enables:**
 - Tag people involved in tasks
 - Assign family tasks to household members
 - Everyone sees what they're responsible for
-- Nothing falls through the cracks
+- Robust sharing built in from day one
 
 **Benefit:** Clear coordination, shared understanding, seamless collaboration.
 
-### 2. **Context Enables Execution — Symphony Makes It First-Class**
+### 2. **Context is First-Class**
 
-Executing a task requires more than a title. You need: phone numbers to call, product links to order from, measurements you took, notes about decisions you made.
+Executing a task requires more than a title. You need: phone numbers to call, product links to order from, measurements you took, notes about decisions you made. No more searching through emails and attachments and spreadsheets for that one piece of information.
 
 **Symphony enables:**
 - Attach phone numbers, links, notes, files during planning
 - Everything surfaces together when it's time to act
 - Set it up once, Symphony brings it forward every time
-- No searching across apps, no "where did I save that?"
+- Zero searching, just execution
 
 **Benefit:** Effortless execution. Everything you need, right when you need it.
 
-### 3. **The Right Time Matters — Symphony Brings Information Forward**
+### 3. **Your Whole Life**
 
-You plan deeply when you have time — Sunday morning, coffee in hand, thinking through your week. You attach context, schedule tasks, organize projects.
+Work, personal, family, house and home — all equally important. Most apps force you to choose between work productivity or family coordination. Symphony handles all contexts with equal importance.
 
 **Symphony enables:**
-- Planning that builds execution context
-- Mobile UI that surfaces what you attached
-- Information appears automatically based on your schedule
-- Desktop for planning, mobile for execution
+- Unified view of your entire life
+- Filter by context when you need focus
+- Desktop for deep planning, mobile for execution
+- Built for individuals, designed for sharing
 
-**Benefit:** The planning you do shows up exactly when you need it. Zero friction.
+**Benefit:** One system for everything. No more juggling multiple apps.
 
 ---
 

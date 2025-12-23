@@ -59,13 +59,15 @@ Before starting the demo, ensure you have:
 **Screen:** Symphony Today view (desktop)
 
 **Script:**
-> "Symphony is your WHOLE Life Operating System. It does three things beautifully:
+> "Symphony is your WHOLE Life Operating System — designed for adults managing complex lives across work, personal, family, and house and home.
 >
-> First, it connects your tasks to people — family members, contractors, doctors — because life is collaborative.
+> Symphony does three things beautifully:
 >
-> Second, it makes context first-class — phone numbers, links, notes, measurements attach to tasks and surface when you need them.
+> First, it's built to collaborate from the very beginning — connecting tasks to people is core functionality, not a tack-on.
 >
-> Third, it works how you actually live — plan deeply on desktop, execute effortlessly on mobile. Three domains: Work, Personal, and Family — all equally important."
+> Second, it makes context first-class — phone numbers, links, notes attach to tasks and surface when you need them. No more searching through emails and attachments and spreadsheets for that one piece of information.
+>
+> Third, it's for your whole life — work, personal, family, house and home all equally important. Unified view with the ability to filter by context."
 
 ---
 
@@ -173,21 +175,22 @@ Before starting the demo, ensure you have:
 
 ---
 
-#### 4:00-4:30 | Three Domains (30 seconds)
+#### 4:00-4:30 | All Contexts (30 seconds)
 
-**Screen:** Back to desktop, show domain filter or color-coded tasks
+**Screen:** Back to desktop, show context filter or color-coded tasks
 
 **Action:**
 1. Show tasks tagged with different contexts:
    - Work tasks (with work icon/color)
    - Family tasks (with family icon/color)
    - Personal tasks (with personal icon/color)
-2. Optionally filter by one domain to show separation
+   - House and Home tasks (with home icon/color)
+2. Optionally filter by one context to show separation
 
 **Script:**
-> "Notice the domains throughout. Work tasks stay private — my client projects, deadlines. Family is shared with my partner — household tasks, kids' schedules. Personal is mine — hobbies, health, learning.
+> "Notice the contexts throughout. Work tasks stay private — my client projects, deadlines. Family is shared with my partner — household tasks, kids' schedules. Personal is mine — hobbies, health, learning. House and home — repairs, renovations, maintenance.
 >
-> Symphony treats all three as first-class. It's not a 'family app' with work bolted on. It's not a 'productivity app' that forgets you have a family. All three matter equally."
+> Symphony treats all contexts equally. It's not a 'family app' with work bolted on. It's not a 'productivity app' that forgets you have a family and a home. Your whole life matters."
 
 ---
 
@@ -196,15 +199,19 @@ Before starting the demo, ensure you have:
 **Screen:** Stay on Today view showing the daily plan
 
 **Script:**
-> "Here's what makes Symphony different: Context is first-class. You attach links, phone numbers, notes, files to your tasks and projects during planning. Symphony surfaces it all when you need it.
+> "Here's what makes Symphony different:
 >
-> Three domains — work, personal, family — all equally important.
+> First, it's built to collaborate from the very beginning — not a tack-on feature. Collaboration is core.
 >
-> Built for individuals with robust sharing. You're the primary unit, not your family. Your data is yours.
+> Second, context is first-class. You attach links, phone numbers, notes, files to your tasks and projects during planning. Symphony surfaces it all when you need it. No more searching through emails and attachments and spreadsheets.
+>
+> Third, it's for your whole life — work, personal, family, house and home — all equally important.
+>
+> Built for individuals, designed for sharing. You're the primary unit. Your data is yours, sharing is robust.
 >
 > Plan deeply on desktop when you have time to think. Execute effortlessly on mobile when life happens.
 >
-> That's Symphony: Your personal operating system for life."
+> That's Symphony: Your WHOLE Life Operating System."
 
 ---
 
@@ -250,25 +257,26 @@ If you want to tell a more narrative-driven demo, use this flow:
 1. **Context Surfacing**
    - "You set it up once during planning..."
    - "When it's time to act, everything is right there"
-   - "No searching. No switching apps."
+   - "No more searching through emails and attachments and spreadsheets"
 
-2. **Three Domains**
-   - "Work, personal, and family — all equally important"
-   - "Not a family app. Not a work app. All of life."
+2. **Your Whole Life**
+   - "Work, personal, family, house and home — all equally important"
+   - "Not a family app. Not a work app. Your whole life."
+   - "Unified view with the ability to filter by context"
 
 3. **Desktop vs Mobile**
    - "Plan deeply on desktop"
    - "Execute effortlessly on mobile"
    - "This is the rhythm"
 
-4. **Individual First**
+4. **Built for Individuals, Designed for Sharing**
    - "You are the primary unit, not your family"
-   - "Your work stays private, your family sharing is robust"
+   - "Your work stays private, sharing is robust and built-in from day one"
 
-5. **Simple Capture, Rich Planning**
-   - "Brain dump is just a title"
-   - "Triage adds the structure"
-   - "Planning adds the context"
+5. **Collaboration from the Beginning**
+   - "Collaboration isn't tacked on — it's core functionality"
+   - "Connect tasks to people, assign to family members"
+   - "Everyone knows what they're responsible for"
 
 ### What NOT to Say
 
@@ -279,10 +287,11 @@ If you want to tell a more narrative-driven demo, use this flow:
 
 ### Key Phrases to Use
 
-✅ "Personal operating system for life"
-✅ "Context surfaces when you need it"
+✅ "Your WHOLE Life Operating System"
+✅ "Context surfaces when you need it — no more searching"
 ✅ "Built for individuals, designed for sharing"
 ✅ "Plan deeply, execute effortlessly"
+✅ "Collaboration from the beginning, not tacked on"
 
 ---
 
@@ -334,11 +343,12 @@ A: "We're currently in private beta — free while we refine the experience with
 ## Success Metrics
 
 A successful demo should:
-- ✅ Clearly communicate the core problem (scattered context)
-- ✅ Show the solution (context surfacing)
-- ✅ Demonstrate all three domains (work, personal, family)
+- ✅ Clearly communicate the core problem (searching through emails/attachments/spreadsheets)
+- ✅ Show the solution (context surfacing when you need it)
+- ✅ Demonstrate all contexts (work, personal, family, house and home)
 - ✅ Show both desktop and mobile UI
-- ✅ Leave viewers understanding: "This is for MY whole life, not just family"
+- ✅ Leave viewers understanding: "This is for MY whole life, not just one part"
+- ✅ Emphasize collaboration is built-in from the beginning
 - ✅ End with them wanting to try it
 
 ---
