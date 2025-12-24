@@ -1369,7 +1369,7 @@ export function TodaySchedule({
                         }
                       }}
                       onPush={
-                        item.type === 'task' && taskId && onPushTask
+                        item.type === 'task' && taskId && onPushTask && !taskId.startsWith('pack-')
                           ? (date: Date) => onPushTask(taskId, date)
                           : item.type === 'routine' && onPushRoutine
                           ? (date: Date) => onPushRoutine(item.id.replace('routine-', ''), date)
@@ -1377,7 +1377,7 @@ export function TodaySchedule({
                           ? (date: Date) => onPushEvent(item.id.replace('event-', ''), date)
                           : undefined
                       }
-                      onSchedule={item.type === 'task' && taskId && onUpdateTask
+                      onSchedule={item.type === 'task' && taskId && onUpdateTask && !taskId.startsWith('pack-')
                         ? (date: Date, isAllDay: boolean) => onUpdateTask(taskId, { scheduledFor: date, isAllDay })
                         : undefined
                       }

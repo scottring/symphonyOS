@@ -198,13 +198,13 @@ export function formatTimeRangeWithDate(start: Date, end: Date, allDay?: boolean
 /**
  * Get the time of day for a given date.
  * Morning: before 12pm
- * Afternoon: 12pm - 5pm
- * Evening: 5pm onwards
+ * Afternoon: 12pm - 6pm
+ * Evening: 6pm onwards
  */
 export function getTimeOfDay(date: Date): TimeOfDay {
   const hour = date.getHours()
   if (hour < 12) return 'morning'
-  if (hour < 17) return 'afternoon'
+  if (hour < 18) return 'afternoon'
   return 'evening'
 }
 
