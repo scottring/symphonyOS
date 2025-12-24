@@ -420,35 +420,72 @@
   <!-- Hero -->
   <section class="hero">
     <svg class="hero-illustration" viewBox="0 0 500 300" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <!-- Split life illustration: two worlds becoming one -->
-      <!-- Left side: work elements -->
-      <circle cx="150" cy="150" r="100" fill="#E5DFF5" opacity="0.6"/>
-      <rect x="110" y="120" width="80" height="60" rx="8" fill="white" stroke="#2D5A47" stroke-width="2"/>
-      <line x1="120" y1="140" x2="180" y2="140" stroke="#2D5A47" stroke-width="2" stroke-linecap="round"/>
-      <line x1="120" y1="155" x2="160" y2="155" stroke="#A8C5B8" stroke-width="2" stroke-linecap="round"/>
-      <circle cx="130" cy="100" r="8" fill="#2D5A47"/>
-      <circle cx="155" cy="95" r="5" fill="#A8C5B8"/>
-      
-      <!-- Right side: family elements -->
-      <circle cx="350" cy="150" r="100" fill="#F5DDD3" opacity="0.6"/>
-      <path d="M330 160 Q350 130 370 160" stroke="#2D5A47" stroke-width="2" fill="none" stroke-linecap="round"/>
-      <circle cx="330" cy="140" r="12" fill="white" stroke="#2D5A47" stroke-width="2"/>
-      <circle cx="370" cy="140" r="10" fill="white" stroke="#2D5A47" stroke-width="2"/>
-      <circle cx="350" cy="175" r="8" fill="white" stroke="#2D5A47" stroke-width="2"/>
-      <path d="M320 190 L340 200 L360 190 L380 200" stroke="#A8C5B8" stroke-width="2" fill="none" stroke-linecap="round"/>
-      
-      <!-- Center: the merge/symphony -->
-      <circle cx="250" cy="150" r="40" fill="#2D5A47" opacity="0.1"/>
-      <circle cx="250" cy="150" r="25" fill="#2D5A47" opacity="0.2"/>
-      <path d="M240 145 L250 155 L270 135" stroke="#2D5A47" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      
-      <!-- Connection lines -->
-      <path d="M200 150 Q225 150 250 150" stroke="#2D5A47" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.4"/>
-      <path d="M300 150 Q275 150 250 150" stroke="#2D5A47" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.4"/>
+      <!-- Subway line illustration: four life domains converging into unified timeline -->
+
+      <!-- Glow effects for depth -->
+      <defs>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+          <feMerge>
+            <feMergeNode in="coloredBlur"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+      </defs>
+
+      <!-- Work line (lavender) - from top left -->
+      <circle cx="80" cy="40" r="20" fill="#E5DFF5" opacity="0.3"/>
+      <circle cx="80" cy="40" r="12" fill="#E5DFF5"/>
+      <path d="M80 52 Q120 80 180 120" stroke="#E5DFF5" stroke-width="5" stroke-linecap="round" opacity="0.7"/>
+      <circle cx="85" cy="42" r="4" fill="#2D5A47" opacity="0.6"/>
+
+      <!-- Personal line (sage) - from top right -->
+      <circle cx="420" cy="40" r="20" fill="#A8C5B8" opacity="0.3"/>
+      <circle cx="420" cy="40" r="12" fill="#A8C5B8"/>
+      <path d="M420 52 Q380 80 320 120" stroke="#A8C5B8" stroke-width="5" stroke-linecap="round" opacity="0.7"/>
+      <circle cx="417" cy="42" r="4" fill="#2D5A47" opacity="0.6"/>
+
+      <!-- Family line (peach) - from bottom left -->
+      <circle cx="80" cy="260" r="20" fill="#F5DDD3" opacity="0.3"/>
+      <circle cx="80" cy="260" r="12" fill="#F5DDD3"/>
+      <path d="M80 248 Q120 220 180 180" stroke="#F5DDD3" stroke-width="5" stroke-linecap="round" opacity="0.7"/>
+      <circle cx="75" cy="255" r="3" fill="#2D5A47" opacity="0.6"/>
+      <circle cx="85" cy="255" r="3" fill="#2D5A47" opacity="0.6"/>
+
+      <!-- House & Home line (warm tan) - from bottom right -->
+      <circle cx="420" cy="260" r="20" fill="#DCC5B0" opacity="0.3"/>
+      <circle cx="420" cy="260" r="12" fill="#DCC5B0"/>
+      <path d="M420 248 Q380 220 320 180" stroke="#DCC5B0" stroke-width="5" stroke-linecap="round" opacity="0.7"/>
+      <path d="M415 263 L420 258 L425 263 L425 268 L415 268 Z" fill="#2D5A47" opacity="0.6" stroke="none"/>
+
+      <!-- Center: Unified timeline interface -->
+      <rect x="190" y="110" width="120" height="80" rx="16" fill="white" stroke="#2D5A47" stroke-width="2.5"/>
+
+      <!-- Timeline items inside the interface -->
+      <rect x="205" y="125" width="90" height="10" rx="5" fill="#E5DFF5" opacity="0.6"/>
+      <rect x="205" y="142" width="70" height="10" rx="5" fill="#A8C5B8" opacity="0.6"/>
+      <rect x="205" y="159" width="85" height="10" rx="5" fill="#F5DDD3" opacity="0.6"/>
+      <rect x="205" y="176" width="65" height="10" rx="5" fill="#DCC5B0" opacity="0.6"/>
+
+      <!-- Small dots showing items -->
+      <circle cx="200" cy="130" r="3" fill="#2D5A47"/>
+      <circle cx="200" cy="147" r="3" fill="#2D5A47"/>
+      <circle cx="200" cy="164" r="3" fill="#2D5A47"/>
+      <circle cx="200" cy="181" r="3" fill="#2D5A47"/>
+
+      <!-- Convergence glow at center -->
+      <circle cx="250" cy="150" r="60" fill="#2D5A47" opacity="0.03"/>
+      <circle cx="250" cy="150" r="40" fill="#2D5A47" opacity="0.05"/>
+
+      <!-- Floating accent dots showing harmony -->
+      <circle cx="245" cy="90" r="4" fill="#A8C5B8" opacity="0.4"/>
+      <circle cx="260" cy="210" r="4" fill="#F5DDD3" opacity="0.4"/>
+      <circle cx="340" cy="150" r="3" fill="#E5DFF5" opacity="0.3"/>
+      <circle cx="160" cy="150" r="3" fill="#DCC5B0" opacity="0.3"/>
     </svg>
     
     <h1>Your WHOLE Life<br/><em>Operating System</em></h1>
-    <p>Everything you need, right when you need it. Work, Personal, Family, and House and Home.</p>
+    <p>Everything you need, right when you need it. Work, Personal, Family, House and Home.</p>
     <a href="#access" class="cta">Request Access</a>
   </section>
 
