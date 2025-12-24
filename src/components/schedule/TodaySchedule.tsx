@@ -588,6 +588,17 @@ export function TodaySchedule({
   void _onAddProject // Available for future inline project creation
   const isMobile = useMobile()
 
+  // Handle item selection - intercept synthetic packing tasks and open project instead
+  const handleSelectItem = useCallback((itemId: string | null) => {
+    if (itemId?.startsWith('task-pack-') && onOpenProject) {
+      // Extract project ID from synthetic packing task ID (format: "task-pack-{projectId}")
+      const projectId = itemId.replace('task-pack-', '')
+      onOpenProject(projectId)
+    } else {
+      onSelectItem(itemId)
+    }
+  }, [onSelectItem, onOpenProject])
+
   // Hide routines toggle with localStorage persistence
   const [hideRoutines, setHideRoutines] = useState(() => {
     const stored = localStorage.getItem('symphony-hide-routines')
@@ -692,12 +703,20 @@ export function TodaySchedule({
       if (!task.scheduledFor) return false
       if (!matchesAssigneeFilter(task.assignedTo)) return false
 
+      // Filter out individual packing tasks - they only show in trip project view
+      if (task.projectId && task.title?.toLowerCase().includes('pack')) {
+        const project = projectsMap?.get(task.projectId)
+        if (project?.type === 'trip') {
+          return false // Hide packing tasks from overdue
+        }
+      }
+
       const taskDate = new Date(task.scheduledFor)
       taskDate.setHours(0, 0, 0, 0)
 
       return taskDate < today
     })
-  }, [tasks, isToday, selectedAssignee])
+  }, [tasks, isToday, selectedAssignee, projectsMap])
 
   // Inbox tasks: needs triage - only shown on today's view
   // Includes: no scheduledFor, OR deferredUntil <= today
@@ -710,6 +729,15 @@ export function TodaySchedule({
       if (task.completed) return false
       if (task.isSomeday) return false // Someday items are not in inbox
       if (!matchesAssigneeFilter(task.assignedTo)) return false
+
+      // Filter out individual packing tasks - they only show in trip project view
+      if (task.projectId && task.title?.toLowerCase().includes('pack')) {
+        const project = projectsMap?.get(task.projectId)
+        if (project?.type === 'trip') {
+          return false // Hide packing tasks from inbox
+        }
+      }
+
       // No scheduled date = inbox item
       if (!task.scheduledFor) {
         // If deferred to a future time, don't show yet
@@ -723,7 +751,7 @@ export function TodaySchedule({
       }
       return false
     })
-  }, [tasks, isToday, selectedAssignee])
+  }, [tasks, isToday, selectedAssignee, projectsMap])
 
   // Filter tasks for the viewed date (only tasks with scheduledFor)
   const filteredTasks = useMemo(() => {
@@ -734,13 +762,22 @@ export function TodaySchedule({
 
     return tasks.filter((task) => {
       if (!matchesAssigneeFilter(task.assignedTo)) return false
+
+      // Filter out individual packing tasks - they only show in trip project view
+      if (task.projectId && task.title?.toLowerCase().includes('pack')) {
+        const project = projectsMap?.get(task.projectId)
+        if (project?.type === 'trip') {
+          return false // Hide packing tasks from timeline
+        }
+      }
+
       if (task.scheduledFor) {
         const taskDate = new Date(task.scheduledFor)
         return taskDate >= startOfDay && taskDate <= endOfDay
       }
       return false // Unscheduled tasks go to inbox, not here
     })
-  }, [tasks, viewedDate, selectedAssignee])
+  }, [tasks, viewedDate, selectedAssignee, projectsMap])
 
   // Filter events for the viewed date and deduplicate by title + start time
   const filteredEvents = useMemo(() => {
@@ -798,8 +835,62 @@ export function TodaySchedule({
     return map
   }, [dateInstances])
 
+  // Generate synthetic "Pack for [Trip]" tasks for trips with packing items
+  const packingTasks = useMemo(() => {
+    if (!projects || projects.length === 0) return []
+
+    const tripProjects = projects.filter(p => p.type === 'trip')
+    const syntheticPackingTasks: Task[] = []
+
+    for (const trip of tripProjects) {
+      // Find packing items for this trip
+      const packingItems = tasks.filter(task =>
+        task.projectId === trip.id &&
+        task.title?.toLowerCase().includes('pack')
+      )
+
+      if (packingItems.length === 0) continue
+
+      // Get trip start date from metadata
+      const tripMetadata = trip.tripMetadata
+      const startDate = tripMetadata?.startDate
+      if (!startDate) continue
+
+      // Schedule packing for day before trip starts
+      const tripStart = new Date(startDate)
+      const packingDate = new Date(tripStart)
+      packingDate.setDate(packingDate.getDate() - 1)
+      packingDate.setHours(18, 0, 0, 0) // 6pm day before
+
+      // Check if any packing items are completed
+      const completedCount = packingItems.filter(t => t.completed).length
+      const totalCount = packingItems.length
+      const allCompleted = completedCount === totalCount
+
+      // Create synthetic task
+      syntheticPackingTasks.push({
+        id: `pack-${trip.id}`,
+        title: `Pack for ${trip.name}`,
+        completed: allCompleted,
+        scheduledFor: packingDate,
+        projectId: trip.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        isAllDay: false,
+        notes: `${completedCount}/${totalCount} items packed`,
+      } as Task)
+    }
+
+    return syntheticPackingTasks
+  }, [projects, tasks])
+
+  // Merge packing tasks with regular filtered tasks
+  const allFilteredTasks = useMemo(() => {
+    return [...filteredTasks, ...packingTasks]
+  }, [filteredTasks, packingTasks])
+
   const grouped = useMemo(() => {
-    const taskItems = filteredTasks.map(taskToTimelineItem)
+    const taskItems = allFilteredTasks.map(taskToTimelineItem)
 
     // Map and filter events by assignee
     const eventItems = filteredEvents
@@ -859,7 +950,7 @@ export function TodaySchedule({
 
     const allItems = [...taskItems, ...eventItems, ...routineItems]
     return groupByDaySection(allItems)
-  }, [filteredTasks, filteredEvents, visibleRoutines, viewedDate, routineStatusMap, eventStatusMap, eventNotesMap, selectedAssignee])
+  }, [allFilteredTasks, filteredEvents, visibleRoutines, viewedDate, routineStatusMap, eventStatusMap, eventNotesMap, selectedAssignee])
 
   const sections: DaySection[] = ['allday', 'morning', 'afternoon', 'evening', 'unscheduled']
 
@@ -872,11 +963,11 @@ export function TodaySchedule({
   }
 
   // Calculate completion stats (only scheduled tasks, not inbox)
-  const completedTasks = filteredTasks.filter((t) => t.completed).length
+  const completedTasks = allFilteredTasks.filter((t) => t.completed).length
   const completedRoutines = visibleRoutines.filter((r) => routineStatusMap.get(r.id)?.status === 'completed').length
   const completedCount = completedTasks + completedRoutines
-  const actionableCount = filteredTasks.length + visibleRoutines.length + overdueTasks.length
-  const totalItems = filteredTasks.length + filteredEvents.length + visibleRoutines.length + inboxTasks.length + overdueTasks.length
+  const actionableCount = allFilteredTasks.length + visibleRoutines.length + overdueTasks.length
+  const totalItems = allFilteredTasks.length + filteredEvents.length + visibleRoutines.length + inboxTasks.length + overdueTasks.length
   const progressPercent = actionableCount > 0 ? (completedCount / actionableCount) * 100 : 0
 
   // Callback to get schedule items for a specific date (used by SchedulePopover)
@@ -1139,7 +1230,7 @@ export function TodaySchedule({
                   key={task.id}
                   task={task}
                   onUpdate={(updates) => onUpdateTask(task.id, updates)}
-                  onSelect={() => onSelectItem(`task-${task.id}`)}
+                  onSelect={() => handleSelectItem(`task-${task.id}`)}
                   onDefer={(date) => {
                     if (date) {
                       onPushTask(task.id, date)
@@ -1244,7 +1335,7 @@ export function TodaySchedule({
                             ? () => onSkipEvent(item.id.replace('event-', ''))
                             : undefined
                         }
-                        onOpenDetail={() => onSelectItem(item.id)}
+                        onOpenDetail={() => handleSelectItem(item.id)}
                         familyMembers={familyMembers}
                         assignedTo={item.assignedTo}
                         onAssign={
@@ -1265,7 +1356,7 @@ export function TodaySchedule({
                       key={item.id}
                       item={item}
                       selected={selectedItemId === item.id}
-                      onSelect={() => onSelectItem(item.id)}
+                      onSelect={() => handleSelectItem(item.id)}
                       onToggleComplete={() => {
                         if (item.type === 'task' && taskId) {
                           onToggleTask(taskId)

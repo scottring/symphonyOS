@@ -1327,6 +1327,7 @@ function App() {
             onUpdateTripProject={updateTripProject}
             onDeleteProject={deleteProject}
             onAddTask={(title, projectId) => addTask(title, undefined, projectId, undefined, { assignedTo: getCurrentUserMember()?.id })}
+            onDeleteTask={deleteTask}
             onSelectTask={handleSelectItem}
             onToggleTask={handleToggleTask}
             onUpdateTask={handleUpdateTaskWithToast}

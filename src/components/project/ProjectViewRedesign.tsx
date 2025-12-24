@@ -22,7 +22,8 @@ interface ProjectViewProps {
   onUpdateProject: (projectId: string, updates: Partial<Project>) => void
   onUpdateTripProject?: (projectId: string, name: string, tripMetadata: TripMetadata) => Promise<void>
   onDeleteProject?: (projectId: string) => void
-  onAddTask?: (title: string, projectId: string) => void
+  onAddTask?: (title: string, projectId: string) => void | Promise<any>
+  onDeleteTask?: (taskId: string) => void
   onSelectTask: (taskId: string) => void
   onToggleTask: (taskId: string) => void
   selectedTaskId?: string | null
@@ -48,6 +49,7 @@ export function ProjectViewRedesign({
   onUpdateTripProject,
   onDeleteProject,
   onAddTask,
+  onDeleteTask,
   onSelectTask,
   onToggleTask,
   selectedTaskId,
@@ -285,6 +287,11 @@ export function ProjectViewRedesign({
                 projectId={project.id}
                 projectName={project.name}
                 onEditEvent={() => setShowEditTripModal(true)}
+                onAddTask={onAddTask ? async (task: { title: string; projectId?: string }) => {
+                  const result = onAddTask(task.title, task.projectId || project.id)
+                  return result instanceof Promise ? result : Promise.resolve(null)
+                } : undefined}
+                onDeleteTask={onDeleteTask}
               />
             )}
           </div>

@@ -40,18 +40,17 @@ export function AuthForm() {
       <div className="relative z-10 w-full max-w-md animate-fade-in-up">
         {/* Header */}
         <div className="text-center mb-10">
-          {/* Logo mark */}
-          <div className="mb-6 animate-fade-in-scale flex justify-center">
+          {/* Logo and title together */}
+          <div className="flex items-center justify-center gap-4 mb-3 animate-fade-in-scale">
             <img
               src="/symphony-logo.jpg"
               alt="Symphony Logo"
-              className="w-24 h-24 rounded-full object-cover shadow-lg"
+              className="w-16 h-16 rounded-full object-cover shadow-lg"
             />
+            <h1 className="font-display text-4xl font-semibold text-neutral-900 tracking-tight">
+              Symphony OS
+            </h1>
           </div>
-
-          <h1 className="font-display text-4xl font-semibold text-neutral-900 mb-3 tracking-tight">
-            Symphony OS
-          </h1>
           <p className="text-neutral-500 text-lg max-w-sm mx-auto">
             Your WHOLE Life Operating System
           </p>

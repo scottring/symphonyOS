@@ -15,7 +15,8 @@ interface ProjectViewProps {
   onUpdateProject: (projectId: string, updates: Partial<Project>) => void
   onUpdateTripProject?: (projectId: string, name: string, tripMetadata: TripMetadata) => Promise<void>
   onDeleteProject?: (projectId: string) => void
-  onAddTask?: (title: string, projectId: string) => void
+  onAddTask?: (title: string, projectId: string) => void | Promise<any>
+  onDeleteTask?: (taskId: string) => void
   onSelectTask: (taskId: string) => void
   onToggleTask: (taskId: string) => void
   selectedTaskId?: string | null
@@ -35,6 +36,7 @@ export function ProjectView({
   onUpdateTripProject,
   onDeleteProject,
   onAddTask,
+  onDeleteTask: _onDeleteTask,
   onSelectTask,
   onToggleTask,
   selectedTaskId,
@@ -43,6 +45,7 @@ export function ProjectView({
   onPin,
   onUnpin,
 }: ProjectViewProps) {
+  void _onDeleteTask // Available for future use
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState('')
   const [editStatus, setEditStatus] = useState<ProjectStatus>('not_started')

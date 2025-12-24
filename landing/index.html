@@ -51,6 +51,16 @@
       font-size: 1.35rem;
       color: var(--forest);
       text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .logo img {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
     }
 
     .nav-links {
@@ -396,7 +406,10 @@
 
   <nav>
     <div class="inner">
-      <a href="#" class="logo">Symphony OS</a>
+      <a href="#" class="logo">
+        <img src="symphony-logo.jpg" alt="Symphony Logo">
+        Symphony OS
+      </a>
       <div class="nav-links">
         <a href="https://app.symphony-os.com" class="login-link">Log in</a>
         <button class="cta" onclick="openModal()">Request Access</button>

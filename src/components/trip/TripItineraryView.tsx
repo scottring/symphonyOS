@@ -19,6 +19,8 @@ interface TripItineraryViewProps {
   projectId?: string
   projectName?: string
   onEditEvent?: (eventId: string) => void
+  onAddTask?: (task: { title: string; projectId?: string }) => Promise<Task | null>
+  onDeleteTask?: (taskId: string) => void
 }
 
 export function TripItineraryView({
@@ -28,11 +30,41 @@ export function TripItineraryView({
   onUpdateTripMetadata,
   projectId,
   projectName,
-  onEditEvent
+  onEditEvent,
+  onAddTask,
+  onDeleteTask
 }: TripItineraryViewProps) {
   const [selectedEventForCharging, setSelectedEventForCharging] = useState<string | null>(null)
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false)
-  const { createTemplate } = usePacking()
+  const [showAIPackingModal, setShowAIPackingModal] = useState(false)
+  const [newItemText, setNewItemText] = useState('')
+  const { createTemplate, templates } = usePacking()
+
+  // Handler to add new packing item
+  const handleAddPackingItem = async () => {
+    if (!newItemText.trim() || !onAddTask || !projectId) return
+
+    // Prefix with "Pack" so it gets categorized as packing
+    const title = `Pack ${newItemText.trim()}`
+    await onAddTask({ title, projectId })
+    setNewItemText('')
+  }
+
+  // Handler to load items from template
+  const handleLoadTemplate = async (templateId: string) => {
+    if (!onAddTask || !projectId) return
+
+    const template = templates.find(t => t.id === templateId)
+    if (!template || !template.items) return
+
+    // Add all items from template
+    for (const item of template.items) {
+      await onAddTask({
+        title: `Pack ${item.name}`,
+        projectId
+      })
+    }
+  }
 
   // Separate packing tasks from event tasks
   const packingTasks = useMemo(() => {
@@ -422,7 +454,17 @@ export function TripItineraryView({
         {/* LEFT SIDEBAR: Trip Itinerary */}
         <aside className="w-80 flex-shrink-0 hidden md:block">
           <div className="sticky top-8">
-            <h2 className="font-display text-lg font-medium text-neutral-800 mb-4">Itinerary</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-display text-lg font-medium text-neutral-800">Itinerary</h2>
+              {onEditEvent && (
+                <button
+                  onClick={() => onEditEvent('')}
+                  className="text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors"
+                >
+                  Edit
+                </button>
+              )}
+            </div>
 
             {tripMetadata.useUnifiedTimeline && tripMetadata.events && tripMetadata.events.length > 0 ? (
               <div className="space-y-3">
@@ -459,15 +501,51 @@ export function TripItineraryView({
           <div className="mb-10">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-display text-lg font-medium text-neutral-800">Packing List</h2>
-              {packingTasks.length > 0 && (
-                <button
-                  onClick={() => setShowSaveTemplateModal(true)}
-                  className="btn bg-white hover:bg-gray-100 text-gray-700 text-sm flex items-center gap-1.5 shadow-sm"
-                >
-                  <Save size={16} />
-                  Save as Template
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {/* Load from Template */}
+                {templates.length > 0 && onAddTask && (
+                  <select
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleLoadTemplate(e.target.value)
+                        e.target.value = '' // Reset selection
+                      }
+                    }}
+                    className="btn bg-white hover:bg-gray-100 text-gray-700 text-sm shadow-sm pr-8"
+                  >
+                    <option value="">Load Template...</option>
+                    {templates.map(template => (
+                      <option key={template.id} value={template.id}>
+                        {template.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {/* AI Generation */}
+                {onAddTask && (
+                  <button
+                    onClick={() => setShowAIPackingModal(true)}
+                    className="btn bg-primary-600 hover:bg-primary-700 text-white text-sm flex items-center gap-1.5 shadow-sm"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    AI Generate
+                  </button>
+                )}
+
+                {/* Save as Template */}
+                {packingTasks.length > 0 && (
+                  <button
+                    onClick={() => setShowSaveTemplateModal(true)}
+                    className="btn bg-white hover:bg-gray-100 text-gray-700 text-sm flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Save size={16} />
+                    Save as Template
+                  </button>
+                )}
+              </div>
             </div>
 
             {totalPackingCount > 0 && (
@@ -496,6 +574,34 @@ export function TripItineraryView({
               </div>
             )}
 
+            {/* Add Item Input */}
+            {onAddTask && (
+              <div className="mb-6 p-4 bg-neutral-50 rounded-xl border border-neutral-200">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={newItemText}
+                    onChange={(e) => setNewItemText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleAddPackingItem()
+                      }
+                    }}
+                    placeholder="Add packing item..."
+                    className="flex-1 px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                  <button
+                    onClick={handleAddPackingItem}
+                    disabled={!newItemText.trim()}
+                    className="px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:bg-neutral-300 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+            )}
+
             {packingTasks.length > 0 ? (
               <div className="grid grid-cols-3 gap-x-8 gap-y-6">
                 {Array.from(packingByCategory.entries()).map(([category, items]) => (
@@ -505,25 +611,38 @@ export function TripItineraryView({
                     </h3>
                     <div className="space-y-0">
                       {items.map((task) => (
-                        <label
+                        <div
                           key={task.id}
-                          className="flex items-center gap-2 py-1 cursor-pointer group hover:bg-neutral-50 rounded transition-colors"
+                          className="flex items-center gap-2 py-1 group hover:bg-neutral-50 rounded transition-colors"
                         >
-                          <input
-                            type="checkbox"
-                            checked={task.completed}
-                            onChange={() => onToggleTask(task.id)}
-                            className="w-3.5 h-3.5 rounded border-neutral-300 text-emerald-600
-                                     focus:ring-1 focus:ring-emerald-500 focus:ring-offset-0 cursor-pointer"
-                          />
-                          <span className={`text-sm flex-1 transition-all ${
-                            task.completed
-                              ? 'text-neutral-400 line-through'
-                              : 'text-neutral-700 group-hover:text-neutral-900'
-                          }`}>
-                            {task.title?.replace(/^Pack\s+/i, '')}
-                          </span>
-                        </label>
+                          <label className="flex items-center gap-2 flex-1 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={task.completed}
+                              onChange={() => onToggleTask(task.id)}
+                              className="w-3.5 h-3.5 rounded border-neutral-300 text-emerald-600
+                                       focus:ring-1 focus:ring-emerald-500 focus:ring-offset-0 cursor-pointer"
+                            />
+                            <span className={`text-sm transition-all ${
+                              task.completed
+                                ? 'text-neutral-400 line-through'
+                                : 'text-neutral-700 group-hover:text-neutral-900'
+                            }`}>
+                              {task.title?.replace(/^Pack\s+/i, '')}
+                            </span>
+                          </label>
+                          {onDeleteTask && (
+                            <button
+                              onClick={() => onDeleteTask(task.id)}
+                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 rounded transition-all text-red-600"
+                              title="Delete item"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -531,7 +650,7 @@ export function TripItineraryView({
               </div>
             ) : (
               <div className="py-12 text-center text-neutral-400 text-sm bg-neutral-50 rounded-xl border border-neutral-200">
-                No packing items yet
+                {onAddTask ? 'Add items above to start your packing list' : 'No packing items yet'}
               </div>
             )}
           </div>
@@ -555,6 +674,20 @@ export function TripItineraryView({
         />
       )}
 
+      {/* AI Packing Generation Modal */}
+      {showAIPackingModal && onAddTask && projectId && (
+        <AIPackingModal
+          tripMetadata={tripMetadata}
+          onGenerate={async (items) => {
+            for (const item of items) {
+              await onAddTask({ title: `Pack ${item}`, projectId })
+            }
+            setShowAIPackingModal(false)
+          }}
+          onClose={() => setShowAIPackingModal(false)}
+        />
+      )}
+
       {/* Save Template Modal */}
       {showSaveTemplateModal && (
         <SaveTemplateModal
@@ -562,6 +695,223 @@ export function TripItineraryView({
           onClose={() => setShowSaveTemplateModal(false)}
         />
       )}
+    </div>
+  )
+}
+
+// AI Packing Modal Component
+interface AIPackingModalProps {
+  tripMetadata: TripMetadata
+  onGenerate: (items: string[]) => Promise<void>
+  onClose: () => void
+}
+
+function AIPackingModal({ tripMetadata, onGenerate, onClose }: AIPackingModalProps) {
+  const [adults, setAdults] = useState(2)
+  const [children, setChildren] = useState(0)
+  const [childAges, setChildAges] = useState('')
+  const [specialNeeds, setSpecialNeeds] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+
+  // Calculate trip duration
+  const duration = useMemo(() => {
+    const start = new Date(tripMetadata.startDate)
+    const end = new Date(tripMetadata.endDate)
+    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+    return days
+  }, [tripMetadata])
+
+  const handleGenerate = async () => {
+    setIsGenerating(true)
+
+    try {
+      // TODO: Replace with actual AI API call
+      // Build prompt for future AI integration:
+      // const destination = tripMetadata.destination?.name || 'destination'
+      // const prompt = `Generate a comprehensive packing list for a ${duration}-day trip to ${destination}...`
+
+      // For now, generate a basic list based on the inputs
+      const items = generateBasicPackingList(adults, children, duration, specialNeeds)
+      await onGenerate(items)
+    } catch (error) {
+      console.error('Error generating packing list:', error)
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  // Temporary fallback generator (replace with AI API call)
+  const generateBasicPackingList = (adults: number, children: number, duration: number, specialNeeds: string): string[] => {
+    const items: string[] = []
+
+    // Clothing (per person, per day)
+    const clothingDays = Math.min(duration + 1, 7) // Max 7 days of clothes
+    items.push(`Underwear (${clothingDays * (adults + children)} sets)`)
+    items.push(`Socks (${clothingDays * (adults + children)} pairs)`)
+    items.push(`Shirts (${clothingDays * (adults + children)})`)
+    items.push(`Pants/Shorts (${Math.ceil(clothingDays / 2) * (adults + children)})`)
+    items.push('Jacket or Sweater')
+    items.push('Pajamas')
+
+    // Toiletries
+    items.push('Toothbrush & Toothpaste')
+    items.push('Shampoo & Conditioner')
+    items.push('Soap/Body Wash')
+    items.push('Deodorant')
+    items.push('Sunscreen')
+    items.push('Medications')
+    items.push('First Aid Kit')
+
+    // Electronics
+    items.push('Phone Charger')
+    items.push('Camera')
+    items.push('Power Bank')
+    items.push('Headphones')
+
+    // Documents
+    items.push('ID/Passport')
+    items.push('Travel Insurance')
+    items.push('Tickets/Confirmations')
+
+    // Kids items
+    if (children > 0) {
+      items.push('Diapers/Pull-ups')
+      items.push('Wipes')
+      items.push('Snacks')
+      items.push('Toys/Entertainment')
+      items.push('Kids Books')
+    }
+
+    // Parse special needs
+    if (specialNeeds.toLowerCase().includes('beach')) {
+      items.push('Swimsuit')
+      items.push('Beach Towel')
+      items.push('Flip Flops')
+    }
+    if (specialNeeds.toLowerCase().includes('ski') || specialNeeds.toLowerCase().includes('snow')) {
+      items.push('Ski Jacket')
+      items.push('Gloves')
+      items.push('Ski Goggles')
+      items.push('Thermal Underwear')
+    }
+
+    return items
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6">
+        <h3 className="text-2xl font-display mb-2">AI Packing List Generator</h3>
+        <p className="text-sm text-neutral-500 mb-6">
+          Tell us about your trip and we'll generate a comprehensive packing list
+        </p>
+
+        <div className="space-y-4 mb-6">
+          {/* Trip Info Summary */}
+          <div className="p-3 bg-primary-50 rounded-lg border border-primary-100">
+            <div className="text-sm text-primary-800">
+              <strong>{duration} days</strong> • {tripMetadata.destination?.name || 'Your destination'}
+            </div>
+          </div>
+
+          {/* Adults */}
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-2">
+              Number of Adults
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="10"
+              value={adults}
+              onChange={(e) => setAdults(parseInt(e.target.value) || 1)}
+              className="input-base w-full"
+            />
+          </div>
+
+          {/* Children */}
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-2">
+              Number of Children
+            </label>
+            <input
+              type="number"
+              min="0"
+              max="10"
+              value={children}
+              onChange={(e) => setChildren(parseInt(e.target.value) || 0)}
+              className="input-base w-full"
+            />
+          </div>
+
+          {/* Child Ages */}
+          {children > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-2">
+                Child Ages (e.g., "3, 7")
+              </label>
+              <input
+                type="text"
+                value={childAges}
+                onChange={(e) => setChildAges(e.target.value)}
+                placeholder="3, 7"
+                className="input-base w-full"
+              />
+            </div>
+          )}
+
+          {/* Special Needs */}
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-2">
+              Special Activities or Needs
+            </label>
+            <textarea
+              value={specialNeeds}
+              onChange={(e) => setSpecialNeeds(e.target.value)}
+              placeholder="Beach, hiking, formal dinner, medical needs..."
+              rows={3}
+              className="input-base w-full resize-none"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isGenerating}
+            className="flex-1 btn bg-neutral-100 hover:bg-neutral-200 text-neutral-700 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleGenerate}
+            disabled={isGenerating}
+            className="flex-1 btn bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {isGenerating ? (
+              <>
+                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Generating...
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Generate List
+              </>
+            )}
+          </button>
+        </div>
+
+        <p className="text-xs text-neutral-400 mt-4 text-center">
+          You can edit and refine the generated items after creation
+        </p>
+      </div>
     </div>
   )
 }

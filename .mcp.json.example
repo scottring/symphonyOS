@@ -4,7 +4,7 @@
       "type": "http",
       "url": "https://mcp.supabase.com/mcp?project_ref=mwadppyrqzuzgstmwpuy"
     },
-    "bubble": {
+    "bubble-readonly": {
       "command": "node",
       "args": [
         "/Users/scottkaufman/Documents/Developer/bubble_mcp/dist/mcp-server.js"
@@ -15,5 +15,6 @@
         "MCP_MODE": "read-only"
       }
     }
-  }
+  },
+  "_comment": "To enable write access, change MCP_MODE to 'read-write' or add a separate 'bubble-write' server entry"
 }

@@ -4,9 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Symphony OS is a personal/family operating system for organizing life — tasks, calendar, routines, and contextual information. The philosophy is **"plan on desktop, execute on mobile"**: full-page views for planning on desktop, quick modals for execution on mobile.
+Symphony OS is a personal operating system for work, life, and family. The core insight: captured information doesn't surface at the right time with the right context. Symphony fixes this by making **context first-class** — links, phone numbers, notes, files attach to tasks and projects, then surface automatically when you need them.
 
-See `VISION.md` for full product context.
+**Three domains, equally important:** Work (private), Personal (private), Family (shared)
+
+**Built for individuals, designed for sharing:** You are the primary unit. Your data is private. Family sharing is robust and first-class, not bolted on.
+
+**Philosophy:** Plan deeply on desktop when you have time to think. Capture quickly and execute effortlessly on mobile when life happens.
+
+See `POSITIONING.md` for product positioning and `VISION.md` for detailed product context.
 
 ---
 
@@ -83,10 +89,18 @@ interface Task {
   title: string
   completed: boolean
   scheduled_for: Date | null      // null = inbox
-  context: 'work' | 'family' | 'personal' | null
+  context: 'work' | 'family' | 'personal' | null  // Life domain
+
+  // Rich context (what makes Symphony different)
+  notes?: string                  // Detailed notes, measurements, decisions
+  links?: TaskLink[]              // Product links, documentation, reservations
+  phoneNumber?: string            // Vendor, doctor, school, contractor
+
+  // Relationships
   project_id: string | null
   contact_id: string | null       // Who task is ABOUT
   assigned_to: string | null      // Who should DO it
+
   created_at: Date
   updated_at: Date
 }
@@ -96,13 +110,23 @@ interface Task {
 - `contact_id`: Related person (e.g., "Call Dr. Smith" → Dr. Smith)
 - `assigned_to`: Owner/assignee (e.g., "Iris should handle this")
 
+**Context is key:** Links, phone numbers, and notes are first-class. Set them up during planning, they surface during execution.
+
 **Project:**
 ```typescript
 interface Project {
   id: string
   name: string
-  status: 'active' | 'on_hold' | 'completed'
+  status: 'not_started' | 'in_progress' | 'on_hold' | 'completed'
+  type?: 'general' | 'trip'
+
+  // Rich context (context containers)
+  notes?: string                  // Project notes, decisions, background
+  links?: TaskLink[]              // Vendor websites, documentation
+  phoneNumber?: string            // Primary contact/vendor number
+
   // Tasks link to projects via project_id
+  // Tasks inherit project context automatically
 }
 ```
 

@@ -4,7 +4,7 @@
       "type": "http",
       "url": "https://mcp.supabase.com/mcp?project_ref=mwadppyrqzuzgstmwpuy"
     },
-    "bubble": {
+    "bubble-readonly": {
       "command": "node",
       "args": [
         "/Users/scottkaufman/Documents/Developer/bubble_mcp/dist/mcp-server.js"
@@ -13,6 +13,17 @@
         "BUBBLE_BASE_URL": "https://app.stacksdata.com",
         "BUBBLE_API_TOKEN": "545beaca23f07ccd35360d0a08191b53",
         "MCP_MODE": "read-only"
+      }
+    },
+    "bubble-write": {
+      "command": "node",
+      "args": [
+        "/Users/scottkaufman/Documents/Developer/bubble_mcp/dist/mcp-server.js"
+      ],
+      "env": {
+        "BUBBLE_BASE_URL": "https://app.stacksdata.com",
+        "BUBBLE_API_TOKEN": "545beaca23f07ccd35360d0a08191b53",
+        "MCP_MODE": "read-write"
       }
     }
   }

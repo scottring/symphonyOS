@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { User } from '@supabase/supabase-js'
+import * as Sentry from '@sentry/react'
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
@@ -44,6 +45,18 @@ export function useAuth() {
       subscription.unsubscribe()
     }
   }, [])
+
+  // Set Sentry user context when user changes
+  useEffect(() => {
+    if (import.meta.env.PROD && user) {
+      Sentry.setUser({
+        id: user.id,
+        email: user.email || undefined,
+      })
+    } else if (import.meta.env.PROD && !user) {
+      Sentry.setUser(null)
+    }
+  }, [user])
 
   const signInWithEmail = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
