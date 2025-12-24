@@ -1,3 +1,11 @@
+export type AgeRange = 'infant' | 'toddler' | 'child' | 'teen' | 'adult'
+
+export interface Medication {
+  name: string
+  dosage?: string
+  frequency?: string
+}
+
 export interface FamilyMember {
   id: string
   user_id: string
@@ -9,6 +17,15 @@ export interface FamilyMember {
   display_order: number
   created_at: string
   auth_user_id?: string | null // Links to auth.users for users with accounts
+
+  // Health profile fields (optional, system-wide)
+  date_of_birth?: string | null
+  age_range?: AgeRange
+  allergies?: string[]
+  medications?: Medication[]
+  dietary_restrictions?: string[]
+  health_conditions?: string[]
+  mobility_needs?: string | null
 }
 
 // ============================================================================

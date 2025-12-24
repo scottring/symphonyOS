@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import type { TripMetadata, TravelMode, Location, PackingTemplate, TripSegment, Accommodation, TransportationLogistic, TripEvent, PackingItem } from '@/types/trip'
+import type { TripMetadata, TravelMode, Location, PackingTemplate, TripSegment, Accommodation, TransportationLogistic, TripEvent, PackingItem, TripEventType } from '@/types/trip'
 import { EV_VEHICLES } from '@/types/trip'
 import type { PlaceAutocompleteResult } from '@/types/directions'
 import type { Project } from '@/types/project'
@@ -8,7 +8,7 @@ import { useDirections } from '@/hooks/useDirections'
 import { SegmentBuilder } from './SegmentBuilder'
 import { AccommodationBuilder } from './AccommodationBuilder'
 import { LogisticsBuilder } from './LogisticsBuilder'
-import { EventBuilder } from './EventBuilder'
+import { EventBuilder, FlightFields, TrainFields, DrivingEVFields, DrivingRentalFields, AccommodationFields, LogisticFields } from './EventBuilder'
 
 interface TripCreationModalProps {
   isOpen: boolean
@@ -16,11 +16,13 @@ interface TripCreationModalProps {
   onCreateTrip: (name: string, tripMetadata: TripMetadata, packingTemplate?: PackingTemplate, customPackingItems?: PackingItem[]) => Promise<Project | null>
   onUpdateTrip?: (projectId: string, name: string, tripMetadata: TripMetadata, packingTemplate?: PackingTemplate, customPackingItems?: PackingItem[]) => Promise<void>
   existingProject?: Project // For edit mode
+  editingEventId?: string | null // For single-event edit mode (null = new event, string = edit specific event)
+  insertAtIndex?: number // For inserting new events at specific position
 }
 
 type TripType = 'simple' | 'multi-segment' | 'timeline'
 
-export function TripCreationModal({ isOpen, onClose, onCreateTrip, onUpdateTrip, existingProject }: TripCreationModalProps) {
+export function TripCreationModal({ isOpen, onClose, onCreateTrip, onUpdateTrip, existingProject, editingEventId, insertAtIndex }: TripCreationModalProps) {
   const { searchPlaces, getPlaceDetails } = useDirections()
   const { templates: customTemplates } = usePacking()
 
@@ -462,85 +464,116 @@ export function TripCreationModal({ isOpen, onClose, onCreateTrip, onUpdateTrip,
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Trip Name */}
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">Trip Name</label>
-            <input
-              type="text"
-              value={tripName}
-              onChange={(e) => setTripName(e.target.value)}
-              placeholder="e.g., Weekend in Portland"
-              className="w-full px-4 py-2 rounded-lg border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              required
-            />
-          </div>
+          {/* Simplified edit mode for timeline trips - focus on events */}
+          {isEditMode && tripType === 'timeline' ? (
+            <>
+              {/* Minimal trip info display */}
+              <div className="bg-neutral-50 rounded-lg p-4 border border-neutral-200">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="text-lg font-semibold text-neutral-800">{tripName}</div>
+                    <div className="text-sm text-neutral-600 mt-1">
+                      {startDate} to {endDate}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Allow editing trip name and dates if needed
+                      const newName = prompt('Edit trip name:', tripName)
+                      if (newName) setTripName(newName)
+                    }}
+                    className="text-xs text-neutral-500 hover:text-primary-600 underline"
+                  >
+                    Edit details
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Full trip setup for create mode or non-timeline trips */}
+              {/* Trip Name */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-2">Trip Name</label>
+                <input
+                  type="text"
+                  value={tripName}
+                  onChange={(e) => setTripName(e.target.value)}
+                  placeholder="e.g., Weekend in Portland"
+                  className="w-full px-4 py-2 rounded-lg border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  required
+                />
+              </div>
 
-          {/* Dates */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-2">Start Date</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-2">End Date</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                required
-              />
-            </div>
-          </div>
+              {/* Dates */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">Start Date</label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full px-4 py-2 rounded-lg border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">End Date</label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full px-4 py-2 rounded-lg border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    required
+                  />
+                </div>
+              </div>
 
-          {/* Trip Type Toggle */}
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">Trip Type</label>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => setTripType('simple')}
-                className={`px-4 py-3 rounded-lg border-2 transition-all ${
-                  tripType === 'simple'
-                    ? 'border-primary-500 bg-primary-50 text-primary-700'
-                    : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'
-                }`}
-              >
-                <div className="font-medium">Simple Trip</div>
-                <div className="text-xs mt-0.5">One mode of travel</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setTripType('timeline')}
-                className={`px-4 py-3 rounded-lg border-2 transition-all ${
-                  tripType === 'timeline'
-                    ? 'border-primary-500 bg-primary-50 text-primary-700'
-                    : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'
-                }`}
-              >
-                <div className="font-medium">Timeline</div>
-                <div className="text-xs mt-0.5">Chronological events</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setTripType('multi-segment')}
-                className={`px-4 py-3 rounded-lg border-2 transition-all ${
-                  tripType === 'multi-segment'
-                    ? 'border-primary-500 bg-primary-50 text-primary-700'
-                    : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'
-                }`}
-              >
-                <div className="font-medium">Multi-Segment</div>
-                <div className="text-xs mt-0.5">Grouped by type</div>
-              </button>
-            </div>
-          </div>
+              {/* Trip Type Toggle */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-2">Trip Type</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTripType('simple')}
+                    className={`px-4 py-3 rounded-lg border-2 transition-all ${
+                      tripType === 'simple'
+                        ? 'border-primary-500 bg-primary-50 text-primary-700'
+                        : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'
+                    }`}
+                  >
+                    <div className="font-medium">Simple Trip</div>
+                    <div className="text-xs mt-0.5">One mode of travel</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTripType('timeline')}
+                    className={`px-4 py-3 rounded-lg border-2 transition-all ${
+                      tripType === 'timeline'
+                        ? 'border-primary-500 bg-primary-50 text-primary-700'
+                        : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'
+                    }`}
+                  >
+                    <div className="font-medium">Timeline</div>
+                    <div className="text-xs mt-0.5">Chronological events</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTripType('multi-segment')}
+                    className={`px-4 py-3 rounded-lg border-2 transition-all ${
+                      tripType === 'multi-segment'
+                        ? 'border-primary-500 bg-primary-50 text-primary-700'
+                        : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'
+                    }`}
+                  >
+                    <div className="font-medium">Multi-Segment</div>
+                    <div className="text-xs mt-0.5">Grouped by type</div>
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
 
           {/* === SIMPLE TRIP UI === */}
           {tripType === 'simple' && (
@@ -760,7 +793,22 @@ export function TripCreationModal({ isOpen, onClose, onCreateTrip, onUpdateTrip,
           {/* === UNIFIED TIMELINE UI === */}
           {tripType === 'timeline' && (
             <div className="space-y-6">
-              <EventBuilder events={events} onChange={setEvents} />
+              {/* Single-event edit mode when editing existing trip */}
+              {isEditMode && editingEventId !== undefined ? (
+                <SingleEventEditor
+                  eventId={editingEventId || ''} // empty string = new event
+                  events={events}
+                  onChange={setEvents}
+                  insertAtIndex={insertAtIndex}
+                  onSave={() => {
+                    // Auto-save when done editing
+                    handleSubmit(new Event('submit') as any)
+                  }}
+                />
+              ) : (
+                /* Full EventBuilder for create mode */
+                <EventBuilder events={events} onChange={setEvents} />
+              )}
             </div>
           )}
 
@@ -773,45 +821,47 @@ export function TripCreationModal({ isOpen, onClose, onCreateTrip, onUpdateTrip,
             </div>
           )}
 
-          {/* Packing Template (always shown) */}
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">Packing List</label>
-            <select
-              value={packingTemplate}
-              onChange={(e) => {
-                const value = e.target.value
-                setPackingTemplate(value)
+          {/* Packing Template (hidden in edit mode for timeline trips) */}
+          {!(isEditMode && tripType === 'timeline') && (
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-2">Packing List</label>
+              <select
+                value={packingTemplate}
+                onChange={(e) => {
+                  const value = e.target.value
+                  setPackingTemplate(value)
 
-                // If it's a custom template ID, set the custom items
-                const customTemplate = customTemplates.find(t => t.id === value)
-                if (customTemplate) {
-                  setCustomPackingItems(customTemplate.items)
-                } else {
-                  setCustomPackingItems(undefined)
-                }
-              }}
-              className="w-full px-4 py-2 rounded-lg border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              <optgroup label="Built-in Templates">
-                <option value="weekend">Weekend Trip</option>
-                <option value="week">Week-Long Trip</option>
-                <option value="ev_road_trip">EV Road Trip</option>
-                <option value="beach">Beach Vacation</option>
-                <option value="ski">Ski Trip</option>
-                <option value="business">Business Trip</option>
-                <option value="camping">Camping</option>
-              </optgroup>
-              {customTemplates.length > 0 && (
-                <optgroup label="Your Templates">
-                  {customTemplates.filter(t => !t.isDefault).map(template => (
-                    <option key={template.id} value={template.id}>
-                      {template.name}
-                    </option>
-                  ))}
+                  // If it's a custom template ID, set the custom items
+                  const customTemplate = customTemplates.find(t => t.id === value)
+                  if (customTemplate) {
+                    setCustomPackingItems(customTemplate.items)
+                  } else {
+                    setCustomPackingItems(undefined)
+                  }
+                }}
+                className="w-full px-4 py-2 rounded-lg border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <optgroup label="Built-in Templates">
+                  <option value="weekend">Weekend Trip</option>
+                  <option value="week">Week-Long Trip</option>
+                  <option value="ev_road_trip">EV Road Trip</option>
+                  <option value="beach">Beach Vacation</option>
+                  <option value="ski">Ski Trip</option>
+                  <option value="business">Business Trip</option>
+                  <option value="camping">Camping</option>
                 </optgroup>
-              )}
-            </select>
-          </div>
+                {customTemplates.length > 0 && (
+                  <optgroup label="Your Templates">
+                    {customTemplates.filter(t => !t.isDefault).map(template => (
+                      <option key={template.id} value={template.id}>
+                        {template.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex gap-3 pt-4">
@@ -828,12 +878,230 @@ export function TripCreationModal({ isOpen, onClose, onCreateTrip, onUpdateTrip,
               className="flex-1 px-4 py-3 bg-primary-500 text-white font-medium rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isCreating
-                ? (isEditMode ? 'Updating Trip...' : 'Creating Trip...')
-                : (isEditMode ? 'Update Trip' : 'Create Trip')
+                ? (isEditMode ? 'Saving...' : 'Creating Trip...')
+                : (isEditMode ? 'Save Changes' : 'Create Trip')
               }
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// Single Event Editor Component
+// ============================================================================
+
+interface SingleEventEditorProps {
+  eventId: string // empty string = new event
+  events: TripEvent[]
+  onChange: (events: TripEvent[]) => void
+  insertAtIndex?: number // For inserting new events at specific position
+  onSave: () => void
+}
+
+function SingleEventEditor({ eventId, events, onChange, insertAtIndex, onSave }: SingleEventEditorProps) {
+  // Find the event being edited, or create a new one
+  const eventIndex = eventId ? events.findIndex(e => e.id === eventId) : -1
+  const event = eventIndex >= 0 ? events[eventIndex] : null
+
+  // If it's a new event and we don't have one yet, create it
+  const [workingEvent, setWorkingEvent] = useState<TripEvent>(() => {
+    if (event) return event
+
+    // Create new event
+    return {
+      id: crypto.randomUUID(),
+      eventType: 'flight',
+      date: '',
+      time: '',
+      origin: { name: '', address: '' },
+      destination: { name: '', address: '' },
+    }
+  })
+
+  // Track whether we've added this new event to the array yet
+  const [hasAddedToArray, setHasAddedToArray] = useState(eventIndex >= 0)
+
+  const handleUpdate = useCallback((updates: Partial<TripEvent>) => {
+    const updated = { ...workingEvent, ...updates } as TripEvent
+    setWorkingEvent(updated)
+
+    // Update in the events array
+    if (eventIndex >= 0) {
+      // Update existing event
+      const newEvents = [...events]
+      newEvents[eventIndex] = updated
+      onChange(newEvents)
+    } else {
+      // For new events, only add once, then update by ID
+      if (!hasAddedToArray) {
+        // First time - add to array
+        if (insertAtIndex !== undefined) {
+          const newEvents = [...events]
+          newEvents.splice(insertAtIndex, 0, updated)
+          onChange(newEvents)
+        } else {
+          onChange([...events, updated])
+        }
+        setHasAddedToArray(true)
+      } else {
+        // Already added - find by ID and update
+        const newEventIndex = events.findIndex(e => e.id === updated.id)
+        if (newEventIndex >= 0) {
+          const newEvents = [...events]
+          newEvents[newEventIndex] = updated
+          onChange(newEvents)
+        }
+      }
+    }
+  }, [workingEvent, eventIndex, events, onChange, insertAtIndex, hasAddedToArray])
+
+  const handleDelete = useCallback(() => {
+    if (eventIndex >= 0) {
+      onChange(events.filter((_, i) => i !== eventIndex))
+      onSave() // Close modal after deleting
+    }
+  }, [eventIndex, events, onChange, onSave])
+
+  // Import the EventCard component's field rendering from EventBuilder
+  // We'll use the same field components
+  const eventTypeConfig: Record<string, { label: string; icon: string }> = {
+    flight: { label: 'Flight', icon: '✈️' },
+    train: { label: 'Train', icon: '🚂' },
+    driving_ev: { label: 'Drive (EV)', icon: '⚡' },
+    driving_rental: { label: 'Drive (Rental)', icon: '🚗' },
+    hotel: { label: 'Hotel', icon: '🏨' },
+    airbnb: { label: 'Airbnb', icon: '🏠' },
+    family_stay: { label: 'Family/Friends', icon: '👨‍👩‍👧' },
+    airport_parking: { label: 'Airport Parking', icon: '🅿️' },
+    rental_pickup: { label: 'Car Rental Pickup', icon: '🔑' },
+    rental_dropoff: { label: 'Car Rental Dropoff', icon: '📍' },
+    other: { label: 'Other', icon: '📝' },
+  }
+
+  const config = eventTypeConfig[workingEvent.eventType] || { label: workingEvent.eventType, icon: '📍' }
+
+  return (
+    <div className="bg-white border border-neutral-200 rounded-xl p-4 space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between pb-3 border-b border-neutral-200">
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">{config.icon}</span>
+          <div className="font-medium text-neutral-800">
+            {eventId ? `Edit ${config.label}` : `Add New Event`}
+          </div>
+        </div>
+        {eventId && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            className="p-1 text-red-400 hover:text-red-600"
+            title="Delete event"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
+          </button>
+        )}
+      </div>
+
+      {/* Event Type Selector */}
+      <div>
+        <label className="block text-sm font-medium text-neutral-700 mb-1">Event Type</label>
+        <select
+          value={workingEvent.eventType}
+          onChange={(e) => {
+            const newType = e.target.value as TripEventType
+            // Reset event to defaults for new type (simplified version)
+            const base = { id: workingEvent.id, eventType: newType, date: workingEvent.date, time: workingEvent.time, notes: workingEvent.notes }
+            handleUpdate(base as any)
+          }}
+          className="input-base w-full"
+        >
+          <optgroup label="Travel">
+            <option value="flight">✈️ Flight</option>
+            <option value="train">🚂 Train</option>
+            <option value="driving_ev">⚡ Drive (EV)</option>
+            <option value="driving_rental">🚗 Drive (Rental)</option>
+          </optgroup>
+          <optgroup label="Accommodations">
+            <option value="hotel">🏨 Hotel</option>
+            <option value="airbnb">🏠 Airbnb</option>
+            <option value="family_stay">👨‍👩‍👧 Family/Friends</option>
+          </optgroup>
+          <optgroup label="Logistics">
+            <option value="airport_parking">🅿️ Airport Parking</option>
+            <option value="rental_pickup">🔑 Car Rental Pickup</option>
+            <option value="rental_dropoff">📍 Car Rental Dropoff</option>
+            <option value="other">📝 Other</option>
+          </optgroup>
+        </select>
+      </div>
+
+      {/* Date & Time */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 mb-1">Date</label>
+          <input
+            type="date"
+            value={workingEvent.date}
+            onChange={(e) => handleUpdate({ date: e.target.value })}
+            className="input-base w-full"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 mb-1">Time</label>
+          <input
+            type="time"
+            value={workingEvent.time || ''}
+            onChange={(e) => handleUpdate({ time: e.target.value })}
+            className="input-base w-full"
+          />
+        </div>
+      </div>
+
+      {/* Event-specific fields */}
+      {(() => {
+        switch (workingEvent.eventType) {
+          case 'flight':
+            return <FlightFields event={workingEvent} onUpdate={handleUpdate} />
+          case 'train':
+            return <TrainFields event={workingEvent} onUpdate={handleUpdate} />
+          case 'driving_ev':
+            return <DrivingEVFields event={workingEvent} onUpdate={handleUpdate} />
+          case 'driving_rental':
+            return <DrivingRentalFields event={workingEvent} onUpdate={handleUpdate} />
+          case 'hotel':
+          case 'airbnb':
+          case 'family_stay':
+            return <AccommodationFields event={workingEvent} onUpdate={handleUpdate} />
+          case 'airport_parking':
+          case 'rental_pickup':
+          case 'rental_dropoff':
+          case 'other':
+            return <LogisticFields event={workingEvent} onUpdate={handleUpdate} />
+          default:
+            return null
+        }
+      })()}
+
+      {/* Notes */}
+      <div>
+        <label className="block text-sm font-medium text-neutral-700 mb-1">Notes</label>
+        <textarea
+          value={workingEvent.notes || ''}
+          onChange={(e) => handleUpdate({ notes: e.target.value })}
+          placeholder="Add any additional notes..."
+          rows={2}
+          className="input-base w-full resize-none"
+        />
       </div>
     </div>
   )

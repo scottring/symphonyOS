@@ -4,7 +4,7 @@ import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
 import type { EventNote } from '@/hooks/useEventNotes'
-import type { TripMetadata } from '@/types/trip'
+import type { TripMetadata, TripEvent } from '@/types/trip'
 import { formatTimeWithDate } from '@/lib/timeUtils'
 import { TaskQuickActions, type ScheduleContextItem } from '@/components/triage'
 import { calculateProjectStatus } from '@/hooks/useProjects'
@@ -69,6 +69,8 @@ export function ProjectViewRedesign({
   const [editLinks, setEditLinks] = useState<string>('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showEditTripModal, setShowEditTripModal] = useState(false)
+  const [editingEventId, setEditingEventId] = useState<string | null>(null)
+  const [insertAtIndex, setInsertAtIndex] = useState<number | undefined>(undefined)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [showStatusDropdown, setShowStatusDropdown] = useState(false)
   const [coachingMessage, setCoachingMessage] = useState<string | null>(null)
@@ -286,7 +288,24 @@ export function ProjectViewRedesign({
                 onUpdateTripMetadata={onUpdateTripProject}
                 projectId={project.id}
                 projectName={project.name}
-                onEditEvent={() => setShowEditTripModal(true)}
+                onEditEvent={(eventId, insertIdx) => {
+                  setEditingEventId(eventId || null)
+                  setInsertAtIndex(insertIdx)
+                  setShowEditTripModal(true)
+                }}
+                onDeleteEvent={(eventId) => {
+                  // Delete event from trip metadata
+                  if (project?.tripMetadata) {
+                    const updatedMetadata = {
+                      ...project.tripMetadata,
+                      events: project.tripMetadata.events?.filter((e: TripEvent) => e.id !== eventId) || []
+                    }
+                    onUpdateProject(project.id, {
+                      ...project,
+                      tripMetadata: updatedMetadata
+                    })
+                  }
+                }}
                 onAddTask={onAddTask ? async (task: { title: string; projectId?: string }) => {
                   const result = onAddTask(task.title, task.projectId || project.id)
                   return result instanceof Promise ? result : Promise.resolve(null)
@@ -854,10 +873,16 @@ export function ProjectViewRedesign({
       {onUpdateTripProject && project.type === 'trip' && project.tripMetadata && (
         <TripCreationModal
           isOpen={showEditTripModal}
-          onClose={() => setShowEditTripModal(false)}
+          onClose={() => {
+            setShowEditTripModal(false)
+            setEditingEventId(null)
+            setInsertAtIndex(undefined)
+          }}
           onCreateTrip={async () => null} // Not used in edit mode
           onUpdateTrip={onUpdateTripProject}
           existingProject={project}
+          editingEventId={editingEventId}
+          insertAtIndex={insertAtIndex}
         />
       )}
     </div>

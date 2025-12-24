@@ -64,8 +64,15 @@ export function useSystemHealth(tasksOrInput: Task[] | SystemHealthInput): Syste
 
     const { tasks, projects = [], routines = [], projectsWithLinkedEvents = new Set() } = input
 
-    // Filter to incomplete tasks only
-    const incompleteTasks = tasks.filter(t => !t.completed)
+    // Filter to incomplete tasks only, excluding individual packing items
+    // Packing items start with "Pack: " and are part of a project-level task
+    const incompleteTasks = tasks.filter(t => {
+      if (t.completed) return false
+      // Exclude individual packing items from clarity score
+      // These are tactical sub-items, not strategic decisions
+      if (t.title.startsWith('Pack: ')) return false
+      return true
+    })
     const now = new Date()
 
     // Categorize tasks

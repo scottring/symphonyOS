@@ -17,7 +17,7 @@ interface EventBuilderProps {
 
 export function EventBuilder({ events, onChange }: EventBuilderProps) {
   const [selectedEventForCharging, setSelectedEventForCharging] = useState<string | null>(null)
-  const handleAddEvent = useCallback(() => {
+  const handleAddEvent = useCallback((insertAtIndex?: number) => {
     const newEvent: TripEvent = {
       id: crypto.randomUUID(),
       eventType: 'flight',
@@ -26,7 +26,16 @@ export function EventBuilder({ events, onChange }: EventBuilderProps) {
       origin: { name: '', address: '' },
       destination: { name: '', address: '' },
     }
-    onChange([...events, newEvent])
+
+    // If no index specified, append to end
+    if (insertAtIndex === undefined) {
+      onChange([...events, newEvent])
+    } else {
+      // Insert at specified index
+      const newEvents = [...events]
+      newEvents.splice(insertAtIndex, 0, newEvent)
+      onChange(newEvents)
+    }
   }, [events, onChange])
 
   const handleRemoveEvent = useCallback(
@@ -117,37 +126,54 @@ export function EventBuilder({ events, onChange }: EventBuilderProps) {
         </div>
       )}
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {events.map((event, index) => (
-          <EventCard
-            key={event.id}
-            event={event}
-            index={index}
-            totalEvents={events.length}
-            onUpdate={(updates) => handleUpdateEvent(event.id, updates)}
-            onRemove={() => handleRemoveEvent(event.id)}
-            onMoveUp={() => handleMoveUp(index)}
-            onMoveDown={() => handleMoveDown(index)}
-            onRequestCharging={
-              event.eventType === 'driving_ev'
-                ? () => setSelectedEventForCharging(event.id)
-                : undefined
-            }
-          />
-        ))}
-      </div>
+          <div key={event.id} className="relative group">
+            <EventCard
+              event={event}
+              index={index}
+              totalEvents={events.length}
+              onUpdate={(updates) => handleUpdateEvent(event.id, updates)}
+              onRemove={() => handleRemoveEvent(event.id)}
+              onMoveUp={() => handleMoveUp(index)}
+              onMoveDown={() => handleMoveDown(index)}
+              onRequestCharging={
+                event.eventType === 'driving_ev'
+                  ? () => setSelectedEventForCharging(event.id)
+                  : undefined
+              }
+            />
 
-      {/* Add Event button at bottom */}
-      <button
-        type="button"
-        onClick={handleAddEvent}
-        className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
-        Add Event
-      </button>
+            {/* Hover zone below - shows on hover, inserts after this card */}
+            <div className="absolute -bottom-2 left-0 right-0 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
+              <button
+                type="button"
+                onClick={() => handleAddEvent(index + 1)}
+                className="px-3 py-1 text-xs bg-white border border-neutral-300 text-neutral-600 hover:text-primary-600 hover:border-primary-400 rounded-full shadow-sm flex items-center gap-1 transition-colors"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add Event
+              </button>
+            </div>
+          </div>
+        ))}
+
+        {/* Add event button at the end when no events or after hovering */}
+        {events.length === 0 && (
+          <button
+            type="button"
+            onClick={() => handleAddEvent()}
+            className="w-full py-3 text-sm text-neutral-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors flex items-center justify-center gap-1.5 border border-dashed border-neutral-300 hover:border-primary-400"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add Event
+          </button>
+        )}
+      </div>
 
       {/* EV Charging Waypoint Selector Modal */}
       {selectedEventForCharging && (
@@ -382,7 +408,7 @@ function EventSpecificFields({ event, onUpdate }: EventSpecificFieldsProps) {
 }
 
 // Flight-specific fields
-function FlightFields({ event, onUpdate }: { event: any; onUpdate: (updates: any) => void }) {
+export function FlightFields({ event, onUpdate }: { event: any; onUpdate: (updates: any) => void }) {
   const {
     query: originQuery,
     setQuery: setOriginQuery,
@@ -539,7 +565,7 @@ function FlightFields({ event, onUpdate }: { event: any; onUpdate: (updates: any
 }
 
 // Train-specific fields (similar to flight)
-function TrainFields({ event, onUpdate }: { event: any; onUpdate: (updates: any) => void }) {
+export function TrainFields({ event, onUpdate }: { event: any; onUpdate: (updates: any) => void }) {
   const {
     query: originQuery,
     setQuery: setOriginQuery,
@@ -696,7 +722,7 @@ function TrainFields({ event, onUpdate }: { event: any; onUpdate: (updates: any)
 }
 
 // Driving EV fields
-function DrivingEVFields({ event, onUpdate }: { event: any; onUpdate: (updates: any) => void }) {
+export function DrivingEVFields({ event, onUpdate }: { event: any; onUpdate: (updates: any) => void }) {
   const {
     query: originQuery,
     setQuery: setOriginQuery,
@@ -851,7 +877,7 @@ function DrivingEVFields({ event, onUpdate }: { event: any; onUpdate: (updates: 
 }
 
 // Driving Rental fields
-function DrivingRentalFields({ event, onUpdate }: { event: any; onUpdate: (updates: any) => void }) {
+export function DrivingRentalFields({ event, onUpdate }: { event: any; onUpdate: (updates: any) => void }) {
   const {
     query: originQuery,
     setQuery: setOriginQuery,
@@ -985,7 +1011,7 @@ function DrivingRentalFields({ event, onUpdate }: { event: any; onUpdate: (updat
 }
 
 // Accommodation fields (hotel, airbnb, family)
-function AccommodationFields({ event, onUpdate }: { event: any; onUpdate: (updates: any) => void }) {
+export function AccommodationFields({ event, onUpdate }: { event: any; onUpdate: (updates: any) => void }) {
   const { query, setQuery, results, selectPlace } = usePlaceAutocomplete()
 
   const handleLocationSelect = useCallback(
@@ -1102,7 +1128,7 @@ function AccommodationFields({ event, onUpdate }: { event: any; onUpdate: (updat
 }
 
 // Logistics fields (parking, rental pickup/dropoff, other)
-function LogisticFields({ event, onUpdate }: { event: any; onUpdate: (updates: any) => void }) {
+export function LogisticFields({ event, onUpdate }: { event: any; onUpdate: (updates: any) => void }) {
   const { query, setQuery, results, selectPlace } = usePlaceAutocomplete()
 
   const handleLocationSelect = useCallback(

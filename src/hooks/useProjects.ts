@@ -229,6 +229,7 @@ export function useProjects() {
     if (updates.links !== undefined) dbUpdates.links = updates.links ?? null
     if (updates.phoneNumber !== undefined) dbUpdates.phone_number = updates.phoneNumber ?? null
     if (updates.parentId !== undefined) dbUpdates.parent_id = updates.parentId ?? null
+    if (updates.tripMetadata !== undefined) dbUpdates.trip_metadata = updates.tripMetadata ?? null
 
     const { error: updateError } = await supabase
       .from('projects')

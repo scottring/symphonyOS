@@ -177,6 +177,56 @@ const CAMPING_TRIP: PackingItem[] = [
   { name: 'Hat & sunglasses', category: 'clothing', essential: true },
 ]
 
+const COLD_WEATHER_TRIP: PackingItem[] = [
+  // Cold Weather Clothing
+  { name: 'Winter coats', category: 'clothing', essential: true },
+  { name: 'Snow boots or warm boots', category: 'clothing', essential: true },
+  { name: 'Warm gloves or mittens', category: 'clothing', essential: true },
+  { name: 'Winter hats/beanies', category: 'clothing', essential: true },
+  { name: 'Scarves or neck warmers', category: 'clothing', essential: true },
+  { name: 'Thermal underwear/base layers', category: 'clothing', essential: true },
+  { name: 'Warm socks (7-10 pairs)', category: 'clothing', essential: true },
+  { name: 'Sweaters or fleeces', category: 'clothing', essential: true },
+  { name: 'Jeans or warm pants', category: 'clothing', essential: true },
+  { name: 'Pajamas', category: 'clothing', essential: true },
+  { name: 'Regular underwear (7-8 sets)', category: 'clothing', essential: true },
+
+  // Toiletries
+  { name: 'Toothbrush & toothpaste', category: 'toiletries', essential: true },
+  { name: 'Shampoo & conditioner', category: 'toiletries', essential: true },
+  { name: 'Body wash or soap', category: 'toiletries', essential: true },
+  { name: 'Deodorant', category: 'toiletries', essential: true },
+  { name: 'Moisturizer (for dry winter air)', category: 'toiletries', essential: true },
+  { name: 'Lip balm with SPF', category: 'toiletries', essential: true },
+  { name: 'Hairbrush or comb', category: 'toiletries', essential: true },
+  { name: 'Sunscreen SPF 30+', category: 'toiletries', essential: true },
+
+  // Health & Safety
+  { name: 'First aid kit', category: 'health', essential: true },
+  { name: 'Pain relievers', category: 'health', essential: false },
+  { name: 'Prescription medications', category: 'health', essential: true },
+  { name: 'Hand warmers', category: 'other', essential: false },
+  { name: 'Tissues', category: 'other', essential: false },
+
+  // Electronics
+  { name: 'Phone chargers', category: 'electronics', essential: true },
+  { name: 'Camera', category: 'electronics', essential: false },
+  { name: 'Power bank', category: 'electronics', essential: false },
+  { name: 'Travel adapter', category: 'electronics', essential: false },
+
+  // Documents
+  { name: 'IDs or passports', category: 'documents', essential: true },
+  { name: 'Hotel confirmations', category: 'documents', essential: true },
+  { name: 'Travel insurance', category: 'documents', essential: false },
+  { name: 'Credit cards & cash', category: 'documents', essential: true },
+
+  // Other
+  { name: 'Reusable water bottles', category: 'other', essential: false },
+  { name: 'Snacks for travel', category: 'other', essential: false },
+  { name: 'Books or entertainment', category: 'other', essential: false },
+  { name: 'Small backpack for day trips', category: 'other', essential: false },
+]
+
 // ============================================================================
 // Template Map
 // ============================================================================
@@ -189,6 +239,7 @@ export const PACKING_TEMPLATES: Record<PackingTemplate, PackingItem[]> = {
   ski: SKI_TRIP,
   business: BUSINESS_TRIP,
   camping: CAMPING_TRIP,
+  cold_weather: COLD_WEATHER_TRIP,
 }
 
 // ============================================================================

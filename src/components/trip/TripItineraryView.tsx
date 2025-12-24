@@ -9,7 +9,14 @@ import type { TripMetadata, TripEvent, DrivingEVEvent, ChargingStation, OtherEve
 import type { Task } from '@/types/task'
 import { EVRoutePlanner } from './EVRoutePlanner'
 import { usePacking } from '@/hooks/usePacking'
-import { Save, Plane, Car, Hotel, Zap, Train, Home, Users, MapPin, Check } from 'lucide-react'
+import { buildPackingContext } from '@/lib/packingContext'
+import { generatePackingList } from '@/services/claudeService'
+import { supabase } from '@/lib/supabase'
+import { Save, Plane, Car, Hotel, Zap, Train, Home, Users, MapPin, Check, AlertCircle, Sparkles, GripVertical } from 'lucide-react'
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
+import type { DragEndEvent } from '@dnd-kit/core'
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 interface TripItineraryViewProps {
   tripMetadata: TripMetadata
@@ -18,7 +25,8 @@ interface TripItineraryViewProps {
   onUpdateTripMetadata?: (projectId: string, name: string, tripMetadata: TripMetadata) => Promise<void>
   projectId?: string
   projectName?: string
-  onEditEvent?: (eventId: string) => void
+  onEditEvent?: (eventId: string, insertAtIndex?: number) => void
+  onDeleteEvent?: (eventId: string) => void
   onAddTask?: (task: { title: string; projectId?: string }) => Promise<Task | null>
   onDeleteTask?: (taskId: string) => void
 }
@@ -31,38 +39,81 @@ export function TripItineraryView({
   projectId,
   projectName,
   onEditEvent,
+  onDeleteEvent,
   onAddTask,
   onDeleteTask
 }: TripItineraryViewProps) {
   const [selectedEventForCharging, setSelectedEventForCharging] = useState<string | null>(null)
-  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false)
-  const [showAIPackingModal, setShowAIPackingModal] = useState(false)
+  const [aiRequest, setAiRequest] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
   const [newItemText, setNewItemText] = useState('')
+  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false)
+  const [templateName, setTemplateName] = useState('')
+
   const { createTemplate, templates } = usePacking()
 
-  // Handler to add new packing item
+  // Handler to manually add a single packing item
   const handleAddPackingItem = async () => {
     if (!newItemText.trim() || !onAddTask || !projectId) return
 
-    // Prefix with "Pack" so it gets categorized as packing
-    const title = `Pack ${newItemText.trim()}`
-    await onAddTask({ title, projectId })
+    await onAddTask({
+      title: `Pack: ${newItemText.trim()}`,
+      projectId
+    })
     setNewItemText('')
   }
 
-  // Handler to load items from template
-  const handleLoadTemplate = async (templateId: string) => {
-    if (!onAddTask || !projectId) return
+  // Handler to generate packing items from AI conversation
+  const handleAIGenerate = async () => {
+    if (!aiRequest.trim() || !onAddTask || !projectId) return
 
-    const template = templates.find(t => t.id === templateId)
-    if (!template || !template.items) return
+    setIsGenerating(true)
+    setAiError(null)
 
-    // Add all items from template
-    for (const item of template.items) {
-      await onAddTask({
-        title: `Pack ${item.name}`,
-        projectId
-      })
+    try {
+      // Fetch family members for context
+      const { data: membersData } = await supabase
+        .from('family_members')
+        .select('*')
+        .order('display_order')
+
+      const members = membersData || []
+
+      // Fetch user profile for home location
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: profileData } = user ? await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single()
+        : { data: null }
+
+      // Build context with trip details
+      const context = await buildPackingContext(
+        tripMetadata,
+        members,
+        profileData,
+        aiRequest  // User's request becomes the special_needs/instructions
+      )
+
+      // Generate items via AI
+      const items = await generatePackingList(context)
+
+      // Add generated items to packing list
+      for (const item of items) {
+        await onAddTask({
+          title: `Pack: ${item.name}`,
+          projectId
+        })
+      }
+
+      setAiRequest('')  // Clear input on success
+    } catch (error) {
+      console.error('AI generation failed:', error)
+      setAiError(error instanceof Error ? error.message : 'Failed to generate items')
+    } finally {
+      setIsGenerating(false)
     }
   }
 
@@ -111,6 +162,74 @@ export function TripItineraryView({
 
     return categories
   }, [packingTasks])
+
+  // Handler to load items from user-saved template
+  const handleLoadTemplate = async (templateId: string) => {
+    if (!onAddTask || !projectId) return
+
+    const template = templates.find(t => t.id === templateId)
+    if (!template || !template.items) return
+
+    // Add all items from template
+    for (const item of template.items) {
+      await onAddTask({
+        title: `Pack: ${item.name}`,
+        projectId
+      })
+    }
+  }
+
+  // Convert packing tasks to PackingItem format for saving as template
+  const convertTasksToPackingItems = (): PackingItem[] => {
+    return packingTasks.map(task => {
+      const title = task.title?.toLowerCase() || ''
+      let category: PackingCategory = 'other'
+
+      // Infer category from task title
+      if (title.includes('toothbrush') || title.includes('soap') || title.includes('shampoo') ||
+          title.includes('deodorant') || title.includes('razor') || title.includes('toiletries')) {
+        category = 'toiletries'
+      } else if (title.includes('underwear') || title.includes('socks') || title.includes('shirt') ||
+                 title.includes('pants') || title.includes('jacket') || title.includes('clothes') || title.includes('outfit')) {
+        category = 'clothing'
+      } else if (title.includes('charger') || title.includes('phone') || title.includes('laptop') ||
+                 title.includes('cable') || title.includes('electronics') || title.includes('headphone')) {
+        category = 'electronics'
+      } else if (title.includes('passport') || title.includes('license') || title.includes('ticket') ||
+                 title.includes('documents') || title.includes('id')) {
+        category = 'documents'
+      } else if (title.includes('snack') || title.includes('water') || title.includes('food') || title.includes('drink')) {
+        category = 'food_drinks'
+      } else if (title.includes('medicine') || title.includes('medication') || title.includes('first aid') || title.includes('health')) {
+        category = 'health'
+      }
+
+      // Check if essential based on task notes
+      const isEssential = task.notes?.toLowerCase().includes('essential') || false
+
+      return {
+        name: task.title?.replace(/^Pack:\s*/i, '') || '',
+        category,
+        essential: isEssential,
+      }
+    })
+  }
+
+  // Handler to save current packing list as template
+  const handleSaveAsTemplate = async () => {
+    if (!templateName.trim()) return
+
+    try {
+      const items = convertTasksToPackingItems()
+      await createTemplate(templateName, items)
+      setShowSaveTemplateModal(false)
+      setTemplateName('')
+      alert('Packing template saved successfully!')
+    } catch (err) {
+      console.error('Failed to save template:', err)
+      alert('Failed to save template')
+    }
+  }
 
   // Calculate actual trip date range from events
   const calculateTripDates = () => {
@@ -282,6 +401,40 @@ export function TripItineraryView({
   const tripDates = calculateTripDates()
   const tripTitle = generateTripTitle()
 
+  // Use events as-is (user can drag to reorder)
+  const events = tripMetadata.events || []
+
+  // Drag-and-drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  // Handle drag end to reorder events
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (!over || active.id === over.id || !onUpdateTripMetadata || !projectId || !projectName) {
+      return
+    }
+
+    const oldIndex = events.findIndex(e => e.id === active.id)
+    const newIndex = events.findIndex(e => e.id === over.id)
+
+    if (oldIndex === -1 || newIndex === -1) return
+
+    const reorderedEvents = arrayMove(events, oldIndex, newIndex)
+
+    const updatedTripMetadata: TripMetadata = {
+      ...tripMetadata,
+      events: reorderedEvents
+    }
+
+    await onUpdateTripMetadata(projectId, projectName, updatedTripMetadata)
+  }
+
   const completedPackingCount = packingTasks.filter(t => t.completed).length
   const totalPackingCount = packingTasks.length
 
@@ -345,53 +498,6 @@ export function TripItineraryView({
 
     // Close the modal
     setSelectedEventForCharging(null)
-  }
-
-  // Convert packing tasks to PackingItem format
-  const convertTasksToPackingItems = (): PackingItem[] => {
-    return packingTasks.map(task => {
-      const title = task.title?.toLowerCase() || ''
-      let category: PackingCategory = 'other'
-
-      // Infer category from task title
-      if (title.includes('toothbrush') || title.includes('soap') || title.includes('shampoo') ||
-          title.includes('deodorant') || title.includes('razor') || title.includes('toiletries')) {
-        category = 'toiletries'
-      } else if (title.includes('underwear') || title.includes('socks') || title.includes('shirt') ||
-                 title.includes('pants') || title.includes('jacket') || title.includes('clothes') || title.includes('outfit')) {
-        category = 'clothing'
-      } else if (title.includes('charger') || title.includes('phone') || title.includes('laptop') ||
-                 title.includes('cable') || title.includes('electronics') || title.includes('headphone')) {
-        category = 'electronics'
-      } else if (title.includes('passport') || title.includes('license') || title.includes('ticket') ||
-                 title.includes('documents') || title.includes('id')) {
-        category = 'documents'
-      } else if (title.includes('snack') || title.includes('water') || title.includes('food') || title.includes('drink')) {
-        category = 'food_drinks'
-      }
-
-      // Check if essential based on task notes
-      const isEssential = task.notes?.toLowerCase().includes('essential') || false
-
-      return {
-        name: task.title?.replace(/^Pack\s+/i, '') || '',
-        category,
-        essential: isEssential,
-      }
-    })
-  }
-
-  // Handle saving packing list as template
-  const handleSaveAsTemplate = async (templateName: string) => {
-    try {
-      const items = convertTasksToPackingItems()
-      await createTemplate(templateName, items)
-      setShowSaveTemplateModal(false)
-      alert('Packing template saved successfully!')
-    } catch (err) {
-      console.error('Failed to save template:', err)
-      alert('Failed to save template')
-    }
   }
 
   return (
@@ -466,21 +572,49 @@ export function TripItineraryView({
               )}
             </div>
 
-            {tripMetadata.useUnifiedTimeline && tripMetadata.events && tripMetadata.events.length > 0 ? (
-              <div className="space-y-3">
-                {tripMetadata.events.map((event) => (
-                  <CompactEventCard
-                    key={event.id}
-                    event={event}
-                    onRequestCharging={
-                      event.eventType === 'driving_ev'
-                        ? () => setSelectedEventForCharging(event.id)
-                        : undefined
-                    }
-                    onClick={onEditEvent ? () => onEditEvent(event.id) : undefined}
-                  />
-                ))}
-              </div>
+            {tripMetadata.useUnifiedTimeline && events.length > 0 ? (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={events.map(e => e.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-2">
+                    {events.map((event, index) => (
+                      <div key={event.id} className="relative group">
+                        <SortableEventCard
+                          event={event}
+                          onRequestCharging={
+                            event.eventType === 'driving_ev'
+                              ? () => setSelectedEventForCharging(event.id)
+                              : undefined
+                          }
+                          onClick={onEditEvent ? () => onEditEvent(event.id) : undefined}
+                          onDelete={onDeleteEvent ? () => onDeleteEvent(event.id) : undefined}
+                        />
+
+                        {/* Hover zone below - shows on hover, inserts after this card */}
+                        {onEditEvent && (
+                          <div className="absolute -bottom-2 left-0 right-0 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                            <button
+                              onClick={() => onEditEvent('', index + 1)}
+                              className="px-3 py-1 text-xs bg-white border border-neutral-300 text-neutral-600 hover:text-primary-600 hover:border-primary-400 rounded-full shadow-sm flex items-center gap-1 transition-colors"
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                              </svg>
+                              Add Event
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
             ) : (
               <div className="py-12 text-center bg-neutral-50 rounded-xl border border-neutral-200">
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-neutral-100 mb-3">
@@ -502,7 +636,7 @@ export function TripItineraryView({
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-display text-lg font-medium text-neutral-800">Packing List</h2>
               <div className="flex items-center gap-2">
-                {/* Load from Template */}
+                {/* Load from My Templates */}
                 {templates.length > 0 && onAddTask && (
                   <select
                     onChange={(e) => {
@@ -513,26 +647,13 @@ export function TripItineraryView({
                     }}
                     className="btn bg-white hover:bg-gray-100 text-gray-700 text-sm shadow-sm pr-8"
                   >
-                    <option value="">Load Template...</option>
+                    <option value="">My Templates...</option>
                     {templates.map(template => (
                       <option key={template.id} value={template.id}>
                         {template.name}
                       </option>
                     ))}
                   </select>
-                )}
-
-                {/* AI Generation */}
-                {onAddTask && (
-                  <button
-                    onClick={() => setShowAIPackingModal(true)}
-                    className="btn bg-primary-600 hover:bg-primary-700 text-white text-sm flex items-center gap-1.5 shadow-sm"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                    AI Generate
-                  </button>
                 )}
 
                 {/* Save as Template */}
@@ -545,8 +666,78 @@ export function TripItineraryView({
                     Save as Template
                   </button>
                 )}
+
+                {/* Clear All Packing Items */}
+                {onDeleteTask && packingTasks.length > 0 && (
+                  <button
+                    onClick={async () => {
+                      if (confirm(`Clear all ${packingTasks.length} packing items?`)) {
+                        for (const task of packingTasks) {
+                          await onDeleteTask(task.id)
+                        }
+                      }
+                    }}
+                    className="btn bg-red-100 hover:bg-red-200 text-red-700 text-sm flex items-center gap-1.5"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Clear All
+                  </button>
+                )}
               </div>
             </div>
+
+            {/* AI Conversational Input */}
+            {onAddTask && (
+              <div className="mb-4">
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      value={aiRequest}
+                      onChange={(e) => setAiRequest(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !isGenerating) {
+                          handleAIGenerate()
+                        }
+                      }}
+                      placeholder="Tell me what you need to pack... (e.g., 'warm clothes and toiletries')"
+                      className="input-base w-full text-sm"
+                      disabled={isGenerating}
+                    />
+                  </div>
+                  <button
+                    onClick={handleAIGenerate}
+                    disabled={!aiRequest.trim() || isGenerating}
+                    className="btn btn-primary text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        Generate
+                      </>
+                    )}
+                  </button>
+                </div>
+                {aiError && (
+                  <p className="text-red-600 text-sm mt-2 flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    {aiError}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Packing Progress */}
 
             {totalPackingCount > 0 && (
               <div className="mb-6 p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
@@ -665,6 +856,51 @@ export function TripItineraryView({
         </div>
       </div>
 
+      {/* Save Template Modal */}
+      {showSaveTemplateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <h3 className="font-display text-xl font-medium text-neutral-800 mb-4">
+              Save as Template
+            </h3>
+            <p className="text-sm text-neutral-600 mb-4">
+              Give your packing list a name to save it as a reusable template.
+            </p>
+            <input
+              type="text"
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && templateName.trim()) {
+                  handleSaveAsTemplate()
+                }
+              }}
+              placeholder="e.g., Beach Vacation, Ski Trip, Business Travel"
+              className="input-base w-full mb-4"
+              autoFocus
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowSaveTemplateModal(false)
+                  setTemplateName('')
+                }}
+                className="btn bg-neutral-100 hover:bg-neutral-200 text-neutral-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveAsTemplate}
+                disabled={!templateName.trim()}
+                className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Save Template
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* EV Route Planner Modal */}
       {selectedEventForCharging && tripMetadata.events && (
         <EVRoutePlanner
@@ -674,300 +910,43 @@ export function TripItineraryView({
         />
       )}
 
-      {/* AI Packing Generation Modal */}
-      {showAIPackingModal && onAddTask && projectId && (
-        <AIPackingModal
-          tripMetadata={tripMetadata}
-          onGenerate={async (items) => {
-            for (const item of items) {
-              await onAddTask({ title: `Pack ${item}`, projectId })
-            }
-            setShowAIPackingModal(false)
-          }}
-          onClose={() => setShowAIPackingModal(false)}
-        />
-      )}
 
-      {/* Save Template Modal */}
-      {showSaveTemplateModal && (
-        <SaveTemplateModal
-          onSave={handleSaveAsTemplate}
-          onClose={() => setShowSaveTemplateModal(false)}
-        />
-      )}
     </div>
   )
 }
 
-// AI Packing Modal Component
-interface AIPackingModalProps {
-  tripMetadata: TripMetadata
-  onGenerate: (items: string[]) => Promise<void>
-  onClose: () => void
-}
+// Sortable Event Card Wrapper
+function SortableEventCard({ event, onRequestCharging, onClick, onDelete }: CompactEventCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: event.id })
 
-function AIPackingModal({ tripMetadata, onGenerate, onClose }: AIPackingModalProps) {
-  const [adults, setAdults] = useState(2)
-  const [children, setChildren] = useState(0)
-  const [childAges, setChildAges] = useState('')
-  const [specialNeeds, setSpecialNeeds] = useState('')
-  const [isGenerating, setIsGenerating] = useState(false)
-
-  // Calculate trip duration
-  const duration = useMemo(() => {
-    const start = new Date(tripMetadata.startDate)
-    const end = new Date(tripMetadata.endDate)
-    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-    return days
-  }, [tripMetadata])
-
-  const handleGenerate = async () => {
-    setIsGenerating(true)
-
-    try {
-      // TODO: Replace with actual AI API call
-      // Build prompt for future AI integration:
-      // const destination = tripMetadata.destination?.name || 'destination'
-      // const prompt = `Generate a comprehensive packing list for a ${duration}-day trip to ${destination}...`
-
-      // For now, generate a basic list based on the inputs
-      const items = generateBasicPackingList(adults, children, duration, specialNeeds)
-      await onGenerate(items)
-    } catch (error) {
-      console.error('Error generating packing list:', error)
-    } finally {
-      setIsGenerating(false)
-    }
-  }
-
-  // Temporary fallback generator (replace with AI API call)
-  const generateBasicPackingList = (adults: number, children: number, duration: number, specialNeeds: string): string[] => {
-    const items: string[] = []
-
-    // Clothing (per person, per day)
-    const clothingDays = Math.min(duration + 1, 7) // Max 7 days of clothes
-    items.push(`Underwear (${clothingDays * (adults + children)} sets)`)
-    items.push(`Socks (${clothingDays * (adults + children)} pairs)`)
-    items.push(`Shirts (${clothingDays * (adults + children)})`)
-    items.push(`Pants/Shorts (${Math.ceil(clothingDays / 2) * (adults + children)})`)
-    items.push('Jacket or Sweater')
-    items.push('Pajamas')
-
-    // Toiletries
-    items.push('Toothbrush & Toothpaste')
-    items.push('Shampoo & Conditioner')
-    items.push('Soap/Body Wash')
-    items.push('Deodorant')
-    items.push('Sunscreen')
-    items.push('Medications')
-    items.push('First Aid Kit')
-
-    // Electronics
-    items.push('Phone Charger')
-    items.push('Camera')
-    items.push('Power Bank')
-    items.push('Headphones')
-
-    // Documents
-    items.push('ID/Passport')
-    items.push('Travel Insurance')
-    items.push('Tickets/Confirmations')
-
-    // Kids items
-    if (children > 0) {
-      items.push('Diapers/Pull-ups')
-      items.push('Wipes')
-      items.push('Snacks')
-      items.push('Toys/Entertainment')
-      items.push('Kids Books')
-    }
-
-    // Parse special needs
-    if (specialNeeds.toLowerCase().includes('beach')) {
-      items.push('Swimsuit')
-      items.push('Beach Towel')
-      items.push('Flip Flops')
-    }
-    if (specialNeeds.toLowerCase().includes('ski') || specialNeeds.toLowerCase().includes('snow')) {
-      items.push('Ski Jacket')
-      items.push('Gloves')
-      items.push('Ski Goggles')
-      items.push('Thermal Underwear')
-    }
-
-    return items
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6">
-        <h3 className="text-2xl font-display mb-2">AI Packing List Generator</h3>
-        <p className="text-sm text-neutral-500 mb-6">
-          Tell us about your trip and we'll generate a comprehensive packing list
-        </p>
-
-        <div className="space-y-4 mb-6">
-          {/* Trip Info Summary */}
-          <div className="p-3 bg-primary-50 rounded-lg border border-primary-100">
-            <div className="text-sm text-primary-800">
-              <strong>{duration} days</strong> • {tripMetadata.destination?.name || 'Your destination'}
-            </div>
-          </div>
-
-          {/* Adults */}
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">
-              Number of Adults
-            </label>
-            <input
-              type="number"
-              min="1"
-              max="10"
-              value={adults}
-              onChange={(e) => setAdults(parseInt(e.target.value) || 1)}
-              className="input-base w-full"
-            />
-          </div>
-
-          {/* Children */}
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">
-              Number of Children
-            </label>
-            <input
-              type="number"
-              min="0"
-              max="10"
-              value={children}
-              onChange={(e) => setChildren(parseInt(e.target.value) || 0)}
-              className="input-base w-full"
-            />
-          </div>
-
-          {/* Child Ages */}
-          {children > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-2">
-                Child Ages (e.g., "3, 7")
-              </label>
-              <input
-                type="text"
-                value={childAges}
-                onChange={(e) => setChildAges(e.target.value)}
-                placeholder="3, 7"
-                className="input-base w-full"
-              />
-            </div>
-          )}
-
-          {/* Special Needs */}
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">
-              Special Activities or Needs
-            </label>
-            <textarea
-              value={specialNeeds}
-              onChange={(e) => setSpecialNeeds(e.target.value)}
-              placeholder="Beach, hiking, formal dinner, medical needs..."
-              rows={3}
-              className="input-base w-full resize-none"
-            />
-          </div>
-        </div>
-
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isGenerating}
-            className="flex-1 btn bg-neutral-100 hover:bg-neutral-200 text-neutral-700 disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleGenerate}
-            disabled={isGenerating}
-            className="flex-1 btn bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {isGenerating ? (
-              <>
-                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                Generating...
-              </>
-            ) : (
-              <>
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                Generate List
-              </>
-            )}
-          </button>
-        </div>
-
-        <p className="text-xs text-neutral-400 mt-4 text-center">
-          You can edit and refine the generated items after creation
-        </p>
+    <div ref={setNodeRef} style={style} className="relative">
+      <div
+        {...attributes}
+        {...listeners}
+        className="absolute left-0 top-1/2 -translate-y-1/2 -ml-6 cursor-grab active:cursor-grabbing text-neutral-400 hover:text-neutral-600 transition-colors"
+      >
+        <GripVertical className="w-5 h-5" />
       </div>
-    </div>
-  )
-}
-
-// Save Template Modal Component
-interface SaveTemplateModalProps {
-  onSave: (name: string) => void
-  onClose: () => void
-}
-
-function SaveTemplateModal({ onSave, onClose }: SaveTemplateModalProps) {
-  const [templateName, setTemplateName] = useState('')
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (templateName.trim()) {
-      onSave(templateName.trim())
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-        <h3 className="text-xl font-display mb-4">Save as Packing Template</h3>
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Template Name
-            </label>
-            <input
-              type="text"
-              value={templateName}
-              onChange={e => setTemplateName(e.target.value)}
-              className="input-base w-full text-lg"
-              placeholder="e.g., Weekend Beach Trip"
-              autoFocus
-            />
-          </div>
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 btn bg-gray-100 hover:bg-gray-200 text-gray-700"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={!templateName.trim()}
-              className="flex-1 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Save Template
-            </button>
-          </div>
-        </form>
-      </div>
+      <CompactEventCard
+        event={event}
+        onRequestCharging={onRequestCharging}
+        onClick={onClick}
+        onDelete={onDelete}
+      />
     </div>
   )
 }
@@ -977,9 +956,10 @@ interface CompactEventCardProps {
   event: TripEvent
   onRequestCharging?: () => void
   onClick?: () => void
+  onDelete?: () => void
 }
 
-function CompactEventCard({ event, onRequestCharging, onClick }: CompactEventCardProps) {
+function CompactEventCard({ event, onRequestCharging, onClick, onDelete }: CompactEventCardProps) {
   const formatDateTime = (dateStr: string, time?: string) => {
     const date = new Date(`${dateStr}T${time || '08:00'}`)
     return {
@@ -1087,12 +1067,36 @@ function CompactEventCard({ event, onRequestCharging, onClick }: CompactEventCar
       } transition-all duration-200 group`}
       onClick={onClick}
     >
-      {/* Header: Icon + Date/Time */}
+      {/* Header: Icon + Date/Time + Delete Button */}
       <div className="flex items-start justify-between mb-2">
         <div className={`${details.iconColor}`}>{details.icon}</div>
-        <div className="text-right">
-          <div className="text-xs font-bold text-neutral-900">{date}</div>
-          {time && <div className="text-xs text-neutral-500">{time}</div>}
+        <div className="flex items-center gap-2">
+          {/* Delete button - shows on hover */}
+          {onDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                if (confirm('Delete this event from the itinerary?')) {
+                  onDelete()
+                }
+              }}
+              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"
+              title="Delete event"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              </svg>
+            </button>
+          )}
+          <div className="text-right">
+            <div className="text-xs font-bold text-neutral-900">{date}</div>
+            {time && <div className="text-xs text-neutral-500">{time}</div>}
+          </div>
         </div>
       </div>
 

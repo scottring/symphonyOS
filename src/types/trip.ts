@@ -349,6 +349,7 @@ export type PackingCategory =
   | 'toiletries'
   | 'electronics'
   | 'documents'
+  | 'health'
   | 'ev_equipment'
   | 'food_drinks'
   | 'recreation'
@@ -369,6 +370,7 @@ export type PackingTemplate =
   | 'ski'
   | 'business'
   | 'camping'
+  | 'cold_weather'
 
 // ============================================================================
 // Vehicle Presets
