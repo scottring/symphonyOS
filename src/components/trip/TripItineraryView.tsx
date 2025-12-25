@@ -502,54 +502,54 @@ export function TripItineraryView({
 
   return (
     <div className="w-full">
-      {/* Compact Header */}
-      <div className="mb-6 bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 border border-amber-100/50 rounded-2xl p-5">
-        <div className="flex items-center justify-between mb-3">
+      {/* Refined Header */}
+      <div className="mb-8 bg-bg-elevated border border-neutral-200 rounded-2xl p-6 shadow-card">
+        <div className="flex items-start justify-between mb-4">
           <div className="flex-1 min-w-0">
-            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-white/60 backdrop-blur-sm rounded-full mb-2">
-              <svg className="w-3.5 h-3.5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <div className="inline-flex items-center gap-1.5 mb-2">
+              <svg className="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span className="text-xs font-semibold text-amber-900 uppercase tracking-wide">Trip</span>
+              <span className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Trip</span>
             </div>
 
-            <h2 className="font-display text-xl font-bold text-neutral-900 leading-tight mb-1">
+            <h2 className="font-display text-2xl text-neutral-900 leading-tight mb-1">
               {tripTitle}
             </h2>
           </div>
 
-          <div className="text-right flex-shrink-0">
-            <div className="text-xs text-neutral-500 mb-1">Dates</div>
-            <div className="text-sm font-semibold text-neutral-900 whitespace-nowrap">
+          <div className="text-right flex-shrink-0 ml-4">
+            <div className="text-xs text-neutral-500 mb-0.5">Dates</div>
+            <div className="text-sm font-medium text-neutral-800 whitespace-nowrap">
               {formatDateRange(tripDates.start, tripDates.end)}
             </div>
           </div>
         </div>
 
-        {/* Trip Stats - Inline */}
-        <div className="flex items-center gap-4 text-xs flex-wrap">
+        {/* Trip Stats - Refined */}
+        <div className="flex items-center gap-5 text-xs flex-wrap pt-3 border-t border-neutral-200/60">
           {tripStats.flights > 0 && (
             <div className="flex items-center gap-1.5">
-              <Plane className="w-4 h-4 text-blue-600" />
-              <span className="font-medium text-neutral-700">{tripStats.flights} flight{tripStats.flights !== 1 ? 's' : ''}</span>
+              <Plane className="w-3.5 h-3.5 text-primary-500" />
+              <span className="text-neutral-600">{tripStats.flights} flight{tripStats.flights !== 1 ? 's' : ''}</span>
             </div>
           )}
           {tripStats.drives > 0 && (
             <div className="flex items-center gap-1.5">
-              <Car className="w-4 h-4 text-green-600" />
-              <span className="font-medium text-neutral-700">{tripStats.drives} drive{tripStats.drives !== 1 ? 's' : ''}</span>
+              <Car className="w-3.5 h-3.5 text-primary-500" />
+              <span className="text-neutral-600">{tripStats.drives} drive{tripStats.drives !== 1 ? 's' : ''}</span>
             </div>
           )}
           {tripStats.accommodations > 0 && (
             <div className="flex items-center gap-1.5">
-              <Hotel className="w-4 h-4 text-rose-600" />
-              <span className="font-medium text-neutral-700">{tripStats.accommodations} stay{tripStats.accommodations !== 1 ? 's' : ''}</span>
+              <Hotel className="w-3.5 h-3.5 text-primary-500" />
+              <span className="text-neutral-600">{tripStats.accommodations} stay{tripStats.accommodations !== 1 ? 's' : ''}</span>
             </div>
           )}
           {tripStats.chargingStops > 0 && (
             <div className="flex items-center gap-1.5">
-              <Zap className="w-4 h-4 text-yellow-600" />
-              <span className="font-medium text-neutral-700">{tripStats.chargingStops} charge{tripStats.chargingStops !== 1 ? 's' : ''}</span>
+              <Zap className="w-3.5 h-3.5 text-primary-500" />
+              <span className="text-neutral-600">{tripStats.chargingStops} charge{tripStats.chargingStops !== 1 ? 's' : ''}</span>
             </div>
           )}
         </div>
@@ -560,8 +560,8 @@ export function TripItineraryView({
         {/* LEFT SIDEBAR: Trip Itinerary */}
         <aside className="w-80 flex-shrink-0 hidden md:block">
           <div className="sticky top-8">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display text-lg font-medium text-neutral-800">Itinerary</h2>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-display text-xl text-neutral-900">Itinerary</h2>
               {onEditEvent && (
                 <button
                   onClick={() => onEditEvent('')}
@@ -632,10 +632,10 @@ export function TripItineraryView({
         {/* RIGHT COLUMN: Packing List + Notes (Main Content) */}
         <div className="flex-1 min-w-0">
           {/* Packing List */}
-          <div className="mb-10">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display text-lg font-medium text-neutral-800">Packing List</h2>
-              <div className="flex items-center gap-2">
+          <div className="mb-12">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+              <h2 className="font-display text-xl text-neutral-900">Packing List</h2>
+              <div className="flex items-center gap-2 flex-wrap">
                 {/* Load from My Templates */}
                 {templates.length > 0 && onAddTask && (
                   <select
@@ -645,9 +645,9 @@ export function TripItineraryView({
                         e.target.value = '' // Reset selection
                       }
                     }}
-                    className="btn bg-white hover:bg-gray-100 text-gray-700 text-sm shadow-sm pr-8"
+                    className="px-3 py-1.5 text-xs bg-bg-elevated hover:bg-neutral-100 text-neutral-700 border border-neutral-200 rounded-lg transition-colors"
                   >
-                    <option value="">My Templates...</option>
+                    <option value="">Load Template...</option>
                     {templates.map(template => (
                       <option key={template.id} value={template.id}>
                         {template.name}
@@ -660,10 +660,10 @@ export function TripItineraryView({
                 {packingTasks.length > 0 && (
                   <button
                     onClick={() => setShowSaveTemplateModal(true)}
-                    className="btn bg-white hover:bg-gray-100 text-gray-700 text-sm flex items-center gap-1.5 shadow-sm"
+                    className="px-3 py-1.5 bg-bg-elevated hover:bg-neutral-100 text-neutral-700 text-xs border border-neutral-200 rounded-lg flex items-center gap-1.5 transition-colors"
                   >
-                    <Save size={16} />
-                    Save as Template
+                    <Save size={14} />
+                    Save Template
                   </button>
                 )}
 
@@ -677,9 +677,9 @@ export function TripItineraryView({
                         }
                       }
                     }}
-                    className="btn bg-red-100 hover:bg-red-200 text-red-700 text-sm flex items-center gap-1.5"
+                    className="px-3 py-1.5 bg-danger-50 hover:bg-danger-100 text-danger-600 text-xs border border-danger-200 rounded-lg flex items-center gap-1.5 transition-colors"
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
                     Clear All
@@ -690,7 +690,7 @@ export function TripItineraryView({
 
             {/* AI Conversational Input */}
             {onAddTask && (
-              <div className="mb-4">
+              <div className="mb-5">
                 <div className="flex gap-2">
                   <div className="flex-1">
                     <input
@@ -702,15 +702,15 @@ export function TripItineraryView({
                           handleAIGenerate()
                         }
                       }}
-                      placeholder="Tell me what you need to pack... (e.g., 'warm clothes and toiletries')"
-                      className="input-base w-full text-sm"
+                      placeholder="Describe what you need to pack..."
+                      className="w-full px-3 py-2.5 text-sm bg-bg-elevated border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                       disabled={isGenerating}
                     />
                   </div>
                   <button
                     onClick={handleAIGenerate}
                     disabled={!aiRequest.trim() || isGenerating}
-                    className="btn btn-primary text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {isGenerating ? (
                       <>
@@ -718,7 +718,7 @@ export function TripItineraryView({
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                         </svg>
-                        Generating...
+                        Generating
                       </>
                     ) : (
                       <>
@@ -729,7 +729,7 @@ export function TripItineraryView({
                   </button>
                 </div>
                 {aiError && (
-                  <p className="text-red-600 text-sm mt-2 flex items-center gap-1">
+                  <p className="text-danger-600 text-sm mt-2 flex items-center gap-1.5">
                     <AlertCircle className="w-4 h-4" />
                     {aiError}
                   </p>
@@ -738,24 +738,23 @@ export function TripItineraryView({
             )}
 
             {/* Packing Progress */}
-
             {totalPackingCount > 0 && (
-              <div className="mb-6 p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
+              <div className="mb-6 p-4 bg-bg-elevated rounded-xl border border-neutral-200">
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="flex-1 h-2 bg-emerald-100 rounded-full overflow-hidden">
+                  <div className="flex-1 h-1.5 bg-neutral-100 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-500"
+                      className="h-full bg-primary-500 rounded-full transition-all duration-500"
                       style={{ width: `${(completedPackingCount / totalPackingCount) * 100}%` }}
                     />
                   </div>
-                  <span className="text-sm font-bold text-emerald-700 tabular-nums">
+                  <span className="text-sm font-medium text-neutral-700 tabular-nums">
                     {completedPackingCount}/{totalPackingCount}
                   </span>
                 </div>
-                <div className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                <div className="text-xs text-neutral-500 flex items-center gap-1.5">
                   {completedPackingCount === totalPackingCount ? (
                     <>
-                      <Check className="w-3.5 h-3.5" />
+                      <Check className="w-3.5 h-3.5 text-success-500" />
                       <span>All packed!</span>
                     </>
                   ) : (
@@ -767,7 +766,7 @@ export function TripItineraryView({
 
             {/* Add Item Input */}
             {onAddTask && (
-              <div className="mb-6 p-4 bg-neutral-50 rounded-xl border border-neutral-200">
+              <div className="mb-6">
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
@@ -779,8 +778,8 @@ export function TripItineraryView({
                         handleAddPackingItem()
                       }
                     }}
-                    placeholder="Add packing item..."
-                    className="flex-1 px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    placeholder="Add item manually..."
+                    className="flex-1 px-3 py-2 text-sm bg-bg-elevated border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                   />
                   <button
                     onClick={handleAddPackingItem}
@@ -794,38 +793,38 @@ export function TripItineraryView({
             )}
 
             {packingTasks.length > 0 ? (
-              <div className="grid grid-cols-3 gap-x-8 gap-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 lg:gap-x-10 gap-y-8">
                 {Array.from(packingByCategory.entries()).map(([category, items]) => (
                   <div key={category}>
-                    <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2">
+                    <h3 className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-3 border-b border-neutral-200 pb-1.5">
                       {category}
                     </h3>
-                    <div className="space-y-0">
+                    <div className="space-y-0.5">
                       {items.map((task) => (
                         <div
                           key={task.id}
-                          className="flex items-center gap-2 py-1 group hover:bg-neutral-50 rounded transition-colors"
+                          className="flex items-center gap-2.5 py-1.5 px-1 group hover:bg-neutral-50 rounded-md transition-colors"
                         >
-                          <label className="flex items-center gap-2 flex-1 cursor-pointer">
+                          <label className="flex items-center gap-2.5 flex-1 cursor-pointer min-w-0">
                             <input
                               type="checkbox"
                               checked={task.completed}
                               onChange={() => onToggleTask(task.id)}
-                              className="w-3.5 h-3.5 rounded border-neutral-300 text-emerald-600
-                                       focus:ring-1 focus:ring-emerald-500 focus:ring-offset-0 cursor-pointer"
+                              className="w-4 h-4 rounded border-neutral-300 text-primary-600
+                                       focus:ring-2 focus:ring-primary-500 focus:ring-offset-0 cursor-pointer flex-shrink-0"
                             />
-                            <span className={`text-sm transition-all ${
+                            <span className={`text-sm leading-relaxed transition-all truncate ${
                               task.completed
                                 ? 'text-neutral-400 line-through'
                                 : 'text-neutral-700 group-hover:text-neutral-900'
                             }`}>
-                              {task.title?.replace(/^Pack\s+/i, '')}
+                              {task.title?.replace(/^Pack:?\s*/i, '')}
                             </span>
                           </label>
                           {onDeleteTask && (
                             <button
                               onClick={() => onDeleteTask(task.id)}
-                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 rounded transition-all text-red-600"
+                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-danger-50 rounded transition-all text-neutral-400 hover:text-danger-600 flex-shrink-0"
                               title="Delete item"
                             >
                               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -840,15 +839,15 @@ export function TripItineraryView({
                 ))}
               </div>
             ) : (
-              <div className="py-12 text-center text-neutral-400 text-sm bg-neutral-50 rounded-xl border border-neutral-200">
+              <div className="py-16 text-center text-neutral-500 text-sm bg-neutral-50/50 rounded-xl border border-neutral-200 border-dashed">
                 {onAddTask ? 'Add items above to start your packing list' : 'No packing items yet'}
               </div>
             )}
           </div>
 
           {/* Notes Section - Placeholder for now */}
-          <div className="pt-8 border-t border-neutral-200/60">
-            <h2 className="font-display text-lg font-medium text-neutral-800 mb-3">Trip Notes</h2>
+          <div className="pt-10 border-t border-neutral-200">
+            <h2 className="font-display text-xl text-neutral-900 mb-3">Trip Notes</h2>
             <div className="text-sm text-neutral-500 italic">
               Notes will appear here
             </div>
@@ -980,10 +979,10 @@ function CompactEventCard({ event, onRequestCharging, onClick, onDelete }: Compa
           title: e.airline && e.flightNumber ? `${e.airline} ${e.flightNumber}` : 'Flight',
           subtitle: `${e.origin?.name || e.origin?.address} → ${e.destination?.name || e.destination?.address}`,
           detail: e.confirmationNumber || null,
-          bg: 'bg-blue-50',
-          border: 'border-blue-200',
-          accent: 'text-blue-700',
-          iconColor: 'text-blue-600'
+          bg: 'bg-bg-elevated',
+          border: 'border-neutral-200',
+          accent: 'text-neutral-800',
+          iconColor: 'text-primary-600'
         }
       }
       case 'train': {
@@ -993,10 +992,10 @@ function CompactEventCard({ event, onRequestCharging, onClick, onDelete }: Compa
           title: e.line || 'Train',
           subtitle: `${e.origin?.name || e.origin?.address} → ${e.destination?.name || e.destination?.address}`,
           detail: e.trainNumber ? `#${e.trainNumber}` : null,
-          bg: 'bg-purple-50',
-          border: 'border-purple-200',
-          accent: 'text-purple-700',
-          iconColor: 'text-purple-600'
+          bg: 'bg-bg-elevated',
+          border: 'border-neutral-200',
+          accent: 'text-neutral-800',
+          iconColor: 'text-primary-600'
         }
       }
       case 'driving_ev': {
@@ -1006,10 +1005,10 @@ function CompactEventCard({ event, onRequestCharging, onClick, onDelete }: Compa
           title: 'Drive (EV)',
           subtitle: `${e.origin?.name || e.origin?.address} → ${e.destination?.name || e.destination?.address}`,
           detail: e.evVehicle ? `${e.evVehicle.currentBattery}% battery` : null,
-          bg: 'bg-green-50',
-          border: 'border-green-200',
-          accent: 'text-green-700',
-          iconColor: 'text-green-600',
+          bg: 'bg-bg-elevated',
+          border: 'border-neutral-200',
+          accent: 'text-neutral-800',
+          iconColor: 'text-primary-600',
           hasCharging: true
         }
       }
@@ -1020,10 +1019,10 @@ function CompactEventCard({ event, onRequestCharging, onClick, onDelete }: Compa
           title: 'Drive (Rental)',
           subtitle: `${e.origin?.name || e.origin?.address} → ${e.destination?.name || e.destination?.address}`,
           detail: e.rentalCar?.company || null,
-          bg: 'bg-orange-50',
-          border: 'border-orange-200',
-          accent: 'text-orange-700',
-          iconColor: 'text-orange-600'
+          bg: 'bg-bg-elevated',
+          border: 'border-neutral-200',
+          accent: 'text-neutral-800',
+          iconColor: 'text-primary-600'
         }
       }
       case 'hotel':
@@ -1036,10 +1035,10 @@ function CompactEventCard({ event, onRequestCharging, onClick, onDelete }: Compa
           title: e.name,
           subtitle: e.location?.name || e.location?.address || e.address,
           detail: `Check-in ${e.checkIn}`,
-          bg: 'bg-rose-50',
-          border: 'border-rose-200',
-          accent: 'text-rose-700',
-          iconColor: 'text-rose-600'
+          bg: 'bg-bg-elevated',
+          border: 'border-neutral-200',
+          accent: 'text-neutral-800',
+          iconColor: 'text-accent-500'
         }
       }
       default: {
@@ -1049,10 +1048,10 @@ function CompactEventCard({ event, onRequestCharging, onClick, onDelete }: Compa
           title: e.description || event.eventType.replace(/_/g, ' '),
           subtitle: e.location?.name || e.location?.address,
           detail: e.confirmationNumber || null,
-          bg: 'bg-neutral-50',
+          bg: 'bg-bg-elevated',
           border: 'border-neutral-200',
-          accent: 'text-neutral-700',
-          iconColor: 'text-neutral-600'
+          accent: 'text-neutral-800',
+          iconColor: 'text-neutral-500'
         }
       }
     }
@@ -1062,13 +1061,13 @@ function CompactEventCard({ event, onRequestCharging, onClick, onDelete }: Compa
 
   return (
     <div
-      className={`${details.bg} border ${details.border} rounded-xl p-3 ${
-        onClick ? 'cursor-pointer hover:shadow-md hover:scale-[1.02]' : ''
+      className={`${details.bg} border ${details.border} rounded-xl p-3.5 shadow-sm ${
+        onClick ? 'cursor-pointer hover:shadow-md hover:border-neutral-300' : ''
       } transition-all duration-200 group`}
       onClick={onClick}
     >
       {/* Header: Icon + Date/Time + Delete Button */}
-      <div className="flex items-start justify-between mb-2">
+      <div className="flex items-start justify-between mb-2.5">
         <div className={`${details.iconColor}`}>{details.icon}</div>
         <div className="flex items-center gap-2">
           {/* Delete button - shows on hover */}
@@ -1080,10 +1079,10 @@ function CompactEventCard({ event, onRequestCharging, onClick, onDelete }: Compa
                   onDelete()
                 }
               }}
-              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"
+              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-neutral-400 hover:text-danger-600 hover:bg-danger-50 rounded"
               title="Delete event"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -1094,34 +1093,34 @@ function CompactEventCard({ event, onRequestCharging, onClick, onDelete }: Compa
             </button>
           )}
           <div className="text-right">
-            <div className="text-xs font-bold text-neutral-900">{date}</div>
+            <div className="text-xs font-semibold text-neutral-900">{date}</div>
             {time && <div className="text-xs text-neutral-500">{time}</div>}
           </div>
         </div>
       </div>
 
       {/* Title */}
-      <h4 className={`font-semibold ${details.accent} text-sm leading-tight mb-1`}>
+      <h4 className={`font-medium ${details.accent} text-sm leading-tight mb-1`}>
         {details.title}
       </h4>
 
       {/* Subtitle */}
       {details.subtitle && (
-        <p className="text-xs text-neutral-600 leading-snug mb-1 line-clamp-2">
+        <p className="text-xs text-neutral-600 leading-relaxed mb-1 line-clamp-2">
           {details.subtitle}
         </p>
       )}
 
       {/* Detail */}
       {details.detail && (
-        <div className="text-xs text-neutral-500 font-medium">
+        <div className="text-xs text-neutral-500">
           {details.detail}
         </div>
       )}
 
       {/* Notes */}
       {event.notes && (
-        <div className="text-xs text-neutral-600 mt-2 p-2 bg-white/60 rounded border border-neutral-200/50 line-clamp-2">
+        <div className="text-xs text-neutral-600 mt-2.5 p-2 bg-neutral-50/50 rounded border border-neutral-200/50 line-clamp-2">
           {event.notes}
         </div>
       )}
@@ -1133,7 +1132,7 @@ function CompactEventCard({ event, onRequestCharging, onClick, onDelete }: Compa
             e.stopPropagation()
             onRequestCharging()
           }}
-          className="mt-2 w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-green-700 bg-green-100 hover:bg-green-200 rounded-lg transition-colors"
+          className="mt-2.5 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg border border-primary-200 transition-colors"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
