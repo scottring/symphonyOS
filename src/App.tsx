@@ -956,6 +956,7 @@ function App() {
           {
             assignedTo: getCurrentUserMember()?.id,
             category: data.category,
+            context: data.context,
           }
         )
         if (taskId) {

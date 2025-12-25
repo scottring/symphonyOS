@@ -38,6 +38,7 @@ interface AppShellProps {
     contactId?: string
     scheduledFor?: Date
     category?: 'task' | 'chore' | 'errand' | 'event' | 'activity'
+    context?: 'work' | 'family' | 'personal'
   }) => void
   // Note creation
   onQuickAddNote?: (data: {

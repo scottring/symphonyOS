@@ -173,6 +173,7 @@ export function useSupabaseTasks() {
     linkType?: LinkType
     assignedTo?: string | null  // Family member ID to assign task to (null = no assignment, undefined = use default)
     category?: TaskCategory  // What kind of family item
+    context?: TaskContext  // Life domain for filtering
     defaultAssigneeId?: string  // Default assignee if assignedTo is undefined
   }
 
@@ -207,6 +208,7 @@ export function useSupabaseTasks() {
       linkType: options?.linkType,
       assignedTo: effectiveAssignedTo ?? undefined,
       category: options?.category ?? 'task',
+      context: options?.context,
     }
     setTasks((prev) => [optimisticTask, ...prev])
 
@@ -224,6 +226,7 @@ export function useSupabaseTasks() {
         link_type: options?.linkType ?? null,
         assigned_to: effectiveAssignedTo,
         category: options?.category ?? 'task',
+        context: options?.context ?? null,
       })
       .select()
       .single()

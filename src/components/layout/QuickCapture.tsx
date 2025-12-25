@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { parseQuickInput, hasParsedFields, type ParsedQuickInput } from '@/lib/quickInputParser'
-import type { TaskCategory } from '@/types/task'
+import type { TaskCategory, TaskContext } from '@/types/task'
+import { useDomain } from '@/hooks/useDomain'
 
 interface QuickCaptureProps {
   onAdd: (title: string) => void
@@ -11,6 +12,7 @@ interface QuickCaptureProps {
     contactId?: string
     scheduledFor?: Date
     category?: TaskCategory
+    context?: TaskContext
   }) => void
   // Note creation
   onAddNote?: (data: {
@@ -45,12 +47,16 @@ export function QuickCapture({
   const [title, setTitle] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Overrides for when user clicks × on a parsed field
+  // Get current domain for smart context defaulting
+  const { currentDomain } = useDomain()
+
+  // Overrides for when user clicks × on a parsed field or applies suggestions
   const [overrides, setOverrides] = useState<{
     projectId?: string | null
     contactId?: string | null
     dueDate?: Date | null
     category?: TaskCategory | null
+    context?: TaskContext | null
   }>({})
 
   const handleOpen = () => {
@@ -94,6 +100,7 @@ export function QuickCapture({
       contactId: overrides.contactId === null ? undefined : (overrides.contactId ?? parsed.contactId),
       dueDate: overrides.dueDate === null ? undefined : (overrides.dueDate ?? parsed.dueDate),
       category: overrides.category === null ? undefined : (overrides.category ?? parsed.category),
+      context: overrides.context === null ? undefined : (overrides.context ?? undefined),
     }
   }, [parsed, overrides])
 
@@ -173,13 +180,14 @@ export function QuickCapture({
       // Plain inbox add (current behavior)
       onAdd(trimmed)
     } else if (onAddRich) {
-      // Rich add with parsed fields
+      // Rich add with parsed fields (context only applied if user explicitly added it)
       onAddRich({
         title: effectiveParsed.title,
         projectId: effectiveParsed.projectId,
         contactId: effectiveParsed.contactId,
         scheduledFor: effectiveParsed.dueDate,
         category: effectiveParsed.category,
+        context: effectiveParsed.context,
       })
     } else {
       // Fallback if onAddRich not provided
@@ -227,6 +235,8 @@ export function QuickCapture({
   const clearContact = () => setOverrides(prev => ({ ...prev, contactId: null }))
   const clearDate = () => setOverrides(prev => ({ ...prev, dueDate: null }))
   const clearCategory = () => setOverrides(prev => ({ ...prev, category: null }))
+  const clearContext = () => setOverrides(prev => ({ ...prev, context: null }))
+  const applyContext = (context: TaskContext) => setOverrides(prev => ({ ...prev, context }))
 
   return (
     <>
@@ -409,6 +419,55 @@ export function QuickCapture({
                           type="button"
                           onClick={clearCategory}
                           className="ml-1 text-purple-400 hover:text-purple-600"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Suggested context chip - show when in a domain and context not yet applied */}
+                  {!effectiveParsed.isNote && currentDomain !== 'universal' && !effectiveParsed.context && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">🏷️</span>
+                      <button
+                        type="button"
+                        onClick={() => applyContext(currentDomain as TaskContext)}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                          currentDomain === 'work'
+                            ? 'bg-blue-50/50 text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300'
+                            : currentDomain === 'family'
+                            ? 'bg-amber-50/50 text-amber-600 border-amber-200 hover:bg-amber-50 hover:border-amber-300'
+                            : 'bg-purple-50/50 text-purple-600 border-purple-200 hover:bg-purple-50 hover:border-purple-300'
+                        }`}
+                      >
+                        + Add to {currentDomain.charAt(0).toUpperCase() + currentDomain.slice(1)}?
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Applied context chip - show when context has been applied */}
+                  {!effectiveParsed.isNote && effectiveParsed.context && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">🏷️</span>
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
+                        effectiveParsed.context === 'work'
+                          ? 'bg-blue-50 text-blue-700 border-blue-100'
+                          : effectiveParsed.context === 'family'
+                          ? 'bg-amber-50 text-amber-700 border-amber-100'
+                          : 'bg-purple-50 text-purple-700 border-purple-100'
+                      }`}>
+                        {effectiveParsed.context.charAt(0).toUpperCase() + effectiveParsed.context.slice(1)}
+                        <button
+                          type="button"
+                          onClick={clearContext}
+                          className={`ml-1 ${
+                            effectiveParsed.context === 'work'
+                              ? 'text-blue-400 hover:text-blue-600'
+                              : effectiveParsed.context === 'family'
+                              ? 'text-amber-400 hover:text-amber-600'
+                              : 'text-purple-400 hover:text-purple-600'
+                          }`}
                         >
                           ×
                         </button>
