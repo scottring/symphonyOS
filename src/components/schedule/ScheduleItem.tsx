@@ -1,8 +1,9 @@
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
+import type { TaskContext } from '@/types/task'
 import { formatTime, formatTimeRange, inferMealTime } from '@/lib/timeUtils'
 import { getProjectColor } from '@/lib/projectUtils'
-import { PushDropdown, SchedulePopover, type ScheduleContextItem } from '@/components/triage'
+import { PushDropdown, SchedulePopover, ContextPicker, type ScheduleContextItem } from '@/components/triage'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
 import { Redo2 } from 'lucide-react'
 import { useMobile } from '@/hooks/useMobile'
@@ -93,6 +94,8 @@ interface ScheduleItemProps {
   // Multi-member assignment (for events)
   assignedToAll?: string[]
   onAssignAll?: (memberIds: string[]) => void
+  // Context assignment (work/family/personal)
+  onContextChange?: (context: TaskContext | undefined) => void
   // Overdue styling
   isOverdue?: boolean
   overdueLabel?: string
@@ -105,6 +108,22 @@ const overdueColors = {
   warning50: 'hsl(38 75% 96%)',
   warning500: 'hsl(35 80% 50%)',
   warning600: 'hsl(32 80% 44%)',
+}
+
+// Domain context colors for visual indicators
+const contextColors = {
+  work: {
+    dot: 'rgb(59 130 246)', // blue-500
+    bg: 'rgba(59, 130, 246, 0.08)',
+  },
+  family: {
+    dot: 'rgb(251 191 36)', // amber-400
+    bg: 'rgba(251, 191, 36, 0.08)',
+  },
+  personal: {
+    dot: 'rgb(168 85 247)', // purple-500
+    bg: 'rgba(168, 85, 247, 0.08)',
+  },
 }
 
 export function ScheduleItem({
@@ -126,6 +145,7 @@ export function ScheduleItem({
   onAssign,
   assignedToAll = [],
   onAssignAll,
+  onContextChange,
   isOverdue,
   overdueLabel,
   getScheduleItemsForDate,
@@ -350,6 +370,17 @@ export function ScheduleItem({
         {/* Title */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
+            {/* Context indicator dot */}
+            {isTask && item.context && item.context in contextColors && (
+              <div
+                className="shrink-0 w-1.5 h-1.5 rounded-full transition-opacity"
+                style={{
+                  backgroundColor: contextColors[item.context as keyof typeof contextColors].dot,
+                  opacity: item.completed || item.skipped ? 0.3 : 0.6,
+                }}
+                title={`${item.context.charAt(0).toUpperCase() + item.context.slice(1)} context`}
+              />
+            )}
             <span
               className={`
                 text-base font-medium line-clamp-2 transition-colors
@@ -402,6 +433,19 @@ export function ScheduleItem({
             onClick={(e) => e.stopPropagation()}
           >
             <PushDropdown onPush={onPush} size="sm" showTodayOption={isOverdue} />
+          </div>
+        )}
+
+        {/* Context picker - for tasks and routines */}
+        {(isTask || isRoutine) && onContextChange && (
+          <div
+            className="shrink-0"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ContextPicker
+              value={item.context ?? undefined}
+              onChange={onContextChange}
+            />
           </div>
         )}
 

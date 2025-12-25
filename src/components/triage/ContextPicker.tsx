@@ -35,21 +35,44 @@ export function ContextPicker({ value, onChange }: ContextPickerProps) {
   }
 
   const hasValue = value !== undefined
+  const selectedContext = CONTEXTS.find(ctx => ctx.value === value)
+
+  // Map context colors to Tailwind text classes
+  const contextTextColors = {
+    work: 'text-blue-500',
+    family: 'text-amber-400',
+    personal: 'text-purple-500',
+  }
 
   return (
     <div ref={containerRef} className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`p-1.5 rounded-lg transition-colors ${
+        className={`p-2 rounded-lg transition-colors ${
           hasValue
-            ? 'text-primary-600 bg-primary-50 hover:bg-primary-100'
-            : 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100'
+            ? 'bg-neutral-50 hover:bg-neutral-100'
+            : 'hover:bg-neutral-100'
         }`}
         aria-label="Set context"
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-        </svg>
+        {selectedContext ? (
+          <svg
+            className={`w-5 h-5 transition-colors ${contextTextColors[selectedContext.value as keyof typeof contextTextColors]}`}
+            fill="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+          </svg>
+        ) : (
+          <svg
+            className="w-5 h-5 text-neutral-400 transition-colors"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+          </svg>
+        )}
       </button>
 
       {isOpen && (

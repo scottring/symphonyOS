@@ -2,7 +2,7 @@ import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
 import { MultiAssigneeDropdown } from '@/components/family'
-import { SchedulePopover, DeferPicker } from '@/components/triage'
+import { SchedulePopover, DeferPicker, ContextPicker } from '@/components/triage'
 import type { ScheduleContextItem } from '@/components/triage'
 
 interface InboxTaskCardProps {
@@ -89,6 +89,12 @@ export function InboxTaskCard({
             }}
             onClear={() => onUpdate({ scheduledFor: undefined, isAllDay: undefined })}
             getItemsForDate={getScheduleItemsForDate}
+          />
+
+          {/* Context picker */}
+          <ContextPicker
+            value={task.context}
+            onChange={(context) => onUpdate({ context })}
           />
 
           {/* Multi-assignee avatar */}

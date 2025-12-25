@@ -9,6 +9,7 @@ export interface Project {
   name: string
   status: ProjectStatus
   type?: ProjectType
+  context?: 'work' | 'family' | 'personal' | null // Life domain for filtering
   notes?: string
   links?: TaskLink[]
   phoneNumber?: string
@@ -24,6 +25,7 @@ export interface DbProject {
   name: string
   status: ProjectStatus
   type: ProjectType | null
+  context?: 'work' | 'family' | 'personal' | null // Life domain for filtering
   notes: string | null
   links: TaskLink[] | null
   phone_number: string | null

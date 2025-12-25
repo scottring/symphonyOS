@@ -483,6 +483,7 @@ interface TodayScheduleProps {
   onCompleteRoutine?: (routineId: string, completed: boolean) => void
   onSkipRoutine?: (routineId: string) => void
   onPushRoutine?: (routineId: string, date: Date) => void
+  onUpdateRoutine?: (id: string, updates: Partial<Routine>) => void
   // Event completion/skip
   onCompleteEvent?: (eventId: string, completed: boolean) => void
   onSkipEvent?: (eventId: string) => void
@@ -565,6 +566,7 @@ export function TodaySchedule({
   onCompleteRoutine,
   onSkipRoutine,
   onPushRoutine,
+  onUpdateRoutine,
   onCompleteEvent,
   onSkipEvent,
   onPushEvent,
@@ -1397,7 +1399,7 @@ export function TodaySchedule({
                       familyMembers={familyMembers}
                       assignedTo={item.assignedTo}
                       onAssign={
-                        item.type === 'task' && taskId && onAssignTask
+                        item.type === 'task' && taskId && onAssignTask && !taskId.startsWith('pack-')
                           ? (memberId) => onAssignTask(taskId, memberId)
                           : item.type === 'event' && onAssignEvent
                           ? (memberId) => onAssignEvent(item.id.replace('event-', ''), memberId)
@@ -1415,12 +1417,19 @@ export function TodaySchedule({
                           : []
                       }
                       onAssignAll={
-                        item.type === 'task' && taskId && onAssignTaskAll
+                        item.type === 'task' && taskId && onAssignTaskAll && !taskId.startsWith('pack-')
                           ? (memberIds) => onAssignTaskAll(taskId, memberIds)
                           : item.type === 'event' && onAssignEventAll
                           ? (memberIds) => onAssignEventAll(item.id.replace('event-', ''), memberIds)
                           : item.type === 'routine' && onAssignRoutineAll
                           ? (memberIds) => onAssignRoutineAll(item.id.replace('routine-', ''), memberIds)
+                          : undefined
+                      }
+                      onContextChange={
+                        item.type === 'task' && taskId && onUpdateTask && !taskId.startsWith('pack-')
+                          ? (context) => onUpdateTask(taskId, { context })
+                          : item.type === 'routine' && onUpdateRoutine
+                          ? (context) => onUpdateRoutine(item.id.replace('routine-', ''), { context })
                           : undefined
                       }
                       getScheduleItemsForDate={getScheduleItemsForDate}

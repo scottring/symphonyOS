@@ -1,5 +1,6 @@
 import symphonyLogo from '@/assets/symphony-logo.jpg'
 import { PinnedSection } from '@/components/pins'
+import { useDomain } from '@/hooks/useDomain'
 import type { PinnedItem } from '@/types/pin'
 import type { PinnableEntityType } from '@/types/pin'
 import type { Task } from '@/types/task'
@@ -55,12 +56,40 @@ export function Sidebar({
   onPinMarkAccessed,
   onPinRefreshStale,
 }: SidebarProps) {
+  const { currentDomain } = useDomain()
+
+  // Define subtle domain theming
+  const domainTheme = {
+    universal: {
+      bg: 'bg-bg-elevated/80',
+      border: '',
+      glow: '',
+    },
+    work: {
+      bg: 'bg-bg-elevated/80',
+      border: 'border-l-2 border-blue-200/30',
+      glow: 'shadow-[inset_4px_0_12px_-8px_rgba(59,130,246,0.15)]',
+    },
+    family: {
+      bg: 'bg-bg-elevated/80',
+      border: 'border-l-2 border-amber-200/30',
+      glow: 'shadow-[inset_4px_0_12px_-8px_rgba(251,191,36,0.15)]',
+    },
+    personal: {
+      bg: 'bg-bg-elevated/80',
+      border: 'border-l-2 border-purple-200/30',
+      glow: 'shadow-[inset_4px_0_12px_-8px_rgba(168,85,247,0.15)]',
+    },
+  }
+
+  const theme = domainTheme[currentDomain]
+
   return (
     <aside
       className={`
-        h-full bg-bg-elevated/80 backdrop-blur-sm
+        h-full ${theme.bg} ${theme.border} ${theme.glow} backdrop-blur-sm
         flex flex-col
-        transition-all duration-200
+        transition-all duration-500
         ${collapsed ? 'w-[68px]' : 'w-60'}
       `}
     >

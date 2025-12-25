@@ -83,7 +83,7 @@ serve(async (req) => {
       })
     }
 
-    const { startDate, endDate } = await req.json()
+    const { startDate, endDate, domain } = await req.json()
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -160,7 +160,43 @@ serve(async (req) => {
       end: { dateTime?: string; date?: string }
     }
 
-    const calendars: GoogleCalendar[] = calendarListData.items || []
+    let calendars: GoogleCalendar[] = calendarListData.items || []
+
+    // Filter calendars by domain if domain is specified and not 'universal'
+    if (domain && domain !== 'universal') {
+      // Query calendar_domain_mappings to get calendars assigned to this domain
+      const { data: mappings, error: mappingsError } = await supabaseAdmin
+        .from('calendar_domain_mappings')
+        .select('calendar_id')
+        .eq('user_id', user.id)
+        .eq('domain', domain)
+
+      if (mappingsError) {
+        console.error('Error fetching calendar domain mappings:', mappingsError)
+        // Don't fail the request - just return empty events
+        return new Response(JSON.stringify({ events: [] }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      // If no calendars are assigned to this domain, return empty events
+      if (!mappings || mappings.length === 0) {
+        console.log(`No calendars assigned to domain: ${domain}`)
+        return new Response(JSON.stringify({ events: [] }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      // Extract calendar IDs from mappings
+      const assignedCalendarIds = new Set(mappings.map(m => m.calendar_id))
+
+      // Filter calendars to only include those assigned to this domain
+      calendars = calendars.filter(c => assignedCalendarIds.has(c.id))
+
+      console.log(`Fetching events for domain "${domain}" from ${calendars.length} assigned calendars`)
+    } else {
+      console.log(`Fetching events from all ${calendars.length} calendars (domain: ${domain || 'not specified'})`)
+    }
 
     // Log which calendars we're fetching from
     console.log('Fetching events from calendars:', calendars.map(c => ({ id: c.id, summary: c.summary })))

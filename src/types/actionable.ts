@@ -73,6 +73,7 @@ export interface Routine {
   time_of_day: string | null // HH:MM:SS format
   raw_input: string | null // Original natural language input
   show_on_timeline: boolean // Whether to display on Today view (default true)
+  context?: 'work' | 'family' | 'personal' | null // Life domain for filtering
   // Templates for auto-generation of linked tasks
   prep_task_templates?: PrepFollowupTemplate[]
   followup_task_templates?: PrepFollowupTemplate[]

@@ -21,6 +21,7 @@ import { useUndo } from '@/hooks/useUndo'
 import { useToast } from '@/hooks/useToast'
 import type { PinnableEntityType } from '@/types/pin'
 import { supabase } from '@/lib/supabase'
+import { DomainPageOutline } from '@/components/domain/DomainPageOutline'
 import { AppShell } from '@/components/layout/AppShell'
 import { HomeView } from '@/components/home'
 import { PlanningSession } from '@/components/planning'
@@ -1067,6 +1068,7 @@ function App() {
         )
       }
     >
+      <DomainPageOutline>
       {activeView === 'home' && (
         <div className="h-full flex flex-col overflow-hidden">
           {/* Calendar connect banner if needed */}
@@ -1181,6 +1183,7 @@ function App() {
               })
               refreshDateInstances()
             }}
+            onUpdateRoutine={updateRoutine}
             onCompleteEvent={async (eventId, completed) => {
               const event = events.find(e => (e.google_event_id || e.id) === eventId)
               const eventName = event?.title || 'Event'
@@ -1578,6 +1581,7 @@ function App() {
           </div>
         </div>
       )}
+      </DomainPageOutline>
     </AppShell>
   )
 }

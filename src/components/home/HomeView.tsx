@@ -9,11 +9,13 @@ import type { EventNote } from '@/hooks/useEventNotes'
 import { useHomeView } from '@/hooks/useHomeView'
 import { useMobile } from '@/hooks/useMobile'
 import { useUndo } from '@/hooks/useUndo'
+import { useDomain } from '@/hooks/useDomain'
 import { HomeViewSwitcher } from './HomeViewSwitcher'
 import { WeekView } from './WeekView'
 import { CascadingRiverView } from './CascadingRiverView'
 import { TodaySchedule } from '@/components/schedule/TodaySchedule'
 import { UndoToast } from '@/components/undo/UndoToast'
+import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
 
 interface HomeViewProps {
   tasks: Task[]
@@ -50,6 +52,7 @@ interface HomeViewProps {
   onCompleteRoutine?: (routineId: string, completed: boolean) => void
   onSkipRoutine?: (routineId: string) => void
   onPushRoutine?: (routineId: string, date: Date) => void
+  onUpdateRoutine?: (id: string, updates: Partial<Routine>) => void
   onCompleteEvent?: (eventId: string, completed: boolean) => void
   onSkipEvent?: (eventId: string) => void
   onPushEvent?: (eventId: string, date: Date) => void
@@ -93,6 +96,7 @@ export function HomeView({
   onCompleteRoutine,
   onSkipRoutine,
   onPushRoutine,
+  onUpdateRoutine,
   onCompleteEvent,
   onSkipEvent,
   onPushEvent,
@@ -103,6 +107,26 @@ export function HomeView({
   const { currentView, setCurrentView } = useHomeView()
   const isMobile = useMobile()
   const { currentAction, pushAction, executeUndo, dismiss } = useUndo({ duration: 5000 })
+  const { currentDomain } = useDomain()
+
+  // Filter tasks, routines, and projects by current domain
+  const filteredTasks = useMemo(() => {
+    if (currentDomain === 'universal') return tasks
+    // Show items with matching context OR null context (for backwards compatibility)
+    return tasks.filter(task => task.context === currentDomain || task.context === null)
+  }, [tasks, currentDomain])
+
+  const filteredRoutines = useMemo(() => {
+    if (currentDomain === 'universal') return routines
+    // Show routines with matching context OR null context (for backwards compatibility)
+    return routines.filter(routine => routine.context === currentDomain || routine.context === null)
+  }, [routines, currentDomain])
+
+  const filteredProjects = useMemo(() => {
+    if (currentDomain === 'universal') return projects
+    // Show projects with matching context OR null context (for backwards compatibility)
+    return projects.filter(project => project.context === currentDomain || project.context === null)
+  }, [projects, currentDomain])
 
   // Assignee filter state - now supports multi-select
   // Empty array = "All", single id = single filter, multiple ids = river view
@@ -130,14 +154,14 @@ export function HomeView({
 
   // Check if there are any unassigned tasks/events/routines for the filter dropdown
   const hasUnassignedTasks = useMemo(() => {
-    // Check tasks
-    for (const task of tasks) {
+    // Check tasks (use filtered tasks)
+    for (const task of filteredTasks) {
       if (!task.completed && !task.assignedTo && (!task.assignedToAll || task.assignedToAll.length === 0)) {
         return true
       }
     }
 
-    // Check events
+    // Check events (already filtered by domain via useGoogleCalendar)
     for (const event of events) {
       const eventId = event.google_event_id || event.id
       const eventNote = eventNotesMap?.get(eventId)
@@ -146,15 +170,15 @@ export function HomeView({
       }
     }
 
-    // Check routines
-    for (const routine of routines) {
+    // Check routines (use filtered routines)
+    for (const routine of filteredRoutines) {
       if (!routine.assigned_to && (!routine.assigned_to_all || routine.assigned_to_all.length === 0)) {
         return true
       }
     }
 
     return false
-  }, [tasks, events, routines, eventNotesMap])
+  }, [filteredTasks, events, filteredRoutines, eventNotesMap])
 
   // Week view state
   const [weekStart, setWeekStart] = useState(() => {
@@ -175,7 +199,7 @@ export function HomeView({
 
   // Wrap callbacks with undo functionality
   const handleToggleTaskWithUndo = useCallback((taskId: string) => {
-    const task = tasks.find(t => t.id === taskId)
+    const task = filteredTasks.find(t => t.id === taskId)
     if (!task) return
 
     const wasCompleted = task.completed
@@ -185,12 +209,12 @@ export function HomeView({
       wasCompleted ? 'Task marked incomplete' : 'Task completed',
       () => onToggleTask(taskId)
     )
-  }, [tasks, onToggleTask, pushAction])
+  }, [filteredTasks, onToggleTask, pushAction])
 
   const handleDeleteTaskWithUndo = useCallback((taskId: string) => {
     if (!onDeleteTask) return
 
-    const task = tasks.find(t => t.id === taskId)
+    const task = filteredTasks.find(t => t.id === taskId)
     if (!task) return
 
     onDeleteTask(taskId)
@@ -228,9 +252,9 @@ export function HomeView({
     if (currentView === 'week') {
       return (
         <WeekView
-          tasks={tasks}
+          tasks={filteredTasks}
           events={events}
-          routines={routines}
+          routines={filteredRoutines}
           dateInstances={dateInstances}
           weekStart={weekStart}
           onWeekChange={setWeekStart}
@@ -245,9 +269,9 @@ export function HomeView({
     if (showRiverView) {
       return (
         <CascadingRiverView
-          tasks={tasks}
+          tasks={filteredTasks}
           events={events}
-          routines={routines}
+          routines={filteredRoutines}
           dateInstances={dateInstances}
           selectedItemId={selectedItemId}
           onSelectItem={onSelectItem}
@@ -278,9 +302,9 @@ export function HomeView({
     // Today view uses TodaySchedule
     return (
       <TodaySchedule
-        tasks={tasks}
+        tasks={filteredTasks}
         events={events}
-        routines={routines}
+        routines={filteredRoutines}
         dateInstances={dateInstances}
         selectedItemId={selectedItemId}
         onSelectItem={onSelectItem}
@@ -293,7 +317,7 @@ export function HomeView({
         onDateChange={onDateChange}
         contactsMap={contactsMap}
         projectsMap={projectsMap}
-        projects={projects}
+        projects={filteredProjects}
         contacts={contacts}
         onSearchContacts={onSearchContacts}
         onAddContact={onAddContact}
@@ -312,6 +336,7 @@ export function HomeView({
         onCompleteRoutine={handleCompleteRoutineWithUndo}
         onSkipRoutine={onSkipRoutine}
         onPushRoutine={onPushRoutine}
+        onUpdateRoutine={onUpdateRoutine}
         onCompleteEvent={handleCompleteEventWithUndo}
         onSkipEvent={onSkipEvent}
         onPushEvent={onPushEvent}
@@ -331,6 +356,9 @@ export function HomeView({
       {/* Header controls - floating in upper right on desktop only */}
       {!isMobile && (
         <div className="absolute top-4 right-6 z-20 flex items-center gap-3">
+          {/* Domain switcher */}
+          <DomainSwitcher />
+
           {/* View switcher (Day/Week) */}
           <HomeViewSwitcher
             currentView={currentView}

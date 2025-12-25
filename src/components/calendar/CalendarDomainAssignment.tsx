@@ -3,11 +3,6 @@ import { Check, Eye, Calendar, Info, AlertTriangle, Briefcase, Users, User } fro
 import type { GoogleCalendarInfo } from '@/hooks/useGoogleCalendar'
 import type { TaskContext } from '@/types/task'
 
-interface CalendarAssignment {
-  calendarId: string
-  domains: TaskContext[]
-}
-
 interface CalendarDomainAssignmentProps {
   calendars: GoogleCalendarInfo[]
   onSave: (assignments: Map<string, TaskContext[]>) => void
@@ -111,7 +106,7 @@ export function CalendarDomainAssignment({ calendars, onSave, onBack }: Calendar
 
       {/* Domain Sections */}
       <div className="space-y-6">
-        {DOMAINS.map(({ value: domain, label, color, icon: Icon }) => {
+        {DOMAINS.map(({ value: domain, label, icon: Icon }) => {
           const assignedCalendars = calendars.filter(cal =>
             (assignments.get(cal.id) || []).includes(domain)
           )

@@ -20,6 +20,7 @@ export interface TimelineItem {
   projectId?: string // Linked project
   parentTaskId?: string // Parent task ID for subtasks
   assignedTo?: string | null // Family member assignment
+  context?: 'work' | 'family' | 'personal' | null // Life domain for filtering
   category?: TaskCategory // Type of task: task, chore, errand, event, activity
   // Subtask support
   subtaskCount?: number // Total subtasks
@@ -58,6 +59,7 @@ export function taskToTimelineItem(task: Task): TimelineItem {
     projectId: task.projectId,
     parentTaskId: task.parentTaskId,
     assignedTo: task.assignedTo,
+    context: task.context,
     category: task.category,
     allDay: task.isAllDay,
     location: task.location,
@@ -116,6 +118,7 @@ export function routineToTimelineItem(routine: Routine, date: Date): TimelineIte
     endTime: null, // Routines don't have duration
     completed: false, // Will be set from actionable_instances
     notes: routine.description || undefined,
+    context: routine.context,
     recurrencePattern: routine.recurrence_pattern,
     assignedTo: routine.assigned_to,
     originalRoutine: routine,

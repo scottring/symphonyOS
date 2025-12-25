@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useDomain } from '@/hooks/useDomain'
 
 export interface CreateEventParams {
   title: string
@@ -85,6 +86,7 @@ interface GoogleCalendarContextValue {
 const GoogleCalendarContext = createContext<GoogleCalendarContextValue | null>(null)
 
 export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
+  const { currentDomain } = useDomain()
   const [isConnected, setIsConnected] = useState(false)
   const [needsReconnect, setNeedsReconnect] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -240,6 +242,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
         body: {
           startDate: startDate.toISOString(),
           endDate: endDate.toISOString(),
+          domain: currentDomain, // Pass current domain for filtering
         },
       })
 
@@ -273,7 +276,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsFetching(false)
     }
-  }, [isConnected])
+  }, [isConnected, currentDomain])
 
   // Fetch today's events
   const fetchTodayEvents = useCallback(async () => {

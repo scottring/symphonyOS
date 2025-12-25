@@ -73,20 +73,23 @@ import App from './App.tsx'
 import { CalendarCallback } from './pages/CalendarCallback'
 import { JoinHousehold } from './pages/JoinHousehold'
 import { GoogleCalendarProvider } from './hooks/useGoogleCalendar'
+import { DomainProvider } from './hooks/useDomain'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
-      <BrowserRouter>
-        <GoogleCalendarProvider>
-          <Routes>
-            <Route path="/" element={<App />} />
-            <Route path="/calendar-callback" element={<CalendarCallback />} />
-            <Route path="/join" element={<JoinHousehold />} />
-          </Routes>
-        </GoogleCalendarProvider>
-      </BrowserRouter>
+      <DomainProvider>
+        <BrowserRouter>
+          <GoogleCalendarProvider>
+            <Routes>
+              <Route path="/" element={<App />} />
+              <Route path="/calendar-callback" element={<CalendarCallback />} />
+              <Route path="/join" element={<JoinHousehold />} />
+            </Routes>
+          </GoogleCalendarProvider>
+        </BrowserRouter>
+      </DomainProvider>
     </ErrorBoundary>
   </StrictMode>,
 )
