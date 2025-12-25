@@ -46,7 +46,7 @@ Read-only calendars still useful—show events, just can't create new ones.
 ```
 ┌─────────────────────────────────────────────────┐
 │                                                 │
-│            🗓️  Connect Google Calendar          │
+│            Connect Google Calendar              │
 │                                                 │
 │  Symphony will access your Google Calendar to  │
 │  show events alongside your tasks.              │
@@ -55,7 +55,7 @@ Read-only calendars still useful—show events, just can't create new ones.
 │  domains on the next screen.                    │
 │                                                 │
 │  ┌───────────────────────────────────────────┐ │
-│  │   🔒  Sign in with Google                 │ │
+│  │   [Lock icon]  Sign in with Google        │ │
 │  └───────────────────────────────────────────┘ │
 │                                                 │
 │  Your calendar data stays private. Events only │
@@ -81,7 +81,7 @@ Read-only calendars still useful—show events, just can't create new ones.
 3. For each calendar, check `accessRole` field:
    - `owner` → Full access, can create events ✓
    - `writer` → Can create events ✓
-   - `reader` → View only 👁️
+   - `reader` → View only [View icon]
    - `freeBusyReader` → Only availability (ignore in UI)
 
 **Screen: "Your Calendars"**
@@ -112,13 +112,13 @@ Read-only calendars still useful—show events, just can't create new ones.
 │  └───────────────────────────────────────────┘ │
 │                                                 │
 │  ┌───────────────────────────────────────────┐ │
-│  │  👁️  iris@kaufmanfamily.com                │ │
+│  │  [View icon]  iris@kaufmanfamily.com       │ │
 │  │     Iris Personal                          │ │
 │  │     View only • You can see but not create │ │
 │  └───────────────────────────────────────────┘ │
 │                                                 │
 │  ┌───────────────────────────────────────────┐ │
-│  │  👁️  US Holidays                           │ │
+│  │  [View icon]  US Holidays                  │ │
 │  │     Holidays                               │ │
 │  │     View only • You can see but not create │ │
 │  └───────────────────────────────────────────┘ │
@@ -132,7 +132,7 @@ Read-only calendars still useful—show events, just can't create new ones.
 
 **Visual Design:**
 - **✓ checkmark** = Writable (owner or writer)
-- **👁️ eye icon** = Read-only (reader)
+- **[View icon]** = Read-only (reader)
 - Subtle gray text below calendar name explains permission level
 - All calendars shown, user doesn't have to "choose" yet
 
@@ -155,9 +155,9 @@ Read-only calendars still useful—show events, just can't create new ones.
 │  Assign each calendar to a domain. Events will │
 │  only appear when you're in that domain.        │
 │                                                 │
-│  💼  Work Domain                                │
+│  [Work icon]  Work Domain                       │
 │  ┌───────────────────────────────────────────┐ │
-│  │  📅  scott.kaufman@company.com             │ │
+│  │  [Calendar icon]  scott.kaufman@company... │ │
 │  │      Work Calendar                    [✓]  │ │
 │  └───────────────────────────────────────────┘ │
 │                                                 │
@@ -166,13 +166,13 @@ Read-only calendars still useful—show events, just can't create new ones.
 │                                                 │
 │  ─────────────────────────────────────────────  │
 │                                                 │
-│  👨‍👩‍👧‍👦  Family Domain                             │
+│  [Family icon]  Family Domain                   │
 │  ┌───────────────────────────────────────────┐ │
-│  │  📅  family@kaufmanfamily.com              │ │
+│  │  [Calendar icon]  family@kaufmanfamily.com │ │
 │  │      Family                           [✓]  │ │
 │  └───────────────────────────────────────────┘ │
 │  ┌───────────────────────────────────────────┐ │
-│  │  👁️  iris@kaufmanfamily.com                │ │
+│  │  [View icon]  iris@kaufmanfamily.com       │ │
 │  │      Iris Personal (view only)        [✓]  │ │
 │  └───────────────────────────────────────────┘ │
 │                                                 │
@@ -181,13 +181,13 @@ Read-only calendars still useful—show events, just can't create new ones.
 │                                                 │
 │  ─────────────────────────────────────────────  │
 │                                                 │
-│  🌱  Personal Domain                            │
+│  [Personal icon]  Personal Domain               │
 │  ┌───────────────────────────────────────────┐ │
-│  │  📅  scott@kaufmanfamily.com               │ │
+│  │  [Calendar icon]  scott@kaufmanfamily.com  │ │
 │  │      Personal                         [✓]  │ │
 │  └───────────────────────────────────────────┘ │
 │  ┌───────────────────────────────────────────┐ │
-│  │  👁️  US Holidays (view only)               │ │
+│  │  [View icon]  US Holidays (view only)      │ │
 │  │      Holidays                         [✓]  │ │
 │  └───────────────────────────────────────────┘ │
 │                                                 │
@@ -196,7 +196,8 @@ Read-only calendars still useful—show events, just can't create new ones.
 │                                                 │
 │  ─────────────────────────────────────────────  │
 │                                                 │
-│  ℹ️  Calendars can appear in multiple domains  │
+│  [Info icon]  Calendars can appear in multiple │
+│               domains                           │
 │                                                 │
 │  ┌─────────────────────────────────────────┐   │
 │  │            Save & Finish                │   │
@@ -218,7 +219,7 @@ Read-only calendars still useful—show events, just can't create new ones.
 - Green checkmark "✓ Work domain has writable calendar" reassures user
 - If domain has NO writable calendars, show warning:
   ```
-  ⚠️ Work domain has no writable calendar
+  [Warning icon] Work domain has no writable calendar
   You won't be able to create new events in Work mode
   ```
 
@@ -241,7 +242,7 @@ Read-only calendars still useful—show events, just can't create new ones.
 │  by domain. Here's what you'll see:             │
 │                                                 │
 │  ┌───────────────────────────────────────────┐ │
-│  │  💼  Work Domain                           │ │
+│  │  [Work icon]  Work Domain                  │ │
 │  │  Shows events from:                        │ │
 │  │  • Work Calendar                           │ │
 │  │                                            │ │
@@ -249,7 +250,7 @@ Read-only calendars still useful—show events, just can't create new ones.
 │  └───────────────────────────────────────────┘ │
 │                                                 │
 │  ┌───────────────────────────────────────────┐ │
-│  │  👨‍👩‍👧‍👦  Family Domain                        │ │
+│  │  [Family icon]  Family Domain              │ │
 │  │  Shows events from:                        │ │
 │  │  • Family                                  │ │
 │  │  • Iris Personal (view only)               │ │
@@ -258,7 +259,7 @@ Read-only calendars still useful—show events, just can't create new ones.
 │  └───────────────────────────────────────────┘ │
 │                                                 │
 │  ┌───────────────────────────────────────────┐ │
-│  │  🌱  Personal Domain                        │ │
+│  │  [Personal icon]  Personal Domain          │ │
 │  │  Shows events from:                        │ │
 │  │  • Personal                                │ │
 │  │  • US Holidays (view only)                 │ │
@@ -266,8 +267,9 @@ Read-only calendars still useful—show events, just can't create new ones.
 │  │  New events go to: Personal                │ │
 │  └───────────────────────────────────────────┘ │
 │                                                 │
-│  🔒  Privacy protected: Work events never      │
-│      appear in Family or Personal domains      │
+│  [Lock icon]  Privacy protected: Work events   │
+│               never appear in Family or         │
+│               Personal domains                  │
 │                                                 │
 │  ┌─────────────────────────────────────────┐   │
 │  │         Go to Today View                │   │
@@ -311,11 +313,11 @@ Read-only calendars still useful—show events, just can't create new ones.
 │                                                 │
 │  Domain Calendar Assignments                    │
 │                                                 │
-│  💼  Work Domain                                │
+│  [Work icon]  Work Domain                       │
 │  ┌───────────────────────────────────────────┐ │
 │  │  Calendars shown in Work mode:             │ │
 │  │                                            │ │
-│  │  📅  Work Calendar                    [×]  │ │
+│  │  [Calendar icon]  Work Calendar       [×]  │ │
 │  │      scott.kaufman@company.com             │ │
 │  │      ✓ Can create events                   │ │
 │  │                                            │ │
@@ -325,15 +327,15 @@ Read-only calendars still useful—show events, just can't create new ones.
 │  │  [ Work Calendar ▾ ]                       │ │
 │  └───────────────────────────────────────────┘ │
 │                                                 │
-│  👨‍👩‍👧‍👦  Family Domain                             │
+│  [Family icon]  Family Domain                   │
 │  ┌───────────────────────────────────────────┐ │
 │  │  Calendars shown in Family mode:           │ │
 │  │                                            │ │
-│  │  📅  Family                           [×]  │ │
+│  │  [Calendar icon]  Family              [×]  │ │
 │  │      family@kaufmanfamily.com              │ │
 │  │      ✓ Can create events                   │ │
 │  │                                            │ │
-│  │  👁️  Iris Personal                     [×]  │ │
+│  │  [View icon]  Iris Personal           [×]  │ │
 │  │      iris@kaufmanfamily.com                │ │
 │  │      View only                             │ │
 │  │                                            │ │
@@ -343,15 +345,15 @@ Read-only calendars still useful—show events, just can't create new ones.
 │  │  [ Family ▾ ]                              │ │
 │  └───────────────────────────────────────────┘ │
 │                                                 │
-│  🌱  Personal Domain                            │
+│  [Personal icon]  Personal Domain               │
 │  ┌───────────────────────────────────────────┐ │
 │  │  Calendars shown in Personal mode:         │ │
 │  │                                            │ │
-│  │  📅  Personal                         [×]  │ │
+│  │  [Calendar icon]  Personal            [×]  │ │
 │  │      scott@kaufmanfamily.com               │ │
 │  │      ✓ Can create events                   │ │
 │  │                                            │ │
-│  │  👁️  US Holidays                       [×]  │ │
+│  │  [View icon]  US Holidays             [×]  │ │
 │  │      Holidays                              │ │
 │  │      View only                             │ │
 │  │                                            │ │
@@ -365,7 +367,7 @@ Read-only calendars still useful—show events, just can't create new ones.
 │                                                 │
 │  Privacy                                        │
 │  ┌───────────────────────────────────────────┐ │
-│  │  🔒  Domain Separation Active              │ │
+│  │  [Lock icon]  Domain Separation Active     │ │
 │  │                                            │ │
 │  │  Work events only appear in Work domain    │ │
 │  │  Family events only appear in Family domain│ │
@@ -394,7 +396,7 @@ Read-only calendars still useful—show events, just can't create new ones.
 **Warning Banner:**
 ```
 ┌─────────────────────────────────────────────────┐
-│  ⚠️  Warning                                    │
+│  [Warning icon]  Warning                        │
 │                                                 │
 │  Work domain has no writable calendar           │
 │                                                 │
@@ -424,7 +426,7 @@ Read-only calendars still useful—show events, just can't create new ones.
 **Banner in App:**
 ```
 ┌─────────────────────────────────────────────────┐
-│  🔌  Calendar Disconnected                      │
+│  [Disconnected icon]  Calendar Disconnected     │
 │                                                 │
 │  Your Google Calendar connection was lost.      │
 │  Events won't update until you reconnect.       │
@@ -444,7 +446,7 @@ Read-only calendars still useful—show events, just can't create new ones.
 **Notification:**
 ```
 ┌─────────────────────────────────────────────────┐
-│  📅  New Calendar Available                     │
+│  [Calendar icon]  New Calendar Available        │
 │                                                 │
 │  "Team Calendar" was shared with you            │
 │                                                 │
@@ -464,7 +466,7 @@ Read-only calendars still useful—show events, just can't create new ones.
 **In-app Notification:**
 ```
 ┌─────────────────────────────────────────────────┐
-│  ℹ️  Calendar Access Changed                    │
+│  [Info icon]  Calendar Access Changed           │
 │                                                 │
 │  You no longer have write access to             │
 │  "Team Calendar"                                │
@@ -477,7 +479,7 @@ Read-only calendars still useful—show events, just can't create new ones.
 ```
 
 **Settings Update:**
-- Icon changes from ✓ → 👁️
+- Icon changes from ✓ → [View icon]
 - "Can create events" changes to "View only"
 - If this was default calendar for domain, prompt to choose new default
 
@@ -490,10 +492,14 @@ Read-only calendars still useful—show events, just can't create new ones.
 | Element | Icon | Meaning |
 |---------|------|---------|
 | Writable calendar | ✓ | Can create & edit events |
-| Read-only calendar | 👁️ | Can view events only |
-| Privacy lock | 🔒 | Data is separated by domain |
-| Warning | ⚠️ | Attention needed |
+| Read-only calendar | [View icon] | Can view events only |
+| Privacy lock | [Lock icon] | Data is separated by domain |
+| Warning | [Warning icon] | Attention needed |
 | Success | ✓ | Configuration valid |
+| Calendar | [Calendar icon] | Calendar reference |
+| Domain: Work | [Work icon] | Work domain |
+| Domain: Family | [Family icon] | Family domain |
+| Domain: Personal | [Personal icon] | Personal domain |
 
 ### Color Coding
 
@@ -518,7 +524,7 @@ Read-only calendars still useful—show events, just can't create new ones.
 
 **Settings Page:**
 - Page title: `text-xl font-semibold`
-- Domain headers: `text-base font-medium` + emoji
+- Domain headers: `text-base font-medium` + domain icon
 - Calendar names: `text-base`
 - Permission status: `text-sm text-neutral-600`
 
@@ -554,7 +560,7 @@ Read-only calendars still useful—show events, just can't create new ones.
 │  └─────────────────────┘  │
 │                           │
 │  ┌─────────────────────┐  │
-│  │ 👁️ US Holidays      │  │
+│  │ [View] US Holidays  │  │
 │  │ Holidays            │  │
 │  │ View only           │  │
 │  └─────────────────────┘  │
@@ -588,7 +594,7 @@ Consistent framing across all screens:
 
 ### Trust Indicators
 
-- 🔒 Lock icon = Privacy protection active
+- [Lock icon] = Privacy protection active
 - Green checkmarks = Valid, secure configuration
 - Domain-specific color coding = Visual separation
 - "View only" badges = Permission transparency

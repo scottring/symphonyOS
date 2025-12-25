@@ -56,6 +56,15 @@ export interface UpdateEventParams {
   calendarId?: string // Optional calendar ID (defaults to 'primary')
 }
 
+export interface GoogleCalendarInfo {
+  id: string
+  summary: string
+  email: string
+  accessRole: 'owner' | 'writer' | 'reader'
+  primary: boolean
+  backgroundColor?: string
+}
+
 interface GoogleCalendarContextValue {
   isConnected: boolean
   needsReconnect: boolean
@@ -68,6 +77,7 @@ interface GoogleCalendarContextValue {
   fetchEvents: (startDate: Date, endDate: Date) => Promise<CalendarEvent[]>
   fetchTodayEvents: () => Promise<CalendarEvent[]>
   fetchWeekEvents: () => Promise<CalendarEvent[]>
+  fetchCalendarList: () => Promise<GoogleCalendarInfo[]>
   createEvent: (params: CreateEventParams) => Promise<CreateEventResult>
   updateEvent: (params: UpdateEventParams) => Promise<void>
 }
@@ -283,6 +293,44 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     return fetchEvents(today, nextWeek)
   }, [fetchEvents])
 
+  // Fetch list of all calendars with permissions
+  const fetchCalendarList = useCallback(async (): Promise<GoogleCalendarInfo[]> => {
+    if (!isConnected) {
+      return []
+    }
+
+    try {
+      const { data, error: fetchError } = await supabase.functions.invoke('google-calendar-list', {
+        body: {},
+      })
+
+      if (fetchError) throw fetchError
+
+      // Check for auth errors
+      if (data?.error) {
+        if (
+          data.error.includes('Unauthorized') ||
+          data.error.includes('invalid_grant') ||
+          data.error.includes('Token has been expired or revoked') ||
+          data.needsReconnect
+        ) {
+          setError('Calendar connection expired. Please reconnect.')
+          setIsConnected(false)
+          setNeedsReconnect(true)
+          return []
+        }
+        throw new Error(data.error)
+      }
+
+      return data.calendars || []
+    } catch (err) {
+      console.error('Failed to fetch calendar list:', err)
+      const message = err instanceof Error ? err.message : 'Failed to fetch calendar list'
+      setError(message)
+      return []
+    }
+  }, [isConnected])
+
   // Create a new calendar event
   // Throws CalendarReconnectError if permissions are expired (catch this to show reconnect UI)
   const createEvent = useCallback(async (params: CreateEventParams): Promise<CreateEventResult> => {
@@ -400,6 +448,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     fetchEvents,
     fetchTodayEvents,
     fetchWeekEvents,
+    fetchCalendarList,
     createEvent,
     updateEvent,
   }
