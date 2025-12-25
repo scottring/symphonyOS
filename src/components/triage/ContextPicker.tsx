@@ -7,9 +7,9 @@ interface ContextPickerProps {
 }
 
 const CONTEXTS: { value: TaskContext; label: string; color: string }[] = [
-  { value: 'work', label: 'Work', color: 'bg-blue-500' },
-  { value: 'family', label: 'Family', color: 'bg-amber-500' },
-  { value: 'personal', label: 'Personal', color: 'bg-purple-500' },
+  { value: 'work', label: 'Work', color: 'rgb(37 99 235)' },      // Blue-600 (matches domain switcher)
+  { value: 'family', label: 'Family', color: 'rgb(217 119 6)' },  // Amber-600 (matches domain switcher)
+  { value: 'personal', label: 'Personal', color: 'rgb(147 51 234)' }, // Purple-600 (matches domain switcher)
 ]
 
 export function ContextPicker({ value, onChange }: ContextPickerProps) {
@@ -37,11 +37,11 @@ export function ContextPicker({ value, onChange }: ContextPickerProps) {
   const hasValue = value !== undefined
   const selectedContext = CONTEXTS.find(ctx => ctx.value === value)
 
-  // Map context colors to Tailwind text classes
-  const contextTextColors = {
-    work: 'text-blue-500',
-    family: 'text-amber-400',
-    personal: 'text-purple-500',
+  // Map context colors to match domain switcher
+  const contextStyles = {
+    work: { color: 'rgb(37 99 235)' },      // Blue-600
+    family: { color: 'rgb(217 119 6)' },    // Amber-600
+    personal: { color: 'rgb(147 51 234)' }, // Purple-600
   }
 
   return (
@@ -57,9 +57,10 @@ export function ContextPicker({ value, onChange }: ContextPickerProps) {
       >
         {selectedContext ? (
           <svg
-            className={`w-5 h-5 transition-colors ${contextTextColors[selectedContext.value as keyof typeof contextTextColors]}`}
+            className="w-5 h-5 transition-colors"
             fill="currentColor"
             viewBox="0 0 24 24"
+            style={contextStyles[selectedContext.value as keyof typeof contextStyles]}
           >
             <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
           </svg>
@@ -88,7 +89,7 @@ export function ContextPicker({ value, onChange }: ContextPickerProps) {
                     : 'hover:bg-neutral-50 text-neutral-700'
                 }`}
               >
-                <span className={`w-2 h-2 rounded-full ${color}`} />
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
                 {label}
               </button>
             ))}

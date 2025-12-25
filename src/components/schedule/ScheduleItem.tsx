@@ -9,15 +9,28 @@ import { Redo2 } from 'lucide-react'
 import { useMobile } from '@/hooks/useMobile'
 
 // Nordic Journal calendar icon - minimal, elegant design
-// Uses the calendar's Google color with a subtle accent, or falls back to primary teal-forest
-function CalendarIcon({ color, completed }: { color?: string | null; completed?: boolean }) {
+// Uses the event's context color (Work/Family/Personal) or falls back to primary teal-forest
+function CalendarIcon({
+  context,
+  completed
+}: {
+  context?: 'work' | 'family' | 'personal' | null
+  completed?: boolean
+}) {
   // Primary forest-teal from design system: hsl(168 45% 30%) ≈ #2a6b5e
   const primaryColor = '#2a6b5e'
   const primaryLight = '#e8f4f1' // ~primary-50
   const completedColor = '#2a6b5e'
 
-  // Use Google Calendar color if provided, otherwise use primary
-  const accentColor = color || primaryColor
+  // Context color mapping - matches domain switcher
+  const contextColorMap = {
+    work: 'rgb(37 99 235)',      // Blue-600
+    family: 'rgb(217 119 6)',    // Amber-600
+    personal: 'rgb(147 51 234)', // Purple-600
+  }
+
+  // Use context color if provided, otherwise use primary
+  const accentColor = context ? contextColorMap[context] : primaryColor
 
   return (
     <div className="w-5 h-5 relative" title="Calendar event">
@@ -49,8 +62,8 @@ function CalendarIcon({ color, completed }: { color?: string | null; completed?:
           strokeWidth="1.5"
           className="transition-colors"
         />
-        {/* Small color dot showing the calendar's color */}
-        {!completed && color && (
+        {/* Small color dot showing the context color */}
+        {!completed && context && (
           <circle
             cx="10"
             cy="12"
@@ -110,19 +123,19 @@ const overdueColors = {
   warning600: 'hsl(32 80% 44%)',
 }
 
-// Domain context colors for visual indicators
+// Domain context colors - matches domain switcher
 const contextColors = {
   work: {
-    dot: 'rgb(59 130 246)', // blue-500
-    bg: 'rgba(59, 130, 246, 0.08)',
+    dot: 'rgb(37 99 235)', // Blue-600 (matches domain switcher)
+    bg: 'rgba(37, 99, 235, 0.08)',
   },
   family: {
-    dot: 'rgb(251 191 36)', // amber-400
-    bg: 'rgba(251, 191, 36, 0.08)',
+    dot: 'rgb(217 119 6)', // Amber-600 (matches domain switcher)
+    bg: 'rgba(217, 119, 6, 0.08)',
   },
   personal: {
-    dot: 'rgb(168 85 247)', // purple-500
-    bg: 'rgba(168, 85, 247, 0.08)',
+    dot: 'rgb(147 51 234)', // Purple-600 (matches domain switcher)
+    bg: 'rgba(147, 51, 234, 0.08)',
   },
 }
 
@@ -328,14 +341,14 @@ export function ScheduleItem({
         {!(isMobile && isOverdue) && (
           <div className="w-5 shrink-0 flex items-center justify-center">
             {isEvent ? (
-              // Calendar events show a calendar icon with the calendar's color
+              // Calendar events show a calendar icon with the context color
               <button
                 onClick={handleCheckboxClick}
                 className="touch-target flex items-center justify-center -m-2 p-2"
                 aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
               >
                 <CalendarIcon
-                  color={item.calendarColor}
+                  context={item.context}
                   completed={item.completed}
                 />
               </button>
