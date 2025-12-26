@@ -184,7 +184,9 @@ export function useSupabaseTasks() {
     scheduledFor?: Date,
     options?: AddTaskOptions
   ): Promise<string | undefined> => {
-    if (!user) return undefined
+    if (!user) {
+      return undefined
+    }
 
     // Determine assignment: explicit assignedTo takes precedence, then default, then null
     // This allows callers to explicitly pass null to create unassigned tasks

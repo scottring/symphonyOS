@@ -33,17 +33,17 @@ export function InboxTaskCard({
   return (
     <div
       onClick={onSelect}
-      className="bg-white rounded-xl border border-neutral-100 px-3 py-2.5 shadow-sm cursor-pointer hover:border-primary-200 hover:shadow-md transition-all group"
+      className="bg-white rounded-xl border border-neutral-100 pl-0.5 pr-3 py-2.5 shadow-sm cursor-pointer hover:border-primary-200 hover:shadow-md transition-all group"
     >
-      {/* Main row: checkbox | title | avatar */}
-      <div className="flex items-center gap-2">
+      {/* Main row: checkbox | title | triage buttons */}
+      <div className="flex items-center gap-0.5">
         {/* Checkbox */}
         <button
           onClick={(e) => {
             e.stopPropagation()
             onUpdate({ completed: !task.completed })
           }}
-          className="shrink-0 touch-target flex items-center justify-center -m-1 p-1"
+          className="shrink-0 flex items-center justify-center"
         >
           <span
             className={`
@@ -71,16 +71,16 @@ export function InboxTaskCard({
           {task.title}
         </span>
 
-        {/* Triage actions: Defer, Schedule, Assign */}
-        <div className="shrink-0 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-          {/* Defer button */}
+        {/* Triage actions */}
+        <div className="shrink-0 flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+          {/* Defer - always visible */}
           <DeferPicker
             deferredUntil={task.deferredUntil}
             deferCount={task.deferCount}
             onDefer={onDefer}
           />
 
-          {/* Schedule button */}
+          {/* Schedule - always visible */}
           <SchedulePopover
             value={task.scheduledFor}
             isAllDay={task.isAllDay}
@@ -91,20 +91,24 @@ export function InboxTaskCard({
             getItemsForDate={getScheduleItemsForDate}
           />
 
-          {/* Context picker */}
-          <ContextPicker
-            value={task.context}
-            onChange={(context) => onUpdate({ context })}
-          />
-
-          {/* Multi-assignee avatar */}
-          {familyMembers.length > 0 && onAssignTaskAll && (
-            <MultiAssigneeDropdown
-              members={familyMembers}
-              selectedIds={task.assignedToAll || []}
-              onSelect={onAssignTaskAll}
-              size="sm"
+          {/* Context picker - desktop only */}
+          <div className="hidden md:block">
+            <ContextPicker
+              value={task.context}
+              onChange={(context) => onUpdate({ context })}
             />
+          </div>
+
+          {/* Multi-assignee - desktop only */}
+          {familyMembers.length > 0 && onAssignTaskAll && (
+            <div className="hidden md:block">
+              <MultiAssigneeDropdown
+                members={familyMembers}
+                selectedIds={task.assignedToAll || []}
+                onSelect={onAssignTaskAll}
+                size="sm"
+              />
+            </div>
           )}
         </div>
       </div>

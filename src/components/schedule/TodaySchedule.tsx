@@ -588,6 +588,7 @@ export function TodaySchedule({
   void _recentlyCreatedTaskId // Available for future triage card
   void _onTriageCardCollapse // Available for future triage card
   void _onAddProject // Available for future inline project creation
+
   const isMobile = useMobile()
 
   // Handle item selection - intercept synthetic packing tasks and open project instead
@@ -1206,7 +1207,7 @@ export function TodaySchedule({
       </header>
 
       {/* Inline collapsible inbox section */}
-      {isToday && showInlineInbox && inboxTasks.length > 0 && onUpdateTask && onPushTask && (
+      {isToday && showInlineInbox && onUpdateTask && onPushTask && (
         <div className="mb-4 md:mb-8 animate-fade-in-up">
           <div className="rounded-xl md:rounded-2xl border border-neutral-200 bg-neutral-50/50">
             {/* Inbox header */}
@@ -1227,26 +1228,33 @@ export function TodaySchedule({
             </div>
             {/* Inbox items */}
             <div className="p-2 md:p-3 space-y-2 max-h-[50vh] md:max-h-[400px] overflow-y-auto">
-              {inboxTasks.map((task) => (
-                <InboxTaskCard
-                  key={task.id}
-                  task={task}
-                  onUpdate={(updates) => onUpdateTask(task.id, updates)}
-                  onSelect={() => handleSelectItem(`task-${task.id}`)}
-                  onDefer={(date) => {
-                    if (date) {
-                      onPushTask(task.id, date)
-                    } else {
-                      onUpdateTask(task.id, { deferredUntil: undefined })
-                    }
-                  }}
-                  projects={projects}
-                  onOpenProject={onOpenProject}
-                  familyMembers={familyMembers}
-                  onAssignTaskAll={onAssignTaskAll ? (memberIds) => onAssignTaskAll(task.id, memberIds) : undefined}
-                  getScheduleItemsForDate={getScheduleItemsForDate}
-                />
-              ))}
+              {inboxTasks.length > 0 ? (
+                inboxTasks.map((task) => (
+                  <InboxTaskCard
+                    key={task.id}
+                    task={task}
+                    onUpdate={(updates) => onUpdateTask(task.id, updates)}
+                    onSelect={() => handleSelectItem(`task-${task.id}`)}
+                    onDefer={(date) => {
+                      if (date) {
+                        onPushTask(task.id, date)
+                      } else {
+                        onUpdateTask(task.id, { deferredUntil: undefined })
+                      }
+                    }}
+                    projects={projects}
+                    onOpenProject={onOpenProject}
+                    familyMembers={familyMembers}
+                    onAssignTaskAll={onAssignTaskAll ? (memberIds) => onAssignTaskAll(task.id, memberIds) : undefined}
+                    getScheduleItemsForDate={getScheduleItemsForDate}
+                  />
+                ))
+              ) : (
+                <div className="text-center py-8 text-neutral-400">
+                  <InboxIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">Inbox is empty</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
