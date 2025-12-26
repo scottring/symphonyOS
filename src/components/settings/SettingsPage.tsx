@@ -4,6 +4,7 @@ import { CalendarSettings } from './CalendarSettings'
 import { WaitlistAdmin } from './WaitlistAdmin'
 import { ThemeSelector } from './ThemeSelector'
 import { HomeAddressSettings } from './HomeAddressSettings'
+import { DemoControls } from './DemoControls'
 import type { FamilyMember } from '@/types/family'
 
 interface SettingsPageProps {
@@ -483,7 +484,15 @@ export function SettingsPage({ onBack, onFamilyMembersChanged }: SettingsPagePro
         )}
 
         {activeTab === 'admin' && (
-          <div className="space-y-6">
+          <div className="space-y-8">
+            <section>
+              <h2 className="text-lg font-semibold text-neutral-700 mb-2">Demo Controls</h2>
+              <p className="text-sm text-neutral-500 mb-6">
+                Set up and reset demo data for presentations.
+              </p>
+              <DemoControls />
+            </section>
+
             <section>
               <h2 className="text-lg font-semibold text-neutral-700 mb-2">Waitlist</h2>
               <p className="text-sm text-neutral-500 mb-6">

@@ -7,7 +7,7 @@ interface TriageDemoProps {
   onContinue: () => void
 }
 
-type TriageAction = 'schedule' | 'defer' | 'skip'
+type TriageAction = 'schedule' | 'defer' | 'skip' | 'tag'
 
 function getNextThursday(): Date {
   const today = new Date()
@@ -45,7 +45,8 @@ export function TriageDemo({ task, onUpdateTask, onContinue }: TriageDemoProps) 
     setIsProcessing(true)
     setSelectedAction(action)
 
-    let scheduledFor: Date | null = null
+    let scheduledFor: Date | undefined = undefined
+    let context: 'family' | undefined = undefined
 
     switch (action) {
       case 'schedule':
@@ -57,9 +58,12 @@ export function TriageDemo({ task, onUpdateTask, onContinue }: TriageDemoProps) 
       case 'skip':
         scheduledFor = getTomorrow()
         break
+      case 'tag':
+        context = 'family'
+        break
     }
 
-    await onUpdateTask(task.id, { scheduledFor })
+    await onUpdateTask(task.id, { scheduledFor, context })
     setIsProcessing(false)
   }
 
@@ -87,6 +91,7 @@ export function TriageDemo({ task, onUpdateTask, onContinue }: TriageDemoProps) 
       schedule: `You scheduled "${task.title}" for Thursday. It'll appear on your Today view that morning.`,
       defer: `You deferred "${task.title}" to next week. It'll reappear when you're ready.`,
       skip: `You skipped "${task.title}". It'll show up again tomorrow.`,
+      tag: `You tagged "${task.title}" as Family. It'll show with an amber tag and surface during family time.`,
     }
 
     return (
@@ -102,8 +107,8 @@ export function TriageDemo({ task, onUpdateTask, onContinue }: TriageDemoProps) 
 
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-8 text-left">
             <p className="text-sm text-amber-800">
-              💡 <span className="font-medium">Pro tip:</span> Defer entire projects and all their
-              tasks hide until that date. Perfect for "I'll deal with this after the holidays."
+              💡 <span className="font-medium">Pro tip:</span> Use domains to keep work, family, and personal separate.
+              Switch domains to focus on what matters right now.
             </p>
           </div>
 
@@ -133,7 +138,7 @@ export function TriageDemo({ task, onUpdateTask, onContinue }: TriageDemoProps) 
         </div>
 
         <p className="text-neutral-500 text-center mb-6">
-          Can't do this today? You have options:
+          Organize this task with scheduling and tagging:
         </p>
 
         {/* Action cards */}
@@ -178,6 +183,24 @@ export function TriageDemo({ task, onUpdateTask, onContinue }: TriageDemoProps) 
               <div>
                 <div className="font-medium text-neutral-800 group-hover:text-primary-700">Skip</div>
                 <div className="text-sm text-neutral-500">Not today — show me tomorrow instead</div>
+              </div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => handleAction('tag')}
+            disabled={isProcessing}
+            className="w-full p-4 bg-white rounded-lg border border-neutral-200 hover:border-primary-300 hover:shadow-md transition-all text-left group"
+          >
+            <div className="flex items-start gap-4">
+              <span className="text-2xl">🏷️</span>
+              <div>
+                <div className="font-medium text-neutral-800 group-hover:text-primary-700">Tag as Family</div>
+                <div className="text-sm text-neutral-500">Organize by domain: Work, Family, or Personal</div>
+                <div className="text-sm flex items-center gap-1 mt-1">
+                  <span className="w-2 h-2 rounded-full bg-amber-600" />
+                  <span className="text-amber-600">Family</span>
+                </div>
               </div>
             </div>
           </button>

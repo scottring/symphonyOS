@@ -6,6 +6,12 @@ interface BuildingBlocksStepProps {
 
 const CARDS = [
   {
+    icon: '🏷️',
+    title: 'Domains',
+    description: 'Work, Family, and Personal. Keep them separate.',
+    examples: 'Work tasks stay in work hours. Family tasks surface when you are home. Personal time is yours.',
+  },
+  {
     icon: '📋',
     title: 'Tasks',
     description: 'The single things you need to do.',
@@ -35,13 +41,13 @@ export function BuildingBlocksStep({ onContinue }: BuildingBlocksStepProps) {
         How Symphony Works
       </h1>
       <p className="text-lg text-neutral-500 text-center mb-12 max-w-md">
-        Three building blocks power your daily rhythm.
+        Four building blocks power your daily rhythm.
       </p>
 
       {/* Cards - Desktop: side by side, Mobile: stacked with tabs */}
       <div className="w-full max-w-4xl">
         {/* Desktop view */}
-        <div className="hidden md:grid grid-cols-3 gap-6 mb-12">
+        <div className="hidden md:grid grid-cols-4 gap-6 mb-12">
           {CARDS.map((card, i) => (
             <div
               key={i}

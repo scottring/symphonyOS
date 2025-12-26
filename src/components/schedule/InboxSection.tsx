@@ -4,7 +4,7 @@ import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
 import type { ScheduleContextItem } from '@/components/triage'
-import { InboxTaskCard } from './InboxTaskCard'
+import { SwipeableInboxCard } from './SwipeableInboxCard'
 import { TriageCard, InboxTriageModal } from '@/components/triage'
 
 interface InboxSectionProps {
@@ -101,7 +101,7 @@ export function InboxSection({
 
         {/* Show regular cards for other tasks */}
         {otherTasks.map((task) => (
-          <InboxTaskCard
+          <SwipeableInboxCard
             key={task.id}
             task={task}
             onUpdate={(updates) => onUpdateTask(task.id, updates)}

@@ -32,8 +32,8 @@ export function WelcomeStep({ onContinue }: WelcomeStepProps) {
 
       {/* Subtitle */}
       <p className="text-lg text-neutral-500 text-center max-w-md mb-12 leading-relaxed">
-        Symphony OS is your family's command center. It brings together everything you need to do —
-        tasks, projects, routines, and calendar events — into one calm, clear view.
+        Symphony OS is your personal operating system for work, life, and family. Three separate domains,
+        one clear view — built for you, designed for sharing.
       </p>
 
       {/* Setup note */}

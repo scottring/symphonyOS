@@ -1058,7 +1058,7 @@ export function TodaySchedule({
             {/* Right side controls - unified group */}
             <div className="flex items-center pr-3">
               {/* Inbox */}
-              {isToday && inboxTasks.length > 0 && (
+              {isToday && (
                 <button
                   ref={organizeButtonRef}
                   onClick={() => setShowInlineInbox(prev => !prev)}
