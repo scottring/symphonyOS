@@ -902,12 +902,23 @@ export function TripItineraryView({
             )}
           </div>
 
-          {/* Notes Section - Placeholder for now */}
+          {/* Notes Section */}
           <div className="pt-10 border-t border-neutral-200">
             <h2 className="font-display text-xl text-neutral-900 mb-3">Trip Notes</h2>
-            <div className="text-sm text-neutral-500 italic">
-              Notes will appear here
-            </div>
+            <textarea
+              value={tripMetadata.notes || ''}
+              onChange={async (e) => {
+                if (!onUpdateTripMetadata || !projectId || !projectName) return
+
+                const updatedMetadata = {
+                  ...tripMetadata,
+                  notes: e.target.value
+                }
+                await onUpdateTripMetadata(projectId, projectName, updatedMetadata)
+              }}
+              placeholder="Add notes about the trip: itinerary details, restaurant reservations, things to remember..."
+              className="w-full min-h-[200px] px-4 py-3 text-sm bg-bg-elevated border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-y"
+            />
           </div>
         </div>
       </div>

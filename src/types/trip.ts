@@ -274,6 +274,9 @@ export interface TripMetadata {
 
   // Packing list (preserves template structure with headings)
   packingList?: PackingNode[] // Structured packing list from templates
+
+  // Trip notes
+  notes?: string // Free-form notes about the trip
 }
 
 // ============================================================================
