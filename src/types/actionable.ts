@@ -69,6 +69,7 @@ export interface Routine {
   assigned_to: string | null // Family member assignment - legacy single
   assigned_to_all: string[] | null // Multi-member assignment
   visibility: RoutineVisibility
+  paused_until: string | null // When set, routine auto-resumes after this timestamp
   recurrence_pattern: RecurrencePattern
   time_of_day: string | null // HH:MM:SS format
   raw_input: string | null // Original natural language input

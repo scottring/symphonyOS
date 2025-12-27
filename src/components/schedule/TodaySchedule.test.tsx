@@ -46,6 +46,7 @@ const createMockRoutine = (overrides: Partial<Routine> = {}): Routine => ({
   time_of_day: '09:00',
   raw_input: null,
   visibility: 'active',
+  paused_until: null,
   show_on_timeline: true,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import type { Routine, RecurrencePattern } from '@/types/actionable'
+import type { UpdateRoutineInput } from '@/hooks/useRoutines'
 import { parseRoutine } from '@/lib/parseRoutine'
 import { SemanticRoutine } from './SemanticRoutine'
+import { PauseRoutineModal } from './PauseRoutineModal'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
 import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
@@ -44,6 +46,7 @@ interface RoutinesListProps {
   familyMembers?: FamilyMember[]
   onSelectRoutine: (routine: Routine) => void
   onCreateRoutine: () => void
+  onUpdateRoutine: (id: string, updates: UpdateRoutineInput) => Promise<boolean>
 }
 
 function formatRecurrence(routine: Routine): string {
@@ -157,7 +160,9 @@ function SectionHeader({ title, count, collapsed, onToggle }: SectionHeaderProps
   )
 }
 
-export function RoutinesListRedesign({ routines, contacts = [], familyMembers = [], onSelectRoutine, onCreateRoutine }: RoutinesListProps) {
+export function RoutinesListRedesign({ routines, contacts = [], familyMembers = [], onSelectRoutine, onCreateRoutine, onUpdateRoutine }: RoutinesListProps) {
+  // Pause modal state
+  const [pauseModalRoutine, setPauseModalRoutine] = useState<Routine | null>(null)
   // Load sort/group preferences from localStorage
   const [sortBy, setSortBy] = useState<SortOption>(() => {
     const saved = localStorage.getItem('routines-sort')
@@ -182,6 +187,22 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
   const getMember = (id: string | null): FamilyMember | undefined => {
     if (!id) return undefined
     return familyMembers.find(m => m.id === id)
+  }
+
+  // Pause handlers
+  const handlePauseRoutines = async (routineIds: string[], pausedUntil: string | null) => {
+    for (const id of routineIds) {
+      await onUpdateRoutine(id, { visibility: 'reference', paused_until: pausedUntil })
+    }
+  }
+
+  const handleQuickToggle = async (routine: Routine, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (routine.visibility === 'active') {
+      setPauseModalRoutine(routine)  // Show modal for duration
+    } else {
+      await onUpdateRoutine(routine.id, { visibility: 'active', paused_until: null })
+    }
   }
 
   // Sort function
@@ -365,6 +386,20 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
         }`}
         style={{ animationDelay: `${index * 50}ms` }}
       >
+        {/* Toggle Switch */}
+        <button
+          onClick={(e) => handleQuickToggle(routine, e)}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ${
+            isPaused ? 'bg-neutral-300' : 'bg-amber-500'
+          }`}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              isPaused ? 'translate-x-1' : 'translate-x-6'
+            }`}
+          />
+        </button>
+
         {/* Cycle icon in circle */}
         <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
           isPaused ? 'bg-neutral-200' : 'bg-amber-100 group-hover:bg-amber-200'
@@ -560,6 +595,17 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
           </section>
         )}
       </div>
+
+      {/* Pause Routine Modal */}
+      {pauseModalRoutine && (
+        <PauseRoutineModal
+          routine={pauseModalRoutine}
+          allRoutines={routines}
+          isOpen={!!pauseModalRoutine}
+          onClose={() => setPauseModalRoutine(null)}
+          onPause={handlePauseRoutines}
+        />
+      )}
     </div>
   )
 }

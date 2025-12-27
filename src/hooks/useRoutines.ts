@@ -23,6 +23,7 @@ export interface UpdateRoutineInput {
   recurrence_pattern?: RecurrencePattern
   time_of_day?: string | null
   visibility?: RoutineVisibility
+  paused_until?: string | null
   default_assignee?: string | null
   assigned_to?: string | null
   assigned_to_all?: string[] | null
@@ -55,7 +56,30 @@ export function useRoutines() {
         .order('name', { ascending: true })
 
       if (fetchError) throw fetchError
-      setRoutines((data || []) as Routine[])
+
+      const routines = (data || []) as Routine[]
+
+      // Auto-resume routines whose pause period has expired
+      const now = new Date()
+      const routinesToResume = routines.filter(
+        r => r.paused_until && new Date(r.paused_until) <= now && r.visibility === 'reference'
+      )
+
+      if (routinesToResume.length > 0) {
+        // Resume all expired routines
+        for (const routine of routinesToResume) {
+          await supabase
+            .from('routines')
+            .update({ visibility: 'active', paused_until: null })
+            .eq('id', routine.id)
+
+          // Update local state
+          routine.visibility = 'active'
+          routine.paused_until = null
+        }
+      }
+
+      setRoutines(routines)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch routines'
       setError(message)

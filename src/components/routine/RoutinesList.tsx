@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import type { Routine, RecurrencePattern } from '@/types/actionable'
+import type { UpdateRoutineInput } from '@/hooks/useRoutines'
 import { parseRoutine } from '@/lib/parseRoutine'
 import { SemanticRoutine } from './SemanticRoutine'
+import { PauseRoutineModal } from './PauseRoutineModal'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
 import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
@@ -44,6 +46,7 @@ interface RoutinesListProps {
   familyMembers?: FamilyMember[]
   onSelectRoutine: (routine: Routine) => void
   onCreateRoutine: () => void
+  onUpdateRoutine: (id: string, updates: UpdateRoutineInput) => Promise<boolean>
 }
 
 function formatRecurrence(routine: Routine): string {
@@ -121,7 +124,10 @@ function getRoutineName(routine: Routine, contacts: Contact[]): string {
   return routine.name
 }
 
-export function RoutinesList({ routines, contacts = [], familyMembers = [], onSelectRoutine, onCreateRoutine }: RoutinesListProps) {
+export function RoutinesList({ routines, contacts = [], familyMembers = [], onSelectRoutine, onCreateRoutine, onUpdateRoutine }: RoutinesListProps) {
+  // Pause modal state
+  const [pauseModalRoutine, setPauseModalRoutine] = useState<Routine | null>(null)
+
   // Load sort/group preferences from localStorage
   const [sortBy, setSortBy] = useState<SortOption>(() => {
     const saved = localStorage.getItem('routines-sort')
@@ -145,6 +151,32 @@ export function RoutinesList({ routines, contacts = [], familyMembers = [], onSe
   const getMember = (id: string | null): FamilyMember | undefined => {
     if (!id) return undefined
     return familyMembers.find(m => m.id === id)
+  }
+
+  // Handle pause with smart suggestions
+  const handlePauseRoutines = async (routineIds: string[], pausedUntil: string | null) => {
+    for (const id of routineIds) {
+      await onUpdateRoutine(id, {
+        visibility: 'reference',
+        paused_until: pausedUntil,
+      })
+    }
+  }
+
+  // Handle quick toggle (pause indefinitely or resume)
+  const handleQuickToggle = async (routine: Routine, e: React.MouseEvent) => {
+    e.stopPropagation()
+
+    if (routine.visibility === 'active') {
+      // If active, show pause modal for duration selection
+      setPauseModalRoutine(routine)
+    } else {
+      // If paused, resume immediately
+      await onUpdateRoutine(routine.id, {
+        visibility: 'active',
+        paused_until: null,
+      })
+    }
   }
 
   // Sort function
@@ -316,45 +348,64 @@ export function RoutinesList({ routines, contacts = [], familyMembers = [], onSe
     const member = getMember(routine.assigned_to)
 
     return (
-      <button
+      <div
         key={routine.id}
-        onClick={() => onSelectRoutine(routine)}
-        className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left ${
+        className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all ${
           isPaused
-            ? 'bg-neutral-50 border-neutral-100 hover:border-neutral-200 hover:shadow-sm opacity-60'
+            ? 'bg-neutral-50 border-neutral-100 opacity-60'
             : 'bg-white border-neutral-100 hover:border-amber-200 hover:shadow-sm'
         }`}
       >
-        {/* Circular indicator */}
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-          isPaused ? 'bg-neutral-200' : 'bg-amber-100'
-        }`}>
-          {isPaused ? (
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          ) : (
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
+        {/* Toggle Switch */}
+        <button
+          onClick={(e) => handleQuickToggle(routine, e)}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 flex-shrink-0 ${
+            isPaused ? 'bg-neutral-300' : 'bg-amber-500'
+          }`}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              isPaused ? 'translate-x-1' : 'translate-x-6'
+            }`}
+          />
+        </button>
+
+        {/* Content - clickable area */}
+        <button
+          onClick={() => onSelectRoutine(routine)}
+          className="flex-1 flex items-center gap-4 text-left min-w-0"
+        >
+          {/* Circular indicator */}
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+            isPaused ? 'bg-neutral-200' : 'bg-amber-100'
+          }`}>
+            {isPaused ? (
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            )}
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            {renderRoutineContent(routine)}
+          </div>
+
+          {/* Assignee Avatar */}
+          {member && (
+            <AssigneeAvatar member={member} size="sm" className="flex-shrink-0" />
           )}
-        </div>
 
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          {renderRoutineContent(routine)}
-        </div>
-
-        {/* Assignee Avatar */}
-        {member && (
-          <AssigneeAvatar member={member} size="sm" className="flex-shrink-0" />
-        )}
-
-        {/* Chevron */}
-        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-neutral-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-        </svg>
-      </button>
+          {/* Chevron */}
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-neutral-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+          </svg>
+        </button>
+      </div>
     )
   }
 
@@ -495,6 +546,17 @@ export function RoutinesList({ routines, contacts = [], familyMembers = [], onSe
           </div>
         )}
       </div>
+
+      {/* Pause Routine Modal */}
+      {pauseModalRoutine && (
+        <PauseRoutineModal
+          routine={pauseModalRoutine}
+          allRoutines={routines}
+          isOpen={!!pauseModalRoutine}
+          onClose={() => setPauseModalRoutine(null)}
+          onPause={handlePauseRoutines}
+        />
+      )}
     </div>
   )
 }

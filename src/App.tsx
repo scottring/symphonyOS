@@ -1354,6 +1354,7 @@ function App() {
             familyMembers={familyMembers}
             onSelectRoutine={(routine) => setSelectedRoutineId(routine.id)}
             onCreateRoutine={() => setCreatingRoutine(true)}
+            onUpdateRoutine={updateRoutine}
           />
         </Suspense>
       )}

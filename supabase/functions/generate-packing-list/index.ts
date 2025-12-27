@@ -281,14 +281,22 @@ function parsePackingList(response: string): PackingItem[] {
 
   // Validation: Check for age-inappropriate items
   const inappropriateInfantItems = [
-    'diaper', 'baby wipe', 'stroller', 'car seat', 'formula', 'bottle', 'sippy cup', 'pull-up'
+    'diaper', 'baby wipe', 'stroller', 'car seat', 'formula', 'baby bottle', 'sippy cup', 'pull-up', 'pacifier', 'onesie'
   ]
 
   const hasInappropriateItems = uniqueItems.some(item => {
     const itemLower = item.name.toLowerCase()
     return inappropriateInfantItems.some(inappropriate => {
+      // More specific matching to avoid false positives
+      // For "baby bottle" we need the full phrase, not just "bottle"
+      const needsWordBoundary = inappropriate === 'baby bottle'
+
       // Check if the item contains an infant-specific term
-      if (itemLower.includes(inappropriate)) {
+      const matches = needsWordBoundary
+        ? itemLower.includes(inappropriate)
+        : new RegExp(`\\b${inappropriate}s?\\b`).test(itemLower) // Word boundary check with optional plural
+
+      if (matches) {
         // Unless it's specifically for an infant/toddler (check for_person field)
         const isForInfantOrToddler = item.for_person &&
           (item.for_person.toLowerCase().includes('infant') ||

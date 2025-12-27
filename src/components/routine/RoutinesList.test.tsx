@@ -18,6 +18,7 @@ Object.defineProperty(window, 'localStorage', { value: localStorageMock })
 describe('RoutinesList', () => {
   const mockOnSelectRoutine = vi.fn()
   const mockOnCreateRoutine = vi.fn()
+  const mockOnUpdateRoutine = vi.fn().mockResolvedValue(true)
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -36,6 +37,7 @@ describe('RoutinesList', () => {
           routines={[]}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -48,6 +50,7 @@ describe('RoutinesList', () => {
           routines={[]}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -60,6 +63,7 @@ describe('RoutinesList', () => {
           routines={[]}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -76,6 +80,7 @@ describe('RoutinesList', () => {
           routines={[]}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -89,6 +94,7 @@ describe('RoutinesList', () => {
           routines={[]}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -101,6 +107,7 @@ describe('RoutinesList', () => {
           routines={[]}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -122,6 +129,7 @@ describe('RoutinesList', () => {
           routines={routines}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -141,6 +149,7 @@ describe('RoutinesList', () => {
           routines={routines}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -159,6 +168,7 @@ describe('RoutinesList', () => {
           routines={routines}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -173,6 +183,7 @@ describe('RoutinesList', () => {
           routines={[routine]}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -194,6 +205,7 @@ describe('RoutinesList', () => {
           routines={[routine]}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -211,6 +223,7 @@ describe('RoutinesList', () => {
           routines={[routine]}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -228,6 +241,7 @@ describe('RoutinesList', () => {
           routines={[routine]}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -245,6 +259,7 @@ describe('RoutinesList', () => {
           routines={[routine]}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -262,6 +277,7 @@ describe('RoutinesList', () => {
           routines={[routine]}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -281,6 +297,7 @@ describe('RoutinesList', () => {
           routines={[routine]}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -298,6 +315,7 @@ describe('RoutinesList', () => {
           routines={[routine]}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -315,6 +333,7 @@ describe('RoutinesList', () => {
           routines={[routine]}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -331,6 +350,7 @@ describe('RoutinesList', () => {
           routines={routines}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -345,6 +365,7 @@ describe('RoutinesList', () => {
           routines={routines}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -364,6 +385,7 @@ describe('RoutinesList', () => {
           routines={routines}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -386,6 +408,7 @@ describe('RoutinesList', () => {
           routines={routines}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -403,6 +426,7 @@ describe('RoutinesList', () => {
           routines={routines}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -422,6 +446,7 @@ describe('RoutinesList', () => {
           routines={routines}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -436,6 +461,7 @@ describe('RoutinesList', () => {
           routines={routines}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -454,6 +480,7 @@ describe('RoutinesList', () => {
           routines={routines}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -472,6 +499,7 @@ describe('RoutinesList', () => {
           routines={routines}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -493,6 +521,7 @@ describe('RoutinesList', () => {
           familyMembers={[familyMember]}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -516,6 +545,7 @@ describe('RoutinesList', () => {
           familyMembers={familyMembers}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -540,6 +570,7 @@ describe('RoutinesList', () => {
           routines={routines}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -557,6 +588,7 @@ describe('RoutinesList', () => {
           routines={routines}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -579,6 +611,7 @@ describe('RoutinesList', () => {
           contacts={contacts}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -594,6 +627,7 @@ describe('RoutinesList', () => {
           routines={[]}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
@@ -609,6 +643,7 @@ describe('RoutinesList', () => {
           routines={routines}
           onSelectRoutine={mockOnSelectRoutine}
           onCreateRoutine={mockOnCreateRoutine}
+          onUpdateRoutine={mockOnUpdateRoutine}
         />
       )
 
