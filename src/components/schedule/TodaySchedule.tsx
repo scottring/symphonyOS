@@ -19,6 +19,7 @@ import { OverdueSection } from './OverdueSection'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { useSystemHealth } from '@/hooks/useSystemHealth'
 import { MultiAssigneeDropdown } from '@/components/family/MultiAssigneeDropdown'
+import { CalendarClock } from 'lucide-react'
 
 // Inbox icon
 function InboxIcon({ className }: { className?: string }) {
@@ -570,7 +571,7 @@ export function TodaySchedule({
   onCompleteEvent,
   onSkipEvent,
   onPushEvent,
-  onOpenPlanning: _onOpenPlanning,
+  onOpenPlanning,
   onCreateTask: _onCreateTask,
   onAddProject: _onAddProject,
   selectedAssignee,
@@ -579,7 +580,6 @@ export function TodaySchedule({
   hasUnassignedTasks = false,
   onOpenTask,
 }: TodayScheduleProps) {
-  void _onOpenPlanning // Reserved - planning now handled by ModeToggle
   void _onCreateTask // Reserved - was used by ReviewSection
   void _onDeleteTask // Available for future inline delete
   void _contacts // Available for future inline triage
@@ -591,15 +591,22 @@ export function TodaySchedule({
 
   const isMobile = useMobile()
 
-  // Handle item selection - intercept synthetic packing tasks and open project instead
+  // Handle item selection - intercept synthetic trip tasks and open project instead
   const handleSelectItem = useCallback((itemId: string | null) => {
-    if (itemId?.startsWith('task-pack-') && onOpenProject) {
-      // Extract project ID from synthetic packing task ID (format: "task-pack-{projectId}")
-      const projectId = itemId.replace('task-pack-', '')
-      onOpenProject(projectId)
-    } else {
-      onSelectItem(itemId)
+    // Check if this is a synthetic trip task (pack, pretrip, departure, return)
+    if (itemId && onOpenProject) {
+      const syntheticPrefixes = ['task-pack-', 'task-pretrip-', 'task-departure-', 'task-return-']
+      const matchedPrefix = syntheticPrefixes.find(prefix => itemId.startsWith(prefix))
+
+      if (matchedPrefix) {
+        // Extract project ID from synthetic task ID (format: "task-{type}-{projectId}")
+        const projectId = itemId.replace(matchedPrefix, '')
+        onOpenProject(projectId)
+        return // Don't call onSelectItem for synthetic tasks
+      }
     }
+
+    onSelectItem(itemId)
   }, [onSelectItem, onOpenProject])
 
   // Hide routines toggle with localStorage persistence
@@ -706,12 +713,9 @@ export function TodaySchedule({
       if (!task.scheduledFor) return false
       if (!matchesAssigneeFilter(task.assignedTo)) return false
 
-      // Filter out individual packing tasks - they only show in trip project view
-      if (task.projectId && task.title?.toLowerCase().includes('pack')) {
-        const project = projectsMap?.get(task.projectId)
-        if (project?.type === 'trip') {
-          return false // Hide packing tasks from overdue
-        }
+      // Filter out individual packing step tasks (pack: prefix)
+      if (task.title?.toLowerCase().startsWith('pack:')) {
+        return false
       }
 
       const taskDate = new Date(task.scheduledFor)
@@ -733,12 +737,9 @@ export function TodaySchedule({
       if (task.isSomeday) return false // Someday items are not in inbox
       if (!matchesAssigneeFilter(task.assignedTo)) return false
 
-      // Filter out individual packing tasks - they only show in trip project view
-      if (task.projectId && task.title?.toLowerCase().includes('pack')) {
-        const project = projectsMap?.get(task.projectId)
-        if (project?.type === 'trip') {
-          return false // Hide packing tasks from inbox
-        }
+      // Filter out individual packing step tasks (pack: prefix)
+      if (task.title?.toLowerCase().startsWith('pack:')) {
+        return false
       }
 
       // No scheduled date = inbox item
@@ -766,11 +767,20 @@ export function TodaySchedule({
     return tasks.filter((task) => {
       if (!matchesAssigneeFilter(task.assignedTo)) return false
 
-      // Filter out individual packing tasks - they only show in trip project view
-      if (task.projectId && task.title?.toLowerCase().includes('pack')) {
+      // Filter out individual packing step tasks (pack: prefix)
+      if (task.title?.toLowerCase().startsWith('pack:')) {
+        return false
+      }
+
+      // Filter out individual trip phase tasks (PreTrip, Departure, Return)
+      if (task.projectId && task.title) {
         const project = projectsMap?.get(task.projectId)
         if (project?.type === 'trip') {
-          return false // Hide packing tasks from timeline
+          if (task.title.startsWith('PreTrip:') ||
+              task.title.startsWith('Departure:') ||
+              task.title.startsWith('Return:')) {
+            return false // Hide phase tasks from timeline, show synthetic cards instead
+          }
         }
       }
 
@@ -859,11 +869,12 @@ export function TodaySchedule({
       const startDate = tripMetadata?.startDate
       if (!startDate) continue
 
-      // Schedule packing for day before trip starts
-      const tripStart = new Date(startDate)
+      // Schedule packing for 2 days before trip starts (matches tripTaskGenerator.ts)
+      // Parse as local date to avoid timezone issues
+      const tripStart = new Date(startDate + 'T00:00:00')
       const packingDate = new Date(tripStart)
-      packingDate.setDate(packingDate.getDate() - 1)
-      packingDate.setHours(18, 0, 0, 0) // 6pm day before
+      packingDate.setDate(packingDate.getDate() - 2)
+      packingDate.setHours(18, 0, 0, 0) // 6pm, 2 days before
 
       // Check if any packing items are completed
       const completedCount = packingItems.filter(t => t.completed).length
@@ -887,10 +898,100 @@ export function TodaySchedule({
     return syntheticPackingTasks
   }, [projects, tasks])
 
-  // Merge packing tasks with regular filtered tasks
+  // Generate synthetic trip phase tasks (PreTrip, Departure, Return)
+  const tripPhaseTasks = useMemo(() => {
+    if (!projects || projects.length === 0) return []
+
+    const tripProjects = projects.filter(p => p.type === 'trip')
+    const syntheticPhaseTasks: Task[] = []
+
+    for (const trip of tripProjects) {
+      const tripMetadata = trip.tripMetadata
+      if (!tripMetadata?.startDate) continue
+
+      // Pre-Trip tasks (2 days before)
+      const preTripItems = tasks.filter(task =>
+        task.projectId === trip.id &&
+        task.title?.startsWith('PreTrip:')
+      )
+
+      if (preTripItems.length > 0) {
+        const completedCount = preTripItems.filter(t => t.completed).length
+        const preTripDate = new Date(tripMetadata.startDate + 'T00:00:00')
+        preTripDate.setDate(preTripDate.getDate() - 2)
+        preTripDate.setHours(14, 0, 0, 0)
+
+        syntheticPhaseTasks.push({
+          id: `pretrip-${trip.id}`,
+          title: `Pre-Trip: ${trip.name}`,
+          completed: completedCount === preTripItems.length,
+          scheduledFor: preTripDate,
+          projectId: trip.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          isAllDay: false,
+          notes: `${completedCount}/${preTripItems.length} tasks completed`,
+        } as Task)
+      }
+
+      // Departure Day tasks
+      const departureItems = tasks.filter(task =>
+        task.projectId === trip.id &&
+        task.title?.startsWith('Departure:')
+      )
+
+      if (departureItems.length > 0) {
+        const completedCount = departureItems.filter(t => t.completed).length
+        const departureDate = new Date(tripMetadata.startDate + 'T00:00:00')
+        departureDate.setHours(6, 0, 0, 0)
+
+        syntheticPhaseTasks.push({
+          id: `departure-${trip.id}`,
+          title: `Departure Day: ${trip.name}`,
+          completed: completedCount === departureItems.length,
+          scheduledFor: departureDate,
+          projectId: trip.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          isAllDay: false,
+          notes: `${completedCount}/${departureItems.length} tasks completed`,
+        } as Task)
+      }
+
+      // Return Home tasks
+      if (tripMetadata.endDate) {
+        const returnItems = tasks.filter(task =>
+          task.projectId === trip.id &&
+          task.title?.startsWith('Return:')
+        )
+
+        if (returnItems.length > 0) {
+          const completedCount = returnItems.filter(t => t.completed).length
+          const returnDate = new Date(tripMetadata.endDate + 'T00:00:00')
+          returnDate.setHours(18, 0, 0, 0)
+
+          syntheticPhaseTasks.push({
+            id: `return-${trip.id}`,
+            title: `Return Home: ${trip.name}`,
+            completed: completedCount === returnItems.length,
+            scheduledFor: returnDate,
+            projectId: trip.id,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            isAllDay: false,
+            notes: `${completedCount}/${returnItems.length} tasks completed`,
+          } as Task)
+        }
+      }
+    }
+
+    return syntheticPhaseTasks
+  }, [projects, tasks])
+
+  // Merge packing tasks, phase tasks, and regular filtered tasks
   const allFilteredTasks = useMemo(() => {
-    return [...filteredTasks, ...packingTasks]
-  }, [filteredTasks, packingTasks])
+    return [...filteredTasks, ...packingTasks, ...tripPhaseTasks]
+  }, [filteredTasks, packingTasks, tripPhaseTasks])
 
   const grouped = useMemo(() => {
     const taskItems = allFilteredTasks.map(taskToTimelineItem)
@@ -1186,6 +1287,18 @@ export function TodaySchedule({
                       <span className="w-5 h-0.5 bg-neutral-400 rotate-45" />
                     </span>
                   )}
+                </button>
+              )}
+
+              {/* Planning button */}
+              {onOpenPlanning && (
+                <button
+                  onClick={onOpenPlanning}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-neutral-600 hover:text-neutral-700 hover:bg-neutral-100 transition-all duration-200"
+                  title="Open multi-day planning view"
+                >
+                  <CalendarClock className="w-4 h-4" />
+                  <span className="hidden sm:inline">Plan</span>
                 </button>
               )}
 

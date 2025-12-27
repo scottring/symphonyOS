@@ -231,12 +231,13 @@ serve(async (req) => {
 
           // For all-day events, keep the date as noon UTC to avoid timezone issues
           // This ensures the date doesn't shift when converted to/from ISO strings
+          // For timed events, preserve the original dateTime from Google (includes timezone)
           const startTime = isAllDay
             ? `${event.start.date}T12:00:00.000Z`
-            : new Date(event.start.dateTime!).toISOString()
+            : event.start.dateTime!
           const endTime = isAllDay
             ? `${event.end.date}T12:00:00.000Z`
-            : new Date(event.end.dateTime!).toISOString()
+            : event.end.dateTime!
 
           return {
             user_id: user.id,

@@ -84,6 +84,13 @@ createRoot(document.getElementById('root')!).render(
           <GoogleCalendarProvider>
             <Routes>
               <Route path="/" element={<App />} />
+              <Route path="/projects" element={<App />} />
+              <Route path="/projects/:projectId" element={<App />} />
+              <Route path="/routines" element={<App />} />
+              <Route path="/routines/new" element={<App />} />
+              <Route path="/routines/:routineId" element={<App />} />
+              <Route path="/contacts" element={<App />} />
+              <Route path="/contacts/:contactId" element={<App />} />
               <Route path="/calendar-callback" element={<CalendarCallback />} />
               <Route path="/join" element={<JoinHousehold />} />
             </Routes>

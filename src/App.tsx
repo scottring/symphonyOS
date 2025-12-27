@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useCallback, Suspense } from 'react'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useAuth } from '@/hooks/useAuth'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
@@ -166,11 +167,32 @@ function App() {
     scheduledFor?: Date
     category?: 'task' | 'chore' | 'errand' | 'event' | 'activity'
   } | null>(null)
-  const [activeView, setActiveView] = useState<ViewType>('home')
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
-  const [selectedRoutineId, setSelectedRoutineId] = useState<string | null>(null)
-  const [selectedContactId, setSelectedContactId] = useState<string | null>(null)
-  const [creatingRoutine, setCreatingRoutine] = useState(false)
+  // URL-based navigation
+  const navigate = useNavigate()
+  const location = useLocation()
+  const params = useParams<{ projectId?: string; routineId?: string; contactId?: string }>()
+
+  // State for non-URL-routed views
+  const [stateView, setStateView] = useState<'lists' | 'notes' | 'history' | 'packing-templates' | 'settings' | 'task-detail' | null>(null)
+
+  // Derive view from URL path or state
+  const activeView: ViewType = useMemo(() => {
+    // State-based views take precedence
+    if (stateView) return stateView
+
+    // URL-based views
+    const path = location.pathname
+    if (path.startsWith('/projects')) return 'projects'
+    if (path.startsWith('/routines')) return 'routines'
+    if (path.startsWith('/contacts')) return 'contact-detail'
+    return 'home'
+  }, [location.pathname, stateView])
+
+  // Get IDs from URL params
+  const selectedProjectId = params.projectId || null
+  const selectedRoutineId = params.routineId || null
+  const selectedContactId = params.contactId || null
+  const creatingRoutine = location.pathname === '/routines/new'
   const [recentlyCreatedTaskId, setRecentlyCreatedTaskId] = useState<string | null>(null)
   const [planningOpen, setPlanningOpen] = useState(false)
 
@@ -570,36 +592,50 @@ function App() {
 
   // Handle view change - clear selections when switching views
   const handleViewChange = useCallback((view: ViewType) => {
-    setActiveView(view)
     setSelectedItemId(null)
     setSelectedTaskId(null)
-    setSelectedProjectId(null)
-    setSelectedRoutineId(null)
-    setSelectedContactId(null)
     setSelectedListId(null)
-    setCreatingRoutine(false)
     setRecipeUrl(null)
-  }, [])
+
+    // Handle URL-based views
+    if (view === 'home') {
+      setStateView(null)
+      navigate('/')
+    } else if (view === 'projects') {
+      setStateView(null)
+      navigate('/projects')
+    } else if (view === 'routines') {
+      setStateView(null)
+      navigate('/routines')
+    } else if (view === 'contact-detail') {
+      setStateView(null)
+      navigate('/contacts')
+    }
+    // Handle state-based views
+    else if (view === 'lists' || view === 'notes' || view === 'history' || view === 'packing-templates' || view === 'settings' || view === 'task-detail') {
+      setStateView(view)
+      navigate('/') // Navigate to home URL but show state view
+    } else {
+      setStateView(null)
+      navigate('/') // fallback
+    }
+  }, [navigate])
 
   // Handle opening a project from detail panel
   const handleOpenProject = useCallback((projectId: string) => {
-    setSelectedProjectId(projectId)
-    setActiveView('projects')
     setSelectedItemId(null)
     setSelectedTaskId(null)
-    setSelectedContactId(null)
     setRecipeUrl(null)
-  }, [])
+    navigate(`/projects/${projectId}`)
+  }, [navigate])
 
   // Handle opening a contact (from TaskView, DetailPanel, etc.)
   const handleOpenContact = useCallback((contactId: string) => {
-    setSelectedContactId(contactId)
-    setActiveView('contact-detail')
     setSelectedItemId(null)
     setSelectedTaskId(null)
-    setSelectedProjectId(null)
     setRecipeUrl(null)
-  }, [])
+    navigate(`/contacts/${contactId}`)
+  }, [navigate])
 
   // Get contact for contact view
   const selectedContactForView = useMemo(() => {
@@ -711,15 +747,14 @@ function App() {
         handleOpenContact(result.id)
         break
       case 'routine':
-        setSelectedRoutineId(result.id)
-        setActiveView('routines')
+        navigate(`/routines/${result.id}`)
         break
       case 'list':
         setSelectedListId(result.id)
-        setActiveView('lists')
+        setStateView('lists')
         break
       case 'note':
-        setActiveView('notes')
+        setStateView('notes')
         break
     }
   }, [clearSearch, handleSelectItem, handleOpenProject, handleOpenContact])
@@ -843,15 +878,14 @@ function App() {
         handleOpenContact(entityId)
         break
       case 'routine':
-        setSelectedRoutineId(entityId)
-        setActiveView('routines')
+        navigate(`/routines/${entityId}`)
         break
       case 'list':
         setSelectedListId(entityId)
-        setActiveView('lists')
+        setStateView('lists')
         break
     }
-  }, [handleSelectItem, handleOpenProject, handleOpenContact])
+  }, [handleSelectItem, handleOpenProject, handleOpenContact, navigate])
 
   // Entity data for PinnedSection
   const pinnedEntities = useMemo(() => ({
@@ -1249,13 +1283,13 @@ function App() {
             task={selectedTask}
             onBack={() => {
               setSelectedTaskId(null)
-              setActiveView('home')
+              setStateView(null)
             }}
             onUpdate={updateTask}
             onDelete={(id) => {
               deleteTask(id)
               setSelectedTaskId(null)
-              setActiveView('home')
+              setStateView(null)
             }}
             onToggleComplete={handleToggleTask}
             onPush={pushTask}
@@ -1282,20 +1316,17 @@ function App() {
           <ContactView
             contact={selectedContactForView}
             onBack={() => {
-              setSelectedContactId(null)
-              setActiveView('home')
+              navigate('/contacts')
             }}
             onUpdate={updateContact}
             onDelete={async (id) => {
               await deleteContact(id)
-              setSelectedContactId(null)
-              setActiveView('home')
+              navigate('/contacts')
             }}
             tasks={tasks}
             onSelectTask={(taskId) => {
               setSelectedTaskId(taskId)
-              setActiveView('task-detail')
-              setSelectedContactId(null)
+              setStateView('task-detail')
             }}
             isPinned={pinnedItems.isPinned('contact', selectedContactForView.id)}
             canPin={pinnedItems.canPin()}
@@ -1313,7 +1344,7 @@ function App() {
           <ProjectsList
             projects={projects}
             tasks={tasks}
-            onSelectProject={setSelectedProjectId}
+            onSelectProject={(id) => navigate(`/projects/${id}`)}
             onAddProject={addProject}
             onAddTrip={addTripProject}
           />
@@ -1326,7 +1357,7 @@ function App() {
             project={selectedProject}
             tasks={tasks}
             contactsMap={contactsMap}
-            onBack={() => setSelectedProjectId(null)}
+            onBack={() => navigate('/projects')}
             onUpdateProject={handleUpdateProject}
             onUpdateTripProject={updateTripProject}
             onDeleteProject={deleteProject}
@@ -1352,8 +1383,8 @@ function App() {
             routines={allRoutines}
             contacts={contacts}
             familyMembers={familyMembers}
-            onSelectRoutine={(routine) => setSelectedRoutineId(routine.id)}
-            onCreateRoutine={() => setCreatingRoutine(true)}
+            onSelectRoutine={(routine) => navigate(`/routines/${routine.id}`)}
+            onCreateRoutine={() => navigate('/routines/new')}
             onUpdateRoutine={updateRoutine}
           />
         </Suspense>
@@ -1365,7 +1396,7 @@ function App() {
             {/* Header */}
             <div className="flex items-center gap-3 p-6 pb-0">
               <button
-                onClick={() => setCreatingRoutine(false)}
+                onClick={() => navigate('/routines')}
                 className="p-2 -ml-2 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
@@ -1379,9 +1410,9 @@ function App() {
                 contacts={contacts}
                 onSave={async (input) => {
                   await addRoutine(input)
-                  setCreatingRoutine(false)
+                  navigate('/routines')
                 }}
-                onCancel={() => setCreatingRoutine(false)}
+                onCancel={() => navigate('/routines')}
               />
             </Suspense>
           </div>
@@ -1395,7 +1426,7 @@ function App() {
             routine={selectedRoutine}
             contacts={contacts}
             familyMembers={familyMembers}
-            onBack={() => setSelectedRoutineId(null)}
+            onBack={() => navigate('/routines')}
             onUpdate={updateRoutine}
             onDelete={deleteRoutine}
             onToggleVisibility={toggleRoutineVisibility}

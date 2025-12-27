@@ -92,12 +92,22 @@ export function PlanningSession({
 
     return tasks.filter((task) => {
       if (task.completed) return false
+
+      // Filter out individual packing step tasks (pack: prefix)
+      if (task.title?.toLowerCase().startsWith('pack:')) {
+        return false
+      }
+
       // Exclude tasks deferred to a future date
       if (task.deferredUntil) {
         const deferDate = new Date(task.deferredUntil)
         deferDate.setHours(0, 0, 0, 0)
         if (deferDate > today) return false
       }
+
+      // Include all-day tasks (so they can be time-blocked)
+      if (task.isAllDay) return true
+
       if (!task.scheduledFor) return true
       // Include tasks scheduled for past dates (they need to be rescheduled)
       const taskDate = new Date(task.scheduledFor)
@@ -120,6 +130,15 @@ export function PlanningSession({
       const tasksForDay = tasks.filter((task) => {
         if (task.completed) return false
         if (!task.scheduledFor) return false
+
+        // Filter out individual packing step tasks (pack: prefix)
+        if (task.title?.toLowerCase().startsWith('pack:')) {
+          return false
+        }
+
+        // Filter out all-day tasks (they show in unscheduled drawer)
+        if (task.isAllDay) return false
+
         const taskDate = new Date(task.scheduledFor)
         return taskDate >= startOfDay && taskDate <= endOfDay
       })

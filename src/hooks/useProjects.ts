@@ -184,6 +184,9 @@ export function useProjects() {
         ...tripTasks.chargingTasks,
         ...tripTasks.accommodationTasks,
         ...tripTasks.logisticsTasks,
+        ...tripTasks.preTripTasks,
+        ...tripTasks.departureTasks,
+        ...tripTasks.returnTasks,
       ].map((task) => ({
         user_id: user.id,
         title: task.title!,
@@ -296,6 +299,9 @@ export function useProjects() {
         ...tripTasks.chargingTasks,
         ...tripTasks.accommodationTasks,
         ...tripTasks.logisticsTasks,
+        ...tripTasks.preTripTasks,
+        ...tripTasks.departureTasks,
+        ...tripTasks.returnTasks,
       ].map((task) => ({
         user_id: user.id,
         title: task.title!,

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Briefcase, Users, User, Globe } from 'lucide-react'
 import { useDomain, type Domain } from '@/hooks/useDomain'
 
@@ -42,70 +43,82 @@ const DOMAINS = [
 
 export function DomainSwitcher() {
   const { currentDomain, setDomain } = useDomain()
+  const [isExpanded, setIsExpanded] = useState(false)
 
   return (
     <div
-      className="inline-flex items-stretch bg-bg-elevated/90 backdrop-blur-sm rounded-lg overflow-hidden"
-      style={{
-        boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.4)',
-      }}
+      className="relative"
+      onMouseEnter={() => setIsExpanded(true)}
+      onMouseLeave={() => setIsExpanded(false)}
     >
-      {DOMAINS.map((domain, index) => {
-        const Icon = domain.icon
-        const isActive = domain.value === currentDomain
-        const isFirst = index === 0
+      <div
+        className="inline-flex items-stretch bg-bg-elevated/90 backdrop-blur-sm rounded-lg overflow-hidden transition-all duration-300 ease-out"
+        style={{
+          boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.4)',
+          width: isExpanded ? 'auto' : '52px',
+        }}
+      >
+        {DOMAINS.map((domain, index) => {
+          const Icon = domain.icon
+          const isActive = domain.value === currentDomain
+          const isFirst = index === 0
+          const shouldShow = isExpanded || isActive
 
-        return (
-          <button
-            key={domain.value}
-            onClick={() => setDomain(domain.value)}
-            title={domain.label}
-            className={`
-              group relative px-3 py-2.5 transition-all duration-300 ease-out
-              ${isActive ? domain.activeColor : 'text-neutral-400'}
-              ${!isFirst ? 'border-l border-neutral-200/40' : ''}
-              hover:bg-neutral-50/50
-            `}
-            style={{
-              transform: isActive ? 'translateY(-1px)' : 'translateY(0)',
-            }}
-          >
-            {/* Icon */}
-            <Icon
+          return (
+            <button
+              key={domain.value}
+              onClick={() => setDomain(domain.value)}
+              title={domain.label}
               className={`
-                w-[18px] h-[18px] transition-all duration-300
-                ${isActive ? 'scale-100' : 'scale-90 opacity-70 group-hover:scale-95 group-hover:opacity-85'}
-              `}
-              strokeWidth={isActive ? 2.5 : 2}
-            />
-
-            {/* Active indicator - refined accent bar */}
-            {isActive && (
-              <div
-                className={`
-                  absolute left-1/2 -translate-x-1/2 bottom-0 w-3 h-[3px] rounded-full
-                  ${domain.accentColor}
-                  transition-all duration-300 ease-out
-                `}
-                style={{
-                  boxShadow: `0 2px 8px ${domain.color.replace('text-', 'rgb(')}/0.4)`,
-                }}
-              />
-            )}
-
-            {/* Subtle hover glow */}
-            <div
-              className={`
-                absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300
-                ${isActive ? 'opacity-0' : ''}
+                group relative py-2.5 transition-all duration-300 ease-out
+                ${isActive ? domain.activeColor : 'text-neutral-400'}
+                ${!isFirst ? 'border-l border-neutral-200/40' : ''}
+                hover:bg-neutral-50/50
+                ${shouldShow ? 'px-3 opacity-100' : 'px-0 opacity-0 pointer-events-none'}
               `}
               style={{
-                background: `radial-gradient(circle at center, ${domain.color.replace('text-', 'rgb(')}/0.05) 0%, transparent 70%)`,
+                transform: isActive ? 'translateY(-1px)' : 'translateY(0)',
+                width: shouldShow ? 'auto' : '0',
+                overflow: 'hidden',
               }}
-            />
-          </button>
-        )
-      })}
+            >
+              {/* Icon */}
+              <Icon
+                className={`
+                  w-[18px] h-[18px] transition-all duration-300
+                  ${isActive ? 'scale-100' : 'scale-90 opacity-70 group-hover:scale-95 group-hover:opacity-85'}
+                `}
+                strokeWidth={isActive ? 2.5 : 2}
+              />
+
+              {/* Active indicator - refined accent bar */}
+              {isActive && (
+                <div
+                  className={`
+                    absolute left-1/2 -translate-x-1/2 bottom-0 w-3 h-[3px] rounded-full
+                    ${domain.accentColor}
+                    transition-all duration-300 ease-out
+                  `}
+                  style={{
+                    boxShadow: `0 2px 8px ${domain.color.replace('text-', 'rgb(')}/0.4)`,
+                  }}
+                />
+              )}
+
+              {/* Subtle hover glow */}
+              <div
+                className={`
+                  absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300
+                  ${isActive ? 'opacity-0' : ''}
+                `}
+                style={{
+                  background: `radial-gradient(circle at center, ${domain.color.replace('text-', 'rgb(')}/0.05) 0%, transparent 70%)`,
+                }}
+              />
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

@@ -960,14 +960,39 @@ interface CompactEventCardProps {
 
 function CompactEventCard({ event, onRequestCharging, onClick, onDelete }: CompactEventCardProps) {
   const formatDateTime = (dateStr: string, time?: string) => {
-    const date = new Date(`${dateStr}T${time || '08:00'}`)
+    if (!time) {
+      const date = new Date(`${dateStr}T08:00`)
+      return {
+        date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        time: null
+      }
+    }
+
+    // If time is already a full ISO timestamp, use it directly
+    let dateTime: Date
+    if (time.includes('T') || time.includes('Z') || time.match(/\d{4}-\d{2}-\d{2}/)) {
+      dateTime = new Date(time)
+    } else {
+      // Time is in HH:MM format, combine with date
+      dateTime = new Date(`${dateStr}T${time}`)
+    }
+
     return {
-      date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      time: time ? date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : null
+      date: dateTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      time: dateTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
     }
   }
 
-  const { date, time } = formatDateTime(event.date, event.time)
+  // Get the appropriate time field based on event type
+  const getEventTime = () => {
+    if (event.eventType === 'flight' || event.eventType === 'train') {
+      const transportEvent = event as FlightEvent | TrainEvent
+      return transportEvent.departureTime
+    }
+    return event.time
+  }
+
+  const { date, time } = formatDateTime(event.date, getEventTime())
 
   // Get event-specific details
   const getEventDetails = () => {

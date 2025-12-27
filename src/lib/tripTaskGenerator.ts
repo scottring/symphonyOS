@@ -14,6 +14,9 @@ export interface GeneratedTripTasks {
   chargingTasks: Partial<Task>[]
   accommodationTasks: Partial<Task>[]
   logisticsTasks: Partial<Task>[]
+  preTripTasks: Partial<Task>[]
+  departureTasks: Partial<Task>[]
+  returnTasks: Partial<Task>[]
 }
 
 // ============================================================================
@@ -45,6 +48,183 @@ export function generatePackingTasks(
     // Use category field or notes to track packing category
     // Could add custom field in future: packing_category: item.category
   }))
+}
+
+// ============================================================================
+// Pre-Trip Checklist Tasks
+// ============================================================================
+
+/**
+ * Generate pre-trip preparation tasks (house prep, admin tasks)
+ * Scheduled for 2 days before trip
+ */
+export function generatePreTripTasks(
+  projectId: string,
+  tripStartDate: string,
+  tripDuration: number
+): Partial<Task>[] {
+  const preTripDate = new Date(tripStartDate)
+  preTripDate.setDate(preTripDate.getDate() - 2)
+  preTripDate.setHours(14, 0, 0, 0) // 2pm, after packing
+
+  const baseTasks: Partial<Task>[] = [
+    {
+      title: 'PreTrip: Stop mail delivery',
+      projectId,
+      scheduledFor: preTripDate,
+      completed: false,
+      context: 'personal',
+      notes: 'Hold mail at post office or arrange neighbor pickup',
+    },
+    {
+      title: 'PreTrip: Notify bank of travel dates',
+      projectId,
+      scheduledFor: preTripDate,
+      completed: false,
+      context: 'personal',
+      notes: 'Prevent fraud alerts on credit/debit cards',
+    },
+    {
+      title: 'PreTrip: Check passport expiration',
+      projectId,
+      scheduledFor: preTripDate,
+      completed: false,
+      context: 'personal',
+      notes: 'Some countries require 6 months validity',
+    },
+  ]
+
+  // Add longer-trip specific tasks
+  if (tripDuration > 7) {
+    baseTasks.push({
+      title: 'PreTrip: Arrange pet care',
+      projectId,
+      scheduledFor: preTripDate,
+      completed: false,
+      context: 'personal',
+      notes: 'Boarding, pet sitter, or neighbor help',
+    })
+    baseTasks.push({
+      title: 'PreTrip: Set thermostat to away mode',
+      projectId,
+      scheduledFor: preTripDate,
+      completed: false,
+      context: 'personal',
+      notes: 'Save energy while gone',
+    })
+  }
+
+  return baseTasks
+}
+
+// ============================================================================
+// Departure Day Checklist Tasks
+// ============================================================================
+
+/**
+ * Generate day-of-departure checklist tasks
+ * Scheduled for departure day morning (6am)
+ */
+export function generateDepartureTasks(
+  projectId: string,
+  tripStartDate: string
+): Partial<Task>[] {
+  const departureDate = new Date(tripStartDate)
+  departureDate.setHours(6, 0, 0, 0) // 6am departure prep
+
+  return [
+    {
+      title: 'Departure: Close and lock all windows',
+      projectId,
+      scheduledFor: departureDate,
+      completed: false,
+      context: 'personal',
+      notes: 'Security and weather protection',
+    },
+    {
+      title: 'Departure: Lock all doors',
+      projectId,
+      scheduledFor: departureDate,
+      completed: false,
+      context: 'personal',
+      notes: 'Front, back, garage doors',
+    },
+    {
+      title: 'Departure: Take out trash and recycling',
+      projectId,
+      scheduledFor: departureDate,
+      completed: false,
+      context: 'personal',
+      notes: 'Avoid unpleasant surprises on return',
+    },
+    {
+      title: 'Departure: Unplug non-essential appliances',
+      projectId,
+      scheduledFor: departureDate,
+      completed: false,
+      context: 'personal',
+      notes: 'Coffee maker, TV, chargers, etc.',
+    },
+    {
+      title: 'Departure: Turn off water main (if extended trip)',
+      projectId,
+      scheduledFor: departureDate,
+      completed: false,
+      context: 'personal',
+      notes: 'Prevent flooding while away',
+    },
+    {
+      title: 'Departure: Set lights on timers',
+      projectId,
+      scheduledFor: departureDate,
+      completed: false,
+      context: 'personal',
+      notes: 'Security - make home look occupied',
+    },
+  ]
+}
+
+// ============================================================================
+// Return Home Checklist Tasks
+// ============================================================================
+
+/**
+ * Generate return home tasks
+ * Scheduled for return day
+ */
+export function generateReturnTasks(
+  projectId: string,
+  tripEndDate: string
+): Partial<Task>[] {
+  const returnDate = new Date(tripEndDate)
+  returnDate.setHours(18, 0, 0, 0) // 6pm return
+
+  return [
+    {
+      title: 'Return: Restart mail delivery',
+      projectId,
+      scheduledFor: returnDate,
+      completed: false,
+      context: 'personal',
+      notes: 'Pick up held mail or notify post office',
+    },
+    {
+      title: 'Return: Unpack and do laundry',
+      projectId,
+      scheduledFor: returnDate,
+      completed: false,
+      context: 'personal',
+      notes: 'Prevent wrinkles and unpleasant smells',
+    },
+    {
+      title: 'Return: Restock groceries',
+      projectId,
+      scheduledFor: returnDate,
+      completed: false,
+      context: 'personal',
+      notes: 'Milk, bread, essentials',
+    },
+  ]
 }
 
 // ============================================================================
@@ -316,6 +496,8 @@ export function generateEventTasks(projectId: string, events: TripEvent[]): Part
           completed: false,
           context: 'personal',
           notes: notes.trim(),
+          location: travelEvent.destination?.address || travelEvent.destination?.name,
+          locationPlaceId: travelEvent.destination?.placeId,
         })
         break
       }
@@ -345,6 +527,8 @@ export function generateEventTasks(projectId: string, events: TripEvent[]): Part
           completed: false,
           context: 'personal',
           notes,
+          location: accommodationEvent.location?.address || accommodationEvent.location?.name || accommodationEvent.address,
+          locationPlaceId: accommodationEvent.location?.placeId,
         })
         break
       }
@@ -364,6 +548,8 @@ export function generateEventTasks(projectId: string, events: TripEvent[]): Part
           completed: false,
           context: 'personal',
           notes,
+          location: logisticEvent.location?.address || logisticEvent.location?.name,
+          locationPlaceId: logisticEvent.location?.placeId,
         })
         break
       }
@@ -391,6 +577,17 @@ export function generateAllTripTasks(
 ): GeneratedTripTasks {
   const packingTasks = generatePackingTasks(projectId, packingTemplate, tripStartDate, customPackingItems)
 
+  // Calculate trip duration for phase tasks
+  const tripEndDate = tripMetadata?.endDate || tripStartDate
+  const tripDuration = Math.ceil(
+    (new Date(tripEndDate).getTime() - new Date(tripStartDate).getTime()) / (1000 * 60 * 60 * 24)
+  )
+
+  // Generate trip phase tasks (pre-trip, departure, return)
+  const preTripTasks = generatePreTripTasks(projectId, tripStartDate, tripDuration)
+  const departureTasks = generateDepartureTasks(projectId, tripStartDate)
+  const returnTasks = generateReturnTasks(projectId, tripEndDate)
+
   // Unified timeline trip (new format)
   if (tripMetadata?.useUnifiedTimeline && tripMetadata.events) {
     const eventTasks = generateEventTasks(projectId, tripMetadata.events)
@@ -401,6 +598,9 @@ export function generateAllTripTasks(
       chargingTasks: [],
       accommodationTasks: [],
       logisticsTasks: [],
+      preTripTasks,
+      departureTasks,
+      returnTasks,
     }
   }
 
@@ -420,6 +620,9 @@ export function generateAllTripTasks(
       chargingTasks: [], // EV charging handled per-segment in future enhancement
       accommodationTasks,
       logisticsTasks,
+      preTripTasks,
+      departureTasks,
+      returnTasks,
     }
   }
 
@@ -438,5 +641,8 @@ export function generateAllTripTasks(
     chargingTasks,
     accommodationTasks: [],
     logisticsTasks: [],
+    preTripTasks,
+    departureTasks,
+    returnTasks,
   }
 }

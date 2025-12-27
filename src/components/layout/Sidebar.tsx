@@ -276,6 +276,24 @@ export function Sidebar({
             {!collapsed && <span className="text-sm">Notes</span>}
           </button>
         )}
+
+        <button
+          onClick={() => onViewChange('packing-templates')}
+          className={`
+            w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-colors duration-150
+            ${activeView === 'packing-templates'
+              ? 'text-primary-700 bg-primary-50/80'
+              : 'text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700'
+            }
+            ${collapsed ? 'justify-center' : ''}
+          `}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-[18px] h-[18px]" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+            <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1V5a1 1 0 00-1-1H3zM14 7a1 1 0 00-1 1v6.05A2.5 2.5 0 0115.95 16H17a1 1 0 001-1v-5a1 1 0 00-.293-.707l-2-2A1 1 0 0015 7h-1z" />
+          </svg>
+          {!collapsed && <span className="text-sm">Packing</span>}
+        </button>
       </nav>
 
       {/* User section */}

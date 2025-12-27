@@ -360,6 +360,7 @@ export interface PackingItem {
   category: PackingCategory
   quantity?: number
   essential: boolean
+  for_person?: string
 }
 
 export type PackingTemplate =
