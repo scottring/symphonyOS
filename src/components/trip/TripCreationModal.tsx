@@ -464,33 +464,8 @@ export function TripCreationModal({ isOpen, onClose, onCreateTrip, onUpdateTrip,
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Simplified edit mode for timeline trips - focus on events */}
-          {isEditMode && tripType === 'timeline' ? (
-            <>
-              {/* Minimal trip info display */}
-              <div className="bg-neutral-50 rounded-lg p-4 border border-neutral-200">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="text-lg font-semibold text-neutral-800">{tripName}</div>
-                    <div className="text-sm text-neutral-600 mt-1">
-                      {startDate} to {endDate}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      // Allow editing trip name and dates if needed
-                      const newName = prompt('Edit trip name:', tripName)
-                      if (newName) setTripName(newName)
-                    }}
-                    className="text-xs text-neutral-500 hover:text-primary-600 underline"
-                  >
-                    Edit details
-                  </button>
-                </div>
-              </div>
-            </>
-          ) : (
+          {/* Always show editable trip basics */}
+          {true && (
             <>
               {/* Full trip setup for create mode or non-timeline trips */}
               {/* Trip Name */}

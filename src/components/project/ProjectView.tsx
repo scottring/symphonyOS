@@ -307,7 +307,10 @@ export function ProjectView({
                 )}
                 {project.type === 'trip' && project.tripMetadata && onUpdateTripProject && (
                   <button
-                    onClick={() => setShowEditTripModal(true)}
+                    onClick={() => {
+                      console.log('Edit trip button clicked!', { showEditTripModal })
+                      setShowEditTripModal(true)
+                    }}
                     className="p-2 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
                     aria-label="Edit trip details"
                     title="Edit trip details"

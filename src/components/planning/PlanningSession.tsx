@@ -98,6 +98,13 @@ export function PlanningSession({
         return false
       }
 
+      // Filter out individual trip phase tasks (PreTrip, Departure, Return)
+      if (task.title?.startsWith('PreTrip:') ||
+          task.title?.startsWith('Departure:') ||
+          task.title?.startsWith('Return:')) {
+        return false
+      }
+
       // Exclude tasks deferred to a future date
       if (task.deferredUntil) {
         const deferDate = new Date(task.deferredUntil)
@@ -133,6 +140,13 @@ export function PlanningSession({
 
         // Filter out individual packing step tasks (pack: prefix)
         if (task.title?.toLowerCase().startsWith('pack:')) {
+          return false
+        }
+
+        // Filter out individual trip phase tasks (PreTrip, Departure, Return)
+        if (task.title?.startsWith('PreTrip:') ||
+            task.title?.startsWith('Departure:') ||
+            task.title?.startsWith('Return:')) {
           return false
         }
 
