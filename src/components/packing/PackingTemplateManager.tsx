@@ -87,7 +87,8 @@ export function PackingTemplateManager() {
                   </div>
                 </div>
                 <div className="text-sm text-gray-500 mb-4">
-                  {template.items.length} items
+                  {template.nodes.filter(n => n.type === 'item').length} items,{' '}
+                  {template.nodes.filter(n => n.type === 'heading').length} sections
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -134,7 +135,8 @@ export function PackingTemplateManager() {
                   </div>
                 </div>
                 <div className="text-sm text-gray-500 mb-4">
-                  {template.items.length} items
+                  {template.nodes.filter(n => n.type === 'item').length} items,{' '}
+                  {template.nodes.filter(n => n.type === 'heading').length} sections
                 </div>
                 <div className="flex gap-2">
                   <button

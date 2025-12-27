@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { PackingTemplateEditor } from './PackingTemplateEditor'
 import type { PackingTemplate } from '@/hooks/usePacking'
-import type { PackingItem } from '@/types/trip'
+import type { PackingNode } from '@/types/trip'
 
 // Mock usePacking hook
 const mockCreateTemplate = vi.fn()
@@ -16,13 +16,13 @@ vi.mock('@/hooks/usePacking', () => ({
   }),
 }))
 
-function createMockPackingItem(overrides: Partial<PackingItem> = {}): PackingItem {
-  return {
-    name: 'Toothbrush',
-    category: 'toiletries',
-    essential: true,
-    ...overrides,
-  }
+function createMockPackingNodes(): PackingNode[] {
+  return [
+    { type: 'heading', level: 2, text: 'Toiletries' },
+    { type: 'item', text: 'Toothbrush', checked: false },
+    { type: 'heading', level: 2, text: 'Clothing' },
+    { type: 'item', text: 'Clothes', checked: false },
+  ]
 }
 
 function createMockTemplate(overrides: Partial<PackingTemplate> = {}): PackingTemplate {
@@ -31,10 +31,7 @@ function createMockTemplate(overrides: Partial<PackingTemplate> = {}): PackingTe
     userId: 'test-user-id',
     name: 'Weekend Trip',
     description: 'Basic items for a weekend getaway',
-    items: [
-      createMockPackingItem(),
-      createMockPackingItem({ name: 'Clothes', category: 'clothing' }),
-    ],
+    nodes: createMockPackingNodes(),
     isDefault: false,
     createdAt: new Date('2024-01-01T00:00:00Z'),
     updatedAt: new Date('2024-01-01T00:00:00Z'),

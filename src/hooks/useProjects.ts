@@ -126,7 +126,7 @@ export function useProjects() {
   }, [user])
 
   const addTripProject = useCallback(
-    async (name: string, tripMetadata: TripMetadata, packingTemplate?: PackingTemplate, customPackingItems?: import('@/types/trip').PackingItem[]) => {
+    async (name: string, tripMetadata: TripMetadata, packingTemplate?: PackingTemplate, customPackingItems?: import('@/types/trip').PackingNode[]) => {
       if (!user) return null
 
       // Create the project first
@@ -249,7 +249,7 @@ export function useProjects() {
   }, [projects])
 
   const updateTripProject = useCallback(
-    async (projectId: string, name: string, tripMetadata: TripMetadata, packingTemplate?: PackingTemplate, customPackingItems?: import('@/types/trip').PackingItem[]) => {
+    async (projectId: string, name: string, tripMetadata: TripMetadata, packingTemplate?: PackingTemplate, customPackingItems?: import('@/types/trip').PackingNode[]) => {
       const project = projects.find((p) => p.id === projectId)
       if (!project || !user) return
 

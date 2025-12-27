@@ -271,6 +271,9 @@ export interface TripMetadata {
   // Unified timeline mode (replaces segments/accommodations/logistics)
   events?: TripEvent[] // Chronologically sorted trip events
   useUnifiedTimeline?: boolean // Flag to use unified timeline instead of separate arrays
+
+  // Packing list (preserves template structure with headings)
+  packingList?: PackingNode[] // Structured packing list from templates
 }
 
 // ============================================================================
@@ -344,6 +347,17 @@ export interface RouteLeg {
 // Packing List Types
 // ============================================================================
 
+/**
+ * Simplified packing list structure: just headings and checklist items
+ */
+export type PackingNode =
+  | { type: 'heading'; level: 1 | 2 | 3 | 4; text: string }
+  | { type: 'item'; text: string; checked?: boolean }
+
+/**
+ * Legacy types - kept for backward compatibility
+ * @deprecated Use PackingNode instead
+ */
 export type PackingCategory =
   | 'clothing'
   | 'toiletries'

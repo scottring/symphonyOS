@@ -5,7 +5,7 @@
  * intelligent, context-aware packing lists from conversational input.
  */
 
-import type { PackingItem } from '@/types/trip'
+import type { PackingNode } from '@/types/trip'
 import type { WeatherSummary } from './weatherService'
 
 export interface TravelerProfile {
@@ -44,10 +44,9 @@ export interface PackingContext {
  * Generate packing list using Claude AI via Supabase Edge Function
  *
  * This calls a server-side edge function which handles the actual AI generation.
- * User provides conversational input (e.g., "warm clothes and toiletries"),
- * which is combined with trip context to generate a focused packing list.
+ * Returns a structured list of headings and items organized hierarchically.
  */
-export async function generatePackingList(context: PackingContext): Promise<PackingItem[]> {
+export async function generatePackingList(context: PackingContext): Promise<PackingNode[]> {
   try {
     // Import supabase client
     const { supabase } = await import('@/lib/supabase')
@@ -77,7 +76,7 @@ export async function generatePackingList(context: PackingContext): Promise<Pack
     }
 
     const data = await response.json()
-    return data.items as PackingItem[]
+    return data.nodes as PackingNode[]
   } catch (error) {
     console.error('Failed to generate packing list:', error)
     throw error

@@ -5,9 +5,10 @@
  */
 
 import { useMemo, useState } from 'react'
-import type { TripMetadata, TripEvent, DrivingEVEvent, ChargingStation, OtherEvent, PackingItem, PackingCategory, HotelEvent, AirbnbEvent, FamilyStayEvent, FlightEvent, TrainEvent, DrivingRentalEvent } from '@/types/trip'
+import type { TripMetadata, TripEvent, DrivingEVEvent, ChargingStation, OtherEvent, PackingNode, HotelEvent, AirbnbEvent, FamilyStayEvent, FlightEvent, TrainEvent, DrivingRentalEvent } from '@/types/trip'
 import type { Task } from '@/types/task'
 import { EVRoutePlanner } from './EVRoutePlanner'
+import { PackingListDisplay } from '@/components/packing/PackingListDisplay'
 import { usePacking } from '@/hooks/usePacking'
 import { buildPackingContext } from '@/lib/packingContext'
 import { generatePackingList } from '@/services/claudeService'
@@ -97,15 +98,17 @@ export function TripItineraryView({
         aiRequest  // User's request becomes the special_needs/instructions
       )
 
-      // Generate items via AI
-      const items = await generatePackingList(context)
+      // Generate nodes via AI
+      const nodes = await generatePackingList(context)
 
-      // Add generated items to packing list
-      for (const item of items) {
-        await onAddTask({
-          title: `Pack: ${item.name}`,
-          projectId
-        })
+      // Add generated items to packing list (skip headings, only add items)
+      for (const node of nodes) {
+        if (node.type === 'item') {
+          await onAddTask({
+            title: `Pack: ${node.text}`,
+            projectId
+          })
+        }
       }
 
       setAiRequest('')  // Clear input on success
@@ -165,54 +168,77 @@ export function TripItineraryView({
 
   // Handler to load items from user-saved template
   const handleLoadTemplate = async (templateId: string) => {
-    if (!onAddTask || !projectId) return
+    if (!projectId) return
 
     const template = templates.find(t => t.id === templateId)
-    if (!template || !template.items) return
+    if (!template || !template.nodes) return
 
-    // Add all items from template
-    for (const item of template.items) {
-      await onAddTask({
-        title: `Pack: ${item.name}`,
-        projectId
-      })
+    // Store the template structure in trip metadata to preserve headings
+    if (onUpdateTripMetadata && projectName) {
+      const updatedMetadata = {
+        ...tripMetadata,
+        packingList: template.nodes
+      }
+      await onUpdateTripMetadata(projectId, projectName, updatedMetadata)
     }
   }
 
-  // Convert packing tasks to PackingItem format for saving as template
-  const convertTasksToPackingItems = (): PackingItem[] => {
-    return packingTasks.map(task => {
+  // Convert packing tasks to PackingNode format for saving as template
+  const convertTasksToPackingNodes = (): PackingNode[] => {
+    const nodes: PackingNode[] = []
+
+    // Group tasks by category
+    const tasksByCategory = new Map<string, Task[]>()
+
+    for (const task of packingTasks) {
       const title = task.title?.toLowerCase() || ''
-      let category: PackingCategory = 'other'
+      let category = 'Other'
 
       // Infer category from task title
       if (title.includes('toothbrush') || title.includes('soap') || title.includes('shampoo') ||
           title.includes('deodorant') || title.includes('razor') || title.includes('toiletries')) {
-        category = 'toiletries'
+        category = 'Toiletries'
       } else if (title.includes('underwear') || title.includes('socks') || title.includes('shirt') ||
                  title.includes('pants') || title.includes('jacket') || title.includes('clothes') || title.includes('outfit')) {
-        category = 'clothing'
+        category = 'Clothing'
       } else if (title.includes('charger') || title.includes('phone') || title.includes('laptop') ||
                  title.includes('cable') || title.includes('electronics') || title.includes('headphone')) {
-        category = 'electronics'
+        category = 'Electronics'
       } else if (title.includes('passport') || title.includes('license') || title.includes('ticket') ||
                  title.includes('documents') || title.includes('id')) {
-        category = 'documents'
+        category = 'Documents'
       } else if (title.includes('snack') || title.includes('water') || title.includes('food') || title.includes('drink')) {
-        category = 'food_drinks'
+        category = 'Food & Drinks'
       } else if (title.includes('medicine') || title.includes('medication') || title.includes('first aid') || title.includes('health')) {
-        category = 'health'
+        category = 'Health'
       }
 
-      // Check if essential based on task notes
-      const isEssential = task.notes?.toLowerCase().includes('essential') || false
-
-      return {
-        name: task.title?.replace(/^Pack:\s*/i, '') || '',
-        category,
-        essential: isEssential,
+      if (!tasksByCategory.has(category)) {
+        tasksByCategory.set(category, [])
       }
-    })
+      tasksByCategory.get(category)!.push(task)
+    }
+
+    // Convert to nodes with headings
+    for (const [category, tasks] of tasksByCategory.entries()) {
+      // Add category heading
+      nodes.push({
+        type: 'heading',
+        level: 2,
+        text: category
+      })
+
+      // Add items for this category
+      for (const task of tasks) {
+        nodes.push({
+          type: 'item',
+          text: task.title?.replace(/^Pack:\s*/i, '') || '',
+          checked: false
+        })
+      }
+    }
+
+    return nodes
   }
 
   // Handler to save current packing list as template
@@ -220,8 +246,12 @@ export function TripItineraryView({
     if (!templateName.trim()) return
 
     try {
-      const items = convertTasksToPackingItems()
-      await createTemplate(templateName, items)
+      // Use structured packing list if it exists, otherwise convert tasks
+      const nodes = tripMetadata.packingList && tripMetadata.packingList.length > 0
+        ? tripMetadata.packingList
+        : convertTasksToPackingNodes()
+
+      await createTemplate(templateName, nodes)
       setShowSaveTemplateModal(false)
       setTemplateName('')
       alert('Packing template saved successfully!')
@@ -435,8 +465,13 @@ export function TripItineraryView({
     await onUpdateTripMetadata(projectId, projectName, updatedTripMetadata)
   }
 
-  const completedPackingCount = packingTasks.filter(t => t.completed).length
-  const totalPackingCount = packingTasks.length
+  // Calculate packing progress from structured list OR tasks
+  const completedPackingCount = tripMetadata.packingList
+    ? tripMetadata.packingList.filter(n => n.type === 'item' && n.checked).length
+    : packingTasks.filter(t => t.completed).length
+  const totalPackingCount = tripMetadata.packingList
+    ? tripMetadata.packingList.filter(n => n.type === 'item').length
+    : packingTasks.length
 
   // Calculate trip stats for dashboard
   const tripStats = useMemo(() => {
@@ -657,7 +692,7 @@ export function TripItineraryView({
                 )}
 
                 {/* Save as Template */}
-                {packingTasks.length > 0 && (
+                {(tripMetadata.packingList && tripMetadata.packingList.length > 0) || packingTasks.length > 0 ? (
                   <button
                     onClick={() => setShowSaveTemplateModal(true)}
                     className="px-3 py-1.5 bg-bg-elevated hover:bg-neutral-100 text-neutral-700 text-xs border border-neutral-200 rounded-lg flex items-center gap-1.5 transition-colors"
@@ -665,7 +700,7 @@ export function TripItineraryView({
                     <Save size={14} />
                     Save Template
                   </button>
-                )}
+                ) : null}
 
                 {/* Clear All Packing Items */}
                 {onDeleteTask && packingTasks.length > 0 && (
@@ -792,7 +827,29 @@ export function TripItineraryView({
               </div>
             )}
 
-            {packingTasks.length > 0 ? (
+            {tripMetadata.packingList && tripMetadata.packingList.length > 0 ? (
+              // Use PackingListDisplay when structured packing list exists
+              <PackingListDisplay
+                nodes={tripMetadata.packingList}
+                onToggleCheck={async (index) => {
+                  if (!onUpdateTripMetadata || !projectId || !projectName) return
+
+                  const updatedNodes = tripMetadata.packingList!.map((node, i) => {
+                    if (i === index && node.type === 'item') {
+                      return { ...node, checked: !node.checked }
+                    }
+                    return node
+                  })
+
+                  const updatedMetadata = {
+                    ...tripMetadata,
+                    packingList: updatedNodes
+                  }
+                  await onUpdateTripMetadata(projectId, projectName, updatedMetadata)
+                }}
+              />
+            ) : packingTasks.length > 0 ? (
+              // Fall back to auto-categorized task display
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 lg:gap-x-10 gap-y-8">
                 {Array.from(packingByCategory.entries()).map(([category, items]) => (
                   <div key={category}>

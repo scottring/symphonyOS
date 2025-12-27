@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import type { TripMetadata, TravelMode, Location, PackingTemplate, TripSegment, Accommodation, TransportationLogistic, TripEvent, PackingItem, TripEventType } from '@/types/trip'
+import type { TripMetadata, TravelMode, Location, PackingTemplate, TripSegment, Accommodation, TransportationLogistic, TripEvent, PackingNode, TripEventType } from '@/types/trip'
 import { EV_VEHICLES } from '@/types/trip'
 import type { PlaceAutocompleteResult } from '@/types/directions'
 import type { Project } from '@/types/project'
@@ -13,8 +13,8 @@ import { EventBuilder, FlightFields, TrainFields, DrivingEVFields, DrivingRental
 interface TripCreationModalProps {
   isOpen: boolean
   onClose: () => void
-  onCreateTrip: (name: string, tripMetadata: TripMetadata, packingTemplate?: PackingTemplate, customPackingItems?: PackingItem[]) => Promise<Project | null>
-  onUpdateTrip?: (projectId: string, name: string, tripMetadata: TripMetadata, packingTemplate?: PackingTemplate, customPackingItems?: PackingItem[]) => Promise<void>
+  onCreateTrip: (name: string, tripMetadata: TripMetadata, packingTemplate?: PackingTemplate, customPackingItems?: PackingNode[]) => Promise<Project | null>
+  onUpdateTrip?: (projectId: string, name: string, tripMetadata: TripMetadata, packingTemplate?: PackingTemplate, customPackingItems?: PackingNode[]) => Promise<void>
   existingProject?: Project // For edit mode
   editingEventId?: string | null // For single-event edit mode (null = new event, string = edit specific event)
   insertAtIndex?: number // For inserting new events at specific position
@@ -34,7 +34,7 @@ export function TripCreationModal({ isOpen, onClose, onCreateTrip, onUpdateTrip,
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [packingTemplate, setPackingTemplate] = useState<PackingTemplate | string>('weekend')
-  const [customPackingItems, setCustomPackingItems] = useState<PackingItem[] | undefined>(undefined)
+  const [customPackingItems, setCustomPackingItems] = useState<PackingNode[] | undefined>(undefined)
 
   // === SIMPLE TRIP STATE ===
   const [travelMode, setTravelMode] = useState<TravelMode>('driving_ev')
@@ -806,10 +806,10 @@ export function TripCreationModal({ isOpen, onClose, onCreateTrip, onUpdateTrip,
                   const value = e.target.value
                   setPackingTemplate(value)
 
-                  // If it's a custom template ID, set the custom items
+                  // If it's a custom template ID, set the custom nodes
                   const customTemplate = customTemplates.find(t => t.id === value)
                   if (customTemplate) {
-                    setCustomPackingItems(customTemplate.items)
+                    setCustomPackingItems(customTemplate.nodes)
                   } else {
                     setCustomPackingItems(undefined)
                   }

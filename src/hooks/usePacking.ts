@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
-import type { PackingItem } from '@/types/trip'
+import type { PackingNode } from '@/types/trip'
 
 export interface PackingTemplate {
   id: string
   userId: string
   name: string
   description?: string
-  items: PackingItem[]
+  nodes: PackingNode[]
   isDefault: boolean
   createdAt: Date
   updatedAt: Date
@@ -19,7 +19,7 @@ interface DbPackingTemplate {
   user_id: string
   name: string
   description: string | null
-  items: PackingItem[]
+  nodes: PackingNode[]
   is_default: boolean
   created_at: string
   updated_at: string
@@ -31,7 +31,7 @@ function dbTemplateToTemplate(dbTemplate: DbPackingTemplate): PackingTemplate {
     userId: dbTemplate.user_id,
     name: dbTemplate.name,
     description: dbTemplate.description ?? undefined,
-    items: dbTemplate.items,
+    nodes: dbTemplate.nodes,
     isDefault: dbTemplate.is_default,
     createdAt: new Date(dbTemplate.created_at),
     updatedAt: new Date(dbTemplate.updated_at),
@@ -100,7 +100,7 @@ export function usePacking() {
    * Create a new packing template
    */
   const createTemplate = useCallback(
-    async (name: string, items: PackingItem[], description?: string) => {
+    async (name: string, nodes: PackingNode[], description?: string) => {
       if (!user) throw new Error('User not authenticated')
 
       try {
@@ -110,7 +110,7 @@ export function usePacking() {
             user_id: user.id,
             name,
             description: description || null,
-            items,
+            nodes,
             is_default: false,
           })
           .select()
@@ -118,9 +118,9 @@ export function usePacking() {
 
         if (insertError) throw insertError
 
-        const newTemplate = dbTemplateToTemplate(data)
-        setTemplates(prev => [...prev, newTemplate].sort((a, b) => a.name.localeCompare(b.name)))
-        return newTemplate
+        // Don't update local state - rely on real-time subscription to update
+        // This prevents race condition where subscription overwrites optimistic update
+        return dbTemplateToTemplate(data)
       } catch (err) {
         console.error('Error creating template:', err)
         throw err
@@ -133,14 +133,14 @@ export function usePacking() {
    * Update an existing template
    */
   const updateTemplate = useCallback(
-    async (id: string, updates: { name?: string; description?: string; items?: PackingItem[] }) => {
+    async (id: string, updates: { name?: string; description?: string; nodes?: PackingNode[] }) => {
       if (!user) throw new Error('User not authenticated')
 
       try {
         const updateData: Record<string, unknown> = {}
         if (updates.name !== undefined) updateData.name = updates.name
         if (updates.description !== undefined) updateData.description = updates.description || null
-        if (updates.items !== undefined) updateData.items = updates.items
+        if (updates.nodes !== undefined) updateData.nodes = updates.nodes
 
         const { data, error: updateError } = await supabase
           .from('packing_templates')
@@ -195,7 +195,7 @@ export function usePacking() {
       const template = templates.find(t => t.id === id)
       if (!template) throw new Error('Template not found')
 
-      return createTemplate(newName, template.items, template.description)
+      return createTemplate(newName, template.nodes, template.description)
     },
     [user, templates, createTemplate]
   )

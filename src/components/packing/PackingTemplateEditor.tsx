@@ -1,25 +1,14 @@
-import { useState } from 'react'
+import { useState, type KeyboardEvent } from 'react'
 import { usePacking } from '@/hooks/usePacking'
 import type { PackingTemplate } from '@/hooks/usePacking'
-import type { PackingItem, PackingCategory } from '@/types/trip'
-import { X, Plus, Trash2, GripVertical } from 'lucide-react'
+import type { PackingNode } from '@/types/trip'
+import { X, Trash2, Type, List } from 'lucide-react'
 
 interface PackingTemplateEditorProps {
   template?: PackingTemplate
   onClose: () => void
   onSave: () => void
 }
-
-const CATEGORY_OPTIONS: { value: PackingCategory; label: string }[] = [
-  { value: 'clothing', label: 'Clothing' },
-  { value: 'toiletries', label: 'Toiletries' },
-  { value: 'electronics', label: 'Electronics' },
-  { value: 'documents', label: 'Documents' },
-  { value: 'ev_equipment', label: 'EV Equipment' },
-  { value: 'food_drinks', label: 'Food & Drinks' },
-  { value: 'recreation', label: 'Recreation' },
-  { value: 'other', label: 'Other' },
-]
 
 export function PackingTemplateEditor({ template, onClose, onSave }: PackingTemplateEditorProps) {
   const { createTemplate, updateTemplate } = usePacking()
@@ -28,168 +17,93 @@ export function PackingTemplateEditor({ template, onClose, onSave }: PackingTemp
   // Form state
   const [name, setName] = useState(template?.name || '')
   const [description, setDescription] = useState(template?.description || '')
-  const [items, setItems] = useState<PackingItem[]>(template?.items || [])
+  const [nodes, setNodes] = useState<PackingNode[]>(template?.nodes || [])
 
-  // New item state
-  const [showNewItem, setShowNewItem] = useState(false)
-  const [newItemName, setNewItemName] = useState('')
-  const [newItemCategory, setNewItemCategory] = useState<PackingCategory>('other')
-  const [newItemQuantity, setNewItemQuantity] = useState<number | undefined>(undefined)
-  const [newItemEssential, setNewItemEssential] = useState(false)
-  const [newItemForPerson, setNewItemForPerson] = useState('')
-
-  // Bulk add state
-  const [showBulkAdd, setShowBulkAdd] = useState(false)
+  // Bulk paste state
+  const [showBulkPaste, setShowBulkPaste] = useState(false)
   const [bulkText, setBulkText] = useState('')
-  const [bulkCategory, setBulkCategory] = useState<PackingCategory>('other')
-  const [bulkEssential, setBulkEssential] = useState(false)
-  const [bulkForPerson, setBulkForPerson] = useState('')
-  const [bulkSmartParse, setBulkSmartParse] = useState(true)
 
-  // View toggle state
-  const [groupBy, setGroupBy] = useState<'category' | 'person'>('category')
+  const addHeading = (level: 1 | 2 | 3 | 4) => {
+    setNodes([...nodes, { type: 'heading', level, text: '' }])
+  }
 
-  const handleAddItem = () => {
-    if (!newItemName.trim()) return
+  const addItem = () => {
+    setNodes([...nodes, { type: 'item', text: '', checked: false }])
+  }
 
-    const newItem: PackingItem = {
-      name: newItemName.trim(),
-      category: newItemCategory,
-      quantity: newItemQuantity,
-      essential: newItemEssential,
-      for_person: newItemForPerson.trim() || undefined,
+  const updateNode = (index: number, text: string) => {
+    setNodes(nodes.map((node, i) => (i === index ? { ...node, text } : node)))
+  }
+
+  const deleteNode = (index: number) => {
+    setNodes(nodes.filter((_, i) => i !== index))
+  }
+
+  const parseBulkText = (text: string): PackingNode[] => {
+    const lines = text.split('\n')
+    const parsed: PackingNode[] = []
+
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed) continue
+
+      // Remove leading bullet characters (•, -, *, etc)
+      const withoutBullet = trimmed.replace(/^[•\-\*]\s*/, '')
+
+      // Check if it's a heading (ends with colon or is ALL CAPS with colon)
+      if (trimmed.includes(':')) {
+        // Remove trailing colon
+        const headingText = withoutBullet.replace(/:$/, '').trim()
+
+        // Determine level based on case and format
+        let level: 1 | 2 | 3 | 4 = 2
+        if (trimmed.startsWith('FOR ') || trimmed === trimmed.toUpperCase()) {
+          level = 1 // Top-level headings like "FOR IRIS:" or "FAMILY SHARED:"
+        } else if (headingText.length > 0) {
+          level = 2 // Regular headings like "Winter Outerwear:"
+        }
+
+        parsed.push({ type: 'heading', level, text: headingText })
+      }
+      // Otherwise it's an item
+      else if (withoutBullet.length > 0) {
+        parsed.push({ type: 'item', text: withoutBullet, checked: false })
+      }
     }
 
-    setItems([...items, newItem])
-    setNewItemName('')
-    setNewItemCategory('other')
-    setNewItemQuantity(undefined)
-    setNewItemEssential(false)
-    setNewItemForPerson('')
-    setShowNewItem(false)
+    return parsed
   }
 
-  const handleRemoveItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index))
-  }
-
-  const handleToggleEssential = (index: number) => {
-    setItems(items.map((item, i) => (i === index ? { ...item, essential: !item.essential } : item)))
-  }
-
-  const handleBulkAdd = () => {
-    if (!bulkText.trim()) return
-
-    let newItems: PackingItem[] = []
-
-    if (bulkSmartParse) {
-      // Smart parsing: detect person headers, category headers, and items
-      const lines = bulkText.split('\n')
-      let currentPerson: string | undefined = bulkForPerson.trim() || undefined
-      let currentCategory: PackingCategory = bulkCategory
-
-      // Category name mapping to PackingCategory enum
-      const categoryMapping: Record<string, PackingCategory> = {
-        outerwear: 'clothing',
-        'winter outerwear': 'clothing',
-        footwear: 'clothing',
-        clothing: 'clothing',
-        fitness: 'clothing',
-        pool: 'recreation',
-        'pool & activities': 'recreation',
-        activities: 'recreation',
-        essentials: 'other',
-        toiletries: 'toiletries',
-        electronics: 'electronics',
-        documents: 'documents',
-        entertainment: 'electronics',
-        'travel entertainment': 'electronics',
-      }
-
-      for (const line of lines) {
-        const trimmed = line.trim()
-        if (!trimmed) continue
-
-        // Check for person header: "FOR IRIS:" or "FAMILY SHARED:"
-        if (
-          trimmed.toUpperCase().startsWith('FOR ') ||
-          trimmed.toUpperCase() === 'FAMILY SHARED:' ||
-          trimmed.toUpperCase().startsWith('FAMILY SHARED')
-        ) {
-          const match = trimmed.match(/^(?:FOR\s+)?(.+?)(?:\s*\([^)]*\))?:?$/i)
-          if (match) {
-            currentPerson = match[1].trim()
-            continue
-          }
-        }
-
-        // Check for category header: ends with ":" and doesn't start with "FOR"
-        if (trimmed.endsWith(':') && !trimmed.toUpperCase().startsWith('FOR ')) {
-          const categoryName = trimmed.slice(0, -1).toLowerCase().trim()
-          currentCategory = categoryMapping[categoryName] || bulkCategory
-          continue
-        }
-
-        // Parse item line
-        // Remove bullet points (•, -, *, or numbers) and leading/trailing whitespace
-        let itemText = trimmed
-          .replace(/^[•\-\*]\s*/, '') // Remove bullet
-          .replace(/^\d+\.\s*/, '') // Remove numbered list
-          .trim()
-
-        if (!itemText) continue
-
-        // Try to extract quantity from start of text (e.g., "2 pairs gloves")
-        let quantity: number | undefined = undefined
-        const quantityMatch = itemText.match(/^(\d+)\s+/)
-        if (quantityMatch) {
-          quantity = parseInt(quantityMatch[1])
-          itemText = itemText.replace(/^(\d+)\s+/, '')
-        }
-
-        // Check if there's a quantity in parentheses at the end (e.g., "Underwear (5)")
-        const parenMatch = itemText.match(/\((\d+)\)$/)
-        if (parenMatch) {
-          quantity = parseInt(parenMatch[1])
-          itemText = itemText.replace(/\s*\(\d+\)$/, '')
-        }
-
-        // Determine if essential based on category name
-        const isEssential = currentCategory === 'documents' || bulkEssential
-
-        newItems.push({
-          name: itemText,
-          category: currentCategory,
-          quantity,
-          essential: isEssential,
-          for_person: currentPerson,
-        })
-      }
-    } else {
-      // Simple parsing: each line is a new item with same settings
-      const lines = bulkText
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line.length > 0)
-
-      if (lines.length === 0) return
-
-      newItems = lines.map(line => ({
-        name: line,
-        category: bulkCategory,
-        essential: bulkEssential,
-        for_person: bulkForPerson.trim() || undefined,
-      }))
-    }
-
-    if (newItems.length === 0) return
-
-    setItems([...items, ...newItems])
+  const handleBulkPaste = () => {
+    const newNodes = parseBulkText(bulkText)
+    setNodes([...nodes, ...newNodes])
     setBulkText('')
-    setBulkCategory('other')
-    setBulkEssential(false)
-    setBulkForPerson('')
-    setShowBulkAdd(false)
+    setShowBulkPaste(false)
+  }
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>, index: number) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      // Add new item after current one
+      const newNodes = [...nodes]
+      newNodes.splice(index + 1, 0, { type: 'item', text: '', checked: false })
+      setNodes(newNodes)
+      // Focus next input after a brief delay
+      setTimeout(() => {
+        const nextInput = document.querySelector<HTMLInputElement>(`[data-node-index="${index + 1}"]`)
+        nextInput?.focus()
+      }, 10)
+    } else if (e.key === 'Backspace' && nodes[index].text === '') {
+      e.preventDefault()
+      deleteNode(index)
+      // Focus previous input
+      if (index > 0) {
+        setTimeout(() => {
+          const prevInput = document.querySelector<HTMLInputElement>(`[data-node-index="${index - 1}"]`)
+          prevInput?.focus()
+        }, 10)
+      }
+    }
   }
 
   const handleSave = async () => {
@@ -198,7 +112,7 @@ export function PackingTemplateEditor({ template, onClose, onSave }: PackingTemp
       return
     }
 
-    if (items.length === 0) {
+    if (nodes.length === 0) {
       alert('Please add at least one item')
       return
     }
@@ -207,15 +121,13 @@ export function PackingTemplateEditor({ template, onClose, onSave }: PackingTemp
       setSaving(true)
 
       if (template) {
-        // Update existing template
         await updateTemplate(template.id, {
           name: name.trim(),
           description: description.trim() || undefined,
-          items,
+          nodes,
         })
       } else {
-        // Create new template
-        await createTemplate(name.trim(), items, description.trim() || undefined)
+        await createTemplate(name.trim(), nodes, description.trim() || undefined)
       }
 
       onSave()
@@ -227,39 +139,15 @@ export function PackingTemplateEditor({ template, onClose, onSave }: PackingTemp
     }
   }
 
-  // Group items by category
-  const itemsByCategory = items.reduce(
-    (acc, item, index) => {
-      if (!acc[item.category]) {
-        acc[item.category] = []
-      }
-      acc[item.category].push({ item, index })
-      return acc
-    },
-    {} as Record<PackingCategory, Array<{ item: PackingItem; index: number }>>
-  )
-
-  // Group items by person
-  const itemsByPerson = items.reduce(
-    (acc, item, index) => {
-      const person = item.for_person || 'Unassigned'
-      if (!acc[person]) {
-        acc[person] = []
-      }
-      acc[person].push({ item, index })
-      return acc
-    },
-    {} as Record<string, Array<{ item: PackingItem; index: number }>>
-  )
+  const itemCount = nodes.filter(n => n.type === 'item').length
+  const sectionCount = nodes.filter(n => n.type === 'heading').length
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-2xl font-display">
-            {template ? 'Edit Template' : 'New Packing Template'}
-          </h2>
+          <h2 className="text-2xl font-display">{template ? 'Edit Template' : 'New Packing Template'}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X size={24} />
           </button>
@@ -280,10 +168,8 @@ export function PackingTemplateEditor({ template, onClose, onSave }: PackingTemp
             />
           </div>
 
-          <div className="mb-8">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Description (optional)
-            </label>
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Description (optional)</label>
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
@@ -293,334 +179,84 @@ export function PackingTemplateEditor({ template, onClose, onSave }: PackingTemp
             />
           </div>
 
-          {/* Items List */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <h3 className="text-lg font-semibold">Items ({items.length})</h3>
-                <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-                  <button
-                    onClick={() => setGroupBy('category')}
-                    className={`px-3 py-1 rounded text-sm transition-colors ${
-                      groupBy === 'category'
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    By Category
-                  </button>
-                  <button
-                    onClick={() => setGroupBy('person')}
-                    className={`px-3 py-1 rounded text-sm transition-colors ${
-                      groupBy === 'person'
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    By Person
-                  </button>
-                </div>
-              </div>
+          {/* Add Buttons */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-sm font-medium text-gray-700">Items ({itemCount} items, {sectionCount} sections)</label>
               <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    setShowBulkAdd(true)
-                    setShowNewItem(false)
-                  }}
-                  className="btn bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 flex items-center gap-1 text-sm"
-                >
-                  <Plus size={16} />
-                  Bulk Add
+                <button onClick={() => setShowBulkPaste(true)} className="btn bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm px-3 py-1">
+                  Bulk Paste
                 </button>
-                <button
-                  onClick={() => {
-                    setShowNewItem(true)
-                    setShowBulkAdd(false)
-                  }}
-                  className="btn-primary flex items-center gap-1 text-sm"
-                >
-                  <Plus size={16} />
-                  Add Item
+                <button onClick={() => addHeading(1)} className="btn bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm px-3 py-1">
+                  <Type size={14} className="inline mr-1" />
+                  H1
+                </button>
+                <button onClick={() => addHeading(2)} className="btn bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm px-3 py-1">
+                  <Type size={14} className="inline mr-1" />
+                  H2
+                </button>
+                <button onClick={() => addHeading(3)} className="btn bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm px-3 py-1">
+                  <Type size={14} className="inline mr-1" />
+                  H3
+                </button>
+                <button onClick={addItem} className="btn-primary text-sm px-3 py-1">
+                  <List size={14} className="inline mr-1" />
+                  Item
                 </button>
               </div>
             </div>
+          </div>
 
-            {/* Bulk Add Form */}
-            {showBulkAdd && (
-              <div className="card p-4 mb-4 bg-green-50 border-green-200">
-                <div className="flex items-center justify-between mb-3">
-                  <label className="block text-sm font-medium text-gray-700">
-                    {bulkSmartParse ? 'Paste structured list' : 'Paste items (one per line)'}
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={bulkSmartParse}
-                      onChange={e => setBulkSmartParse(e.target.checked)}
-                      className="w-4 h-4 rounded border-gray-300"
-                    />
-                    <span className="text-sm text-gray-700">Smart parse</span>
-                  </label>
-                </div>
-                <div className="mb-3">
-                  <textarea
-                    value={bulkText}
-                    onChange={e => setBulkText(e.target.value)}
-                    className="input-base w-full resize-none font-mono text-sm"
-                    rows={12}
-                    placeholder={
-                      bulkSmartParse
-                        ? 'FOR IRIS:\nWinter Outerwear:\n  • Heavy winter coat\n  • 2 pairs gloves\nFootwear:\n  • Insulated boots\n\nFOR KALEB:\nClothing:\n  • 3 pairs pants\n  • Underwear (5)'
-                        : 'Winter coat\nSnow boots\nGloves\nScarf\nWarm socks'
-                    }
-                    autoFocus
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    {bulkSmartParse
-                      ? 'Smart parse detects person headers (FOR NAME:), category headers (Category:), and extracts quantities.'
-                      : 'Each line becomes one item with the settings below.'}
-                  </p>
-                </div>
-                {!bulkSmartParse && (
-                  <div className="grid grid-cols-2 gap-3 mb-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                      <select
-                        value={bulkCategory}
-                        onChange={e => setBulkCategory(e.target.value as PackingCategory)}
-                        className="input-base w-full"
-                      >
-                        {CATEGORY_OPTIONS.map(cat => (
-                          <option key={cat.value} value={cat.value}>
-                            {cat.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">For Person</label>
+          {/* Editable List */}
+          <div className="border border-gray-200 rounded-lg p-4 bg-white min-h-[400px]">
+            {nodes.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <p>Click a button above to add headings or items</p>
+                <p className="text-sm mt-2">Press Enter to add new items, Backspace on empty items to delete</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {nodes.map((node, index) => (
+                  <div key={index} className="flex items-center gap-2 group">
+                    {node.type === 'heading' ? (
                       <input
                         type="text"
-                        value={bulkForPerson}
-                        onChange={e => setBulkForPerson(e.target.value)}
-                        className="input-base w-full"
-                        placeholder="Optional"
+                        value={node.text}
+                        onChange={e => updateNode(index, e.target.value)}
+                        onKeyDown={e => handleKeyDown(e, index)}
+                        data-node-index={index}
+                        className={`flex-1 outline-none border-b border-transparent hover:border-gray-300 focus:border-blue-500 px-2 py-1 ${
+                          node.level === 1 ? 'text-3xl font-display font-bold' :
+                          node.level === 2 ? 'text-2xl font-display font-semibold' :
+                          node.level === 3 ? 'text-xl font-semibold' :
+                          'text-lg font-semibold'
+                        }`}
+                        placeholder={`Heading ${node.level}`}
                       />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="flex items-center gap-2 cursor-pointer">
+                    ) : (
+                      <div className="flex-1 flex items-center gap-2">
+                        <span className="text-gray-400">•</span>
                         <input
-                          type="checkbox"
-                          checked={bulkEssential}
-                          onChange={e => setBulkEssential(e.target.checked)}
-                          className="w-4 h-4 rounded border-gray-300"
+                          type="text"
+                          value={node.text}
+                          onChange={e => updateNode(index, e.target.value)}
+                          onKeyDown={e => handleKeyDown(e, index)}
+                          data-node-index={index}
+                          className="flex-1 outline-none border-b border-transparent hover:border-gray-300 focus:border-blue-500 px-2 py-1"
+                          placeholder="Item text"
                         />
-                        <span className="text-sm">Mark all as essential</span>
-                      </label>
-                    </div>
-                  </div>
-                )}
-                <div className="flex gap-2">
-                  <button onClick={handleBulkAdd} className="btn-primary flex-1" disabled={!bulkText.trim()}>
-                    Add Items
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowBulkAdd(false)
-                      setBulkText('')
-                    }}
-                    className="btn bg-gray-100 hover:bg-gray-200 text-gray-700"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* New Item Form */}
-            {showNewItem && (
-              <div className="card p-4 mb-4 bg-blue-50 border-blue-200">
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <div className="col-span-2">
-                    <input
-                      type="text"
-                      value={newItemName}
-                      onChange={e => setNewItemName(e.target.value)}
-                      className="input-base w-full"
-                      placeholder="Item name"
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') handleAddItem()
-                        if (e.key === 'Escape') {
-                          setShowNewItem(false)
-                          setNewItemName('')
-                        }
-                      }}
-                      autoFocus
-                    />
-                  </div>
-                  <div>
-                    <select
-                      value={newItemCategory}
-                      onChange={e => setNewItemCategory(e.target.value as PackingCategory)}
-                      className="input-base w-full"
-                    >
-                      {CATEGORY_OPTIONS.map(cat => (
-                        <option key={cat.value} value={cat.value}>
-                          {cat.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <input
-                      type="number"
-                      value={newItemQuantity || ''}
-                      onChange={e => setNewItemQuantity(e.target.value ? Number(e.target.value) : undefined)}
-                      className="input-base w-full"
-                      placeholder="Quantity (optional)"
-                      min="1"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <input
-                      type="text"
-                      value={newItemForPerson}
-                      onChange={e => setNewItemForPerson(e.target.value)}
-                      className="input-base w-full"
-                      placeholder="For person (optional)"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={newItemEssential}
-                        onChange={e => setNewItemEssential(e.target.checked)}
-                        className="w-4 h-4 rounded border-gray-300"
-                      />
-                      <span className="text-sm">Essential item</span>
-                    </label>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={handleAddItem} className="btn-primary flex-1">
-                    Add Item
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowNewItem(false)
-                      setNewItemName('')
-                    }}
-                    className="btn bg-gray-100 hover:bg-gray-200 text-gray-700"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Empty state */}
-            {items.length === 0 && !showNewItem && !showBulkAdd && (
-              <div className="text-center py-8 text-gray-500">
-                No items yet. Click "Add Item" or "Bulk Add" to get started.
-              </div>
-            )}
-
-            {/* Items grouped by category */}
-            {groupBy === 'category' &&
-              CATEGORY_OPTIONS.map(({ value: category, label }) => {
-                const categoryItems = itemsByCategory[category]
-                if (!categoryItems || categoryItems.length === 0) return null
-
-                return (
-                  <div key={category} className="mb-6">
-                    <h4 className="text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wide">
-                      {label}
-                    </h4>
-                    <div className="space-y-2">
-                      {categoryItems.map(({ item, index }) => (
-                        <div
-                          key={index}
-                          className="flex items-center gap-3 p-3 rounded-lg border bg-white hover:bg-gray-50"
-                        >
-                          <GripVertical size={16} className="text-gray-400" />
-                          <div className="flex-1">
-                            <div className="font-medium">{item.name}</div>
-                            <div className="flex gap-2 text-sm text-gray-500">
-                              {item.quantity && <span>Qty: {item.quantity}</span>}
-                              {item.for_person && <span>• {item.for_person}</span>}
-                            </div>
-                          </div>
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={item.essential}
-                              onChange={() => handleToggleEssential(index)}
-                              className="w-4 h-4 rounded border-gray-300"
-                            />
-                            <span className="text-sm text-gray-600">Essential</span>
-                          </label>
-                          <button
-                            onClick={() => handleRemoveItem(index)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
-
-            {/* Items grouped by person */}
-            {groupBy === 'person' &&
-              Object.keys(itemsByPerson)
-                .sort()
-                .map(person => {
-                  const personItems = itemsByPerson[person]
-                  if (!personItems || personItems.length === 0) return null
-
-                  return (
-                    <div key={person} className="mb-6">
-                      <h4 className="text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wide">
-                        {person}
-                      </h4>
-                      <div className="space-y-2">
-                        {personItems.map(({ item, index }) => (
-                          <div
-                            key={index}
-                            className="flex items-center gap-3 p-3 rounded-lg border bg-white hover:bg-gray-50"
-                          >
-                            <GripVertical size={16} className="text-gray-400" />
-                            <div className="flex-1">
-                              <div className="font-medium">{item.name}</div>
-                              <div className="flex gap-2 text-sm text-gray-500">
-                                <span>{CATEGORY_OPTIONS.find(c => c.value === item.category)?.label}</span>
-                                {item.quantity && <span>• Qty: {item.quantity}</span>}
-                              </div>
-                            </div>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={item.essential}
-                                onChange={() => handleToggleEssential(index)}
-                                className="w-4 h-4 rounded border-gray-300"
-                              />
-                              <span className="text-sm text-gray-600">Essential</span>
-                            </label>
-                            <button
-                              onClick={() => handleRemoveItem(index)}
-                              className="text-red-500 hover:text-red-700"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        ))}
                       </div>
-                    </div>
-                  )
-                })}
+                    )}
+                    <button
+                      onClick={() => deleteNode(index)}
+                      className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -634,6 +270,52 @@ export function PackingTemplateEditor({ template, onClose, onSave }: PackingTemp
           </button>
         </div>
       </div>
+
+      {/* Bulk Paste Modal */}
+      {showBulkPaste && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h3 className="text-xl font-display">Bulk Paste</h3>
+              <button onClick={() => setShowBulkPaste(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              <p className="text-sm text-gray-600 mb-3">
+                Paste your formatted list. Lines with ":" become headings, lines with bullets (•, -, *) become items.
+              </p>
+              <textarea
+                value={bulkText}
+                onChange={e => setBulkText(e.target.value)}
+                className="input-base w-full font-mono text-sm resize-none"
+                rows={20}
+                placeholder={`FOR IRIS:
+Winter Outerwear:
+• Heavy winter coat (waterproof, insulated)
+• Waterproof snow pants
+• Warm hat covering ears
+
+FAMILY SHARED:
+Travel Entertainment:
+• Tablets/phones with downloaded shows
+• Card games (UNO, Spot It)`}
+                autoFocus
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 p-6 border-t bg-gray-50">
+              <button onClick={() => setShowBulkPaste(false)} className="btn bg-white hover:bg-gray-100 text-gray-700">
+                Cancel
+              </button>
+              <button onClick={handleBulkPaste} className="btn-primary">
+                Add to List
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

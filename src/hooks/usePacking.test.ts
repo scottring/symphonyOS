@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { usePacking } from './usePacking'
 import type { PackingTemplate } from './usePacking'
-import type { PackingItem } from '@/types/trip'
+import type { PackingNode } from '@/types/trip'
 
 // Mock Supabase data
 const mockSupabaseData: PackingTemplate[] = []
@@ -53,13 +53,15 @@ vi.mock('@/lib/supabase', () => ({
   },
 }))
 
-function createMockPackingItem(overrides: Partial<PackingItem> = {}): PackingItem {
-  return {
-    name: 'Toothbrush',
-    category: 'toiletries',
-    essential: true,
-    ...overrides,
-  }
+function createMockPackingNodes(): PackingNode[] {
+  return [
+    { type: 'heading', level: 2, text: 'Toiletries' },
+    { type: 'item', text: 'Toothbrush', checked: false },
+    { type: 'item', text: 'Toothpaste', checked: false },
+    { type: 'heading', level: 2, text: 'Clothing' },
+    { type: 'item', text: 'Shirts (3)', checked: false },
+    { type: 'item', text: 'Pants (2)', checked: false },
+  ]
 }
 
 function createMockTemplate(overrides: Partial<PackingTemplate> = {}): PackingTemplate {
@@ -68,10 +70,7 @@ function createMockTemplate(overrides: Partial<PackingTemplate> = {}): PackingTe
     userId: 'test-user-id',
     name: 'Weekend Trip',
     description: 'Basic items for a weekend getaway',
-    items: [
-      createMockPackingItem(),
-      createMockPackingItem({ name: 'Clothes', category: 'clothing' }),
-    ],
+    nodes: createMockPackingNodes(),
     isDefault: false,
     createdAt: new Date('2024-01-01T00:00:00Z'),
     updatedAt: new Date('2024-01-01T00:00:00Z'),
@@ -167,10 +166,7 @@ describe('usePacking', () => {
   describe('createTemplate', () => {
     it('should create a new template', async () => {
       const newTemplate = createMockTemplate()
-      const items: PackingItem[] = [
-        createMockPackingItem(),
-        createMockPackingItem({ name: 'Clothes', category: 'clothing' }),
-      ]
+      const nodes: PackingNode[] = createMockPackingNodes()
 
       mockSingle.mockResolvedValue({
         data: {
@@ -178,7 +174,7 @@ describe('usePacking', () => {
           user_id: newTemplate.userId,
           name: newTemplate.name,
           description: newTemplate.description,
-          items: newTemplate.items,
+          nodes: newTemplate.nodes,
           is_default: newTemplate.isDefault,
           created_at: newTemplate.createdAt.toISOString(),
           updated_at: newTemplate.updatedAt.toISOString(),
@@ -197,7 +193,7 @@ describe('usePacking', () => {
       await act(async () => {
         createdTemplate = await result.current.createTemplate(
           'Weekend Trip',
-          items,
+          nodes,
           'Basic items for a weekend getaway'
         )
       })
@@ -206,18 +202,21 @@ describe('usePacking', () => {
         user_id: 'test-user-id',
         name: 'Weekend Trip',
         description: 'Basic items for a weekend getaway',
-        items,
+        nodes,
         is_default: false,
       })
 
       expect(createdTemplate).toBeDefined()
       expect(createdTemplate?.name).toBe('Weekend Trip')
-      expect(createdTemplate?.items).toHaveLength(2)
+      expect(createdTemplate?.nodes).toHaveLength(6)
     })
 
     it('should create a template without description', async () => {
       const newTemplate = createMockTemplate({ description: undefined })
-      const items: PackingItem[] = [createMockPackingItem()]
+      const nodes: PackingNode[] = [
+        { type: 'heading', level: 2, text: 'Essentials' },
+        { type: 'item', text: 'Phone charger', checked: false },
+      ]
 
       mockSingle.mockResolvedValue({
         data: {
@@ -225,7 +224,7 @@ describe('usePacking', () => {
           user_id: newTemplate.userId,
           name: newTemplate.name,
           description: null,
-          items: newTemplate.items,
+          nodes: nodes,
           is_default: newTemplate.isDefault,
           created_at: newTemplate.createdAt.toISOString(),
           updated_at: newTemplate.updatedAt.toISOString(),
@@ -240,14 +239,14 @@ describe('usePacking', () => {
       })
 
       await act(async () => {
-        await result.current.createTemplate('Weekend Trip', items)
+        await result.current.createTemplate('Weekend Trip', nodes)
       })
 
       expect(mockInsert).toHaveBeenCalledWith({
         user_id: 'test-user-id',
         name: 'Weekend Trip',
         description: null,
-        items,
+        nodes,
         is_default: false,
       })
     })
@@ -265,7 +264,7 @@ describe('usePacking', () => {
       })
 
       await expect(
-        result.current.createTemplate('Test', [createMockPackingItem()])
+        result.current.createTemplate('Test', [{ type: 'item', text: 'Test item', checked: false }])
       ).rejects.toThrow('User not authenticated')
     })
   })
@@ -303,17 +302,18 @@ describe('usePacking', () => {
       })
     })
 
-    it('should update template items', async () => {
+    it('should update template nodes', async () => {
       const template = createMockTemplate()
-      const newItems: PackingItem[] = [
-        createMockPackingItem(),
-        createMockPackingItem({ name: 'Sunscreen', category: 'toiletries' }),
+      const newNodes: PackingNode[] = [
+        { type: 'heading', level: 2, text: 'Beach Gear' },
+        { type: 'item', text: 'Sunscreen', checked: false },
+        { type: 'item', text: 'Towel', checked: false },
       ]
 
       mockSingle.mockResolvedValue({
         data: {
           ...template,
-          items: newItems,
+          nodes: newNodes,
           user_id: template.userId,
           is_default: template.isDefault,
           created_at: template.createdAt.toISOString(),
@@ -329,24 +329,26 @@ describe('usePacking', () => {
       })
 
       await act(async () => {
-        await result.current.updateTemplate('template-1', { items: newItems })
+        await result.current.updateTemplate('template-1', { nodes: newNodes })
       })
 
       expect(mockUpdate).toHaveBeenCalledWith({
-        items: newItems,
+        nodes: newNodes,
       })
     })
 
     it('should update multiple fields at once', async () => {
       const template = createMockTemplate()
-      const newItems: PackingItem[] = [createMockPackingItem()]
+      const newNodes: PackingNode[] = [
+        { type: 'item', text: 'Passport', checked: false },
+      ]
 
       mockSingle.mockResolvedValue({
         data: {
           ...template,
           name: 'New Name',
           description: 'New Description',
-          items: newItems,
+          nodes: newNodes,
           user_id: template.userId,
           is_default: template.isDefault,
           created_at: template.createdAt.toISOString(),
@@ -365,14 +367,14 @@ describe('usePacking', () => {
         await result.current.updateTemplate('template-1', {
           name: 'New Name',
           description: 'New Description',
-          items: newItems,
+          nodes: newNodes,
         })
       })
 
       expect(mockUpdate).toHaveBeenCalledWith({
         name: 'New Name',
         description: 'New Description',
-        items: newItems,
+        nodes: newNodes,
       })
     })
   })
@@ -459,13 +461,13 @@ describe('usePacking', () => {
         user_id: 'test-user-id',
         name: 'Weekend Trip (Copy)',
         description: originalTemplate.description,
-        items: originalTemplate.items,
+        nodes: originalTemplate.nodes,
         is_default: false,
       })
 
       expect(duplicated).toBeDefined()
       expect(duplicated?.name).toBe('Weekend Trip (Copy)')
-      expect(duplicated?.items).toEqual(originalTemplate.items)
+      expect(duplicated?.nodes).toEqual(originalTemplate.nodes)
     })
 
     it('should throw error if template not found', async () => {

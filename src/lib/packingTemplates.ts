@@ -1,237 +1,266 @@
 /**
  * Packing List Templates
  * Predefined packing lists for different trip types
+ * Using simplified PackingNode structure (headings + checklist items)
  */
 
-import type { PackingItem, PackingTemplate, PackingCategory } from '@/types/trip'
+import type { PackingNode, PackingTemplate } from '@/types/trip'
 
 // ============================================================================
 // Packing List Templates
 // ============================================================================
 
-const WEEKEND_TRIP: PackingItem[] = [
-  // Clothing
-  { name: 'Outfits (2-3 days)', category: 'clothing', essential: true },
-  { name: 'Underwear & socks (3 sets)', category: 'clothing', essential: true },
-  { name: 'Pajamas', category: 'clothing', essential: true },
-  { name: 'Jacket or sweater', category: 'clothing', essential: false },
-  { name: 'Comfortable shoes', category: 'clothing', essential: true },
-  { name: 'Extra pair of shoes', category: 'clothing', essential: false },
+const WEEKEND_TRIP: PackingNode[] = [
+  { type: 'heading', level: 2, text: 'Clothing' },
+  { type: 'item', text: 'Outfits (2-3 days)', checked: false },
+  { type: 'item', text: 'Underwear & socks (3 sets)', checked: false },
+  { type: 'item', text: 'Pajamas', checked: false },
+  { type: 'item', text: 'Jacket or sweater', checked: false },
+  { type: 'item', text: 'Comfortable shoes', checked: false },
+  { type: 'item', text: 'Extra pair of shoes', checked: false },
 
-  // Toiletries
-  { name: 'Toothbrush & toothpaste', category: 'toiletries', essential: true },
-  { name: 'Deodorant', category: 'toiletries', essential: true },
-  { name: 'Shampoo & conditioner', category: 'toiletries', essential: true },
-  { name: 'Body wash or soap', category: 'toiletries', essential: true },
-  { name: 'Hairbrush or comb', category: 'toiletries', essential: true },
-  { name: 'Medications', category: 'toiletries', essential: true },
-  { name: 'Sunscreen', category: 'toiletries', essential: false },
+  { type: 'heading', level: 2, text: 'Toiletries' },
+  { type: 'item', text: 'Toothbrush & toothpaste', checked: false },
+  { type: 'item', text: 'Deodorant', checked: false },
+  { type: 'item', text: 'Shampoo & conditioner', checked: false },
+  { type: 'item', text: 'Body wash or soap', checked: false },
+  { type: 'item', text: 'Hairbrush or comb', checked: false },
+  { type: 'item', text: 'Medications', checked: false },
+  { type: 'item', text: 'Sunscreen', checked: false },
 
-  // Electronics
-  { name: 'Phone charger', category: 'electronics', essential: true },
-  { name: 'Portable battery pack', category: 'electronics', essential: false },
-  { name: 'Headphones', category: 'electronics', essential: false },
+  { type: 'heading', level: 2, text: 'Electronics' },
+  { type: 'item', text: 'Phone charger', checked: false },
+  { type: 'item', text: 'Portable battery pack', checked: false },
+  { type: 'item', text: 'Headphones', checked: false },
 
-  // Documents
-  { name: 'ID/Driver\'s license', category: 'documents', essential: true },
-  { name: 'Credit/debit cards', category: 'documents', essential: true },
-  { name: 'Insurance cards', category: 'documents', essential: true },
+  { type: 'heading', level: 2, text: 'Documents' },
+  { type: 'item', text: "ID/Driver's license", checked: false },
+  { type: 'item', text: 'Credit/debit cards', checked: false },
+  { type: 'item', text: 'Insurance cards', checked: false },
 
-  // Food & Drinks
-  { name: 'Water bottle', category: 'food_drinks', essential: false },
-  { name: 'Snacks for travel', category: 'food_drinks', essential: false },
+  { type: 'heading', level: 2, text: 'Food & Drinks' },
+  { type: 'item', text: 'Water bottle', checked: false },
+  { type: 'item', text: 'Snacks for travel', checked: false },
 ]
 
-const WEEK_LONG_TRIP: PackingItem[] = [
-  // Everything from weekend trip
-  ...WEEKEND_TRIP.filter(item => item.name !== 'Outfits (2-3 days)'),
-  { name: 'Outfits (7-8 days)', category: 'clothing', essential: true },
-  { name: 'Underwear & socks (8 sets)', category: 'clothing', essential: true },
-  { name: 'Workout clothes', category: 'clothing', essential: false },
-  { name: 'Swimsuit', category: 'clothing', essential: false },
-  { name: 'Dressy outfit', category: 'clothing', essential: false },
+const WEEK_LONG_TRIP: PackingNode[] = [
+  { type: 'heading', level: 2, text: 'Clothing' },
+  { type: 'item', text: 'Outfits (7-8 days)', checked: false },
+  { type: 'item', text: 'Underwear & socks (8 sets)', checked: false },
+  { type: 'item', text: 'Pajamas', checked: false },
+  { type: 'item', text: 'Jacket or sweater', checked: false },
+  { type: 'item', text: 'Comfortable shoes', checked: false },
+  { type: 'item', text: 'Extra pair of shoes', checked: false },
+  { type: 'item', text: 'Workout clothes', checked: false },
+  { type: 'item', text: 'Swimsuit', checked: false },
+  { type: 'item', text: 'Dressy outfit', checked: false },
 
-  // Additional electronics
-  { name: 'Laptop & charger', category: 'electronics', essential: false },
-  { name: 'E-reader or books', category: 'electronics', essential: false },
-  { name: 'Camera', category: 'electronics', essential: false },
+  { type: 'heading', level: 2, text: 'Toiletries' },
+  { type: 'item', text: 'Toothbrush & toothpaste', checked: false },
+  { type: 'item', text: 'Deodorant', checked: false },
+  { type: 'item', text: 'Shampoo & conditioner', checked: false },
+  { type: 'item', text: 'Body wash or soap', checked: false },
+  { type: 'item', text: 'Hairbrush or comb', checked: false },
+  { type: 'item', text: 'Medications', checked: false },
+  { type: 'item', text: 'Sunscreen', checked: false },
+  { type: 'item', text: 'Laundry detergent packets', checked: false },
+  { type: 'item', text: 'First aid kit', checked: false },
 
-  // Additional toiletries
-  { name: 'Laundry detergent packets', category: 'toiletries', essential: false },
-  { name: 'First aid kit', category: 'toiletries', essential: false },
+  { type: 'heading', level: 2, text: 'Electronics' },
+  { type: 'item', text: 'Phone charger', checked: false },
+  { type: 'item', text: 'Portable battery pack', checked: false },
+  { type: 'item', text: 'Headphones', checked: false },
+  { type: 'item', text: 'Laptop & charger', checked: false },
+  { type: 'item', text: 'E-reader or books', checked: false },
+  { type: 'item', text: 'Camera', checked: false },
+
+  { type: 'heading', level: 2, text: 'Documents' },
+  { type: 'item', text: "ID/Driver's license", checked: false },
+  { type: 'item', text: 'Credit/debit cards', checked: false },
+  { type: 'item', text: 'Insurance cards', checked: false },
+
+  { type: 'heading', level: 2, text: 'Food & Drinks' },
+  { type: 'item', text: 'Water bottle', checked: false },
+  { type: 'item', text: 'Snacks for travel', checked: false },
 ]
 
-const EV_ROAD_TRIP: PackingItem[] = [
-  // EV-specific equipment
-  { name: 'EV charging adapter (if needed)', category: 'ev_equipment', essential: true },
-  { name: 'Charging cable', category: 'ev_equipment', essential: true },
-  { name: 'Extension cord (for destination charging)', category: 'ev_equipment', essential: false },
-  { name: 'Tire pressure gauge', category: 'ev_equipment', essential: false },
-  { name: 'Emergency roadside kit', category: 'ev_equipment', essential: false },
+const EV_ROAD_TRIP: PackingNode[] = [
+  { type: 'heading', level: 2, text: 'EV Equipment' },
+  { type: 'item', text: 'EV charging adapter (if needed)', checked: false },
+  { type: 'item', text: 'Charging cable', checked: false },
+  { type: 'item', text: 'Extension cord (for destination charging)', checked: false },
+  { type: 'item', text: 'Tire pressure gauge', checked: false },
+  { type: 'item', text: 'Emergency roadside kit', checked: false },
 
-  // Food & Entertainment for longer drives
-  { name: 'Cooler with drinks & snacks', category: 'food_drinks', essential: false },
-  { name: 'Coffee/tea thermos', category: 'food_drinks', essential: false },
-  { name: 'Road trip playlist', category: 'recreation', essential: false },
-  { name: 'Audiobooks or podcasts downloaded', category: 'recreation', essential: false },
+  { type: 'heading', level: 2, text: 'Food & Drinks' },
+  { type: 'item', text: 'Cooler with drinks & snacks', checked: false },
+  { type: 'item', text: 'Coffee/tea thermos', checked: false },
 
-  // Comfort items
-  { name: 'Pillow & blanket', category: 'other', essential: false },
-  { name: 'Phone mount for navigation', category: 'electronics', essential: true },
+  { type: 'heading', level: 2, text: 'Recreation' },
+  { type: 'item', text: 'Road trip playlist', checked: false },
+  { type: 'item', text: 'Audiobooks or podcasts downloaded', checked: false },
+  { type: 'item', text: 'Pillow & blanket', checked: false },
+
+  { type: 'heading', level: 2, text: 'Electronics' },
+  { type: 'item', text: 'Phone mount for navigation', checked: false },
 ]
 
-const BEACH_TRIP: PackingItem[] = [
-  // Beach essentials
-  { name: 'Swimsuit', category: 'clothing', essential: true },
-  { name: 'Cover-up', category: 'clothing', essential: true },
-  { name: 'Flip-flops or sandals', category: 'clothing', essential: true },
-  { name: 'Sun hat', category: 'clothing', essential: true },
-  { name: 'Sunglasses', category: 'clothing', essential: true },
+const BEACH_TRIP: PackingNode[] = [
+  { type: 'heading', level: 2, text: 'Clothing' },
+  { type: 'item', text: 'Swimsuit', checked: false },
+  { type: 'item', text: 'Cover-up', checked: false },
+  { type: 'item', text: 'Flip-flops or sandals', checked: false },
+  { type: 'item', text: 'Sun hat', checked: false },
+  { type: 'item', text: 'Sunglasses', checked: false },
 
-  // Beach gear
-  { name: 'Beach towel', category: 'recreation', essential: true },
-  { name: 'Sunscreen (SPF 30+)', category: 'toiletries', essential: true },
-  { name: 'After-sun lotion', category: 'toiletries', essential: false },
-  { name: 'Beach bag', category: 'other', essential: true },
-  { name: 'Beach umbrella or tent', category: 'recreation', essential: false },
-  { name: 'Beach chair', category: 'recreation', essential: false },
-  { name: 'Snorkel gear', category: 'recreation', essential: false },
-  { name: 'Waterproof phone case', category: 'electronics', essential: false },
+  { type: 'heading', level: 2, text: 'Beach Gear' },
+  { type: 'item', text: 'Beach towel', checked: false },
+  { type: 'item', text: 'Beach bag', checked: false },
+  { type: 'item', text: 'Beach umbrella or tent', checked: false },
+  { type: 'item', text: 'Beach chair', checked: false },
+  { type: 'item', text: 'Snorkel gear', checked: false },
+  { type: 'item', text: 'Beach toys/games', checked: false },
 
-  // Recreation
-  { name: 'Book or e-reader', category: 'recreation', essential: false },
-  { name: 'Beach toys/games', category: 'recreation', essential: false },
+  { type: 'heading', level: 2, text: 'Toiletries' },
+  { type: 'item', text: 'Sunscreen (SPF 30+)', checked: false },
+  { type: 'item', text: 'After-sun lotion', checked: false },
+
+  { type: 'heading', level: 2, text: 'Electronics' },
+  { type: 'item', text: 'Waterproof phone case', checked: false },
+
+  { type: 'heading', level: 2, text: 'Recreation' },
+  { type: 'item', text: 'Book or e-reader', checked: false },
 ]
 
-const SKI_TRIP: PackingItem[] = [
-  // Ski clothing
-  { name: 'Ski jacket', category: 'clothing', essential: true },
-  { name: 'Ski pants', category: 'clothing', essential: true },
-  { name: 'Base layers (2-3 sets)', category: 'clothing', essential: true },
-  { name: 'Wool socks (3-4 pairs)', category: 'clothing', essential: true },
-  { name: 'Gloves or mittens', category: 'clothing', essential: true },
-  { name: 'Hat or beanie', category: 'clothing', essential: true },
-  { name: 'Neck warmer or balaclava', category: 'clothing', essential: true },
-  { name: 'Goggles', category: 'clothing', essential: true },
+const SKI_TRIP: PackingNode[] = [
+  { type: 'heading', level: 2, text: 'Ski Clothing' },
+  { type: 'item', text: 'Ski jacket', checked: false },
+  { type: 'item', text: 'Ski pants', checked: false },
+  { type: 'item', text: 'Base layers (2-3 sets)', checked: false },
+  { type: 'item', text: 'Wool socks (3-4 pairs)', checked: false },
+  { type: 'item', text: 'Gloves or mittens', checked: false },
+  { type: 'item', text: 'Hat or beanie', checked: false },
+  { type: 'item', text: 'Neck warmer or balaclava', checked: false },
+  { type: 'item', text: 'Goggles', checked: false },
 
-  // Ski gear
-  { name: 'Skis/snowboard (if not renting)', category: 'recreation', essential: false },
-  { name: 'Ski boots (if not renting)', category: 'recreation', essential: false },
-  { name: 'Helmet', category: 'recreation', essential: true },
-  { name: 'Hand/toe warmers', category: 'other', essential: false },
+  { type: 'heading', level: 2, text: 'Ski Gear' },
+  { type: 'item', text: 'Skis/snowboard (if not renting)', checked: false },
+  { type: 'item', text: 'Ski boots (if not renting)', checked: false },
+  { type: 'item', text: 'Helmet', checked: false },
+  { type: 'item', text: 'Hand/toe warmers', checked: false },
 
-  // After-ski
-  { name: 'Warm casual clothes', category: 'clothing', essential: true },
-  { name: 'Lip balm with SPF', category: 'toiletries', essential: true },
-  { name: 'Moisturizer', category: 'toiletries', essential: true },
+  { type: 'heading', level: 2, text: 'After-Ski' },
+  { type: 'item', text: 'Warm casual clothes', checked: false },
+  { type: 'item', text: 'Lip balm with SPF', checked: false },
+  { type: 'item', text: 'Moisturizer', checked: false },
 ]
 
-const BUSINESS_TRIP: PackingItem[] = [
-  // Professional attire
-  { name: 'Business suits/outfits', category: 'clothing', essential: true },
-  { name: 'Dress shoes', category: 'clothing', essential: true },
-  { name: 'Belt', category: 'clothing', essential: true },
-  { name: 'Professional accessories', category: 'clothing', essential: false },
+const BUSINESS_TRIP: PackingNode[] = [
+  { type: 'heading', level: 2, text: 'Professional Attire' },
+  { type: 'item', text: 'Business suits/outfits', checked: false },
+  { type: 'item', text: 'Dress shoes', checked: false },
+  { type: 'item', text: 'Belt', checked: false },
+  { type: 'item', text: 'Professional accessories', checked: false },
 
-  // Work essentials
-  { name: 'Laptop & charger', category: 'electronics', essential: true },
-  { name: 'Work documents/files', category: 'documents', essential: true },
-  { name: 'Business cards', category: 'documents', essential: true },
-  { name: 'Notebook & pen', category: 'other', essential: true },
-  { name: 'Phone charger & adapter', category: 'electronics', essential: true },
-  { name: 'Presentation materials', category: 'other', essential: false },
+  { type: 'heading', level: 2, text: 'Work Essentials' },
+  { type: 'item', text: 'Laptop & charger', checked: false },
+  { type: 'item', text: 'Work documents/files', checked: false },
+  { type: 'item', text: 'Business cards', checked: false },
+  { type: 'item', text: 'Notebook & pen', checked: false },
+  { type: 'item', text: 'Phone charger & adapter', checked: false },
+  { type: 'item', text: 'Presentation materials', checked: false },
 
-  // Casual
-  { name: 'Casual outfit for evenings', category: 'clothing', essential: false },
-  { name: 'Gym clothes', category: 'clothing', essential: false },
+  { type: 'heading', level: 2, text: 'Casual' },
+  { type: 'item', text: 'Casual outfit for evenings', checked: false },
+  { type: 'item', text: 'Gym clothes', checked: false },
 ]
 
-const CAMPING_TRIP: PackingItem[] = [
-  // Shelter
-  { name: 'Tent', category: 'recreation', essential: true },
-  { name: 'Sleeping bag', category: 'recreation', essential: true },
-  { name: 'Sleeping pad or air mattress', category: 'recreation', essential: true },
-  { name: 'Pillow', category: 'other', essential: false },
+const CAMPING_TRIP: PackingNode[] = [
+  { type: 'heading', level: 2, text: 'Shelter' },
+  { type: 'item', text: 'Tent', checked: false },
+  { type: 'item', text: 'Sleeping bag', checked: false },
+  { type: 'item', text: 'Sleeping pad or air mattress', checked: false },
+  { type: 'item', text: 'Pillow', checked: false },
 
-  // Cooking
-  { name: 'Camp stove & fuel', category: 'recreation', essential: true },
-  { name: 'Cookware & utensils', category: 'other', essential: true },
-  { name: 'Cooler with ice', category: 'food_drinks', essential: true },
-  { name: 'Food & ingredients', category: 'food_drinks', essential: true },
-  { name: 'Water bottles/hydration system', category: 'food_drinks', essential: true },
-  { name: 'Biodegradable soap', category: 'toiletries', essential: true },
+  { type: 'heading', level: 2, text: 'Cooking' },
+  { type: 'item', text: 'Camp stove & fuel', checked: false },
+  { type: 'item', text: 'Cookware & utensils', checked: false },
+  { type: 'item', text: 'Cooler with ice', checked: false },
+  { type: 'item', text: 'Food & ingredients', checked: false },
+  { type: 'item', text: 'Water bottles/hydration system', checked: false },
+  { type: 'item', text: 'Biodegradable soap', checked: false },
 
-  // Gear
-  { name: 'Headlamp or flashlight', category: 'other', essential: true },
-  { name: 'Extra batteries', category: 'electronics', essential: true },
-  { name: 'First aid kit', category: 'toiletries', essential: true },
-  { name: 'Camping chairs', category: 'recreation', essential: false },
-  { name: 'Multi-tool or knife', category: 'other', essential: true },
-  { name: 'Fire starter/matches', category: 'other', essential: true },
-  { name: 'Trash bags', category: 'other', essential: true },
+  { type: 'heading', level: 2, text: 'Gear' },
+  { type: 'item', text: 'Headlamp or flashlight', checked: false },
+  { type: 'item', text: 'Extra batteries', checked: false },
+  { type: 'item', text: 'First aid kit', checked: false },
+  { type: 'item', text: 'Camping chairs', checked: false },
+  { type: 'item', text: 'Multi-tool or knife', checked: false },
+  { type: 'item', text: 'Fire starter/matches', checked: false },
+  { type: 'item', text: 'Trash bags', checked: false },
 
-  // Clothing
-  { name: 'Layers for varying temperatures', category: 'clothing', essential: true },
-  { name: 'Rain jacket', category: 'clothing', essential: true },
-  { name: 'Hiking boots', category: 'clothing', essential: true },
-  { name: 'Hat & sunglasses', category: 'clothing', essential: true },
+  { type: 'heading', level: 2, text: 'Clothing' },
+  { type: 'item', text: 'Layers for varying temperatures', checked: false },
+  { type: 'item', text: 'Rain jacket', checked: false },
+  { type: 'item', text: 'Hiking boots', checked: false },
+  { type: 'item', text: 'Hat & sunglasses', checked: false },
 ]
 
-const COLD_WEATHER_TRIP: PackingItem[] = [
-  // Cold Weather Clothing
-  { name: 'Winter coats', category: 'clothing', essential: true },
-  { name: 'Snow boots or warm boots', category: 'clothing', essential: true },
-  { name: 'Warm gloves or mittens', category: 'clothing', essential: true },
-  { name: 'Winter hats/beanies', category: 'clothing', essential: true },
-  { name: 'Scarves or neck warmers', category: 'clothing', essential: true },
-  { name: 'Thermal underwear/base layers', category: 'clothing', essential: true },
-  { name: 'Warm socks (7-10 pairs)', category: 'clothing', essential: true },
-  { name: 'Sweaters or fleeces', category: 'clothing', essential: true },
-  { name: 'Jeans or warm pants', category: 'clothing', essential: true },
-  { name: 'Pajamas', category: 'clothing', essential: true },
-  { name: 'Regular underwear (7-8 sets)', category: 'clothing', essential: true },
+const COLD_WEATHER_TRIP: PackingNode[] = [
+  { type: 'heading', level: 2, text: 'Cold Weather Clothing' },
+  { type: 'item', text: 'Winter coats', checked: false },
+  { type: 'item', text: 'Snow boots or warm boots', checked: false },
+  { type: 'item', text: 'Warm gloves or mittens', checked: false },
+  { type: 'item', text: 'Winter hats/beanies', checked: false },
+  { type: 'item', text: 'Scarves or neck warmers', checked: false },
+  { type: 'item', text: 'Thermal underwear/base layers', checked: false },
+  { type: 'item', text: 'Warm socks (7-10 pairs)', checked: false },
+  { type: 'item', text: 'Sweaters or fleeces', checked: false },
+  { type: 'item', text: 'Jeans or warm pants', checked: false },
+  { type: 'item', text: 'Pajamas', checked: false },
+  { type: 'item', text: 'Regular underwear (7-8 sets)', checked: false },
 
-  // Toiletries
-  { name: 'Toothbrush & toothpaste', category: 'toiletries', essential: true },
-  { name: 'Shampoo & conditioner', category: 'toiletries', essential: true },
-  { name: 'Body wash or soap', category: 'toiletries', essential: true },
-  { name: 'Deodorant', category: 'toiletries', essential: true },
-  { name: 'Moisturizer (for dry winter air)', category: 'toiletries', essential: true },
-  { name: 'Lip balm with SPF', category: 'toiletries', essential: true },
-  { name: 'Hairbrush or comb', category: 'toiletries', essential: true },
-  { name: 'Sunscreen SPF 30+', category: 'toiletries', essential: true },
+  { type: 'heading', level: 2, text: 'Toiletries' },
+  { type: 'item', text: 'Toothbrush & toothpaste', checked: false },
+  { type: 'item', text: 'Shampoo & conditioner', checked: false },
+  { type: 'item', text: 'Body wash or soap', checked: false },
+  { type: 'item', text: 'Deodorant', checked: false },
+  { type: 'item', text: 'Moisturizer (for dry winter air)', checked: false },
+  { type: 'item', text: 'Lip balm with SPF', checked: false },
+  { type: 'item', text: 'Hairbrush or comb', checked: false },
+  { type: 'item', text: 'Sunscreen SPF 30+', checked: false },
 
-  // Health & Safety
-  { name: 'First aid kit', category: 'health', essential: true },
-  { name: 'Pain relievers', category: 'health', essential: false },
-  { name: 'Prescription medications', category: 'health', essential: true },
-  { name: 'Hand warmers', category: 'other', essential: false },
-  { name: 'Tissues', category: 'other', essential: false },
+  { type: 'heading', level: 2, text: 'Health & Safety' },
+  { type: 'item', text: 'First aid kit', checked: false },
+  { type: 'item', text: 'Pain relievers', checked: false },
+  { type: 'item', text: 'Prescription medications', checked: false },
+  { type: 'item', text: 'Hand warmers', checked: false },
+  { type: 'item', text: 'Tissues', checked: false },
 
-  // Electronics
-  { name: 'Phone chargers', category: 'electronics', essential: true },
-  { name: 'Camera', category: 'electronics', essential: false },
-  { name: 'Power bank', category: 'electronics', essential: false },
-  { name: 'Travel adapter', category: 'electronics', essential: false },
+  { type: 'heading', level: 2, text: 'Electronics' },
+  { type: 'item', text: 'Phone chargers', checked: false },
+  { type: 'item', text: 'Camera', checked: false },
+  { type: 'item', text: 'Power bank', checked: false },
+  { type: 'item', text: 'Travel adapter', checked: false },
 
-  // Documents
-  { name: 'IDs or passports', category: 'documents', essential: true },
-  { name: 'Hotel confirmations', category: 'documents', essential: true },
-  { name: 'Travel insurance', category: 'documents', essential: false },
-  { name: 'Credit cards & cash', category: 'documents', essential: true },
+  { type: 'heading', level: 2, text: 'Documents' },
+  { type: 'item', text: 'IDs or passports', checked: false },
+  { type: 'item', text: 'Hotel confirmations', checked: false },
+  { type: 'item', text: 'Travel insurance', checked: false },
+  { type: 'item', text: 'Credit cards & cash', checked: false },
 
-  // Other
-  { name: 'Reusable water bottles', category: 'other', essential: false },
-  { name: 'Snacks for travel', category: 'other', essential: false },
-  { name: 'Books or entertainment', category: 'other', essential: false },
-  { name: 'Small backpack for day trips', category: 'other', essential: false },
+  { type: 'heading', level: 2, text: 'Other' },
+  { type: 'item', text: 'Reusable water bottles', checked: false },
+  { type: 'item', text: 'Snacks for travel', checked: false },
+  { type: 'item', text: 'Books or entertainment', checked: false },
+  { type: 'item', text: 'Small backpack for day trips', checked: false },
 ]
 
 // ============================================================================
 // Template Map
 // ============================================================================
 
-export const PACKING_TEMPLATES: Record<PackingTemplate, PackingItem[]> = {
+export const PACKING_TEMPLATES: Record<PackingTemplate, PackingNode[]> = {
   weekend: WEEKEND_TRIP,
   week: WEEK_LONG_TRIP,
   ev_road_trip: EV_ROAD_TRIP,
@@ -249,39 +278,26 @@ export const PACKING_TEMPLATES: Record<PackingTemplate, PackingItem[]> = {
 /**
  * Get packing list for a specific template
  */
-export function getPackingList(template: PackingTemplate): PackingItem[] {
+export function getPackingList(template: PackingTemplate): PackingNode[] {
   return PACKING_TEMPLATES[template] || []
 }
 
 /**
  * Combine multiple templates (for multi-purpose trips)
- * Deduplicates items by name
+ * Deduplicates items by text
  */
-export function combinePackingLists(...templates: PackingTemplate[]): PackingItem[] {
-  const combined = new Map<string, PackingItem>()
+export function combinePackingLists(...templates: PackingTemplate[]): PackingNode[] {
+  const combined = new Map<string, PackingNode>()
 
   for (const template of templates) {
-    const items = PACKING_TEMPLATES[template] || []
-    for (const item of items) {
-      if (!combined.has(item.name)) {
-        combined.set(item.name, item)
+    const nodes = PACKING_TEMPLATES[template] || []
+    for (const node of nodes) {
+      const key = node.type === 'heading' ? `h${node.level}:${node.text}` : `item:${node.text}`
+      if (!combined.has(key)) {
+        combined.set(key, node)
       }
     }
   }
 
   return Array.from(combined.values())
-}
-
-/**
- * Get packing items by category
- */
-export function filterByCategory(items: PackingItem[], category: PackingCategory): PackingItem[] {
-  return items.filter(item => item.category === category)
-}
-
-/**
- * Get only essential items from a packing list
- */
-export function getEssentialItems(items: PackingItem[]): PackingItem[] {
-  return items.filter(item => item.essential)
 }

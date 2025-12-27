@@ -46,13 +46,9 @@ interface PackingContext {
   special_needs?: string
 }
 
-interface PackingItem {
-  name: string
-  category: string
-  quantity?: number
-  essential: boolean
-  for_person?: string
-}
+type PackingNode =
+  | { type: 'heading'; level: 1 | 2 | 3 | 4; text: string }
+  | { type: 'item'; text: string; checked?: boolean }
 
 function buildPackingPrompt(context: PackingContext): string {
   const { trip, weather, travelers, special_needs } = context
@@ -115,7 +111,7 @@ function buildPackingPrompt(context: PackingContext): string {
     }
   }
 
-  const prompt = `Create a packing list for this trip. Follow the PROCESS below step-by-step.
+  const prompt = `Create a packing list for this trip with headings and checklist items.
 
 TRIP CONTEXT:
 - ${trip.destination} for ${trip.duration_days} days (${trip.startDate} to ${trip.endDate})
@@ -123,55 +119,56 @@ TRIP CONTEXT:
 - Travelers: ${travelers.map(t => `${t.name} (${t.age_range || 'adult'})`).join(', ')}
 ${special_needs ? `- Special: ${special_needs}` : ''}
 
-PROCESS (follow exactly):
+OUTPUT FORMAT:
+Return a JSON array of PackingNode objects. Each node is either:
+- Heading: { "type": "heading", "level": 2-4, "text": "Heading text" }
+- Item: { "type": "item", "text": "Item description", "checked": false }
 
-STEP 1: Identify needs by category
-- Clothing: Weather-appropriate items per person
-- Toiletries: Shared + personal hygiene items
-- Health: Medications, first aid (NO infant items for children/teens/adults)
-- Electronics: Chargers, adapters
-- Documents: IDs, tickets, confirmations
-- Other: Activity gear, snacks
-
-STEP 2: Generate items (TARGET: 20-30 TOTAL)
-For each category, list UNIQUE items only:
-- Clothing: BY PERSON (e.g., "Warm jacket for Ella", "Jeans for Scott")
-- Shared items: ONE entry (e.g., "Phone chargers" with quantity: 2)
-- NO DUPLICATES: "Umbrella" and "Travel umbrella" = SAME ITEM (pick one)
-
-STEP 3: Verify before submitting
-Check your list:
-□ Each item appears EXACTLY ONCE
-□ No infant items (diapers, bottles, strollers) for ${travelers.filter(t => t.age_range && !['infant', 'toddler'].includes(t.age_range)).map(t => t.name).join(', ')}
-□ Total count: 20-30 items
-□ Realistic quantities for ${trip.duration_days} days
+STRUCTURE GUIDELINES:
+- Use level 2 headings for main categories or people
+- Use level 3 headings for subcategories
+- Group items logically beneath headings
+- Include quantities in item text (e.g., "Wool socks (6 pairs)")
+- Target 20-30 total items
 
 EXAMPLE (Montreal winter trip, 2 adults + 2 children, 6 days):
 [
-  {"name": "Winter coat for Scott", "category": "clothing", "essential": true, "for_person": "Scott"},
-  {"name": "Winter coat for Iris", "category": "clothing", "essential": true, "for_person": "Iris"},
-  {"name": "Snow boots for Ella", "category": "clothing", "essential": true, "for_person": "Ella"},
-  {"name": "Snow boots for Caleb", "category": "clothing", "essential": true, "for_person": "Caleb"},
-  {"name": "Gloves", "category": "clothing", "quantity": 4, "essential": true},
-  {"name": "Wool socks", "category": "clothing", "quantity": 12, "essential": true},
-  {"name": "Sweaters", "category": "clothing", "quantity": 8, "essential": true},
-  {"name": "Jeans", "category": "clothing", "quantity": 8, "essential": true},
-  {"name": "Underwear", "category": "clothing", "quantity": 24, "essential": true},
-  {"name": "Toothbrushes", "category": "toiletries", "quantity": 4, "essential": true},
-  {"name": "Toothpaste", "category": "toiletries", "essential": true},
-  {"name": "Shampoo", "category": "toiletries", "essential": true},
-  {"name": "Deodorant", "category": "toiletries", "quantity": 2, "essential": true},
-  {"name": "Moisturizer", "category": "toiletries", "essential": true},
-  {"name": "Sunscreen SPF 30", "category": "toiletries", "essential": true},
-  {"name": "First aid kit", "category": "health", "essential": true},
-  {"name": "Pain relievers", "category": "health", "essential": true},
-  {"name": "Phone chargers", "category": "electronics", "quantity": 2, "essential": true},
-  {"name": "Camera", "category": "electronics", "essential": false},
-  {"name": "Passports", "category": "documents", "essential": true},
-  {"name": "Hotel confirmations", "category": "documents", "essential": true},
-  {"name": "Credit cards", "category": "documents", "essential": true},
-  {"name": "Snacks for kids", "category": "food_drinks", "essential": false},
-  {"name": "Reusable water bottles", "category": "other", "quantity": 4, "essential": true}
+  {"type": "heading", "level": 2, "text": "Scott"},
+  {"type": "heading", "level": 3, "text": "Clothing"},
+  {"type": "item", "text": "Winter coat", "checked": false},
+  {"type": "item", "text": "Snow boots", "checked": false},
+  {"type": "item", "text": "Jeans (2)", "checked": false},
+  {"type": "item", "text": "Sweaters (2)", "checked": false},
+
+  {"type": "heading", "level": 2, "text": "Iris"},
+  {"type": "heading", "level": 3, "text": "Clothing"},
+  {"type": "item", "text": "Winter coat", "checked": false},
+  {"type": "item", "text": "Snow boots", "checked": false},
+
+  {"type": "heading", "level": 2, "text": "Ella"},
+  {"type": "heading", "level": 3, "text": "Clothing"},
+  {"type": "item", "text": "Winter coat", "checked": false},
+  {"type": "item", "text": "Snow boots", "checked": false},
+
+  {"type": "heading", "level": 2, "text": "Caleb"},
+  {"type": "heading", "level": 3, "text": "Clothing"},
+  {"type": "item", "text": "Winter coat", "checked": false},
+  {"type": "item", "text": "Snow boots", "checked": false},
+
+  {"type": "heading", "level": 2, "text": "Shared Items"},
+  {"type": "heading", "level": 3, "text": "Toiletries"},
+  {"type": "item", "text": "Toothbrushes (4)", "checked": false},
+  {"type": "item", "text": "Toothpaste", "checked": false},
+  {"type": "item", "text": "Shampoo", "checked": false},
+  {"type": "item", "text": "Sunscreen SPF 30", "checked": false},
+
+  {"type": "heading", "level": 3, "text": "Electronics"},
+  {"type": "item", "text": "Phone chargers (2)", "checked": false},
+  {"type": "item", "text": "Camera", "checked": false},
+
+  {"type": "heading", "level": 3, "text": "Documents"},
+  {"type": "item", "text": "Passports", "checked": false},
+  {"type": "item", "text": "Hotel confirmations", "checked": false}
 ]
 
 NOW generate the packing list for THIS trip. Return ONLY the JSON array, no other text.`
@@ -179,37 +176,7 @@ NOW generate the packing list for THIS trip. Return ONLY the JSON array, no othe
   return prompt
 }
 
-function normalizeCategory(category: string): string {
-  const normalized = category.toLowerCase().replace(/[^a-z_]/g, '_')
-
-  const validCategories = [
-    'clothing',
-    'toiletries',
-    'electronics',
-    'documents',
-    'health',
-    'food_drinks',
-    'recreation',
-    'ev_equipment',
-    'other'
-  ]
-
-  const categoryMap: Record<string, string> = {
-    'medicine': 'health',
-    'medical': 'health',
-    'medication': 'health',
-    'tech': 'electronics',
-    'gear': 'recreation',
-    'food': 'food_drinks',
-    'drinks': 'food_drinks',
-    'snacks': 'food_drinks'
-  }
-
-  const mapped = categoryMap[normalized] || normalized
-  return validCategories.includes(mapped) ? mapped : 'other'
-}
-
-function parsePackingList(response: string): PackingItem[] {
+function parsePackingList(response: string): PackingNode[] {
   // Remove markdown code blocks if present
   let jsonStr = response.trim()
   if (jsonStr.startsWith('```')) {
@@ -222,98 +189,52 @@ function parsePackingList(response: string): PackingItem[] {
     throw new Error('Response is not an array')
   }
 
-  // Validation: Reject if too many items (indicates AI not following instructions)
-  if (parsed.length > 50) {
-    throw new Error(`Too many items generated (${parsed.length}). AI not following quality over quantity instruction.`)
+  // Validation: Reject if too many nodes (indicates AI not following instructions)
+  if (parsed.length > 100) {
+    throw new Error(`Too many nodes generated (${parsed.length}). AI not following instructions.`)
   }
 
-  const items = parsed.map((item: any) => ({
-    name: item.name,
-    category: normalizeCategory(item.category),
-    quantity: item.quantity || undefined,
-    essential: item.essential !== false,
-    for_person: item.for_person || undefined
-  }))
-
-  // Aggressive deduplication to catch variations
-  // Normalize item names by removing common words and checking for similarity
-  const normalizeForDedup = (name: string): string => {
-    return name
-      .toLowerCase()
-      .trim()
-      // Remove common descriptors that don't change the core item
-      .replace(/\b(travel|reusable|portable|small|large|kids?|adults?|for\s+\w+)\b/gi, '')
-      // Remove parentheticals like "(2)" or "(for Scott)"
-      .replace(/\([^)]*\)/g, '')
-      // Remove extra whitespace
-      .replace(/\s+/g, ' ')
-      .trim()
-  }
-
-  const seen = new Set<string>()
-  const seenNormalized = new Set<string>()
-  const uniqueItems: PackingItem[] = []
-
-  for (const item of items) {
-    const exactKey = item.name.toLowerCase().trim()
-    const normalizedKey = normalizeForDedup(item.name)
-
-    // Skip if we've seen the exact name OR a normalized version of it
-    if (seen.has(exactKey) || (normalizedKey && seenNormalized.has(normalizedKey))) {
-      console.log(`Skipping duplicate: "${item.name}" (normalized: "${normalizedKey}")`)
-      continue
-    }
-
-    seen.add(exactKey)
-    if (normalizedKey) {
-      seenNormalized.add(normalizedKey)
-    }
-    uniqueItems.push(item)
-  }
-
-  // Validation: Reject if we found too many duplicates
-  const duplicateCount = items.length - uniqueItems.length
-  const duplicateRate = duplicateCount / items.length
-
-  if (duplicateRate > 0.3) {
-    throw new Error(`Too many duplicates detected (${duplicateCount}/${items.length}). Response quality too low.`)
-  }
-
-  // Validation: Check for age-inappropriate items
-  const inappropriateInfantItems = [
-    'diaper', 'baby wipe', 'stroller', 'car seat', 'formula', 'baby bottle', 'sippy cup', 'pull-up', 'pacifier', 'onesie'
-  ]
-
-  const hasInappropriateItems = uniqueItems.some(item => {
-    const itemLower = item.name.toLowerCase()
-    return inappropriateInfantItems.some(inappropriate => {
-      // More specific matching to avoid false positives
-      // For "baby bottle" we need the full phrase, not just "bottle"
-      const needsWordBoundary = inappropriate === 'baby bottle'
-
-      // Check if the item contains an infant-specific term
-      const matches = needsWordBoundary
-        ? itemLower.includes(inappropriate)
-        : new RegExp(`\\b${inappropriate}s?\\b`).test(itemLower) // Word boundary check with optional plural
-
-      if (matches) {
-        // Unless it's specifically for an infant/toddler (check for_person field)
-        const isForInfantOrToddler = item.for_person &&
-          (item.for_person.toLowerCase().includes('infant') ||
-           item.for_person.toLowerCase().includes('toddler') ||
-           item.for_person.toLowerCase().includes('baby'))
-        return !isForInfantOrToddler
+  // Validate and transform nodes
+  const nodes: PackingNode[] = parsed.map((node: any) => {
+    if (node.type === 'heading') {
+      if (!node.level || !node.text) {
+        throw new Error('Invalid heading node: missing level or text')
       }
-      return false
-    })
+      if (node.level < 1 || node.level > 4) {
+        throw new Error(`Invalid heading level: ${node.level}. Must be 1-4.`)
+      }
+      return {
+        type: 'heading',
+        level: node.level as 1 | 2 | 3 | 4,
+        text: node.text
+      }
+    } else if (node.type === 'item') {
+      if (!node.text) {
+        throw new Error('Invalid item node: missing text')
+      }
+      return {
+        type: 'item',
+        text: node.text,
+        checked: node.checked || false
+      }
+    } else {
+      throw new Error(`Unknown node type: ${node.type}`)
+    }
   })
 
-  if (hasInappropriateItems) {
-    console.error('Inappropriate infant items detected in response')
-    throw new Error('Response contains age-inappropriate items (infant items for older children/adults)')
+  // Count items (not headings)
+  const itemCount = nodes.filter(n => n.type === 'item').length
+
+  // Validation: Ensure reasonable item count
+  if (itemCount < 5) {
+    throw new Error(`Too few items generated (${itemCount}). Need at least 5 items.`)
   }
 
-  return uniqueItems
+  if (itemCount > 50) {
+    throw new Error(`Too many items generated (${itemCount}). Target is 20-30 items.`)
+  }
+
+  return nodes
 }
 
 serve(async (req) => {
@@ -383,9 +304,9 @@ serve(async (req) => {
     const responseText = claudeData.content[0].text
 
     // Parse the response
-    const packingItems = parsePackingList(responseText)
+    const packingNodes = parsePackingList(responseText)
 
-    return new Response(JSON.stringify({ items: packingItems }), {
+    return new Response(JSON.stringify({ nodes: packingNodes }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {

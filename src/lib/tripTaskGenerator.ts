@@ -4,7 +4,7 @@
  * Supports both simple trips and multi-segment trips
  */
 
-import type { PackingTemplate, PackingItem, EVRouteResult, TripMetadata, TripSegment, Accommodation, TransportationLogistic, TripEvent } from '@/types/trip'
+import type { PackingTemplate, PackingNode, EVRouteResult, TripMetadata, TripSegment, Accommodation, TransportationLogistic, TripEvent } from '@/types/trip'
 import type { Task } from '@/types/task'
 import { getPackingList } from './packingTemplates'
 
@@ -24,30 +24,30 @@ export interface GeneratedTripTasks {
 // ============================================================================
 
 /**
- * Generate packing list tasks from template or custom items
+ * Generate packing list tasks from template or custom nodes
  */
 export function generatePackingTasks(
   projectId: string,
   packingTemplate: PackingTemplate,
   tripStartDate: string,
-  customItems?: PackingItem[]
+  customNodes?: PackingNode[]
 ): Partial<Task>[] {
-  const packingItems = customItems || getPackingList(packingTemplate)
+  const packingNodes = customNodes || getPackingList(packingTemplate)
 
   // Schedule packing tasks for 2 days before trip
   const packByDate = new Date(tripStartDate)
   packByDate.setDate(packByDate.getDate() - 2)
 
-  return packingItems.map((item) => ({
-    title: `Pack: ${item.name}`,
-    projectId: projectId,
-    scheduledFor: packByDate,
-    completed: false,
-    context: 'personal',
-    notes: item.essential ? 'Essential item' : 'Optional item',
-    // Use category field or notes to track packing category
-    // Could add custom field in future: packing_category: item.category
-  }))
+  // Filter to only process item nodes, skip headings
+  return packingNodes
+    .filter((node) => node.type === 'item')
+    .map((node) => ({
+      title: `Pack: ${node.text}`,
+      projectId: projectId,
+      scheduledFor: packByDate,
+      completed: false,
+      context: 'personal',
+    }))
 }
 
 // ============================================================================
@@ -573,9 +573,9 @@ export function generateAllTripTasks(
   routeResult: EVRouteResult | null,
   tripStartDate: string,
   tripMetadata?: TripMetadata,
-  customPackingItems?: PackingItem[]
+  customPackingNodes?: PackingNode[]
 ): GeneratedTripTasks {
-  const packingTasks = generatePackingTasks(projectId, packingTemplate, tripStartDate, customPackingItems)
+  const packingTasks = generatePackingTasks(projectId, packingTemplate, tripStartDate, customPackingNodes)
 
   // Calculate trip duration for phase tasks
   const tripEndDate = tripMetadata?.endDate || tripStartDate
