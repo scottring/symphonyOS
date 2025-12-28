@@ -196,6 +196,8 @@ export function useProjects() {
         context: task.context,
         notes: task.notes,
         estimated_duration: task.estimatedDuration,
+        location: task.location,
+        location_place_id: task.locationPlaceId,
       }))
 
       if (allTasks.length > 0) {
@@ -311,6 +313,8 @@ export function useProjects() {
         context: task.context,
         notes: task.notes,
         estimated_duration: task.estimatedDuration,
+        location: task.location,
+        location_place_id: task.locationPlaceId,
       }))
 
       if (allTasks.length > 0) {

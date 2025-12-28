@@ -15,6 +15,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { DrivingEVEvent, ChargingStation, ChargingNetwork } from '@/types/trip'
 import { calculateEVRoute } from '@/lib/evRouteOptimizer'
+import { findChargersAlongRoute } from '@/lib/chargingStations'
 import { Zap, Navigation, Sliders, Route as RouteIcon, Target, RefreshCw } from 'lucide-react'
 
 interface EVRoutePlannerProps {
@@ -38,7 +39,7 @@ export function EVRoutePlanner({ event, onClose, onSelectWaypoints }: EVRoutePla
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [originalStations, setOriginalStations] = useState<ChargingStation[]>([]) // All stations from initial load
+  const [_originalStations, setOriginalStations] = useState<ChargingStation[]>([]) // All stations from initial load
   const [allStations, setAllStations] = useState<ChargingStation[]>([]) // Stations for current route
   const [filteredStations, setFilteredStations] = useState<ChargingStation[]>([])
   const [selectedStations, setSelectedStations] = useState<Set<string>>(new Set())
@@ -336,13 +337,72 @@ export function EVRoutePlanner({ event, onClose, onSelectWaypoints }: EVRoutePla
     }
   }, [selectedRouteIndex, availableRoutes])
 
-  // DISABLED: Route proximity filter - show all stations regardless of distance
+  // Refresh charging stations when route changes
   useEffect(() => {
-    if (!originalStations.length) return
+    // Skip if no routes available yet or if we're still on the initial load
+    if (!availableRoutes.length || selectedRouteIndex >= availableRoutes.length) {
+      return
+    }
 
-    // Show all stations without filtering by route proximity
-    setAllStations(originalStations)
-  }, [originalStations])
+    const selectedRoute = availableRoutes[selectedRouteIndex]
+    if (!selectedRoute || !event.evVehicle) {
+      return
+    }
+
+    // Skip initial render - only refresh when user actually switches routes
+    // We check if this is the first route (index 0) and we haven't loaded stations yet
+    if (selectedRouteIndex === 0 && isLoading) {
+      return
+    }
+
+    console.log(`🔄 Refreshing stations for route ${selectedRouteIndex + 1} of ${availableRoutes.length}`)
+
+    // Extract route points from the selected route
+    const extractRoutePoints = (route: google.maps.DirectionsRoute): Array<{ lat: number; lng: number }> => {
+      const points: Array<{ lat: number; lng: number }> = []
+
+      for (const leg of route.legs) {
+        // Add start point
+        points.push({ lat: leg.start_location.lat(), lng: leg.start_location.lng() })
+
+        // Add points from steps (sample every few steps to avoid too many points)
+        const sampleInterval = Math.max(1, Math.floor(leg.steps.length / 10))
+        for (let i = 0; i < leg.steps.length; i += sampleInterval) {
+          const step = leg.steps[i]
+          points.push({ lat: step.end_location.lat(), lng: step.end_location.lng() })
+        }
+      }
+
+      return points
+    }
+
+    // Recalculate charging stations for the selected route
+    const recalculateStations = async () => {
+      setIsRefreshing(true)
+      try {
+        const routePoints = extractRoutePoints(selectedRoute)
+        console.log(`📍 Extracted ${routePoints.length} route points`)
+
+        const stations = await findChargersAlongRoute({
+          routePoints,
+          searchRadiusMiles: 25,
+          minPowerKW: 50,
+        })
+
+        console.log(`⚡ Found ${stations.length} charging stations for route ${selectedRouteIndex + 1}`)
+
+        setOriginalStations(stations)
+        setAllStations(stations)
+        setFilteredStations(stations)
+      } catch (error) {
+        console.error('❌ Error recalculating stations for new route:', error)
+      } finally {
+        setIsRefreshing(false)
+      }
+    }
+
+    recalculateStations()
+  }, [selectedRouteIndex, availableRoutes, event.evVehicle, isLoading])
 
   // Update station markers when filtered stations change
   useEffect(() => {

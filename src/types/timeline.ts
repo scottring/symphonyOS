@@ -27,6 +27,7 @@ export interface TimelineItem {
   subtaskCompletedCount?: number // Completed subtasks
   // Event-specific
   location?: string
+  locationPlaceId?: string // Google Place ID for precise directions
   allDay?: boolean
   googleDescription?: string // Read-only description from Google Calendar
   calendarName?: string | null // Name of the source calendar (e.g., "Family", "Work")
@@ -63,6 +64,7 @@ export function taskToTimelineItem(task: Task): TimelineItem {
     category: task.category,
     allDay: task.isAllDay,
     location: task.location,
+    locationPlaceId: task.locationPlaceId,
     subtaskCount,
     subtaskCompletedCount,
     originalTask: task,

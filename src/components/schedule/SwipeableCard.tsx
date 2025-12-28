@@ -293,6 +293,38 @@ export function SwipeableCard({
             </div>
           )}
         </div>
+
+        {/* Location row - shows destination/location with directions link */}
+        {item.location && (
+          <div className="flex items-center gap-2 mt-1.5 ml-[3.75rem]">
+            <a
+              href={`https://www.google.com/maps/dir/?api=1&destination=${
+                item.locationPlaceId
+                  ? `place_id:${item.locationPlaceId}`
+                  : encodeURIComponent(item.location)
+              }`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              onTouchStart={(e) => {
+                e.stopPropagation()
+                setIsDragging(false)
+              }}
+              onTouchEnd={(e) => e.stopPropagation()}
+              onTouchMove={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1.5 px-2 py-1 bg-primary-50 active:bg-primary-100 text-primary-700 rounded-lg text-xs font-medium border border-primary-100 transition-colors max-w-full"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+              </svg>
+              <span className="truncate">{item.location}</span>
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+                <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+              </svg>
+            </a>
+          </div>
+        )}
       </div>
     </div>
   )
