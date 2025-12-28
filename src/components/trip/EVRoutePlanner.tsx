@@ -95,15 +95,6 @@ export function EVRoutePlanner({ event, onClose, onSelectWaypoints }: EVRoutePla
       })
 
       const stations = result.availableStations || []
-      console.log(`EVRoutePlanner: Loaded ${stations.length} stations from calculateEVRoute`)
-      if (stations.length > 0) {
-        const networkCounts = stations.reduce((acc, s) => {
-          acc[s.network] = (acc[s.network] || 0) + 1
-          return acc
-        }, {} as Record<string, number>)
-        console.log('Network distribution:', networkCounts)
-      }
-
       setOriginalStations(stations) // Store original stations
       setAllStations(stations)
       setFilteredStations(stations)
@@ -347,12 +338,7 @@ export function EVRoutePlanner({ event, onClose, onSelectWaypoints }: EVRoutePla
 
   // DISABLED: Route proximity filter - show all stations regardless of distance
   useEffect(() => {
-    if (!originalStations.length) {
-      console.log('No stations loaded yet')
-      return
-    }
-
-    console.log(`Showing all ${originalStations.length} stations (route proximity filter disabled)`)
+    if (!originalStations.length) return
 
     // Show all stations without filtering by route proximity
     setAllStations(originalStations)
@@ -463,7 +449,6 @@ export function EVRoutePlanner({ event, onClose, onSelectWaypoints }: EVRoutePla
       }
     }
 
-    console.log(`Final filter: ${filtered.length}/${allStations.length} stations passed filters (networks: ${filters.networks.size}, minPowerKW: ${filters.minPowerKW})`)
     setFilteredStations(filtered)
   }, [filters, allStations, availableRoutes, selectedRouteIndex])
 

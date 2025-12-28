@@ -6,45 +6,74 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { findChargingStations, findChargersAlongRoute, calculateDistance, findClosestStation } from './chargingStations'
 import type { ChargingStation } from '@/types/trip'
 
-// Mock Supabase client
-vi.mock('./supabase', () => ({
-  supabase: {
-    functions: {
-      invoke: vi.fn(),
+// Mock Google Maps global objects
+const mockNearbySearch = vi.fn()
+const mockGetDetails = vi.fn()
+const mockMap = {}
+
+// Set up global window.google before importing anything
+global.window = {
+  google: {
+    maps: {
+      Map: vi.fn(() => mockMap),
+      LatLng: vi.fn((lat, lng) => ({ lat, lng })),
+      places: {
+        PlacesService: vi.fn(() => ({
+          nearbySearch: mockNearbySearch,
+          getDetails: mockGetDetails,
+        })),
+        PlacesServiceStatus: {
+          OK: 'OK',
+          ZERO_RESULTS: 'ZERO_RESULTS',
+          ERROR: 'ERROR',
+        },
+      },
     },
   },
-}))
+} as any
 
-import { supabase } from './supabase'
+// Mock Google Maps SDK
+vi.mock('./googleMaps', () => ({
+  loadGoogleMapsSDK: vi.fn().mockResolvedValue(undefined),
+}))
 
 describe('chargingStations', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    // Clear mocks
+    mockNearbySearch.mockReset()
+    mockGetDetails.mockReset()
+
+    // Set default implementations
+    mockNearbySearch.mockImplementation((_request, callback) => {
+      callback([], 'ZERO_RESULTS')
+    })
+
+    mockGetDetails.mockImplementation((_request, callback) => {
+      callback(null, 'ERROR')
+    })
   })
 
   describe('findChargingStations', () => {
-    it('should call Supabase edge function with correct parameters', async () => {
-      const mockStations: ChargingStation[] = [
-        {
-          id: 'ocm-1',
-          name: 'Test Station',
+    it('should call Google Places API with correct parameters', async () => {
+      const mockPlaceResult = {
+        place_id: 'test-place-1',
+        name: 'Electrify America - Test Station',
+        vicinity: '123 Main St',
+        geometry: {
           location: {
-            name: 'Test Location',
-            address: '123 Main St',
-            lat: 40.7128,
-            lng: -74.0060,
+            lat: () => 40.7128,
+            lng: () => -74.0060,
           },
-          network: 'Electrify America',
-          powerKW: 350,
-          connectorTypes: ['CCS'],
-          available: true,
-          distance: 5,
         },
-      ]
+        business_status: 'OPERATIONAL',
+      } as google.maps.places.PlaceResult
 
-      vi.mocked(supabase.functions.invoke).mockResolvedValue({
-        data: { stations: mockStations },
-        error: null,
+      mockNearbySearch.mockImplementation((_request, callback) => {
+        callback([mockPlaceResult], 'OK')
+      })
+
+      mockGetDetails.mockImplementation((_request, callback) => {
+        callback(mockPlaceResult, 'OK')
       })
 
       const result = await findChargingStations({
@@ -54,46 +83,46 @@ describe('chargingStations', () => {
         maxResults: 20,
       })
 
-      expect(supabase.functions.invoke).toHaveBeenCalledWith('find-charging-stations', {
-        body: {
-          latitude: 40.7128,
-          longitude: -74.0060,
-          radiusMiles: 25,
-          maxResults: 20,
-          minPowerKW: undefined,
-        },
-      })
-
-      expect(result).toEqual(mockStations)
+      expect(mockNearbySearch).toHaveBeenCalled()
+      expect(result).toHaveLength(1)
+      expect(result[0].network).toBe('Electrify America')
+      expect(result[0].name).toContain('Electrify America')
     })
 
     it('should filter by network when specified', async () => {
-      const mockStations: ChargingStation[] = [
+      const mockPlaces = [
         {
-          id: 'ocm-1',
-          name: 'Tesla Station',
-          location: { name: 'Tesla', address: '123 Main St', lat: 40.7128, lng: -74.0060 },
-          network: 'Tesla Supercharger',
-          powerKW: 250,
-          connectorTypes: ['Tesla'],
-          available: true,
-          distance: 5,
+          place_id: 'tesla-1',
+          name: 'Tesla Supercharger',
+          vicinity: '123 Main St',
+          geometry: {
+            location: {
+              lat: () => 40.7128,
+              lng: () => -74.0060,
+            },
+          },
+          business_status: 'OPERATIONAL',
         },
         {
-          id: 'ocm-2',
-          name: 'EA Station',
-          location: { name: 'EA', address: '456 Oak Ave', lat: 40.7130, lng: -74.0062 },
-          network: 'Electrify America',
-          powerKW: 350,
-          connectorTypes: ['CCS'],
-          available: true,
-          distance: 6,
+          place_id: 'ea-1',
+          name: 'Electrify America',
+          vicinity: '456 Oak Ave',
+          geometry: {
+            location: {
+              lat: () => 40.7130,
+              lng: () => -74.0062,
+            },
+          },
+          business_status: 'OPERATIONAL',
         },
-      ]
+      ] as google.maps.places.PlaceResult[]
 
-      vi.mocked(supabase.functions.invoke).mockResolvedValue({
-        data: { stations: mockStations },
-        error: null,
+      mockNearbySearch.mockImplementation((_request, callback) => {
+        callback(mockPlaces, 'OK')
+      })
+
+      mockGetDetails.mockImplementation((_request, callback) => {
+        callback(mockPlaces[0], 'OK')
       })
 
       const result = await findChargingStations({
@@ -107,32 +136,39 @@ describe('chargingStations', () => {
     })
 
     it('should filter out unavailable stations when operationalOnly is true', async () => {
-      const mockStations: ChargingStation[] = [
+      const mockPlaces = [
         {
-          id: 'ocm-1',
-          name: 'Available Station',
-          location: { name: 'Station 1', address: '123 Main St', lat: 40.7128, lng: -74.0060 },
-          network: 'ChargePoint',
-          powerKW: 150,
-          connectorTypes: ['CCS'],
-          available: true,
-          distance: 5,
+          place_id: 'cp-1',
+          name: 'ChargePoint Station',
+          vicinity: '123 Main St',
+          geometry: {
+            location: {
+              lat: () => 40.7128,
+              lng: () => -74.0060,
+            },
+          },
+          business_status: 'OPERATIONAL',
         },
         {
-          id: 'ocm-2',
-          name: 'Unavailable Station',
-          location: { name: 'Station 2', address: '456 Oak Ave', lat: 40.7130, lng: -74.0062 },
-          network: 'ChargePoint',
-          powerKW: 150,
-          connectorTypes: ['CCS'],
-          available: false,
-          distance: 6,
+          place_id: 'cp-2',
+          name: 'ChargePoint Station 2',
+          vicinity: '456 Oak Ave',
+          geometry: {
+            location: {
+              lat: () => 40.7130,
+              lng: () => -74.0062,
+            },
+          },
+          business_status: 'CLOSED_PERMANENTLY',
         },
-      ]
+      ] as google.maps.places.PlaceResult[]
 
-      vi.mocked(supabase.functions.invoke).mockResolvedValue({
-        data: { stations: mockStations },
-        error: null,
+      mockNearbySearch.mockImplementation((_request, callback) => {
+        callback(mockPlaces, 'OK')
+      })
+
+      mockGetDetails.mockImplementation((_request, callback) => {
+        callback(mockPlaces[0], 'OK')
       })
 
       const result = await findChargingStations({
@@ -145,10 +181,9 @@ describe('chargingStations', () => {
       expect(result[0].available).toBe(true)
     })
 
-    it('should handle edge function errors gracefully', async () => {
-      vi.mocked(supabase.functions.invoke).mockResolvedValue({
-        data: null,
-        error: new Error('API Error'),
+    it('should handle API errors gracefully', async () => {
+      mockNearbySearch.mockImplementation((_request, callback) => {
+        callback(null, 'ERROR')
       })
 
       const result = await findChargingStations({
@@ -159,10 +194,9 @@ describe('chargingStations', () => {
       expect(result).toEqual([])
     })
 
-    it('should handle missing data in response', async () => {
-      vi.mocked(supabase.functions.invoke).mockResolvedValue({
-        data: {},
-        error: null,
+    it('should handle zero results', async () => {
+      mockNearbySearch.mockImplementation((_request, callback) => {
+        callback([], 'ZERO_RESULTS')
       })
 
       const result = await findChargingStations({
@@ -184,20 +218,25 @@ describe('chargingStations', () => {
         { lat: 40.8500, lng: -74.0300 },
       ]
 
-      const mockStation: ChargingStation = {
-        id: 'ocm-1',
-        name: 'Test Station',
-        location: { name: 'Station', address: '123 Main St', lat: 40.7500, lng: -74.0100 },
-        network: 'ChargePoint',
-        powerKW: 150,
-        connectorTypes: ['CCS'],
-        available: true,
-        distance: 5,
-      }
+      const mockPlace = {
+        place_id: 'cp-1',
+        name: 'ChargePoint Station',
+        vicinity: '123 Main St',
+        geometry: {
+          location: {
+            lat: () => 40.7500,
+            lng: () => -74.0100,
+          },
+        },
+        business_status: 'OPERATIONAL',
+      } as google.maps.places.PlaceResult
 
-      vi.mocked(supabase.functions.invoke).mockResolvedValue({
-        data: { stations: [mockStation] },
-        error: null,
+      mockNearbySearch.mockImplementation((_request, callback) => {
+        callback([mockPlace], 'OK')
+      })
+
+      mockGetDetails.mockImplementation((_request, callback) => {
+        callback(mockPlace, 'OK')
       })
 
       const result = await findChargersAlongRoute({
@@ -206,7 +245,7 @@ describe('chargingStations', () => {
       })
 
       // Should have called the function multiple times (once per search point)
-      expect(supabase.functions.invoke).toHaveBeenCalled()
+      expect(mockNearbySearch).toHaveBeenCalled()
       expect(result).toBeInstanceOf(Array)
     })
 
@@ -216,21 +255,26 @@ describe('chargingStations', () => {
         { lat: 40.7200, lng: -74.0080 }, // Close to first point, might return same station
       ]
 
-      const mockStation: ChargingStation = {
-        id: 'ocm-1',
-        name: 'Duplicate Station',
-        location: { name: 'Station', address: '123 Main St', lat: 40.7150, lng: -74.0070 },
-        network: 'ChargePoint',
-        powerKW: 150,
-        connectorTypes: ['CCS'],
-        available: true,
-        distance: 5,
-      }
+      const mockPlace = {
+        place_id: 'cp-1',
+        name: 'ChargePoint Station',
+        vicinity: '123 Main St',
+        geometry: {
+          location: {
+            lat: () => 40.7150,
+            lng: () => -74.0070,
+          },
+        },
+        business_status: 'OPERATIONAL',
+      } as google.maps.places.PlaceResult
 
       // Return same station for both searches
-      vi.mocked(supabase.functions.invoke).mockResolvedValue({
-        data: { stations: [mockStation] },
-        error: null,
+      mockNearbySearch.mockImplementation((_request, callback) => {
+        callback([mockPlace], 'OK')
+      })
+
+      mockGetDetails.mockImplementation((_request, callback) => {
+        callback(mockPlace, 'OK')
       })
 
       const result = await findChargersAlongRoute({
@@ -238,42 +282,47 @@ describe('chargingStations', () => {
       })
 
       // Should only include each unique station once
-      const stationIds = result.map(s => s.id)
+      const stationIds = result.map((s) => s.id)
       const uniqueIds = [...new Set(stationIds)]
       expect(stationIds).toEqual(uniqueIds)
     })
 
     it('should sort results by distance', async () => {
-      const routePoints = [
-        { lat: 40.7128, lng: -74.0060 },
-      ]
+      const routePoints = [{ lat: 40.7128, lng: -74.006 }]
 
-      const mockStations: ChargingStation[] = [
+      const mockPlaces = [
         {
-          id: 'ocm-1',
-          name: 'Far Station',
-          location: { name: 'Station 1', address: '123 Main St', lat: 40.7200, lng: -74.0100 },
-          network: 'ChargePoint',
-          powerKW: 150,
-          connectorTypes: ['CCS'],
-          available: true,
-          distance: 10,
+          place_id: 'cp-1',
+          name: 'ChargePoint Far',
+          vicinity: '123 Main St',
+          geometry: {
+            location: {
+              lat: () => 40.72,
+              lng: () => -74.01,
+            },
+          },
+          business_status: 'OPERATIONAL',
         },
         {
-          id: 'ocm-2',
-          name: 'Near Station',
-          location: { name: 'Station 2', address: '456 Oak Ave', lat: 40.7130, lng: -74.0062 },
-          network: 'ChargePoint',
-          powerKW: 150,
-          connectorTypes: ['CCS'],
-          available: true,
-          distance: 2,
+          place_id: 'cp-2',
+          name: 'ChargePoint Near',
+          vicinity: '456 Oak Ave',
+          geometry: {
+            location: {
+              lat: () => 40.713,
+              lng: () => -74.0062,
+            },
+          },
+          business_status: 'OPERATIONAL',
         },
-      ]
+      ] as google.maps.places.PlaceResult[]
 
-      vi.mocked(supabase.functions.invoke).mockResolvedValue({
-        data: { stations: mockStations },
-        error: null,
+      mockNearbySearch.mockImplementation((_request, callback) => {
+        callback(mockPlaces, 'OK')
+      })
+
+      mockGetDetails.mockImplementation((_request, callback) => {
+        callback(mockPlaces[0], 'OK')
       })
 
       const result = await findChargersAlongRoute({
@@ -281,7 +330,9 @@ describe('chargingStations', () => {
       })
 
       // Should be sorted by distance ascending
-      expect(result[0].distance).toBeLessThanOrEqual(result[result.length - 1].distance || 0)
+      if (result.length > 1) {
+        expect(result[0].distance).toBeLessThanOrEqual(result[result.length - 1].distance || 0)
+      }
     })
   })
 

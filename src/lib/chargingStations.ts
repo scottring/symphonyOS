@@ -1,11 +1,10 @@
 /**
  * Charging Station Integration
- * Integration with Open Charge Map API for finding EV charging stations
- * API Docs: https://openchargemap.org/site/develop/api
+ * Integration with Google Places API for finding EV charging stations
  */
 
 import type { ChargingStation, ChargingNetwork } from '@/types/trip'
-import { supabase } from './supabase'
+import { loadGoogleMapsSDK } from './googleMaps'
 
 // ============================================================================
 // API Functions
@@ -22,7 +21,7 @@ export interface FindChargersParams {
 }
 
 /**
- * Find charging stations near a location
+ * Find charging stations near a location using Google Places API
  */
 export async function findChargingStations(params: FindChargersParams): Promise<ChargingStation[]> {
   const {
@@ -36,37 +35,91 @@ export async function findChargingStations(params: FindChargersParams): Promise<
   } = params
 
   try {
-    // Call our Supabase Edge Function to fetch stations from NREL API
-    const { data, error } = await supabase.functions.invoke('find-charging-stations-nrel', {
-      body: {
-        latitude,
-        longitude,
-        radiusMiles,
-        maxResults,
-        minPowerKW,
-        networks, // Pass network filter to NREL
-      },
-    })
+    // Ensure Google Maps is loaded
+    await loadGoogleMapsSDK()
 
-    if (error) {
-      console.error('Error calling find-charging-stations-nrel function:', error)
+    if (!window.google?.maps?.places?.PlacesService) {
       return []
     }
 
-    const stations: ChargingStation[] = data.stations || []
+    // Create a temporary map element for PlacesService (required by Google)
+    const mapDiv = document.createElement('div')
+    const map = new google.maps.Map(mapDiv)
+    const service = new google.maps.places.PlacesService(map)
 
-    // Log networks for debugging
-    if (stations.length > 0) {
-      const uniqueNetworks = [...new Set(stations.map(s => s.network))]
-      const operationalCount = stations.filter(s => s.available).length
-      console.log(`Received ${stations.length} stations (${operationalCount} operational) with networks:`, uniqueNetworks)
-      console.log(`Filtering by networks:`, networks)
+    // Search for EV charging stations using keyword search
+    // Note: 'type' parameter doesn't reliably filter charging stations, so we use 'keyword'
+    const request: google.maps.places.PlaceSearchRequest = {
+      location: new google.maps.LatLng(latitude, longitude),
+      radius: radiusMiles * 1609.34, // Convert miles to meters
+      keyword: 'EV charging station electric vehicle',
     }
+
+    const results = await new Promise<google.maps.places.PlaceResult[]>((resolve, reject) => {
+      service.nearbySearch(request, (results, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+          resolve(results)
+        } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
+          resolve([])
+        } else {
+          reject(new Error(`Places API error: ${status}`))
+        }
+      })
+    })
+
+    // Get detailed information for each place to find network data
+    // We'll fetch details for up to maxResults stations
+    const detailedResults: google.maps.places.PlaceResult[] = []
+
+    for (const place of results.slice(0, maxResults)) {
+      if (!place.place_id) continue
+
+      try {
+        const details = await new Promise<google.maps.places.PlaceResult>((resolve) => {
+          service.getDetails(
+            {
+              placeId: place.place_id!,
+              fields: [
+                'name',
+                'formatted_address',
+                'geometry',
+                'place_id',
+                'business_status',
+                'types',
+                'website',
+                'opening_hours',
+              ],
+            },
+            (result, status) => {
+              if (status === google.maps.places.PlacesServiceStatus.OK && result) {
+                resolve(result)
+              } else {
+                resolve(place) // Fall back to basic place data
+              }
+            }
+          )
+        })
+
+        detailedResults.push(details)
+      } catch (error) {
+        detailedResults.push(place) // Fall back to basic data
+      }
+    }
+
+    // Transform Google Places results to our ChargingStation format
+    const stations: ChargingStation[] = detailedResults
+      .map((place) => transformPlaceToStation(place, { lat: latitude, lng: longitude }))
+      .filter((station): station is ChargingStation => station !== null)
 
     // Apply client-side filters
     const filtered = stations.filter((station) => {
       // Filter operational status
       if (operationalOnly && !station.available) {
+        return false
+      }
+
+      // Filter by minimum power
+      if (minPowerKW && station.powerKW < minPowerKW) {
         return false
       }
 
@@ -81,25 +134,19 @@ export async function findChargingStations(params: FindChargersParams): Promise<
     })
 
     // If network filter returned 0 results, fall back to showing all stations
-    // (user's preferred networks may not be available in this area)
     if (networks && networks.length > 0 && filtered.length === 0 && stations.length > 0) {
-      console.log(`No stations match preferred networks. Trying all networks...`)
-
       // First try operational stations from all networks
-      const allOperational = stations.filter(station => station.available)
+      const allOperational = stations.filter((station) => station.available)
       if (allOperational.length > 0) {
-        console.log(`Showing ${allOperational.length} operational stations from all networks.`)
         return allOperational
       }
 
-      // If no operational stations, show all stations including non-operational
-      console.log(`No operational stations found. Showing all ${stations.length} stations (including non-operational).`)
+      // Show all stations including non-operational
       return stations
     }
 
     return filtered
   } catch (error) {
-    console.error('Error fetching charging stations:', error)
     return []
   }
 }
@@ -116,18 +163,9 @@ export async function findChargersAlongRoute(params: {
 }): Promise<ChargingStation[]> {
   const { routePoints, searchRadiusMiles = 10, minPowerKW, networks } = params
 
-  console.log('findChargersAlongRoute called:', {
-    routePointsCount: routePoints.length,
-    searchRadiusMiles,
-    minPowerKW,
-    networks,
-  })
-
   // Search at key points along the route (every N points to avoid too many API calls)
   const searchInterval = Math.max(1, Math.floor(routePoints.length / 5)) // Max 5 searches
   const searchPoints = routePoints.filter((_, index) => index % searchInterval === 0)
-
-  console.log(`Searching at ${searchPoints.length} points along route`)
 
   const allStations: ChargingStation[] = []
   const seenStationIds = new Set<string>()
@@ -142,8 +180,6 @@ export async function findChargersAlongRoute(params: {
       networks,
     })
 
-    console.log(`Found ${stations.length} stations at point (${point.lat}, ${point.lng})`)
-
     // Deduplicate stations
     for (const station of stations) {
       if (!seenStationIds.has(station.id)) {
@@ -153,8 +189,6 @@ export async function findChargersAlongRoute(params: {
     }
   }
 
-  console.log(`Total unique stations found: ${allStations.length}`)
-
   // Sort by distance if available
   return allStations.sort((a, b) => (a.distance || 0) - (b.distance || 0))
 }
@@ -162,6 +196,117 @@ export async function findChargersAlongRoute(params: {
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+/**
+ * Transform Google Places result to ChargingStation format
+ */
+function transformPlaceToStation(
+  place: google.maps.places.PlaceResult,
+  searchOrigin: { lat: number; lng: number }
+): ChargingStation | null {
+  if (!place.place_id || !place.geometry?.location) {
+    return null
+  }
+
+  const lat = place.geometry.location.lat()
+  const lng = place.geometry.location.lng()
+  const name = place.name || 'Unknown Station'
+  const address = place.vicinity || place.formatted_address || ''
+
+  // Detect network from station name, address, and website
+  const network = detectChargingNetwork(name, address, place.website)
+
+  // Estimate power based on network
+  const powerKW = estimatePowerByNetwork(network)
+
+  // Calculate distance from search origin
+  const distance = calculateDistance(searchOrigin, { lat, lng })
+
+  // Determine availability (assume open if business_status is OPERATIONAL)
+  const available = place.business_status === 'OPERATIONAL' || !place.business_status
+
+  return {
+    id: `google-${place.place_id}`,
+    name,
+    location: {
+      name,
+      address,
+      placeId: place.place_id,
+      lat,
+      lng,
+    },
+    network,
+    powerKW,
+    connectorTypes: [], // Google Places doesn't provide this directly
+    available,
+    distance,
+  }
+}
+
+/**
+ * Detect charging network from station name, address, and website
+ */
+function detectChargingNetwork(
+  name: string,
+  address?: string,
+  website?: string
+): ChargingNetwork {
+  // Combine all available text for searching
+  const searchText = [name, address, website].filter(Boolean).join(' ').toLowerCase()
+
+  if (
+    searchText.includes('electrify america') ||
+    searchText.includes('electrify-america') ||
+    searchText.includes('electrifyamerica.com')
+  ) {
+    return 'Electrify America'
+  }
+  if (
+    searchText.includes('tesla') ||
+    searchText.includes('supercharger') ||
+    searchText.includes('tesla.com')
+  ) {
+    return 'Tesla Supercharger'
+  }
+  if (
+    searchText.includes('chargepoint') ||
+    searchText.includes('charge point') ||
+    searchText.includes('chargepoint.com')
+  ) {
+    return 'ChargePoint'
+  }
+  if (searchText.includes('evgo') || searchText.includes('ev go') || searchText.includes('evgo.com')) {
+    return 'EVgo'
+  }
+  if (searchText.includes('blink') || searchText.includes('blinkcharging.com')) {
+    return 'Blink'
+  }
+
+  return 'Other'
+}
+
+/**
+ * Estimate charging power based on network
+ * These are typical values - actual stations may vary
+ */
+function estimatePowerByNetwork(network: ChargingNetwork): number {
+  switch (network) {
+    case 'Electrify America':
+      return 350 // EA typically has 150-350kW chargers
+    case 'Tesla Supercharger':
+      return 250 // V3 Superchargers are 250kW
+    case 'EVgo':
+      return 100 // EVgo typically 50-100kW
+    case 'ChargePoint':
+      return 62.5 // ChargePoint Express is typically 62.5kW
+    case 'Blink':
+      return 50 // Blink DC fast chargers are typically 50kW
+    case 'Other':
+      return 50 // Conservative default for unknown networks
+    default:
+      return 50
+  }
+}
 
 /**
  * Calculate distance between two lat/lng points in miles

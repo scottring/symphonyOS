@@ -48,8 +48,9 @@ export async function loadGoogleMapsSDK(): Promise<void> {
 
     // Create script element - load core only, we'll import libraries dynamically
     // Use loading=async to suppress console warning about async loading
+    // Use v=weekly to get latest features including importLibrary support
     const script = document.createElement('script')
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&loading=async&callback=${callbackName}`
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=weekly&loading=async&callback=${callbackName}`
     script.async = true
     script.defer = true
     script.onerror = () => {
