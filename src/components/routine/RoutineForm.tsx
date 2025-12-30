@@ -47,6 +47,7 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
   const [description, setDescription] = useState(routine.description || '')
   const [recurrenceType, setRecurrenceType] = useState<RecurrencePattern['type']>(routine.recurrence_pattern.type)
   const [selectedDays, setSelectedDays] = useState<string[]>(routine.recurrence_pattern.days || [])
+  const [dayOfMonth, setDayOfMonth] = useState<number>(routine.recurrence_pattern.day_of_month || 1)
   const [timeOfDay, setTimeOfDay] = useState(routine.time_of_day || '')
 
   const [isSaving, setIsSaving] = useState(false)
@@ -76,6 +77,9 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
       if (selectedDays.length !== originalDays.length) return true
       if (!selectedDays.every(d => originalDays.includes(d))) return true
     }
+    if (recurrenceType === 'monthly') {
+      if (dayOfMonth !== (routine.recurrence_pattern.day_of_month || 1)) return true
+    }
     return false
   }
 
@@ -100,6 +104,9 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
       const recurrence_pattern: RecurrencePattern = { type: recurrenceType }
       if (recurrenceType === 'weekly') {
         recurrence_pattern.days = selectedDays
+      }
+      if (recurrenceType === 'monthly') {
+        recurrence_pattern.day_of_month = dayOfMonth
       }
 
       await onUpdate(routine.id, {
@@ -293,6 +300,29 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
                   {recurrenceType === 'weekly' && selectedDays.length === 0 && (
                     <p className="text-sm text-red-500 mt-2">Select at least one day</p>
                   )}
+                </div>
+              )}
+
+              {/* Day number selector for monthly */}
+              {recurrenceType === 'monthly' && (
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">On day</label>
+                  <select
+                    value={dayOfMonth}
+                    onChange={(e) => setDayOfMonth(Number(e.target.value))}
+                    className="w-full px-4 py-3 rounded-xl border border-neutral-200 bg-white
+                               text-neutral-800
+                               focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  >
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                      <option key={day} value={day}>
+                        {day}{day === 1 ? 'st' : day === 2 ? 'nd' : day === 3 ? 'rd' : 'th'} of the month
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-neutral-500 mt-2">
+                    For months with fewer days, the routine will occur on the last day of that month
+                  </p>
                 </div>
               )}
 

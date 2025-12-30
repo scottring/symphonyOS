@@ -167,7 +167,7 @@ export function parseRoutine(input: string, contacts: Contact[] = []): ParsedRou
     { regex: /\byearly\b/i, result: { type: 'yearly' as const } },
     { regex: /\bannually\b/i, result: { type: 'yearly' as const } },
     { regex: /\bevery\s+year\b/i, result: { type: 'yearly' as const } },
-    // Monthly
+    // Monthly (without day number - will be enhanced below)
     { regex: /\bmonthly\b/i, result: { type: 'monthly' as const } },
     { regex: /\bevery\s+month\b/i, result: { type: 'monthly' as const } },
     // Weekdays
@@ -297,6 +297,36 @@ export function parseRoutine(input: string, contacts: Contact[] = []): ParsedRou
           type: 'day-pattern',
           text: getRecurrenceDisplay(recurrence),
         })
+      }
+    }
+  }
+
+  // Check for monthly patterns with day numbers: "monthly on the 10th", "every month on the 15th"
+  if (!recurrenceFound || recurrence.type === 'monthly') {
+    const monthlyDayPatterns = [
+      // "monthly on the 10th", "every month on the 15th"
+      /\b(?:monthly|every\s+month)\s+on\s+the\s+(\d{1,2})(?:st|nd|rd|th)?\b/i,
+      // "on the 10th of the month", "on the 15th of each month"
+      /\bon\s+the\s+(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+(?:the|each)\s+month)\b/i,
+      // "the 10th of every month"
+      /\bthe\s+(\d{1,2})(?:st|nd|rd|th)?\s+of\s+every\s+month\b/i,
+    ]
+
+    for (const pattern of monthlyDayPatterns) {
+      const match = normalized.match(pattern)
+      if (match && match.index !== undefined) {
+        const dayNum = parseInt(match[1], 10)
+        if (dayNum >= 1 && dayNum <= 31) {
+          recurrence = { type: 'monthly', dayOfMonth: dayNum }
+          extractedRanges.push({
+            start: match.index,
+            end: match.index + match[0].length,
+            type: 'day-pattern',
+            text: getRecurrenceDisplay(recurrence),
+          })
+          recurrenceFound = true
+          break
+        }
       }
     }
   }
@@ -485,6 +515,11 @@ function getRecurrenceDisplay(recurrence: ParsedRoutine['recurrence']): string {
       return days.map(d => dayNames[d]).join(', ')
     }
     case 'monthly':
+      if (recurrence.dayOfMonth) {
+        const day = recurrence.dayOfMonth
+        const suffix = day === 1 ? 'ST' : day === 2 ? 'ND' : day === 3 ? 'RD' : day === 21 ? 'ST' : day === 22 ? 'ND' : day === 23 ? 'RD' : day === 31 ? 'ST' : 'TH'
+        return `MONTHLY (${day}${suffix})`
+      }
       return 'MONTHLY'
     case 'quarterly':
       return 'QUARTERLY'
@@ -500,14 +535,14 @@ function getRecurrenceDisplay(recurrence: ParsedRoutine['recurrence']): string {
  */
 export function parsedRoutineToDb(parsed: ParsedRoutine): {
   name: string
-  recurrence_pattern: { type: string; days?: string[]; interval?: number; start_date?: string }
+  recurrence_pattern: { type: string; days?: string[]; interval?: number; start_date?: string; day_of_month?: number }
   time_of_day: string | null
   default_assignee: string | null
   raw_input: string
 } {
   // Convert recurrence to DB format
   const dayMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-  let dbRecurrence: { type: string; days?: string[]; interval?: number; start_date?: string }
+  let dbRecurrence: { type: string; days?: string[]; interval?: number; start_date?: string; day_of_month?: number }
   const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
 
   switch (parsed.recurrence.type) {
@@ -542,6 +577,9 @@ export function parsedRoutineToDb(parsed: ParsedRoutine): {
       break
     case 'monthly':
       dbRecurrence = { type: 'monthly' }
+      if (parsed.recurrence.dayOfMonth) {
+        dbRecurrence.day_of_month = parsed.recurrence.dayOfMonth
+      }
       break
     case 'quarterly':
       dbRecurrence = { type: 'quarterly' }

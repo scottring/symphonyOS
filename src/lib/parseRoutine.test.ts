@@ -253,12 +253,49 @@ describe('parseRoutine', () => {
       const result = parseRoutine('pay rent monthly')
       expect(result.recurrence.type).toBe('monthly')
       expect(result.action).toBe('pay rent')
+      expect(result.recurrence.dayOfMonth).toBeUndefined()
     })
 
     it('parses "every month"', () => {
       const result = parseRoutine('every month review budget')
       expect(result.recurrence.type).toBe('monthly')
       expect(result.action).toBe('review budget')
+      expect(result.recurrence.dayOfMonth).toBeUndefined()
+    })
+
+    it('parses "monthly on the 10th"', () => {
+      const result = parseRoutine('pay rent monthly on the 10th')
+      expect(result.recurrence.type).toBe('monthly')
+      expect(result.recurrence.dayOfMonth).toBe(10)
+      expect(result.action).toBe('pay rent')
+    })
+
+    it('parses "every month on the 15th"', () => {
+      const result = parseRoutine('review budget every month on the 15th')
+      expect(result.recurrence.type).toBe('monthly')
+      expect(result.recurrence.dayOfMonth).toBe(15)
+      expect(result.action).toBe('review budget')
+    })
+
+    it('parses "on the 1st of the month"', () => {
+      const result = parseRoutine('submit report on the 1st of the month')
+      expect(result.recurrence.type).toBe('monthly')
+      expect(result.recurrence.dayOfMonth).toBe(1)
+      expect(result.action).toBe('submit report')
+    })
+
+    it('parses "the 31st of every month"', () => {
+      const result = parseRoutine('check accounts the 31st of every month')
+      expect(result.recurrence.type).toBe('monthly')
+      expect(result.recurrence.dayOfMonth).toBe(31)
+      expect(result.action).toBe('check accounts')
+    })
+
+    it('parses day number without suffix', () => {
+      const result = parseRoutine('team meeting monthly on the 5')
+      expect(result.recurrence.type).toBe('monthly')
+      expect(result.recurrence.dayOfMonth).toBe(5)
+      expect(result.action).toBe('team meeting')
     })
   })
 
