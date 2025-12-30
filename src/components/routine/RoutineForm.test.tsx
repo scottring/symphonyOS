@@ -4,6 +4,17 @@ import { RoutineForm } from './RoutineForm'
 import { createMockRoutine, createMockFamilyMember, resetIdCounter } from '@/test/mocks/factories'
 import type { Routine } from '@/types/actionable'
 
+// Mock TiptapEditor as a simple textarea for testing
+vi.mock('@/components/notes/TiptapEditor', () => ({
+  TiptapEditor: ({ content, onChange, placeholder }: { content: string; onChange: (value: string) => void; placeholder?: string }) => (
+    <textarea
+      value={content}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+    />
+  ),
+}))
+
 describe('RoutineForm', () => {
   const mockOnBack = vi.fn()
   const mockOnUpdate = vi.fn()

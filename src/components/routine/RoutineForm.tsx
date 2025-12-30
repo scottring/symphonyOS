@@ -61,7 +61,14 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
       return nlInput !== routine.raw_input
     }
     if (name !== routine.name) return true
-    if (description !== (routine.description || '')) return true
+
+    // Normalize empty description - TiptapEditor may return '<p></p>' for empty content
+    const normalizeEmpty = (str: string) => {
+      const trimmed = str.trim()
+      return trimmed === '' || trimmed === '<p></p>' ? '' : trimmed
+    }
+    if (normalizeEmpty(description) !== normalizeEmpty(routine.description || '')) return true
+
     if (recurrenceType !== routine.recurrence_pattern.type) return true
     if (timeOfDay !== (routine.time_of_day || '')) return true
     if (recurrenceType === 'weekly') {

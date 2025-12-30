@@ -593,7 +593,8 @@ describe('RoutinesList', () => {
       )
 
       const button = screen.getByText('Paused Routine').closest('button')
-      expect(button).toHaveClass('opacity-60')
+      const container = button?.parentElement
+      expect(container).toHaveClass('opacity-60')
     })
   })
 

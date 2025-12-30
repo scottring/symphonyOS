@@ -98,6 +98,7 @@ describe('useSearch', () => {
         contacts: [],
         routines: [],
         lists: [],
+        notes: [],
       })
     })
   })

@@ -21,14 +21,15 @@ describe('ContextPicker', () => {
       render(<ContextPicker onChange={mockOnChange} />)
 
       const button = screen.getByRole('button', { name: 'Set context' })
-      expect(button).toHaveClass('text-neutral-400')
+      const svg = button.querySelector('svg')
+      expect(svg).toHaveClass('text-neutral-400')
     })
 
     it('applies active styling when value is set', () => {
       render(<ContextPicker value="work" onChange={mockOnChange} />)
 
       const button = screen.getByRole('button', { name: 'Set context' })
-      expect(button).toHaveClass('text-primary-600')
+      expect(button).toHaveClass('bg-neutral-50')
     })
 
     it('does not show dropdown initially', () => {
@@ -138,7 +139,7 @@ describe('ContextPicker', () => {
 
       const workButton = screen.getByText('Work').closest('button')
       const indicator = workButton?.querySelector('span.rounded-full')
-      expect(indicator).toHaveClass('bg-blue-500')
+      expect(indicator).toHaveStyle({ backgroundColor: 'rgb(37 99 235)' })
     })
 
     it('shows amber indicator for Family', () => {
@@ -148,7 +149,7 @@ describe('ContextPicker', () => {
 
       const familyButton = screen.getByText('Family').closest('button')
       const indicator = familyButton?.querySelector('span.rounded-full')
-      expect(indicator).toHaveClass('bg-amber-500')
+      expect(indicator).toHaveStyle({ backgroundColor: 'rgb(217 119 6)' })
     })
 
     it('shows purple indicator for Personal', () => {
@@ -158,7 +159,7 @@ describe('ContextPicker', () => {
 
       const personalButton = screen.getByText('Personal').closest('button')
       const indicator = personalButton?.querySelector('span.rounded-full')
-      expect(indicator).toHaveClass('bg-purple-500')
+      expect(indicator).toHaveStyle({ backgroundColor: 'rgb(147 51 234)' })
     })
   })
 

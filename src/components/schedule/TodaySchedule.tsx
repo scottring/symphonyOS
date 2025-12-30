@@ -591,23 +591,10 @@ export function TodaySchedule({
 
   const isMobile = useMobile()
 
-  // Handle item selection - intercept synthetic trip tasks and open project instead
+  // Handle item selection
   const handleSelectItem = useCallback((itemId: string | null) => {
-    // Check if this is a synthetic trip task (pack, pretrip, departure, return)
-    if (itemId && onOpenProject) {
-      const syntheticPrefixes = ['task-pack-', 'task-pretrip-', 'task-departure-', 'task-return-']
-      const matchedPrefix = syntheticPrefixes.find(prefix => itemId.startsWith(prefix))
-
-      if (matchedPrefix) {
-        // Extract project ID from synthetic task ID (format: "task-{type}-{projectId}")
-        const projectId = itemId.replace(matchedPrefix, '')
-        onOpenProject(projectId)
-        return // Don't call onSelectItem for synthetic tasks
-      }
-    }
-
     onSelectItem(itemId)
-  }, [onSelectItem, onOpenProject])
+  }, [onSelectItem])
 
   // Hide routines toggle with localStorage persistence
   const [hideRoutines, setHideRoutines] = useState(() => {
@@ -713,11 +700,6 @@ export function TodaySchedule({
       if (!task.scheduledFor) return false
       if (!matchesAssigneeFilter(task.assignedTo)) return false
 
-      // Filter out individual packing step tasks (pack: prefix)
-      if (task.title?.toLowerCase().startsWith('pack:')) {
-        return false
-      }
-
       const taskDate = new Date(task.scheduledFor)
       taskDate.setHours(0, 0, 0, 0)
 
@@ -736,11 +718,6 @@ export function TodaySchedule({
       if (task.completed) return false
       if (task.isSomeday) return false // Someday items are not in inbox
       if (!matchesAssigneeFilter(task.assignedTo)) return false
-
-      // Filter out individual packing step tasks (pack: prefix)
-      if (task.title?.toLowerCase().startsWith('pack:')) {
-        return false
-      }
 
       // No scheduled date = inbox item
       if (!task.scheduledFor) {
@@ -766,23 +743,6 @@ export function TodaySchedule({
 
     return tasks.filter((task) => {
       if (!matchesAssigneeFilter(task.assignedTo)) return false
-
-      // Filter out individual packing step tasks (pack: prefix)
-      if (task.title?.toLowerCase().startsWith('pack:')) {
-        return false
-      }
-
-      // Filter out individual trip phase tasks (PreTrip, Departure, Return)
-      if (task.projectId && task.title) {
-        const project = projectsMap?.get(task.projectId)
-        if (project?.type === 'trip') {
-          if (task.title.startsWith('PreTrip:') ||
-              task.title.startsWith('Departure:') ||
-              task.title.startsWith('Return:')) {
-            return false // Hide phase tasks from timeline, show synthetic cards instead
-          }
-        }
-      }
 
       if (task.scheduledFor) {
         const taskDate = new Date(task.scheduledFor)
@@ -848,150 +808,8 @@ export function TodaySchedule({
     return map
   }, [dateInstances])
 
-  // Generate synthetic "Pack for [Trip]" tasks for trips with packing items
-  const packingTasks = useMemo(() => {
-    if (!projects || projects.length === 0) return []
-
-    const tripProjects = projects.filter(p => p.type === 'trip')
-    const syntheticPackingTasks: Task[] = []
-
-    for (const trip of tripProjects) {
-      // Find packing items for this trip
-      const packingItems = tasks.filter(task =>
-        task.projectId === trip.id &&
-        task.title?.toLowerCase().includes('pack')
-      )
-
-      if (packingItems.length === 0) continue
-
-      // Get trip start date from metadata
-      const tripMetadata = trip.tripMetadata
-      const startDate = tripMetadata?.startDate
-      if (!startDate) continue
-
-      // Schedule packing for 2 days before trip starts (matches tripTaskGenerator.ts)
-      // Parse as local date to avoid timezone issues
-      const tripStart = new Date(startDate + 'T00:00:00')
-      const packingDate = new Date(tripStart)
-      packingDate.setDate(packingDate.getDate() - 2)
-      packingDate.setHours(18, 0, 0, 0) // 6pm, 2 days before
-
-      // Check if any packing items are completed
-      const completedCount = packingItems.filter(t => t.completed).length
-      const totalCount = packingItems.length
-      const allCompleted = completedCount === totalCount
-
-      // Create synthetic task
-      syntheticPackingTasks.push({
-        id: `pack-${trip.id}`,
-        title: `Pack for ${trip.name}`,
-        completed: allCompleted,
-        scheduledFor: packingDate,
-        projectId: trip.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        isAllDay: false,
-        notes: `${completedCount}/${totalCount} items packed`,
-      } as Task)
-    }
-
-    return syntheticPackingTasks
-  }, [projects, tasks])
-
-  // Generate synthetic trip phase tasks (PreTrip, Departure, Return)
-  const tripPhaseTasks = useMemo(() => {
-    if (!projects || projects.length === 0) return []
-
-    const tripProjects = projects.filter(p => p.type === 'trip')
-    const syntheticPhaseTasks: Task[] = []
-
-    for (const trip of tripProjects) {
-      const tripMetadata = trip.tripMetadata
-      if (!tripMetadata?.startDate) continue
-
-      // Pre-Trip tasks (2 days before)
-      const preTripItems = tasks.filter(task =>
-        task.projectId === trip.id &&
-        task.title?.startsWith('PreTrip:')
-      )
-
-      if (preTripItems.length > 0) {
-        const completedCount = preTripItems.filter(t => t.completed).length
-        const preTripDate = new Date(tripMetadata.startDate + 'T00:00:00')
-        preTripDate.setDate(preTripDate.getDate() - 2)
-        preTripDate.setHours(14, 0, 0, 0)
-
-        syntheticPhaseTasks.push({
-          id: `pretrip-${trip.id}`,
-          title: `Pre-Trip: ${trip.name}`,
-          completed: completedCount === preTripItems.length,
-          scheduledFor: preTripDate,
-          projectId: trip.id,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          isAllDay: false,
-          notes: `${completedCount}/${preTripItems.length} tasks completed`,
-        } as Task)
-      }
-
-      // Departure Day tasks
-      const departureItems = tasks.filter(task =>
-        task.projectId === trip.id &&
-        task.title?.startsWith('Departure:')
-      )
-
-      if (departureItems.length > 0) {
-        const completedCount = departureItems.filter(t => t.completed).length
-        const departureDate = new Date(tripMetadata.startDate + 'T00:00:00')
-        departureDate.setHours(6, 0, 0, 0)
-
-        syntheticPhaseTasks.push({
-          id: `departure-${trip.id}`,
-          title: `Departure Day: ${trip.name}`,
-          completed: completedCount === departureItems.length,
-          scheduledFor: departureDate,
-          projectId: trip.id,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          isAllDay: false,
-          notes: `${completedCount}/${departureItems.length} tasks completed`,
-        } as Task)
-      }
-
-      // Return Home tasks
-      if (tripMetadata.endDate) {
-        const returnItems = tasks.filter(task =>
-          task.projectId === trip.id &&
-          task.title?.startsWith('Return:')
-        )
-
-        if (returnItems.length > 0) {
-          const completedCount = returnItems.filter(t => t.completed).length
-          const returnDate = new Date(tripMetadata.endDate + 'T00:00:00')
-          returnDate.setHours(18, 0, 0, 0)
-
-          syntheticPhaseTasks.push({
-            id: `return-${trip.id}`,
-            title: `Return Home: ${trip.name}`,
-            completed: completedCount === returnItems.length,
-            scheduledFor: returnDate,
-            projectId: trip.id,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            isAllDay: false,
-            notes: `${completedCount}/${returnItems.length} tasks completed`,
-          } as Task)
-        }
-      }
-    }
-
-    return syntheticPhaseTasks
-  }, [projects, tasks])
-
-  // Merge packing tasks, phase tasks, and regular filtered tasks
-  const allFilteredTasks = useMemo(() => {
-    return [...filteredTasks, ...packingTasks, ...tripPhaseTasks]
-  }, [filteredTasks, packingTasks, tripPhaseTasks])
+  // Use filtered tasks directly
+  const allFilteredTasks = filteredTasks
 
   const grouped = useMemo(() => {
     const taskItems = allFilteredTasks.map(taskToTimelineItem)
@@ -1492,7 +1310,7 @@ export function TodaySchedule({
                         }
                       }}
                       onPush={
-                        item.type === 'task' && taskId && onPushTask && !taskId.startsWith('pack-')
+                        item.type === 'task' && taskId && onPushTask
                           ? (date: Date) => onPushTask(taskId, date)
                           : item.type === 'routine' && onPushRoutine
                           ? (date: Date) => onPushRoutine(item.id.replace('routine-', ''), date)
@@ -1500,7 +1318,7 @@ export function TodaySchedule({
                           ? (date: Date) => onPushEvent(item.id.replace('event-', ''), date)
                           : undefined
                       }
-                      onSchedule={item.type === 'task' && taskId && onUpdateTask && !taskId.startsWith('pack-')
+                      onSchedule={item.type === 'task' && taskId && onUpdateTask
                         ? (date: Date, isAllDay: boolean) => onUpdateTask(taskId, { scheduledFor: date, isAllDay })
                         : undefined
                       }
@@ -1520,7 +1338,7 @@ export function TodaySchedule({
                       familyMembers={familyMembers}
                       assignedTo={item.assignedTo}
                       onAssign={
-                        item.type === 'task' && taskId && onAssignTask && !taskId.startsWith('pack-')
+                        item.type === 'task' && taskId && onAssignTask
                           ? (memberId) => onAssignTask(taskId, memberId)
                           : item.type === 'event' && onAssignEvent
                           ? (memberId) => onAssignEvent(item.id.replace('event-', ''), memberId)
@@ -1538,7 +1356,7 @@ export function TodaySchedule({
                           : []
                       }
                       onAssignAll={
-                        item.type === 'task' && taskId && onAssignTaskAll && !taskId.startsWith('pack-')
+                        item.type === 'task' && taskId && onAssignTaskAll
                           ? (memberIds) => onAssignTaskAll(taskId, memberIds)
                           : item.type === 'event' && onAssignEventAll
                           ? (memberIds) => onAssignEventAll(item.id.replace('event-', ''), memberIds)
@@ -1547,7 +1365,7 @@ export function TodaySchedule({
                           : undefined
                       }
                       onContextChange={
-                        item.type === 'task' && taskId && onUpdateTask && !taskId.startsWith('pack-')
+                        item.type === 'task' && taskId && onUpdateTask
                           ? (context) => onUpdateTask(taskId, { context })
                           : item.type === 'routine' && onUpdateRoutine
                           ? (context) => onUpdateRoutine(item.id.replace('routine-', ''), { context })

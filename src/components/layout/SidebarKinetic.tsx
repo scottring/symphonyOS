@@ -14,7 +14,7 @@ const FEATURES = {
   lists: false,
 }
 
-export type ViewType = 'home' | 'projects' | 'routines' | 'lists' | 'notes' | 'history' | 'task-detail' | 'contact-detail' | 'settings' | 'packing-templates'
+export type ViewType = 'home' | 'projects' | 'routines' | 'lists' | 'notes' | 'history' | 'task-detail' | 'contact-detail' | 'settings'
 
 interface EntityData {
   tasks: Task[]

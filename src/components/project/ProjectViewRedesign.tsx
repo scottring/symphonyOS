@@ -4,13 +4,10 @@ import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
 import type { EventNote } from '@/hooks/useEventNotes'
-import type { TripMetadata, TripEvent } from '@/types/trip'
 import { formatTimeWithDate } from '@/lib/timeUtils'
 import { TaskQuickActions, type ScheduleContextItem } from '@/components/triage'
 import { calculateProjectStatus } from '@/hooks/useProjects'
 import { UnifiedNotesEditor } from '@/components/notes/UnifiedNotesEditor'
-import { TripCreationModal } from '../trip/TripCreationModal'
-import { TripItineraryView } from '../trip/TripItineraryView'
 import { analyzeLanguage, getCoachingMessage, getExamples } from '@/lib/outcomeLanguage'
 import { CoachingTip } from '@/components/coaching/CoachingTip'
 
@@ -20,7 +17,6 @@ interface ProjectViewProps {
   contactsMap: Map<string, Contact>
   onBack: () => void
   onUpdateProject: (projectId: string, updates: Partial<Project>) => void
-  onUpdateTripProject?: (projectId: string, name: string, tripMetadata: TripMetadata) => Promise<void>
   onDeleteProject?: (projectId: string) => void
   onAddTask?: (title: string, projectId: string) => void | Promise<any>
   onDeleteTask?: (taskId: string) => void
@@ -46,10 +42,8 @@ export function ProjectViewRedesign({
   contactsMap,
   onBack,
   onUpdateProject,
-  onUpdateTripProject,
   onDeleteProject,
   onAddTask,
-  onDeleteTask,
   onSelectTask,
   onToggleTask,
   selectedTaskId,
@@ -68,9 +62,6 @@ export function ProjectViewRedesign({
   const [editPhoneNumber, setEditPhoneNumber] = useState('')
   const [editLinks, setEditLinks] = useState<string>('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [showEditTripModal, setShowEditTripModal] = useState(false)
-  const [editingEventId, setEditingEventId] = useState<string | null>(null)
-  const [insertAtIndex, setInsertAtIndex] = useState<number | undefined>(undefined)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [showStatusDropdown, setShowStatusDropdown] = useState(false)
   const [coachingMessage, setCoachingMessage] = useState<string | null>(null)
@@ -196,15 +187,12 @@ export function ProjectViewRedesign({
     onUpdateProject(project.id, { notes: value || undefined })
   }, [project.id, onUpdateProject])
 
-  // Trip projects get a completely different, full-width layout
-  const isTripProject = project.type === 'trip' && project.tripMetadata
-
   return (
     <div className="h-full overflow-auto bg-[var(--color-bg-base)]">
       {/* Top accent */}
       <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-blue-50/50 to-transparent pointer-events-none" />
 
-      <div className={`relative ${isTripProject ? 'max-w-full' : 'max-w-6xl'} mx-auto px-6 py-8`}>
+      <div className="relative max-w-6xl mx-auto px-6 py-8">
         {/* Back button */}
         <button
           onClick={onBack}
@@ -222,101 +210,8 @@ export function ProjectViewRedesign({
           Back to projects
         </button>
 
-        {/* Conditional layout: Full-width for trips, Two-column for regular projects */}
-        {isTripProject ? (
-          /* Full-width Trip Layout */
-          <div>
-            {/* Condensed trip header */}
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h1 className="font-display text-3xl font-semibold text-neutral-900 leading-tight">
-                  {project.name}
-                </h1>
-                <div className="flex items-center gap-3 mt-2">
-                  <span className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full ${statusConfig[project.status].bg} ${statusConfig[project.status].color}`}>
-                    {statusConfig[project.status].label}
-                  </span>
-                  {totalCount > 0 && (
-                    <span className="text-sm text-neutral-500">
-                      {completedCount} of {totalCount} tasks complete
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {onUpdateTripProject && (
-                  <button
-                    onClick={() => setShowEditTripModal(true)}
-                    className="p-2 text-neutral-500 hover:text-primary-600 rounded-lg transition-colors hover:bg-neutral-100"
-                    aria-label="Edit trip details"
-                    title="Edit trip details"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                    </svg>
-                  </button>
-                )}
-                <button
-                  onClick={handleEdit}
-                  className="p-2 text-neutral-300 hover:text-primary-600 rounded-lg transition-colors"
-                  aria-label="Edit project"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                  </svg>
-                </button>
-                {onDeleteProject && (
-                  <button
-                    onClick={() => setShowDeleteConfirm(true)}
-                    className="p-2 text-neutral-300 hover:text-red-500 rounded-lg transition-colors"
-                    aria-label="Delete project"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Full-width Trip Itinerary */}
-            {project.tripMetadata && (
-              <TripItineraryView
-                tripMetadata={project.tripMetadata}
-                tasks={projectTasks}
-                onToggleTask={onToggleTask}
-                onUpdateTripMetadata={onUpdateTripProject}
-                projectId={project.id}
-                projectName={project.name}
-                onEditEvent={(eventId, insertIdx) => {
-                  setEditingEventId(eventId || null)
-                  setInsertAtIndex(insertIdx)
-                  setShowEditTripModal(true)
-                }}
-                onDeleteEvent={(eventId) => {
-                  // Delete event from trip metadata
-                  if (project?.tripMetadata) {
-                    const updatedMetadata = {
-                      ...project.tripMetadata,
-                      events: project.tripMetadata.events?.filter((e: TripEvent) => e.id !== eventId) || []
-                    }
-                    onUpdateProject(project.id, {
-                      ...project,
-                      tripMetadata: updatedMetadata
-                    })
-                  }
-                }}
-                onAddTask={onAddTask ? async (task: { title: string; projectId?: string }) => {
-                  const result = onAddTask(task.title, task.projectId || project.id)
-                  return result instanceof Promise ? result : Promise.resolve(null)
-                } : undefined}
-                onDeleteTask={onDeleteTask}
-              />
-            )}
-          </div>
-        ) : (
-          /* Two-column layout for regular projects */
-          <div className="flex gap-12 lg:gap-16">
+        {/* Two-column layout */}
+        <div className="flex gap-12 lg:gap-16">
           {/* ========== MAIN COLUMN - Tasks ========== */}
           <div className="flex-1 min-w-0">
             {/* Project Header */}
@@ -349,18 +244,6 @@ export function ProjectViewRedesign({
 
               {/* Actions */}
               <div className="flex items-center gap-2 mt-4 ml-19">
-                {project.type === 'trip' && project.tripMetadata && onUpdateTripProject && (
-                  <button
-                    onClick={() => setShowEditTripModal(true)}
-                    className="p-2 text-neutral-300 hover:text-primary-600 rounded-lg transition-colors"
-                    aria-label="Edit trip details"
-                    title="Edit trip details"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                    </svg>
-                  </button>
-                )}
                 <button
                   onClick={handleEdit}
                   className="p-2 text-neutral-300 hover:text-primary-600 rounded-lg transition-colors"
@@ -866,25 +749,8 @@ export function ProjectViewRedesign({
             </div>
           </aside>
         </div>
-        )}
       </div>
 
-      {/* Trip Edit Modal */}
-      {onUpdateTripProject && project.type === 'trip' && project.tripMetadata && (
-        <TripCreationModal
-          isOpen={showEditTripModal}
-          onClose={() => {
-            setShowEditTripModal(false)
-            setEditingEventId(null)
-            setInsertAtIndex(undefined)
-          }}
-          onCreateTrip={async () => null} // Not used in edit mode
-          onUpdateTrip={onUpdateTripProject}
-          existingProject={project}
-          editingEventId={editingEventId}
-          insertAtIndex={insertAtIndex}
-        />
-      )}
     </div>
   )
 }

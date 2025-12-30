@@ -359,7 +359,7 @@ describe('ContactView', () => {
     it('renders linked tasks count', () => {
       render(<ContactView {...defaultProps} />)
 
-      expect(screen.getByText('Linked Tasks (2)')).toBeInTheDocument()
+      expect(screen.getByText('History (2)')).toBeInTheDocument()
     })
 
     it('renders linked task titles', () => {

@@ -32,7 +32,6 @@ import { LoadingFallback } from '@/components/layout/LoadingFallback'
 import { ListsList, ListView } from '@/components/list'
 import { NotesPage } from '@/components/notes'
 import { CompletedTasksView } from '@/components/history/CompletedTasksView'
-import { PackingTemplateManager } from '@/components/packing/PackingTemplateManager'
 import { Toast } from '@/components/toast'
 import { UndoToast } from '@/components/undo/UndoToast'
 import {
@@ -69,7 +68,7 @@ function App() {
   const [onboardingLoading, setOnboardingLoading] = useState(true)
   const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, updateEventAssignmentAll, updateRecipeUrl, updateEventProject, getNote, getEventNotesForProject, notes: eventNotesMap } = useEventNotes()
   const { contacts, contactsMap, addContact, updateContact, deleteContact, searchContacts } = useContacts()
-  const { projects, projectsMap, addProject, addTripProject, updateProject, updateTripProject, deleteProject, searchProjects, recalculateProjectStatus } = useProjects()
+  const { projects, projectsMap, addProject, updateProject, deleteProject, searchProjects, recalculateProjectStatus } = useProjects()
   const {
     routines: allRoutines,
     activeRoutines,
@@ -173,7 +172,7 @@ function App() {
   const params = useParams<{ projectId?: string; routineId?: string; contactId?: string }>()
 
   // State for non-URL-routed views
-  const [stateView, setStateView] = useState<'lists' | 'notes' | 'history' | 'packing-templates' | 'settings' | 'task-detail' | null>(null)
+  const [stateView, setStateView] = useState<'lists' | 'notes' | 'history' | 'settings' | 'task-detail' | null>(null)
 
   // Derive view from URL path or state
   const activeView: ViewType = useMemo(() => {
@@ -612,7 +611,7 @@ function App() {
       navigate('/contacts')
     }
     // Handle state-based views
-    else if (view === 'lists' || view === 'notes' || view === 'history' || view === 'packing-templates' || view === 'settings' || view === 'task-detail') {
+    else if (view === 'lists' || view === 'notes' || view === 'history' || view === 'settings' || view === 'task-detail') {
       setStateView(view)
       navigate('/') // Navigate to home URL but show state view
     } else {
@@ -1346,7 +1345,6 @@ function App() {
             tasks={tasks}
             onSelectProject={(id) => navigate(`/projects/${id}`)}
             onAddProject={addProject}
-            onAddTrip={addTripProject}
           />
         </Suspense>
       )}
@@ -1359,7 +1357,6 @@ function App() {
             contactsMap={contactsMap}
             onBack={() => navigate('/projects')}
             onUpdateProject={handleUpdateProject}
-            onUpdateTripProject={updateTripProject}
             onDeleteProject={deleteProject}
             onAddTask={(title, projectId) => addTask(title, undefined, projectId, undefined, { assignedTo: getCurrentUserMember()?.id })}
             onDeleteTask={deleteTask}
@@ -1436,10 +1433,6 @@ function App() {
             onUnpin={() => pinnedItems.unpin('routine', selectedRoutine.id)}
           />
         </Suspense>
-      )}
-
-      {activeView === 'packing-templates' && (
-        <PackingTemplateManager />
       )}
 
       {activeView === 'lists' && !selectedListId && (

@@ -174,6 +174,8 @@ export function useSupabaseTasks() {
     assignedTo?: string | null  // Family member ID to assign task to (null = no assignment, undefined = use default)
     category?: TaskCategory  // What kind of family item
     context?: TaskContext  // Life domain for filtering
+    location?: string  // Address or place name
+    locationPlaceId?: string  // Google Place ID for precise directions
     defaultAssigneeId?: string  // Default assignee if assignedTo is undefined
   }
 
@@ -211,6 +213,8 @@ export function useSupabaseTasks() {
       assignedTo: effectiveAssignedTo ?? undefined,
       category: options?.category ?? 'task',
       context: options?.context,
+      location: options?.location,
+      locationPlaceId: options?.locationPlaceId,
     }
     setTasks((prev) => [optimisticTask, ...prev])
 
@@ -229,6 +233,8 @@ export function useSupabaseTasks() {
         assigned_to: effectiveAssignedTo,
         category: options?.category ?? 'task',
         context: options?.context ?? null,
+        location: options?.location ?? null,
+        location_place_id: options?.locationPlaceId ?? null,
       })
       .select()
       .single()

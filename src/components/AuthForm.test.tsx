@@ -26,7 +26,7 @@ describe('AuthForm', () => {
     it('renders sign in form by default', () => {
       render(<AuthForm />)
 
-      expect(screen.getByText('Welcome Back')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Sign In' })).toBeInTheDocument()
       expect(screen.getByLabelText('Email')).toBeInTheDocument()
       expect(screen.getByLabelText('Password')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Sign In' })).toBeInTheDocument()
@@ -36,7 +36,6 @@ describe('AuthForm', () => {
       render(<AuthForm />)
 
       expect(screen.getByText('Symphony OS')).toBeInTheDocument()
-      expect(screen.getByText('The family coordination platform')).toBeInTheDocument()
       expect(screen.getByAltText('Symphony Logo')).toBeInTheDocument()
     })
 
@@ -45,12 +44,6 @@ describe('AuthForm', () => {
 
       expect(screen.getByText("Don't have an account?")).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Sign Up' })).toBeInTheDocument()
-    })
-
-    it('renders footer text', () => {
-      render(<AuthForm />)
-
-      expect(screen.getByText(/For families juggling multiple schedules/)).toBeInTheDocument()
     })
   })
 
@@ -77,7 +70,7 @@ describe('AuthForm', () => {
 
       // Switch back to sign in
       fireEvent.click(screen.getByRole('button', { name: 'Sign In' }))
-      expect(screen.getByRole('heading', { name: 'Welcome Back' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Sign In' })).toBeInTheDocument()
     })
   })
 

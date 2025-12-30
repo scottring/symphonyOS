@@ -3,9 +3,6 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import type { Project, DbProject, ProjectStatus } from '@/types/project'
 import type { Task } from '@/types/task'
-import type { TripMetadata, PackingTemplate } from '@/types/trip'
-import { calculateEVRoute } from '@/lib/evRouteOptimizer'
-import { generateAllTripTasks } from '@/lib/tripTaskGenerator'
 
 /**
  * Calculate what status a project should have based on its tasks.
@@ -27,12 +24,11 @@ function dbProjectToProject(dbProject: DbProject): Project {
     id: dbProject.id,
     name: dbProject.name,
     status: dbProject.status,
-    type: dbProject.type ?? undefined,
     notes: dbProject.notes ?? undefined,
     links: dbProject.links ?? undefined,
     phoneNumber: dbProject.phone_number ?? undefined,
     parentId: dbProject.parent_id ?? undefined,
-    tripMetadata: dbProject.trip_metadata ?? undefined,
+    context: dbProject.context ?? undefined,
     createdAt: new Date(dbProject.created_at),
     updatedAt: new Date(dbProject.updated_at),
   }
@@ -125,98 +121,6 @@ export function useProjects() {
     return realProject
   }, [user])
 
-  const addTripProject = useCallback(
-    async (name: string, tripMetadata: TripMetadata, packingTemplate?: PackingTemplate, customPackingItems?: import('@/types/trip').PackingNode[]) => {
-      if (!user) return null
-
-      // Create the project first
-      const { data: projectData, error: projectError } = await supabase
-        .from('projects')
-        .insert({
-          user_id: user.id,
-          name,
-          type: 'trip',
-          status: 'not_started',
-          trip_metadata: tripMetadata,
-        })
-        .select()
-        .single()
-
-      if (projectError) {
-        setError(projectError.message)
-        return null
-      }
-
-      const project = dbProjectToProject(projectData as DbProject)
-
-      // Calculate EV route if this is an EV trip
-      let routeResult = null
-      if (tripMetadata.travelMode === 'driving_ev' && tripMetadata.rangePerCharge) {
-        try {
-          routeResult = await calculateEVRoute({
-            origin: tripMetadata.origin,
-            destination: tripMetadata.destination,
-            waypoints: tripMetadata.waypoints || [],
-            vehicleRange: tripMetadata.rangePerCharge,
-            currentBattery: tripMetadata.currentBattery || 80,
-            preferredNetworks: tripMetadata.preferredNetworks,
-          })
-        } catch (error) {
-          console.error('Error calculating EV route:', error)
-          // Continue without route optimization
-        }
-      }
-
-      // Generate all trip tasks
-      const tripTasks = generateAllTripTasks(
-        project.id,
-        packingTemplate || 'weekend',
-        routeResult,
-        tripMetadata.startDate,
-        tripMetadata,
-        customPackingItems
-      )
-
-      // Insert all tasks in bulk
-      const allTasks = [
-        ...tripTasks.packingTasks,
-        ...tripTasks.travelTasks,
-        ...tripTasks.chargingTasks,
-        ...tripTasks.accommodationTasks,
-        ...tripTasks.logisticsTasks,
-        ...tripTasks.preTripTasks,
-        ...tripTasks.departureTasks,
-        ...tripTasks.returnTasks,
-      ].map((task) => ({
-        user_id: user.id,
-        title: task.title!,
-        project_id: task.projectId,
-        scheduled_for: task.scheduledFor,
-        completed: task.completed ?? false,
-        context: task.context,
-        notes: task.notes,
-        estimated_duration: task.estimatedDuration,
-        location: task.location,
-        location_place_id: task.locationPlaceId,
-      }))
-
-      if (allTasks.length > 0) {
-        const { error: tasksError } = await supabase.from('tasks').insert(allTasks)
-
-        if (tasksError) {
-          console.error('Error creating trip tasks:', tasksError)
-          // Don't fail the whole operation - project was created successfully
-        }
-      }
-
-      // Add project to state
-      setProjects((prev) => [...prev, project].sort((a, b) => a.name.localeCompare(b.name)))
-
-      return project
-    },
-    [user]
-  )
-
   const updateProject = useCallback(async (id: string, updates: Partial<Project>) => {
     const project = projects.find((p) => p.id === id)
     if (!project) return
@@ -234,7 +138,7 @@ export function useProjects() {
     if (updates.links !== undefined) dbUpdates.links = updates.links ?? null
     if (updates.phoneNumber !== undefined) dbUpdates.phone_number = updates.phoneNumber ?? null
     if (updates.parentId !== undefined) dbUpdates.parent_id = updates.parentId ?? null
-    if (updates.tripMetadata !== undefined) dbUpdates.trip_metadata = updates.tripMetadata ?? null
+    if (updates.context !== undefined) dbUpdates.context = updates.context ?? null
 
     const { error: updateError } = await supabase
       .from('projects')
@@ -249,80 +153,6 @@ export function useProjects() {
       setError(updateError.message)
     }
   }, [projects])
-
-  const updateTripProject = useCallback(
-    async (projectId: string, name: string, tripMetadata: TripMetadata, packingTemplate?: PackingTemplate, customPackingItems?: import('@/types/trip').PackingNode[]) => {
-      const project = projects.find((p) => p.id === projectId)
-      if (!project || !user) return
-
-      // Optimistic update
-      const optimisticUpdate = { name, tripMetadata }
-      setProjects((prev) =>
-        prev
-          .map((p) => (p.id === projectId ? { ...p, ...optimisticUpdate } : p))
-          .sort((a, b) => a.name.localeCompare(b.name))
-      )
-
-      const { error: updateError } = await supabase
-        .from('projects')
-        .update({
-          name,
-          trip_metadata: tripMetadata,
-        })
-        .eq('id', projectId)
-
-      if (updateError) {
-        // Rollback on error
-        setProjects((prev) => prev.map((p) => (p.id === projectId ? project : p)))
-        setError(updateError.message)
-        return
-      }
-
-      // Delete existing trip tasks and regenerate with updated dates
-      await supabase
-        .from('tasks')
-        .delete()
-        .eq('project_id', projectId)
-
-      // Generate new tasks with correct dates
-      const tripTasks = generateAllTripTasks(
-        projectId,
-        packingTemplate || 'weekend',
-        null, // No route result for timeline trips
-        tripMetadata.startDate,
-        tripMetadata,
-        customPackingItems
-      )
-
-      // Insert regenerated tasks
-      const allTasks = [
-        ...tripTasks.packingTasks,
-        ...tripTasks.travelTasks,
-        ...tripTasks.chargingTasks,
-        ...tripTasks.accommodationTasks,
-        ...tripTasks.logisticsTasks,
-        ...tripTasks.preTripTasks,
-        ...tripTasks.departureTasks,
-        ...tripTasks.returnTasks,
-      ].map((task) => ({
-        user_id: user.id,
-        title: task.title!,
-        project_id: task.projectId,
-        scheduled_for: task.scheduledFor,
-        completed: task.completed ?? false,
-        context: task.context,
-        notes: task.notes,
-        estimated_duration: task.estimatedDuration,
-        location: task.location,
-        location_place_id: task.locationPlaceId,
-      }))
-
-      if (allTasks.length > 0) {
-        await supabase.from('tasks').insert(allTasks)
-      }
-    },
-    [projects, user]
-  )
 
   const deleteProject = useCallback(async (id: string) => {
     // Save for rollback
@@ -404,9 +234,7 @@ export function useProjects() {
     loading,
     error,
     addProject,
-    addTripProject,
     updateProject,
-    updateTripProject,
     deleteProject,
     searchProjects,
     getProjectById,
