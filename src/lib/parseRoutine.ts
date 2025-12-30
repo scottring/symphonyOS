@@ -318,6 +318,15 @@ export function parseRoutine(input: string, contacts: Contact[] = []): ParsedRou
         const dayNum = parseInt(match[1], 10)
         if (dayNum >= 1 && dayNum <= 31) {
           recurrence = { type: 'monthly', dayOfMonth: dayNum }
+
+          // Remove any existing monthly range (to avoid "MONTHLY MONTHLY (10TH)")
+          if (recurrence.type === 'monthly' && recurrenceFound) {
+            const monthlyRangeIndex = extractedRanges.findIndex(r => r.type === 'day-pattern')
+            if (monthlyRangeIndex !== -1) {
+              extractedRanges.splice(monthlyRangeIndex, 1)
+            }
+          }
+
           extractedRanges.push({
             start: match.index,
             end: match.index + match[0].length,
