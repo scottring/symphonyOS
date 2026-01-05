@@ -27,6 +27,7 @@ interface AppShellProps {
   onSidebarToggle: () => void
   panelOpen: boolean
   onPanelClose?: () => void
+  focusModeOpen?: boolean
   userEmail?: string
   userName?: string
   onSignOut?: () => void
@@ -69,6 +70,7 @@ export function AppShell({
   onSidebarToggle,
   panelOpen,
   onPanelClose,
+  focusModeOpen = false,
   userEmail,
   userName,
   onSignOut,
@@ -134,10 +136,17 @@ export function AppShell({
         className={`
           flex-1 overflow-auto overflow-x-hidden
           transition-all duration-300 ease-in-out
-          ${!isMobile && panelOpen ? 'mr-[420px]' : ''}
           ${isMobile ? 'pb-14' : ''}
         `}
-        style={isMobile ? { paddingBottom: 'calc(3rem + env(safe-area-inset-bottom, 0px))' } : undefined}
+        style={isMobile
+          ? { paddingBottom: 'calc(3rem + env(safe-area-inset-bottom, 0px))' }
+          : {
+              marginRight: panelOpen && focusModeOpen ? '872px'
+                : focusModeOpen ? '452px'
+                : panelOpen ? '420px'
+                : '0'
+            }
+        }
       >
         {/* Mobile header */}
         {isMobile && (
@@ -222,12 +231,13 @@ export function AppShell({
           )}
           <aside
             className={`
-              fixed top-0 right-0 h-full w-[420px]
+              fixed top-0 h-full w-[420px]
               bg-bg-elevated border-l border-neutral-200/80
-              transform transition-transform duration-300 ease-out
+              transform transition-all duration-300 ease-out
               ${panelOpen ? 'translate-x-0' : 'translate-x-full'}
               shadow-xl z-20
             `}
+            style={{ right: focusModeOpen ? '452px' : '0' }}
           >
             {panel}
           </aside>

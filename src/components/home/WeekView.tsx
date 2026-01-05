@@ -122,14 +122,11 @@ function DayColumn({
             <div className="text-[10px] font-semibold text-amber-600/70 uppercase tracking-wide mb-0.5">
               Morning
             </div>
-            {day.sections.morning.slice(0, 2).map((title, i) => (
+            {day.sections.morning.map((title, i) => (
               <div key={i} className="text-xs text-neutral-600 truncate leading-snug">
                 · {title}
               </div>
             ))}
-            {day.sections.morning.length > 2 && (
-              <div className="text-[10px] text-neutral-400">+{day.sections.morning.length - 2} more</div>
-            )}
           </div>
         )}
 
@@ -139,14 +136,11 @@ function DayColumn({
             <div className="text-[10px] font-semibold text-sky-600/70 uppercase tracking-wide mb-0.5">
               Afternoon
             </div>
-            {day.sections.afternoon.slice(0, 2).map((title, i) => (
+            {day.sections.afternoon.map((title, i) => (
               <div key={i} className="text-xs text-neutral-600 truncate leading-snug">
                 · {title}
               </div>
             ))}
-            {day.sections.afternoon.length > 2 && (
-              <div className="text-[10px] text-neutral-400">+{day.sections.afternoon.length - 2} more</div>
-            )}
           </div>
         )}
 
@@ -156,21 +150,18 @@ function DayColumn({
             <div className="text-[10px] font-semibold text-indigo-600/70 uppercase tracking-wide mb-0.5">
               Evening
             </div>
-            {day.sections.evening.slice(0, 2).map((title, i) => (
+            {day.sections.evening.map((title, i) => (
               <div key={i} className="text-xs text-neutral-600 truncate leading-snug">
                 · {title}
               </div>
             ))}
-            {day.sections.evening.length > 2 && (
-              <div className="text-[10px] text-neutral-400">+{day.sections.evening.length - 2} more</div>
-            )}
           </div>
         )}
 
         {/* All day items shown at top if any */}
         {day.sections.allday.length > 0 && (
           <div className="mt-1 pt-1 border-t border-neutral-100">
-            {day.sections.allday.slice(0, 2).map((title, i) => (
+            {day.sections.allday.map((title, i) => (
               <div key={i} className="text-[10px] text-neutral-500 truncate">
                 ◇ {title}
               </div>

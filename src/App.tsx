@@ -25,6 +25,8 @@ import { supabase } from '@/lib/supabase'
 import { DomainPageOutline } from '@/components/domain/DomainPageOutline'
 import { AppShell } from '@/components/layout/AppShell'
 import { HomeView } from '@/components/home'
+import { FocusMode } from '@/components/focus'
+import { useFocusMode } from '@/hooks/useFocusMode'
 import { PlanningSession } from '@/components/planning'
 import { DetailPanelRedesign as DetailPanel } from '@/components/detail/DetailPanelRedesign'
 import { SearchModal } from '@/components/search/SearchModal'
@@ -82,6 +84,7 @@ function App() {
   const { getInstancesForDate, markDone, undoDone, skip, reschedule } = useActionableInstances()
   const { members: familyMembers, getCurrentUserMember, refetch: refetchFamilyMembers } = useFamilyMembers()
   const isOnline = useOnlineStatus()
+  const focusMode = useFocusMode()
 
   // Lists state
   const [selectedListId, setSelectedListId] = useState<string | null>(null)
@@ -928,6 +931,7 @@ function App() {
       sidebarCollapsed={sidebarCollapsed}
       onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
       panelOpen={selectedItemId !== null || recipeUrl !== null}
+      focusModeOpen={focusMode.isOpen}
       onPanelClose={() => {
         if (recipeUrl) setRecipeUrl(null)
         else setSelectedItemId(null)
@@ -1608,6 +1612,12 @@ function App() {
         </div>
       )}
       </DomainPageOutline>
+
+      {/* Focus Mode - scratch pad */}
+      <FocusMode
+        isOpen={focusMode.isOpen}
+        onClose={focusMode.close}
+      />
     </AppShell>
   )
 }

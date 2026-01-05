@@ -12,6 +12,7 @@ import { useUndo } from '@/hooks/useUndo'
 import { useDomain } from '@/hooks/useDomain'
 import { HomeViewSwitcher } from './HomeViewSwitcher'
 import { WeekView } from './WeekView'
+import { MonthView } from './MonthView'
 import { CascadingRiverView } from './CascadingRiverView'
 import { TodaySchedule } from '@/components/schedule/TodaySchedule'
 import { UndoToast } from '@/components/undo/UndoToast'
@@ -191,6 +192,12 @@ export function HomeView({
     return monday
   })
 
+  // Month view state
+  const [monthStart, setMonthStart] = useState(() => {
+    const today = new Date()
+    return new Date(today.getFullYear(), today.getMonth(), 1)
+  })
+
   // Handle day selection from week view
   const handleSelectDay = (date: Date) => {
     onDateChange(date)
@@ -249,6 +256,22 @@ export function HomeView({
 
   // Render the appropriate view
   const renderContent = () => {
+    if (currentView === 'month') {
+      return (
+        <MonthView
+          tasks={filteredTasks}
+          events={events}
+          routines={filteredRoutines}
+          dateInstances={dateInstances}
+          monthStart={monthStart}
+          onMonthChange={setMonthStart}
+          onSelectDay={handleSelectDay}
+          selectedAssignee={selectedAssigneeForSchedule}
+          eventNotesMap={eventNotesMap}
+        />
+      )
+    }
+
     if (currentView === 'week') {
       return (
         <WeekView
