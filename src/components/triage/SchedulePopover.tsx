@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { CalendarPlus, ChevronLeft, Sun, Sunrise, CalendarDays, Calendar } from 'lucide-react'
 import {
   getBaseDate,
@@ -325,45 +326,20 @@ export function SchedulePopover({
 
   const hasValue = value !== undefined
 
-  return (
-    <div ref={containerRef} className="relative">
-      {/* Trigger */}
-      {trigger ? (
-        <div ref={triggerRef as React.RefObject<HTMLDivElement | null>} onClick={() => setIsOpen(!isOpen)}>{trigger}</div>
-      ) : (
-        <button
-          ref={triggerRef as React.RefObject<HTMLButtonElement | null>}
-          onClick={() => setIsOpen(!isOpen)}
-          className={`
-            p-1.5 rounded-lg
-            transition-all duration-200
-            ${hasValue
-              ? 'bg-primary-50 text-primary-600 hover:bg-primary-100'
-              : 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100'
-            }
-          `}
-          title="Schedule"
-          aria-label="Schedule"
-        >
-          <CalendarPlus className="w-4 h-4" />
-        </button>
-      )}
-
-      {/* Popover */}
-      {isOpen && (
-        <div
-          ref={dropdownRef}
-          className="fixed z-[100] animate-fade-in-scale max-h-[90vh] overflow-y-auto"
-          style={{
-            ...(dropdownPosition.top !== undefined ? { top: dropdownPosition.top } : { bottom: dropdownPosition.bottom }),
-            left: dropdownPosition.left,
-            background: 'linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(44 50% 99%) 100%)',
-            borderRadius: 'var(--radius-xl)',
-            border: '1px solid hsl(38 25% 88%)',
-            boxShadow: '0 4px 20px hsl(32 20% 20% / 0.12), 0 0 0 1px hsl(38 25% 88% / 0.5)',
-            minWidth: '280px',
-          }}
-        >
+  const popoverContent = isOpen ? (
+    <div
+      ref={dropdownRef}
+      className="fixed z-[9999] animate-fade-in-scale max-h-[90vh] overflow-y-auto"
+      style={{
+        ...(dropdownPosition.top !== undefined ? { top: dropdownPosition.top } : { bottom: dropdownPosition.bottom }),
+        left: dropdownPosition.left,
+        background: 'linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(44 50% 99%) 100%)',
+        borderRadius: 'var(--radius-xl)',
+        border: '1px solid hsl(38 25% 88%)',
+        boxShadow: '0 4px 20px hsl(32 20% 20% / 0.12), 0 0 0 1px hsl(38 25% 88% / 0.5)',
+        minWidth: '280px',
+      }}
+    >
           {/* Step 1: Pick date */}
           {step === 'date' && (
             <div className="p-3">
@@ -690,8 +666,33 @@ export function SchedulePopover({
               </div>
             </div>
           )}
-        </div>
+    </div>
+  ) : null
+
+  return (
+    <div ref={containerRef} className="relative">
+      {/* Trigger */}
+      {trigger ? (
+        <div ref={triggerRef as React.RefObject<HTMLDivElement | null>} onClick={() => setIsOpen(!isOpen)}>{trigger}</div>
+      ) : (
+        <button
+          ref={triggerRef as React.RefObject<HTMLButtonElement | null>}
+          onClick={() => setIsOpen(!isOpen)}
+          className={`
+            p-1.5 rounded-lg
+            transition-all duration-200
+            ${hasValue
+              ? 'bg-primary-50 text-primary-600 hover:bg-primary-100'
+              : 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100'
+            }
+          `}
+          title="Schedule"
+          aria-label="Schedule"
+        >
+          <CalendarPlus className="w-4 h-4" />
+        </button>
       )}
+      {popoverContent && createPortal(popoverContent, document.body)}
     </div>
   )
 }

@@ -141,8 +141,8 @@ export function AppShell({
         style={isMobile
           ? { paddingBottom: 'calc(3rem + env(safe-area-inset-bottom, 0px))' }
           : {
-              marginRight: panelOpen && focusModeOpen ? '872px'
-                : focusModeOpen ? '452px'
+              marginRight: panelOpen && focusModeOpen ? '840px'
+                : focusModeOpen ? '420px'
                 : panelOpen ? '420px'
                 : '0'
             }
@@ -237,7 +237,7 @@ export function AppShell({
               ${panelOpen ? 'translate-x-0' : 'translate-x-full'}
               shadow-xl z-20
             `}
-            style={{ right: focusModeOpen ? '452px' : '0' }}
+            style={{ right: focusModeOpen ? '420px' : '0' }}
           >
             {panel}
           </aside>

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import type { TaskContext } from '@/types/task'
 
 interface ContextPickerProps {
@@ -14,18 +15,39 @@ const CONTEXTS: { value: TaskContext; label: string; color: string }[] = [
 
 export function ContextPicker({ value, onChange }: ContextPickerProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 })
+  const triggerRef = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Calculate menu position when opening
+  useEffect(() => {
+    if (isOpen && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      setMenuPosition({
+        top: rect.bottom + 4,
+        right: window.innerWidth - rect.right,
+      })
+    }
+  }, [isOpen])
 
   // Close on outside click
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+    function handleClickOutside(event: MouseEvent | TouchEvent) {
+      const target = event.target as Node
+      if (
+        triggerRef.current && !triggerRef.current.contains(target) &&
+        menuRef.current && !menuRef.current.contains(target)
+      ) {
         setIsOpen(false)
       }
     }
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
+      document.addEventListener('touchstart', handleClickOutside)
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside)
+        document.removeEventListener('touchstart', handleClickOutside)
+      }
     }
   }, [isOpen])
 
@@ -44,8 +66,47 @@ export function ContextPicker({ value, onChange }: ContextPickerProps) {
     personal: { color: 'rgb(147 51 234)' }, // Purple-600
   }
 
+  const menuContent = isOpen ? (
+    <div
+      ref={menuRef}
+      className="fixed z-[9999] bg-white rounded-xl border border-neutral-200 shadow-lg p-2 min-w-[120px] animate-fade-in-up"
+      style={{
+        top: menuPosition.top,
+        right: menuPosition.right,
+      }}
+    >
+      <div className="space-y-1">
+        {CONTEXTS.map(({ value: ctxValue, label, color }) => (
+          <button
+            key={ctxValue}
+            onClick={() => handleSelect(ctxValue)}
+            className={`w-full px-3 py-1.5 text-sm text-left rounded-lg flex items-center gap-2 ${
+              value === ctxValue
+                ? 'bg-primary-50 text-primary-700'
+                : 'hover:bg-neutral-50 text-neutral-700'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+            {label}
+          </button>
+        ))}
+        {hasValue && (
+          <>
+            <div className="border-t border-neutral-100 my-1" />
+            <button
+              onClick={() => handleSelect(undefined)}
+              className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-red-50 text-red-600"
+            >
+              Clear
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  ) : null
+
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={triggerRef} className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`p-2 rounded-lg transition-colors ${
@@ -75,38 +136,7 @@ export function ContextPicker({ value, onChange }: ContextPickerProps) {
           </svg>
         )}
       </button>
-
-      {isOpen && (
-        <div className="absolute right-0 top-full mt-1 z-50 bg-white rounded-xl border border-neutral-200 shadow-lg p-2 min-w-[120px]">
-          <div className="space-y-1">
-            {CONTEXTS.map(({ value: ctxValue, label, color }) => (
-              <button
-                key={ctxValue}
-                onClick={() => handleSelect(ctxValue)}
-                className={`w-full px-3 py-1.5 text-sm text-left rounded-lg flex items-center gap-2 ${
-                  value === ctxValue
-                    ? 'bg-primary-50 text-primary-700'
-                    : 'hover:bg-neutral-50 text-neutral-700'
-                }`}
-              >
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-                {label}
-              </button>
-            ))}
-            {hasValue && (
-              <>
-                <div className="border-t border-neutral-100 my-1" />
-                <button
-                  onClick={() => handleSelect(undefined)}
-                  className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-red-50 text-red-600"
-                >
-                  Clear
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      {menuContent && createPortal(menuContent, document.body)}
     </div>
   )
 }
