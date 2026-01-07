@@ -672,14 +672,14 @@ export function SchedulePopover({
   // Create trigger with click handler
   const triggerElement = trigger ? (
     isValidElement(trigger) ? (
-      cloneElement(trigger, {
-        ...trigger.props,
+      cloneElement(trigger as React.ReactElement<any>, {
+        ...(trigger.props as any),
         ref: triggerRef,
         onClick: (e: React.MouseEvent) => {
-          trigger.props.onClick?.(e)
+          ;(trigger.props as any).onClick?.(e)
           setIsOpen(!isOpen)
         },
-      } as any)
+      })
     ) : (
       trigger
     )
