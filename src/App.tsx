@@ -1617,6 +1617,9 @@ function App() {
       <FocusMode
         isOpen={focusMode.isOpen}
         onClose={focusMode.close}
+        onAddNote={addNote}
+        onUpdateNote={updateNoteContent}
+        notes={notes.filter((n): n is Note => !n.sourceTaskId)}
       />
     </AppShell>
   )
