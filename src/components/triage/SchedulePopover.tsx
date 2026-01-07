@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo, cloneElement, isValidElement } from 'react'
 import { createPortal } from 'react-dom'
 import { CalendarPlus, ChevronLeft, Sun, Sunrise, CalendarDays, Calendar } from 'lucide-react'
 import {
@@ -669,29 +669,42 @@ export function SchedulePopover({
     </div>
   ) : null
 
+  // Create trigger with click handler
+  const triggerElement = trigger ? (
+    isValidElement(trigger) ? (
+      cloneElement(trigger, {
+        ...trigger.props,
+        ref: triggerRef,
+        onClick: (e: React.MouseEvent) => {
+          trigger.props.onClick?.(e)
+          setIsOpen(!isOpen)
+        },
+      } as any)
+    ) : (
+      trigger
+    )
+  ) : (
+    <button
+      ref={triggerRef as React.RefObject<HTMLButtonElement | null>}
+      onClick={() => setIsOpen(!isOpen)}
+      className={`
+        p-1.5 rounded-lg
+        transition-all duration-200
+        ${hasValue
+          ? 'bg-primary-50 text-primary-600 hover:bg-primary-100'
+          : 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100'
+        }
+      `}
+      title="Schedule"
+      aria-label="Schedule"
+    >
+      <CalendarPlus className="w-4 h-4" />
+    </button>
+  )
+
   return (
     <div ref={containerRef} className="relative">
-      {/* Trigger */}
-      {trigger ? (
-        <div ref={triggerRef as React.RefObject<HTMLDivElement | null>} onClick={() => setIsOpen(!isOpen)}>{trigger}</div>
-      ) : (
-        <button
-          ref={triggerRef as React.RefObject<HTMLButtonElement | null>}
-          onClick={() => setIsOpen(!isOpen)}
-          className={`
-            p-1.5 rounded-lg
-            transition-all duration-200
-            ${hasValue
-              ? 'bg-primary-50 text-primary-600 hover:bg-primary-100'
-              : 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100'
-            }
-          `}
-          title="Schedule"
-          aria-label="Schedule"
-        >
-          <CalendarPlus className="w-4 h-4" />
-        </button>
-      )}
+      {triggerElement}
       {popoverContent && createPortal(popoverContent, document.body)}
     </div>
   )

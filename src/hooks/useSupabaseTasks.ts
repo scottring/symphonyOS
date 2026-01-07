@@ -165,6 +165,65 @@ export function useSupabaseTasks() {
     }
 
     fetchTasks()
+
+    // Subscribe to real-time changes for tasks
+    const channel = supabase
+      .channel('tasks-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tasks',
+        },
+        (payload) => {
+          console.log('[useSupabaseTasks] Real-time update:', payload)
+
+          if (payload.eventType === 'INSERT') {
+            const newTask = dbTaskToTask(payload.new as DbTask)
+            setTasks((prev) => {
+              const nested = nestSubtasks([newTask, ...prev])
+              return nested
+            })
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedTask = dbTaskToTask(payload.new as DbTask)
+            setTasks((prev) => {
+              const updated = prev.map((t) => {
+                if (t.id === updatedTask.id) return updatedTask
+                // Also check subtasks
+                if (t.subtasks) {
+                  const updatedSubtasks = t.subtasks.map((st) =>
+                    st.id === updatedTask.id ? updatedTask : st
+                  )
+                  if (updatedSubtasks !== t.subtasks) {
+                    return { ...t, subtasks: updatedSubtasks }
+                  }
+                }
+                return t
+              })
+              return nestSubtasks(updated)
+            })
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = (payload.old as { id: string }).id
+            setTasks((prev) => {
+              const filtered = prev.filter((t) => {
+                if (t.id === deletedId) return false
+                if (t.subtasks) {
+                  t.subtasks = t.subtasks.filter((st) => st.id !== deletedId)
+                }
+                return true
+              })
+              return filtered
+            })
+          }
+        }
+      )
+      .subscribe()
+
+    // Cleanup subscription on unmount
+    return () => {
+      channel.unsubscribe()
+    }
   }, [user])
 
   // Options for creating linked tasks
