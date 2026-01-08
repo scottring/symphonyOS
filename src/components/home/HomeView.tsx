@@ -112,9 +112,19 @@ export function HomeView({
 
   // Filter tasks, routines, and projects by current domain
   const filteredTasks = useMemo(() => {
-    if (currentDomain === 'universal') return tasks
+    console.log('[HomeView] Filtering tasks:', { totalTasks: tasks.length, currentDomain })
+    if (currentDomain === 'universal') {
+      console.log('[HomeView] Universal domain - showing all tasks')
+      return tasks
+    }
     // Show items with matching context OR null context (for backwards compatibility)
-    return tasks.filter(task => task.context === currentDomain || task.context === null)
+    const filtered = tasks.filter(task => task.context === currentDomain || task.context === null)
+    console.log('[HomeView] Filtered tasks:', {
+      filtered: filtered.length,
+      nullContextTasks: tasks.filter(t => t.context === null).length,
+      matchingContextTasks: tasks.filter(t => t.context === currentDomain).length
+    })
+    return filtered
   }, [tasks, currentDomain])
 
   const filteredRoutines = useMemo(() => {
