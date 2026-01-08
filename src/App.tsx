@@ -267,14 +267,27 @@ function App() {
   }, [selectedItemId, searchOpen])
 
   // Auto-open QuickCapture from URL parameter (for Action Button shortcut)
+  // Store intent in sessionStorage to preserve through auth flow
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get('quickadd') === 'true') {
-      setQuickAddOpen(true)
-      // Clean URL after opening to prevent reopening on refresh
+      sessionStorage.setItem('symphony:quickadd', 'true')
+      // Clean URL immediately
       window.history.replaceState({}, '', window.location.pathname)
     }
   }, [])
+
+  // Open QuickCapture when app is ready (after auth/onboarding)
+  useEffect(() => {
+    if (user && onboardingComplete === true) {
+      const shouldOpenQuickAdd = sessionStorage.getItem('symphony:quickadd')
+      if (shouldOpenQuickAdd === 'true') {
+        sessionStorage.removeItem('symphony:quickadd')
+        // Small delay to ensure app is fully rendered
+        setTimeout(() => setQuickAddOpen(true), 100)
+      }
+    }
+  }, [user, onboardingComplete])
 
   // Fetch calendar events when connected or date changes
   useEffect(() => {
