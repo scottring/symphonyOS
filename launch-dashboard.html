@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Symphony OS Launch Command Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fraunces:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --cream: #FDFCFA;
+      --cream-warm: #FAF6F1;
+      --forest: #2D5A47;
+      --forest-light: #3D7A5F;
+      --charcoal: #1A1A1A;
+      --sage: #A8C5B8;
+      --peach: #F5DDD3;
+      --lavender: #E5DFF5;
+      --shadow: 0 2px 12px rgba(45, 90, 71, 0.08);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--cream);
+      color: var(--charcoal);
+      padding: 2rem;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    h1, h2, h3 {
+      font-family: 'Fraunces', serif;
+      font-weight: 400;
+      color: var(--forest);
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 2rem;
+      font-size: 1.1rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+    }
+
+    .card h2 {
+      font-size: 1.3rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .card h3 {
+      font-size: 1.1rem;
+      margin: 1rem 0 0.5rem;
+      font-weight: 500;
+    }
+
+    .metric {
+      background: var(--cream-warm);
+      padding: 1rem;
+      border-radius: 12px;
+      margin-bottom: 0.75rem;
+    }
+
+    .metric-label {
+      font-size: 0.85rem;
+      color: #666;
+      margin-bottom: 0.25rem;
+    }
+
+    .metric-value {
+      font-size: 2rem;
+      font-weight: 600;
+      color: var(--forest);
+      font-family: 'Fraunces', serif;
+    }
+
+    .phase {
+      margin-bottom: 1.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--cream-warm);
+    }
+
+    .phase:last-child {
+      border-bottom: none;
+    }
+
+    .phase-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .phase-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--forest);
+    }
+
+    .phase-progress {
+      font-size: 0.85rem;
+      color: #666;
+    }
+
+    .checklist {
+      margin-left: 0;
+      list-style: none;
+    }
+
+    .checklist li {
+      padding: 0.5rem 0;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+
+    .checklist input[type="checkbox"] {
+      margin-top: 0.25rem;
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    .checklist label {
+      flex: 1;
+      cursor: pointer;
+    }
+
+    .checklist li.completed label {
+      text-decoration: line-through;
+      opacity: 0.5;
+    }
+
+    .input-group {
+      margin-bottom: 1rem;
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="number"],
+    textarea {
+      width: 100%;
+      padding: 0.75rem;
+      border: 2px solid var(--cream-warm);
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      transition: border-color 0.2s;
+    }
+
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: var(--forest);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    button {
+      background: var(--forest);
+      color: white;
+      border: none;
+      padding: 0.75rem 1.25rem;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(45, 90, 71, 0.2);
+    }
+
+    button.secondary {
+      background: var(--cream-warm);
+      color: var(--forest);
+    }
+
+    .item {
+      background: var(--cream-warm);
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 0.75rem;
+      position: relative;
+    }
+
+    .item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 0.5rem;
+    }
+
+    .item-title {
+      font-weight: 500;
+      flex: 1;
+    }
+
+    .item-meta {
+      font-size: 0.85rem;
+      color: #666;
+      margin-bottom: 0.5rem;
+    }
+
+    .item-body {
+      font-size: 0.95rem;
+      color: #444;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 100px;
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    .badge.bug { background: #FFE5E5; color: #C0392B; }
+    .badge.feature { background: #E5F5FF; color: #2874A6; }
+    .badge.praise { background: #E8F5E9; color: #27AE60; }
+    .badge.pending { background: #FFF3E0; color: #E67E22; }
+    .badge.invited { background: #E3F2FD; color: #1976D2; }
+    .badge.active { background: #E8F5E9; color: #2E7D32; }
+
+    .delete-btn {
+      background: none;
+      color: #999;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.85rem;
+    }
+
+    .delete-btn:hover {
+      color: #C0392B;
+      background: none;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .progress-bar {
+      height: 8px;
+      background: var(--cream-warm);
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 0.5rem 0;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--forest), var(--sage));
+      transition: width 0.3s ease;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 2rem;
+      color: #999;
+      font-style: italic;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    @media (max-width: 768px) {
+      body { padding: 1rem; }
+      h1 { font-size: 2rem; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚀 Symphony OS Launch Command Center</h1>
+    <p class="subtitle">Track your launch, gather feedback, and iterate quickly</p>
+
+    <!-- Top Metrics -->
+    <div class="stats-grid">
+      <div class="metric">
+        <div class="metric-label">Waitlist</div>
+        <div class="metric-value" id="waitlistCount">0</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Active Users</div>
+        <div class="metric-value" id="activeUsers">0</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Feedback Items</div>
+        <div class="metric-value" id="feedbackCount">0</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Bugs Tracked</div>
+        <div class="metric-value" id="bugCount">0</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Launch Progress</div>
+        <div class="metric-value" id="overallProgress">0%</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- Launch Phases -->
+      <div class="card" style="grid-column: 1 / -1;">
+        <h2>📋 Launch Phases</h2>
+        <div id="phasesContainer"></div>
+      </div>
+
+      <!-- Quick Add -->
+      <div class="card">
+        <h2>⚡ Quick Capture</h2>
+        <div class="input-group">
+          <input type="text" id="quickCapture" placeholder="Quick note, idea, or task...">
+        </div>
+        <button onclick="addQuickNote()">Capture</button>
+        <div id="quickNotes" style="margin-top: 1rem;"></div>
+      </div>
+
+      <!-- User Invites -->
+      <div class="card">
+        <h2>👥 User Invites</h2>
+        <div class="input-group">
+          <input type="text" id="inviteName" placeholder="Name">
+        </div>
+        <div class="input-group">
+          <input type="email" id="inviteEmail" placeholder="Email">
+        </div>
+        <button onclick="addInvite()">Add User</button>
+        <div id="invitesList" style="margin-top: 1rem;"></div>
+      </div>
+
+      <!-- Feedback Log -->
+      <div class="card">
+        <h2>💬 Feedback & Reactions</h2>
+        <div class="input-group">
+          <input type="text" id="feedbackUser" placeholder="User name">
+        </div>
+        <div class="input-group">
+          <select id="feedbackType" style="width: 100%; padding: 0.75rem; border: 2px solid var(--cream-warm); border-radius: 8px;">
+            <option value="praise">👍 Praise</option>
+            <option value="feature">💡 Feature Request</option>
+            <option value="bug">🐛 Bug Report</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <textarea id="feedbackText" placeholder="What did they say?"></textarea>
+        </div>
+        <button onclick="addFeedback()">Log Feedback</button>
+        <div id="feedbackList" style="margin-top: 1rem;"></div>
+      </div>
+
+      <!-- Verification Tracker -->
+      <div class="card">
+        <h2>✓ Google Verification</h2>
+        <div class="checklist">
+          <li>
+            <input type="checkbox" id="verify-submit" onchange="saveData()">
+            <label for="verify-submit">Submitted verification request</label>
+          </li>
+          <li>
+            <input type="checkbox" id="verify-response" onchange="saveData()">
+            <label for="verify-response">Received response from Google</label>
+          </li>
+          <li>
+            <input type="checkbox" id="verify-approved" onchange="saveData()">
+            <label for="verify-approved">Verification approved ✨</label>
+          </li>
+        </div>
+        <div class="input-group" style="margin-top: 1rem;">
+          <textarea id="verifyNotes" placeholder="Notes on verification process..." onchange="saveData()"></textarea>
+        </div>
+      </div>
+
+      <!-- Launch Day Checklist -->
+      <div class="card">
+        <h2>🎯 Launch Day Actions</h2>
+        <div class="checklist">
+          <li>
+            <input type="checkbox" id="launch-email" onchange="saveData()">
+            <label for="launch-email">Email waitlist</label>
+          </li>
+          <li>
+            <input type="checkbox" id="launch-twitter" onchange="saveData()">
+            <label for="launch-twitter">Post on Twitter/X</label>
+          </li>
+          <li>
+            <input type="checkbox" id="launch-linkedin" onchange="saveData()">
+            <label for="launch-linkedin">Post on LinkedIn</label>
+          </li>
+          <li>
+            <input type="checkbox" id="launch-ph" onchange="saveData()">
+            <label for="launch-ph">Submit to Product Hunt</label>
+          </li>
+          <li>
+            <input type="checkbox" id="launch-hn" onchange="saveData()">
+            <label for="launch-hn">Post on Hacker News Show HN</label>
+          </li>
+          <li>
+            <input type="checkbox" id="launch-reddit" onchange="saveData()">
+            <label for="launch-reddit">Post in relevant subreddits</label>
+          </li>
+          <li>
+            <input type="checkbox" id="launch-friends" onchange="saveData()">
+            <label for="launch-friends">Text 5-10 friends personally</label>
+          </li>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Data structure
+    let launchData = {
+      phases: [
+        {
+          id: 'phase1',
+          name: 'Phase 1: Foundation & Validation',
+          items: [
+            { id: 'p1-1', text: 'Landing page live with waitlist', done: true },
+            { id: 'p1-2', text: 'Privacy policy published', done: true },
+            { id: 'p1-3', text: 'Terms of service published', done: true },
+            { id: 'p1-4', text: 'Test app with 3-5 friends/family', done: false },
+            { id: 'p1-5', text: 'Identify top 3 user pain points', done: false },
+          ]
+        },
+        {
+          id: 'phase2',
+          name: 'Phase 2: Technical Infrastructure',
+          items: [
+            { id: 'p2-1', text: 'Analytics installed (consider PostHog/Plausible)', done: false },
+            { id: 'p2-2', text: 'User feedback mechanism in place', done: false },
+            { id: 'p2-3', text: 'Error tracking setup (Sentry)', done: false },
+            { id: 'p2-4', text: 'Email system ready (transactional emails)', done: false },
+            { id: 'p2-5', text: 'Backup/export functionality tested', done: false },
+          ]
+        },
+        {
+          id: 'phase3',
+          name: 'Phase 3: Marketing Assets',
+          items: [
+            { id: 'p3-1', text: 'Demo video recorded (2-3 min walkthrough)', done: false },
+            { id: 'p3-2', text: 'Screenshot library for social posts', done: false },
+            { id: 'p3-3', text: 'One-pager explaining Symphony OS value', done: false },
+            { id: 'p3-4', text: 'Social media profiles updated', done: false },
+            { id: 'p3-5', text: 'Testimonials collected from beta users', done: false },
+          ]
+        },
+        {
+          id: 'phase4',
+          name: 'Phase 4: Soft Launch (Week 1-2)',
+          items: [
+            { id: 'p4-1', text: 'Invite first 10-20 beta users', done: false },
+            { id: 'p4-2', text: 'Daily check-ins with early users', done: false },
+            { id: 'p4-3', text: 'Fix critical bugs as they emerge', done: false },
+            { id: 'p4-4', text: 'Validate core use cases are working', done: false },
+            { id: 'p4-5', text: 'Measure engagement (DAU, retention)', done: false },
+          ]
+        },
+        {
+          id: 'phase5',
+          name: 'Phase 5: Public Launch',
+          items: [
+            { id: 'p5-1', text: 'Google verification approved (4-6 weeks)', done: false },
+            { id: 'p5-2', text: 'Product Hunt launch', done: false },
+            { id: 'p5-3', text: 'Hacker News Show HN post', done: false },
+            { id: 'p5-4', text: 'Email all waitlist users', done: false },
+            { id: 'p5-5', text: 'Announce on all social channels', done: false },
+            { id: 'p5-6', text: 'Reach 100 active users', done: false },
+          ]
+        },
+      ],
+      invites: [],
+      feedback: [],
+      quickNotes: [],
+      metrics: {
+        waitlist: 0,
+        activeUsers: 0,
+      }
+    };
+
+    // Load data from localStorage
+    function loadData() {
+      const saved = localStorage.getItem('symphonyLaunchData');
+      if (saved) {
+        launchData = JSON.parse(saved);
+      }
+      renderAll();
+    }
+
+    // Save data to localStorage
+    function saveData() {
+      localStorage.setItem('symphonyLaunchData', JSON.stringify(launchData));
+      renderAll();
+    }
+
+    // Render phases
+    function renderPhases() {
+      const container = document.getElementById('phasesContainer');
+      container.innerHTML = launchData.phases.map(phase => {
+        const completed = phase.items.filter(i => i.done).length;
+        const total = phase.items.length;
+        const progress = Math.round((completed / total) * 100);
+
+        return `
+          <div class="phase">
+            <div class="phase-header">
+              <div class="phase-title">${phase.name}</div>
+              <div class="phase-progress">${completed}/${total} complete</div>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: ${progress}%"></div>
+            </div>
+            <ul class="checklist">
+              ${phase.items.map(item => `
+                <li class="${item.done ? 'completed' : ''}">
+                  <input type="checkbox" id="${item.id}" ${item.done ? 'checked' : ''} onchange="togglePhaseItem('${phase.id}', '${item.id}')">
+                  <label for="${item.id}">${item.text}</label>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function togglePhaseItem(phaseId, itemId) {
+      const phase = launchData.phases.find(p => p.id === phaseId);
+      const item = phase.items.find(i => i.id === itemId);
+      item.done = !item.done;
+      saveData();
+    }
+
+    // Render invites
+    function renderInvites() {
+      const container = document.getElementById('invitesList');
+      if (launchData.invites.length === 0) {
+        container.innerHTML = '<div class="empty-state">No users invited yet</div>';
+        return;
+      }
+
+      container.innerHTML = launchData.invites.map((invite, idx) => `
+        <div class="item">
+          <div class="item-header">
+            <div class="item-title">${invite.name}</div>
+            <button class="delete-btn" onclick="deleteInvite(${idx})">×</button>
+          </div>
+          <div class="item-meta">${invite.email} • <span class="badge ${invite.status}">${invite.status}</span></div>
+        </div>
+      `).join('');
+    }
+
+    function addInvite() {
+      const name = document.getElementById('inviteName').value.trim();
+      const email = document.getElementById('inviteEmail').value.trim();
+      if (!name || !email) return;
+
+      launchData.invites.push({
+        name,
+        email,
+        status: 'pending',
+        date: new Date().toISOString()
+      });
+
+      document.getElementById('inviteName').value = '';
+      document.getElementById('inviteEmail').value = '';
+      saveData();
+    }
+
+    function deleteInvite(idx) {
+      launchData.invites.splice(idx, 1);
+      saveData();
+    }
+
+    // Render feedback
+    function renderFeedback() {
+      const container = document.getElementById('feedbackList');
+      if (launchData.feedback.length === 0) {
+        container.innerHTML = '<div class="empty-state">No feedback yet</div>';
+        return;
+      }
+
+      container.innerHTML = launchData.feedback.slice().reverse().map((fb, idx) => `
+        <div class="item">
+          <div class="item-header">
+            <div class="item-title">${fb.user}</div>
+            <button class="delete-btn" onclick="deleteFeedback(${launchData.feedback.length - 1 - idx})">×</button>
+          </div>
+          <div class="item-meta">
+            <span class="badge ${fb.type}">${fb.type}</span> •
+            ${new Date(fb.date).toLocaleDateString()}
+          </div>
+          <div class="item-body">${fb.text}</div>
+        </div>
+      `).join('');
+    }
+
+    function addFeedback() {
+      const user = document.getElementById('feedbackUser').value.trim();
+      const type = document.getElementById('feedbackType').value;
+      const text = document.getElementById('feedbackText').value.trim();
+      if (!user || !text) return;
+
+      launchData.feedback.push({
+        user,
+        type,
+        text,
+        date: new Date().toISOString()
+      });
+
+      document.getElementById('feedbackUser').value = '';
+      document.getElementById('feedbackText').value = '';
+      saveData();
+    }
+
+    function deleteFeedback(idx) {
+      launchData.feedback.splice(idx, 1);
+      saveData();
+    }
+
+    // Quick notes
+    function renderQuickNotes() {
+      const container = document.getElementById('quickNotes');
+      if (launchData.quickNotes.length === 0) {
+        container.innerHTML = '';
+        return;
+      }
+
+      container.innerHTML = launchData.quickNotes.slice(-5).reverse().map((note, idx) => `
+        <div class="item">
+          <div class="item-header">
+            <div class="item-body">${note.text}</div>
+            <button class="delete-btn" onclick="deleteQuickNote(${launchData.quickNotes.length - 1 - idx})">×</button>
+          </div>
+          <div class="item-meta">${new Date(note.date).toLocaleString()}</div>
+        </div>
+      `).join('');
+    }
+
+    function addQuickNote() {
+      const text = document.getElementById('quickCapture').value.trim();
+      if (!text) return;
+
+      launchData.quickNotes.push({
+        text,
+        date: new Date().toISOString()
+      });
+
+      document.getElementById('quickCapture').value = '';
+      saveData();
+    }
+
+    function deleteQuickNote(idx) {
+      launchData.quickNotes.splice(idx, 1);
+      saveData();
+    }
+
+    // Update metrics
+    function updateMetrics() {
+      const totalPhaseItems = launchData.phases.reduce((sum, p) => sum + p.items.length, 0);
+      const completedPhaseItems = launchData.phases.reduce((sum, p) => sum + p.items.filter(i => i.done).length, 0);
+      const overallProgress = Math.round((completedPhaseItems / totalPhaseItems) * 100);
+
+      document.getElementById('waitlistCount').textContent = launchData.metrics.waitlist;
+      document.getElementById('activeUsers').textContent = launchData.metrics.activeUsers;
+      document.getElementById('feedbackCount').textContent = launchData.feedback.length;
+      document.getElementById('bugCount').textContent = launchData.feedback.filter(f => f.type === 'bug').length;
+      document.getElementById('overallProgress').textContent = `${overallProgress}%`;
+    }
+
+    // Render all
+    function renderAll() {
+      renderPhases();
+      renderInvites();
+      renderFeedback();
+      renderQuickNotes();
+      updateMetrics();
+    }
+
+    // Quick capture with Enter key
+    document.getElementById('quickCapture').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') addQuickNote();
+    });
+
+    // Load on page load
+    loadData();
+  </script>
+</body>
+</html>

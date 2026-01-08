@@ -963,9 +963,7 @@ function App() {
       userName={getCurrentUserMember()?.name}
       onSignOut={signOut}
       onQuickAdd={async (title) => {
-        console.log('[QuickAdd] Creating task:', { title, assignedTo: getCurrentUserMember()?.id })
         const taskId = await addTask(title, undefined, undefined, undefined, { assignedTo: getCurrentUserMember()?.id })
-        console.log('[QuickAdd] Task created with ID:', taskId)
         if (taskId) {
           setRecentlyCreatedTaskId(taskId)
         }
