@@ -99,6 +99,7 @@ export function TriageCard({
           }}
           onClear={() => onUpdate({ scheduledFor: undefined, isAllDay: undefined })}
           getItemsForDate={getScheduleItemsForDate}
+          itemTitle={task.title}
         />
 
         {/* Defer/Later button */}

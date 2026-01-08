@@ -34,6 +34,8 @@ interface SchedulePopoverProps {
   getItemsForDate?: (date: Date) => ScheduleContextItem[]
   // Skip straight to time selection when editing existing scheduled item
   skipToTime?: boolean
+  // Title of task/event being scheduled (for context)
+  itemTitle?: string
 }
 
 type Step = 'date' | 'time'
@@ -59,11 +61,11 @@ const TIME_PRESETS = [
   { label: '10pm', hour: 22 },
 ]
 
-// Generate 5-minute increment options
+// Generate 15-minute increment options
 function generateTimeOptions(): { value: string; label: string }[] {
   const options: { value: string; label: string }[] = []
   for (let hour = 6; hour <= 22; hour++) {
-    for (let minute = 0; minute < 60; minute += 5) {
+    for (let minute = 0; minute < 60; minute += 15) {
       const h = hour.toString().padStart(2, '0')
       const m = minute.toString().padStart(2, '0')
       const value = `${h}:${m}`
@@ -149,12 +151,12 @@ export function SchedulePopover({
   scheduleItems,
   getItemsForDate,
   skipToTime = false,
+  itemTitle,
 }: SchedulePopoverProps) {
   void _isAllDay // Reserved for visual indicator
   const [isOpen, setIsOpen] = useState(false)
   const [step, setStep] = useState<Step>('date')
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
-  const [showCustomTime, setShowCustomTime] = useState(false)
 
   // Determine if we should show the schedule context view
   const hasScheduleContext = !!(scheduleItems || getItemsForDate)
@@ -202,8 +204,10 @@ export function SchedulePopover({
       const target = event.target as Node
       const isOutsideContainer = containerRef.current && !containerRef.current.contains(target)
       const isOutsideDropdown = dropdownRef.current && !dropdownRef.current.contains(target)
+      const isInputClick = customTimeInputRef.current && customTimeInputRef.current.contains(target)
 
-      if (isOutsideContainer && isOutsideDropdown) {
+      // Don't close if clicking inside dropdown or on the input field
+      if (isOutsideContainer && isOutsideDropdown && !isInputClick) {
         handleClose()
       }
     }
@@ -224,7 +228,6 @@ export function SchedulePopover({
         setStep('date')
         setSelectedDate(null)
       }
-      setShowCustomTime(false)
       setCustomTimeSearch('')
     }
   }, [isOpen, skipToTime, value])
@@ -246,30 +249,22 @@ export function SchedulePopover({
         // Position above: use bottom to anchor to viewport bottom
         setDropdownPosition({
           bottom: window.innerHeight - rect.top + 8,
-          left: Math.max(8, Math.min(rect.left, window.innerWidth - 280 - 8)),
+          left: Math.max(8, Math.min(rect.left, window.innerWidth - 320 - 16)),
         })
       } else {
         // Position below: use top
         setDropdownPosition({
           top: rect.bottom + 8,
-          left: Math.max(8, Math.min(rect.left, window.innerWidth - 280 - 8)),
+          left: Math.max(8, Math.min(rect.left, window.innerWidth - 320 - 16)),
         })
       }
     }
   }, [isOpen])
 
-  // Focus custom time input when shown
-  useEffect(() => {
-    if (showCustomTime && customTimeInputRef.current) {
-      customTimeInputRef.current.focus()
-    }
-  }, [showCustomTime])
-
   const handleClose = useCallback(() => {
     setIsOpen(false)
     setStep('date')
     setSelectedDate(null)
-    setShowCustomTime(false)
     setCustomTimeSearch('')
   }, [])
 
@@ -313,11 +308,126 @@ export function SchedulePopover({
     handleClose()
   }
 
+  // Parse digit-only input as time (e.g., "210" -> "2:10", "217p" -> "14:17", "930a" -> "9:30")
+  const parseDigitInput = (input: string): string | null => {
+    const lowerInput = input.toLowerCase()
+    const digits = input.replace(/\D/g, '') // Remove non-digits
+    if (!digits) return null
+
+    // Detect AM/PM indicator
+    const isPM = lowerInput.includes('p')
+    const isAM = lowerInput.includes('a')
+
+    let hour: number
+    let minute: number
+
+    if (digits.length === 1 || digits.length === 2) {
+      // "2" or "14" -> interpret as hour
+      hour = parseInt(digits, 10)
+      minute = 0
+    } else if (digits.length === 3) {
+      // "210" -> "2:10", "930" -> "9:30"
+      hour = parseInt(digits.slice(0, 1), 10)
+      minute = parseInt(digits.slice(1), 10)
+    } else if (digits.length === 4) {
+      // "1410" -> "14:10"
+      hour = parseInt(digits.slice(0, 2), 10)
+      minute = parseInt(digits.slice(2), 10)
+    } else {
+      return null
+    }
+
+    // Validate minute
+    if (minute < 0 || minute > 59) return null
+
+    // Handle AM/PM conversion
+    if (isPM && hour >= 1 && hour <= 11) {
+      hour += 12 // Convert to 24-hour format (1pm -> 13, 11pm -> 23)
+    } else if (isAM && hour === 12) {
+      hour = 0 // 12am -> 00:00
+    } else if (isPM && hour === 12) {
+      hour = 12 // 12pm stays 12
+    }
+
+    // Validate final hour
+    if (hour < 0 || hour > 23) return null
+
+    return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+  }
+
   // Filter time options based on search
-  const filteredTimeOptions = TIME_OPTIONS.filter(opt =>
-    opt.label.toLowerCase().includes(customTimeSearch.toLowerCase()) ||
-    opt.value.includes(customTimeSearch)
-  )
+  const filteredTimeOptions = (() => {
+    const search = customTimeSearch.toLowerCase().trim()
+    if (!search) return TIME_OPTIONS
+
+    // First, try standard matching (label or value contains search)
+    const standardMatches = TIME_OPTIONS.filter(opt =>
+      opt.label.toLowerCase().includes(search) ||
+      opt.value.includes(search)
+    )
+
+    // If we have matches from standard search, return those
+    if (standardMatches.length > 0) return standardMatches
+
+    // Otherwise, try parsing as digit input
+    const lowerInput = search.toLowerCase()
+    const hasAmPmIndicator = lowerInput.includes('a') || lowerInput.includes('p')
+
+    const parsedTime = parseDigitInput(search)
+    if (parsedTime) {
+      // Find exact match in 15-min increments
+      const exactMatch = TIME_OPTIONS.find(opt => opt.value === parsedTime)
+      if (exactMatch) {
+        return [exactMatch]
+      }
+
+      // If no exact match, create custom option(s) for this time
+      const [hourStr, minuteStr] = parsedTime.split(':')
+      const hour = parseInt(hourStr, 10)
+      const minute = parseInt(minuteStr, 10)
+
+      // If no AM/PM indicator and hour is 1-11, show both AM and PM options
+      if (!hasAmPmIndicator && hour >= 1 && hour <= 11) {
+        const amHour = hour
+        const pmHour = hour + 12
+
+        const amDisplayHour = amHour === 12 ? 12 : amHour
+        const pmDisplayHour = pmHour > 12 ? pmHour - 12 : pmHour
+
+        const amLabel = minute === 0
+          ? `${amDisplayHour}am`
+          : `${amDisplayHour}:${minuteStr}am`
+        const pmLabel = minute === 0
+          ? `${pmDisplayHour}pm`
+          : `${pmDisplayHour}:${minuteStr}pm`
+
+        return [
+          {
+            value: `${amHour.toString().padStart(2, '0')}:${minuteStr}`,
+            label: amLabel
+          },
+          {
+            value: `${pmHour.toString().padStart(2, '0')}:${minuteStr}`,
+            label: pmLabel
+          }
+        ]
+      }
+
+      // Otherwise, show single option with the parsed time
+      const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour
+      const period = hour >= 12 ? 'pm' : 'am'
+      const label = minute === 0
+        ? `${displayHour}${period}`
+        : `${displayHour}:${minuteStr}${period}`
+
+      return [{
+        value: parsedTime,
+        label: label
+      }]
+    }
+
+    return []
+  })()
 
   const formatSelectedDateLabel = () => {
     if (!selectedDate) return ''
@@ -329,7 +439,7 @@ export function SchedulePopover({
   const popoverContent = isOpen ? (
     <div
       ref={dropdownRef}
-      className="fixed z-[9999] animate-fade-in-scale max-h-[90vh] overflow-y-auto"
+      className="fixed z-[9999] animate-fade-in-scale max-h-[90vh] overflow-y-auto overflow-x-hidden"
       style={{
         ...(dropdownPosition.top !== undefined ? { top: dropdownPosition.top } : { bottom: dropdownPosition.bottom }),
         left: dropdownPosition.left,
@@ -337,7 +447,8 @@ export function SchedulePopover({
         borderRadius: 'var(--radius-xl)',
         border: '1px solid hsl(38 25% 88%)',
         boxShadow: '0 4px 20px hsl(32 20% 20% / 0.12), 0 0 0 1px hsl(38 25% 88% / 0.5)',
-        minWidth: '280px',
+        width: '320px',
+        maxWidth: 'calc(100vw - 16px)',
       }}
     >
           {/* Step 1: Pick date */}
@@ -424,33 +535,94 @@ export function SchedulePopover({
           )}
 
           {/* Step 2: Pick time - with schedule context if available */}
-          {step === 'time' && !showCustomTime && (
+          {step === 'time' && (
             <div className="p-3">
-              {/* Back button with selected date */}
+              {/* Back button with selected date and task title */}
               <button
                 onClick={() => setStep('date')}
                 className="flex items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-700 mb-3 px-1"
               >
                 <ChevronLeft className="w-4 h-4" />
                 <span className="font-medium">{formatSelectedDateLabel()}</span>
+                {itemTitle && (
+                  <>
+                    <span className="text-neutral-300">•</span>
+                    <span className="truncate max-w-[140px]">{itemTitle}</span>
+                  </>
+                )}
               </button>
+
+              {/* Search/type-ahead input at top */}
+              <div
+                className="relative mb-3"
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <input
+                  ref={customTimeInputRef}
+                  type="text"
+                  value={customTimeSearch}
+                  onChange={(e) => setCustomTimeSearch(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  placeholder="Type time (e.g., 2:15pm)"
+                  className="
+                    w-full px-3 py-2 rounded-lg text-sm
+                    border border-neutral-200 bg-white
+                    focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400
+                    transition-all duration-150
+                  "
+                />
+              </div>
+
+              {/* Show filtered time suggestions when user is typing */}
+              {customTimeSearch && filteredTimeOptions.length > 0 && (
+                <div
+                  className="mb-3 max-h-48 overflow-y-auto rounded-lg border border-neutral-100"
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
+                  {filteredTimeOptions.slice(0, 20).map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => handleCustomTimeSelect(option.value)}
+                      className="
+                        w-full px-3 py-2 text-sm text-left
+                        text-neutral-700 hover:bg-primary-50 hover:text-primary-700
+                        transition-colors first:rounded-t-lg last:rounded-b-lg
+                      "
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Show no results message */}
+              {customTimeSearch && filteredTimeOptions.length === 0 && (
+                <div className="mb-3 px-3 py-4 text-sm text-neutral-400 text-center rounded-lg border border-neutral-100">
+                  No matching times
+                </div>
+              )}
 
               {/* All day option */}
-              <button
-                onClick={() => handleTimeSelect('all-day')}
-                className="
-                  w-full flex items-center gap-2 px-3 py-2 mb-3 rounded-lg text-sm font-medium
-                  text-neutral-600 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
-                  transition-all duration-150
-                "
-              >
-                <span className="text-base">🌤️</span>
-                <span>All Day</span>
-              </button>
+              {!customTimeSearch && (
+                <button
+                  onClick={() => handleTimeSelect('all-day')}
+                  className="
+                    w-full flex items-center gap-2 px-3 py-2 mb-3 rounded-lg text-sm font-medium
+                    text-neutral-600 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
+                    transition-all duration-150
+                  "
+                >
+                  <span className="text-base">🌤️</span>
+                  <span>All Day</span>
+                </button>
+              )}
 
               {/* Schedule context view - shows day structure with gaps */}
-              {hasScheduleContext ? (
-                <div className="space-y-3 max-h-[320px] overflow-y-auto">
+              {!customTimeSearch && hasScheduleContext ? (
+                <div className="space-y-3 max-h-[240px] overflow-y-auto">
                   {/* Render each section with items and gaps */}
                   {(['morning', 'afternoon', 'evening'] as const).map((section) => {
                     const sectionItems = groupedItems[section]
@@ -484,7 +656,7 @@ export function SchedulePopover({
                                         handleTimeSelect(gapTime.getHours())
                                       }}
                                       className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs
-                                        text-primary-600 bg-primary-50/50 hover:bg-primary-100
+                                        text-primary-600 bg-primary-50/50 hover:bg-primary-100 hover:border-primary-300
                                         border border-dashed border-primary-200
                                         transition-all duration-150 mb-1"
                                     >
@@ -560,110 +732,27 @@ export function SchedulePopover({
                       </div>
                     )
                   })}
-
-                  {/* Custom time option */}
-                  <button
-                    onClick={() => setShowCustomTime(true)}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs
-                      text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50
-                      transition-all duration-150 mt-2"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>Pick exact time...</span>
-                  </button>
                 </div>
-              ) : (
+              ) : !customTimeSearch ? (
                 /* Fallback: Hourly time grid when no schedule context */
-                <>
-                  {/* Scrollable grid of hourly times */}
-                  <div className="max-h-64 overflow-y-auto mb-2">
-                    <div className="grid grid-cols-3 gap-1.5 p-1">
-                      {TIME_PRESETS.map((preset) => (
-                        <button
-                          key={preset.hour}
-                          onClick={() => handleTimeSelect(preset.hour)}
-                          className="
-                            px-3 py-2 rounded-lg text-sm font-medium
-                            text-neutral-700 bg-neutral-50 hover:bg-primary-100 hover:text-primary-700
-                            transition-all duration-150
-                          "
-                        >
-                          {preset.label}
-                        </button>
-                      ))}
-                    </div>
+                <div className="max-h-64 overflow-y-auto mb-2">
+                  <div className="grid grid-cols-3 gap-1.5 p-1">
+                    {TIME_PRESETS.map((preset) => (
+                      <button
+                        key={preset.hour}
+                        onClick={() => handleTimeSelect(preset.hour)}
+                        className="
+                          px-3 py-2 rounded-lg text-sm font-medium
+                          text-neutral-700 bg-neutral-50 hover:bg-primary-100 hover:text-primary-700
+                          transition-all duration-150
+                        "
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
                   </div>
-
-                  <button
-                    onClick={() => setShowCustomTime(true)}
-                    className="
-                      w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs
-                      text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50
-                      transition-all duration-150 border-t border-neutral-100 pt-2
-                    "
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>Need 5-minute precision?</span>
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Custom time picker */}
-          {step === 'time' && showCustomTime && (
-            <div className="p-3">
-              {/* Back button */}
-              <button
-                onClick={() => setShowCustomTime(false)}
-                className="flex items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-700 mb-3 px-1"
-              >
-                <ChevronLeft className="w-4 h-4" />
-                <span className="font-medium">{formatSelectedDateLabel()}</span>
-              </button>
-
-              {/* Search/type-ahead input */}
-              <div className="relative mb-2">
-                <input
-                  ref={customTimeInputRef}
-                  type="text"
-                  value={customTimeSearch}
-                  onChange={(e) => setCustomTimeSearch(e.target.value)}
-                  placeholder="Type time (e.g., 2:30pm)"
-                  className="
-                    w-full px-3 py-2 rounded-lg text-sm
-                    border border-neutral-200 bg-white
-                    focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400
-                    transition-all duration-150
-                  "
-                />
-              </div>
-
-              {/* Time options list */}
-              <div className="max-h-48 overflow-y-auto rounded-lg border border-neutral-100">
-                {filteredTimeOptions.slice(0, 20).map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => handleCustomTimeSelect(option.value)}
-                    className="
-                      w-full px-3 py-2 text-sm text-left
-                      text-neutral-700 hover:bg-primary-50 hover:text-primary-700
-                      transition-colors first:rounded-t-lg last:rounded-b-lg
-                    "
-                  >
-                    {option.label}
-                  </button>
-                ))}
-                {filteredTimeOptions.length === 0 && (
-                  <div className="px-3 py-4 text-sm text-neutral-400 text-center">
-                    No matching times
-                  </div>
-                )}
-              </div>
+                </div>
+              ) : null}
             </div>
           )}
     </div>

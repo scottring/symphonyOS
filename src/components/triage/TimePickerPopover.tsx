@@ -22,11 +22,11 @@ interface TimePickerPopoverProps {
   getItemsForDate?: (date: Date) => ScheduleContextItem[]
 }
 
-// Generate 5-minute increment options
+// Generate 15-minute increment options
 function generateTimeOptions(): { value: string; label: string }[] {
   const options: { value: string; label: string }[] = []
   for (let hour = 6; hour <= 22; hour++) {
-    for (let minute = 0; minute < 60; minute += 5) {
+    for (let minute = 0; minute < 60; minute += 15) {
       const h = hour.toString().padStart(2, '0')
       const m = minute.toString().padStart(2, '0')
       const value = `${h}:${m}`

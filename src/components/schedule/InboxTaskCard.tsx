@@ -89,6 +89,7 @@ export function InboxTaskCard({
             }}
             onClear={() => onUpdate({ scheduledFor: undefined, isAllDay: undefined })}
             getItemsForDate={getScheduleItemsForDate}
+            itemTitle={task.title}
           />
 
           {/* Context picker - desktop only */}
