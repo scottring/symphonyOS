@@ -266,6 +266,16 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedItemId, searchOpen])
 
+  // Auto-open QuickCapture from URL parameter (for Action Button shortcut)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('quickadd') === 'true') {
+      setQuickAddOpen(true)
+      // Clean URL after opening to prevent reopening on refresh
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
+
   // Fetch calendar events when connected or date changes
   useEffect(() => {
     if (isConnected) {
