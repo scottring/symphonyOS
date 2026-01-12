@@ -57,9 +57,16 @@ export const FOCUS_PANEL_WIDTH = 420
 export function FocusMode({ isOpen, onClose, onAddNote, onUpdateNote, notes }: FocusModeProps) {
   const [scratchPad, setScratchPad] = useState(getStoredScratchPad)
   const [currentNoteId, setCurrentNoteId] = useState<string | null>(null)
+  const currentNoteIdRef = useRef<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const saveInProgressRef = useRef(false)
   const timeOfDay = getTimeOfDay(new Date())
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    currentNoteIdRef.current = currentNoteId
+  }, [currentNoteId])
 
   // Load today's scratchpad from database when opened
   useEffect(() => {
@@ -69,35 +76,49 @@ export function FocusMode({ isOpen, onClose, onAddNote, onUpdateNote, notes }: F
     if (todaysScratchpad) {
       setScratchPad(todaysScratchpad.content)
       setCurrentNoteId(todaysScratchpad.id)
+      currentNoteIdRef.current = todaysScratchpad.id
       localStorage.setItem(SCRATCH_PAD_KEY, todaysScratchpad.content)
       localStorage.setItem(SCRATCH_PAD_DATE_KEY, new Date().toDateString())
     } else {
       // Use localStorage fallback if no database note yet
       setScratchPad(getStoredScratchPad())
       setCurrentNoteId(null)
+      currentNoteIdRef.current = null
     }
   }, [isOpen, notes])
 
   // Debounced save to database
   const saveToDB = useCallback(
-    async (content: string, noteId: string | null) => {
-      // If there's an existing note, update it even if empty (for clearing)
-      if (noteId) {
-        await onUpdateNote(noteId, { content })
-        return
-      }
+    async (content: string) => {
+      // Prevent concurrent saves
+      if (saveInProgressRef.current) return
+      saveInProgressRef.current = true
 
-      // Only create new note if content is not empty
-      if (!content.trim()) return
+      try {
+        // Use ref to get the latest note ID (not captured in closure)
+        const noteId = currentNoteIdRef.current
 
-      const newNote = await onAddNote({
-        title: SCRATCH_PAD_NOTE_TITLE,
-        content,
-        type: 'quick_capture',
-        source: 'manual',
-      })
-      if (newNote) {
-        setCurrentNoteId(newNote.id)
+        // If there's an existing note, update it even if empty (for clearing)
+        if (noteId) {
+          await onUpdateNote(noteId, { content })
+          return
+        }
+
+        // Only create new note if content is not empty
+        if (!content.trim()) return
+
+        const newNote = await onAddNote({
+          title: SCRATCH_PAD_NOTE_TITLE,
+          content,
+          type: 'quick_capture',
+          source: 'manual',
+        })
+        if (newNote) {
+          setCurrentNoteId(newNote.id)
+          currentNoteIdRef.current = newNote.id
+        }
+      } finally {
+        saveInProgressRef.current = false
       }
     },
     [onAddNote, onUpdateNote]
@@ -115,7 +136,7 @@ export function FocusMode({ isOpen, onClose, onAddNote, onUpdateNote, notes }: F
 
     // Debounce database save (1 second after typing stops)
     saveTimeoutRef.current = setTimeout(() => {
-      saveToDB(scratchPad, currentNoteId)
+      saveToDB(scratchPad)
     }, 1000)
 
     return () => {
@@ -123,7 +144,7 @@ export function FocusMode({ isOpen, onClose, onAddNote, onUpdateNote, notes }: F
         clearTimeout(saveTimeoutRef.current)
       }
     }
-  }, [scratchPad, currentNoteId, saveToDB])
+  }, [scratchPad, saveToDB])
 
   // Focus textarea when opened
   useEffect(() => {
