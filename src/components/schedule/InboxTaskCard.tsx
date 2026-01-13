@@ -69,10 +69,12 @@ export function InboxTaskCard({
           onSelect()
         }
       }}
-      className={`bg-white rounded-xl border pl-0.5 pr-3 py-2.5 shadow-sm cursor-pointer hover:shadow-md transition-all group ${
+      className={`bg-white rounded-xl border pl-0.5 pr-3 py-2.5 shadow-sm cursor-pointer transition-all group ${
         isSelected
-          ? 'bg-primary-50/30 border-primary-200'
-          : 'border-neutral-100 hover:border-primary-200'
+          ? 'bg-primary-50/40 border-primary-300 shadow-md ring-2 ring-primary-100'
+          : selectionMode
+            ? 'border-neutral-200 hover:bg-primary-50/20 hover:border-primary-200'
+            : 'border-neutral-100 hover:shadow-md hover:border-primary-200'
       }`}
     >
       {/* Main row: checkbox | title | triage buttons */}
@@ -100,7 +102,7 @@ export function InboxTaskCard({
               w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors
               ${selectionMode
                 ? isSelected
-                  ? 'bg-primary-500 border-primary-500 text-white'
+                  ? 'bg-primary-500/50 border-primary-500/50'
                   : 'border-primary-300 hover:border-primary-400'
                 : task.completed
                   ? 'bg-primary-500 border-primary-500 text-white'
@@ -108,7 +110,8 @@ export function InboxTaskCard({
               }
             `}
           >
-            {((selectionMode && isSelected) || (!selectionMode && task.completed)) && (
+            {/* Show checkmark only for completion, not for selection */}
+            {!selectionMode && task.completed && (
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
               </svg>

@@ -87,12 +87,20 @@ export function InboxSection({
     if (!onUpdateTasksBulk) return
 
     const taskIds = Array.from(selectedTaskIds)
-    const updates: Partial<Task> = {
-      deferredUntil: date,
-      deferCount: undefined, // Will need to increment individually if we want accurate counts
-    }
 
-    await onUpdateTasksBulk(taskIds, updates)
+    // For each task, increment defer count
+    for (const taskId of taskIds) {
+      const task = tasks.find(t => t.id === taskId)
+      if (!task) continue
+
+      const updates: Partial<Task> = {
+        deferredUntil: date,
+        deferCount: (task.deferCount || 0) + 1,
+      }
+
+      // Update one at a time to preserve individual defer counts
+      await onUpdateTasksBulk([taskId], updates)
+    }
 
     // Clear selection and exit mode
     setSelectedTaskIds(new Set())

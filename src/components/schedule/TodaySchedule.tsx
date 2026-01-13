@@ -15,6 +15,7 @@ import { TimeGroup } from './TimeGroup'
 import { ScheduleItem } from './ScheduleItem'
 import { SwipeableCard } from './SwipeableCard'
 import { DateNavigator } from './DateNavigator'
+import { InboxSection } from './InboxSection'
 import { InboxTaskCard } from './InboxTaskCard'
 import { OverdueSection } from './OverdueSection'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
@@ -630,6 +631,20 @@ export function TodaySchedule({
     })
   }, [])
 
+  // Completed inbox items - collapsed by default
+  const [showCompletedInbox, setShowCompletedInbox] = useState(() => {
+    const stored = localStorage.getItem('symphony-show-completed-inbox')
+    return stored === 'true'
+  })
+
+  const toggleShowCompletedInbox = useCallback(() => {
+    setShowCompletedInbox(prev => {
+      const newValue = !prev
+      localStorage.setItem('symphony-show-completed-inbox', String(newValue))
+      return newValue
+    })
+  }, [])
+
   // Flying pill animation for inbox captures
   const organizeButtonRef = useRef<HTMLButtonElement>(null)
   const [flyingPill, setFlyingPill] = useState<{
@@ -753,6 +768,34 @@ export function TodaySchedule({
       return false
     })
   }, [tasks, isToday, selectedAssignee, projectsMap])
+
+  // Auto-close inbox when it becomes empty
+  useEffect(() => {
+    if (showInlineInbox && inboxTasks.length === 0) {
+      setShowInlineInbox(false)
+    }
+  }, [showInlineInbox, inboxTasks.length])
+
+  // Completed inbox tasks - tasks that were completed from inbox (never scheduled) on the viewed date
+  const completedInboxTasks = useMemo(() => {
+    const startOfDay = new Date(viewedDate)
+    startOfDay.setHours(0, 0, 0, 0)
+    const endOfDay = new Date(viewedDate)
+    endOfDay.setHours(23, 59, 59, 999)
+
+    return tasks.filter((task) => {
+      if (!task.completed) return false  // Only completed
+      if (task.isSomeday) return false   // Not someday
+      if (task.scheduledFor) return false // Was never scheduled (pure inbox item)
+      if (!matchesAssigneeFilter(task.assignedTo)) return false
+
+      // Check if completed on the viewed date (using updatedAt as completion timestamp)
+      const updatedDate = new Date(task.updatedAt)
+      if (updatedDate < startOfDay || updatedDate > endOfDay) return false
+
+      return true
+    })
+  }, [tasks, viewedDate, selectedAssignee])
 
   // Filter tasks for the viewed date (only tasks with scheduledFor)
   const filteredTasks = useMemo(() => {
@@ -1158,60 +1201,40 @@ export function TodaySchedule({
       </header>
 
       {/* Inline collapsible inbox section */}
-      {isToday && showInlineInbox && onUpdateTask && onPushTask && (
+      {isToday && showInlineInbox && inboxTasks.length > 0 && onUpdateTask && onPushTask && (
         <div className="mb-4 md:mb-8 animate-fade-in-up">
           <div className="rounded-xl md:rounded-2xl border border-neutral-200 bg-neutral-50/50">
             {/* Inbox header */}
             <div className="flex items-center justify-between px-3 py-2 md:px-4 md:py-3 border-b border-neutral-200/60">
-              <div className="flex items-center gap-2 text-sm font-medium text-neutral-700">
-                <InboxIcon className="w-4 h-4 text-neutral-500" />
-                Inbox
-                <span className="text-neutral-400">({inboxTasks.length})</span>
-              </div>
               <button
                 onClick={() => setShowInlineInbox(false)}
-                className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-200/50 transition-colors"
+                className="ml-auto p-1.5 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-200/50 transition-colors"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
                 </svg>
               </button>
             </div>
-            {/* Inbox items */}
-            <div className="p-2 md:p-3 space-y-2 max-h-[50vh] md:max-h-[400px] overflow-y-auto">
-              {inboxTasks.length > 0 ? (
-                inboxTasks.map((task) => (
-                  <InboxTaskCard
-                    key={task.id}
-                    task={task}
-                    onUpdate={(updates) => onUpdateTask(task.id, updates)}
-                    onSelect={() => handleSelectItem(`task-${task.id}`)}
-                    onDefer={(date) => {
-                      if (date) {
-                        onPushTask(task.id, date)
-                      } else {
-                        onUpdateTask(task.id, { deferredUntil: undefined })
-                      }
-                    }}
-                    projects={projects}
-                    onOpenProject={onOpenProject}
-                    familyMembers={familyMembers}
-                    onAssignTaskAll={onAssignTaskAll ? (memberIds) => onAssignTaskAll(task.id, memberIds) : undefined}
-                    getScheduleItemsForDate={getScheduleItemsForDate}
-                    lists={lists}
-                    listsByCategory={listsByCategory}
-                    onSendToList={onSendToList ? (listId) => onSendToList(task.id, listId) : undefined}
-                    onCreateList={onCreateList}
-                    panelOpen={panelOpen}
-                    onClosePanel={onClosePanel}
-                  />
-                ))
-              ) : (
-                <div className="text-center py-8 text-neutral-400">
-                  <InboxIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Inbox is empty</p>
-                </div>
-              )}
+            {/* Inbox items with bulk select */}
+            <div className="p-2 md:p-3">
+              <InboxSection
+                tasks={inboxTasks}
+                onUpdateTask={onUpdateTask}
+                onPushTask={onPushTask}
+                onSelectTask={(taskId) => handleSelectItem(`task-${taskId}`)}
+                projects={projects}
+                onOpenProject={onOpenProject}
+                familyMembers={familyMembers}
+                onAssignTaskAll={onAssignTaskAll}
+                getScheduleItemsForDate={getScheduleItemsForDate}
+                lists={lists}
+                listsByCategory={listsByCategory}
+                onSendToList={onSendToList}
+                onCreateList={onCreateList}
+                onUpdateTasksBulk={onUpdateTasksBulk}
+                panelOpen={panelOpen}
+                onClosePanel={onClosePanel}
+              />
             </div>
           </div>
         </div>
@@ -1407,6 +1430,61 @@ export function TodaySchedule({
             )
           })}
 
+        </div>
+      )}
+
+      {/* Completed Inbox Items - collapsible section at bottom */}
+      {completedInboxTasks.length > 0 && onUpdateTask && (
+        <div className="mt-8 mb-4">
+          {/* Header with collapse toggle */}
+          <button
+            onClick={toggleShowCompletedInbox}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-neutral-100 transition-colors group"
+          >
+            <h3 className="font-display text-sm tracking-wide text-neutral-400 uppercase flex items-center gap-2">
+              <svg
+                className={`w-4 h-4 transition-transform ${showCompletedInbox ? 'rotate-90' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              Completed Inbox Items ({completedInboxTasks.length})
+            </h3>
+          </button>
+
+          {/* Collapsible content */}
+          {showCompletedInbox && (
+            <div className="mt-3 space-y-3 animate-fade-in-up">
+              {completedInboxTasks.map((task) => (
+                <InboxTaskCard
+                  key={task.id}
+                  task={task}
+                  onUpdate={(updates) => onUpdateTask(task.id, updates)}
+                  onSelect={() => handleSelectItem(`task-${task.id}`)}
+                  onDefer={(date) => {
+                    if (date && onPushTask) {
+                      onPushTask(task.id, date)
+                    } else if (onUpdateTask) {
+                      onUpdateTask(task.id, { deferredUntil: undefined })
+                    }
+                  }}
+                  projects={projects}
+                  onOpenProject={onOpenProject}
+                  familyMembers={familyMembers}
+                  onAssignTaskAll={onAssignTaskAll ? (memberIds) => onAssignTaskAll(task.id, memberIds) : undefined}
+                  getScheduleItemsForDate={getScheduleItemsForDate}
+                  lists={lists}
+                  listsByCategory={listsByCategory}
+                  onSendToList={onSendToList ? (listId) => onSendToList(task.id, listId) : undefined}
+                  onCreateList={onCreateList}
+                  panelOpen={panelOpen}
+                  onClosePanel={onClosePanel}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 

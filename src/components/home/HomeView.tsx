@@ -163,6 +163,16 @@ export function HomeView({
     return null // Multi-select uses river view, schedule shows all
   }, [selectedAssignees])
 
+  // Bulk update handler for inbox triage
+  const handleUpdateTasksBulk = useCallback(async (taskIds: string[], updates: Partial<Task>) => {
+    if (!onUpdateTask) return
+
+    // Update each task individually
+    for (const taskId of taskIds) {
+      onUpdateTask(taskId, updates)
+    }
+  }, [onUpdateTask])
+
   // Check if there are any unassigned tasks/events/routines for the filter dropdown
   const hasUnassignedTasks = useMemo(() => {
     // Check tasks (use filtered tasks)
@@ -384,6 +394,7 @@ export function HomeView({
         listsByCategory={listsByCategory}
         onSendToList={onSendToList}
         onCreateList={onCreateList}
+        onUpdateTasksBulk={handleUpdateTasksBulk}
         panelOpen={selectedItemId !== null}
         onClosePanel={() => onSelectItem(null)}
       />

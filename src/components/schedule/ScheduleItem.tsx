@@ -410,13 +410,12 @@ export function ScheduleItem({
         {/* Title */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            {/* Context indicator dot */}
+            {/* Context indicator dot - hidden by default, shown on hover */}
             {isTask && item.context && item.context in contextColors && (
               <div
-                className="shrink-0 w-1.5 h-1.5 rounded-full transition-opacity"
+                className="shrink-0 w-1.5 h-1.5 rounded-full opacity-0 md:group-hover:opacity-100 transition-opacity duration-200"
                 style={{
                   backgroundColor: contextColors[item.context as keyof typeof contextColors].dot,
-                  opacity: item.completed || item.skipped ? 0.3 : 0.6,
                 }}
                 title={`${item.context.charAt(0).toUpperCase() + item.context.slice(1)} context`}
               />
@@ -482,10 +481,10 @@ export function ScheduleItem({
           </div>
         )}
 
-        {/* Context picker - for tasks and routines */}
+        {/* Context picker - hidden by default, shown on hover */}
         {(isTask || isRoutine) && onContextChange && (
           <div
-            className="shrink-0"
+            className="shrink-0 opacity-0 md:group-hover:opacity-100 transition-opacity duration-200"
             onClick={(e) => {
               e.stopPropagation()
               // Close panel when opening context picker
