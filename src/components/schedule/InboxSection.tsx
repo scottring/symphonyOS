@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Task } from '@/types/task'
+import type { Task, TaskContext } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
@@ -7,6 +7,7 @@ import type { List, ListCategory } from '@/types/list'
 import type { ScheduleContextItem } from '@/components/triage'
 import { InboxTaskCard } from './InboxTaskCard'
 import { TriageCard, InboxTriageModal } from '@/components/triage'
+import { BulkActionToolbar } from './BulkActionToolbar'
 
 interface InboxSectionProps {
   tasks: Task[]
@@ -33,6 +34,8 @@ interface InboxSectionProps {
   lists?: List[]
   listsByCategory?: Record<ListCategory, List[]>
   onSendToList?: (taskId: string, listId: string) => void
+  // Bulk actions
+  onUpdateTasksBulk?: (taskIds: string[], updates: Partial<Task>) => Promise<void>
 }
 
 export function InboxSection({
@@ -57,6 +60,7 @@ export function InboxSection({
   lists = [],
   listsByCategory,
   onSendToList,
+  onUpdateTasksBulk,
 }: InboxSectionProps) {
   // Suppress unused variable warnings - these are kept in the interface for future use
   void _contacts
@@ -66,6 +70,91 @@ export function InboxSection({
   // Triage modal state
   const [triageTaskId, setTriageTaskId] = useState<string | null>(null)
   const triageTask = triageTaskId ? tasks.find(t => t.id === triageTaskId) : null
+
+  // Selection state for bulk actions
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
+
+  // Bulk action handlers
+  const handleBulkDefer = async (date: Date | undefined) => {
+    if (!onUpdateTasksBulk) return
+
+    const taskIds = Array.from(selectedTaskIds)
+    const updates: Partial<Task> = {
+      deferredUntil: date,
+      deferCount: undefined, // Will need to increment individually if we want accurate counts
+    }
+
+    await onUpdateTasksBulk(taskIds, updates)
+
+    // Clear selection and exit mode
+    setSelectedTaskIds(new Set())
+    setSelectionMode(false)
+  }
+
+  const handleBulkSchedule = async (date: Date, isAllDay: boolean) => {
+    if (!onUpdateTasksBulk) return
+
+    const taskIds = Array.from(selectedTaskIds)
+    const updates: Partial<Task> = {
+      scheduledFor: date,
+      isAllDay,
+      deferredUntil: undefined,
+    }
+
+    await onUpdateTasksBulk(taskIds, updates)
+
+    // Clear selection and exit mode
+    setSelectedTaskIds(new Set())
+    setSelectionMode(false)
+  }
+
+  const handleBulkSetContext = async (context: TaskContext | undefined) => {
+    if (!onUpdateTasksBulk) return
+
+    const taskIds = Array.from(selectedTaskIds)
+    const updates: Partial<Task> = { context }
+
+    await onUpdateTasksBulk(taskIds, updates)
+
+    // Clear selection and exit mode
+    setSelectedTaskIds(new Set())
+    setSelectionMode(false)
+  }
+
+  const handleBulkAssign = async (memberIds: string[]) => {
+    if (!onUpdateTasksBulk) return
+
+    const taskIds = Array.from(selectedTaskIds)
+    const updates: Partial<Task> = { assignedToAll: memberIds }
+
+    await onUpdateTasksBulk(taskIds, updates)
+
+    // Clear selection and exit mode
+    setSelectedTaskIds(new Set())
+    setSelectionMode(false)
+  }
+
+  const handleBulkSendToList = async (listId: string) => {
+    if (!onSendToList) return
+
+    const taskIds = Array.from(selectedTaskIds)
+
+    // Send each task to the list
+    for (const taskId of taskIds) {
+      onSendToList(taskId, listId)
+    }
+
+    // Clear selection and exit mode
+    setSelectedTaskIds(new Set())
+    setSelectionMode(false)
+  }
+
+  const handleCancelSelection = () => {
+    setSelectedTaskIds(new Set())
+    setSelectionMode(false)
+  }
+
   // Don't render if no inbox tasks
   if (tasks.length === 0) return null
 
@@ -81,12 +170,30 @@ export function InboxSection({
 
   return (
     <div className="mb-8">
-      <h2 className="font-display text-sm tracking-wide text-neutral-500 uppercase mb-4 flex items-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 2h10v7h-2l-1 2H8l-1-2H5V5z" clipRule="evenodd" />
-        </svg>
-        Inbox ({tasks.length})
-      </h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-display text-sm tracking-wide text-neutral-500 uppercase flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 2h10v7h-2l-1 2H8l-1-2H5V5z" clipRule="evenodd" />
+          </svg>
+          Inbox ({tasks.length})
+        </h2>
+        <button
+          onClick={() => {
+            setSelectionMode(!selectionMode)
+            if (selectionMode) {
+              // Clear selection when exiting selection mode
+              setSelectedTaskIds(new Set())
+            }
+          }}
+          className={`text-sm font-medium transition-colors ${
+            selectionMode
+              ? 'text-primary-600 hover:text-primary-700'
+              : 'text-neutral-500 hover:text-neutral-700'
+          }`}
+        >
+          {selectionMode ? 'Cancel' : 'Select'}
+        </button>
+      </div>
       <div className="space-y-3">
         {/* Show TriageCard for recently created task at the top */}
         {recentlyCreatedTask && onTriageCardCollapse && (
@@ -132,6 +239,20 @@ export function InboxSection({
             lists={lists}
             listsByCategory={listsByCategory}
             onSendToList={onSendToList ? (listId) => onSendToList(task.id, listId) : undefined}
+            // Selection props
+            selectionMode={selectionMode}
+            isSelected={selectedTaskIds.has(task.id)}
+            onToggleSelection={() => {
+              setSelectedTaskIds(prev => {
+                const next = new Set(prev)
+                if (next.has(task.id)) {
+                  next.delete(task.id)
+                } else {
+                  next.add(task.id)
+                }
+                return next
+              })
+            }}
           />
         ))}
       </div>
@@ -176,6 +297,23 @@ export function InboxSection({
           projects={projects}
           familyMembers={familyMembers}
           currentUserId={currentUserId}
+        />
+      )}
+
+      {/* Bulk Action Toolbar - shown when tasks are selected */}
+      {selectedTaskIds.size > 0 && (
+        <BulkActionToolbar
+          selectedCount={selectedTaskIds.size}
+          onDefer={handleBulkDefer}
+          onSchedule={handleBulkSchedule}
+          onSetContext={handleBulkSetContext}
+          onAssign={handleBulkAssign}
+          onSendToList={handleBulkSendToList}
+          onCancel={handleCancelSelection}
+          familyMembers={familyMembers}
+          lists={lists}
+          listsByCategory={listsByCategory}
+          getScheduleItemsForDate={getScheduleItemsForDate}
         />
       )}
     </div>

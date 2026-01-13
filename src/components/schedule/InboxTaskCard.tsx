@@ -24,6 +24,10 @@ interface InboxTaskCardProps {
   // Panel state (for smart close behavior)
   panelOpen?: boolean
   onClosePanel?: () => void
+  // Selection mode props
+  selectionMode?: boolean
+  isSelected?: boolean
+  onToggleSelection?: () => void
 }
 
 export function InboxTaskCard({
@@ -41,21 +45,33 @@ export function InboxTaskCard({
   onSendToList,
   panelOpen,
   onClosePanel,
+  selectionMode = false,
+  isSelected = false,
+  onToggleSelection,
 }: InboxTaskCardProps) {
   const project = projects.find(p => p.id === task.projectId)
 
   return (
     <div
       onClick={() => {
-        // If panel is open, close it
+        // In selection mode, clicking the card toggles selection
+        if (selectionMode && onToggleSelection) {
+          onToggleSelection()
+          return
+        }
+
+        // Normal mode: toggle panel
         if (panelOpen && onClosePanel) {
           onClosePanel()
         } else {
-          // If panel is closed, open for this item
           onSelect()
         }
       }}
-      className="bg-white rounded-xl border border-neutral-100 pl-0.5 pr-3 py-2.5 shadow-sm cursor-pointer hover:border-primary-200 hover:shadow-md transition-all group"
+      className={`bg-white rounded-xl border pl-0.5 pr-3 py-2.5 shadow-sm cursor-pointer hover:shadow-md transition-all group ${
+        isSelected
+          ? 'bg-primary-50/30 border-primary-200'
+          : 'border-neutral-100 hover:border-primary-200'
+      }`}
     >
       {/* Main row: checkbox | title | triage buttons */}
       <div className="flex items-center gap-0.5">
@@ -64,26 +80,33 @@ export function InboxTaskCard({
           onClick={(e) => {
             e.stopPropagation()
 
-            // Always close panel if open
-            if (panelOpen && onClosePanel) {
-              onClosePanel()
+            if (selectionMode && onToggleSelection) {
+              // Selection mode: toggle selection
+              onToggleSelection()
+            } else {
+              // Normal mode: toggle completion
+              if (panelOpen && onClosePanel) {
+                onClosePanel()
+              }
+              onUpdate({ completed: !task.completed })
             }
-
-            // Then complete the task
-            onUpdate({ completed: !task.completed })
           }}
           className="shrink-0 flex items-center justify-center"
         >
           <span
             className={`
               w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors
-              ${task.completed
-                ? 'bg-primary-500 border-primary-500 text-white'
-                : 'border-neutral-300 hover:border-primary-400'
+              ${selectionMode
+                ? isSelected
+                  ? 'bg-primary-500 border-primary-500 text-white'
+                  : 'border-primary-300 hover:border-primary-400'
+                : task.completed
+                  ? 'bg-primary-500 border-primary-500 text-white'
+                  : 'border-neutral-300 hover:border-primary-400'
               }
             `}
           >
-            {task.completed && (
+            {((selectionMode && isSelected) || (!selectionMode && task.completed)) && (
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
               </svg>
@@ -100,17 +123,18 @@ export function InboxTaskCard({
           {task.title}
         </span>
 
-        {/* Triage actions */}
-        <div
-          className="shrink-0 flex items-center gap-0.5"
-          onClick={(e) => {
-            e.stopPropagation()
-            // Close panel when interacting with triage icons
-            if (panelOpen && onClosePanel) {
-              onClosePanel()
-            }
-          }}
-        >
+        {/* Triage actions - hidden in selection mode */}
+        {!selectionMode && (
+          <div
+            className="shrink-0 flex items-center gap-0.5"
+            onClick={(e) => {
+              e.stopPropagation()
+              // Close panel when interacting with triage icons
+              if (panelOpen && onClosePanel) {
+                onClosePanel()
+              }
+            }}
+          >
           {/* Defer - always visible */}
           <DeferPicker
             deferredUntil={task.deferredUntil}
@@ -159,6 +183,7 @@ export function InboxTaskCard({
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* Chips row - desktop only, only show if project exists */}

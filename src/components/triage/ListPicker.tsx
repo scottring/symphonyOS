@@ -6,6 +6,7 @@ interface ListPickerProps {
   lists: List[]
   listsByCategory: Record<ListCategory, List[]>
   onSendToList: (listId: string) => void
+  onCreateList?: (title: string, category: ListCategory) => Promise<string | null>
 }
 
 const CATEGORY_LABELS: Record<ListCategory, string> = {

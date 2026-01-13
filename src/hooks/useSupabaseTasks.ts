@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { useFamilyMembers } from './useFamilyMembers'
+import { useToast } from './useToast'
 import type { Task, TaskLink, TaskContext, TaskCategory, LinkedActivity, LinkType, LinkedActivityType } from '@/types/task'
 
 interface DbTask {
@@ -119,6 +121,8 @@ export function useSupabaseTasks() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { members: familyMembers } = useFamilyMembers()
+  const { showToast } = useToast()
 
   // Fetch tasks on mount and when user changes
   useEffect(() => {
@@ -542,6 +546,18 @@ export function useSupabaseTasks() {
       return
     }
 
+    // Auto-context: Assign to family member → auto-set context='family'
+    if ('assignedTo' in updates && updates.assignedTo) {
+      const isFamilyMember = familyMembers.some(m => m.id === updates.assignedTo)
+      if (isFamilyMember && !('context' in updates)) {
+        console.log('[updateTask] Auto-setting context to family for family member assignment')
+        updates = { ...updates, context: 'family' }
+
+        // Show toast notification
+        showToast('Set context to Family', 'info', 2500)
+      }
+    }
+
     // Optimistic update
     setTasks((prev) =>
       prev.map((t) => (t.id === id ? { ...t, ...updates } : t))
@@ -604,6 +620,77 @@ export function useSupabaseTasks() {
       console.log('[updateTask] DB update successful, returned notes:', (data[0] as DbTask).notes)
     } else {
       console.warn('[updateTask] DB update returned no data!')
+    }
+  }, [tasks, familyMembers, showToast])
+
+  // Bulk update multiple tasks at once
+  const updateTasksBulk = useCallback(async (taskIds: string[], updates: Partial<Task>) => {
+    if (taskIds.length === 0) return
+
+    console.log('[updateTasksBulk] Called with:', { taskIds, updates })
+
+    // Save original tasks for rollback
+    const tasksToUpdate = tasks.filter(t => taskIds.includes(t.id))
+    const rollbackMap = new Map(tasksToUpdate.map(t => [t.id, { ...t }]))
+
+    console.log('[updateTasksBulk] Tasks to update:', tasksToUpdate.length)
+
+    // Optimistic update
+    setTasks(prev => prev.map(t =>
+      taskIds.includes(t.id) ? { ...t, ...updates } : t
+    ))
+
+    // Convert Task updates to DB format (same logic as updateTask)
+    const dbUpdates: Record<string, unknown> = {}
+    if ('title' in updates) dbUpdates.title = updates.title
+    if ('completed' in updates) dbUpdates.completed = updates.completed
+    if ('scheduledFor' in updates) {
+      dbUpdates.scheduled_for = updates.scheduledFor?.toISOString() ?? null
+    }
+    if ('deferredUntil' in updates) {
+      dbUpdates.deferred_until = updates.deferredUntil
+        ? updates.deferredUntil.toISOString()
+        : null
+    }
+    if ('deferCount' in updates) dbUpdates.defer_count = updates.deferCount ?? 0
+    if ('isAllDay' in updates) dbUpdates.is_all_day = updates.isAllDay ?? null
+    if ('isSomeday' in updates) dbUpdates.is_someday = updates.isSomeday ?? false
+    if ('context' in updates) dbUpdates.context = updates.context ?? null
+    if ('category' in updates) dbUpdates.category = updates.category ?? 'task'
+    if ('notes' in updates) dbUpdates.notes = updates.notes ?? null
+    if ('links' in updates) dbUpdates.links = updates.links ?? null
+    if ('phoneNumber' in updates) dbUpdates.phone_number = updates.phoneNumber ?? null
+    if ('contactId' in updates) dbUpdates.contact_id = updates.contactId ?? null
+    if ('assignedTo' in updates) dbUpdates.assigned_to = updates.assignedTo ?? null
+    if ('assignedToAll' in updates) dbUpdates.assigned_to_all = updates.assignedToAll ?? null
+    if ('projectId' in updates) dbUpdates.project_id = updates.projectId ?? null
+    if ('parentTaskId' in updates) dbUpdates.parent_task_id = updates.parentTaskId ?? null
+    if ('linkedEventId' in updates) dbUpdates.linked_event_id = updates.linkedEventId ?? null
+    if ('linkedTo' in updates) {
+      dbUpdates.linked_activity_type = updates.linkedTo?.type ?? null
+      dbUpdates.linked_activity_id = updates.linkedTo?.id ?? null
+    }
+    if ('linkType' in updates) dbUpdates.link_type = updates.linkType ?? null
+    if ('estimatedDuration' in updates) dbUpdates.estimated_duration = updates.estimatedDuration ?? null
+    if ('location' in updates) dbUpdates.location = updates.location ?? null
+    if ('locationPlaceId' in updates) dbUpdates.location_place_id = updates.locationPlaceId ?? null
+
+    console.log('[updateTasksBulk] Sending to DB:', { taskIds, dbUpdates })
+
+    // Bulk update with .in()
+    const { error: updateError } = await supabase
+      .from('tasks')
+      .update(dbUpdates)
+      .in('id', taskIds)
+
+    console.log('[updateTasksBulk] DB response:', { error: updateError?.message })
+
+    if (updateError) {
+      console.error('[updateTasksBulk] DB error:', updateError.message)
+      // Rollback all tasks
+      setTasks(prev => prev.map(t => rollbackMap.get(t.id) || t))
+      setError(updateError.message)
+      throw updateError
     }
   }, [tasks])
 
@@ -716,5 +803,5 @@ export function useSupabaseTasks() {
     }
   }, [tasks])
 
-  return { tasks, loading, error, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, deleteTask, updateTask, scheduleTask, pushTask }
+  return { tasks, loading, error, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, deleteTask, updateTask, updateTasksBulk, scheduleTask, pushTask }
 }
