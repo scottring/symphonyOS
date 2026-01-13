@@ -20,7 +20,7 @@ import { OverdueSection } from './OverdueSection'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { useSystemHealth } from '@/hooks/useSystemHealth'
 import { MultiAssigneeDropdown } from '@/components/family/MultiAssigneeDropdown'
-import { CalendarClock } from 'lucide-react'
+// import { CalendarClock } from 'lucide-react' // Hidden - Plan button removed
 
 // Inbox icon
 function InboxIcon({ className }: { className?: string }) {
@@ -505,9 +505,12 @@ interface TodayScheduleProps {
   lists?: List[]
   listsByCategory?: Record<ListCategory, List[]>
   onSendToList?: (taskId: string, listId: string) => void
+  onCreateList?: (title: string, category: ListCategory) => Promise<string | null>
   // Panel state (for smart close behavior)
   panelOpen?: boolean
   onClosePanel?: () => void
+  // Bulk actions
+  onUpdateTasksBulk?: (taskIds: string[], updates: Partial<Task>) => Promise<void>
 }
 
 function LoadingSkeleton() {
@@ -590,8 +593,10 @@ export function TodaySchedule({
   lists = [],
   listsByCategory,
   onSendToList,
+  onCreateList,
   panelOpen,
   onClosePanel,
+  onUpdateTasksBulk,
 }: TodayScheduleProps) {
   void _onCreateTask // Reserved - was used by ReviewSection
   void _onDeleteTask // Available for future inline delete
@@ -601,6 +606,8 @@ export function TodaySchedule({
   void _recentlyCreatedTaskId // Available for future triage card
   void _onTriageCardCollapse // Available for future triage card
   void _onAddProject // Available for future inline project creation
+  void onUpdateTasksBulk // Available for bulk actions in inline inbox
+  void onOpenPlanning // Hidden - Plan button removed
 
   const isMobile = useMobile()
 
@@ -1121,8 +1128,8 @@ export function TodaySchedule({
                 </button>
               )}
 
-              {/* Planning button */}
-              {onOpenPlanning && (
+              {/* Planning button - hidden */}
+              {/* {onOpenPlanning && (
                 <button
                   onClick={onOpenPlanning}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-neutral-600 hover:text-neutral-700 hover:bg-neutral-100 transition-all duration-200"
@@ -1131,7 +1138,7 @@ export function TodaySchedule({
                   <CalendarClock className="w-4 h-4" />
                   <span className="hidden sm:inline">Plan</span>
                 </button>
-              )}
+              )} */}
 
               {/* Clarity score - right side */}
               {isToday && !loading && tasks.length > 0 && (
@@ -1194,6 +1201,7 @@ export function TodaySchedule({
                     lists={lists}
                     listsByCategory={listsByCategory}
                     onSendToList={onSendToList ? (listId) => onSendToList(task.id, listId) : undefined}
+                    onCreateList={onCreateList}
                     panelOpen={panelOpen}
                     onClosePanel={onClosePanel}
                   />

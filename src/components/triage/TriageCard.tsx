@@ -23,6 +23,7 @@ interface TriageCardProps {
   lists?: List[]
   listsByCategory?: Record<ListCategory, List[]>
   onSendToList?: (listId: string) => void
+  onCreateList?: (title: string, category: ListCategory) => Promise<string | null>
 }
 
 export function TriageCard({
@@ -38,6 +39,7 @@ export function TriageCard({
   lists = [],
   listsByCategory,
   onSendToList,
+  onCreateList,
 }: TriageCardProps) {
   const [isInteracting, setIsInteracting] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -132,6 +134,7 @@ export function TriageCard({
               // Collapse after sending to list
               setTimeout(onCollapse, 200)
             }}
+            onCreateList={onCreateList}
           />
         )}
 

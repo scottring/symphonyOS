@@ -12,6 +12,7 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { useLists } from '@/hooks/useLists'
 import { useListItems } from '@/hooks/useListItems'
+import type { ListCategory } from '@/types/list'
 import { useNotes } from '@/hooks/useNotes'
 import { useNoteTopics } from '@/hooks/useNoteTopics'
 import type { Note, NoteEntityType } from '@/types/note'
@@ -890,6 +891,27 @@ function App() {
     showToast(`Sent to ${list.title}`, 'success')
   }, [tasks, lists, deleteTask, showToast, user])
 
+  // Handler for creating new list during triage
+  const handleCreateListInTriage = useCallback(async (
+    title: string,
+    category: ListCategory
+  ): Promise<string | null> => {
+    // Use addList hook which handles optimistic updates
+    const newList = await addList({
+      title,
+      category,
+      visibility: 'self',
+    })
+
+    if (!newList) {
+      showToast('Failed to create list', 'warning')
+      return null
+    }
+
+    showToast(`Created "${title}"`, 'success')
+    return newList.id
+  }, [addList, showToast])
+
   // Helper to format date for toast message
   const formatDateForToast = useCallback((date: Date): string => {
     const today = new Date()
@@ -1320,6 +1342,7 @@ function App() {
             lists={lists}
             listsByCategory={listsByCategory}
             onSendToList={handleSendToList}
+            onCreateList={handleCreateListInTriage}
           />
         </div>
       )}

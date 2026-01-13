@@ -6,7 +6,7 @@ import type { ScheduleContextItem } from '@/components/triage'
 import { DeferPicker, SchedulePopover, ContextPicker } from '@/components/triage'
 import { ListPicker } from '@/components/triage/ListPicker'
 import { MultiAssigneeDropdown } from '@/components/family'
-import { useIsMobile } from '@/hooks/useIsMobile'
+import { useMobile } from '@/hooks/useMobile'
 
 interface BulkActionToolbarProps {
   selectedCount: number
@@ -36,7 +36,7 @@ export function BulkActionToolbar({
   listsByCategory,
   getScheduleItemsForDate,
 }: BulkActionToolbarProps) {
-  const isMobile = useIsMobile()
+  const isMobile = useMobile()
 
   return createPortal(
     <div

@@ -65,6 +65,7 @@ interface HomeViewProps {
   lists?: List[]
   listsByCategory?: Record<ListCategory, List[]>
   onSendToList?: (taskId: string, listId: string) => void
+  onCreateList?: (title: string, category: ListCategory) => Promise<string | null>
 }
 
 export function HomeView({
@@ -112,6 +113,7 @@ export function HomeView({
   lists = [],
   listsByCategory,
   onSendToList,
+  onCreateList,
 }: HomeViewProps) {
   const { currentView, setCurrentView } = useHomeView()
   const isMobile = useMobile()
@@ -381,6 +383,7 @@ export function HomeView({
         lists={lists}
         listsByCategory={listsByCategory}
         onSendToList={onSendToList}
+        onCreateList={onCreateList}
         panelOpen={selectedItemId !== null}
         onClosePanel={() => onSelectItem(null)}
       />

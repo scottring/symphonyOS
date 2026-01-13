@@ -29,11 +29,16 @@ const CATEGORY_ORDER: ListCategory[] = [
   'other',
 ]
 
-export function ListPicker({ lists, listsByCategory, onSendToList }: ListPickerProps) {
+export function ListPicker({ lists, listsByCategory, onSendToList, onCreateList }: ListPickerProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 })
   const triggerRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  // Inline list creation state
+  const [isCreating, setIsCreating] = useState(false)
+  const [newListTitle, setNewListTitle] = useState('')
+  const [newListCategory, setNewListCategory] = useState<ListCategory>('entertainment')
 
   // Calculate menu position when opening
   useEffect(() => {
@@ -81,17 +86,11 @@ export function ListPicker({ lists, listsByCategory, onSendToList }: ListPickerP
         right: menuPosition.right,
       }}
     >
-      {lists.length === 0 ? (
-        <div className="px-3 py-8 text-center">
-          <p className="text-sm text-neutral-500 mb-2">No lists yet</p>
-          <p className="text-xs text-neutral-400">
-            Create a list first from the Lists view
-          </p>
-        </div>
-      ) : (
+      {/* Existing lists */}
+      {lists.length > 0 && (
         <div className="space-y-1">
           {CATEGORY_ORDER.map((category) => {
-            const categoryLists = listsByCategory[category]
+            const categoryLists = listsByCategory?.[category] || []
             if (categoryLists.length === 0) return null
 
             return (
@@ -132,6 +131,85 @@ export function ListPicker({ lists, listsByCategory, onSendToList }: ListPickerP
             )
           })}
         </div>
+      )}
+
+      {/* Empty state when no lists exist and no create function */}
+      {lists.length === 0 && !onCreateList && (
+        <div className="px-3 py-8 text-center">
+          <p className="text-sm text-neutral-500 mb-2">No lists yet</p>
+          <p className="text-xs text-neutral-400">
+            Create a list from the Lists view first
+          </p>
+        </div>
+      )}
+
+      {/* Inline list creation form */}
+      {onCreateList && (
+        <>
+          {lists.length > 0 && <div className="border-t border-neutral-100 my-1" />}
+
+          {!isCreating ? (
+            <button
+              onClick={() => setIsCreating(true)}
+              className="w-full px-3 py-2 text-sm text-left rounded-lg hover:bg-neutral-50 text-primary-600 flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Create New List
+            </button>
+          ) : (
+            <div className="px-3 py-2 space-y-2">
+              <input
+                type="text"
+                value={newListTitle}
+                onChange={(e) => setNewListTitle(e.target.value)}
+                placeholder="List name..."
+                className="w-full px-2 py-1.5 text-sm rounded-lg border border-neutral-200 focus:border-primary-300 focus:outline-none"
+                autoFocus
+              />
+              <select
+                value={newListCategory}
+                onChange={(e) => setNewListCategory(e.target.value as ListCategory)}
+                className="w-full px-2 py-1.5 text-sm rounded-lg border border-neutral-200 focus:border-primary-300 focus:outline-none"
+              >
+                {CATEGORY_ORDER.map((cat) => (
+                  <option key={cat} value={cat}>{CATEGORY_LABELS[cat]}</option>
+                ))}
+              </select>
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    if (!newListTitle.trim()) return
+                    const newListId = await onCreateList(newListTitle.trim(), newListCategory)
+                    if (newListId) {
+                      onSendToList(newListId) // Auto-send to new list
+                      setIsOpen(false) // Close popover
+                    }
+                    // Reset form
+                    setIsCreating(false)
+                    setNewListTitle('')
+                    setNewListCategory('entertainment')
+                  }}
+                  disabled={!newListTitle.trim()}
+                  className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Create
+                </button>
+                <button
+                  onClick={() => {
+                    setIsCreating(false)
+                    setNewListTitle('')
+                    setNewListCategory('entertainment')
+                  }}
+                  className="px-3 py-1.5 text-sm rounded-lg border border-neutral-200 hover:bg-neutral-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   ) : null

@@ -21,6 +21,7 @@ interface InboxTaskCardProps {
   lists?: List[]
   listsByCategory?: Record<ListCategory, List[]>
   onSendToList?: (listId: string) => void
+  onCreateList?: (title: string, category: ListCategory) => Promise<string | null>
   // Panel state (for smart close behavior)
   panelOpen?: boolean
   onClosePanel?: () => void
@@ -43,6 +44,7 @@ export function InboxTaskCard({
   lists = [],
   listsByCategory,
   onSendToList,
+  onCreateList,
   panelOpen,
   onClosePanel,
   selectionMode = false,
@@ -135,43 +137,47 @@ export function InboxTaskCard({
               }
             }}
           >
-          {/* Defer - always visible */}
-          <DeferPicker
-            deferredUntil={task.deferredUntil}
-            deferCount={task.deferCount}
-            onDefer={onDefer}
-          />
-
-          {/* Schedule - always visible */}
-          <SchedulePopover
-            value={task.scheduledFor}
-            isAllDay={task.isAllDay}
-            onSchedule={(date, isAllDay) => {
-              onUpdate({ scheduledFor: date, isAllDay, deferredUntil: undefined })
-            }}
-            onClear={() => onUpdate({ scheduledFor: undefined, isAllDay: undefined })}
-            getItemsForDate={getScheduleItemsForDate}
-            itemTitle={task.title}
-          />
-
-          {/* Send to List - always visible */}
-          {onSendToList && listsByCategory && (
-            <ListPicker
-              lists={lists}
-              listsByCategory={listsByCategory}
-              onSendToList={onSendToList}
+          {/* Hidden triage buttons - shown on hover (desktop only) */}
+          <div className="opacity-0 md:group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-0.5">
+            {/* Defer */}
+            <DeferPicker
+              deferredUntil={task.deferredUntil}
+              deferCount={task.deferCount}
+              onDefer={onDefer}
             />
-          )}
 
-          {/* Context picker - desktop only */}
-          <div className="hidden md:block">
-            <ContextPicker
-              value={task.context}
-              onChange={(context) => onUpdate({ context })}
+            {/* Schedule */}
+            <SchedulePopover
+              value={task.scheduledFor}
+              isAllDay={task.isAllDay}
+              onSchedule={(date, isAllDay) => {
+                onUpdate({ scheduledFor: date, isAllDay, deferredUntil: undefined })
+              }}
+              onClear={() => onUpdate({ scheduledFor: undefined, isAllDay: undefined })}
+              getItemsForDate={getScheduleItemsForDate}
+              itemTitle={task.title}
             />
+
+            {/* Send to List */}
+            {onSendToList && listsByCategory && (
+              <ListPicker
+                lists={lists}
+                listsByCategory={listsByCategory}
+                onSendToList={onSendToList}
+                onCreateList={onCreateList}
+              />
+            )}
+
+            {/* Context picker - desktop only */}
+            <div className="hidden md:block">
+              <ContextPicker
+                value={task.context}
+                onChange={(context) => onUpdate({ context })}
+              />
+            </div>
           </div>
 
-          {/* Multi-assignee - desktop only */}
+          {/* Always visible - avatars provide at-a-glance context */}
           {familyMembers.length > 0 && onAssignTaskAll && (
             <div className="hidden md:block">
               <MultiAssigneeDropdown

@@ -38,11 +38,12 @@ export function useLists() {
       setLoading(true)
       setError(null)
 
-      // Fetch lists: own lists + family-visible lists (not hidden from this user)
+      // Fetch lists: own lists + family-visible lists
+      // We'll filter out hidden lists client-side since PostgREST doesn't support NOT contains in OR
       const { data, error: fetchError } = await supabase
         .from('lists')
         .select('*')
-        .or(`user_id.eq.${user.id},and(visibility.eq.family,not.hidden_from.cs.{${user.id}})`)
+        .or(`user_id.eq.${user.id},visibility.eq.family`)
         .order('sort_order', { ascending: true })
         .order('title', { ascending: true })
 
@@ -52,7 +53,18 @@ export function useLists() {
         return
       }
 
-      setLists((data as DbList[]).map(dbListToList))
+      // Filter out family lists that are hidden from this user
+      const filteredLists = (data as DbList[]).filter(list => {
+        // Include if it's the user's own list
+        if (list.user_id === user.id) return true
+        // Include if it's a family list AND not hidden from this user
+        if (list.visibility === 'family') {
+          return !list.hidden_from || !list.hidden_from.includes(user.id)
+        }
+        return false
+      })
+
+      setLists(filteredLists.map(dbListToList))
       setLoading(false)
     }
 

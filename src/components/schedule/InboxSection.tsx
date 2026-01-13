@@ -34,8 +34,12 @@ interface InboxSectionProps {
   lists?: List[]
   listsByCategory?: Record<ListCategory, List[]>
   onSendToList?: (taskId: string, listId: string) => void
+  onCreateList?: (title: string, category: ListCategory) => Promise<string | null>
   // Bulk actions
   onUpdateTasksBulk?: (taskIds: string[], updates: Partial<Task>) => Promise<void>
+  // Panel state (for smart close behavior in cards)
+  panelOpen?: boolean
+  onClosePanel?: () => void
 }
 
 export function InboxSection({
@@ -60,7 +64,10 @@ export function InboxSection({
   lists = [],
   listsByCategory,
   onSendToList,
+  onCreateList,
   onUpdateTasksBulk,
+  panelOpen,
+  onClosePanel,
 }: InboxSectionProps) {
   // Suppress unused variable warnings - these are kept in the interface for future use
   void _contacts
@@ -214,6 +221,7 @@ export function InboxSection({
             lists={lists}
             listsByCategory={listsByCategory}
             onSendToList={onSendToList ? (listId) => onSendToList(recentlyCreatedTask.id, listId) : undefined}
+            onCreateList={onCreateList}
           />
         )}
 
@@ -239,6 +247,9 @@ export function InboxSection({
             lists={lists}
             listsByCategory={listsByCategory}
             onSendToList={onSendToList ? (listId) => onSendToList(task.id, listId) : undefined}
+            onCreateList={onCreateList}
+            panelOpen={panelOpen}
+            onClosePanel={onClosePanel}
             // Selection props
             selectionMode={selectionMode}
             isSelected={selectedTaskIds.has(task.id)}
