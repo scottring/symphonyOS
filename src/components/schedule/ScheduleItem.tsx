@@ -114,6 +114,9 @@ interface ScheduleItemProps {
   overdueLabel?: string
   // Schedule context for the schedule popover
   getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
+  // Panel state (for smart close behavior)
+  panelOpen?: boolean
+  onClosePanel?: () => void
 }
 
 // Warm amber color tokens for overdue styling
@@ -162,6 +165,8 @@ export function ScheduleItem({
   isOverdue,
   overdueLabel,
   getScheduleItemsForDate,
+  panelOpen,
+  onClosePanel,
 }: ScheduleItemProps) {
   const isMobile = useMobile()
   const isTask = item.type === 'task'
@@ -171,6 +176,13 @@ export function ScheduleItem({
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation()
+
+    // Always close panel if open
+    if (panelOpen && onClosePanel) {
+      onClosePanel()
+    }
+
+    // Then perform the complete action
     onToggleComplete()
   }
 
@@ -220,7 +232,15 @@ export function ScheduleItem({
 
   return (
     <div
-      onClick={onSelect}
+      onClick={() => {
+        // If panel is open, close it
+        if (panelOpen && onClosePanel) {
+          onClosePanel()
+        } else {
+          // If panel is closed, open for this item
+          onSelect()
+        }
+      }}
       onKeyDown={handleKeyDown}
       tabIndex={0}
       role="button"
@@ -265,7 +285,13 @@ export function ScheduleItem({
         {(isTask && onSchedule) || ((isRoutine || item.type === 'event') && onPush) ? (
           <div
             className="w-12 shrink-0 relative"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation()
+              // Close panel when opening schedule popover
+              if (panelOpen && onClosePanel) {
+                onClosePanel()
+              }
+            }}
           >
             <SchedulePopover
               value={item.startTime ?? undefined}
@@ -444,7 +470,13 @@ export function ScheduleItem({
         {isTask && onPush && (
           <div
             className={`shrink-0 ${isMobile && isOverdue ? '' : 'hidden md:block opacity-0 group-hover:opacity-100'} transition-opacity`}
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation()
+              // Close panel when opening push dropdown
+              if (panelOpen && onClosePanel) {
+                onClosePanel()
+              }
+            }}
           >
             <PushDropdown onPush={onPush} size="sm" showTodayOption={isOverdue} />
           </div>
@@ -454,7 +486,13 @@ export function ScheduleItem({
         {(isTask || isRoutine) && onContextChange && (
           <div
             className="shrink-0"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation()
+              // Close panel when opening context picker
+              if (panelOpen && onClosePanel) {
+                onClosePanel()
+              }
+            }}
           >
             <ContextPicker
               value={item.context ?? undefined}
@@ -467,7 +505,13 @@ export function ScheduleItem({
         {familyMembers.length > 0 && onAssignAll ? (
           <div
             className="shrink-0"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation()
+              // Close panel when opening assignee picker
+              if (panelOpen && onClosePanel) {
+                onClosePanel()
+              }
+            }}
           >
             <MultiAssigneeDropdown
               members={familyMembers}
@@ -480,7 +524,13 @@ export function ScheduleItem({
         ) : familyMembers.length > 0 && onAssign && (
           <div
             className="shrink-0"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation()
+              // Close panel when opening assignee picker
+              if (panelOpen && onClosePanel) {
+                onClosePanel()
+              }
+            }}
           >
             <AssigneeDropdown
               members={familyMembers}

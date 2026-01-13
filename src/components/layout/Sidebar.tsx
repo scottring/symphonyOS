@@ -11,7 +11,7 @@ import type { Routine } from '@/types/routine'
 // Feature flags for in-progress features
 const FEATURES = {
   notes: true, // Notes feature enabled - entity linking in progress
-  lists: false, // Lists feature is not feature-complete yet
+  lists: true, // Lists feature enabled - reference lists for books, movies, ideas, etc.
 }
 
 export type ViewType = 'home' | 'projects' | 'routines' | 'lists' | 'notes' | 'history' | 'task-detail' | 'contact-detail' | 'settings'

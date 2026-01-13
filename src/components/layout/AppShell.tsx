@@ -91,6 +91,7 @@ export function AppShell({
   onPinMarkAccessed,
   onPinRefreshStale,
 }: AppShellProps) {
+  void onPanelClose // No longer used - panel closing handled by smart handlers in schedule components
   const isMobile = useMobile()
   const { theme } = useTheme()
 
@@ -220,28 +221,18 @@ export function AppShell({
           {panel}
         </div>
       ) : (
-        <>
-          {/* Backdrop for click-outside-to-close */}
-          {panelOpen && onPanelClose && (
-            <div
-              className="fixed inset-0 z-10 bg-neutral-900/5"
-              onClick={onPanelClose}
-              aria-hidden="true"
-            />
-          )}
-          <aside
-            className={`
-              fixed top-0 h-full w-[420px]
-              bg-bg-elevated border-l border-neutral-200/80
-              transform transition-all duration-300 ease-out
-              ${panelOpen ? 'translate-x-0' : 'translate-x-full'}
-              shadow-xl z-20
-            `}
-            style={{ right: focusModeOpen ? '420px' : '0' }}
-          >
-            {panel}
-          </aside>
-        </>
+        <aside
+          className={`
+            fixed top-0 h-full w-[420px]
+            bg-bg-elevated border-l border-neutral-200/80
+            transform transition-all duration-300 ease-out
+            ${panelOpen ? 'translate-x-0' : 'translate-x-full'}
+            shadow-xl z-20
+          `}
+          style={{ right: focusModeOpen ? '420px' : '0' }}
+        >
+          {panel}
+        </aside>
       )}
 
       {/* Mobile bottom navigation */}

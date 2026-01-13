@@ -2,7 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
+import type { List, ListCategory } from '@/types/list'
 import { SchedulePopover, DeferPicker, type ScheduleContextItem } from '@/components/triage'
+import { ListPicker } from '@/components/triage/ListPicker'
 import { AssigneeDropdown } from '@/components/family'
 import { AgeIndicator } from '@/components/health'
 
@@ -17,6 +19,10 @@ interface TriageCardProps {
   autoCollapseMs?: number
   // Schedule context for the schedule popover
   getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
+  // List picker props
+  lists?: List[]
+  listsByCategory?: Record<ListCategory, List[]>
+  onSendToList?: (listId: string) => void
 }
 
 export function TriageCard({
@@ -29,6 +35,9 @@ export function TriageCard({
   onAssignTask,
   autoCollapseMs = 4000,
   getScheduleItemsForDate,
+  lists = [],
+  listsByCategory,
+  onSendToList,
 }: TriageCardProps) {
   const [isInteracting, setIsInteracting] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -112,6 +121,19 @@ export function TriageCard({
             if (date) setTimeout(onCollapse, 200)
           }}
         />
+
+        {/* Send to List button */}
+        {onSendToList && listsByCategory && (
+          <ListPicker
+            lists={lists}
+            listsByCategory={listsByCategory}
+            onSendToList={(listId) => {
+              onSendToList(listId)
+              // Collapse after sending to list
+              setTimeout(onCollapse, 200)
+            }}
+          />
+        )}
 
         {/* Someday button */}
         <button

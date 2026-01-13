@@ -3,6 +3,7 @@ import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
+import type { List, ListCategory } from '@/types/list'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
@@ -60,6 +61,10 @@ interface HomeViewProps {
   onOpenPlanning?: () => void
   onCreateTask?: (title: string) => void
   onAddProject?: (project: { name: string }) => Promise<Project | null>
+  // List picker props
+  lists?: List[]
+  listsByCategory?: Record<ListCategory, List[]>
+  onSendToList?: (taskId: string, listId: string) => void
 }
 
 export function HomeView({
@@ -104,6 +109,9 @@ export function HomeView({
   onOpenPlanning,
   onCreateTask,
   onAddProject,
+  lists = [],
+  listsByCategory,
+  onSendToList,
 }: HomeViewProps) {
   const { currentView, setCurrentView } = useHomeView()
   const isMobile = useMobile()
@@ -370,6 +378,11 @@ export function HomeView({
         onSelectAssignee={(id) => setSelectedAssignees(id ? [id] : [])}
         assigneesWithTasks={familyMembers}
         hasUnassignedTasks={hasUnassignedTasks}
+        lists={lists}
+        listsByCategory={listsByCategory}
+        onSendToList={onSendToList}
+        panelOpen={selectedItemId !== null}
+        onClosePanel={() => onSelectItem(null)}
       />
     )
   }

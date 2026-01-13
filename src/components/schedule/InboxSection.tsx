@@ -3,6 +3,7 @@ import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
+import type { List, ListCategory } from '@/types/list'
 import type { ScheduleContextItem } from '@/components/triage'
 import { InboxTaskCard } from './InboxTaskCard'
 import { TriageCard, InboxTriageModal } from '@/components/triage'
@@ -28,6 +29,10 @@ interface InboxSectionProps {
   currentUserId?: string
   // Schedule context for the schedule popover
   getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
+  // List picker props
+  lists?: List[]
+  listsByCategory?: Record<ListCategory, List[]>
+  onSendToList?: (taskId: string, listId: string) => void
 }
 
 export function InboxSection({
@@ -49,6 +54,9 @@ export function InboxSection({
   onAssignTaskAll,
   currentUserId,
   getScheduleItemsForDate,
+  lists = [],
+  listsByCategory,
+  onSendToList,
 }: InboxSectionProps) {
   // Suppress unused variable warnings - these are kept in the interface for future use
   void _contacts
@@ -96,6 +104,9 @@ export function InboxSection({
             projects={projects}
             familyMembers={familyMembers}
             getScheduleItemsForDate={getScheduleItemsForDate}
+            lists={lists}
+            listsByCategory={listsByCategory}
+            onSendToList={onSendToList ? (listId) => onSendToList(recentlyCreatedTask.id, listId) : undefined}
           />
         )}
 
@@ -118,6 +129,9 @@ export function InboxSection({
             familyMembers={familyMembers}
             onAssignTaskAll={onAssignTaskAll ? (memberIds) => onAssignTaskAll(task.id, memberIds) : undefined}
             getScheduleItemsForDate={getScheduleItemsForDate}
+            lists={lists}
+            listsByCategory={listsByCategory}
+            onSendToList={onSendToList ? (listId) => onSendToList(task.id, listId) : undefined}
           />
         ))}
       </div>

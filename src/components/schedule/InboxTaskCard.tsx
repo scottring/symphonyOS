@@ -1,8 +1,10 @@
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
+import type { List, ListCategory } from '@/types/list'
 import { MultiAssigneeDropdown } from '@/components/family'
 import { SchedulePopover, DeferPicker, ContextPicker } from '@/components/triage'
+import { ListPicker } from '@/components/triage/ListPicker'
 import type { ScheduleContextItem } from '@/components/triage'
 
 interface InboxTaskCardProps {
@@ -15,6 +17,13 @@ interface InboxTaskCardProps {
   familyMembers?: FamilyMember[]
   onAssignTaskAll?: (memberIds: string[]) => void
   getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
+  // List picker props
+  lists?: List[]
+  listsByCategory?: Record<ListCategory, List[]>
+  onSendToList?: (listId: string) => void
+  // Panel state (for smart close behavior)
+  panelOpen?: boolean
+  onClosePanel?: () => void
 }
 
 export function InboxTaskCard({
@@ -27,12 +36,25 @@ export function InboxTaskCard({
   familyMembers = [],
   onAssignTaskAll,
   getScheduleItemsForDate,
+  lists = [],
+  listsByCategory,
+  onSendToList,
+  panelOpen,
+  onClosePanel,
 }: InboxTaskCardProps) {
   const project = projects.find(p => p.id === task.projectId)
 
   return (
     <div
-      onClick={onSelect}
+      onClick={() => {
+        // If panel is open, close it
+        if (panelOpen && onClosePanel) {
+          onClosePanel()
+        } else {
+          // If panel is closed, open for this item
+          onSelect()
+        }
+      }}
       className="bg-white rounded-xl border border-neutral-100 pl-0.5 pr-3 py-2.5 shadow-sm cursor-pointer hover:border-primary-200 hover:shadow-md transition-all group"
     >
       {/* Main row: checkbox | title | triage buttons */}
@@ -41,6 +63,13 @@ export function InboxTaskCard({
         <button
           onClick={(e) => {
             e.stopPropagation()
+
+            // Always close panel if open
+            if (panelOpen && onClosePanel) {
+              onClosePanel()
+            }
+
+            // Then complete the task
             onUpdate({ completed: !task.completed })
           }}
           className="shrink-0 flex items-center justify-center"
@@ -72,7 +101,16 @@ export function InboxTaskCard({
         </span>
 
         {/* Triage actions */}
-        <div className="shrink-0 flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="shrink-0 flex items-center gap-0.5"
+          onClick={(e) => {
+            e.stopPropagation()
+            // Close panel when interacting with triage icons
+            if (panelOpen && onClosePanel) {
+              onClosePanel()
+            }
+          }}
+        >
           {/* Defer - always visible */}
           <DeferPicker
             deferredUntil={task.deferredUntil}
@@ -91,6 +129,15 @@ export function InboxTaskCard({
             getItemsForDate={getScheduleItemsForDate}
             itemTitle={task.title}
           />
+
+          {/* Send to List - always visible */}
+          {onSendToList && listsByCategory && (
+            <ListPicker
+              lists={lists}
+              listsByCategory={listsByCategory}
+              onSendToList={onSendToList}
+            />
+          )}
 
           {/* Context picker - desktop only */}
           <div className="hidden md:block">

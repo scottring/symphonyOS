@@ -3,6 +3,7 @@ import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
+import type { List, ListCategory } from '@/types/list'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
@@ -500,6 +501,13 @@ interface TodayScheduleProps {
   hasUnassignedTasks?: boolean
   // Parent task navigation (for subtasks shown on timeline)
   onOpenTask?: (taskId: string) => void
+  // List picker props
+  lists?: List[]
+  listsByCategory?: Record<ListCategory, List[]>
+  onSendToList?: (taskId: string, listId: string) => void
+  // Panel state (for smart close behavior)
+  panelOpen?: boolean
+  onClosePanel?: () => void
 }
 
 function LoadingSkeleton() {
@@ -579,6 +587,11 @@ export function TodaySchedule({
   assigneesWithTasks = [],
   hasUnassignedTasks = false,
   onOpenTask,
+  lists = [],
+  listsByCategory,
+  onSendToList,
+  panelOpen,
+  onClosePanel,
 }: TodayScheduleProps) {
   void _onCreateTask // Reserved - was used by ReviewSection
   void _onDeleteTask // Available for future inline delete
@@ -1178,6 +1191,11 @@ export function TodaySchedule({
                     familyMembers={familyMembers}
                     onAssignTaskAll={onAssignTaskAll ? (memberIds) => onAssignTaskAll(task.id, memberIds) : undefined}
                     getScheduleItemsForDate={getScheduleItemsForDate}
+                    lists={lists}
+                    listsByCategory={listsByCategory}
+                    onSendToList={onSendToList ? (listId) => onSendToList(task.id, listId) : undefined}
+                    panelOpen={panelOpen}
+                    onClosePanel={onClosePanel}
                   />
                 ))
               ) : (
@@ -1372,6 +1390,8 @@ export function TodaySchedule({
                           : undefined
                       }
                       getScheduleItemsForDate={getScheduleItemsForDate}
+                      panelOpen={panelOpen}
+                      onClosePanel={onClosePanel}
                     />
                   )
                 })}

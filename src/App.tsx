@@ -857,6 +857,39 @@ function App() {
     }
   }, [updateProject, pinnedItems])
 
+  // Handler for sending inbox task to list
+  const handleSendToList = useCallback(async (taskId: string, listId: string) => {
+    const task = tasks.find(t => t.id === taskId)
+    if (!task) return
+
+    const list = lists.find(l => l.id === listId)
+    if (!list) return
+
+    // We need to use the hook for the specific list
+    // For now, directly call the Supabase API since we can't use hooks conditionally
+    const { error } = await supabase
+      .from('list_items')
+      .insert({
+        user_id: user?.id,
+        list_id: listId,
+        text: task.title,
+        note: task.notes || null,
+        sort_order: 0, // Add to top
+      })
+
+    if (error) {
+      console.error('Failed to create list item:', error)
+      showToast('Failed to send to list', 'warning')
+      return
+    }
+
+    // Delete original task
+    await deleteTask(taskId)
+
+    // Show success toast
+    showToast(`Sent to ${list.title}`, 'success')
+  }, [tasks, lists, deleteTask, showToast, user])
+
   // Helper to format date for toast message
   const formatDateForToast = useCallback((date: Date): string => {
     const today = new Date()
@@ -1284,6 +1317,9 @@ function App() {
             }}
             onOpenPlanning={() => setPlanningOpen(true)}
             onAddProject={addProject}
+            lists={lists}
+            listsByCategory={listsByCategory}
+            onSendToList={handleSendToList}
           />
         </div>
       )}
