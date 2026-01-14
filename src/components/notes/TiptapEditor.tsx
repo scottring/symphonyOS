@@ -48,6 +48,61 @@ export function TiptapEditor({
       attributes: {
         class: 'prose prose-neutral max-w-none focus:outline-none min-h-[200px] px-4 py-3',
       },
+      handlePaste: (view, event) => {
+        // Get clipboard data
+        const text = event.clipboardData?.getData('text/plain')
+        if (!text) return false
+
+        // Check if it looks like tabular data (has tabs and multiple lines)
+        const lines = text.split('\n').filter(line => line.trim())
+        const hasTabs = lines.some(line => line.includes('\t'))
+
+        if (!hasTabs || lines.length < 2) return false // Let default paste handle it
+
+        // Parse TSV data
+        const rows = lines.map(line => line.split('\t'))
+        const cols = Math.max(...rows.map(row => row.length))
+
+        // Ensure all rows have the same number of columns
+        const normalizedRows = rows.map(row => {
+          const normalized = [...row]
+          while (normalized.length < cols) {
+            normalized.push('')
+          }
+          return normalized
+        })
+
+        // Insert table
+        const { tr } = view.state
+        const table = view.state.schema.nodes.table.create(null, [
+          // Create header row
+          view.state.schema.nodes.tableRow.create(
+            null,
+            normalizedRows[0].map(cell =>
+              view.state.schema.nodes.tableHeader.create(
+                null,
+                view.state.schema.text(cell)
+              )
+            )
+          ),
+          // Create body rows
+          ...normalizedRows.slice(1).map(row =>
+            view.state.schema.nodes.tableRow.create(
+              null,
+              row.map(cell =>
+                view.state.schema.nodes.tableCell.create(
+                  null,
+                  view.state.schema.text(cell)
+                )
+              )
+            )
+          ),
+        ])
+
+        view.dispatch(tr.replaceSelectionWith(table))
+        event.preventDefault()
+        return true
+      },
     },
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML())
@@ -98,9 +153,44 @@ export function TiptapEditor({
     editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
   }, [editor])
 
+  // Table manipulation commands
+  const addRowBefore = useCallback(() => {
+    editor?.chain().focus().addRowBefore().run()
+  }, [editor])
+
+  const addRowAfter = useCallback(() => {
+    editor?.chain().focus().addRowAfter().run()
+  }, [editor])
+
+  const deleteRow = useCallback(() => {
+    editor?.chain().focus().deleteRow().run()
+  }, [editor])
+
+  const addColumnBefore = useCallback(() => {
+    editor?.chain().focus().addColumnBefore().run()
+  }, [editor])
+
+  const addColumnAfter = useCallback(() => {
+    editor?.chain().focus().addColumnAfter().run()
+  }, [editor])
+
+  const deleteColumn = useCallback(() => {
+    editor?.chain().focus().deleteColumn().run()
+  }, [editor])
+
+  const deleteTable = useCallback(() => {
+    editor?.chain().focus().deleteTable().run()
+  }, [editor])
+
+  const toggleHeaderRow = useCallback(() => {
+    editor?.chain().focus().toggleHeaderRow().run()
+  }, [editor])
+
   if (!editor) {
     return null
   }
+
+  const isInTable = editor.isActive('table')
 
   return (
     <div className="border border-neutral-200 rounded-xl overflow-hidden bg-white">
@@ -216,6 +306,106 @@ export function TiptapEditor({
               <line x1="15" y1="3" x2="15" y2="21" />
             </svg>
           </ToolbarButton>
+
+          {/* Table controls (shown when cursor is in a table) */}
+          {isInTable && (
+            <>
+              <div className="w-px h-5 bg-neutral-200 mx-1 flex-shrink-0" />
+
+              {/* Row controls */}
+              <ToolbarButton
+                onClick={addRowBefore}
+                title="Add row above"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <line x1="3" y1="9" x2="21" y2="9" />
+                  <line x1="9" y1="3" x2="15" y2="9" />
+                  <line x1="12" y1="3" x2="12" y2="9" />
+                </svg>
+              </ToolbarButton>
+              <ToolbarButton
+                onClick={addRowAfter}
+                title="Add row below"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <line x1="3" y1="15" x2="21" y2="15" />
+                  <line x1="9" y1="15" x2="15" y2="21" />
+                  <line x1="12" y1="15" x2="12" y2="21" />
+                </svg>
+              </ToolbarButton>
+              <ToolbarButton
+                onClick={deleteRow}
+                title="Delete row"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <line x1="3" y1="12" x2="21" y2="12" strokeWidth="2.5" />
+                  <line x1="8" y1="8" x2="16" y2="16" />
+                </svg>
+              </ToolbarButton>
+
+              <div className="w-px h-5 bg-neutral-200 mx-1 flex-shrink-0" />
+
+              {/* Column controls */}
+              <ToolbarButton
+                onClick={addColumnBefore}
+                title="Add column left"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <line x1="9" y1="3" x2="9" y2="21" />
+                  <line x1="3" y1="9" x2="9" y2="15" />
+                  <line x1="3" y1="12" x2="9" y2="12" />
+                </svg>
+              </ToolbarButton>
+              <ToolbarButton
+                onClick={addColumnAfter}
+                title="Add column right"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <line x1="15" y1="3" x2="15" y2="21" />
+                  <line x1="15" y1="9" x2="21" y2="15" />
+                  <line x1="15" y1="12" x2="21" y2="12" />
+                </svg>
+              </ToolbarButton>
+              <ToolbarButton
+                onClick={deleteColumn}
+                title="Delete column"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <line x1="12" y1="3" x2="12" y2="21" strokeWidth="2.5" />
+                  <line x1="8" y1="8" x2="16" y2="16" />
+                </svg>
+              </ToolbarButton>
+
+              <div className="w-px h-5 bg-neutral-200 mx-1 flex-shrink-0" />
+
+              {/* Table options */}
+              <ToolbarButton
+                onClick={toggleHeaderRow}
+                title="Toggle header row"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <line x1="3" y1="9" x2="21" y2="9" strokeWidth="2.5" />
+                </svg>
+              </ToolbarButton>
+              <ToolbarButton
+                onClick={deleteTable}
+                title="Delete table"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <line x1="7" y1="7" x2="17" y2="17" strokeWidth="2.5" />
+                  <line x1="17" y1="7" x2="7" y2="17" strokeWidth="2.5" />
+                </svg>
+              </ToolbarButton>
+            </>
+          )}
         </div>
       )}
 

@@ -369,9 +369,36 @@ export function useNotes() {
     [notes]
   )
 
-  // Merge notes and task notes for display
+  // Merge notes and task notes for display with deduplication for scratchpad notes
   const allNotes = useMemo<DisplayNote[]>(() => {
-    const combined = [...notes, ...taskNotes]
+    let combined = [...notes, ...taskNotes]
+
+    // Deduplicate scratchpad notes - keep only the most recent one per day
+    const scratchpadsByDate = new Map<string, DisplayNote>()
+    const nonScratchpadNotes: DisplayNote[] = []
+
+    for (const note of combined) {
+      const isScratchpad =
+        'title' in note &&
+        note.title === 'Scratch Pad' &&
+        note.type === 'quick_capture'
+
+      if (isScratchpad) {
+        const dateKey = new Date(note.createdAt).toDateString()
+        const existing = scratchpadsByDate.get(dateKey)
+
+        // Keep the most recent scratchpad for each day
+        if (!existing || note.updatedAt > existing.updatedAt) {
+          scratchpadsByDate.set(dateKey, note)
+        }
+      } else {
+        nonScratchpadNotes.push(note)
+      }
+    }
+
+    // Combine deduplicated scratchpads with other notes
+    combined = [...nonScratchpadNotes, ...Array.from(scratchpadsByDate.values())]
+
     return combined.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
   }, [notes, taskNotes])
 

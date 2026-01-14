@@ -100,6 +100,13 @@ export function NotesPage({
     [onAddNote]
   )
 
+  const handleNewNote = useCallback(async () => {
+    const newNote = await onAddNote('', selectedTopicId || undefined)
+    if (newNote) {
+      setSelectedNoteId(newNote.id)
+    }
+  }, [onAddNote, selectedTopicId])
+
   const handleAddTopic = useCallback(
     async (name: string) => {
       return onAddTopic(name)
@@ -156,12 +163,29 @@ export function NotesPage({
     <div className="h-full flex">
       {/* Notes List - 400px fixed width */}
       <div className="w-[400px] border-r border-neutral-200/80 bg-bg-elevated flex flex-col overflow-hidden">
-        {/* Quick Capture at top - always visible */}
-        <div className="sticky top-0 z-10 p-4 bg-bg-elevated border-b border-neutral-100">
-          <NotesQuickCapture
-            onSave={handleQuickCapture}
-            topics={topics}
-          />
+        {/* Header with New Note button */}
+        <div className="sticky top-0 z-10 bg-bg-elevated border-b border-neutral-100">
+          <div className="flex items-center justify-between px-4 pt-4 pb-3">
+            <h2 className="text-lg font-display text-neutral-800">Notes</h2>
+            <button
+              onClick={handleNewNote}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
+              aria-label="New note"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+              </svg>
+              New Note
+            </button>
+          </div>
+
+          {/* Quick Capture */}
+          <div className="px-4 pb-4">
+            <NotesQuickCapture
+              onSave={handleQuickCapture}
+              topics={topics}
+            />
+          </div>
         </div>
 
         {/* Topic Filter */}

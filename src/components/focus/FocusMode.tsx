@@ -31,12 +31,12 @@ function getStoredScratchPad(): string {
   return stored || ''
 }
 
-// Helper to find today's scratchpad note
+// Helper to find today's scratchpad note (returns most recent if multiple exist)
 function findTodaysScratchpad(notes: Note[]): Note | undefined {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  return notes.find(note => {
+  const todaysScratchpads = notes.filter(note => {
     if (note.title !== SCRATCH_PAD_NOTE_TITLE || note.type !== 'quick_capture') return false
 
     const noteDate = new Date(note.createdAt)
@@ -44,6 +44,14 @@ function findTodaysScratchpad(notes: Note[]): Note | undefined {
 
     return noteDate.getTime() === today.getTime()
   })
+
+  // Return the most recently updated scratchpad if multiple exist
+  if (todaysScratchpads.length === 0) return undefined
+  if (todaysScratchpads.length === 1) return todaysScratchpads[0]
+
+  return todaysScratchpads.reduce((latest, current) =>
+    current.updatedAt > latest.updatedAt ? current : latest
+  )
 }
 
 const TIME_LABELS: Record<TimeOfDay, string> = {

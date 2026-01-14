@@ -1,10 +1,11 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import type { Note, NoteTopic, NoteEntityLink, NoteEntityType, UpdateNoteInput } from '@/types/note'
 import { noteTypeLabels, noteTypeDotColors } from '@/types/note'
 import { formatRelativeTime } from '@/lib/timeUtils'
 import { htmlToPlainText } from '@/lib/htmlUtils'
 import { TopicPicker } from './TopicPicker'
 import { EntityLinkPicker } from './EntityLinkPicker'
+import { UnifiedNotesEditor } from './UnifiedNotesEditor'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
@@ -45,7 +46,6 @@ export function NoteDetail({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showEntityPicker, setShowEntityPicker] = useState(false)
   const [removingLinkId, setRemovingLinkId] = useState<string | null>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Create lookup maps for entity names
   const entityNameMap = useMemo(() => {
@@ -64,12 +64,15 @@ export function NoteDetail({
 
   // Reset editing state when note changes
   useEffect(() => {
-    setIsEditing(false)
-    setShowDeleteConfirm(false)
-    setShowEntityPicker(false)
     if (note) {
       setEditContent(note.content)
+      // Auto-enter edit mode for blank notes
+      setIsEditing(!note.content.trim())
+    } else {
+      setIsEditing(false)
     }
+    setShowDeleteConfirm(false)
+    setShowEntityPicker(false)
   }, [note?.id, note?.content])
 
   const handleAddEntityLink = useCallback(
@@ -95,10 +98,25 @@ export function NoteDetail({
   )
 
   const handleSave = useCallback(async () => {
-    if (!note || !editContent.trim()) return
-    await onUpdate(note.id, { content: editContent.trim() })
+    if (!note) return
+
+    // Check if content is effectively empty (HTML or plain text)
+    const isEmpty = !editContent.trim() || editContent === '<p></p>'
+
+    // If content is empty, delete the note instead
+    if (isEmpty) {
+      await onDelete(note.id)
+      onClose?.()
+      return
+    }
+
+    await onUpdate(note.id, { content: editContent })
     setIsEditing(false)
-  }, [note, editContent, onUpdate])
+  }, [note, editContent, onUpdate, onDelete, onClose])
+
+  const handleEditorChange = useCallback((content: string | null) => {
+    setEditContent(content || '')
+  }, [])
 
   const handleDelete = useCallback(async () => {
     if (!note || isDeleting) return
@@ -119,13 +137,27 @@ export function NoteDetail({
     [note, onUpdate]
   )
 
-  // Auto-resize textarea
+  // Handle keyboard shortcuts for escape and save
   useEffect(() => {
-    if (isEditing && textareaRef.current) {
-      textareaRef.current.style.height = 'auto'
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+    if (!isEditing || !note) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Escape: If editing a blank note, delete it
+      if (e.key === 'Escape' && (!editContent.trim() || editContent === '<p></p>')) {
+        e.preventDefault()
+        onDelete(note.id)
+        onClose?.()
+      }
+      // Cmd/Ctrl+S: Save
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault()
+        handleSave()
+      }
     }
-  }, [isEditing, editContent])
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isEditing, editContent, note, onDelete, onClose, handleSave])
 
   if (!note) {
     return (
@@ -151,11 +183,9 @@ export function NoteDetail({
 
   const topic = note.topicId ? topics.find((t) => t.id === note.topicId) : undefined
 
-  // Check if content contains HTML and convert if needed
-  const hasHtml = /<[^>]+>/.test(note.content)
-  const plainContent = hasHtml ? htmlToPlainText(note.content) : note.content
-
-  const lines = plainContent.split('\n')
+  // Extract title from content
+  const plainContent = htmlToPlainText(note.content)
+  const lines = plainContent.split('\n').filter(line => line.trim())
   const displayTitle = note.title || lines[0] || 'Untitled'
 
   return (
@@ -242,21 +272,18 @@ export function NoteDetail({
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-6 pb-6">
         {isEditing ? (
-          <textarea
-            ref={textareaRef}
+          <UnifiedNotesEditor
             value={editContent}
-            onChange={(e) => setEditContent(e.target.value)}
-            className="w-full min-h-[200px] text-neutral-700 bg-transparent border-none resize-none focus:outline-none leading-relaxed"
-            autoFocus
+            onChange={handleEditorChange}
+            placeholder="Start writing..."
+            autoFocus={true}
+            minHeight={200}
           />
         ) : (
-          <div className="prose prose-neutral max-w-none">
-            {plainContent.split('\n').map((line, i) => (
-              <p key={i} className="text-neutral-700 leading-relaxed">
-                {line || '\u00A0'}
-              </p>
-            ))}
-          </div>
+          <div
+            className="prose prose-neutral max-w-none"
+            dangerouslySetInnerHTML={{ __html: note.content }}
+          />
         )}
 
         {/* Entity links */}
