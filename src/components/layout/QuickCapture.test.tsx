@@ -72,7 +72,7 @@ describe('QuickCapture', () => {
   })
 
   describe('Submit behavior (no parsing)', () => {
-    it('calls onAdd with title when Add to Inbox is clicked', async () => {
+    it('calls onAdd with title when Add to My Inbox is clicked', async () => {
       const onAdd = vi.fn()
       const { user } = render(
         <QuickCapture onAdd={onAdd} isOpen={true} showFab={false} />
@@ -80,19 +80,19 @@ describe('QuickCapture', () => {
 
       const input = screen.getByPlaceholderText("What's on your mind?")
       await user.type(input, 'My new task')
-      await user.click(screen.getByRole('button', { name: 'Add to Inbox' }))
+      await user.click(screen.getByRole('button', { name: 'Add to My Inbox' }))
 
       expect(onAdd).toHaveBeenCalledWith('My new task')
     })
 
-    it('Add to Inbox button is disabled when title is empty', () => {
+    it('Add to My Inbox button is disabled when title is empty', () => {
       render(<QuickCapture onAdd={vi.fn()} isOpen={true} showFab={false} />)
 
-      const saveButton = screen.getByRole('button', { name: 'Add to Inbox' })
+      const saveButton = screen.getByRole('button', { name: 'Add to My Inbox' })
       expect(saveButton).toBeDisabled()
     })
 
-    it('Add to Inbox button is enabled when title has text', async () => {
+    it('Add to My Inbox button is enabled when title has text', async () => {
       const { user } = render(
         <QuickCapture onAdd={vi.fn()} isOpen={true} showFab={false} />
       )
@@ -100,7 +100,7 @@ describe('QuickCapture', () => {
       const input = screen.getByPlaceholderText("What's on your mind?")
       await user.type(input, 'Some text')
 
-      const saveButton = screen.getByRole('button', { name: 'Add to Inbox' })
+      const saveButton = screen.getByRole('button', { name: 'Add to My Inbox' })
       expect(saveButton).not.toBeDisabled()
     })
 
@@ -110,7 +110,7 @@ describe('QuickCapture', () => {
         <QuickCapture onAdd={onAdd} isOpen={true} showFab={false} />
       )
 
-      await user.click(screen.getByRole('button', { name: 'Add to Inbox' }))
+      await user.click(screen.getByRole('button', { name: 'Add to My Inbox' }))
 
       expect(onAdd).not.toHaveBeenCalled()
     })
@@ -123,7 +123,7 @@ describe('QuickCapture', () => {
 
       const input = screen.getByPlaceholderText("What's on your mind?")
       await user.type(input, '  My task  ')
-      await user.click(screen.getByRole('button', { name: 'Add to Inbox' }))
+      await user.click(screen.getByRole('button', { name: 'Add to My Inbox' }))
 
       expect(onAdd).toHaveBeenCalledWith('My task')
     })
@@ -221,7 +221,7 @@ describe('QuickCapture', () => {
       )
     })
 
-    it('shows Add to Inbox button for raw text when parsing occurs', async () => {
+    it('shows Add to My Inbox button for raw text when parsing occurs', async () => {
       const { user } = render(
         <QuickCapture
           onAdd={vi.fn()}
@@ -236,11 +236,11 @@ describe('QuickCapture', () => {
       await user.type(input, 'buy milk tomorrow')
 
       // Should show both buttons when parsing happens
-      expect(screen.getByRole('button', { name: 'Add to Inbox' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Add to My Inbox' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Save with Above' })).toBeInTheDocument()
     })
 
-    it('calls onAdd with raw text when Add to Inbox is clicked during parsing', async () => {
+    it('calls onAdd with raw text when Add to My Inbox is clicked during parsing', async () => {
       const onAdd = vi.fn()
       const onAddRich = vi.fn()
       const { user } = render(
@@ -256,7 +256,7 @@ describe('QuickCapture', () => {
 
       const input = screen.getByPlaceholderText("What's on your mind?")
       await user.type(input, 'buy milk tomorrow')
-      await user.click(screen.getByRole('button', { name: 'Add to Inbox' }))
+      await user.click(screen.getByRole('button', { name: 'Add to My Inbox' }))
 
       // Should call onAdd with raw text, not onAddRich
       expect(onAdd).toHaveBeenCalledWith('buy milk tomorrow')

@@ -35,7 +35,7 @@ import { LoadingFallback } from '@/components/layout/LoadingFallback'
 import { ListsList, ListView } from '@/components/list'
 import { NotesPage } from '@/components/notes'
 import { CompletedTasksView } from '@/components/history/CompletedTasksView'
-import { Toast } from '@/components/toast'
+import { Toast, ConfirmationToast, type ConfirmationToastMessage } from '@/components/toast'
 import { UndoToast } from '@/components/undo/UndoToast'
 import {
   ProjectsList,
@@ -65,6 +65,7 @@ function App() {
   const pinnedItems = usePinnedItems()
   const undo = useUndo({ duration: 5000 })
   const { toast, showToast, dismissToast } = useToast()
+  const [confirmationToast, setConfirmationToast] = useState<ConfirmationToastMessage | null>(null)
 
   // Onboarding state
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null)
@@ -924,14 +925,12 @@ function App() {
     return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
   }, [])
 
-  // Wrapper for updateTask that shows toast when scheduling to future date
+  // Wrapper for updateTask that shows toast when scheduling to future date or confirmation for past date
   const handleUpdateTaskWithToast = useCallback(async (
     id: string,
     updates: Parameters<typeof updateTask>[1]
   ) => {
-    await updateTask(id, updates)
-
-    // Show toast if scheduling to a future date (not today)
+    // Check if scheduling to a past date
     if (updates.scheduledFor) {
       const scheduleDate = updates.scheduledFor
       const today = new Date()
@@ -939,9 +938,42 @@ function App() {
       const scheduleDateStart = new Date(scheduleDate)
       scheduleDateStart.setHours(0, 0, 0, 0)
 
+      // Past date - show confirmation
+      if (scheduleDateStart < today) {
+        setConfirmationToast({
+          id: Math.random().toString(36).substring(7),
+          message: `Schedule to ${formatDateForToast(scheduleDate)}? This is in the past.`,
+          actions: [
+            {
+              label: 'Confirm',
+              variant: 'secondary',
+              onClick: async () => {
+                await updateTask(id, updates)
+                showToast(`Scheduled for ${formatDateForToast(scheduleDate)}`, 'info', 2500)
+              },
+            },
+            {
+              label: 'Schedule & Complete',
+              variant: 'primary',
+              onClick: async () => {
+                await updateTask(id, { ...updates, completed: true })
+                showToast(`Completed and scheduled for ${formatDateForToast(scheduleDate)}`, 'success', 2500)
+              },
+            },
+          ],
+        })
+        return
+      }
+
+      // Future date or today - proceed normally
+      await updateTask(id, updates)
+
       if (scheduleDateStart > today) {
         showToast(`Scheduled for ${formatDateForToast(scheduleDate)}`, 'info', 2500)
       }
+    } else {
+      // No date change, proceed normally
+      await updateTask(id, updates)
     }
   }, [updateTask, showToast, formatDateForToast])
 
@@ -1613,6 +1645,10 @@ function App() {
 
       {/* Toast notifications */}
       <Toast toast={toast} onDismiss={dismissToast} />
+      <ConfirmationToast
+        toast={confirmationToast}
+        onDismiss={() => setConfirmationToast(null)}
+      />
       <UndoToast
         action={undo.currentAction}
         onUndo={undo.executeUndo}

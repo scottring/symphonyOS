@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowRightToLine } from 'lucide-react'
+import { ArrowRightToLine, Clock, Sunset, Sun, Calendar, CalendarDays } from 'lucide-react'
 import {
   getHoursFromNow,
   getThisEvening,
+  getNextWeekend,
+  getWeekendAfterNext,
   isBeforeEvening,
   parseDateInput,
 } from '@/lib/dateHelpers'
@@ -110,51 +112,96 @@ export function PushDropdown({ onPush, size = 'md', showTodayOption = false }: P
           onClick={(e) => e.stopPropagation()}
         >
           {!showDatePicker ? (
-            <div className="space-y-1">
-              <div className="px-3 py-1 text-xs font-medium text-neutral-500 uppercase tracking-wide">
+            <div className="p-1">
+              {/* Header */}
+              <div className="text-xs font-medium text-neutral-400 uppercase tracking-wider mb-3 px-1">
                 {showTodayOption ? 'Reschedule to' : 'Push until'}
               </div>
+
+              {/* Today option if needed */}
               {showTodayOption && (
-                <button
-                  onClick={() => handlePush(getToday())}
-                  className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-primary-700 font-medium"
-                >
-                  Today
-                </button>
+                <>
+                  <button
+                    onClick={() => handlePush(getToday())}
+                    className="w-full flex items-center gap-2 px-3 py-2 mb-2 rounded-lg text-sm font-medium
+                      text-primary-600 bg-primary-50 hover:bg-primary-100
+                      transition-all duration-150"
+                  >
+                    <Sun className="w-4 h-4" />
+                    <span>Today</span>
+                  </button>
+                  <div className="border-t border-neutral-100 mb-3" />
+                </>
               )}
-              <button
-                onClick={() => handlePush(getHoursFromNow(3))}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
-              >
-                In 3 hours
-              </button>
-              {isBeforeEvening() && (
+
+              {/* Quick push options in 2-column grid */}
+              <div className="grid grid-cols-2 gap-2 mb-2">
                 <button
-                  onClick={() => handlePush(getThisEvening())}
-                  className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
+                  onClick={() => handlePush(getHoursFromNow(3))}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
+                    text-neutral-700 bg-neutral-50 hover:bg-amber-50 hover:text-amber-700
+                    transition-all duration-150"
                 >
-                  This evening
+                  <Clock className="w-4 h-4" />
+                  <span>In 3 hours</span>
                 </button>
-              )}
-              <button
-                onClick={() => handlePush(getTomorrow())}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
-              >
-                Tomorrow
-              </button>
-              <button
-                onClick={() => handlePush(getNextWeek())}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
-              >
-                Next Week
-              </button>
-              <div className="border-t border-neutral-100 my-1" />
-              <button
-                onClick={() => setShowDatePicker(true)}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700"
-              >
-                Pick date...
-              </button>
+                {isBeforeEvening() && (
+                  <button
+                    onClick={() => handlePush(getThisEvening())}
+                    className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
+                      text-neutral-700 bg-neutral-50 hover:bg-amber-50 hover:text-amber-700
+                      transition-all duration-150"
+                  >
+                    <Sunset className="w-4 h-4" />
+                    <span>This evening</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => handlePush(getTomorrow())}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
+                    text-neutral-700 bg-neutral-50 hover:bg-amber-50 hover:text-amber-700
+                    transition-all duration-150"
+                >
+                  <Sun className="w-4 h-4" />
+                  <span>Tomorrow</span>
+                </button>
+                <button
+                  onClick={() => handlePush(getNextWeekend())}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
+                    text-neutral-700 bg-neutral-50 hover:bg-amber-50 hover:text-amber-700
+                    transition-all duration-150"
+                >
+                  <CalendarDays className="w-4 h-4" />
+                  <span>This Weekend</span>
+                </button>
+                <button
+                  onClick={() => handlePush(getWeekendAfterNext())}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
+                    text-neutral-700 bg-neutral-50 hover:bg-amber-50 hover:text-amber-700
+                    transition-all duration-150"
+                >
+                  <CalendarDays className="w-4 h-4" />
+                  <span>Next Weekend</span>
+                </button>
+                <button
+                  onClick={() => handlePush(getNextWeek())}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
+                    text-neutral-700 bg-neutral-50 hover:bg-amber-50 hover:text-amber-700
+                    transition-all duration-150"
+                >
+                  <Calendar className="w-4 h-4" />
+                  <span>Next Week</span>
+                </button>
+                <button
+                  onClick={() => setShowDatePicker(true)}
+                  className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
+                    text-neutral-700 bg-neutral-50 hover:bg-amber-50 hover:text-amber-700
+                    transition-all duration-150"
+                >
+                  <CalendarDays className="w-4 h-4" />
+                  <span>Pick date...</span>
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-2">

@@ -45,7 +45,9 @@ export function QuickCapture({
   const isOpen = controlledIsOpen ?? internalIsOpen
 
   const [title, setTitle] = useState('')
+  const [isClosing, setIsClosing] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const autoCloseTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Get current domain for smart context defaulting
   const { currentDomain } = useDomain()
@@ -59,7 +61,16 @@ export function QuickCapture({
     context?: TaskContext | null
   }>({})
 
+  const clearAutoCloseTimer = () => {
+    if (autoCloseTimerRef.current) {
+      clearTimeout(autoCloseTimerRef.current)
+      autoCloseTimerRef.current = null
+    }
+  }
+
   const handleOpen = () => {
+    setIsClosing(false)
+    clearAutoCloseTimer()
     if (onOpen) {
       onOpen()
     } else {
@@ -68,13 +79,19 @@ export function QuickCapture({
   }
 
   const handleClose = () => {
-    setTitle('')
-    setOverrides({})
-    if (onClose) {
-      onClose()
-    } else {
-      setInternalIsOpen(false)
-    }
+    clearAutoCloseTimer()
+    setIsClosing(true)
+    // Wait for fade-out animation to complete before actually closing
+    setTimeout(() => {
+      setTitle('')
+      setOverrides({})
+      setIsClosing(false)
+      if (onClose) {
+        onClose()
+      } else {
+        setInternalIsOpen(false)
+      }
+    }, 200) // Match the animation duration
   }
 
   // Focus input when modal opens
@@ -86,6 +103,27 @@ export function QuickCapture({
       setTimeout(() => inputRef.current?.focus(), 50)
     }
   }, [isOpen])
+
+  // Auto-close timer: start when input is cleared after entry, reset when typing resumes
+  useEffect(() => {
+    if (!isOpen) return
+
+    // Clear any existing timer
+    clearAutoCloseTimer()
+
+    // If input is empty, start the auto-close timer (25 seconds)
+    if (title.trim() === '') {
+      autoCloseTimerRef.current = setTimeout(() => {
+        handleClose()
+      }, 25000) // 25 seconds
+    }
+
+    // Cleanup on unmount or when dependencies change
+    return () => {
+      clearAutoCloseTimer()
+    }
+  }, [isOpen, title]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Note: handleClose is intentionally not in deps to avoid recreating timer unnecessarily
 
   // Parse input live
   const parsed = useMemo<ParsedQuickInput>(() => {
@@ -260,12 +298,16 @@ export function QuickCapture({
       {/* Modal Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
+          className={`fixed inset-0 z-50 bg-black/40 flex items-center justify-center transition-opacity duration-200 ${
+            isClosing ? 'opacity-0' : 'opacity-100'
+          }`}
           onClick={handleClose}
         >
           {/* Modal Content */}
           <div
-            className="bg-white p-6 w-[90%] md:w-1/2 max-w-lg rounded-2xl shadow-xl"
+            className={`bg-white p-6 w-[90%] md:w-1/2 max-w-lg rounded-2xl shadow-xl transition-all duration-200 ${
+              isClosing ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
+            }`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header with keyboard hint and close button */}
@@ -479,7 +521,7 @@ export function QuickCapture({
 
               {/* Buttons */}
               <div className="flex gap-3">
-                {/* Only show "Add to Inbox" if there ARE parsed fields AND it's not a note */}
+                {/* Only show "Add to My Inbox" if there ARE parsed fields AND it's not a note */}
                 {showPreview && !effectiveParsed.isNote && (
                   <button
                     type="button"
@@ -487,7 +529,7 @@ export function QuickCapture({
                     className="flex-1 touch-target py-3 rounded-xl border border-neutral-200 text-neutral-600 font-medium
                                hover:bg-neutral-50 transition-colors"
                   >
-                    Add to Inbox
+                    Add to My Inbox
                   </button>
                 )}
 
@@ -499,14 +541,24 @@ export function QuickCapture({
                              disabled:opacity-50 disabled:cursor-not-allowed
                              transition-colors"
                 >
-                  {effectiveParsed.isNote ? 'Save Note' : (showPreview ? 'Save with Above' : 'Add to Inbox')}
+                  {effectiveParsed.isNote ? 'Save Note' : (showPreview ? 'Save with Above' : 'Add to My Inbox')}
                 </button>
               </div>
 
+              {/* Privacy hint */}
+              {!effectiveParsed.isNote && (
+                <p className="text-center text-xs text-neutral-400 mt-3 flex items-center justify-center gap-1">
+                  <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                  </svg>
+                  Private until you share it
+                </p>
+              )}
+
               {/* Keyboard hint - only if parsed fields exist */}
               {showPreview && (
-                <p className="text-center text-xs text-neutral-400 mt-3">
-                  💡 <kbd className="px-1.5 py-0.5 bg-neutral-100 text-neutral-500 rounded text-xs font-mono">Shift</kbd>+<kbd className="px-1.5 py-0.5 bg-neutral-100 text-neutral-500 rounded text-xs font-mono">Enter</kbd> to add raw text to inbox
+                <p className="text-center text-xs text-neutral-400 mt-1">
+                  <kbd className="px-1.5 py-0.5 bg-neutral-100 text-neutral-500 rounded text-xs font-mono">Shift</kbd>+<kbd className="px-1.5 py-0.5 bg-neutral-100 text-neutral-500 rounded text-xs font-mono">Enter</kbd> to add raw text to inbox
                 </p>
               )}
             </form>

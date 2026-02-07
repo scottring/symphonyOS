@@ -42,6 +42,16 @@ export function getNextMonday(): Date {
 }
 
 /**
+ * Get the Saturday after next at midnight (weekend following the upcoming weekend)
+ */
+export function getWeekendAfterNext(): Date {
+  const nextWeekend = getNextWeekend()
+  const weekendAfterNext = new Date(nextWeekend)
+  weekendAfterNext.setDate(nextWeekend.getDate() + 7)
+  return weekendAfterNext
+}
+
+/**
  * Get a time N hours from now, rounded to nearest 30-minute interval
  */
 export function getHoursFromNow(hours: number): Date {

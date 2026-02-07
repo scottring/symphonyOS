@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { getBaseDate, parseDateInput, parseTimeInput, formatDateLabel } from '@/lib/dateHelpers'
+import { getBaseDate, getNextWeekend, getWeekendAfterNext, parseDateInput, parseTimeInput, formatDateLabel } from '@/lib/dateHelpers'
 import { DATE_INPUT_CLASS, TIME_INPUT_CLASS } from '@/lib/inputStyles'
 
 interface WhenPickerProps {
@@ -174,6 +174,18 @@ export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerP
                 className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
               >
                 Tomorrow
+              </button>
+              <button
+                onClick={() => handleDaySelect(getNextWeekend())}
+                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+              >
+                This Weekend
+              </button>
+              <button
+                onClick={() => handleDaySelect(getWeekendAfterNext())}
+                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+              >
+                Next Weekend
               </button>
               <button
                 onClick={() => handleDaySelect(getBaseDate(7))}

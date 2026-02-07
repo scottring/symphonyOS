@@ -6,12 +6,15 @@ export function useFamilyMembers() {
   const [members, setMembers] = useState<FamilyMember[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const seedingRef = useRef(false)
 
   const fetchMembers = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
+
+      setCurrentUserId(user.id)
 
       // RLS policies handle household sharing - no need to filter by user_id
       const { data, error } = await supabase
@@ -146,8 +149,14 @@ export function useFamilyMembers() {
 
   // Helper to get the current user's family member record
   const getCurrentUserMember = useCallback((): FamilyMember | undefined => {
+    // Match on user_id to get the correct member in shared households
+    if (currentUserId) {
+      const match = members.find(m => m.user_id === currentUserId)
+      if (match) return match
+    }
+    // Fallback for legacy data or before user_id is loaded
     return members.find(m => m.is_full_user)
-  }, [members])
+  }, [members, currentUserId])
 
   return {
     members,

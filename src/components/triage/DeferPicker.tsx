@@ -4,6 +4,7 @@ import { ArrowRightToLine, Clock, Sunset, Sun, Calendar, CalendarDays, Check } f
 import {
   getBaseDate,
   getNextWeekend,
+  getWeekendAfterNext,
   getNextMonday,
   getHoursFromNow,
   getThisEvening,
@@ -189,6 +190,15 @@ export function DeferPicker({ deferredUntil, deferCount, onDefer }: DeferPickerP
                 >
                   <CalendarDays className="w-4 h-4" />
                   <span>This Weekend</span>
+                </button>
+                <button
+                  onClick={() => handleDefer(getWeekendAfterNext())}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
+                    text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
+                    transition-all duration-150"
+                >
+                  <CalendarDays className="w-4 h-4" />
+                  <span>Next Weekend</span>
                 </button>
                 <button
                   onClick={() => handleDefer(getNextMonday())}
