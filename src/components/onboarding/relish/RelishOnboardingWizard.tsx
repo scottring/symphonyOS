@@ -6,6 +6,9 @@ import { supabase } from '@/lib/supabase'
 import { useConversation } from '@/hooks/useConversation'
 import { useRelishOnboarding } from '@/hooks/useRelishOnboarding'
 import { useHousehold } from '@/hooks/useHousehold'
+import { useManual } from '@/hooks/useManual'
+import { useYearbook } from '@/hooks/useYearbook'
+import { useYearbookGeneration } from '@/hooks/useYearbookGeneration'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { ConversationView } from './ConversationView'
 import { PhaseProgress } from './PhaseProgress'
@@ -20,10 +23,127 @@ type WizardStep =
   | 'phase-conversation'
   | 'phase-review'
   | 'choose-next'
+  | 'generating'
   | 'complete'
 
 const VALID_PHASES: OnboardingPhaseId[] = ['foundation', 'relationships', 'operations', 'strategy']
 const MIN_PHASES_FOR_LAUNCH = 2
+
+// ==================== Generating Step Component ====================
+
+import type { FamilyMember } from '@/types/family'
+import type { Manual } from '@/types/manual'
+
+interface GeneratingStepProps {
+  householdId: string | null
+  familyMembers: FamilyMember[]
+  manuals: Manual[]
+  getOrCreateYearbook: (personId: string) => Promise<string>
+  generateContent: (personId: string, yearbookId: string, manualId: string, count?: number) => Promise<number>
+  isGenerating: boolean
+  genProgress: { name: string; done: boolean }[]
+  setGenProgress: React.Dispatch<React.SetStateAction<{ name: string; done: boolean }[]>>
+  genTotal: number
+  setGenTotal: React.Dispatch<React.SetStateAction<number>>
+  onDone: () => void
+}
+
+function GeneratingStep({
+  householdId,
+  familyMembers,
+  manuals,
+  getOrCreateYearbook,
+  generateContent,
+  genProgress,
+  setGenProgress,
+  setGenTotal,
+  onDone,
+}: GeneratingStepProps) {
+  const [started, setStarted] = useState(false)
+
+  useEffect(() => {
+    if (started || !householdId) return
+    setStarted(true)
+
+    const householdManual = manuals.find(m => m.type === 'household')
+    if (!householdManual) {
+      onDone()
+      return
+    }
+
+    const members = familyMembers.length > 0 ? familyMembers : []
+    if (members.length === 0) {
+      onDone()
+      return
+    }
+
+    // Initialize progress tracking
+    setGenProgress(members.map(m => ({ name: m.name, done: false })))
+
+    async function generateForAll() {
+      let total = 0
+      for (let i = 0; i < members.length; i++) {
+        const member = members[i]
+        try {
+          const yearbookId = await getOrCreateYearbook(member.id)
+          const count = await generateContent(member.id, yearbookId, householdManual!.id, 8)
+          total += count
+        } catch (err) {
+          console.error(`Failed to generate for ${member.name}:`, err)
+        }
+        setGenProgress(prev => prev.map((p, j) => j === i ? { ...p, done: true } : p))
+      }
+      setGenTotal(total)
+      // Brief pause to show success state
+      setTimeout(onDone, 1500)
+    }
+
+    generateForAll()
+  }, [started, householdId, familyMembers, manuals, getOrCreateYearbook, generateContent, setGenProgress, setGenTotal, onDone])
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12">
+      <div className="mb-8">
+        <svg className="w-12 h-12 text-stone-600 animate-spin" viewBox="0 0 24 24" fill="none">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+      </div>
+
+      <h2 className="text-2xl font-bold text-stone-900 mb-3 text-center">
+        Generating your family's first entries...
+      </h2>
+      <p className="text-stone-500 text-center max-w-md mb-8">
+        We're creating personalized stories, activities, discussions, and more from your manual.
+      </p>
+
+      {genProgress.length > 0 && (
+        <div className="space-y-3 w-full max-w-xs">
+          {genProgress.map((p, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
+                p.done ? 'bg-emerald-100' : 'bg-stone-100'
+              }`}>
+                {p.done ? (
+                  <svg className="w-3 h-3 text-emerald-600" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                  </svg>
+                ) : (
+                  <div className="w-2 h-2 bg-stone-300 rounded-full animate-pulse" />
+                )}
+              </div>
+              <span className={`text-sm ${p.done ? 'text-emerald-700' : 'text-stone-500'}`}>
+                {p.name}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ==================== Main Wizard ====================
 
 interface RelishOnboardingWizardProps {
   onComplete: () => void
@@ -35,12 +155,17 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
   const { state: onboardingState, loading: onboardingLoading, savePhaseData, completePhase, completeIntro, getNextPhase, getPreviousPhaseData } = useRelishOnboarding(householdId)
   const { turns, isLoading: convLoading, error: convError, lastResponse, startConversation, sendMessage } = useConversation()
   const { members: familyMembers, addMember, updateMember, deleteMember, refetch: refetchFamily } = useFamilyMembers()
+  const { manuals } = useManual(householdId)
+  const { getOrCreateYearbook } = useYearbook(householdId)
+  const { generateContent, isGenerating } = useYearbookGeneration(householdId)
 
   const [step, setStep] = useState<WizardStep>('welcome')
   const [activePhase, setActivePhase] = useState<OnboardingPhaseId>('foundation')
   const [isSaving, setIsSaving] = useState(false)
   const [conversationStarted, setConversationStarted] = useState(false)
   const [savedNextPhase, setSavedNextPhase] = useState<OnboardingPhaseId | null>(null)
+  const [genProgress, setGenProgress] = useState<{ name: string; done: boolean }[]>([])
+  const [genTotal, setGenTotal] = useState(0)
 
   // Determine initial step based on existing onboarding state
   useEffect(() => {
@@ -106,8 +231,8 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
       const next = VALID_PHASES.find(p => !uniqueCompleted.includes(p)) ?? null
 
       if (!next) {
-        // All phases done
-        setStep('complete')
+        // All phases done — go to generation
+        setStep('generating')
       } else if (uniqueCompleted.length >= MIN_PHASES_FOR_LAUNCH) {
         // Minimum met — offer choice
         setSavedNextPhase(next)
@@ -134,7 +259,7 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
   }
 
   const handleLaunch = () => {
-    setStep('complete')
+    setStep('generating')
   }
 
   const handleFinish = useCallback(async () => {
@@ -310,6 +435,23 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
         </div>
       )}
 
+      {/* ==================== Generating Yearbooks ==================== */}
+      {step === 'generating' && (
+        <GeneratingStep
+          householdId={householdId}
+          familyMembers={familyMembers}
+          manuals={manuals}
+          getOrCreateYearbook={getOrCreateYearbook}
+          generateContent={generateContent}
+          isGenerating={isGenerating}
+          genProgress={genProgress}
+          setGenProgress={setGenProgress}
+          genTotal={genTotal}
+          setGenTotal={setGenTotal}
+          onDone={() => setStep('complete')}
+        />
+      )}
+
       {/* ==================== Complete ==================== */}
       {step === 'complete' && (
         <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12">
@@ -333,8 +475,18 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
             Your manual is ready.
           </h1>
 
-          <p className="text-lg text-neutral-500 text-center max-w-md mb-8">
-            You've mapped your family's operating system. Explore your manual, add yearbook entries,
+          <p className="text-lg text-neutral-500 text-center max-w-md mb-4">
+            You've mapped your family's operating system.
+          </p>
+
+          {genTotal > 0 && (
+            <p className="text-emerald-600 font-medium text-center mb-4">
+              {genTotal} entries created across {genProgress.length} yearbook{genProgress.length !== 1 ? 's' : ''}
+            </p>
+          )}
+
+          <p className="text-sm text-stone-400 text-center max-w-md mb-8">
+            Explore your manual, browse yearbook entries,
             and check in weekly to keep things aligned.
           </p>
 

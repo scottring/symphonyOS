@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import type { Goal, GoalArea, Quarter } from '@/types/goal'
 import { RelishPlansWidget } from './RelishPlansWidget'
+import { CascadingGoalWizard } from './CascadingGoalWizard'
 
 interface GoalsListProps {
   areas: GoalArea[]
@@ -10,6 +11,8 @@ interface GoalsListProps {
   onSelectGoal: (goalId: string) => void
   onAddArea: (name: string) => Promise<GoalArea | null>
   onAddGoal: (areaId: string, name: string) => Promise<Goal | null>
+  onUpdateGoal: (id: string, updates: { notes?: string }) => void
+  onAddAction: (goalId: string, description: string, quarter: Quarter) => Promise<unknown>
   onToggleAction: (actionId: string) => void
   onDeleteArea: (areaId: string) => void
 }
@@ -22,6 +25,8 @@ export function GoalsList({
   onSelectGoal,
   onAddArea,
   onAddGoal,
+  onUpdateGoal,
+  onAddAction,
   onToggleAction,
   onDeleteArea,
 }: GoalsListProps) {
@@ -103,6 +108,19 @@ export function GoalsList({
               New Area
             </button>
           )}
+        </div>
+
+        {/* AI Goal Generation from Manual */}
+        <div className="mb-8">
+          <CascadingGoalWizard
+            year={year}
+            existingAreas={areas}
+            onAddArea={onAddArea}
+            onAddGoal={onAddGoal}
+            onUpdateGoal={onUpdateGoal}
+            onAddAction={onAddAction}
+            onComplete={() => {}}
+          />
         </div>
 
         {/* New area form */}

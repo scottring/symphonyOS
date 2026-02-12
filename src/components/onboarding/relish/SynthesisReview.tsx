@@ -1,6 +1,7 @@
 import type { OnboardingPhaseId } from '@/types/manual'
 import { PHASE_NAMES, DOMAIN_NAMES, PHASE_DOMAINS } from '@/types/manual'
 import { DomainDataView } from '@/components/manual/DomainDataView'
+import { EntryPreview } from './EntryPreview'
 
 interface SynthesisReviewProps {
   phaseId: OnboardingPhaseId
@@ -47,6 +48,11 @@ export function SynthesisReview({
           {DOMAIN_NAMES[domain2]}
         </h3>
         <DomainDataView domainId={domain2} data={(structuredData[domain2] as Record<string, unknown>) || {}} />
+      </div>
+
+      {/* Entry previews — the "so what" moment */}
+      <div className="bg-white rounded-xl border border-stone-200 p-6">
+        <EntryPreview phaseId={phaseId} structuredData={structuredData} />
       </div>
 
       {/* Actions */}

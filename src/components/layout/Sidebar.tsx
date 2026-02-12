@@ -14,7 +14,7 @@ const FEATURES = {
   lists: true, // Lists feature enabled - reference lists for books, movies, ideas, etc.
 }
 
-export type ViewType = 'home' | 'goals' | 'projects' | 'routines' | 'lists' | 'notes' | 'history' | 'manual' | 'checkin' | 'task-detail' | 'contact-detail' | 'settings'
+export type ViewType = 'home' | 'goals' | 'projects' | 'routines' | 'lists' | 'notes' | 'history' | 'manual' | 'yearbook' | 'checkin' | 'task-detail' | 'contact-detail' | 'settings'
 
 interface EntityData {
   tasks: Task[]
@@ -310,6 +310,24 @@ export function Sidebar({
             <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V16" />
           </svg>
           {!collapsed && <span className="text-[15px]">Manual</span>}
+        </button>
+
+        {/* Yearbooks */}
+        <button
+          onClick={() => onViewChange('yearbook')}
+          className={`
+            w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
+            ${activeView === 'yearbook'
+              ? 'text-primary-700 bg-primary-50/80 font-medium'
+              : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
+            }
+            ${collapsed ? 'justify-center' : ''}
+          `}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 2h10v7h-2l-1-2-3 4-2-3-2 3V5z" />
+          </svg>
+          {!collapsed && <span className="text-[15px]">Yearbooks</span>}
         </button>
 
         {/* Weekly Check-in */}

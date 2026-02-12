@@ -22,6 +22,8 @@ interface UseCheckinReturn {
   currentWeek: string
   hasCheckedInThisWeek: boolean
   submitCheckin: (responses: Record<string, CheckinResponse>) => Promise<string>
+  generateObservations: (checkinId: string) => Promise<{ observations: unknown[]; driftSignals: unknown[] }>
+  acknowledgeDriftSignal: (checkinId: string, signalId: string) => Promise<void>
 }
 
 export function useCheckin(householdId: string | null): UseCheckinReturn {
@@ -117,6 +119,59 @@ export function useCheckin(householdId: string | null): UseCheckinReturn {
     return newCheckin.id
   }, [householdId, currentWeek])
 
+  const generateObservations = useCallback(async (checkinId: string) => {
+    if (!householdId) throw new Error('No household')
+
+    const { data, error: fnError } = await supabase.functions.invoke('generate-coherence-observations', {
+      body: { checkinId, householdId },
+    })
+
+    if (fnError) throw new Error(fnError.message || 'Failed to generate observations')
+
+    // Refetch check-ins to get updated data
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data: updatedCheckins } = await supabase
+        .from('checkins')
+        .select('*')
+        .eq('household_id', householdId)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(12)
+
+      if (updatedCheckins) setRecentCheckins(updatedCheckins)
+    }
+
+    return data as { observations: unknown[]; driftSignals: unknown[] }
+  }, [householdId])
+
+  const acknowledgeDriftSignal = useCallback(async (checkinId: string, signalId: string) => {
+    // Read current drift_signals, update the one matching signalId
+    const { data: checkin, error: readError } = await supabase
+      .from('checkins')
+      .select('drift_signals')
+      .eq('id', checkinId)
+      .single()
+
+    if (readError || !checkin) throw readError || new Error('Check-in not found')
+
+    const updatedSignals = (checkin.drift_signals || []).map((ds: DriftSignal) =>
+      ds.id === signalId ? { ...ds, acknowledged: true } : ds
+    )
+
+    const { error: updateError } = await supabase
+      .from('checkins')
+      .update({ drift_signals: updatedSignals })
+      .eq('id', checkinId)
+
+    if (updateError) throw updateError
+
+    // Update local state
+    setRecentCheckins(prev => prev.map(c =>
+      c.id === checkinId ? { ...c, drift_signals: updatedSignals } : c
+    ))
+  }, [])
+
   return {
     currentCheckin,
     recentCheckins,
@@ -126,5 +181,7 @@ export function useCheckin(householdId: string | null): UseCheckinReturn {
     currentWeek,
     hasCheckedInThisWeek,
     submitCheckin,
+    generateObservations,
+    acknowledgeDriftSignal,
   }
 }

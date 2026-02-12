@@ -54,6 +54,7 @@ import {
   GoalView,
 } from '@/components/lazy'
 import { ManualView } from '@/components/manual/ManualView'
+import { YearbookView } from '@/components/yearbook/YearbookView'
 import { CheckinFlow } from '@/components/checkin/CheckinFlow'
 import { useGoals } from '@/hooks/useGoals'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
@@ -197,7 +198,7 @@ function App() {
   const params = useParams<{ projectId?: string; routineId?: string; contactId?: string; goalId?: string }>()
 
   // State for non-URL-routed views
-  const [stateView, setStateView] = useState<'lists' | 'notes' | 'history' | 'manual' | 'checkin' | 'settings' | 'task-detail' | null>(null)
+  const [stateView, setStateView] = useState<'lists' | 'notes' | 'history' | 'manual' | 'yearbook' | 'checkin' | 'settings' | 'task-detail' | null>(null)
 
   // Derive view from URL path or state
   const activeView: ViewType = useMemo(() => {
@@ -664,7 +665,7 @@ function App() {
       navigate('/contacts')
     }
     // Handle state-based views
-    else if (view === 'lists' || view === 'notes' || view === 'history' || view === 'manual' || view === 'checkin' || view === 'settings' || view === 'task-detail') {
+    else if (view === 'lists' || view === 'notes' || view === 'history' || view === 'manual' || view === 'yearbook' || view === 'checkin' || view === 'settings' || view === 'task-detail') {
       setStateView(view)
       navigate('/') // Navigate to home URL but show state view
     } else {
@@ -1527,6 +1528,8 @@ function App() {
             onSelectGoal={(id) => navigate(`/goals/${id}`)}
             onAddArea={addGoalArea}
             onAddGoal={addGoal}
+            onUpdateGoal={updateGoal}
+            onAddAction={addGoalAction}
             onToggleAction={toggleGoalAction}
             onDeleteArea={deleteGoalArea}
           />
@@ -1679,6 +1682,10 @@ function App() {
 
       {activeView === 'manual' && (
         <ManualView />
+      )}
+
+      {activeView === 'yearbook' && (
+        <YearbookView />
       )}
 
       {activeView === 'checkin' && (
