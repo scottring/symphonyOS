@@ -69,9 +69,17 @@ export const CalendarConnect = lazy(() =>
   import('./CalendarConnect').then(m => ({ default: m.CalendarConnect }))
 )
 
-// Onboarding
+// Onboarding (Relish AI conversation flow)
 export const OnboardingWizard = lazy(() =>
-  import('./onboarding').then(m => ({ default: m.OnboardingWizard }))
+  import('./onboarding/relish/RelishOnboardingWizard').then(m => ({ default: m.RelishOnboardingWizard }))
+)
+
+// Goals views
+export const GoalsList = lazy(() =>
+  import('./goals/GoalsList').then(m => ({ default: m.GoalsList }))
+)
+export const GoalView = lazy(() =>
+  import('./goals/GoalView').then(m => ({ default: m.GoalView }))
 )
 
 // Settings

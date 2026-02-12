@@ -133,7 +133,7 @@ export function CalendarSetupWizard({ onComplete }: CalendarSetupWizardProps) {
             Connect Google Calendar
           </h1>
           <p className="text-neutral-600 max-w-md mx-auto">
-            Symphony will access your Google Calendar to show events alongside your tasks.
+            Relish will access your Google Calendar to show events alongside your tasks.
           </p>
           <p className="text-neutral-600 mt-2 max-w-md mx-auto">
             You choose which calendars appear in which domains on the next screen.

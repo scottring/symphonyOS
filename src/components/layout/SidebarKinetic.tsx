@@ -1,4 +1,4 @@
-import symphonyLogo from '@/assets/symphony-logo.jpg'
+import relishLogo from '@/assets/relish-logo.jpg'
 import { PinnedSection } from '@/components/pins'
 import type { PinnedItem } from '@/types/pin'
 import type { PinnableEntityType } from '@/types/pin'
@@ -6,7 +6,7 @@ import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { Routine } from '@/types/routine'
-import { Home, FolderKanban, RefreshCw, Clock, FileText, Search, Settings, LogOut, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Home, Flag, FolderKanban, RefreshCw, Clock, FileText, Search, Settings, LogOut, ChevronLeft, ChevronRight } from 'lucide-react'
 
 // Feature flags for in-progress features
 const FEATURES = {
@@ -14,7 +14,7 @@ const FEATURES = {
   lists: false,
 }
 
-export type ViewType = 'home' | 'projects' | 'routines' | 'lists' | 'notes' | 'history' | 'task-detail' | 'contact-detail' | 'settings'
+export type ViewType = 'home' | 'goals' | 'projects' | 'routines' | 'lists' | 'notes' | 'history' | 'manual' | 'checkin' | 'task-detail' | 'contact-detail' | 'settings'
 
 interface EntityData {
   tasks: Task[]
@@ -69,18 +69,18 @@ export function SidebarKinetic({
           <div className="relative group">
             <div className="absolute inset-0 bg-gradient-primary rounded-xl opacity-20 blur-lg group-hover:opacity-40 transition-opacity"></div>
             <img
-              src={symphonyLogo}
-              alt="Symphony"
+              src={relishLogo}
+              alt="Relish"
               className="w-10 h-10 rounded-xl object-cover relative z-10 ring-2 ring-electric-500/30 group-hover:ring-electric-400/50 transition-all"
             />
           </div>
           {!collapsed && (
             <div className="flex flex-col">
               <span className="font-display text-xl font-semibold text-gradient leading-tight">
-                Symphony
+                Relish
               </span>
               <span className="text-[10px] font-mono text-slate-400 tracking-wider uppercase">
-                Kinetic OS
+                Family OS
               </span>
             </div>
           )}
@@ -156,6 +156,15 @@ export function SidebarKinetic({
           collapsed={collapsed}
           onClick={() => onViewChange('home')}
           gradient="from-electric-500 to-electric-600"
+        />
+
+        <NavButton
+          icon={Flag}
+          label="Goals"
+          active={activeView === 'goals'}
+          collapsed={collapsed}
+          onClick={() => onViewChange('goals')}
+          gradient="from-amber-400 to-electric-500"
         />
 
         <NavButton

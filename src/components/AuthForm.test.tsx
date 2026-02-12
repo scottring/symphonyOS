@@ -32,11 +32,11 @@ describe('AuthForm', () => {
       expect(screen.getByRole('button', { name: 'Sign In' })).toBeInTheDocument()
     })
 
-    it('renders Symphony branding', () => {
+    it('renders Relish branding', () => {
       render(<AuthForm />)
 
-      expect(screen.getByText('Symphony OS')).toBeInTheDocument()
-      expect(screen.getByAltText('Symphony Logo')).toBeInTheDocument()
+      expect(screen.getByText('Relish')).toBeInTheDocument()
+      expect(screen.getByAltText('Relish Logo')).toBeInTheDocument()
     })
 
     it('renders toggle to sign up', () => {

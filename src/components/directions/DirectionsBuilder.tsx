@@ -6,7 +6,7 @@ import { AddStopInput } from './AddStopInput'
 import { TravelModeSelector } from './TravelModeSelector'
 
 // Local storage key for home location
-const HOME_LOCATION_KEY = 'symphony_home_location'
+const HOME_LOCATION_KEY = 'relish_home_location'
 
 interface SavedLocation {
   name: string

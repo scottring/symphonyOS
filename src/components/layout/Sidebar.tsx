@@ -1,4 +1,4 @@
-import symphonyLogo from '@/assets/symphony-logo.jpg'
+import relishLogo from '@/assets/relish-logo.jpg'
 import { PinnedSection } from '@/components/pins'
 import { useDomain } from '@/hooks/useDomain'
 import type { PinnedItem } from '@/types/pin'
@@ -14,7 +14,7 @@ const FEATURES = {
   lists: true, // Lists feature enabled - reference lists for books, movies, ideas, etc.
 }
 
-export type ViewType = 'home' | 'projects' | 'routines' | 'lists' | 'notes' | 'history' | 'task-detail' | 'contact-detail' | 'settings'
+export type ViewType = 'home' | 'goals' | 'projects' | 'routines' | 'lists' | 'notes' | 'history' | 'manual' | 'checkin' | 'task-detail' | 'contact-detail' | 'settings'
 
 interface EntityData {
   tasks: Task[]
@@ -97,12 +97,12 @@ export function Sidebar({
       <div className="p-4 flex items-center justify-between">
         <div className={`flex items-center gap-3 ${collapsed ? 'justify-center w-full' : ''}`}>
           <img
-            src={symphonyLogo}
-            alt="Symphony"
+            src={relishLogo}
+            alt="Relish"
             className="w-12 h-12 rounded-lg object-cover"
           />
           {!collapsed && (
-            <span className="font-display text-2xl font-semibold tracking-wide text-neutral-800">Symphony</span>
+            <span className="font-display text-2xl font-semibold tracking-wide text-neutral-800">Relish</span>
           )}
         </div>
         {!collapsed && (
@@ -185,6 +185,23 @@ export function Sidebar({
             <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
           </svg>
           {!collapsed && <span className="text-[15px]">Home</span>}
+        </button>
+
+        <button
+          onClick={() => onViewChange('goals')}
+          className={`
+            w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
+            ${activeView === 'goals'
+              ? 'text-primary-700 bg-primary-50/80 font-medium'
+              : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
+            }
+            ${collapsed ? 'justify-center' : ''}
+          `}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clipRule="evenodd" />
+          </svg>
+          {!collapsed && <span className="text-[15px]">Goals</span>}
         </button>
 
         <button
@@ -276,6 +293,42 @@ export function Sidebar({
             {!collapsed && <span className="text-[15px]">Notes</span>}
           </button>
         )}
+
+        {/* Family Manual */}
+        <button
+          onClick={() => onViewChange('manual')}
+          className={`
+            w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
+            ${activeView === 'manual'
+              ? 'text-primary-700 bg-primary-50/80 font-medium'
+              : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
+            }
+            ${collapsed ? 'justify-center' : ''}
+          `}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V16" />
+          </svg>
+          {!collapsed && <span className="text-[15px]">Manual</span>}
+        </button>
+
+        {/* Weekly Check-in */}
+        <button
+          onClick={() => onViewChange('checkin')}
+          className={`
+            w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
+            ${activeView === 'checkin'
+              ? 'text-primary-700 bg-primary-50/80 font-medium'
+              : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
+            }
+            ${collapsed ? 'justify-center' : ''}
+          `}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+          {!collapsed && <span className="text-[15px]">Check-in</span>}
+        </button>
       </nav>
 
       {/* User section */}

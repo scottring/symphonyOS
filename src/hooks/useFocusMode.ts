@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 
-const FOCUS_MODE_KEY = 'symphony-focus-mode-open'
+const FOCUS_MODE_KEY = 'relish-focus-mode-open'
 
 interface UseFocusModeResult {
   isOpen: boolean

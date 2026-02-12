@@ -179,7 +179,7 @@ vi.mock('@/hooks/useMobile', () => ({
 describe('App', () => {
   it('renders the app name in sidebar', async () => {
     render(<App />)
-    expect(await screen.findByText('Symphony')).toBeInTheDocument()
+    expect(await screen.findByText('Relish')).toBeInTheDocument()
   })
 
   it('renders empty state when no tasks', async () => {
@@ -196,7 +196,7 @@ describe('App', () => {
     const { user } = render(<App />)
 
     // Wait for app to load
-    await screen.findByText('Symphony')
+    await screen.findByText('Relish')
 
     // On desktop, use Cmd+K to open quick add modal
     await user.keyboard('{Meta>}k{/Meta}')
@@ -218,7 +218,7 @@ describe('App', () => {
     const { user } = render(<App />)
 
     // Wait for app to load
-    await screen.findByText('Symphony')
+    await screen.findByText('Relish')
 
     // On desktop, use Cmd+K to open quick add modal
     await user.keyboard('{Meta>}k{/Meta}')

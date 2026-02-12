@@ -50,7 +50,12 @@ import {
   OnboardingWizard,
   SettingsPage,
   AuthForm,
+  GoalsList,
+  GoalView,
 } from '@/components/lazy'
+import { ManualView } from '@/components/manual/ManualView'
+import { CheckinFlow } from '@/components/checkin/CheckinFlow'
+import { useGoals } from '@/hooks/useGoals'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import type { ViewType } from '@/components/layout/Sidebar'
 import type { ActionableInstance, Routine } from '@/types/actionable'
@@ -73,6 +78,21 @@ function App() {
   const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, updateEventAssignmentAll, updateRecipeUrl, updateEventProject, getNote, getEventNotesForProject, notes: eventNotesMap } = useEventNotes()
   const { contacts, contactsMap, addContact, updateContact, deleteContact, searchContacts } = useContacts()
   const { projects, projectsMap, addProject, updateProject, deleteProject, searchProjects, recalculateProjectStatus } = useProjects()
+  const {
+    areas: goalAreas,
+    goals,
+    addArea: addGoalArea,
+    deleteArea: deleteGoalArea,
+    addGoal,
+    updateGoal,
+    deleteGoal,
+    addAction: addGoalAction,
+    updateAction: updateGoalAction,
+    toggleAction: toggleGoalAction,
+    deleteAction: deleteGoalAction,
+    getGoalById,
+    getCurrentQuarter,
+  } = useGoals()
   const {
     routines: allRoutines,
     activeRoutines,
@@ -154,7 +174,7 @@ function App() {
 
   // UI state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    const stored = localStorage.getItem('symphony-sidebar-collapsed')
+    const stored = localStorage.getItem('relish-sidebar-collapsed')
     return stored === 'true'
   })
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
@@ -174,10 +194,10 @@ function App() {
   // URL-based navigation
   const navigate = useNavigate()
   const location = useLocation()
-  const params = useParams<{ projectId?: string; routineId?: string; contactId?: string }>()
+  const params = useParams<{ projectId?: string; routineId?: string; contactId?: string; goalId?: string }>()
 
   // State for non-URL-routed views
-  const [stateView, setStateView] = useState<'lists' | 'notes' | 'history' | 'settings' | 'task-detail' | null>(null)
+  const [stateView, setStateView] = useState<'lists' | 'notes' | 'history' | 'manual' | 'checkin' | 'settings' | 'task-detail' | null>(null)
 
   // Derive view from URL path or state
   const activeView: ViewType = useMemo(() => {
@@ -186,6 +206,7 @@ function App() {
 
     // URL-based views
     const path = location.pathname
+    if (path.startsWith('/goals')) return 'goals'
     if (path.startsWith('/projects')) return 'projects'
     if (path.startsWith('/routines')) return 'routines'
     if (path.startsWith('/contacts')) return 'contact-detail'
@@ -196,6 +217,7 @@ function App() {
   const selectedProjectId = params.projectId || null
   const selectedRoutineId = params.routineId || null
   const selectedContactId = params.contactId || null
+  const selectedGoalId = params.goalId || null
   const creatingRoutine = location.pathname === '/routines/new'
   const [recentlyCreatedTaskId, setRecentlyCreatedTaskId] = useState<string | null>(null)
   const [planningOpen, setPlanningOpen] = useState(false)
@@ -206,7 +228,7 @@ function App() {
 
   // Persist sidebar state
   useEffect(() => {
-    localStorage.setItem('symphony-sidebar-collapsed', String(sidebarCollapsed))
+    localStorage.setItem('relish-sidebar-collapsed', String(sidebarCollapsed))
   }, [sidebarCollapsed])
 
   // Check onboarding status
@@ -273,7 +295,7 @@ function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get('quickadd') === 'true') {
-      sessionStorage.setItem('symphony:quickadd', 'true')
+      sessionStorage.setItem('relish:quickadd', 'true')
       // Clean URL immediately
       window.history.replaceState({}, '', window.location.pathname)
     }
@@ -282,9 +304,9 @@ function App() {
   // Open QuickCapture when app is ready (after auth/onboarding)
   useEffect(() => {
     if (user && onboardingComplete === true) {
-      const shouldOpenQuickAdd = sessionStorage.getItem('symphony:quickadd')
+      const shouldOpenQuickAdd = sessionStorage.getItem('relish:quickadd')
       if (shouldOpenQuickAdd === 'true') {
-        sessionStorage.removeItem('symphony:quickadd')
+        sessionStorage.removeItem('relish:quickadd')
         // Small delay to ensure app is fully rendered
         setTimeout(() => setQuickAddOpen(true), 100)
       }
@@ -479,7 +501,7 @@ function App() {
       if (!event) return null
 
       const timelineItem = eventToTimelineItem(event)
-      // Add user's Symphony notes from event_notes table
+      // Add user's Relish notes from event_notes table
       const eventNote = getNote(eventId)
       if (eventNote?.notes) {
         timelineItem.notes = eventNote.notes
@@ -628,6 +650,9 @@ function App() {
     if (view === 'home') {
       setStateView(null)
       navigate('/')
+    } else if (view === 'goals') {
+      setStateView(null)
+      navigate('/goals')
     } else if (view === 'projects') {
       setStateView(null)
       navigate('/projects')
@@ -639,7 +664,7 @@ function App() {
       navigate('/contacts')
     }
     // Handle state-based views
-    else if (view === 'lists' || view === 'notes' || view === 'history' || view === 'settings' || view === 'task-detail') {
+    else if (view === 'lists' || view === 'notes' || view === 'history' || view === 'manual' || view === 'checkin' || view === 'settings' || view === 'task-detail') {
       setStateView(view)
       navigate('/') // Navigate to home URL but show state view
     } else {
@@ -1492,6 +1517,39 @@ function App() {
         </Suspense>
       )}
 
+      {activeView === 'goals' && !selectedGoalId && (
+        <Suspense fallback={<LoadingFallback />}>
+          <GoalsList
+            areas={goalAreas}
+            goals={goals}
+            currentQuarter={getCurrentQuarter()}
+            year={new Date().getFullYear()}
+            onSelectGoal={(id) => navigate(`/goals/${id}`)}
+            onAddArea={addGoalArea}
+            onAddGoal={addGoal}
+            onToggleAction={toggleGoalAction}
+            onDeleteArea={deleteGoalArea}
+          />
+        </Suspense>
+      )}
+
+      {activeView === 'goals' && selectedGoalId && getGoalById(selectedGoalId) && (
+        <Suspense fallback={<LoadingFallback />}>
+          <GoalView
+            goal={getGoalById(selectedGoalId)!}
+            area={goalAreas.find(a => a.id === getGoalById(selectedGoalId)!.areaId)}
+            currentQuarter={getCurrentQuarter()}
+            onBack={() => navigate('/goals')}
+            onUpdateGoal={updateGoal}
+            onDeleteGoal={deleteGoal}
+            onAddAction={addGoalAction}
+            onUpdateAction={updateGoalAction}
+            onToggleAction={toggleGoalAction}
+            onDeleteAction={deleteGoalAction}
+          />
+        </Suspense>
+      )}
+
       {activeView === 'routines' && !selectedRoutineId && !creatingRoutine && (
         <Suspense fallback={<LoadingFallback />}>
           <RoutinesList
@@ -1619,6 +1677,14 @@ function App() {
         />
       )}
 
+      {activeView === 'manual' && (
+        <ManualView />
+      )}
+
+      {activeView === 'checkin' && (
+        <CheckinFlow />
+      )}
+
       {activeView === 'settings' && (
         <Suspense fallback={<LoadingFallback />}>
           <SettingsPage
@@ -1678,7 +1744,7 @@ function App() {
               Calendar Not Connected
             </h3>
             <p className="text-sm text-neutral-500 text-center mb-6">
-              Your Google Calendar is disconnected. This event will only be saved locally in Symphony and won't appear in your Google Calendar.
+              Your Google Calendar is disconnected. This event will only be saved locally in Relish and won't appear in your Google Calendar.
             </p>
             <div className="flex flex-col gap-3">
               <button

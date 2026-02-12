@@ -34,12 +34,12 @@ export function AuthForm() {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-2">
             <img
-              src="/symphony-logo.jpg"
-              alt="Symphony Logo"
+              src="/relish-logo.jpg"
+              alt="Relish Logo"
               className="w-12 h-12 rounded-full object-cover"
             />
             <h1 className="font-display text-3xl text-neutral-900">
-              Symphony OS
+              Relish
             </h1>
           </div>
         </div>

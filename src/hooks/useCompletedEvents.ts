@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 
-const STORAGE_KEY = 'symphony-completed-events'
+const STORAGE_KEY = 'relish-completed-events'
 
 /**
  * Hook to track completed events in localStorage.

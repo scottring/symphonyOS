@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import type { ThemeVariant } from '@/config/theme'
 import { THEMES } from '@/config/theme'
 
-const THEME_STORAGE_KEY = 'symphony-theme'
+const THEME_STORAGE_KEY = 'relish-theme'
 
 /**
  * Get the initial theme from localStorage or default to 'nordic'

@@ -122,7 +122,7 @@ export function JoinHousehold() {
             onClick={() => navigate('/')}
             className="btn-primary w-full"
           >
-            Go to Symphony
+            Go to Relish
           </button>
         </div>
       </div>
@@ -143,7 +143,7 @@ export function JoinHousehold() {
             Welcome to the household!
           </h1>
           <p className="text-neutral-500">
-            Redirecting you to Symphony...
+            Redirecting you to Relish...
           </p>
         </div>
       </div>
@@ -189,7 +189,7 @@ export function JoinHousehold() {
             Join {invitation?.household_name}
           </h1>
           <p className="text-neutral-500 mb-6">
-            You've been invited to join a household on Symphony.
+            You've been invited to join a household on Relish.
             Please sign in or create an account to continue.
           </p>
           <p className="text-sm text-neutral-400 mb-6">

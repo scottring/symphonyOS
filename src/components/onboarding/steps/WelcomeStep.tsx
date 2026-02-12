@@ -32,7 +32,7 @@ export function WelcomeStep({ onContinue }: WelcomeStepProps) {
 
       {/* Subtitle */}
       <p className="text-lg text-neutral-500 text-center max-w-md mb-12 leading-relaxed">
-        Symphony OS is your personal operating system for work, life, and family. Three separate domains,
+        Relish is your operating system for work, life, and family. Three separate domains,
         one clear view — built for you, designed for sharing.
       </p>
 

@@ -324,7 +324,7 @@ describe('PinnedSection', () => {
       const header = screen.getByText('Pinned').closest('button')!
       fireEvent.click(header)
 
-      expect(localStorageMock.setItem).toHaveBeenCalledWith('symphony-pins-collapsed', 'true')
+      expect(localStorageMock.setItem).toHaveBeenCalledWith('relish-pins-collapsed', 'true')
     })
 
     it('reads collapse state from localStorage on mount', () => {
@@ -427,7 +427,7 @@ describe('PinnedSection', () => {
 
     it('shows non-rotated chevron when collapsed', () => {
       // Set localStorage to return 'true' for collapsed state
-      localStorageStore = { 'symphony-pins-collapsed': 'true' }
+      localStorageStore = { 'relish-pins-collapsed': 'true' }
 
       const pins = [createMockPin()]
       const entities = createMockEntities()

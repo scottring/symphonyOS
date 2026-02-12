@@ -48,7 +48,7 @@ if (import.meta.env.PROD && import.meta.env.VITE_SENTRY_DSN) {
       if (event.contexts) {
         event.contexts.app = {
           version: '1.0.0-beta',
-          theme: localStorage.getItem('symphony-theme') || 'nordic',
+          theme: localStorage.getItem('relish-theme') || 'nordic',
         }
       }
       
@@ -58,7 +58,7 @@ if (import.meta.env.PROD && import.meta.env.VITE_SENTRY_DSN) {
 }
 
 // Load theme from localStorage, default to Nordic Journal
-const THEME_STORAGE_KEY = 'symphony-theme'
+const THEME_STORAGE_KEY = 'relish-theme'
 const savedTheme = localStorage.getItem(THEME_STORAGE_KEY)
 const ACTIVE_THEME = (savedTheme === 'kinetic' || savedTheme === 'nordic') ? savedTheme : 'nordic'
 
@@ -84,6 +84,8 @@ createRoot(document.getElementById('root')!).render(
           <GoogleCalendarProvider>
             <Routes>
               <Route path="/" element={<App />} />
+              <Route path="/goals" element={<App />} />
+              <Route path="/goals/:goalId" element={<App />} />
               <Route path="/projects" element={<App />} />
               <Route path="/projects/:projectId" element={<App />} />
               <Route path="/routines" element={<App />} />

@@ -38,7 +38,7 @@ export function BuildingBlocksStep({ onContinue }: BuildingBlocksStepProps) {
     <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12 pt-24">
       {/* Header */}
       <h1 className="font-display text-3xl md:text-4xl font-semibold text-neutral-800 text-center mb-4">
-        How Symphony Works
+        How Relish Works
       </h1>
       <p className="text-lg text-neutral-500 text-center mb-12 max-w-md">
         Four building blocks power your daily rhythm.

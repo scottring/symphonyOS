@@ -2,7 +2,7 @@
  * User Profile Types
  *
  * Extends the basic auth user with application-specific profile data.
- * Home location fields enable system-wide features across Symphony OS.
+ * Home location fields enable system-wide features across Relish.
  */
 
 export interface UserProfile {
@@ -19,6 +19,12 @@ export interface UserProfile {
   home_lng?: number | null
   home_place_id?: string | null
   home_timezone?: string | null
+
+  // Relish onboarding (family coherence system)
+  relish_onboarding_phases_completed?: string[]
+  relish_current_phase?: string | null
+  family_manual_id?: string | null
+  relish_intro_completed?: boolean
 
   created_at: string
   updated_at: string

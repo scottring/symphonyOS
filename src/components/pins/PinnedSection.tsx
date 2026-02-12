@@ -7,7 +7,7 @@ import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { Routine } from '@/types/routine'
 
-const STORAGE_KEY = 'symphony-pins-collapsed'
+const STORAGE_KEY = 'relish-pins-collapsed'
 
 interface EntityData {
   tasks: Task[]

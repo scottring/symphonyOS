@@ -235,7 +235,7 @@ export function QuickCapture({
     // Dispatch animation event for inbox items
     if (isInboxAdd && inputRect) {
       const taskTitle = useRaw ? trimmed : effectiveParsed.title
-      window.dispatchEvent(new CustomEvent('symphony:inbox-add', {
+      window.dispatchEvent(new CustomEvent('relish:inbox-add', {
         detail: {
           title: taskTitle,
           sourceRect: {

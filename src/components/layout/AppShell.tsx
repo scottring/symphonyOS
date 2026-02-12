@@ -4,7 +4,7 @@ import { SidebarKinetic } from './SidebarKinetic'
 import { QuickCapture } from './QuickCapture'
 import { useMobile } from '@/hooks/useMobile'
 import { useTheme } from '@/hooks/useTheme'
-import symphonyLogo from '@/assets/symphony-logo.jpg'
+import relishLogo from '@/assets/relish-logo.jpg'
 import type { PinnedItem } from '@/types/pin'
 import type { PinnableEntityType } from '@/types/pin'
 import type { Task } from '@/types/task'
@@ -156,11 +156,11 @@ export function AppShell({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <img
-                  src={symphonyLogo}
-                  alt="Symphony"
+                  src={relishLogo}
+                  alt="Relish"
                   className="w-8 h-8 rounded-lg object-cover"
                 />
-                <span className="font-display text-base font-semibold text-neutral-900">Symphony</span>
+                <span className="font-display text-base font-semibold text-neutral-900">Relish</span>
               </div>
               <div className="flex items-center gap-1">
                 {onOpenSearch && (
