@@ -240,6 +240,13 @@ body {
   mix-blend-mode: multiply;
 }
 
+/* Nordic bookshelf surface — warm wood-grain edge */
+.nordic-shelf-surface {
+  height: 10px;
+  background: linear-gradient(to bottom, hsl(30 25% 65% / 0.4), hsl(35 20% 55% / 0.2));
+  border-radius: 0 0 4px 4px;
+}
+
 /* Gradient mesh for auth page */
 .gradient-mesh {
   background:

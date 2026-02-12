@@ -14,7 +14,7 @@ const FEATURES = {
   lists: true, // Lists feature enabled - reference lists for books, movies, ideas, etc.
 }
 
-export type ViewType = 'home' | 'goals' | 'projects' | 'routines' | 'lists' | 'notes' | 'history' | 'manual' | 'yearbook' | 'checkin' | 'task-detail' | 'contact-detail' | 'settings'
+export type ViewType = 'bookshelf' | 'home' | 'today' | 'goals' | 'projects' | 'routines' | 'lists' | 'notes' | 'history' | 'manual' | 'yearbook' | 'checkin' | 'task-detail' | 'contact-detail' | 'settings'
 
 interface EntityData {
   tasks: Task[]
@@ -168,13 +168,17 @@ export function Sidebar({
         />
       )}
 
-      {/* Navigation */}
-      <nav className="flex-1 px-3 mt-6 space-y-1">
+      {/* Navigation — grouped by purpose */}
+      <nav className="flex-1 px-3 mt-6 space-y-1 overflow-y-auto">
+        {/* ── YOUR FAMILY ── */}
+        {!collapsed && (
+          <p className="px-3.5 pt-2 pb-1 text-[11px] font-medium text-neutral-400 uppercase tracking-wider">Your Family</p>
+        )}
         <button
-          onClick={() => onViewChange('home')}
+          onClick={() => onViewChange('bookshelf')}
           className={`
             w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
-            ${activeView === 'home'
+            ${activeView === 'bookshelf' || activeView === 'home'
               ? 'text-primary-700 bg-primary-50/80 font-medium'
               : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
             }
@@ -182,16 +186,16 @@ export function Sidebar({
           `}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+            <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V16" />
           </svg>
-          {!collapsed && <span className="text-[15px]">Home</span>}
+          {!collapsed && <span className="text-[15px]">Bookshelf</span>}
         </button>
 
         <button
-          onClick={() => onViewChange('goals')}
+          onClick={() => onViewChange('checkin')}
           className={`
             w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
-            ${activeView === 'goals'
+            ${activeView === 'checkin'
               ? 'text-primary-700 bg-primary-50/80 font-medium'
               : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
             }
@@ -199,9 +203,31 @@ export function Sidebar({
           `}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clipRule="evenodd" />
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
           </svg>
-          {!collapsed && <span className="text-[15px]">Goals</span>}
+          {!collapsed && <span className="text-[15px]">Check-in</span>}
+        </button>
+
+        {/* ── YOUR WORK ── */}
+        {!collapsed && (
+          <p className="px-3.5 pt-4 pb-1 text-[11px] font-medium text-neutral-400 uppercase tracking-wider">Your Work</p>
+        )}
+        {collapsed && <div className="h-3" />}
+        <button
+          onClick={() => onViewChange('today')}
+          className={`
+            w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
+            ${activeView === 'today'
+              ? 'text-primary-700 bg-primary-50/80 font-medium'
+              : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
+            }
+            ${collapsed ? 'justify-center' : ''}
+          `}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+          </svg>
+          {!collapsed && <span className="text-[15px]">Today</span>}
         </button>
 
         <button
@@ -239,10 +265,10 @@ export function Sidebar({
         </button>
 
         <button
-          onClick={() => onViewChange('history')}
+          onClick={() => onViewChange('goals')}
           className={`
             w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
-            ${activeView === 'history'
+            ${activeView === 'goals'
               ? 'text-primary-700 bg-primary-50/80 font-medium'
               : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
             }
@@ -250,29 +276,16 @@ export function Sidebar({
           `}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+            <path fillRule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clipRule="evenodd" />
           </svg>
-          {!collapsed && <span className="text-[15px]">History</span>}
+          {!collapsed && <span className="text-[15px]">Goals</span>}
         </button>
 
-        {FEATURES.lists && (
-          <button
-            onClick={() => onViewChange('lists')}
-            className={`
-              w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
-              ${activeView === 'lists'
-                ? 'text-primary-700 bg-primary-50/80 font-medium'
-                : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
-              }
-              ${collapsed ? 'justify-center' : ''}
-            `}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-            </svg>
-            {!collapsed && <span className="text-[15px]">Lists</span>}
-          </button>
+        {/* ── REFERENCE ── */}
+        {!collapsed && (
+          <p className="px-3.5 pt-4 pb-1 text-[11px] font-medium text-neutral-400 uppercase tracking-wider">Reference</p>
         )}
+        {collapsed && <div className="h-3" />}
 
         {FEATURES.notes && (
           <button
@@ -294,30 +307,30 @@ export function Sidebar({
           </button>
         )}
 
-        {/* Family Manual */}
-        <button
-          onClick={() => onViewChange('manual')}
-          className={`
-            w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
-            ${activeView === 'manual'
-              ? 'text-primary-700 bg-primary-50/80 font-medium'
-              : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
-            }
-            ${collapsed ? 'justify-center' : ''}
-          `}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V16" />
-          </svg>
-          {!collapsed && <span className="text-[15px]">Manual</span>}
-        </button>
+        {FEATURES.lists && (
+          <button
+            onClick={() => onViewChange('lists')}
+            className={`
+              w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
+              ${activeView === 'lists'
+                ? 'text-primary-700 bg-primary-50/80 font-medium'
+                : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
+              }
+              ${collapsed ? 'justify-center' : ''}
+            `}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+            </svg>
+            {!collapsed && <span className="text-[15px]">Lists</span>}
+          </button>
+        )}
 
-        {/* Yearbooks */}
         <button
-          onClick={() => onViewChange('yearbook')}
+          onClick={() => onViewChange('history')}
           className={`
             w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
-            ${activeView === 'yearbook'
+            ${activeView === 'history'
               ? 'text-primary-700 bg-primary-50/80 font-medium'
               : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
             }
@@ -325,27 +338,9 @@ export function Sidebar({
           `}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 2h10v7h-2l-1-2-3 4-2-3-2 3V5z" />
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
           </svg>
-          {!collapsed && <span className="text-[15px]">Yearbooks</span>}
-        </button>
-
-        {/* Weekly Check-in */}
-        <button
-          onClick={() => onViewChange('checkin')}
-          className={`
-            w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
-            ${activeView === 'checkin'
-              ? 'text-primary-700 bg-primary-50/80 font-medium'
-              : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
-            }
-            ${collapsed ? 'justify-center' : ''}
-          `}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-          </svg>
-          {!collapsed && <span className="text-[15px]">Check-in</span>}
+          {!collapsed && <span className="text-[15px]">History</span>}
         </button>
       </nav>
 

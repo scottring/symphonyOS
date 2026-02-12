@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Sidebar, type ViewType } from './Sidebar'
 import { SidebarKinetic } from './SidebarKinetic'
+import { MoreSheet } from './MoreSheet'
 import { QuickCapture } from './QuickCapture'
 import { useMobile } from '@/hooks/useMobile'
 import { useTheme } from '@/hooks/useTheme'
@@ -55,6 +56,7 @@ interface AppShellProps {
   activeView: ViewType
   onViewChange: (view: ViewType) => void
   onOpenSearch?: () => void
+  hasCheckinNudge?: boolean
   // Pinned items props
   pins?: PinnedItem[]
   entities?: EntityData
@@ -85,6 +87,7 @@ export function AppShell({
   activeView,
   onViewChange,
   onOpenSearch,
+  hasCheckinNudge = false,
   pins,
   entities,
   onPinNavigate,
@@ -94,6 +97,7 @@ export function AppShell({
   void onPanelClose // No longer used - panel closing handled by smart handlers in schedule components
   const isMobile = useMobile()
   const { theme } = useTheme()
+  const [moreSheetOpen, setMoreSheetOpen] = useState(false)
 
   return (
     <div className="h-screen flex overflow-hidden overflow-x-hidden bg-bg-base w-full max-w-[100vw]">
@@ -235,27 +239,46 @@ export function AppShell({
         </aside>
       )}
 
-      {/* Mobile bottom navigation */}
+      {/* Mobile bottom navigation — 4 tabs */}
       {isMobile && !panelOpen && (
         <nav className="fixed bottom-0 left-0 right-0 z-40 bg-bg-elevated/95 backdrop-blur-lg border-t border-neutral-200/50"
              style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
           <div className="flex items-center justify-around px-4 py-1">
+            {/* Home → bookshelf */}
             <button
-              onClick={() => onViewChange('home')}
+              onClick={() => onViewChange('bookshelf')}
               className={`
                 flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-all
-                ${activeView === 'home'
+                ${activeView === 'bookshelf' || activeView === 'home'
                   ? 'text-primary-600'
                   : 'text-neutral-400 hover:text-neutral-600'
                 }
               `}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V16" />
               </svg>
-              <span className={`text-[10px] font-medium ${activeView === 'home' ? 'font-semibold' : ''}`}>Home</span>
+              <span className={`text-[10px] font-medium ${activeView === 'bookshelf' || activeView === 'home' ? 'font-semibold' : ''}`}>Home</span>
             </button>
 
+            {/* Today → today schedule */}
+            <button
+              onClick={() => onViewChange('today')}
+              className={`
+                flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-all
+                ${activeView === 'today'
+                  ? 'text-accent-600'
+                  : 'text-neutral-400 hover:text-neutral-600'
+                }
+              `}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+              </svg>
+              <span className={`text-[10px] font-medium ${activeView === 'today' ? 'font-semibold' : ''}`}>Today</span>
+            </button>
+
+            {/* Projects */}
             <button
               onClick={() => onViewChange('projects')}
               className={`
@@ -272,42 +295,38 @@ export function AppShell({
               <span className={`text-[10px] font-medium ${activeView === 'projects' ? 'font-semibold' : ''}`}>Projects</span>
             </button>
 
+            {/* More → opens MoreSheet */}
             <button
-              onClick={() => onViewChange('routines')}
+              onClick={() => setMoreSheetOpen(true)}
               className={`
-                flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-all
-                ${activeView === 'routines'
-                  ? 'text-amber-600'
+                relative flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-all
+                ${moreSheetOpen
+                  ? 'text-neutral-700'
                   : 'text-neutral-400 hover:text-neutral-600'
                 }
               `}
             >
+              {hasCheckinNudge && (
+                <span className="absolute top-1 right-3 w-2 h-2 bg-amber-400 rounded-full" />
+              )}
               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
               </svg>
-              <span className={`text-[10px] font-medium ${activeView === 'routines' ? 'font-semibold' : ''}`}>Routines</span>
+              <span className="text-[10px] font-medium">More</span>
             </button>
-
-            {/* Lists button hidden - feature not complete
-            <button
-              onClick={() => onViewChange('lists')}
-              className={`
-                flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-all
-                ${activeView === 'lists'
-                  ? 'text-purple-600'
-                  : 'text-neutral-400 hover:text-neutral-600'
-                }
-              `}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
-                <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
-              </svg>
-              <span className={`text-[10px] font-medium ${activeView === 'lists' ? 'font-semibold' : ''}`}>Lists</span>
-            </button>
-            */}
           </div>
         </nav>
+      )}
+
+      {/* MoreSheet — mobile slide-up menu */}
+      {isMobile && (
+        <MoreSheet
+          isOpen={moreSheetOpen}
+          onClose={() => setMoreSheetOpen(false)}
+          onNavigate={onViewChange}
+          activeView={activeView}
+          hasCheckinNudge={hasCheckinNudge}
+        />
       )}
     </div>
   )

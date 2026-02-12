@@ -56,6 +56,11 @@ import {
 import { ManualView } from '@/components/manual/ManualView'
 import { YearbookView } from '@/components/yearbook/YearbookView'
 import { CheckinFlow } from '@/components/checkin/CheckinFlow'
+import { RelishHome } from '@/components/home/RelishHome'
+import { useHousehold } from '@/hooks/useHousehold'
+import { useManual } from '@/hooks/useManual'
+import { useYearbook } from '@/hooks/useYearbook'
+import { useCheckin } from '@/hooks/useCheckin'
 import { useGoals } from '@/hooks/useGoals'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import type { ViewType } from '@/components/layout/Sidebar'
@@ -108,6 +113,15 @@ function App() {
   const { members: familyMembers, getCurrentUserMember, refetch: refetchFamilyMembers } = useFamilyMembers()
   const isOnline = useOnlineStatus()
   const focusMode = useFocusMode()
+
+  // Relish family OS hooks
+  const { household } = useHousehold()
+  const { manuals } = useManual(household?.id ?? null)
+  const { yearbooks } = useYearbook(household?.id ?? null)
+  const { hasCheckedInThisWeek, recentDriftSignals } = useCheckin(household?.id ?? null)
+
+  // The household manual (type === 'household') for the coherence pulse
+  const householdManual = useMemo(() => manuals.find(m => m.type === 'household') ?? null, [manuals])
 
   // Lists state
   const [selectedListId, setSelectedListId] = useState<string | null>(null)
@@ -198,7 +212,7 @@ function App() {
   const params = useParams<{ projectId?: string; routineId?: string; contactId?: string; goalId?: string }>()
 
   // State for non-URL-routed views
-  const [stateView, setStateView] = useState<'lists' | 'notes' | 'history' | 'manual' | 'yearbook' | 'checkin' | 'settings' | 'task-detail' | null>(null)
+  const [stateView, setStateView] = useState<'bookshelf' | 'today' | 'lists' | 'notes' | 'history' | 'manual' | 'yearbook' | 'checkin' | 'settings' | 'task-detail' | null>(null)
 
   // Derive view from URL path or state
   const activeView: ViewType = useMemo(() => {
@@ -211,7 +225,7 @@ function App() {
     if (path.startsWith('/projects')) return 'projects'
     if (path.startsWith('/routines')) return 'routines'
     if (path.startsWith('/contacts')) return 'contact-detail'
-    return 'home'
+    return 'bookshelf'
   }, [location.pathname, stateView])
 
   // Get IDs from URL params
@@ -648,8 +662,11 @@ function App() {
     setRecipeUrl(null)
 
     // Handle URL-based views
-    if (view === 'home') {
+    if (view === 'home' || view === 'bookshelf') {
       setStateView(null)
+      navigate('/')
+    } else if (view === 'today') {
+      setStateView('today')
       navigate('/')
     } else if (view === 'goals') {
       setStateView(null)
@@ -1164,6 +1181,7 @@ function App() {
       activeView={activeView}
       onViewChange={handleViewChange}
       onOpenSearch={() => setSearchOpen(true)}
+      hasCheckinNudge={!hasCheckedInThisWeek}
       pins={pinnedItems.pins}
       entities={pinnedEntities}
       onPinNavigate={handlePinNavigate}
@@ -1243,8 +1261,27 @@ function App() {
       }
     >
       <DomainPageOutline>
-      {activeView === 'home' && (
+      {(activeView === 'bookshelf' || activeView === 'today') && (
         <div className="h-full flex flex-col overflow-hidden">
+          {/* Zone 1+2: RelishHome (welcome + bookshelf) — only on bookshelf view */}
+          {activeView === 'bookshelf' && (
+            <div className="shrink-0">
+              <RelishHome
+                userName={getCurrentUserMember()?.name ?? user?.email?.split('@')[0] ?? ''}
+                householdName={household?.name ?? 'My Family'}
+                manual={householdManual}
+                manuals={manuals}
+                yearbooks={yearbooks}
+                familyMembers={familyMembers}
+                hasCheckedInThisWeek={hasCheckedInThisWeek}
+                driftSignalCount={recentDriftSignals.length}
+                onStartCheckin={() => handleViewChange('checkin')}
+                onOpenManual={(_manualId) => handleViewChange('manual')}
+                onOpenYearbook={(_personId) => handleViewChange('yearbook')}
+              />
+            </div>
+          )}
+
           {/* Calendar connect banner if needed */}
           {!isConnected && (
             <div className="p-4 border-b border-neutral-100 shrink-0">
@@ -1254,7 +1291,7 @@ function App() {
             </div>
           )}
 
-          {/* Home view with Today/Today+Context/Week */}
+          {/* Zone 3: Today's schedule */}
           <HomeView
             tasks={tasks}
             events={filteredEvents}
@@ -1647,7 +1684,7 @@ function App() {
           contactsMap={contactsMap}
           projectsMap={projectsMap}
           onSelectTask={(taskId) => handleSelectItem(`task-${taskId}`)}
-          onBack={() => handleViewChange('home')}
+          onBack={() => handleViewChange('bookshelf')}
         />
       )}
 
@@ -1697,7 +1734,7 @@ function App() {
           <SettingsPage
             onBack={() => {
               refetchFamilyMembers() // Refresh family members in case they were edited
-              handleViewChange('home')
+              handleViewChange('bookshelf')
             }}
             onFamilyMembersChanged={refetchFamilyMembers}
           />
