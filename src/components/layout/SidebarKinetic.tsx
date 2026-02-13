@@ -6,6 +6,7 @@ import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { Routine } from '@/types/routine'
+import type { ViewType } from './Sidebar'
 import { Home, Flag, FolderKanban, RefreshCw, Clock, FileText, Search, Settings, LogOut, ChevronLeft, ChevronRight } from 'lucide-react'
 
 // Feature flags for in-progress features
@@ -13,8 +14,6 @@ const FEATURES = {
   notes: true,
   lists: false,
 }
-
-export type ViewType = 'home' | 'goals' | 'projects' | 'routines' | 'lists' | 'notes' | 'history' | 'manual' | 'checkin' | 'task-detail' | 'contact-detail' | 'settings'
 
 interface EntityData {
   tasks: Task[]

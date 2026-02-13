@@ -1,9 +1,9 @@
 // useManual — CRUD + real-time subscription for Relish family manuals
 // Ported from Relish, adapted for Supabase
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import type { Manual, ManualType, DomainId, DomainUpdateSource } from '@/types/manual'
+import type { Manual, ManualType, DomainId, IndividualDomainId, DomainUpdateSource } from '@/types/manual'
 import { emptyDomains } from '@/types/manual'
 
 interface UseManualReturn {
@@ -13,12 +13,15 @@ interface UseManualReturn {
   getManual: (manualId: string) => Manual | undefined
   createManual: (type: ManualType, title: string, personId?: string) => Promise<string>
   updateDomain: (manualId: string, domainId: DomainId, data: Record<string, unknown>, source?: DomainUpdateSource) => Promise<void>
+  updateIndividualDomain: (manualId: string, domainId: IndividualDomainId, data: Record<string, unknown>, source?: DomainUpdateSource) => Promise<void>
+  refetch: () => Promise<void>
 }
 
 export function useManual(householdId: string | null): UseManualReturn {
   const [manuals, setManuals] = useState<Manual[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const fetchManualsRef = useRef<(() => Promise<void>) | null>(null)
 
   // Fetch manuals and subscribe to real-time updates
   useEffect(() => {
@@ -49,6 +52,7 @@ export function useManual(householdId: string | null): UseManualReturn {
     }
 
     fetchManuals()
+    fetchManualsRef.current = fetchManuals
 
     // Real-time subscription
     const channel = supabase
@@ -144,6 +148,46 @@ export function useManual(householdId: string | null): UseManualReturn {
     if (updateError) throw updateError
   }, [])
 
+  const refetch = useCallback(async () => {
+    if (fetchManualsRef.current) {
+      await fetchManualsRef.current()
+    }
+  }, [])
+
+  const updateIndividualDomain = useCallback(async (
+    manualId: string,
+    domainId: IndividualDomainId,
+    data: Record<string, unknown>,
+    source: DomainUpdateSource = 'manual-edit'
+  ) => {
+    const { data: current, error: readError } = await supabase
+      .from('manuals')
+      .select('individual_domains, domain_meta')
+      .eq('id', manualId)
+      .single()
+
+    if (readError) throw readError
+
+    const updatedDomains = { ...(current.individual_domains || {}), [domainId]: data }
+    const updatedMeta = {
+      ...(current.domain_meta || {}),
+      [domainId]: {
+        updated_at: new Date().toISOString(),
+        updated_by: source,
+      },
+    }
+
+    const { error: updateError } = await supabase
+      .from('manuals')
+      .update({
+        individual_domains: updatedDomains,
+        domain_meta: updatedMeta,
+      })
+      .eq('id', manualId)
+
+    if (updateError) throw updateError
+  }, [])
+
   return {
     manuals,
     loading,
@@ -151,5 +195,7 @@ export function useManual(householdId: string | null): UseManualReturn {
     getManual,
     createManual,
     updateDomain,
+    updateIndividualDomain,
+    refetch,
   }
 }

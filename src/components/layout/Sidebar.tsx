@@ -39,6 +39,7 @@ interface SidebarProps {
   onPinNavigate?: (entityType: PinnableEntityType, entityId: string) => void
   onPinMarkAccessed?: (entityType: PinnableEntityType, entityId: string) => void
   onPinRefreshStale?: (id: string) => void
+  onResumeOnboarding?: () => void
 }
 
 export function Sidebar({
@@ -55,6 +56,7 @@ export function Sidebar({
   onPinNavigate,
   onPinMarkAccessed,
   onPinRefreshStale,
+  onResumeOnboarding,
 }: SidebarProps) {
   const { currentDomain } = useDomain()
 
@@ -207,6 +209,22 @@ export function Sidebar({
           </svg>
           {!collapsed && <span className="text-[15px]">Check-in</span>}
         </button>
+
+        {onResumeOnboarding && (
+          <button
+            onClick={onResumeOnboarding}
+            className={`
+              w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
+              text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800
+              ${collapsed ? 'justify-center' : ''}
+            `}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V16" />
+            </svg>
+            {!collapsed && <span className="text-[15px]">Build Manual</span>}
+          </button>
+        )}
 
         {/* ── YOUR WORK ── */}
         {!collapsed && (

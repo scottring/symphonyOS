@@ -4,7 +4,7 @@ import type { Entry, DiscussionContent } from '@/types/entry'
 interface Props {
   entry: Entry
   onUpdate?: (updates: Partial<Entry>) => void
-  mode?: 'card' | 'full'
+  mode?: 'card' | 'full' | 'yearbook'
 }
 
 const AUDIENCE_LABELS = {

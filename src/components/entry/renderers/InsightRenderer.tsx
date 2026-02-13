@@ -3,7 +3,7 @@ import type { Entry, InsightContent } from '@/types/entry'
 interface Props {
   entry: Entry
   onUpdate?: (updates: Partial<Entry>) => void
-  mode?: 'card' | 'full'
+  mode?: 'card' | 'full' | 'yearbook'
 }
 
 export function InsightRenderer({ entry, mode = 'card' }: Props) {

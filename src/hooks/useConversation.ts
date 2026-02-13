@@ -18,7 +18,9 @@ interface ConversationResponse {
 
 type ConversationParams =
   | { mode: 'onboarding'; phaseId: OnboardingPhaseId; householdId: string; previousDomains?: Record<string, unknown> }
+  | { mode: 'domain-assessment'; domainId: DomainId; householdId: string; previousDomains?: Record<string, unknown> }
   | { mode: 'refresh'; domainId: DomainId; householdId: string; currentDomainData: Record<string, unknown> }
+  | { mode: 'individual-profile'; householdId: string; personName: string; personId?: string; previousDomains?: Record<string, unknown> }
 
 interface UseConversationReturn {
   turns: ConversationTurn[]
@@ -27,9 +29,13 @@ interface UseConversationReturn {
   error: string | null
   lastResponse: ConversationResponse | null
   startConversation: (phaseId: OnboardingPhaseId, householdId: string, previousDomains?: Record<string, unknown>) => Promise<void>
+  startDomainAssessment: (domainId: DomainId, householdId: string, previousDomains?: Record<string, unknown>) => Promise<void>
   startRefreshConversation: (domainId: DomainId, householdId: string, currentDomainData: Record<string, unknown>) => Promise<void>
+  startIndividualProfile: (householdId: string, personName: string, personId?: string, previousDomains?: Record<string, unknown>) => Promise<void>
   sendMessage: (message: string) => Promise<ConversationResponse>
   requestSynthesis: () => Promise<ConversationResponse>
+  restoreState: (savedTurns: ConversationTurn[], savedConversationId: string, savedLastResponse: ConversationResponse | null) => void
+  reset: () => void
 }
 
 export function useConversation(): UseConversationReturn {
@@ -65,6 +71,15 @@ export function useConversation(): UseConversationReturn {
       if (params.mode === 'onboarding') {
         body.phaseId = params.phaseId
         body.previousDomains = params.previousDomains
+      } else if (params.mode === 'domain-assessment') {
+        body.mode = 'domain-assessment'
+        body.domainId = params.domainId
+        body.previousDomains = params.previousDomains
+      } else if (params.mode === 'individual-profile') {
+        body.mode = 'individual-profile'
+        body.personName = params.personName
+        body.personId = params.personId
+        body.previousDomains = params.previousDomains
       } else {
         body.mode = 'refresh'
         body.domainId = params.domainId
@@ -96,12 +111,29 @@ export function useConversation(): UseConversationReturn {
     await startWithParams({ mode: 'onboarding', phaseId, householdId, previousDomains })
   }, [startWithParams])
 
+  const startDomainAssessment = useCallback(async (
+    domainId: DomainId,
+    householdId: string,
+    previousDomains?: Record<string, unknown>
+  ) => {
+    await startWithParams({ mode: 'domain-assessment', domainId, householdId, previousDomains })
+  }, [startWithParams])
+
   const startRefreshConversation = useCallback(async (
     domainId: DomainId,
     householdId: string,
     currentDomainData: Record<string, unknown>
   ) => {
     await startWithParams({ mode: 'refresh', domainId, householdId, currentDomainData })
+  }, [startWithParams])
+
+  const startIndividualProfile = useCallback(async (
+    householdId: string,
+    personName: string,
+    personId?: string,
+    previousDomains?: Record<string, unknown>
+  ) => {
+    await startWithParams({ mode: 'individual-profile', householdId, personName, personId, previousDomains })
   }, [startWithParams])
 
   const sendMessage = useCallback(async (message: string): Promise<ConversationResponse> => {
@@ -128,6 +160,15 @@ export function useConversation(): UseConversationReturn {
       }
       if (params.mode === 'onboarding') {
         body.phaseId = params.phaseId
+        body.previousDomains = params.previousDomains
+      } else if (params.mode === 'domain-assessment') {
+        body.mode = 'domain-assessment'
+        body.domainId = params.domainId
+        body.previousDomains = params.previousDomains
+      } else if (params.mode === 'individual-profile') {
+        body.mode = 'individual-profile'
+        body.personName = params.personName
+        body.personId = params.personId
         body.previousDomains = params.previousDomains
       } else {
         body.mode = 'refresh'
@@ -161,6 +202,27 @@ export function useConversation(): UseConversationReturn {
     return sendMessage('Please synthesize what we discussed.')
   }, [sendMessage])
 
+  const restoreState = useCallback((
+    savedTurns: ConversationTurn[],
+    savedConversationId: string,
+    savedLastResponse: ConversationResponse | null,
+  ) => {
+    setTurns(savedTurns)
+    setConversationId(savedConversationId)
+    setLastResponse(savedLastResponse)
+    setError(null)
+    setIsLoading(false)
+  }, [])
+
+  const reset = useCallback(() => {
+    setTurns([])
+    setConversationId(null)
+    setLastResponse(null)
+    setError(null)
+    setIsLoading(false)
+    paramsRef.current = null
+  }, [])
+
   return {
     turns,
     conversationId,
@@ -168,8 +230,12 @@ export function useConversation(): UseConversationReturn {
     error,
     lastResponse,
     startConversation,
+    startDomainAssessment,
     startRefreshConversation,
+    startIndividualProfile,
     sendMessage,
     requestSynthesis,
+    restoreState,
+    reset,
   }
 }

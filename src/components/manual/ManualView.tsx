@@ -1,164 +1,198 @@
-// ManualView — Main manual viewer: 8 collapsible domain sections with freshness indicators
-// Now with Edit + Refresh actions per domain
+// ManualView — Living assessment engine: domain cards with harmony scores, findings, actions
+// Replaces old constellation + collapsible raw data view
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { supabase } from '@/lib/supabase'
 import { useHousehold } from '@/hooks/useHousehold'
 import { useManual } from '@/hooks/useManual'
-import { DomainDataView } from './DomainDataView'
-import { EditableDomainView } from './EditableDomainView'
-import { DomainRefreshFlow } from './DomainRefreshFlow'
-import { DOMAIN_NAMES, DOMAIN_DESCRIPTIONS, DOMAIN_ORDER, getDomainAge, getDomainFreshnessLabel } from '@/types/manual'
-import type { DomainId, Manual, ManualDomains, FreshnessLabel } from '@/types/manual'
+import { useConversation } from '@/hooks/useConversation'
+import { useRelishOnboarding } from '@/hooks/useRelishOnboarding'
+import { useActionSynthesis } from '@/hooks/useActionSynthesis'
+import { DomainCard } from './DomainCard'
+import { AssessmentResults } from './AssessmentResults'
+import { HarmonyBadge } from './HarmonyBadge'
+import { HarmonyMap } from './HarmonyMap'
+import { AssessmentDepthMeter } from './AssessmentDepthMeter'
+import { ConversationBubble } from '@/components/onboarding/relish/ConversationBubble'
+import { ResponseInput } from '@/components/onboarding/relish/ResponseInput'
+import {
+  DOMAIN_ORDER, DOMAIN_NAMES, isDomainAssessed, getHarmonyStatus,
+} from '@/types/manual'
+import type { DomainId, ManualDomains, DomainAssessment, ActionItem } from '@/types/manual'
 
-function isDomainEmpty(data: Record<string, unknown>): boolean {
-  return Object.values(data).every(v => {
-    if (Array.isArray(v)) return v.length === 0
-    if (typeof v === 'string') return !v
-    if (typeof v === 'object' && v !== null) return Object.keys(v).length === 0
-    return !v
-  })
-}
-
-type DomainMode = 'read' | 'edit'
-
-function DomainSection({ domainId, manual, householdId, onUpdateDomain }: {
+type ActiveFlow = {
+  type: 'assessment'
   domainId: DomainId
-  manual: Manual
-  householdId: string
-  onUpdateDomain: (domainId: DomainId, data: Record<string, unknown>, source: 'manual-edit' | 'refresh') => Promise<void>
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const [mode, setMode] = useState<DomainMode>('read')
-  const [showRefresh, setShowRefresh] = useState(false)
-
-  const domainData = (manual.domains as ManualDomains)[domainId] as unknown as Record<string, unknown>
-  const empty = !domainData || isDomainEmpty(domainData)
-
-  const ageMs = getDomainAge(manual, domainId)
-  const freshness: FreshnessLabel | null = ageMs > 0 ? getDomainFreshnessLabel(ageMs) : null
-  const isStale = freshness === 'aging' || freshness === 'stale'
-
-  const handleSaveEdit = useCallback(async (data: Record<string, unknown>) => {
-    await onUpdateDomain(domainId, data, 'manual-edit')
-    setMode('read')
-  }, [domainId, onUpdateDomain])
-
-  const handleSaveRefresh = useCallback(async (data: Record<string, unknown>) => {
-    await onUpdateDomain(domainId, data, 'refresh')
-    setShowRefresh(false)
-  }, [domainId, onUpdateDomain])
-
-  return (
-    <>
-      <div className="border border-stone-200 rounded-xl overflow-hidden">
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="w-full flex items-center justify-between px-5 py-4 hover:bg-stone-50 transition-colors"
-        >
-          <div className="text-left">
-            <h3 className="font-medium text-stone-800">{DOMAIN_NAMES[domainId]}</h3>
-            <p className="text-xs text-stone-400 mt-0.5">{DOMAIN_DESCRIPTIONS[domainId]}</p>
-          </div>
-          <div className="flex items-center gap-3 shrink-0">
-            {freshness && (
-              <span className={`text-xs px-2 py-1 rounded-md ${
-                freshness === 'fresh' ? 'bg-emerald-50 text-emerald-600' :
-                freshness === 'aging' ? 'bg-amber-50 text-amber-600' :
-                'bg-red-50 text-red-600'
-              }`}>
-                {freshness.charAt(0).toUpperCase() + freshness.slice(1)}
-              </span>
-            )}
-            {empty && (
-              <span className="text-xs text-stone-300">Empty</span>
-            )}
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className={`w-5 h-5 text-stone-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-          </div>
-        </button>
-
-        {expanded && (
-          <div className="px-5 pb-5 border-t border-stone-100">
-            {/* Action buttons */}
-            {!empty && mode === 'read' && (
-              <div className="flex items-center gap-2 pt-3 pb-1">
-                <button
-                  onClick={() => setMode('edit')}
-                  className="text-xs flex items-center gap-1 px-2.5 py-1.5 text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors"
-                >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
-                  </svg>
-                  Edit
-                </button>
-                {isStale && (
-                  <button
-                    onClick={() => setShowRefresh(true)}
-                    className="text-xs flex items-center gap-1 px-2.5 py-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
-                  >
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H4.28a.75.75 0 00-.75.75v3.955a.75.75 0 001.5 0v-2.134l.218.218a7 7 0 0011.712-3.138.75.75 0 00-1.449-.394zm.137-7.868a.75.75 0 00-1.5 0v2.134l-.217-.218A7 7 0 002.02 8.61a.75.75 0 001.45.394A5.5 5.5 0 0112.69 6.54l.311.31H10.57a.75.75 0 000 1.5h3.951a.75.75 0 00.75-.75V3.556z" clipRule="evenodd" />
-                    </svg>
-                    Refresh with AI
-                  </button>
-                )}
-              </div>
-            )}
-
-            <div className="pt-3">
-              {empty ? (
-                <p className="text-sm text-stone-400 italic">
-                  No data yet. Complete the {DOMAIN_NAMES[domainId].toLowerCase()} conversation to populate this domain.
-                </p>
-              ) : mode === 'edit' ? (
-                <EditableDomainView
-                  domainId={domainId}
-                  data={domainData}
-                  onSave={handleSaveEdit}
-                  onCancel={() => setMode('read')}
-                />
-              ) : (
-                <DomainDataView domainId={domainId} data={domainData} />
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {showRefresh && (
-        <DomainRefreshFlow
-          domainId={domainId}
-          householdId={householdId}
-          currentData={domainData}
-          onSave={handleSaveRefresh}
-          onClose={() => setShowRefresh(false)}
-        />
-      )}
-    </>
-  )
+  step: 'conversation' | 'results'
+  synthesisData?: DomainAssessment
 }
 
 export function ManualView() {
+  const navigate = useNavigate()
   const { household } = useHousehold()
-  const { manuals, loading, updateDomain } = useManual(household?.id ?? null)
+  const { manuals, loading, refetch: refetchManuals } = useManual(household?.id ?? null)
+  const { saveDomainAssessment } = useRelishOnboarding(household?.id ?? null)
+  const { pushToSymphony, pushing } = useActionSynthesis(household?.id ?? null)
+  const conversation = useConversation()
+  const [activeFlow, setActiveFlow] = useState<ActiveFlow | null>(null)
+  const [saving, setSaving] = useState(false)
 
   const householdManual = manuals.find(m => m.type === 'household')
 
-  const handleUpdateDomain = useCallback(async (
-    domainId: DomainId,
-    data: Record<string, unknown>,
-    source: 'manual-edit' | 'refresh'
-  ) => {
-    if (!householdManual) return
-    await updateDomain(householdManual.id, domainId, data, source)
-  }, [householdManual, updateDomain])
+  // Compute overall harmony stats
+  const harmonyStats = useMemo(() => {
+    if (!householdManual) return { assessed: 0, avgScore: 0 }
+    const domains = householdManual.domains as ManualDomains
+    let total = 0
+    let count = 0
+    for (const id of DOMAIN_ORDER) {
+      if (isDomainAssessed(householdManual, id)) {
+        const score = domains[id]?.harmonyScore
+        if (Number.isFinite(score)) {
+          total += score
+          count++
+        }
+      }
+    }
+    return { assessed: count, avgScore: count > 0 ? Math.round(total / count) : 0 }
+  }, [householdManual])
 
+  // Start or resume domain assessment conversation
+  const handleStartAssessment = useCallback(async (domainId: DomainId) => {
+    if (!household?.id || !householdManual) return
+    setActiveFlow({ type: 'assessment', domainId, step: 'conversation' })
+
+    // Check for an existing active conversation for this domain
+    const { data: existing } = await supabase
+      .from('conversations')
+      .select('id, turns')
+      .eq('household_id', household.id)
+      .eq('purpose', 'domain-assessment')
+      .eq('domain_id', domainId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (existing && existing.turns && existing.turns.length > 0) {
+      // Resume existing conversation
+      const turns = existing.turns as Array<{ role: string; content: string; timestamp: string; extractedData?: unknown }>
+      const userTurns = turns.filter(t => t.role === 'user').length
+      conversation.restoreState(
+        turns.map(t => ({ role: t.role as 'user' | 'assistant', content: t.content, timestamp: t.timestamp })),
+        existing.id,
+        { conversationId: existing.id, type: 'question', message: turns[turns.length - 1]?.content ?? '', structuredData: null, turnCount: userTurns, minTurns: 6, maxTurns: 10 }
+      )
+      return
+    }
+
+    // Gather previously assessed domains for context
+    const domains = householdManual.domains as ManualDomains
+    const previousDomains: Record<string, unknown> = {}
+    for (const id of DOMAIN_ORDER) {
+      if (isDomainAssessed(householdManual, id)) {
+        previousDomains[id] = domains[id]
+      }
+    }
+
+    conversation.reset()
+    await conversation.startDomainAssessment(domainId, household.id, previousDomains)
+  }, [household?.id, householdManual, conversation])
+
+  // Send message during assessment
+  const handleSendMessage = useCallback(async (message: string) => {
+    const response = await conversation.sendMessage(message)
+
+    // Check if synthesis came back
+    if (response.type === 'synthesis' && response.structuredData && activeFlow) {
+      // Extract the domain assessment from structured data
+      const domainId = activeFlow.domainId
+      const rawData = response.structuredData as Record<string, unknown>
+      const assessmentData = (rawData[domainId] || rawData) as DomainAssessment
+
+      setActiveFlow({
+        ...activeFlow,
+        step: 'results',
+        synthesisData: assessmentData,
+      })
+    }
+  }, [conversation, activeFlow])
+
+  // Request synthesis
+  const handleRequestSynthesis = useCallback(async () => {
+    const response = await conversation.requestSynthesis()
+    if (response.structuredData && activeFlow) {
+      const domainId = activeFlow.domainId
+      const rawData = response.structuredData as Record<string, unknown>
+      const assessmentData = (rawData[domainId] || rawData) as DomainAssessment
+
+      setActiveFlow({
+        ...activeFlow,
+        step: 'results',
+        synthesisData: assessmentData,
+      })
+    }
+  }, [conversation, activeFlow])
+
+  // Save assessment results
+  const handleSaveAssessment = useCallback(async () => {
+    if (!activeFlow?.synthesisData || !activeFlow.domainId) return
+    setSaving(true)
+    try {
+      await saveDomainAssessment(activeFlow.domainId, activeFlow.synthesisData as unknown as Record<string, unknown>)
+
+      // Mark the conversation as completed so it doesn't get resumed
+      if (conversation.conversationId) {
+        await supabase
+          .from('conversations')
+          .update({ status: 'completed' })
+          .eq('id', conversation.conversationId)
+      }
+
+      // Refetch manuals to ensure UI shows updated data
+      await refetchManuals()
+
+      setActiveFlow(null)
+      conversation.reset()
+    } catch (err) {
+      console.error('Save assessment error:', err)
+    } finally {
+      setSaving(false)
+    }
+  }, [activeFlow, saveDomainAssessment, conversation, refetchManuals])
+
+  // Push action to Symphony
+  const handleAddToSymphony = useCallback(async (action: ActionItem, domainId: DomainId) => {
+    await pushToSymphony(action, domainId)
+  }, [pushToSymphony])
+
+  // Navigate to linked Symphony item
+  const handleNavigateToItem = useCallback((symphonyItemId: string, type: ActionItem['type']) => {
+    const routes: Record<string, string> = {
+      task: '/',
+      project: `/projects/${symphonyItemId}`,
+      routine: `/routines/${symphonyItemId}`,
+      goal: `/goals/${symphonyItemId}`,
+    }
+    navigate(routes[type] || '/')
+  }, [navigate])
+
+  // Close assessment flow
+  const handleCloseFlow = useCallback(() => {
+    setActiveFlow(null)
+    conversation.reset()
+  }, [conversation])
+
+  // Progress info from last response
+  const turnCount = conversation.lastResponse?.turnCount ?? 0
+  const minTurns = conversation.lastResponse?.minTurns ?? 6
+  const maxTurns = conversation.lastResponse?.maxTurns ?? 10
+
+  // Can synthesize once minimum turns reached
+  const canSynthesize = turnCount >= minTurns && !conversation.isLoading && conversation.lastResponse?.type !== 'synthesis'
+
+  // Loading
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -167,6 +201,7 @@ export function ManualView() {
     )
   }
 
+  // No manual
   if (!householdManual) {
     return (
       <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
@@ -177,42 +212,169 @@ export function ManualView() {
         </div>
         <h2 className="text-lg font-semibold text-stone-800 mb-2">No manual yet</h2>
         <p className="text-sm text-stone-500 max-w-sm">
-          Your family's operating manual will appear here after completing the onboarding conversations.
+          Your family's operating manual will appear here after completing assessments.
         </p>
       </div>
     )
   }
 
-  const populatedCount = DOMAIN_ORDER.filter(id => {
-    const data = (householdManual.domains as ManualDomains)[id] as unknown as Record<string, unknown>
-    return data && !isDomainEmpty(data)
-  }).length
+  const domains = householdManual.domains as ManualDomains
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
-      {/* Header */}
+      {/* Header with overall harmony */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-stone-900">{householdManual.title}</h1>
-        {householdManual.subtitle && (
-          <p className="text-stone-500 mt-1">{householdManual.subtitle}</p>
-        )}
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-stone-900">{householdManual.title}</h1>
+            {householdManual.subtitle && (
+              <p className="text-stone-500 mt-1">{householdManual.subtitle}</p>
+            )}
+          </div>
+          {harmonyStats.assessed > 0 && (
+            <HarmonyBadge score={harmonyStats.avgScore} className="mt-1" />
+          )}
+        </div>
         <p className="text-xs text-stone-400 mt-2">
-          {populatedCount} of 8 domains populated
+          {harmonyStats.assessed} of 8 domains assessed
         </p>
+
+        {/* Mini harmony bar */}
+        {harmonyStats.assessed > 0 && (
+          <div className="flex gap-1 mt-3">
+            {DOMAIN_ORDER.map(id => {
+              const assessed = isDomainAssessed(householdManual, id)
+              const score = assessed ? domains[id].harmonyScore : 0
+              const status = getHarmonyStatus(score)
+              const bg = status === 'resonating' ? 'bg-emerald-400'
+                : status === 'adjusting' ? 'bg-amber-400'
+                : status === 'discordant' ? 'bg-red-400'
+                : 'bg-stone-200'
+              return (
+                <div
+                  key={id}
+                  className={`flex-1 h-1.5 rounded-full ${bg}`}
+                  title={`${DOMAIN_NAMES[id]}: ${assessed ? score : 'Uncharted'}`}
+                />
+              )
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Domain sections */}
+      {/* Harmony Map — domain visual overview */}
+      {harmonyStats.assessed > 0 && (
+        <div className="mb-8">
+          <HarmonyMap
+            manual={householdManual}
+            onAssessDomain={handleStartAssessment}
+          />
+        </div>
+      )}
+
+      {/* Domain cards */}
       <div className="space-y-3">
         {DOMAIN_ORDER.map(domainId => (
-          <DomainSection
+          <DomainCard
             key={domainId}
             domainId={domainId}
-            manual={householdManual}
-            householdId={household!.id}
-            onUpdateDomain={handleUpdateDomain}
+            assessment={domains[domainId]}
+            onAssess={() => handleStartAssessment(domainId)}
+            onAddToSymphony={(action) => handleAddToSymphony(action, domainId)}
+            onNavigateToItem={handleNavigateToItem}
+            pushing={pushing}
           />
         ))}
       </div>
+
+      {/* Assessment conversation overlay */}
+      {activeFlow?.step === 'conversation' && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full h-[80vh] flex flex-col">
+            {/* Conversation header with depth meter */}
+            <div className="px-6 py-4 border-b border-stone-100">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-stone-900">
+                    Assessing {DOMAIN_NAMES[activeFlow.domainId]}
+                  </h2>
+                  <p className="text-xs text-stone-400 mt-0.5">
+                    Share openly — the more detail, the better your assessment
+                  </p>
+                </div>
+                <button onClick={handleCloseFlow} className="text-stone-400 hover:text-stone-600 shrink-0 ml-4">
+                  <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+              <AssessmentDepthMeter
+                turnCount={turnCount}
+                minTurns={minTurns}
+                maxTurns={maxTurns}
+              />
+            </div>
+
+            {/* Conversation messages */}
+            <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+              {conversation.turns.map((turn, i) => (
+                <ConversationBubble key={i} turn={turn} />
+              ))}
+
+              {conversation.isLoading && (
+                <div className="flex justify-start animate-fade-in">
+                  <div className="bg-white border border-stone-200 rounded-2xl rounded-bl-md px-4 py-3">
+                    <div className="flex gap-1.5">
+                      <div className="w-2 h-2 bg-stone-300 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <div className="w-2 h-2 bg-stone-300 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <div className="w-2 h-2 bg-stone-300 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {conversation.error && (
+                <div className="bg-red-50 border border-red-100 rounded-lg p-3">
+                  <p className="text-sm text-red-600">{conversation.error}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Input */}
+            <div className="border-t border-stone-200 bg-stone-50 px-4 py-3">
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <ResponseInput
+                    onSend={handleSendMessage}
+                    disabled={conversation.isLoading}
+                    placeholder="Share your thoughts..."
+                  />
+                </div>
+                {canSynthesize && (
+                  <button
+                    onClick={handleRequestSynthesis}
+                    disabled={conversation.isLoading}
+                    className="text-xs px-3 py-3 bg-emerald-50 text-emerald-700 rounded-xl hover:bg-emerald-100 disabled:opacity-50 shrink-0"
+                  >
+                    Synthesize
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assessment results overlay */}
+      {activeFlow?.step === 'results' && activeFlow.synthesisData && (
+        <AssessmentResults
+          domainId={activeFlow.domainId}
+          assessment={activeFlow.synthesisData}
+          onSave={handleSaveAssessment}
+          onBack={() => setActiveFlow({ ...activeFlow, step: 'conversation' })}
+          saving={saving}
+        />
+      )}
     </div>
   )
 }

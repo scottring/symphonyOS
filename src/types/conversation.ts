@@ -23,7 +23,7 @@ export interface Conversation {
   updated_at: string
 }
 
-export type ConversationPurpose = 'onboarding' | 'coaching' | 'checkin' | 'facilitation' | 'refresh'
+export type ConversationPurpose = 'onboarding' | 'domain-assessment' | 'coaching' | 'checkin' | 'facilitation' | 'refresh'
 
 export interface RelishOnboardingProgress {
   introCompleted: boolean

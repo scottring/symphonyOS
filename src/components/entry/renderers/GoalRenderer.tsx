@@ -3,7 +3,7 @@ import type { Entry, GoalContent } from '@/types/entry'
 interface Props {
   entry: Entry
   onUpdate?: (updates: Partial<Entry>) => void
-  mode?: 'card' | 'full'
+  mode?: 'card' | 'full' | 'yearbook'
 }
 
 export function GoalRenderer({ entry, onUpdate, mode = 'card' }: Props) {

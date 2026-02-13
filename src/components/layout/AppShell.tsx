@@ -63,6 +63,7 @@ interface AppShellProps {
   onPinNavigate?: (entityType: PinnableEntityType, entityId: string) => void
   onPinMarkAccessed?: (entityType: PinnableEntityType, entityId: string) => void
   onPinRefreshStale?: (id: string) => void
+  onResumeOnboarding?: () => void
 }
 
 export function AppShell({
@@ -93,6 +94,7 @@ export function AppShell({
   onPinNavigate,
   onPinMarkAccessed,
   onPinRefreshStale,
+  onResumeOnboarding,
 }: AppShellProps) {
   void onPanelClose // No longer used - panel closing handled by smart handlers in schedule components
   const isMobile = useMobile()
@@ -133,6 +135,7 @@ export function AppShell({
           onPinNavigate={onPinNavigate}
           onPinMarkAccessed={onPinMarkAccessed}
           onPinRefreshStale={onPinRefreshStale}
+          onResumeOnboarding={onResumeOnboarding}
         />
       )}
 

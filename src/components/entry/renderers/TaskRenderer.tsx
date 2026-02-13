@@ -3,7 +3,7 @@ import type { Entry, TaskContent } from '@/types/entry'
 interface Props {
   entry: Entry
   onUpdate?: (updates: Partial<Entry>) => void
-  mode?: 'card' | 'full'
+  mode?: 'card' | 'full' | 'yearbook'
 }
 
 export function TaskRenderer({ entry, onUpdate }: Props) {

@@ -1,6 +1,7 @@
 // MoreSheet — Mobile slide-up menu for secondary nav items
 // Opens from the "More" tab in the bottom nav
 
+import type { ReactElement } from 'react'
 import type { ViewType } from './Sidebar'
 
 interface MoreSheetProps {
@@ -14,7 +15,7 @@ interface MoreSheetProps {
 interface NavItem {
   view: ViewType
   label: string
-  icon: JSX.Element
+  icon: ReactElement
   badge?: boolean
 }
 

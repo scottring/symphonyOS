@@ -54,6 +54,7 @@ import {
   GoalView,
 } from '@/components/lazy'
 import { ManualView } from '@/components/manual/ManualView'
+import { IndividualManualView } from '@/components/manual/IndividualManualView'
 import { YearbookView } from '@/components/yearbook/YearbookView'
 import { CheckinFlow } from '@/components/checkin/CheckinFlow'
 import { RelishHome } from '@/components/home/RelishHome'
@@ -197,6 +198,7 @@ function App() {
   const [viewedDate, setViewedDate] = useState(() => new Date())
   const [recipeUrl, setRecipeUrl] = useState<string | null>(null)
   const [quickAddOpen, setQuickAddOpen] = useState(false)
+  const [selectedManualId, setSelectedManualId] = useState<string | null>(null)
 
   // Calendar reconnect prompt state
   const [pendingEventData, setPendingEventData] = useState<{
@@ -660,6 +662,7 @@ function App() {
     setSelectedTaskId(null)
     setSelectedListId(null)
     setRecipeUrl(null)
+    setSelectedManualId(null)
 
     // Handle URL-based views
     if (view === 'home' || view === 'bookshelf') {
@@ -1187,6 +1190,7 @@ function App() {
       onPinNavigate={handlePinNavigate}
       onPinMarkAccessed={pinnedItems.markAccessed}
       onPinRefreshStale={pinnedItems.refreshStale}
+      onResumeOnboarding={() => setOnboardingComplete(false)}
       panel={
         recipeUrl ? (
           <Suspense fallback={<LoadingFallback />}>
@@ -1276,8 +1280,9 @@ function App() {
                 hasCheckedInThisWeek={hasCheckedInThisWeek}
                 driftSignalCount={recentDriftSignals.length}
                 onStartCheckin={() => handleViewChange('checkin')}
-                onOpenManual={(_manualId) => handleViewChange('manual')}
+                onOpenManual={(manualId) => { handleViewChange('manual'); setSelectedManualId(manualId) }}
                 onOpenYearbook={(_personId) => handleViewChange('yearbook')}
+                onStartDeepening={(_domainId) => handleViewChange('manual')}
               />
             </div>
           )}
@@ -1718,7 +1723,9 @@ function App() {
       )}
 
       {activeView === 'manual' && (
-        <ManualView />
+        selectedManualId && manuals.find(m => m.id === selectedManualId)?.type === 'individual'
+          ? <IndividualManualView manualId={selectedManualId} onBack={() => handleViewChange('bookshelf')} />
+          : <ManualView />
       )}
 
       {activeView === 'yearbook' && (

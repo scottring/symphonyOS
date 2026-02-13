@@ -88,10 +88,24 @@ export function useYearbook(householdId: string | null): UseYearbookReturn {
   }, [householdId])
 
   const getOrCreateYearbook = useCallback(async (personId: string): Promise<string> => {
+    // Check in-memory first
     const existing = getYearbookForPerson(personId)
     if (existing) return existing.id
+
+    // Fallback: query DB directly (in-memory state may be stale/loading)
+    const targetYear = new Date().getFullYear()
+    const { data: dbExisting } = await supabase
+      .from('yearbooks')
+      .select('id')
+      .eq('household_id', householdId)
+      .eq('person_id', personId)
+      .eq('year', targetYear)
+      .single()
+
+    if (dbExisting) return dbExisting.id
+
     return createYearbook(personId)
-  }, [getYearbookForPerson, createYearbook])
+  }, [householdId, getYearbookForPerson, createYearbook])
 
   return {
     yearbooks,

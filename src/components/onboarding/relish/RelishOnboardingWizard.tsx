@@ -1,7 +1,8 @@
-// RelishOnboardingWizard — replaces the brain-dump onboarding with Relish's
-// AI diagnostic conversation flow. Internal state machine, no routing needed.
+// RelishOnboardingWizard — Domain-at-a-time assessment onboarding
+// Flow: Welcome → Family Setup → Domain Picker → Assessment Conversation →
+//       Results → Domain Picker (or Launch) → Person Profiles → Generate → Complete
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useConversation } from '@/hooks/useConversation'
 import { useRelishOnboarding } from '@/hooks/useRelishOnboarding'
@@ -11,23 +12,76 @@ import { useYearbook } from '@/hooks/useYearbook'
 import { useYearbookGeneration } from '@/hooks/useYearbookGeneration'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { ConversationView } from './ConversationView'
-import { PhaseProgress } from './PhaseProgress'
-import { SynthesisReview } from './SynthesisReview'
+import { DomainPicker } from './DomainPicker'
+import { AssessmentResults } from '@/components/manual/AssessmentResults'
 import { FamilySetup } from '@/components/onboarding/steps/FamilySetup'
-import { PHASE_NAMES, PHASE_DESCRIPTIONS } from '@/types/manual'
-import type { OnboardingPhaseId } from '@/types/manual'
+import { DOMAIN_ORDER, isDomainAssessed } from '@/types/manual'
+import type { DomainId, ManualDomains, DomainAssessment } from '@/types/manual'
+import type { ConversationTurn } from '@/types/conversation'
 
 type WizardStep =
   | 'welcome'
   | 'family'
-  | 'phase-conversation'
-  | 'phase-review'
-  | 'choose-next'
+  | 'domain-picker'
+  | 'domain-conversation'
+  | 'domain-results'
+  | 'person-profiles'
+  | 'person-profile-conversation'
   | 'generating'
   | 'complete'
 
-const VALID_PHASES: OnboardingPhaseId[] = ['foundation', 'relationships', 'operations', 'strategy']
-const MIN_PHASES_FOR_LAUNCH = 2
+const DRAFT_MAX_AGE_MS = 2 * 60 * 60 * 1000 // 2 hours
+
+interface DomainConversationDraft {
+  domainId: DomainId
+  conversationId: string
+  turns: ConversationTurn[]
+  lastResponse: {
+    type: 'question' | 'synthesis'
+    message: string
+    structuredData: Record<string, unknown> | null
+    conversationId: string
+    turnCount: number
+    minTurns: number
+    maxTurns: number
+  } | null
+  savedAt: number
+}
+
+function getDraftKey(domainId: DomainId): string {
+  return `relish-domain-draft-${domainId}`
+}
+
+function saveDomainDraft(draft: DomainConversationDraft): void {
+  try {
+    sessionStorage.setItem(getDraftKey(draft.domainId), JSON.stringify(draft))
+  } catch {
+    // fail silently
+  }
+}
+
+function loadDomainDraft(domainId: DomainId): DomainConversationDraft | null {
+  try {
+    const raw = sessionStorage.getItem(getDraftKey(domainId))
+    if (!raw) return null
+    const draft = JSON.parse(raw) as DomainConversationDraft
+    if (Date.now() - draft.savedAt > DRAFT_MAX_AGE_MS) {
+      sessionStorage.removeItem(getDraftKey(domainId))
+      return null
+    }
+    return draft
+  } catch {
+    return null
+  }
+}
+
+function clearDomainDraft(domainId: DomainId): void {
+  try {
+    sessionStorage.removeItem(getDraftKey(domainId))
+  } catch {
+    // fail silently
+  }
+}
 
 // ==================== Generating Step Component ====================
 
@@ -77,7 +131,6 @@ function GeneratingStep({
       return
     }
 
-    // Initialize progress tracking
     setGenProgress(members.map(m => ({ name: m.name, done: false })))
 
     async function generateForAll() {
@@ -94,7 +147,6 @@ function GeneratingStep({
         setGenProgress(prev => prev.map((p, j) => j === i ? { ...p, done: true } : p))
       }
       setGenTotal(total)
-      // Brief pause to show success state
       setTimeout(onDone, 1500)
     }
 
@@ -152,53 +204,104 @@ interface RelishOnboardingWizardProps {
 export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardProps) {
   const { household } = useHousehold()
   const householdId = household?.id ?? null
-  const { state: onboardingState, loading: onboardingLoading, savePhaseData, completePhase, completeIntro, getNextPhase, getPreviousPhaseData } = useRelishOnboarding(householdId)
-  const { turns, isLoading: convLoading, error: convError, lastResponse, startConversation, sendMessage } = useConversation()
+  const {
+    state: onboardingState, loading: onboardingLoading,
+    saveDomainAssessment, saveIndividualProfileData,
+    completeIntro, getPreviousPhaseData,
+  } = useRelishOnboarding(householdId)
+  const {
+    turns, isLoading: convLoading, error: convError, lastResponse,
+    startDomainAssessment, startIndividualProfile, sendMessage,
+    restoreState, reset, conversationId,
+  } = useConversation()
   const { members: familyMembers, addMember, updateMember, deleteMember, refetch: refetchFamily } = useFamilyMembers()
   const { manuals } = useManual(householdId)
   const { getOrCreateYearbook } = useYearbook(householdId)
   const { generateContent, isGenerating } = useYearbookGeneration(householdId)
 
   const [step, setStep] = useState<WizardStep>('welcome')
-  const [activePhase, setActivePhase] = useState<OnboardingPhaseId>('foundation')
+  const [activeDomain, setActiveDomain] = useState<DomainId>('values')
   const [isSaving, setIsSaving] = useState(false)
   const [conversationStarted, setConversationStarted] = useState(false)
-  const [savedNextPhase, setSavedNextPhase] = useState<OnboardingPhaseId | null>(null)
+  const [synthesisData, setSynthesisData] = useState<DomainAssessment | null>(null)
   const [genProgress, setGenProgress] = useState<{ name: string; done: boolean }[]>([])
   const [genTotal, setGenTotal] = useState(0)
+  const restoredFromDraft = useRef(false)
+  const [profileMemberIndex, setProfileMemberIndex] = useState(0)
+  const [profiledMembers, setProfiledMembers] = useState<string[]>([])
+  const [profileConversationStarted, setProfileConversationStarted] = useState(false)
 
-  // Determine initial step based on existing onboarding state
+  const householdManual = manuals.find(m => m.type === 'household') ?? null
+
+  // Compute assessed domains from manual
+  const assessedDomains: DomainId[] = householdManual
+    ? DOMAIN_ORDER.filter(id => isDomainAssessed(householdManual, id))
+    : []
+
+  // Determine initial step on load
   useEffect(() => {
     if (onboardingLoading) return
 
     if (onboardingState.introCompleted) {
-      // Already past intro — figure out where they left off
-      const nextPhase = getNextPhase()
-      if (nextPhase) {
-        setActivePhase(nextPhase)
-        setStep('phase-conversation')
-      } else {
-        setStep('complete')
-      }
+      // Past intro — go to domain picker (they'll see their progress)
+      setStep('domain-picker')
     }
-  }, [onboardingLoading, onboardingState.introCompleted, getNextPhase])
+  }, [onboardingLoading, onboardingState.introCompleted])
 
-  // Auto-start conversation when entering phase-conversation step
+  // Auto-start domain assessment conversation
   useEffect(() => {
-    if (step === 'phase-conversation' && householdId && !conversationStarted) {
+    if (step === 'domain-conversation' && householdId && !conversationStarted) {
       setConversationStarted(true)
-      getPreviousPhaseData().then(prevDomains => {
-        startConversation(activePhase, householdId, prevDomains)
-      })
-    }
-  }, [step, householdId, activePhase, conversationStarted, startConversation, getPreviousPhaseData])
 
-  // Detect synthesis response
-  useEffect(() => {
-    if (lastResponse?.type === 'synthesis' && lastResponse.structuredData) {
-      setStep('phase-review')
+      // Check for a saved draft first
+      const draft = loadDomainDraft(activeDomain)
+      if (draft && draft.turns.length > 0) {
+        restoredFromDraft.current = true
+        restoreState(draft.turns, draft.conversationId, draft.lastResponse)
+        return
+      }
+
+      // Gather previously assessed domains for context
+      const previousDomains: Record<string, unknown> = {}
+      if (householdManual) {
+        const domains = householdManual.domains as ManualDomains
+        for (const id of DOMAIN_ORDER) {
+          if (isDomainAssessed(householdManual, id)) {
+            previousDomains[id] = domains[id]
+          }
+        }
+      }
+
+      startDomainAssessment(activeDomain, householdId, previousDomains)
     }
-  }, [lastResponse])
+  }, [step, householdId, activeDomain, conversationStarted, startDomainAssessment, householdManual, restoreState])
+
+  // Auto-save conversation draft after each AI response
+  useEffect(() => {
+    if (step !== 'domain-conversation') return
+    if (turns.length === 0 || !conversationId) return
+    const hasAiTurn = turns.some(t => t.role === 'assistant')
+    if (!hasAiTurn) return
+
+    saveDomainDraft({
+      domainId: activeDomain,
+      conversationId,
+      turns,
+      lastResponse,
+      savedAt: Date.now(),
+    })
+  }, [step, turns, conversationId, lastResponse, activeDomain])
+
+  // Detect synthesis response → go to results
+  useEffect(() => {
+    if (step !== 'domain-conversation') return
+    if (lastResponse?.type === 'synthesis' && lastResponse.structuredData) {
+      const rawData = lastResponse.structuredData as Record<string, unknown>
+      const assessment = (rawData[activeDomain] || rawData) as DomainAssessment
+      setSynthesisData(assessment)
+      setStep('domain-results')
+    }
+  }, [step, lastResponse, activeDomain])
 
   const handleWelcomeContinue = async () => {
     await completeIntro()
@@ -206,64 +309,101 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
   }
 
   const handleFamilyContinue = () => {
-    const nextPhase = getNextPhase() || 'foundation'
-    setActivePhase(nextPhase)
+    setStep('domain-picker')
+  }
+
+  const handleSelectDomain = (domainId: DomainId) => {
+    setActiveDomain(domainId)
     setConversationStarted(false)
-    setStep('phase-conversation')
+    setSynthesisData(null)
+    reset()
+    setStep('domain-conversation')
   }
 
   const handleSendMessage = useCallback(async (message: string) => {
     await sendMessage(message)
   }, [sendMessage])
 
-  const handleApprovePhase = useCallback(async (editedData?: Record<string, unknown>) => {
-    const dataToSave = editedData || lastResponse?.structuredData
-    if (!dataToSave) return
-
+  // Save assessment results and return to picker
+  const handleSaveAssessment = useCallback(async () => {
+    if (!synthesisData) return
     setIsSaving(true)
     try {
-      await savePhaseData(activePhase, dataToSave)
-      await completePhase(activePhase)
-
-      // Compute next phase from what we know is now complete
-      const completedAfterThis = [...onboardingState.phasesCompleted, activePhase]
-      const uniqueCompleted = [...new Set(completedAfterThis)]
-      const next = VALID_PHASES.find(p => !uniqueCompleted.includes(p)) ?? null
-
-      if (!next) {
-        // All phases done — go to generation
-        setStep('generating')
-      } else if (uniqueCompleted.length >= MIN_PHASES_FOR_LAUNCH) {
-        // Minimum met — offer choice
-        setSavedNextPhase(next)
-        setStep('choose-next')
-      } else {
-        // Not enough yet — auto-advance
-        setActivePhase(next)
-        setConversationStarted(false)
-        setStep('phase-conversation')
-      }
+      await saveDomainAssessment(activeDomain, synthesisData as unknown as Record<string, unknown>)
+      clearDomainDraft(activeDomain)
+      restoredFromDraft.current = false
+      reset()
+      setSynthesisData(null)
+      setStep('domain-picker')
     } catch (err) {
-      console.error('Failed to save phase:', err)
+      console.error('Failed to save domain assessment:', err)
     } finally {
       setIsSaving(false)
     }
-  }, [lastResponse, activePhase, savePhaseData, completePhase, onboardingState.phasesCompleted])
+  }, [synthesisData, activeDomain, saveDomainAssessment, reset])
 
-  const handleContinueToNext = () => {
-    if (savedNextPhase) {
-      setActivePhase(savedNextPhase)
-      setConversationStarted(false)
-      setStep('phase-conversation')
+  const handleLaunch = () => {
+    if (familyMembers.length > 0) {
+      setProfileMemberIndex(0)
+      setProfiledMembers([])
+      setStep('person-profiles')
+    } else {
+      setStep('generating')
     }
   }
 
-  const handleLaunch = () => {
+  // Auto-start individual profile conversation
+  useEffect(() => {
+    if (step === 'person-profile-conversation' && householdId && !profileConversationStarted) {
+      setProfileConversationStarted(true)
+      const member = familyMembers[profileMemberIndex]
+      if (member) {
+        getPreviousPhaseData().then(prevDomains => {
+          startIndividualProfile(householdId, member.name, member.id, prevDomains)
+        })
+      }
+    }
+  }, [step, householdId, profileConversationStarted, profileMemberIndex, familyMembers, startIndividualProfile, getPreviousPhaseData])
+
+  // Detect individual profile synthesis and auto-save
+  useEffect(() => {
+    if (step !== 'person-profile-conversation') return
+    if (lastResponse?.type !== 'synthesis' || !lastResponse.structuredData) return
+
+    const member = familyMembers[profileMemberIndex]
+    if (!member || profiledMembers.includes(member.id)) return
+
+    setIsSaving(true)
+    saveIndividualProfileData(member.id, member.name, lastResponse.structuredData)
+      .then(() => {
+        setProfiledMembers(prev => [...prev, member.id])
+        reset()
+        setProfileConversationStarted(false)
+
+        const nextIndex = profileMemberIndex + 1
+        if (nextIndex < familyMembers.length) {
+          setProfileMemberIndex(nextIndex)
+          setStep('person-profiles')
+        } else {
+          setStep('generating')
+        }
+      })
+      .catch(err => console.error('Failed to save individual profile:', err))
+      .finally(() => setIsSaving(false))
+  }, [step, lastResponse, profileMemberIndex, familyMembers, profiledMembers, saveIndividualProfileData, reset])
+
+  const handleStartPersonProfile = (index: number) => {
+    setProfileMemberIndex(index)
+    setProfileConversationStarted(false)
+    reset()
+    setStep('person-profile-conversation')
+  }
+
+  const handleSkipPersonProfiles = () => {
     setStep('generating')
   }
 
   const handleFinish = useCallback(async () => {
-    // Mark Relish onboarding as complete so it persists on reload
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       await supabase
@@ -287,6 +427,16 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
 
   return (
     <div className="min-h-screen bg-bg-base flex flex-col">
+      {/* Dev skip button */}
+      {import.meta.env.DEV && (
+        <button
+          onClick={handleFinish}
+          className="fixed top-3 right-3 z-50 px-3 py-1.5 text-xs bg-red-500 text-white rounded-lg opacity-60 hover:opacity-100 transition-opacity"
+        >
+          Skip onboarding (dev)
+        </button>
+      )}
+
       {/* ==================== Welcome ==================== */}
       {step === 'welcome' && (
         <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12">
@@ -305,12 +455,12 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
           </h1>
 
           <p className="text-lg text-neutral-500 text-center max-w-md mb-6 leading-relaxed">
-            Through a few guided conversations, we'll map out how your family actually works &mdash;
-            your values, communication patterns, roles, routines, and more.
+            Through guided conversations, we'll do a deep assessment of how your family actually works &mdash;
+            your values, roles, routines, communication, and more.
           </p>
 
           <p className="text-sm text-stone-400 mb-8">
-            Each conversation takes about 5 minutes. You'll start with 2 and can add more anytime.
+            Each domain takes about 5 minutes. Start with 3 and add more anytime.
           </p>
 
           <button
@@ -337,100 +487,146 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
         />
       )}
 
-      {/* ==================== Phase Conversation ==================== */}
-      {step === 'phase-conversation' && (
-        <>
-          <div className="border-b border-stone-200 bg-white px-4 py-3">
-            <div className="max-w-2xl mx-auto flex items-center justify-between">
-              <div>
-                <h1 className="text-lg font-semibold text-stone-900">
-                  {PHASE_NAMES[activePhase]}
-                </h1>
-                <p className="text-xs text-stone-400">{PHASE_DESCRIPTIONS[activePhase]}</p>
-              </div>
-              <PhaseProgress
-                completedPhases={onboardingState.phasesCompleted}
-                currentPhase={activePhase}
-              />
-            </div>
-          </div>
-
-          {convError && (
-            <div className="px-4 py-2 bg-red-50 border-b border-red-200">
-              <p className="text-sm text-red-700 max-w-2xl mx-auto">{convError}</p>
-            </div>
-          )}
-
-          <div className="flex-1 max-w-2xl mx-auto w-full">
-            <ConversationView
-              turns={turns}
-              isLoading={convLoading}
-              onSendMessage={handleSendMessage}
-              phaseId={activePhase}
-            />
-          </div>
-        </>
+      {/* ==================== Domain Picker ==================== */}
+      {step === 'domain-picker' && (
+        <DomainPicker
+          manual={householdManual}
+          assessedDomains={assessedDomains}
+          onSelectDomain={handleSelectDomain}
+          onLaunch={handleLaunch}
+        />
       )}
 
-      {/* ==================== Phase Review ==================== */}
-      {step === 'phase-review' && lastResponse?.structuredData && (
-        <>
-          <div className="border-b border-stone-200 bg-white px-4 py-3">
-            <div className="max-w-2xl mx-auto flex items-center justify-between">
-              <h1 className="text-lg font-semibold text-stone-900">Review: {PHASE_NAMES[activePhase]}</h1>
-              <PhaseProgress
-                completedPhases={onboardingState.phasesCompleted}
-                currentPhase={activePhase}
-              />
-            </div>
-          </div>
-          <div className="flex-1 max-w-2xl mx-auto w-full p-4">
-            <SynthesisReview
-              phaseId={activePhase}
-              summary={lastResponse.message}
-              structuredData={lastResponse.structuredData}
-              onApprove={handleApprovePhase}
-              isLoading={isSaving}
-            />
-          </div>
-        </>
+      {/* ==================== Domain Assessment Conversation ==================== */}
+      {step === 'domain-conversation' && (
+        <div className="flex-1 flex flex-col">
+          <ConversationView
+            turns={turns}
+            isLoading={convLoading}
+            onSendMessage={handleSendMessage}
+            domainId={activeDomain}
+            familyName={household?.name}
+            error={convError}
+          />
+        </div>
       )}
 
-      {/* ==================== Choose Next ==================== */}
-      {step === 'choose-next' && (
+      {/* ==================== Domain Assessment Results ==================== */}
+      {step === 'domain-results' && synthesisData && (
+        <AssessmentResults
+          domainId={activeDomain}
+          assessment={synthesisData}
+          onSave={handleSaveAssessment}
+          onBack={() => setStep('domain-conversation')}
+          saving={isSaving}
+        />
+      )}
+
+      {/* ==================== Person Profiles — Intro ==================== */}
+      {step === 'person-profiles' && (
         <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12">
           <div className="animate-fade-in-up flex flex-col items-center text-center max-w-md">
-            <h2 className="text-2xl font-bold text-stone-900 mb-3">
-              Nice work
+            <div className="w-14 h-14 rounded-full bg-rose-50 flex items-center justify-center mb-6">
+              <svg className="w-7 h-7 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+              </svg>
+            </div>
+
+            <h2 className="font-display text-2xl font-semibold text-stone-900 mb-3">
+              Quick personal profiles
             </h2>
-            <p className="text-stone-500 leading-relaxed mb-10">
-              You've covered enough ground to bring your manual to life.
-              You can keep going to make it richer, or jump in now.
+            <p className="text-stone-500 leading-relaxed mb-8">
+              A quick 1-2 minute sketch for each family member. How do they communicate?
+              What stresses them? What lights them up? You can deepen these over time.
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-3 w-full">
-              <button
-                onClick={handleLaunch}
-                className="flex-1 px-6 py-3 bg-stone-900 text-white rounded-xl hover:bg-stone-800 font-medium"
-              >
-                Enter the app
-              </button>
-              {savedNextPhase && (
-                <button
-                  onClick={handleContinueToNext}
-                  className="flex-1 px-6 py-3 border border-stone-300 text-stone-700 rounded-xl hover:bg-stone-50 font-medium"
-                >
-                  Continue to {PHASE_NAMES[savedNextPhase]}
-                  <span className="block text-xs text-stone-400 mt-0.5">
-                    {VALID_PHASES.filter(p =>
-                      !onboardingState.phasesCompleted.includes(p) && p !== activePhase
-                    ).length} {VALID_PHASES.filter(p =>
-                      !onboardingState.phasesCompleted.includes(p) && p !== activePhase
-                    ).length === 1 ? 'phase' : 'phases'} remaining
-                  </span>
-                </button>
-              )}
+            <div className="space-y-3 w-full mb-8">
+              {familyMembers.map((member, i) => {
+                const isDone = profiledMembers.includes(member.id)
+                const isNext = i === profileMemberIndex && !isDone
+                return (
+                  <button
+                    key={member.id}
+                    onClick={() => !isDone && handleStartPersonProfile(i)}
+                    disabled={isDone}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors text-left ${
+                      isDone
+                        ? 'border-emerald-200 bg-emerald-50/50'
+                        : isNext
+                          ? 'border-stone-300 bg-white hover:bg-stone-50 shadow-sm'
+                          : 'border-stone-200 bg-white/50 hover:bg-stone-50'
+                    }`}
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                      isDone
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-stone-100 text-stone-500'
+                    }`}>
+                      {isDone ? (
+                        <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                        </svg>
+                      ) : (
+                        member.name.charAt(0).toUpperCase()
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <p className={`text-sm font-medium ${isDone ? 'text-emerald-700' : 'text-stone-800'}`}>
+                        {member.name}
+                      </p>
+                      <p className="text-xs text-stone-400">
+                        {isDone ? 'Profile complete' : isNext ? 'Ready to start' : 'Waiting'}
+                      </p>
+                    </div>
+                    {isNext && (
+                      <span className="text-xs font-medium text-stone-500 px-2 py-1 bg-stone-100 rounded-lg">
+                        Start
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
             </div>
+
+            <button
+              onClick={handleSkipPersonProfiles}
+              className="text-sm text-stone-400 hover:text-stone-600 transition-colors"
+            >
+              Skip for now — I'll add these later
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== Person Profile Conversation ==================== */}
+      {step === 'person-profile-conversation' && (
+        <div className="flex-1 flex flex-col">
+          <div className="border-b border-stone-100 px-5 py-3 bg-white/80 flex items-center gap-3">
+            <button
+              onClick={() => setStep('person-profiles')}
+              className="text-stone-400 hover:text-stone-600 transition-colors"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z" clipRule="evenodd" />
+              </svg>
+            </button>
+            <div>
+              <h1 className="text-lg font-semibold text-stone-900">
+                {familyMembers[profileMemberIndex]?.name}'s Profile
+              </h1>
+              <p className="text-xs text-stone-400">
+                Quick sketch — {profileMemberIndex + 1} of {familyMembers.length}
+              </p>
+            </div>
+          </div>
+          <div className="flex-1">
+            <ConversationView
+              turns={turns}
+              isLoading={convLoading || isSaving}
+              onSendMessage={handleSendMessage}
+              familyName={familyMembers[profileMemberIndex]?.name}
+              error={convError}
+            />
           </div>
         </div>
       )}
@@ -456,18 +652,8 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
       {step === 'complete' && (
         <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12">
           <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mb-8">
-            <svg
-              className="w-10 h-10 text-emerald-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 13l4 4L19 7"
-              />
+            <svg className="w-10 h-10 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
 

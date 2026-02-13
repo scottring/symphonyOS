@@ -14,7 +14,7 @@ import { InsightRenderer } from './InsightRenderer'
 export interface EntryRendererProps {
   entry: Entry
   onUpdate?: (updates: Partial<Entry>) => void
-  mode?: 'card' | 'full'
+  mode?: 'card' | 'full' | 'yearbook'
 }
 
 export function EntryRenderer({ entry, onUpdate, mode = 'card' }: EntryRendererProps) {

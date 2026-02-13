@@ -3,10 +3,9 @@
 
 import { useState, useCallback } from 'react'
 import { formatLabel } from './DomainDataView'
-import type { DomainId, ManualDomains } from '@/types/manual'
+import type { DomainId } from '@/types/manual'
 import type {
   Value, Ritual, RoleAssignment, DecisionArea,
-  SpaceAssessment, FamilySystem, ManualRoutine,
 } from '@/types/manual'
 
 interface EditableDomainViewProps {
