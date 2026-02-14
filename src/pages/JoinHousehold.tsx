@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useHousehold } from '@/hooks/useHousehold'
 import { useAuth } from '@/hooks/useAuth'
+import { AuthForm } from '@/components/AuthForm'
 import { supabase } from '@/lib/supabase'
 
 export function JoinHousehold() {
@@ -175,32 +176,20 @@ export function JoinHousehold() {
     )
   }
 
-  // Need to log in first
+  // Need to log in first — show auth form with invite banner
   if (!user) {
     return (
-      <div className="min-h-screen bg-bg-base flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 text-center">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary-100 flex items-center justify-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-primary-600" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" />
-            </svg>
-          </div>
-          <h1 className="font-display text-2xl font-semibold text-neutral-800 mb-2">
-            Join {invitation?.household_name}
-          </h1>
-          <p className="text-neutral-500 mb-6">
-            You've been invited to join a household on Relish.
-            Please sign in or create an account to continue.
+      <div className="relative">
+        {/* Invite context banner */}
+        <div className="fixed top-0 left-0 right-0 z-10 bg-primary-50 border-b border-primary-100 px-4 py-3 text-center">
+          <p className="text-sm text-primary-800">
+            You've been invited to join <strong>{invitation?.household_name}</strong>.
+            Sign in or create an account to continue.
           </p>
-          <p className="text-sm text-neutral-400 mb-6">
-            Invitation for: <strong>{invitation?.email}</strong>
-          </p>
-          <button
-            onClick={() => navigate(`/login?redirect=/join?token=${token}`)}
-            className="btn-primary w-full"
-          >
-            Sign In or Create Account
-          </button>
+        </div>
+        {/* Auth form with top padding for banner */}
+        <div className="pt-12">
+          <AuthForm />
         </div>
       </div>
     )

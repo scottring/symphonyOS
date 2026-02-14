@@ -149,8 +149,11 @@ export function useFamilyMembers() {
 
   // Helper to get the current user's family member record
   const getCurrentUserMember = useCallback((): FamilyMember | undefined => {
-    // Match on user_id to get the correct member in shared households
     if (currentUserId) {
+      // Check auth_user_id first (for joined household members like Iris)
+      const authMatch = members.find(m => m.auth_user_id === currentUserId)
+      if (authMatch) return authMatch
+      // Then check user_id (for the household creator)
       const match = members.find(m => m.user_id === currentUserId)
       if (match) return match
     }

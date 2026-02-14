@@ -293,6 +293,36 @@ export function useHousehold(): UseHouseholdReturn {
       .update({ accepted_at: new Date().toISOString() })
       .eq('id', invitation.id)
 
+    // Try to link the new user to their family_members record
+    try {
+      if (user.email) {
+        // Find unlinked family members created by the household owner
+        const { data: familyMembers } = await supabase
+          .from('family_members')
+          .select('id, name, auth_user_id, is_full_user')
+          .eq('user_id', invitation.invited_by)
+          .is('auth_user_id', null)
+          .eq('is_full_user', false)
+
+        if (familyMembers && familyMembers.length > 0) {
+          // Match by name heuristic (e.g., "Iris" matches iris@email.com)
+          const emailName = user.email.split('@')[0].toLowerCase()
+          const match = familyMembers.find(fm =>
+            fm.name.toLowerCase().includes(emailName) || emailName.includes(fm.name.toLowerCase())
+          )
+          if (match) {
+            await supabase
+              .from('family_members')
+              .update({ auth_user_id: user.id, is_full_user: true })
+              .eq('id', match.id)
+          }
+        }
+      }
+    } catch (linkErr) {
+      // Non-critical — user can link manually later
+      console.warn('Could not auto-link family member:', linkErr)
+    }
+
     // Refetch to get the new household
     await fetchHousehold()
   }, [household, fetchHousehold])
