@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { OnboardingPhaseId, DomainId } from '@/types/manual'
-import { emptyDomains, emptyIndividualDomains, PHASE_DOMAINS } from '@/types/manual'
+import { emptyDomains, emptyIndividualDomains, PHASE_DOMAINS, DOMAIN_ORDER } from '@/types/manual'
 
 const PHASE_ORDER: OnboardingPhaseId[] = ['foundation', 'relationships', 'operations', 'strategy']
 
@@ -65,6 +65,7 @@ interface RelishOnboardingState {
 interface UseRelishOnboardingReturn {
   state: RelishOnboardingState
   loading: boolean
+  currentUserId: string | null
   savePhaseData: (phaseId: OnboardingPhaseId, data: Record<string, unknown>) => Promise<void>
   saveDomainAssessment: (domainId: DomainId, assessmentData: Record<string, unknown>) => Promise<void>
   saveIndividualProfileData: (personId: string, personName: string, data: Record<string, unknown>) => Promise<void>
@@ -87,6 +88,7 @@ export function useRelishOnboarding(householdId: string | null): UseRelishOnboar
     familyManualId: null,
   })
   const [loading, setLoading] = useState(true)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
   const manualIdRef = useRef<string | null>(null)
 
@@ -95,6 +97,8 @@ export function useRelishOnboarding(householdId: string | null): UseRelishOnboar
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
+
+      setCurrentUserId(user.id)
 
       const { data: profile, error } = await supabase
         .from('user_profiles')
@@ -141,7 +145,7 @@ export function useRelishOnboarding(householdId: string | null): UseRelishOnboar
     return PHASE_ORDER.find(p => !state.phasesCompleted.includes(p)) ?? null
   }, [state.phasesCompleted])
 
-  // Get or create the household manual
+  // Get or create the household manual (one per household, shared by all members)
   const getOrCreateManual = useCallback(async (): Promise<string> => {
     if (manualIdRef.current) return manualIdRef.current
     if (!householdId) throw new Error('No household')
@@ -207,9 +211,11 @@ export function useRelishOnboarding(householdId: string | null): UseRelishOnboar
       if (data[domainId]) {
         // Merge with existing data so multiple family members' input combines
         updatedDomains[domainId] = mergeDomainData(updatedDomains[domainId], data[domainId])
+        const existingAssessedBy = (updatedMeta[domainId] as Record<string, unknown>)?.assessed_by as string[] || []
         updatedMeta[domainId] = {
           updated_at: now,
           updated_by: 'onboarding',
+          assessed_by: existingAssessedBy.includes(user.id) ? existingAssessedBy : [...existingAssessedBy, user.id],
         }
       }
     }
@@ -226,6 +232,7 @@ export function useRelishOnboarding(householdId: string | null): UseRelishOnboar
   }, [getOrCreateManual])
 
   // Save a single domain assessment (DomainAssessment format) — used by domain-at-a-time flow
+  // MERGES with existing data so multiple family members' assessments combine
   const saveDomainAssessment = useCallback(async (domainId: DomainId, assessmentData: Record<string, unknown>) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('No user')
@@ -245,22 +252,36 @@ export function useRelishOnboarding(householdId: string | null): UseRelishOnboar
     // The edge function wraps data as { [domainId]: assessmentData }
     // Extract the domain data if it's wrapped, otherwise use directly
     const domainData = assessmentData[domainId] ?? assessmentData
+    const existingDomainData = (currentManual.domains as Record<string, unknown>)?.[domainId] || {}
+
+    // Merge with existing data so multiple family members' input combines
+    // (arrays get concatenated with dedup, non-array fields take incoming)
+    const mergedDomainData = mergeDomainData(existingDomainData, domainData) as Record<string, unknown>
+
+    // Update metadata fields on top of merged data
+    const existingConversationCount = (existingDomainData as Record<string, unknown>)?.conversationCount as number || 0
+    mergedDomainData.lastAssessedAt = now
+    mergedDomainData.assessmentDepth = (domainData as Record<string, unknown>).assessmentDepth || 'initial'
+    mergedDomainData.conversationCount = existingConversationCount + 1
 
     const updatedDomains = {
       ...currentManual.domains,
-      [domainId]: {
-        ...domainData,
-        lastAssessedAt: now,
-        assessmentDepth: (domainData as Record<string, unknown>).assessmentDepth || 'initial',
-        conversationCount: ((currentManual.domains as Record<string, unknown>)?.[domainId] as Record<string, unknown>)?.conversationCount
-          ? (((currentManual.domains as Record<string, unknown>)[domainId] as Record<string, unknown>).conversationCount as number) + 1
-          : 1,
-      },
+      [domainId]: mergedDomainData,
     }
 
+    // Track which users have assessed this domain
+    const currentMeta = (currentManual.domain_meta || {}) as Record<string, Record<string, unknown>>
+    const domainMetaEntry = currentMeta[domainId] || {}
+    const assessedBy = (domainMetaEntry.assessed_by as string[]) || []
+    const updatedAssessedBy = assessedBy.includes(user.id) ? assessedBy : [...assessedBy, user.id]
+
     const updatedMeta = {
-      ...(currentManual.domain_meta || {}),
-      [domainId]: { updated_at: now, updated_by: 'assessment' },
+      ...currentMeta,
+      [domainId]: {
+        updated_at: now,
+        updated_by: 'assessment',
+        assessed_by: updatedAssessedBy,
+      },
     }
 
     const { error: updateError } = await supabase
@@ -271,25 +292,43 @@ export function useRelishOnboarding(householdId: string | null): UseRelishOnboar
     if (updateError) throw updateError
   }, [getOrCreateManual])
 
-  // Get list of domains that have been assessed (have real data, not empty)
+  // Get list of domains the CURRENT USER has assessed (per-user tracking)
   const getAssessedDomains = useCallback(async (): Promise<DomainId[]> => {
     const manualId = state.familyManualId || manualIdRef.current
     if (!manualId) return []
 
     try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return []
+
       const { data: manual, error } = await supabase
         .from('manuals')
-        .select('domains')
+        .select('domains, domain_meta, user_id')
         .eq('id', manualId)
         .single()
 
       if (error || !manual) return []
 
       const assessed: DomainId[] = []
-      const domains = manual.domains as Record<string, Record<string, unknown>>
-      for (const [id, domain] of Object.entries(domains)) {
-        if (domain.assessmentDepth && domain.assessmentDepth !== 'none') {
-          assessed.push(id as DomainId)
+      const meta = (manual.domain_meta || {}) as Record<string, Record<string, unknown>>
+
+      for (const domainId of DOMAIN_ORDER) {
+        const domainMeta = meta[domainId]
+        const assessedBy = domainMeta?.assessed_by as string[] | undefined
+
+        if (assessedBy) {
+          // New per-user tracking: check if current user is in the list
+          if (assessedBy.includes(user.id)) {
+            assessed.push(domainId)
+          }
+        } else {
+          // Legacy fallback: domain has data but no assessed_by tracking
+          // Attribute to the manual creator (user_id)
+          const domains = manual.domains as Record<string, Record<string, unknown>>
+          const domain = domains[domainId]
+          if (domain?.assessmentDepth && domain.assessmentDepth !== 'none' && user.id === manual.user_id) {
+            assessed.push(domainId)
+          }
         }
       }
       return assessed
@@ -475,6 +514,7 @@ export function useRelishOnboarding(householdId: string | null): UseRelishOnboar
   return {
     state,
     loading,
+    currentUserId,
     savePhaseData,
     saveDomainAssessment,
     saveIndividualProfileData,

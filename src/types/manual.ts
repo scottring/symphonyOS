@@ -129,6 +129,7 @@ export interface Manual {
 export interface DomainMeta {
   updated_at: string
   updated_by: DomainUpdateSource
+  assessed_by?: string[]  // User IDs who have assessed this domain
 }
 
 // ==================== Legacy Domain Interfaces ====================

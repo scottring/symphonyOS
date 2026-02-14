@@ -205,7 +205,7 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
   const { household } = useHousehold()
   const householdId = household?.id ?? null
   const {
-    state: onboardingState, loading: onboardingLoading,
+    state: onboardingState, loading: onboardingLoading, currentUserId,
     saveDomainAssessment, saveIndividualProfileData,
     completeIntro, getPreviousPhaseData,
   } = useRelishOnboarding(householdId)
@@ -233,9 +233,25 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
 
   const householdManual = manuals.find(m => m.type === 'household') ?? null
 
-  // Compute assessed domains from manual
-  const assessedDomains: DomainId[] = householdManual
-    ? DOMAIN_ORDER.filter(id => isDomainAssessed(householdManual, id))
+  // Compute per-USER assessed domains (each family member has their own assessment state)
+  const assessedDomains: DomainId[] = (householdManual && currentUserId)
+    ? DOMAIN_ORDER.filter(id => {
+        const meta = householdManual.domain_meta?.[id]
+        const assessedBy = meta?.assessed_by
+
+        if (assessedBy) {
+          // New per-user tracking: check if current user is in the list
+          return assessedBy.includes(currentUserId)
+        }
+
+        // Legacy fallback: domain has data but no assessed_by tracking
+        // Attribute to the manual creator (user_id on the manual record)
+        if (isDomainAssessed(householdManual, id)) {
+          return currentUserId === householdManual.user_id
+        }
+
+        return false
+      })
     : []
 
   // Determine initial step on load
