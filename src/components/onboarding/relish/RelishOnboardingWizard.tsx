@@ -273,7 +273,13 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
       const draft = loadDomainDraft(activeDomain)
       if (draft && draft.turns.length > 0) {
         restoredFromDraft.current = true
-        restoreState(draft.turns, draft.conversationId, draft.lastResponse)
+        // Pass params so sendMessage works after restore (fixes "Conversation not started" bug)
+        restoreState(draft.turns, draft.conversationId, draft.lastResponse, {
+          mode: 'domain-assessment',
+          domainId: activeDomain,
+          householdId: householdId!,
+          previousDomains: {},
+        })
         return
       }
 

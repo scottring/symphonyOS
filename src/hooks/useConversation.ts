@@ -34,7 +34,7 @@ interface UseConversationReturn {
   startIndividualProfile: (householdId: string, personName: string, personId?: string, previousDomains?: Record<string, unknown>) => Promise<void>
   sendMessage: (message: string) => Promise<ConversationResponse>
   requestSynthesis: () => Promise<ConversationResponse>
-  restoreState: (savedTurns: ConversationTurn[], savedConversationId: string, savedLastResponse: ConversationResponse | null) => void
+  restoreState: (savedTurns: ConversationTurn[], savedConversationId: string, savedLastResponse: ConversationResponse | null, params?: ConversationParams) => void
   reset: () => void
 }
 
@@ -206,12 +206,14 @@ export function useConversation(): UseConversationReturn {
     savedTurns: ConversationTurn[],
     savedConversationId: string,
     savedLastResponse: ConversationResponse | null,
+    params?: ConversationParams,
   ) => {
     setTurns(savedTurns)
     setConversationId(savedConversationId)
     setLastResponse(savedLastResponse)
     setError(null)
     setIsLoading(false)
+    if (params) paramsRef.current = params
   }, [])
 
   const reset = useCallback(() => {
