@@ -277,12 +277,13 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
         return
       }
 
-      // Gather previously assessed domains for context
+      // Gather only THIS USER's previously assessed domains for context
+      // (so Iris gets a virgin experience, not Scott's answers)
       const previousDomains: Record<string, unknown> = {}
       if (householdManual) {
         const domains = householdManual.domains as ManualDomains
-        for (const id of DOMAIN_ORDER) {
-          if (isDomainAssessed(householdManual, id)) {
+        for (const id of assessedDomains) {
+          if (id !== activeDomain && domains[id]) {
             previousDomains[id] = domains[id]
           }
         }
