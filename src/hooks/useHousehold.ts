@@ -270,7 +270,28 @@ export function useHousehold(): UseHouseholdReturn {
 
     // Leave current household if any
     if (household) {
-      await leaveHousehold()
+      // Delete membership first
+      await supabase
+        .from('household_members')
+        .delete()
+        .eq('household_id', household.id)
+        .eq('user_id', user.id)
+
+      // If owner of a solo household (auto-created), delete the empty household too
+      if (isOwner) {
+        const { data: remainingMembers } = await supabase
+          .from('household_members')
+          .select('id')
+          .eq('household_id', household.id)
+          .limit(1)
+
+        if (!remainingMembers || remainingMembers.length === 0) {
+          await supabase
+            .from('households')
+            .delete()
+            .eq('id', household.id)
+        }
+      }
     }
 
     // Join the new household
