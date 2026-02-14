@@ -250,103 +250,17 @@ export function useHousehold(): UseHouseholdReturn {
     setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role } : m))
   }, [isOwner])
 
-  // Accept an invitation (by token)
+  // Accept an invitation (by token) — uses RPC to bypass RLS
   const acceptInvitation = useCallback(async (token: string) => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error('Not authenticated')
+    const { error } = await supabase.rpc('accept_household_invitation', {
+      invitation_token: token,
+    })
 
-    // Find the invitation
-    const { data: invitation, error: findError } = await supabase
-      .from('household_invitations')
-      .select('*')
-      .eq('token', token)
-      .is('accepted_at', null)
-      .gt('expires_at', new Date().toISOString())
-      .single()
-
-    if (findError || !invitation) {
-      throw new Error('Invalid or expired invitation')
-    }
-
-    // Leave current household if any
-    if (household) {
-      // Delete membership first
-      await supabase
-        .from('household_members')
-        .delete()
-        .eq('household_id', household.id)
-        .eq('user_id', user.id)
-
-      // If owner of a solo household (auto-created), delete the empty household too
-      if (isOwner) {
-        const { data: remainingMembers } = await supabase
-          .from('household_members')
-          .select('id')
-          .eq('household_id', household.id)
-          .limit(1)
-
-        if (!remainingMembers || remainingMembers.length === 0) {
-          await supabase
-            .from('households')
-            .delete()
-            .eq('id', household.id)
-        }
-      }
-    }
-
-    // Join the new household
-    const { error: joinError } = await supabase
-      .from('household_members')
-      .insert({
-        household_id: invitation.household_id,
-        user_id: user.id,
-        role: 'member',
-        status: 'active',
-        invited_by: invitation.invited_by,
-        joined_at: new Date().toISOString(),
-      })
-
-    if (joinError) throw joinError
-
-    // Mark invitation as accepted
-    await supabase
-      .from('household_invitations')
-      .update({ accepted_at: new Date().toISOString() })
-      .eq('id', invitation.id)
-
-    // Try to link the new user to their family_members record
-    try {
-      if (user.email) {
-        // Find unlinked family members created by the household owner
-        const { data: familyMembers } = await supabase
-          .from('family_members')
-          .select('id, name, auth_user_id, is_full_user')
-          .eq('user_id', invitation.invited_by)
-          .is('auth_user_id', null)
-          .eq('is_full_user', false)
-
-        if (familyMembers && familyMembers.length > 0) {
-          // Match by name heuristic (e.g., "Iris" matches iris@email.com)
-          const emailName = user.email.split('@')[0].toLowerCase()
-          const match = familyMembers.find(fm =>
-            fm.name.toLowerCase().includes(emailName) || emailName.includes(fm.name.toLowerCase())
-          )
-          if (match) {
-            await supabase
-              .from('family_members')
-              .update({ auth_user_id: user.id, is_full_user: true })
-              .eq('id', match.id)
-          }
-        }
-      }
-    } catch (linkErr) {
-      // Non-critical — user can link manually later
-      console.warn('Could not auto-link family member:', linkErr)
-    }
+    if (error) throw error
 
     // Refetch to get the new household
     await fetchHousehold()
-  }, [household, fetchHousehold])
+  }, [fetchHousehold])
 
   // Leave household
   const leaveHousehold = useCallback(async () => {
