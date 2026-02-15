@@ -56,6 +56,7 @@ import {
 import { ManualView } from '@/components/manual/ManualView'
 import { IndividualManualView } from '@/components/manual/IndividualManualView'
 import { YearbookView } from '@/components/yearbook/YearbookView'
+import { DailyPageView } from '@/components/yearbook/DailyPageView'
 import { CheckinFlow } from '@/components/checkin/CheckinFlow'
 import { RelishHome } from '@/components/home/RelishHome'
 import { useHousehold } from '@/hooks/useHousehold'
@@ -214,7 +215,7 @@ function App() {
   const params = useParams<{ projectId?: string; routineId?: string; contactId?: string; goalId?: string }>()
 
   // State for non-URL-routed views
-  const [stateView, setStateView] = useState<'bookshelf' | 'today' | 'lists' | 'notes' | 'history' | 'manual' | 'yearbook' | 'checkin' | 'settings' | 'task-detail' | null>(null)
+  const [stateView, setStateView] = useState<'bookshelf' | 'today' | 'lists' | 'notes' | 'history' | 'manual' | 'yearbook' | 'daily-page' | 'checkin' | 'settings' | 'task-detail' | null>(null)
 
   // Derive view from URL path or state
   const activeView: ViewType = useMemo(() => {
@@ -691,7 +692,7 @@ function App() {
       navigate('/contacts')
     }
     // Handle state-based views
-    else if (view === 'lists' || view === 'notes' || view === 'history' || view === 'manual' || view === 'yearbook' || view === 'checkin' || view === 'settings' || view === 'task-detail') {
+    else if (view === 'lists' || view === 'notes' || view === 'history' || view === 'manual' || view === 'yearbook' || view === 'daily-page' || view === 'checkin' || view === 'settings' || view === 'task-detail') {
       setStateView(view)
       navigate('/') // Navigate to home URL but show state view
     } else {
@@ -1288,6 +1289,7 @@ function App() {
                 onStartCheckin={() => handleViewChange('checkin')}
                 onOpenManual={(manualId) => { handleViewChange('manual'); setSelectedManualId(manualId) }}
                 onOpenYearbook={(_personId) => handleViewChange('yearbook')}
+                onOpenDailyPage={() => handleViewChange('daily-page')}
                 onStartDeepening={(_domainId) => handleViewChange('manual')}
               />
             </div>
@@ -1736,6 +1738,10 @@ function App() {
 
       {activeView === 'yearbook' && (
         <YearbookView />
+      )}
+
+      {activeView === 'daily-page' && (
+        <DailyPageView />
       )}
 
       {activeView === 'checkin' && (

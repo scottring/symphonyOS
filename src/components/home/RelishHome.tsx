@@ -22,6 +22,7 @@ interface RelishHomeProps {
   onStartCheckin: () => void
   onOpenManual: (manualId: string) => void
   onOpenYearbook: (personId: string) => void
+  onOpenDailyPage?: () => void
   onStartDeepening?: (domainId: DomainId) => void
 }
 
@@ -37,6 +38,7 @@ export function RelishHome({
   onStartCheckin,
   onOpenManual,
   onOpenYearbook,
+  onOpenDailyPage,
   onStartDeepening,
 }: RelishHomeProps) {
   const [dismissed, setDismissed] = useState(false)
@@ -59,6 +61,31 @@ export function RelishHome({
         driftSignalCount={driftSignalCount}
         onStartCheckin={onStartCheckin}
       />
+
+      {/* Today's Page — primary CTA */}
+      {onOpenDailyPage && (
+        <section className="px-4 pb-4 max-w-lg mx-auto">
+          <button
+            onClick={onOpenDailyPage}
+            className="w-full p-4 rounded-xl text-left transition-all duration-200 hover:translate-y-[-1px]"
+            style={{
+              background: 'linear-gradient(135deg, hsl(168 30% 94%) 0%, hsl(48 35% 99%) 100%)',
+              boxShadow: 'var(--shadow-elevated)',
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">📖</span>
+              <div>
+                <div className="font-display text-lg text-neutral-800">Today's Page</div>
+                <div className="text-xs text-neutral-500 mt-0.5">Your daily script, checklists, and coaching</div>
+              </div>
+              <svg className="w-5 h-5 text-neutral-400 ml-auto" viewBox="0 0 20 20" fill="none">
+                <path d="M7 5L12 10L7 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </div>
+          </button>
+        </section>
+      )}
 
       {/* Zone 2: Bookshelf */}
       <section className="pb-4">

@@ -14,7 +14,7 @@ const FEATURES = {
   lists: true, // Lists feature enabled - reference lists for books, movies, ideas, etc.
 }
 
-export type ViewType = 'bookshelf' | 'home' | 'today' | 'goals' | 'projects' | 'routines' | 'lists' | 'notes' | 'history' | 'manual' | 'yearbook' | 'checkin' | 'task-detail' | 'contact-detail' | 'settings'
+export type ViewType = 'bookshelf' | 'home' | 'today' | 'goals' | 'projects' | 'routines' | 'lists' | 'notes' | 'history' | 'manual' | 'yearbook' | 'daily-page' | 'checkin' | 'task-detail' | 'contact-detail' | 'settings'
 
 interface EntityData {
   tasks: Task[]

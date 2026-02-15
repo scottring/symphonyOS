@@ -15,6 +15,8 @@ interface ConversationViewProps {
   domainId?: DomainId
   familyName?: string
   error?: string | null
+  minTurns?: number
+  maxTurns?: number
 }
 
 export function ConversationView({
@@ -24,6 +26,8 @@ export function ConversationView({
   domainId,
   familyName,
   error,
+  minTurns = 3,
+  maxTurns = 10,
 }: ConversationViewProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -33,30 +37,77 @@ export function ConversationView({
 
   // Compute turn info for the counter
   const userTurns = turns.filter(t => t.role === 'user').length
-  const estimatedTotal = 8 // ~8 user turns per domain assessment
+  const goodTurns = Math.ceil((minTurns + maxTurns) / 2) // midpoint = "good depth"
+
+  // Depth state: what color is the bar?
+  const depthState: 'empty' | 'building' | 'minimum' | 'good' | 'deep' =
+    userTurns === 0 ? 'empty' :
+    userTurns < minTurns ? 'building' :
+    userTurns < goodTurns ? 'minimum' :
+    userTurns < maxTurns ? 'good' : 'deep'
+
+  const depthPercent = Math.min(100, Math.round((userTurns / maxTurns) * 100))
+
+  const depthBarColor = {
+    empty: 'bg-stone-200',
+    building: 'bg-stone-300',
+    minimum: 'bg-amber-400',
+    good: 'bg-emerald-400',
+    deep: 'bg-emerald-500',
+  }[depthState]
+
+  const depthLabel = {
+    empty: '',
+    building: 'Getting started...',
+    minimum: 'Good start — keep going for richer insights',
+    good: 'Strong depth',
+    deep: 'Wrapping up...',
+  }[depthState]
 
   return (
     <div className="flex flex-col h-full">
       {/* ==================== Conversation Panel ==================== */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Topic breadcrumbs + turn counter */}
-        <div className="border-b border-stone-100 px-5 py-3 flex items-center justify-between bg-white/80 backdrop-blur-sm">
-          <div className="flex items-center gap-2 text-sm text-stone-400 min-w-0">
-            {domainId && (
-              <>
-                <span className="font-medium text-stone-600">Assessment</span>
-                <span className="text-stone-300">/</span>
-                <span className="truncate">{DOMAIN_NAMES[domainId]}</span>
-              </>
-            )}
-            {!domainId && familyName && (
-              <span className="font-medium text-stone-600">{familyName}</span>
+        <div className="border-b border-stone-100 px-5 py-3 bg-white/80 backdrop-blur-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm text-stone-400 min-w-0">
+              {domainId && (
+                <>
+                  <span className="font-medium text-stone-600">Assessment</span>
+                  <span className="text-stone-300">/</span>
+                  <span className="truncate">{DOMAIN_NAMES[domainId]}</span>
+                </>
+              )}
+              {!domainId && familyName && (
+                <span className="font-medium text-stone-600">{familyName}</span>
+              )}
+            </div>
+            {userTurns > 0 && (
+              <span className="text-xs text-stone-400 tabular-nums shrink-0 ml-3">
+                {userTurns} of ~{maxTurns}
+              </span>
             )}
           </div>
+
+          {/* Depth progress bar */}
           {userTurns > 0 && (
-            <span className="text-xs text-stone-400 tabular-nums shrink-0 ml-3">
-              {userTurns} of ~{estimatedTotal}
-            </span>
+            <div className="mt-2">
+              <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-700 ease-out ${depthBarColor}`}
+                  style={{ width: `${depthPercent}%` }}
+                />
+              </div>
+              {depthLabel && (
+                <p className={`mt-1 text-[11px] ${
+                  depthState === 'good' || depthState === 'deep' ? 'text-emerald-600' :
+                  depthState === 'minimum' ? 'text-amber-600' : 'text-stone-400'
+                }`}>
+                  {depthLabel}
+                </p>
+              )}
+            </div>
           )}
         </div>
 

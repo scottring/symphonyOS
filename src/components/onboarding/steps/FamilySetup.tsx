@@ -63,6 +63,7 @@ export function FamilySetup({
         is_full_user: false,
         display_order: members.length,
         avatar_url: null,
+        member_type: 'core',
       })
       setNewName('')
       setNewColor('blue')

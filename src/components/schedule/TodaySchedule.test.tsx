@@ -97,6 +97,7 @@ const mockFamilyMember: FamilyMember = {
   is_full_user: false,
   display_order: 0,
   created_at: '2024-01-01T00:00:00Z',
+  member_type: 'core',
 }
 
 describe('TodaySchedule', () => {

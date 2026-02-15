@@ -34,6 +34,7 @@ const mockFamilyMembers: FamilyMember[] = [
     is_full_user: true,
     display_order: 0,
     created_at: '2024-01-01',
+    member_type: 'core',
   },
   {
     id: 'member-2',
@@ -44,6 +45,7 @@ const mockFamilyMembers: FamilyMember[] = [
     avatar_url: null,
     is_full_user: false,
     display_order: 1,
+    member_type: 'core',
     created_at: '2024-01-01',
   },
 ]

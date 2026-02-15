@@ -1,3 +1,5 @@
+import type { ChildProfile } from '@/types/userProfile'
+
 export type AgeRange = 'infant' | 'toddler' | 'child' | 'teen' | 'adult'
 
 export interface Medication {
@@ -5,6 +7,8 @@ export interface Medication {
   dosage?: string
   frequency?: string
 }
+
+export type MemberType = 'core' | 'guest'
 
 export interface FamilyMember {
   id: string
@@ -18,6 +22,11 @@ export interface FamilyMember {
   created_at: string
   auth_user_id?: string | null // Links to auth.users for users with accounts
 
+  // Household role (Phase 1: Relish redesign)
+  member_type: MemberType           // 'core' = lives here, 'guest' = recurring visitor
+  role_label?: string | null        // "parent", "child", "grandparent", "babysitter", etc.
+  typical_involvement?: string | null // Guest only: "picks up Tuesdays", "Thursday evenings"
+
   // Health profile fields (optional, system-wide)
   date_of_birth?: string | null
   age_range?: AgeRange
@@ -26,6 +35,9 @@ export interface FamilyMember {
   dietary_restrictions?: string[]
   health_conditions?: string[]
   mobility_needs?: string | null
+
+  // Child profile (filled by parents, Phase 2: Relish redesign)
+  child_profile?: ChildProfile | null
 }
 
 // ============================================================================
@@ -36,6 +48,7 @@ export interface Household {
   id: string
   name: string
   owner_id: string
+  address?: string | null  // Home address (Phase 1: Relish redesign)
   created_at: string
   updated_at: string
 }

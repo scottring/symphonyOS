@@ -251,6 +251,7 @@ describe('useFamilyMembers', () => {
           avatar_url: null,
           is_full_user: false,
           display_order: 0,
+          member_type: 'core',
         })
       })
 
@@ -278,6 +279,7 @@ describe('useFamilyMembers', () => {
           avatar_url: null,
           is_full_user: false,
           display_order: 0,
+          member_type: 'core',
         })
       ).rejects.toThrow('Not authenticated')
     })
@@ -304,6 +306,7 @@ describe('useFamilyMembers', () => {
           avatar_url: null,
           is_full_user: false,
           display_order: 0,
+          member_type: 'core',
         })
       ).rejects.toBeTruthy()
 

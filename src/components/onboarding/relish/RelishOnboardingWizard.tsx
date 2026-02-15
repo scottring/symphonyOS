@@ -1,6 +1,6 @@
 // RelishOnboardingWizard — Domain-at-a-time assessment onboarding
-// Flow: Welcome → Family Setup → Domain Picker → Assessment Conversation →
-//       Results → Domain Picker (or Launch) → Person Profiles → Generate → Complete
+// Flow: Welcome → Household Setup → Wellness → Child Profiles → Domain Picker →
+//       Assessment Conversation → Results → Domain Picker (or Launch) → Generate → Complete
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -14,14 +14,19 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { ConversationView } from './ConversationView'
 import { DomainPicker } from './DomainPicker'
 import { AssessmentResults } from '@/components/manual/AssessmentResults'
-import { FamilySetup } from '@/components/onboarding/steps/FamilySetup'
+import { HouseholdSetup } from '@/components/onboarding/steps/HouseholdSetup'
+import { WellnessAssessment } from '@/components/onboarding/steps/WellnessAssessment'
+import { ChildProfileForm } from '@/components/onboarding/steps/ChildProfileForm'
 import { DOMAIN_ORDER, isDomainAssessed } from '@/types/manual'
+import type { PersonalWellness, ChildProfile } from '@/types/userProfile'
 import type { DomainId, ManualDomains, DomainAssessment } from '@/types/manual'
 import type { ConversationTurn } from '@/types/conversation'
 
 type WizardStep =
   | 'welcome'
   | 'family'
+  | 'wellness'
+  | 'child-profiles'
   | 'domain-picker'
   | 'domain-conversation'
   | 'domain-results'
@@ -251,7 +256,7 @@ interface RelishOnboardingWizardProps {
 }
 
 export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardProps) {
-  const { household } = useHousehold()
+  const { household, updateHousehold } = useHousehold()
   const householdId = household?.id ?? null
   const {
     state: onboardingState, loading: onboardingLoading, currentUserId,
@@ -264,7 +269,7 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
     restoreState, reset, conversationId,
   } = useConversation()
   const { members: familyMembers, addMember, updateMember, deleteMember, refetch: refetchFamily } = useFamilyMembers()
-  const { manuals } = useManual(householdId)
+  const { manuals, refetch: refetchManuals } = useManual(householdId)
   const { getOrCreateYearbook } = useYearbook(householdId)
   const { generateContent, isGenerating } = useYearbookGeneration(householdId)
 
@@ -395,8 +400,68 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
   }
 
   const handleFamilyContinue = () => {
-    setStep('domain-picker')
+    setStep('wellness')
   }
+
+  // Wellness assessment — save to user_profiles
+  const [childProfileIndex, setChildProfileIndex] = useState(0)
+  const childMembers = familyMembers.filter(m => m.member_type === 'core' && m.role_label === 'child')
+
+  const handleWellnessSave = useCallback(async (data: PersonalWellness) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    await supabase
+      .from('user_profiles')
+      .upsert({ user_id: user.id, personal_wellness: data }, { onConflict: 'user_id' })
+    // If there are children, go to child profiles; otherwise domain picker
+    if (childMembers.length > 0) {
+      setChildProfileIndex(0)
+      setStep('child-profiles')
+    } else {
+      setStep('domain-picker')
+    }
+  }, [childMembers.length])
+
+  const handleWellnessSkip = useCallback(() => {
+    if (childMembers.length > 0) {
+      setChildProfileIndex(0)
+      setStep('child-profiles')
+    } else {
+      setStep('domain-picker')
+    }
+  }, [childMembers.length])
+
+  // Child profiles — save to family_members.child_profile
+  const handleChildProfileSave = useCallback(async (childId: string, profile: ChildProfile) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    // Add current user to assessed_by
+    const updatedProfile = { ...profile, assessed_by: [user.id] }
+    await updateMember(childId, { child_profile: updatedProfile } as Partial<import('@/types/family').FamilyMember>)
+    await refetchFamily()
+    // Advance to next child or domain picker
+    if (childProfileIndex < childMembers.length - 1) {
+      setChildProfileIndex(prev => prev + 1)
+    } else {
+      setStep('domain-picker')
+    }
+  }, [childProfileIndex, childMembers.length, updateMember, refetchFamily])
+
+  const handleChildProfileSkip = useCallback(() => {
+    if (childProfileIndex < childMembers.length - 1) {
+      setChildProfileIndex(prev => prev + 1)
+    } else {
+      setStep('domain-picker')
+    }
+  }, [childProfileIndex, childMembers.length])
+
+  const handleChildProfileBack = useCallback(() => {
+    if (childProfileIndex > 0) {
+      setChildProfileIndex(prev => prev - 1)
+    } else {
+      setStep('wellness')
+    }
+  }, [childProfileIndex])
 
   const handleSelectDomain = (domainId: DomainId) => {
     setActiveDomain(domainId)
@@ -420,13 +485,16 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
       restoredFromDraft.current = false
       reset()
       setSynthesisData(null)
+      // Explicitly refetch manuals so assessedDomains recomputes immediately
+      // (don't rely solely on realtime subscription — it can miss updates)
+      await refetchManuals()
       setStep('domain-picker')
     } catch (err) {
       console.error('Failed to save domain assessment:', err)
     } finally {
       setIsSaving(false)
     }
-  }, [synthesisData, activeDomain, saveDomainAssessment, reset])
+  }, [synthesisData, activeDomain, saveDomainAssessment, reset, refetchManuals])
 
   const handleLaunch = () => {
     if (familyMembers.length > 0) {
@@ -558,10 +626,12 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
         </div>
       )}
 
-      {/* ==================== Family Setup ==================== */}
+      {/* ==================== Household Setup ==================== */}
       {step === 'family' && (
-        <FamilySetup
+        <HouseholdSetup
+          household={household}
           members={familyMembers}
+          onUpdateHousehold={updateHousehold}
           onAddMember={async (member) => {
             const newMember = await addMember(member)
             await refetchFamily()
@@ -570,6 +640,28 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
           onUpdateMember={updateMember}
           onDeleteMember={deleteMember}
           onContinue={handleFamilyContinue}
+        />
+      )}
+
+      {/* ==================== Wellness Assessment ==================== */}
+      {step === 'wellness' && (
+        <WellnessAssessment
+          userName={familyMembers.find(m => m.is_full_user)?.name || 'there'}
+          onSave={handleWellnessSave}
+          onSkip={handleWellnessSkip}
+        />
+      )}
+
+      {/* ==================== Child Profiles ==================== */}
+      {step === 'child-profiles' && childMembers[childProfileIndex] && (
+        <ChildProfileForm
+          child={childMembers[childProfileIndex]}
+          existingProfile={childMembers[childProfileIndex].child_profile}
+          onSave={handleChildProfileSave}
+          onSkip={handleChildProfileSkip}
+          onBack={handleChildProfileBack}
+          currentIndex={childProfileIndex}
+          totalChildren={childMembers.length}
         />
       )}
 
@@ -593,6 +685,8 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
             domainId={activeDomain}
             familyName={household?.name}
             error={convError}
+            minTurns={lastResponse?.minTurns ?? 3}
+            maxTurns={lastResponse?.maxTurns ?? 10}
           />
         </div>
       )}

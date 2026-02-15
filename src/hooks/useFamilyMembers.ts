@@ -55,7 +55,7 @@ export function useFamilyMembers() {
       const initials = userName.split(/\s+/).map((w: string) => w[0]).join('').substring(0, 2).toUpperCase()
 
       const defaultMembers = [
-        { name: userName, initials, color: 'blue', is_full_user: true, display_order: 0, avatar_url: null },
+        { name: userName, initials, color: 'blue', is_full_user: true, display_order: 0, avatar_url: null, member_type: 'core' as const, role_label: 'parent' },
       ]
 
       try {
