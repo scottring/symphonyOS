@@ -84,7 +84,9 @@ function clearDomainDraft(domainId: DomainId): void {
 }
 
 // Load the most recent active conversation from the server (survives tab close)
-async function loadServerDraft(domainId: DomainId, householdId: string): Promise<DomainConversationDraft | null> {
+// Searches by user_id + domain_id only (not household_id) to handle cases where
+// the user's household membership changed (e.g., joined a different household).
+async function loadServerDraft(domainId: DomainId): Promise<DomainConversationDraft | null> {
   try {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
@@ -92,7 +94,6 @@ async function loadServerDraft(domainId: DomainId, householdId: string): Promise
     const { data, error } = await supabase
       .from('conversations')
       .select('id, turns, status, created_at')
-      .eq('household_id', householdId)
       .eq('user_id', user.id)
       .eq('domain_id', domainId)
       .eq('status', 'active')
@@ -332,7 +333,7 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
       }
 
       // 2. Check server for an existing active conversation (survives tab close)
-      const serverDraft = await loadServerDraft(activeDomain, householdId!)
+      const serverDraft = await loadServerDraft(activeDomain)
       if (serverDraft && serverDraft.turns.length > 0) {
         restoredFromDraft.current = true
         restoreState(serverDraft.turns, serverDraft.conversationId, serverDraft.lastResponse, {

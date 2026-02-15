@@ -438,15 +438,17 @@ export function useRelishOnboarding(householdId: string | null): UseRelishOnboar
     }))
   }, [state.phasesCompleted, getOrCreateManual])
 
-  // Mark intro as completed
+  // Mark intro as completed — uses UPSERT to handle users without a user_profiles row
   const completeIntro = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('No user')
 
     const { error } = await supabase
       .from('user_profiles')
-      .update({ relish_intro_completed: true })
-      .eq('user_id', user.id)
+      .upsert(
+        { user_id: user.id, relish_intro_completed: true },
+        { onConflict: 'user_id' }
+      )
 
     if (error) throw error
 
