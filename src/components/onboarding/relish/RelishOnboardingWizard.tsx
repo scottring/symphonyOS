@@ -83,6 +83,54 @@ function clearDomainDraft(domainId: DomainId): void {
   }
 }
 
+// Load the most recent active conversation from the server (survives tab close)
+async function loadServerDraft(domainId: DomainId, householdId: string): Promise<DomainConversationDraft | null> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
+
+    const { data, error } = await supabase
+      .from('conversations')
+      .select('id, turns, status, created_at')
+      .eq('household_id', householdId)
+      .eq('user_id', user.id)
+      .eq('domain_id', domainId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (error || !data) return null
+
+    const turns = (data.turns ?? []) as ConversationTurn[]
+    // Only restore if there's meaningful content (at least one user turn)
+    const hasUserTurn = turns.some(t => t.role === 'user')
+    if (!hasUserTurn) return null
+
+    // Reconstruct a lastResponse from the last assistant turn
+    const lastAssistantTurn = [...turns].reverse().find(t => t.role === 'assistant')
+    const lastResponse = lastAssistantTurn ? {
+      type: 'question' as const,
+      message: lastAssistantTurn.content,
+      structuredData: null,
+      conversationId: data.id,
+      turnCount: turns.filter(t => t.role === 'user').length,
+      minTurns: 3,
+      maxTurns: 10,
+    } : null
+
+    return {
+      domainId,
+      conversationId: data.id,
+      turns,
+      lastResponse,
+      savedAt: new Date(data.created_at).getTime(),
+    }
+  } catch {
+    return null
+  }
+}
+
 // ==================== Generating Step Component ====================
 
 import type { FamilyMember } from '@/types/family'
@@ -266,15 +314,15 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
 
   // Auto-start domain assessment conversation
   useEffect(() => {
-    if (step === 'domain-conversation' && householdId && !conversationStarted) {
-      setConversationStarted(true)
+    if (step !== 'domain-conversation' || !householdId || conversationStarted) return
+    setConversationStarted(true)
 
-      // Check for a saved draft first
-      const draft = loadDomainDraft(activeDomain)
-      if (draft && draft.turns.length > 0) {
+    async function startOrRestore() {
+      // 1. Check sessionStorage draft (same tab session)
+      const sessionDraft = loadDomainDraft(activeDomain)
+      if (sessionDraft && sessionDraft.turns.length > 0) {
         restoredFromDraft.current = true
-        // Pass params so sendMessage works after restore (fixes "Conversation not started" bug)
-        restoreState(draft.turns, draft.conversationId, draft.lastResponse, {
+        restoreState(sessionDraft.turns, sessionDraft.conversationId, sessionDraft.lastResponse, {
           mode: 'domain-assessment',
           domainId: activeDomain,
           householdId: householdId!,
@@ -283,8 +331,20 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
         return
       }
 
-      // Gather only THIS USER's previously assessed domains for context
-      // (so Iris gets a virgin experience, not Scott's answers)
+      // 2. Check server for an existing active conversation (survives tab close)
+      const serverDraft = await loadServerDraft(activeDomain, householdId!)
+      if (serverDraft && serverDraft.turns.length > 0) {
+        restoredFromDraft.current = true
+        restoreState(serverDraft.turns, serverDraft.conversationId, serverDraft.lastResponse, {
+          mode: 'domain-assessment',
+          domainId: activeDomain,
+          householdId: householdId!,
+          previousDomains: {},
+        })
+        return
+      }
+
+      // 3. No draft found — start a fresh conversation
       const previousDomains: Record<string, unknown> = {}
       if (householdManual) {
         const domains = householdManual.domains as ManualDomains
@@ -295,8 +355,10 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
         }
       }
 
-      startDomainAssessment(activeDomain, householdId, previousDomains)
+      startDomainAssessment(activeDomain, householdId!, previousDomains)
     }
+
+    startOrRestore()
   }, [step, householdId, activeDomain, conversationStarted, startDomainAssessment, householdManual, restoreState])
 
   // Auto-save conversation draft after each AI response
