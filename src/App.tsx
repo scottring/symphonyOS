@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback, Suspense } from 'react'
+import { useEffect, useState, useMemo, useCallback, useRef, Suspense } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useAuth } from '@/hooks/useAuth'
@@ -248,13 +248,19 @@ function App() {
     localStorage.setItem('relish-sidebar-collapsed', String(sidebarCollapsed))
   }, [sidebarCollapsed])
 
-  // Check onboarding status
+  // Check onboarding status — only on initial load, not on auth token refreshes.
+  // This prevents the wizard from unmounting mid-conversation when Supabase
+  // refreshes the auth token and a transient error would flip onboardingComplete.
+  const onboardingChecked = useRef(false)
   useEffect(() => {
+    if (onboardingChecked.current) return // Only check once
     async function checkOnboarding() {
       if (!user) {
         setOnboardingLoading(false)
         return
       }
+
+      onboardingChecked.current = true
 
       try {
         const { data: profile, error } = await supabase

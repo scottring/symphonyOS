@@ -343,7 +343,7 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
     setStep('domain-conversation')
   }
 
-  const handleSendMessage = useCallback(async (message: string) => {
+  const handleSendMessage = useCallback(async (message: string): Promise<void> => {
     await sendMessage(message)
   }, [sendMessage])
 

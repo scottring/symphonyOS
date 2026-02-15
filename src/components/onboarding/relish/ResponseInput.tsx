@@ -88,7 +88,7 @@ const DEMO_ANSWERS: Partial<Record<DomainId, string[]>> = {
 }
 
 interface ResponseInputProps {
-  onSend: (message: string) => void
+  onSend: (message: string) => Promise<void> | void
   disabled?: boolean
   placeholder?: string
   domainId?: DomainId
@@ -97,7 +97,10 @@ interface ResponseInputProps {
 
 export function ResponseInput({ onSend, disabled, placeholder = 'Share your thoughts...', domainId, turnCount = 0 }: ResponseInputProps) {
   const [text, setText] = useState('')
+  const [sending, setSending] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const isDisabled = disabled || sending
 
   useEffect(() => {
     const ta = textareaRef.current
@@ -108,16 +111,24 @@ export function ResponseInput({ onSend, disabled, placeholder = 'Share your thou
   }, [text])
 
   useEffect(() => {
-    if (!disabled) {
+    if (!isDisabled) {
       textareaRef.current?.focus()
     }
-  }, [disabled])
+  }, [isDisabled])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!text.trim() || disabled) return
-    onSend(text.trim())
-    setText('')
+    if (!text.trim() || isDisabled) return
+    const message = text.trim()
+    setSending(true)
+    try {
+      await onSend(message)
+      setText('') // Only clear after successful send
+    } catch {
+      // Keep text in input so user doesn't lose their work
+    } finally {
+      setSending(false)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -127,13 +138,20 @@ export function ResponseInput({ onSend, disabled, placeholder = 'Share your thou
     }
   }
 
-  const handleDemoFill = () => {
+  const handleDemoFill = async () => {
     if (!domainId) return
     const answers = DEMO_ANSWERS[domainId]
     if (!answers) return
     const userTurnIndex = Math.floor(turnCount / 2)
     const answer = answers[userTurnIndex % answers.length]
-    onSend(answer)
+    setSending(true)
+    try {
+      await onSend(answer)
+    } catch {
+      // Demo fill failure is non-critical
+    } finally {
+      setSending(false)
+    }
   }
 
   const isDev = import.meta.env.DEV
@@ -142,7 +160,7 @@ export function ResponseInput({ onSend, disabled, placeholder = 'Share your thou
   return (
     <form onSubmit={handleSubmit} className="relative">
       <div className={`relative rounded-xl border transition-colors ${
-        disabled
+        isDisabled
           ? 'border-stone-100 bg-stone-50'
           : hasText
             ? 'border-stone-300 bg-white'
@@ -153,7 +171,7 @@ export function ResponseInput({ onSend, disabled, placeholder = 'Share your thou
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          disabled={disabled}
+          disabled={isDisabled}
           placeholder={placeholder}
           rows={1}
           className="w-full px-4 py-3 pr-20 text-base md:text-lg leading-relaxed bg-transparent resize-none focus:outline-none disabled:opacity-40 placeholder:text-stone-300"
@@ -165,7 +183,7 @@ export function ResponseInput({ onSend, disabled, placeholder = 'Share your thou
             <button
               type="button"
               onClick={handleDemoFill}
-              disabled={disabled}
+              disabled={isDisabled}
               className="px-2 py-1.5 text-[10px] font-medium uppercase tracking-wider text-amber-600 bg-amber-50 rounded-md hover:bg-amber-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               title="Fill demo answer"
             >
@@ -174,9 +192,9 @@ export function ResponseInput({ onSend, disabled, placeholder = 'Share your thou
           )}
           <button
             type="submit"
-            disabled={!hasText || disabled}
+            disabled={!hasText || isDisabled}
             className={`p-2 rounded-lg transition-all ${
-              hasText && !disabled
+              hasText && !isDisabled
                 ? 'bg-stone-900 text-white hover:bg-stone-800'
                 : 'bg-stone-100 text-stone-300 cursor-not-allowed'
             }`}
