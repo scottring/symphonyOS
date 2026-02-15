@@ -316,10 +316,10 @@ const DOMAIN_REFRESH_CONFIG: Record<string, {
 }
 
 // ==================== Deep Domain Assessment Configs ====================
-// Each domain gets its own dedicated conversation (6-12 turns) for deep assessment.
+// Each domain gets its own focused conversation (3-6 turns) for assessment.
 // Produces DomainAssessment output: headline, harmonyScore, strengths, issues, opportunities, actions, and domain-specific data.
 
-const ASSESSMENT_PREAMBLE = `You are an expert family systems coach conducting a DEEP domain assessment. This is not a survey — it's a diagnostic conversation. Your goal is to understand this domain thoroughly, identify patterns the family may not see, and surface specific, actionable findings.
+const ASSESSMENT_PREAMBLE = `You are an expert family systems coach conducting a focused domain assessment. This is not a survey — it's a diagnostic conversation. Your goal is to efficiently understand this domain, identify patterns the family may not see, and surface specific, actionable findings.
 
 YOUR APPROACH:
 - Ask ONE probing question at a time. Follow up with diagnostic observations.
@@ -328,7 +328,9 @@ YOUR APPROACH:
 - Be warm but direct. You're a trusted expert, not a cheerleader.
 - Use their language but add clinical framing.
 - Each response should include a brief observation/insight AND your next question.
-- Go deep — you have 6-10 exchanges to thoroughly understand this domain.`
+- BE EFFICIENT: You have 3-6 exchanges. Cover the most important ground first. Ask compound questions when appropriate (e.g., "Tell me about X — and while you're at it, how does Y connect to that?").
+- Don't ask about things they've already covered thoroughly. Move to the next area.
+- By exchange 4-5, start weaving in summary observations rather than opening new threads.`
 
 const DOMAIN_ASSESSMENT_CONFIGS: Record<string, {
   minTurns: number
@@ -338,7 +340,7 @@ const DOMAIN_ASSESSMENT_CONFIGS: Record<string, {
   dataShape: string
 }> = {
   values: {
-    minTurns: 5, maxTurns: 8, label: 'Values & Identity',
+    minTurns: 3, maxTurns: 6, label: 'Values & Identity',
     systemPrompt: ASSESSMENT_PREAMBLE + `
 
 DOMAIN: Values & Identity
@@ -363,7 +365,7 @@ Start with: "I want to understand what your family actually stands for — not t
   },
 
   communication: {
-    minTurns: 6, maxTurns: 10, label: 'Communication',
+    minTurns: 3, maxTurns: 6, label: 'Communication',
     systemPrompt: ASSESSMENT_PREAMBLE + `
 
 DOMAIN: Communication
@@ -389,7 +391,7 @@ Start with: "Let's talk about how your family actually communicates — not the 
   },
 
   connection: {
-    minTurns: 5, maxTurns: 9, label: 'Connection & Rituals',
+    minTurns: 3, maxTurns: 6, label: 'Connection & Rituals',
     systemPrompt: ASSESSMENT_PREAMBLE + `
 
 DOMAIN: Connection & Rituals
@@ -414,7 +416,7 @@ Start with: "Let's map the emotional landscape of your family. I want to underst
   },
 
   roles: {
-    minTurns: 7, maxTurns: 12, label: 'Roles & Responsibilities',
+    minTurns: 3, maxTurns: 6, label: 'Roles & Responsibilities',
     systemPrompt: ASSESSMENT_PREAMBLE + `
 
 DOMAIN: Roles & Responsibilities
@@ -439,7 +441,7 @@ Start with: "Let's do a complete audit of who does what in your family — and I
   },
 
   organization: {
-    minTurns: 7, maxTurns: 12, label: 'Organization & Spaces',
+    minTurns: 3, maxTurns: 6, label: 'Organization & Spaces',
     systemPrompt: ASSESSMENT_PREAMBLE + `
 
 DOMAIN: Organization & Spaces
@@ -463,7 +465,7 @@ Start with: "Let's walk through your home — the real version, not the company-
   },
 
   adaptability: {
-    minTurns: 6, maxTurns: 11, label: 'Adaptability & Stress',
+    minTurns: 3, maxTurns: 6, label: 'Adaptability & Stress',
     systemPrompt: ASSESSMENT_PREAMBLE + `
 
 DOMAIN: Adaptability & Stress
@@ -488,7 +490,7 @@ Start with: "Let's do a complete stress inventory for your family. Not just the 
   },
 
   problemSolving: {
-    minTurns: 5, maxTurns: 9, label: 'Problem Solving & Decisions',
+    minTurns: 3, maxTurns: 6, label: 'Problem Solving & Decisions',
     systemPrompt: ASSESSMENT_PREAMBLE + `
 
 DOMAIN: Problem Solving & Decisions
@@ -512,7 +514,7 @@ Start with: "Let's talk about how your family handles problems and makes decisio
   },
 
   resources: {
-    minTurns: 6, maxTurns: 10, label: 'Resources & Finances',
+    minTurns: 3, maxTurns: 6, label: 'Resources & Finances',
     systemPrompt: ASSESSMENT_PREAMBLE + `
 
 DOMAIN: Resources & Finances

@@ -124,7 +124,7 @@ async function loadServerDraft(domainId: DomainId): Promise<DomainConversationDr
       conversationId: data.id,
       turnCount: turns.filter(t => t.role === 'user').length,
       minTurns: 3,
-      maxTurns: 10,
+      maxTurns: 6,
     } : null
 
     return {
