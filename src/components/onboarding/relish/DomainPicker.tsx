@@ -15,6 +15,9 @@ interface DomainPickerProps {
   assessedDomains: DomainId[]
   onSelectDomain: (domainId: DomainId) => void
   onLaunch: () => void
+  // Joint review
+  overlappingDomains?: DomainId[]
+  onStartJointReview?: (domainIds: DomainId[]) => void
 }
 
 export function DomainPicker({
@@ -22,6 +25,8 @@ export function DomainPicker({
   assessedDomains,
   onSelectDomain,
   onLaunch,
+  overlappingDomains = [],
+  onStartJointReview,
 }: DomainPickerProps) {
   const canLaunch = assessedDomains.length >= 3
   const domains = manual?.domains as ManualDomains | undefined
@@ -57,6 +62,34 @@ export function DomainPicker({
         <p className="text-xs text-stone-400 mb-8">
           {assessedDomains.length} of 8 assessed — each takes about 5 minutes
         </p>
+
+        {/* Joint review banner — when both partners have overlapping domains */}
+        {overlappingDomains.length >= 2 && onStartJointReview && (
+          <button
+            onClick={() => onStartJointReview(overlappingDomains)}
+            className="w-full mb-6 px-5 py-4 rounded-xl border-2 border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 text-left transition-all hover:shadow-md hover:border-amber-300 group"
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
+                <svg className="w-5 h-5 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-1.053M18 10.5a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-900 mb-1">
+                  Joint Review Available
+                </p>
+                <p className="text-xs text-amber-700 leading-relaxed">
+                  You and your partner have both assessed {overlappingDomains.length} domain{overlappingDomains.length > 1 ? 's' : ''}.
+                  Sit down together and let the AI surface where you agree, where you differ, and help you build a shared picture.
+                </p>
+                <p className="text-xs font-medium text-amber-600 mt-2 group-hover:text-amber-800 transition-colors">
+                  Start joint review →
+                </p>
+              </div>
+            </div>
+          </button>
+        )}
 
         {/* Domain grid */}
         <div className="space-y-2 w-full mb-8">

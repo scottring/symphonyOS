@@ -21,6 +21,7 @@ type ConversationParams =
   | { mode: 'domain-assessment'; domainId: DomainId; householdId: string; previousDomains?: Record<string, unknown> }
   | { mode: 'refresh'; domainId: DomainId; householdId: string; currentDomainData: Record<string, unknown> }
   | { mode: 'individual-profile'; householdId: string; personName: string; personId?: string; previousDomains?: Record<string, unknown> }
+  | { mode: 'joint-review'; householdId: string; person1Name: string; person2Name: string; domainIds: DomainId[]; domainAssessments: Record<string, unknown> }
 
 interface UseConversationReturn {
   turns: ConversationTurn[]
@@ -32,6 +33,7 @@ interface UseConversationReturn {
   startDomainAssessment: (domainId: DomainId, householdId: string, previousDomains?: Record<string, unknown>) => Promise<void>
   startRefreshConversation: (domainId: DomainId, householdId: string, currentDomainData: Record<string, unknown>) => Promise<void>
   startIndividualProfile: (householdId: string, personName: string, personId?: string, previousDomains?: Record<string, unknown>) => Promise<void>
+  startJointReview: (householdId: string, person1Name: string, person2Name: string, domainIds: DomainId[], domainAssessments: Record<string, unknown>) => Promise<void>
   sendMessage: (message: string) => Promise<ConversationResponse>
   requestSynthesis: () => Promise<ConversationResponse>
   restoreState: (savedTurns: ConversationTurn[], savedConversationId: string, savedLastResponse: ConversationResponse | null, params?: ConversationParams) => void
@@ -80,6 +82,12 @@ export function useConversation(): UseConversationReturn {
         body.personName = params.personName
         body.personId = params.personId
         body.previousDomains = params.previousDomains
+      } else if (params.mode === 'joint-review') {
+        body.mode = 'joint-review'
+        body.person1Name = params.person1Name
+        body.person2Name = params.person2Name
+        body.domainIds = params.domainIds
+        body.domainAssessments = params.domainAssessments
       } else {
         body.mode = 'refresh'
         body.domainId = params.domainId
@@ -136,6 +144,16 @@ export function useConversation(): UseConversationReturn {
     await startWithParams({ mode: 'individual-profile', householdId, personName, personId, previousDomains })
   }, [startWithParams])
 
+  const startJointReview = useCallback(async (
+    householdId: string,
+    person1Name: string,
+    person2Name: string,
+    domainIds: DomainId[],
+    domainAssessments: Record<string, unknown>
+  ) => {
+    await startWithParams({ mode: 'joint-review', householdId, person1Name, person2Name, domainIds, domainAssessments })
+  }, [startWithParams])
+
   const sendMessage = useCallback(async (message: string): Promise<ConversationResponse> => {
     const params = paramsRef.current
     if (!params) {
@@ -170,6 +188,12 @@ export function useConversation(): UseConversationReturn {
         body.personName = params.personName
         body.personId = params.personId
         body.previousDomains = params.previousDomains
+      } else if (params.mode === 'joint-review') {
+        body.mode = 'joint-review'
+        body.person1Name = params.person1Name
+        body.person2Name = params.person2Name
+        body.domainIds = params.domainIds
+        body.domainAssessments = params.domainAssessments
       } else {
         body.mode = 'refresh'
         body.domainId = params.domainId
@@ -235,6 +259,7 @@ export function useConversation(): UseConversationReturn {
     startDomainAssessment,
     startRefreshConversation,
     startIndividualProfile,
+    startJointReview,
     sendMessage,
     requestSynthesis,
     restoreState,

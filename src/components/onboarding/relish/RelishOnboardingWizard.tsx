@@ -17,7 +17,7 @@ import { AssessmentResults } from '@/components/manual/AssessmentResults'
 import { HouseholdSetup } from '@/components/onboarding/steps/HouseholdSetup'
 import { WellnessAssessment } from '@/components/onboarding/steps/WellnessAssessment'
 import { ChildProfileForm } from '@/components/onboarding/steps/ChildProfileForm'
-import { DOMAIN_ORDER, isDomainAssessed } from '@/types/manual'
+import { DOMAIN_ORDER, DOMAIN_NAMES, isDomainAssessed } from '@/types/manual'
 import type { PersonalWellness, ChildProfile } from '@/types/userProfile'
 import type { DomainId, ManualDomains, DomainAssessment } from '@/types/manual'
 import type { ConversationTurn } from '@/types/conversation'
@@ -30,6 +30,8 @@ type WizardStep =
   | 'domain-picker'
   | 'domain-conversation'
   | 'domain-results'
+  | 'joint-review'
+  | 'joint-review-results'
   | 'person-profiles'
   | 'person-profile-conversation'
   | 'generating'
@@ -265,7 +267,7 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
   } = useRelishOnboarding(householdId)
   const {
     turns, isLoading: convLoading, error: convError, lastResponse,
-    startDomainAssessment, startIndividualProfile, sendMessage,
+    startDomainAssessment, startIndividualProfile, startJointReview, sendMessage,
     restoreState, reset, conversationId,
   } = useConversation()
   const { members: familyMembers, addMember, updateMember, deleteMember, refetch: refetchFamily } = useFamilyMembers()
@@ -284,6 +286,9 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
   const [profileMemberIndex, setProfileMemberIndex] = useState(0)
   const [profiledMembers, setProfiledMembers] = useState<string[]>([])
   const [profileConversationStarted, setProfileConversationStarted] = useState(false)
+  const [jointReviewStarted, setJointReviewStarted] = useState(false)
+  const [jointReviewDomains, setJointReviewDomains] = useState<DomainId[]>([])
+  const [jointSynthesisData, setJointSynthesisData] = useState<Record<string, unknown> | null>(null)
 
   const householdManual = manuals.find(m => m.type === 'household') ?? null
 
@@ -307,6 +312,23 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
         return false
       })
     : []
+
+  // Compute overlapping domains — domains where both the current user AND another user have assessed
+  const overlappingDomains: DomainId[] = (householdManual && currentUserId)
+    ? DOMAIN_ORDER.filter(id => {
+        const assessedBy = householdManual.domain_meta?.[id]?.assessed_by
+        if (!assessedBy || assessedBy.length < 2) return false
+        return assessedBy.includes(currentUserId) && assessedBy.some((uid: string) => uid !== currentUserId)
+      })
+    : []
+
+  // Find the other user's name for joint review UI
+  const otherAdultName = familyMembers.find(m =>
+    m.is_full_user && m.auth_user_id && m.auth_user_id !== currentUserId
+  )?.name ?? 'your partner'
+  const currentUserName = familyMembers.find(m =>
+    m.auth_user_id === currentUserId
+  )?.name ?? 'you'
 
   // Determine initial step on load
   useEffect(() => {
@@ -471,6 +493,49 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
     setStep('domain-conversation')
   }
 
+  // Joint review — start conversation with both partners' assessments
+  const handleStartJointReview = useCallback((domainIds: DomainId[]) => {
+    setJointReviewDomains(domainIds)
+    setJointReviewStarted(false)
+    setJointSynthesisData(null)
+    reset()
+    setStep('joint-review')
+  }, [reset])
+
+  // Auto-start joint review conversation
+  useEffect(() => {
+    if (step !== 'joint-review' || !householdId || jointReviewStarted) return
+    setJointReviewStarted(true)
+
+    // Gather both partners' assessments for the overlapping domains
+    const domainAssessments: Record<string, unknown> = {}
+    if (householdManual) {
+      const domains = householdManual.domains as ManualDomains
+      for (const domainId of jointReviewDomains) {
+        if (domains[domainId]) {
+          domainAssessments[domainId] = domains[domainId]
+        }
+      }
+    }
+
+    startJointReview(
+      householdId,
+      currentUserName,
+      otherAdultName,
+      jointReviewDomains,
+      domainAssessments,
+    )
+  }, [step, householdId, jointReviewStarted, jointReviewDomains, householdManual, startJointReview, currentUserName, otherAdultName])
+
+  // Detect joint review synthesis → go to results
+  useEffect(() => {
+    if (step !== 'joint-review') return
+    if (lastResponse?.type === 'synthesis' && lastResponse.structuredData) {
+      setJointSynthesisData(lastResponse.structuredData)
+      setStep('joint-review-results')
+    }
+  }, [step, lastResponse])
+
   const handleSendMessage = useCallback(async (message: string): Promise<void> => {
     await sendMessage(message)
   }, [sendMessage])
@@ -495,6 +560,34 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
       setIsSaving(false)
     }
   }, [synthesisData, activeDomain, saveDomainAssessment, reset, refetchManuals])
+
+  // Save joint review results — overwrite domains with the agreed-upon assessments
+  const handleSaveJointReview = useCallback(async () => {
+    if (!jointSynthesisData) return
+    setIsSaving(true)
+    try {
+      // The synthesis should contain updatedDomains with agreed assessments
+      const updatedDomains = (jointSynthesisData as Record<string, unknown>).updatedDomains as Record<string, unknown> | undefined
+      if (updatedDomains) {
+        // Save each agreed domain assessment
+        for (const domainId of jointReviewDomains) {
+          const agreedAssessment = updatedDomains[domainId] as Record<string, unknown> | undefined
+          if (agreedAssessment) {
+            await saveDomainAssessment(domainId as DomainId, agreedAssessment)
+          }
+        }
+      }
+      reset()
+      setJointSynthesisData(null)
+      setJointReviewDomains([])
+      await refetchManuals()
+      setStep('domain-picker')
+    } catch (err) {
+      console.error('Failed to save joint review:', err)
+    } finally {
+      setIsSaving(false)
+    }
+  }, [jointSynthesisData, jointReviewDomains, saveDomainAssessment, reset, refetchManuals])
 
   const handleLaunch = () => {
     if (familyMembers.length > 0) {
@@ -672,6 +765,8 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
           assessedDomains={assessedDomains}
           onSelectDomain={handleSelectDomain}
           onLaunch={handleLaunch}
+          overlappingDomains={overlappingDomains}
+          onStartJointReview={handleStartJointReview}
         />
       )}
 
@@ -700,6 +795,117 @@ export function RelishOnboardingWizard({ onComplete }: RelishOnboardingWizardPro
           onBack={() => setStep('domain-conversation')}
           saving={isSaving}
         />
+      )}
+
+      {/* ==================== Joint Review Conversation ==================== */}
+      {step === 'joint-review' && (
+        <div className="flex-1 flex flex-col">
+          {/* Joint review header */}
+          <div className="border-b border-amber-100 px-5 py-3 bg-gradient-to-r from-amber-50/80 to-orange-50/80 backdrop-blur-sm">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => { reset(); setStep('domain-picker') }}
+                className="text-amber-600 hover:text-amber-800 transition-colors"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z" clipRule="evenodd" />
+                </svg>
+              </button>
+              <div>
+                <h1 className="text-base font-semibold text-amber-900">
+                  Joint Review — {currentUserName} & {otherAdultName}
+                </h1>
+                <p className="text-xs text-amber-600">
+                  {jointReviewDomains.map(id => DOMAIN_NAMES[id]).join(', ')}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="flex-1">
+            <ConversationView
+              turns={turns}
+              isLoading={convLoading}
+              onSendMessage={handleSendMessage}
+              familyName={`${currentUserName} & ${otherAdultName}`}
+              error={convError}
+              minTurns={lastResponse?.minTurns ?? 4}
+              maxTurns={lastResponse?.maxTurns ?? 8}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ==================== Joint Review Results ==================== */}
+      {step === 'joint-review-results' && jointSynthesisData && (
+        <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12">
+          <div className="animate-fade-in-up flex flex-col items-center text-center max-w-lg w-full">
+            <div className="w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center mb-6">
+              <svg className="w-7 h-7 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.746 3.746 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.746 3.746 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z" />
+              </svg>
+            </div>
+
+            <h2 className="font-display text-2xl font-semibold text-stone-900 mb-2">
+              Joint Review Complete
+            </h2>
+            <p className="text-stone-500 leading-relaxed mb-6">
+              You've aligned on a shared picture for{' '}
+              {jointReviewDomains.map(id => DOMAIN_NAMES[id]).join(' and ')}.
+              This becomes your family's agreed-upon truth.
+            </p>
+
+            {/* Show synthesis highlights */}
+            {(() => {
+              const data = jointSynthesisData as Record<string, unknown>
+              const alignments = data.alignments as string[] | undefined
+              const tensions = data.tensions as string[] | undefined
+              return (
+                <div className="w-full space-y-4 mb-8 text-left">
+                  {alignments && alignments.length > 0 && (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
+                      <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider mb-2">Where you align</p>
+                      <ul className="space-y-1.5">
+                        {alignments.slice(0, 4).map((a, i) => (
+                          <li key={i} className="text-sm text-emerald-800 flex gap-2">
+                            <span className="text-emerald-500 shrink-0">+</span>
+                            {a}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {tensions && tensions.length > 0 && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4">
+                      <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider mb-2">Tensions addressed</p>
+                      <ul className="space-y-1.5">
+                        {tensions.slice(0, 4).map((t, i) => (
+                          <li key={i} className="text-sm text-amber-800 flex gap-2">
+                            <span className="text-amber-500 shrink-0">~</span>
+                            {t}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+
+            <button
+              onClick={handleSaveJointReview}
+              disabled={isSaving}
+              className="w-full py-3 bg-stone-900 text-white rounded-xl hover:bg-stone-800 font-medium mb-3 disabled:opacity-50"
+            >
+              {isSaving ? 'Saving...' : 'Save & Return'}
+            </button>
+            <button
+              onClick={() => setStep('joint-review')}
+              className="text-sm text-stone-400 hover:text-stone-600 transition-colors"
+            >
+              Back to conversation
+            </button>
+          </div>
+        </div>
       )}
 
       {/* ==================== Person Profiles — Intro ==================== */}

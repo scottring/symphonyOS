@@ -585,6 +585,87 @@ ACTION GUIDELINES:
 Use the family's actual words in findings. Be diagnostic. Be specific, not generic.`
 }
 
+// ==================== Joint Review Config (Two Adults, One Screen) ====================
+
+const JOINT_REVIEW_CONFIG: {
+  minTurns: number
+  maxTurns: number
+  domains: string[]
+  buildSystemPrompt: (person1Name: string, person2Name: string, domainAssessments: Record<string, unknown>) => string
+  buildSynthesisPrompt: (domainIds: string[]) => string
+} = {
+  minTurns: 4,
+  maxTurns: 8,
+  domains: ['joint-review'],
+  buildSystemPrompt: (person1Name: string, person2Name: string, domainAssessments: Record<string, unknown>) => {
+    const domainSummaries = Object.entries(domainAssessments).map(([domainId, data]) => {
+      const d = data as Record<string, unknown>
+      return `**${domainId.toUpperCase()}**: harmony=${d.harmonyScore ?? 'N/A'}, headline="${d.headline ?? 'N/A'}"
+Strengths: ${JSON.stringify((d.strengths as unknown[])?.map((s: unknown) => (s as Record<string, string>).title) ?? [])}
+Issues: ${JSON.stringify((d.issues as unknown[])?.map((i: unknown) => ({ title: (i as Record<string, string>).title, severity: (i as Record<string, string>).severity })) ?? [])}
+Key data: ${JSON.stringify(d.data ?? {})}`
+    }).join('\n\n')
+
+    return `You are a skilled couples/family facilitator running a JOINT REVIEW session. ${person1Name} and ${person2Name} are sitting together at one screen. Both have completed independent assessments of their family. Your job is to walk them through their combined findings.
+
+YOUR ROLE: Facilitator, not reporter. You don't just read back data — you surface TENSIONS, celebrate ALIGNMENT, and guide AGREEMENT.
+
+CRITICAL RULES:
+- Address BOTH people by name. "Scott, you mentioned X. Iris, you described it as Y."
+- When perspectives align, celebrate it briefly and move on.
+- When perspectives DIFFER, slow down. Ask each person to respond to the other's perspective.
+- When you spot something NEITHER person mentioned but the data reveals, name it as an observation.
+- Push for SPECIFICITY. If they agree something needs to change, ask "What exactly would that look like?"
+- Your goal is a SHARED TRUTH — not two separate perspectives, but one agreed-upon reality.
+- Be warm but direct. You're a trusted expert guiding a meaningful conversation.
+- At transitions between topics, acknowledge what was agreed and move forward.
+
+ASSESSMENT DATA FROM BOTH PARTNERS:
+${domainSummaries}
+
+FLOW:
+1. Start by naming what you see as the clearest ALIGNMENT across their assessments — something they both clearly agree on. Celebrate it.
+2. Then surface the most important TENSION — where their perspectives diverge most. Frame it neutrally, ask each to respond.
+3. Work through 2-3 key tension points, guiding toward agreement on each.
+4. Surface any BLIND SPOTS — things the data reveals that neither partner explicitly named.
+5. End with shared priorities: "Based on everything we've discussed, what are the 2-3 things you both agree need attention?"
+
+Start the conversation warmly. This is a meaningful moment — two people sitting together to build a shared understanding of their family.`
+  },
+  buildSynthesisPrompt: (domainIds: string[]) => {
+    return `Based on this joint review conversation, synthesize the couple's AGREED findings across these domains: ${domainIds.join(', ')}.
+
+Return ONLY a valid JSON object (no markdown fences, no explanation before or after):
+{
+  "alignments": [
+    { "id": "al1", "title": "What they agree on", "detail": "Specific shared view with evidence from the conversation", "domains": ["domainId1"] }
+  ],
+  "tensions": [
+    { "id": "t1", "title": "Where they differ", "person1View": "What Person 1 sees", "person2View": "What Person 2 sees", "resolution": "What they agreed to after discussing", "domains": ["domainId1"] }
+  ],
+  "blindSpots": [
+    { "id": "b1", "title": "What neither saw clearly", "detail": "Observation from the facilitator", "domains": ["domainId1"] }
+  ],
+  "sharedPriorities": [
+    { "id": "p1", "title": "Priority they both agreed on", "detail": "What they want to focus on", "domains": ["domainId1"] }
+  ],
+  "updatedDomains": {
+    ${domainIds.map(id => `"${id}": {
+      "headline": "Updated headline reflecting shared truth",
+      "summary": "2-3 sentence portrait reflecting both perspectives",
+      "harmonyScore": 0-100,
+      "strengths": [{ "id": "s1", "title": "...", "detail": "..." }],
+      "issues": [{ "id": "i1", "title": "...", "detail": "...", "severity": "minor|moderate|significant" }],
+      "opportunities": [{ "id": "o1", "title": "...", "detail": "..." }],
+      "actions": [{ "id": "a1", "title": "...", "description": "...", "effort": "quick_win|small|medium|large|ongoing", "estimatedTime": "...", "type": "task|routine|project|goal", "priority": "now|soon|later", "status": "suggested" }]
+    }`).join(',\n    ')}
+  }
+}
+
+IMPORTANT: The "updatedDomains" should reflect the AGREED truth from this conversation — not just one person's perspective. Updated harmony scores should reflect the shared assessment. Actions should include items BOTH partners committed to.`
+  },
+}
+
 // ==================== Individual (Per-Person) Profile Config ====================
 
 const INDIVIDUAL_PROFILE_CONFIG: {
@@ -851,13 +932,22 @@ Deno.serve(async (req) => {
       phaseId, conversationId, message, householdId, previousDomains,
       mode, domainId, currentDomainData,
       personName, personId,
+      // Joint review params
+      person1Name, person2Name, domainIds, domainAssessments,
     } = body
 
     const isRefresh = mode === 'refresh'
     const isDomainAssessment = mode === 'domain-assessment'
     const isIndividualProfile = mode === 'individual-profile'
+    const isJointReview = mode === 'joint-review'
 
-    if (isRefresh || isDomainAssessment) {
+    if (isJointReview) {
+      if (!householdId || !person1Name || !person2Name || !domainAssessments) {
+        return new Response(JSON.stringify({ error: 'householdId, person1Name, person2Name, and domainAssessments are required for joint-review mode' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+    } else if (isRefresh || isDomainAssessment) {
       if (!domainId || !householdId) {
         return new Response(JSON.stringify({ error: 'domainId and householdId are required for ' + mode + ' mode' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -886,7 +976,16 @@ Deno.serve(async (req) => {
       synthesisPrompt: string
     }
 
-    if (isDomainAssessment) {
+    if (isJointReview) {
+      const reviewDomainIds = domainIds || Object.keys(domainAssessments)
+      phaseConfig = {
+        minTurns: JOINT_REVIEW_CONFIG.minTurns,
+        maxTurns: JOINT_REVIEW_CONFIG.maxTurns,
+        domains: reviewDomainIds,
+        systemPrompt: JOINT_REVIEW_CONFIG.buildSystemPrompt(person1Name, person2Name, domainAssessments),
+        synthesisPrompt: JOINT_REVIEW_CONFIG.buildSynthesisPrompt(reviewDomainIds),
+      }
+    } else if (isDomainAssessment) {
       const assessmentConfig = DOMAIN_ASSESSMENT_CONFIGS[domainId]
       if (!assessmentConfig) {
         return new Response(JSON.stringify({ error: `Invalid domainId for assessment: ${domainId}` }), {
@@ -955,7 +1054,7 @@ Deno.serve(async (req) => {
       }
       conversationRow = data
     } else {
-      const purpose = isDomainAssessment ? 'domain-assessment' : isIndividualProfile ? 'individual-profile' : isRefresh ? 'refresh' : 'onboarding'
+      const purpose = isJointReview ? 'joint-review' : isDomainAssessment ? 'domain-assessment' : isIndividualProfile ? 'individual-profile' : isRefresh ? 'refresh' : 'onboarding'
       const newConversation = {
         household_id: householdId,
         user_id: user.id,
@@ -1033,8 +1132,8 @@ Deno.serve(async (req) => {
         { role: 'user', content: 'Please synthesize everything we\'ve discussed into the structured format now.' },
       ]
 
-      // Domain assessments produce richer output with full findings + actions
-      const synthesisTokens = isDomainAssessment ? 4000 : 2000
+      // Domain assessments and joint reviews produce richer output with full findings + actions
+      const synthesisTokens = isJointReview ? 6000 : isDomainAssessment ? 4000 : 2000
       const rawText = await callLLM(synthesisMessages, synthesisTokens, 0.5)
 
       try {
@@ -1084,8 +1183,8 @@ Deno.serve(async (req) => {
         { role: 'system', content: phaseConfig.systemPrompt + previousDomainContext },
         { role: 'user', content: 'Please begin the conversation with your opening question.' },
       ]
-      // Domain assessments need more tokens for observation + question format
-      const turnTokens = isDomainAssessment ? 600 : 300
+      // Domain assessments and joint reviews need more tokens for observation + question format
+      const turnTokens = isJointReview ? 800 : isDomainAssessment ? 600 : 300
       aiResponse = await callLLM(openingMessages, turnTokens, 0.7)
     } else {
       // Ongoing conversation: ask next question
@@ -1094,7 +1193,7 @@ Deno.serve(async (req) => {
         { role: 'system', content: phaseConfig.systemPrompt + previousDomainContext },
         ...chatMessages,
       ]
-      const turnTokens = isDomainAssessment ? 600 : 300
+      const turnTokens = isJointReview ? 800 : isDomainAssessment ? 600 : 300
       aiResponse = await callLLM(nextMessages, turnTokens, 0.7)
     }
 
