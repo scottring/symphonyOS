@@ -3,8 +3,6 @@
 
 import { useState } from 'react'
 import type { Goal, GoalArea, Quarter } from '@/types/goal'
-import { DOMAIN_NAMES } from '@/types/manual'
-import type { DomainId } from '@/types/manual'
 
 interface GoalTreeViewProps {
   areas: GoalArea[]
@@ -34,13 +32,6 @@ export function GoalTreeView({
 
   const quarters: Quarter[] = ['Q1', 'Q2', 'Q3', 'Q4']
 
-  // Try to extract domain from goal notes (we store "Domain: xyz" in notes when importing)
-  const getDomainFromNotes = (notes?: string): DomainId | null => {
-    if (!notes) return null
-    const match = notes.match(/Domain:\s*(\w+)/)
-    return match ? (match[1] as DomainId) : null
-  }
-
   return (
     <div className="space-y-6">
       {areas.map(area => {
@@ -62,7 +53,6 @@ export function GoalTreeView({
                 const totalActions = goal.actions.length
                 const completedActions = goal.actions.filter(a => a.completed).length
                 const progressPct = totalActions > 0 ? Math.round((completedActions / totalActions) * 100) : 0
-                const domain = getDomainFromNotes(goal.notes)
 
                 return (
                   <div key={goal.id} className="rounded-2xl border border-neutral-100 bg-white overflow-hidden">
@@ -83,11 +73,6 @@ export function GoalTreeView({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
                           <span className="font-medium text-neutral-800 truncate">{goal.name}</span>
-                          {domain && DOMAIN_NAMES[domain] && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary-50 text-primary-600 shrink-0">
-                              {DOMAIN_NAMES[domain]}
-                            </span>
-                          )}
                         </div>
                         {goal.notes && (
                           <p className="text-xs text-neutral-400 truncate">

@@ -71,7 +71,7 @@ export function TriageDemo({ task, onUpdateTask, onContinue }: TriageDemoProps) 
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12">
         <h1 className="font-display text-3xl font-semibold text-neutral-800 mb-4">
-          Life changes. Relish adapts.
+          Life changes. Symphony adapts.
         </h1>
         <p className="text-neutral-500 mb-8">
           You'll learn to triage tasks as you use the app.
@@ -128,7 +128,7 @@ export function TriageDemo({ task, onUpdateTask, onContinue }: TriageDemoProps) 
       <div className="w-full max-w-lg">
         {/* Header */}
         <h1 className="font-display text-3xl md:text-4xl font-semibold text-neutral-800 text-center mb-4">
-          Life changes. Relish adapts.
+          Life changes. Symphony adapts.
         </h1>
 
         {/* Task card */}

@@ -18,13 +18,13 @@ interface DomainProviderProps {
 export function DomainProvider({ children }: DomainProviderProps) {
   const [currentDomain, setCurrentDomain] = useState<Domain>(() => {
     // Load from localStorage on mount
-    const saved = localStorage.getItem('relish-current-domain')
+    const saved = localStorage.getItem('symphony-current-domain')
     return (saved as Domain) || 'universal'
   })
 
   useEffect(() => {
     // Persist to localStorage whenever domain changes
-    localStorage.setItem('relish-current-domain', currentDomain)
+    localStorage.setItem('symphony-current-domain', currentDomain)
   }, [currentDomain])
 
   return (

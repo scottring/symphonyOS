@@ -5,7 +5,6 @@ import { MoreSheet } from './MoreSheet'
 import { QuickCapture } from './QuickCapture'
 import { useMobile } from '@/hooks/useMobile'
 import { useTheme } from '@/hooks/useTheme'
-import relishLogo from '@/assets/relish-logo.jpg'
 import type { PinnedItem } from '@/types/pin'
 import type { PinnableEntityType } from '@/types/pin'
 import type { Task } from '@/types/task'
@@ -56,14 +55,12 @@ interface AppShellProps {
   activeView: ViewType
   onViewChange: (view: ViewType) => void
   onOpenSearch?: () => void
-  hasCheckinNudge?: boolean
   // Pinned items props
   pins?: PinnedItem[]
   entities?: EntityData
   onPinNavigate?: (entityType: PinnableEntityType, entityId: string) => void
   onPinMarkAccessed?: (entityType: PinnableEntityType, entityId: string) => void
   onPinRefreshStale?: (id: string) => void
-  onResumeOnboarding?: () => void
 }
 
 export function AppShell({
@@ -88,13 +85,11 @@ export function AppShell({
   activeView,
   onViewChange,
   onOpenSearch,
-  hasCheckinNudge = false,
   pins,
   entities,
   onPinNavigate,
   onPinMarkAccessed,
   onPinRefreshStale,
-  onResumeOnboarding,
 }: AppShellProps) {
   void onPanelClose // No longer used - panel closing handled by smart handlers in schedule components
   const isMobile = useMobile()
@@ -135,7 +130,6 @@ export function AppShell({
           onPinNavigate={onPinNavigate}
           onPinMarkAccessed={onPinMarkAccessed}
           onPinRefreshStale={onPinRefreshStale}
-          onResumeOnboarding={onResumeOnboarding}
         />
       )}
 
@@ -162,12 +156,7 @@ export function AppShell({
                   style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <img
-                  src={relishLogo}
-                  alt="Relish"
-                  className="w-8 h-8 rounded-lg object-cover"
-                />
-                <span className="font-display text-base font-semibold text-neutral-900">Relish</span>
+                <span className="font-display text-base font-semibold text-neutral-900">Symphony</span>
               </div>
               <div className="flex items-center gap-1">
                 {onOpenSearch && (
@@ -247,24 +236,7 @@ export function AppShell({
         <nav className="fixed bottom-0 left-0 right-0 z-40 bg-bg-elevated/95 backdrop-blur-lg border-t border-neutral-200/50"
              style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
           <div className="flex items-center justify-around px-4 py-1">
-            {/* Home → bookshelf */}
-            <button
-              onClick={() => onViewChange('bookshelf')}
-              className={`
-                flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-all
-                ${activeView === 'bookshelf' || activeView === 'home'
-                  ? 'text-primary-600'
-                  : 'text-neutral-400 hover:text-neutral-600'
-                }
-              `}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V16" />
-              </svg>
-              <span className={`text-[10px] font-medium ${activeView === 'bookshelf' || activeView === 'home' ? 'font-semibold' : ''}`}>Home</span>
-            </button>
-
-            {/* Today → today schedule */}
+            {/* Today */}
             <button
               onClick={() => onViewChange('today')}
               className={`
@@ -309,9 +281,6 @@ export function AppShell({
                 }
               `}
             >
-              {hasCheckinNudge && (
-                <span className="absolute top-1 right-3 w-2 h-2 bg-amber-400 rounded-full" />
-              )}
               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
               </svg>
@@ -328,7 +297,6 @@ export function AppShell({
           onClose={() => setMoreSheetOpen(false)}
           onNavigate={onViewChange}
           activeView={activeView}
-          hasCheckinNudge={hasCheckinNudge}
         />
       )}
     </div>

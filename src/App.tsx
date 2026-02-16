@@ -53,16 +53,6 @@ import {
   GoalsList,
   GoalView,
 } from '@/components/lazy'
-import { ManualView } from '@/components/manual/ManualView'
-import { IndividualManualView } from '@/components/manual/IndividualManualView'
-import { YearbookView } from '@/components/yearbook/YearbookView'
-import { DailyPageView } from '@/components/yearbook/DailyPageView'
-import { CheckinFlow } from '@/components/checkin/CheckinFlow'
-import { RelishHome } from '@/components/home/RelishHome'
-import { useHousehold } from '@/hooks/useHousehold'
-import { useManual } from '@/hooks/useManual'
-import { useYearbook } from '@/hooks/useYearbook'
-import { useCheckin } from '@/hooks/useCheckin'
 import { useGoals } from '@/hooks/useGoals'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import type { ViewType } from '@/components/layout/Sidebar'
@@ -115,15 +105,6 @@ function App() {
   const { members: familyMembers, getCurrentUserMember, refetch: refetchFamilyMembers } = useFamilyMembers()
   const isOnline = useOnlineStatus()
   const focusMode = useFocusMode()
-
-  // Relish family OS hooks
-  const { household } = useHousehold()
-  const { manuals } = useManual(household?.id ?? null)
-  const { yearbooks } = useYearbook(household?.id ?? null)
-  const { hasCheckedInThisWeek, recentDriftSignals } = useCheckin(household?.id ?? null)
-
-  // The household manual (type === 'household') for the coherence pulse
-  const householdManual = useMemo(() => manuals.find(m => m.type === 'household') ?? null, [manuals])
 
   // Lists state
   const [selectedListId, setSelectedListId] = useState<string | null>(null)
@@ -191,7 +172,7 @@ function App() {
 
   // UI state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    const stored = localStorage.getItem('relish-sidebar-collapsed')
+    const stored = localStorage.getItem('symphony-sidebar-collapsed')
     return stored === 'true'
   })
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
@@ -199,8 +180,6 @@ function App() {
   const [viewedDate, setViewedDate] = useState(() => new Date())
   const [recipeUrl, setRecipeUrl] = useState<string | null>(null)
   const [quickAddOpen, setQuickAddOpen] = useState(false)
-  const [selectedManualId, setSelectedManualId] = useState<string | null>(null)
-
   // Calendar reconnect prompt state
   const [pendingEventData, setPendingEventData] = useState<{
     title: string
@@ -215,7 +194,7 @@ function App() {
   const params = useParams<{ projectId?: string; routineId?: string; contactId?: string; goalId?: string }>()
 
   // State for non-URL-routed views
-  const [stateView, setStateView] = useState<'bookshelf' | 'today' | 'lists' | 'notes' | 'history' | 'manual' | 'yearbook' | 'daily-page' | 'checkin' | 'settings' | 'task-detail' | null>(null)
+  const [stateView, setStateView] = useState<'today' | 'lists' | 'notes' | 'history' | 'settings' | 'task-detail' | null>(null)
 
   // Derive view from URL path or state
   const activeView: ViewType = useMemo(() => {
@@ -228,7 +207,7 @@ function App() {
     if (path.startsWith('/projects')) return 'projects'
     if (path.startsWith('/routines')) return 'routines'
     if (path.startsWith('/contacts')) return 'contact-detail'
-    return 'bookshelf'
+    return 'today'
   }, [location.pathname, stateView])
 
   // Get IDs from URL params
@@ -246,7 +225,7 @@ function App() {
 
   // Persist sidebar state
   useEffect(() => {
-    localStorage.setItem('relish-sidebar-collapsed', String(sidebarCollapsed))
+    localStorage.setItem('symphony-sidebar-collapsed', String(sidebarCollapsed))
   }, [sidebarCollapsed])
 
   // Check onboarding status — only on initial load, not on auth token refreshes.
@@ -319,7 +298,7 @@ function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get('quickadd') === 'true') {
-      sessionStorage.setItem('relish:quickadd', 'true')
+      sessionStorage.setItem('symphony:quickadd', 'true')
       // Clean URL immediately
       window.history.replaceState({}, '', window.location.pathname)
     }
@@ -328,9 +307,9 @@ function App() {
   // Open QuickCapture when app is ready (after auth/onboarding)
   useEffect(() => {
     if (user && onboardingComplete === true) {
-      const shouldOpenQuickAdd = sessionStorage.getItem('relish:quickadd')
+      const shouldOpenQuickAdd = sessionStorage.getItem('symphony:quickadd')
       if (shouldOpenQuickAdd === 'true') {
-        sessionStorage.removeItem('relish:quickadd')
+        sessionStorage.removeItem('symphony:quickadd')
         // Small delay to ensure app is fully rendered
         setTimeout(() => setQuickAddOpen(true), 100)
       }
@@ -525,7 +504,7 @@ function App() {
       if (!event) return null
 
       const timelineItem = eventToTimelineItem(event)
-      // Add user's Relish notes from event_notes table
+      // Add user's notes from event_notes table
       const eventNote = getNote(eventId)
       if (eventNote?.notes) {
         timelineItem.notes = eventNote.notes
@@ -669,13 +648,9 @@ function App() {
     setSelectedTaskId(null)
     setSelectedListId(null)
     setRecipeUrl(null)
-    setSelectedManualId(null)
 
     // Handle URL-based views
-    if (view === 'home' || view === 'bookshelf') {
-      setStateView(null)
-      navigate('/')
-    } else if (view === 'today') {
+    if (view === 'home' || view === 'today') {
       setStateView('today')
       navigate('/')
     } else if (view === 'goals') {
@@ -692,7 +667,7 @@ function App() {
       navigate('/contacts')
     }
     // Handle state-based views
-    else if (view === 'lists' || view === 'notes' || view === 'history' || view === 'manual' || view === 'yearbook' || view === 'daily-page' || view === 'checkin' || view === 'settings' || view === 'task-detail') {
+    else if (view === 'lists' || view === 'notes' || view === 'history' || view === 'settings' || view === 'task-detail') {
       setStateView(view)
       navigate('/') // Navigate to home URL but show state view
     } else {
@@ -1191,13 +1166,11 @@ function App() {
       activeView={activeView}
       onViewChange={handleViewChange}
       onOpenSearch={() => setSearchOpen(true)}
-      hasCheckinNudge={!hasCheckedInThisWeek}
       pins={pinnedItems.pins}
       entities={pinnedEntities}
       onPinNavigate={handlePinNavigate}
       onPinMarkAccessed={pinnedItems.markAccessed}
       onPinRefreshStale={pinnedItems.refreshStale}
-      onResumeOnboarding={() => setOnboardingComplete(false)}
       panel={
         recipeUrl ? (
           <Suspense fallback={<LoadingFallback />}>
@@ -1272,29 +1245,8 @@ function App() {
       }
     >
       <DomainPageOutline>
-      {(activeView === 'bookshelf' || activeView === 'today') && (
+      {activeView === 'today' && (
         <div className="h-full flex flex-col overflow-hidden">
-          {/* Zone 1+2: RelishHome (welcome + bookshelf) — only on bookshelf view */}
-          {activeView === 'bookshelf' && (
-            <div className="shrink-0">
-              <RelishHome
-                userName={getCurrentUserMember()?.name ?? user?.email?.split('@')[0] ?? ''}
-                householdName={household?.name ?? 'My Family'}
-                manual={householdManual}
-                manuals={manuals}
-                yearbooks={yearbooks}
-                familyMembers={familyMembers}
-                hasCheckedInThisWeek={hasCheckedInThisWeek}
-                driftSignalCount={recentDriftSignals.length}
-                onStartCheckin={() => handleViewChange('checkin')}
-                onOpenManual={(manualId) => { handleViewChange('manual'); setSelectedManualId(manualId) }}
-                onOpenYearbook={(_personId) => handleViewChange('yearbook')}
-                onOpenDailyPage={() => handleViewChange('daily-page')}
-                onStartDeepening={(_domainId) => handleViewChange('manual')}
-              />
-            </div>
-          )}
-
           {/* Calendar connect banner if needed */}
           {!isConnected && (
             <div className="p-4 border-b border-neutral-100 shrink-0">
@@ -1578,8 +1530,6 @@ function App() {
             onSelectGoal={(id) => navigate(`/goals/${id}`)}
             onAddArea={addGoalArea}
             onAddGoal={addGoal}
-            onUpdateGoal={updateGoal}
-            onAddAction={addGoalAction}
             onToggleAction={toggleGoalAction}
             onDeleteArea={deleteGoalArea}
           />
@@ -1697,7 +1647,7 @@ function App() {
           contactsMap={contactsMap}
           projectsMap={projectsMap}
           onSelectTask={(taskId) => handleSelectItem(`task-${taskId}`)}
-          onBack={() => handleViewChange('bookshelf')}
+          onBack={() => handleViewChange('today')}
         />
       )}
 
@@ -1730,30 +1680,12 @@ function App() {
         />
       )}
 
-      {activeView === 'manual' && (
-        selectedManualId && manuals.find(m => m.id === selectedManualId)?.type === 'individual'
-          ? <IndividualManualView manualId={selectedManualId} onBack={() => handleViewChange('bookshelf')} />
-          : <ManualView />
-      )}
-
-      {activeView === 'yearbook' && (
-        <YearbookView />
-      )}
-
-      {activeView === 'daily-page' && (
-        <DailyPageView />
-      )}
-
-      {activeView === 'checkin' && (
-        <CheckinFlow />
-      )}
-
       {activeView === 'settings' && (
         <Suspense fallback={<LoadingFallback />}>
           <SettingsPage
             onBack={() => {
               refetchFamilyMembers() // Refresh family members in case they were edited
-              handleViewChange('bookshelf')
+              handleViewChange('today')
             }}
             onFamilyMembersChanged={refetchFamilyMembers}
           />
@@ -1807,7 +1739,7 @@ function App() {
               Calendar Not Connected
             </h3>
             <p className="text-sm text-neutral-500 text-center mb-6">
-              Your Google Calendar is disconnected. This event will only be saved locally in Relish and won't appear in your Google Calendar.
+              Your Google Calendar is disconnected. This event will only be saved locally in Symphony and won't appear in your Google Calendar.
             </p>
             <div className="flex flex-col gap-3">
               <button

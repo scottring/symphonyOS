@@ -1,5 +1,3 @@
-import type { ChildProfile } from '@/types/userProfile'
-
 export type AgeRange = 'infant' | 'toddler' | 'child' | 'teen' | 'adult'
 
 export interface Medication {
@@ -22,7 +20,7 @@ export interface FamilyMember {
   created_at: string
   auth_user_id?: string | null // Links to auth.users for users with accounts
 
-  // Household role (Phase 1: Relish redesign)
+  // Household role
   member_type: MemberType           // 'core' = lives here, 'guest' = recurring visitor
   role_label?: string | null        // "parent", "child", "grandparent", "babysitter", etc.
   typical_involvement?: string | null // Guest only: "picks up Tuesdays", "Thursday evenings"
@@ -36,50 +34,6 @@ export interface FamilyMember {
   health_conditions?: string[]
   mobility_needs?: string | null
 
-  // Child profile (filled by parents, Phase 2: Relish redesign)
-  child_profile?: ChildProfile | null
-}
-
-// ============================================================================
-// HOUSEHOLD TYPES
-// ============================================================================
-
-export interface Household {
-  id: string
-  name: string
-  owner_id: string
-  address?: string | null  // Home address (Phase 1: Relish redesign)
-  created_at: string
-  updated_at: string
-}
-
-export type HouseholdMemberRole = 'owner' | 'admin' | 'member'
-export type HouseholdMemberStatus = 'pending' | 'active' | 'declined'
-
-export interface HouseholdMember {
-  id: string
-  household_id: string
-  user_id: string
-  role: HouseholdMemberRole
-  status: HouseholdMemberStatus
-  invited_by: string | null
-  invited_email: string | null
-  joined_at: string | null
-  created_at: string
-  // Joined data
-  user_email?: string
-  user_name?: string
-}
-
-export interface HouseholdInvitation {
-  id: string
-  household_id: string
-  email: string
-  invited_by: string
-  token: string
-  expires_at: string
-  accepted_at: string | null
-  created_at: string
 }
 
 export type FamilyMemberColor = 'blue' | 'purple' | 'green' | 'orange' | 'pink' | 'teal'

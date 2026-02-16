@@ -13,8 +13,8 @@ interface FocusModeProps {
   notes: Note[]
 }
 
-const SCRATCH_PAD_KEY = 'relish-focus-scratch-pad'
-const SCRATCH_PAD_DATE_KEY = 'relish-focus-scratch-pad-date'
+const SCRATCH_PAD_KEY = 'symphony-focus-scratch-pad'
+const SCRATCH_PAD_DATE_KEY = 'symphony-focus-scratch-pad-date'
 const SCRATCH_PAD_NOTE_TITLE = 'Scratch Pad'
 
 function getStoredScratchPad(): string {

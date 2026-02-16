@@ -29,7 +29,7 @@ export function CompleteStep({ onComplete }: CompleteStepProps) {
 
       {/* Subtitle */}
       <p className="text-lg text-neutral-500 text-center max-w-md mb-8">
-        Your brain is empty. Relish holds it all.
+        Your brain is empty. Symphony holds it all.
       </p>
 
       {/* Final tip */}

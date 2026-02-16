@@ -1,4 +1,3 @@
-import relishLogo from '@/assets/relish-logo.jpg'
 import { PinnedSection } from '@/components/pins'
 import type { PinnedItem } from '@/types/pin'
 import type { PinnableEntityType } from '@/types/pin'
@@ -62,26 +61,13 @@ export function SidebarKinetic({
         ${collapsed ? 'w-20' : 'w-72'}
       `}
     >
-      {/* Header with animated logo */}
+      {/* Header */}
       <div className="p-5 flex items-center justify-between">
         <div className={`flex items-center gap-3 ${collapsed ? 'justify-center w-full' : ''}`}>
-          <div className="relative group">
-            <div className="absolute inset-0 bg-gradient-primary rounded-xl opacity-20 blur-lg group-hover:opacity-40 transition-opacity"></div>
-            <img
-              src={relishLogo}
-              alt="Relish"
-              className="w-10 h-10 rounded-xl object-cover relative z-10 ring-2 ring-electric-500/30 group-hover:ring-electric-400/50 transition-all"
-            />
-          </div>
           {!collapsed && (
-            <div className="flex flex-col">
-              <span className="font-display text-xl font-semibold text-gradient leading-tight">
-                Relish
-              </span>
-              <span className="text-[10px] font-mono text-slate-400 tracking-wider uppercase">
-                Family OS
-              </span>
-            </div>
+            <span className="font-display text-xl font-semibold text-gradient leading-tight">
+              Symphony
+            </span>
           )}
         </div>
         {!collapsed && (

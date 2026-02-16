@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 
 // Local storage key for home location (shared with DirectionsBuilder)
-const HOME_LOCATION_KEY = 'relish_home_location'
+const HOME_LOCATION_KEY = 'symphony_home_location'
 
 interface SavedLocation {
   name: string

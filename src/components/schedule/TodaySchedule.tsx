@@ -619,28 +619,28 @@ export function TodaySchedule({
 
   // Hide routines toggle with localStorage persistence
   const [hideRoutines, setHideRoutines] = useState(() => {
-    const stored = localStorage.getItem('relish-hide-routines')
+    const stored = localStorage.getItem('symphony-hide-routines')
     return stored === 'true'
   })
 
   const toggleHideRoutines = useCallback(() => {
     setHideRoutines(prev => {
       const newValue = !prev
-      localStorage.setItem('relish-hide-routines', String(newValue))
+      localStorage.setItem('symphony-hide-routines', String(newValue))
       return newValue
     })
   }, [])
 
   // Completed inbox items - collapsed by default
   const [showCompletedInbox, setShowCompletedInbox] = useState(() => {
-    const stored = localStorage.getItem('relish-show-completed-inbox')
+    const stored = localStorage.getItem('symphony-show-completed-inbox')
     return stored === 'true'
   })
 
   const toggleShowCompletedInbox = useCallback(() => {
     setShowCompletedInbox(prev => {
       const newValue = !prev
-      localStorage.setItem('relish-show-completed-inbox', String(newValue))
+      localStorage.setItem('symphony-show-completed-inbox', String(newValue))
       return newValue
     })
   }, [])
@@ -719,8 +719,8 @@ export function TodaySchedule({
       }, 500) // Match the CSS animation duration
     }
 
-    window.addEventListener('relish:inbox-add', handleInboxAdd as EventListener)
-    return () => window.removeEventListener('relish:inbox-add', handleInboxAdd as EventListener)
+    window.addEventListener('symphony:inbox-add', handleInboxAdd as EventListener)
+    return () => window.removeEventListener('symphony:inbox-add', handleInboxAdd as EventListener)
   }, [isToday])
 
   // Overdue tasks: scheduled for past days, not completed - only shown on today's view

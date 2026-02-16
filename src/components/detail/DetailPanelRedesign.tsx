@@ -1909,7 +1909,7 @@ export function DetailPanelRedesign({
                     placeId: undefined,
                   } : null}
                   onSelect={(place: PlaceSelection) => {
-                    // Must use google_event_id, not the Relish UUID
+                    // Must use google_event_id, not the internal UUID
                     const eventId = item.originalEvent?.google_event_id
                     const calendarId = item.originalEvent?.calendar_id || item.originalEvent?.calendarId
                     
@@ -1931,7 +1931,7 @@ export function DetailPanelRedesign({
                     }
                   }}
                   onClear={() => {
-                    // Must use google_event_id, not the Relish UUID
+                    // Must use google_event_id, not the internal UUID
                     const eventId = item.originalEvent?.google_event_id
                     const calendarId = item.originalEvent?.calendar_id || item.originalEvent?.calendarId
                     

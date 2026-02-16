@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import type { HomeViewType } from '@/types/homeView'
 
-const STORAGE_KEY = 'relish-home-view'
+const STORAGE_KEY = 'symphony-home-view'
 
 interface UseHomeViewResult {
   currentView: HomeViewType

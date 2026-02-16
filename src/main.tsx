@@ -48,7 +48,7 @@ if (import.meta.env.PROD && import.meta.env.VITE_SENTRY_DSN) {
       if (event.contexts) {
         event.contexts.app = {
           version: '1.0.0-beta',
-          theme: localStorage.getItem('relish-theme') || 'nordic',
+          theme: localStorage.getItem('symphony-theme') || 'nordic',
         }
       }
       
@@ -58,7 +58,7 @@ if (import.meta.env.PROD && import.meta.env.VITE_SENTRY_DSN) {
 }
 
 // Load theme from localStorage, default to Nordic Journal
-const THEME_STORAGE_KEY = 'relish-theme'
+const THEME_STORAGE_KEY = 'symphony-theme'
 const savedTheme = localStorage.getItem(THEME_STORAGE_KEY)
 const ACTIVE_THEME = (savedTheme === 'kinetic' || savedTheme === 'nordic') ? savedTheme : 'nordic'
 
@@ -71,7 +71,6 @@ if (ACTIVE_THEME === 'kinetic') {
 
 import App from './App.tsx'
 import { CalendarCallback } from './pages/CalendarCallback'
-import { JoinHousehold } from './pages/JoinHousehold'
 import { GoogleCalendarProvider } from './hooks/useGoogleCalendar'
 import { DomainProvider } from './hooks/useDomain'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -94,7 +93,6 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/contacts" element={<App />} />
               <Route path="/contacts/:contactId" element={<App />} />
               <Route path="/calendar-callback" element={<CalendarCallback />} />
-              <Route path="/join" element={<JoinHousehold />} />
             </Routes>
           </GoogleCalendarProvider>
         </BrowserRouter>

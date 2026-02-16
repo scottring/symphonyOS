@@ -3,7 +3,7 @@ import { renderHook, act } from '@testing-library/react'
 import { useHomeView } from './useHomeView'
 
 describe('useHomeView', () => {
-  const STORAGE_KEY = 'relish-home-view'
+  const STORAGE_KEY = 'symphony-home-view'
 
   beforeEach(() => {
     localStorage.clear()

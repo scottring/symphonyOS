@@ -18,9 +18,6 @@ import { CascadingRiverView } from './CascadingRiverView'
 import { TodaySchedule } from '@/components/schedule/TodaySchedule'
 import { UndoToast } from '@/components/undo/UndoToast'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
-import { DriftSignalBanner } from '@/components/checkin/DriftSignalBanner'
-import { useCheckin } from '@/hooks/useCheckin'
-import { useHousehold } from '@/hooks/useHousehold'
 
 interface HomeViewProps {
   tasks: Task[]
@@ -122,9 +119,6 @@ export function HomeView({
   const isMobile = useMobile()
   const { currentAction, pushAction, executeUndo, dismiss } = useUndo({ duration: 5000 })
   const { currentDomain } = useDomain()
-  const { household } = useHousehold()
-  const { recentDriftSignals } = useCheckin(household?.id ?? null)
-  const showDriftSignals = (currentDomain === 'family' || currentDomain === 'universal') && recentDriftSignals.length > 0
 
   // Filter tasks, routines, and projects by current domain
   const filteredTasks = useMemo(() => {
@@ -420,13 +414,6 @@ export function HomeView({
             currentView={currentView}
             onViewChange={handleViewChange}
           />
-        </div>
-      )}
-
-      {/* Drift signal banner for family domain */}
-      {showDriftSignals && (
-        <div className="px-6 pt-4">
-          <DriftSignalBanner signals={recentDriftSignals} />
         </div>
       )}
 
