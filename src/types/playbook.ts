@@ -88,6 +88,8 @@ export interface FamilyRule {
   userId: string
   rule: string
   appliesTo: string[]
+  category: string | null
+  layerId: string | null
   status: 'draft' | 'active' | 'paused' | 'retired'
   rationale?: string | null
   enforcementTip?: string | null

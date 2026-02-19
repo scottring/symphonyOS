@@ -305,6 +305,36 @@ export function usePlaybook() {
     setBlocks(prev => prev.filter(b => b.id !== id))
   }, [])
 
+  // Suppress a block for a specific date (Skip Today)
+  const suppressBlock = useCallback(async (blockId: string, date: string): Promise<void> => {
+    const block = blocks.find(b => b.id === blockId)
+    if (!block) return
+
+    // Read current suppressed_dates from DB (block type doesn't have it locally, it's a DB-only JSONB)
+    const { data, error: fetchErr } = await supabase
+      .from('playbook_blocks')
+      .select('suppressed_dates')
+      .eq('id', blockId)
+      .single()
+
+    if (fetchErr) { console.error('suppressBlock fetch:', fetchErr); return }
+
+    const existing: string[] = (data?.suppressed_dates as string[]) || []
+    if (existing.includes(date)) return // Already suppressed
+
+    const updated = [...existing, date]
+
+    const { error } = await supabase
+      .from('playbook_blocks')
+      .update({ suppressed_dates: updated, updated_at: new Date().toISOString() })
+      .eq('id', blockId)
+
+    if (error) { console.error('suppressBlock:', error); return }
+
+    // Remove instances for this block on this date from local state
+    setInstances(prev => prev.filter(i => !(i.blockId === blockId && i.date === date)))
+  }, [blocks])
+
   const reorderBlocks = useCallback(async (blockIds: string[]): Promise<void> => {
     const updates = blockIds.map((id, i) => ({
       id,
@@ -368,6 +398,7 @@ export function usePlaybook() {
     addBlock,
     updateBlock,
     deleteBlock,
+    suppressBlock,
     reorderBlocks,
     markBlockDone,
     reactToBlock,

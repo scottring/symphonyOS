@@ -25,6 +25,8 @@ interface PlaybookBlockCardProps {
   onTag: (instanceId: string, tags: string[]) => void
   onNote: (instanceId: string, notes: string | null) => void
   onEdit?: (block: PlaybookInstance['block']) => void
+  onDelete?: (blockId: string) => void
+  onSuppress?: (blockId: string, date: string) => void
 }
 
 export const PlaybookBlockCard = memo(function PlaybookBlockCard({
@@ -36,6 +38,8 @@ export const PlaybookBlockCard = memo(function PlaybookBlockCard({
   onTag,
   onNote,
   onEdit,
+  onDelete,
+  onSuppress,
 }: PlaybookBlockCardProps) {
   const block = instance.block
   if (!block) return null
@@ -43,6 +47,8 @@ export const PlaybookBlockCard = memo(function PlaybookBlockCard({
   const [showAddNote, setShowAddNote] = useState(false)
   const [noteText, setNoteText] = useState(instance.notes || '')
   const [expanded, setExpanded] = useState(!instance.completed)
+  const [showMenu, setShowMenu] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const config = BLOCK_TYPE_CONFIG[block.blockType]
 
@@ -153,16 +159,59 @@ export const PlaybookBlockCard = memo(function PlaybookBlockCard({
               {config.label}
             </span>
             <div className="ml-auto flex items-center gap-2">
-              {onEdit && (
-                <button
-                  onClick={() => onEdit(block)}
-                  className="p-1 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
-                  title="Edit block"
-                >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                  </svg>
-                </button>
+              {/* Overflow menu */}
+              {(onEdit || onDelete || onSuppress) && (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowMenu(!showMenu)}
+                    className="p-1 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
+                    title="Actions"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                    </svg>
+                  </button>
+                  {showMenu && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+                      <div className="absolute right-0 top-full mt-1 z-50 w-40 bg-white rounded-xl shadow-lg border border-neutral-200/60 py-1 animate-fade-in-scale">
+                        {onEdit && (
+                          <button
+                            onClick={() => { setShowMenu(false); onEdit(block) }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors"
+                          >
+                            <svg className="w-3.5 h-3.5 text-neutral-400" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                            </svg>
+                            Edit
+                          </button>
+                        )}
+                        {onSuppress && (
+                          <button
+                            onClick={() => { setShowMenu(false); onSuppress(block.id, instance.date) }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors"
+                          >
+                            <svg className="w-3.5 h-3.5 text-neutral-400" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                            Skip Today
+                          </button>
+                        )}
+                        {onDelete && (
+                          <button
+                            onClick={() => { setShowMenu(false); setShowDeleteConfirm(true) }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                          >
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
               )}
               {instance.completed && (
                 <button
@@ -292,6 +341,32 @@ export const PlaybookBlockCard = memo(function PlaybookBlockCard({
           )}
         </div>
       </div>
+
+      {/* Delete confirmation dialog */}
+      {showDeleteConfirm && onDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-5">
+            <h3 className="text-base font-semibold text-neutral-800 mb-2">Delete block?</h3>
+            <p className="text-sm text-neutral-500 mb-4">
+              This will permanently remove &ldquo;{block.label}&rdquo; and all its instances.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 px-4 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-600 hover:bg-neutral-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { onDelete(block.id); setShowDeleteConfirm(false) }}
+                className="flex-1 px-4 py-2 rounded-xl bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 })

@@ -53,6 +53,7 @@ interface PlanningWorkspaceProps {
     onRejectSuggestion: (index: number) => void
   }
   onBack?: () => void
+  initialTab?: 'research' | 'rules' | 'weekly-review'
 }
 
 type MobileTab = 'research' | 'rules' | 'review'
@@ -78,11 +79,16 @@ export function PlanningWorkspace({
   onViewPublishedRules,
   weeklyReview,
   onBack,
+  initialTab,
 }: PlanningWorkspaceProps) {
   const isMobile = useMobile()
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null)
-  const [mobileTab, setMobileTab] = useState<MobileTab>('research')
-  const [desktopRightPanel, setDesktopRightPanel] = useState<DesktopRightPanel>('rules')
+  const [mobileTab, setMobileTab] = useState<MobileTab>(
+    initialTab === 'weekly-review' ? 'review' : initialTab === 'rules' ? 'rules' : 'research'
+  )
+  const [desktopRightPanel, setDesktopRightPanel] = useState<DesktopRightPanel>(
+    initialTab === 'weekly-review' ? 'review' : 'rules'
+  )
 
   const selectedWorkspace = useMemo(() => {
     if (!selectedWorkspaceId) return null

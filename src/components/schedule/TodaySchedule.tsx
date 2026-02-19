@@ -12,6 +12,7 @@ import type { PlaybookInstance, QuickReact } from '@/types/playbook'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem, playbookInstanceToTimelineItem } from '@/types/timeline'
 import { PlaybookBlockCard } from '@/components/playbook/PlaybookBlockCard'
 import { EveningReflection } from '@/components/playbook/EveningReflection'
+import { ScanMyDay } from './ScanMyDay'
 import { groupByDaySection, type DaySection } from '@/lib/timeUtils'
 import { useMobile } from '@/hooks/useMobile'
 import { TimeGroup } from './TimeGroup'
@@ -525,6 +526,9 @@ interface TodayScheduleProps {
   onPlaybookReact?: (instanceId: string, react: QuickReact | null) => void
   onPlaybookTag?: (instanceId: string, tags: string[]) => void
   onPlaybookNote?: (instanceId: string, notes: string | null) => void
+  onPlaybookEdit?: (block: PlaybookInstance['block']) => void
+  onPlaybookDelete?: (blockId: string) => void
+  onPlaybookSuppress?: (blockId: string, date: string) => void
 }
 
 function LoadingSkeleton() {
@@ -618,6 +622,9 @@ export function TodaySchedule({
   onPlaybookReact,
   onPlaybookTag,
   onPlaybookNote,
+  onPlaybookEdit,
+  onPlaybookDelete,
+  onPlaybookSuppress,
 }: TodayScheduleProps) {
   void _onCreateTask // Reserved - was used by ReviewSection
   void _onDeleteTask // Available for future inline delete
@@ -1303,6 +1310,15 @@ export function TodaySchedule({
         )}
       </header>
 
+      {/* Scan My Day - morning briefing card */}
+      {isToday && !loading && !hideCoaching && (
+        <ScanMyDay
+          tasks={allFilteredTasks}
+          events={filteredEvents}
+          playbookInstances={playbookInstances ?? []}
+        />
+      )}
+
       {/* Inline collapsible inbox section */}
       {isToday && showInlineInbox && inboxTasks.length > 0 && onUpdateTask && onPushTask && (
         <div className="mb-4 md:mb-8 animate-fade-in-up">
@@ -1413,6 +1429,9 @@ export function TodaySchedule({
                         onReact={onPlaybookReact ?? (() => {})}
                         onTag={onPlaybookTag ?? (() => {})}
                         onNote={onPlaybookNote ?? (() => {})}
+                        onEdit={onPlaybookEdit}
+                        onDelete={onPlaybookDelete}
+                        onSuppress={onPlaybookSuppress}
                       />
                     )
                   }

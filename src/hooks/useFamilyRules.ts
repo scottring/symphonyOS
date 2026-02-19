@@ -8,6 +8,8 @@ function rowToRule(row: Record<string, unknown>): FamilyRule {
     userId: row.user_id as string,
     rule: row.rule as string,
     appliesTo: (row.applies_to || ['everyone']) as string[],
+    category: (row.category || null) as string | null,
+    layerId: (row.layer_id || null) as string | null,
     status: (row.status || 'active') as FamilyRule['status'],
     rationale: row.rationale as string | null,
     enforcementTip: row.enforcement_tip as string | null,
@@ -37,6 +39,8 @@ export function useFamilyRules() {
   const addRule = useCallback(async (input: {
     rule: string
     appliesTo?: string[]
+    category?: string
+    layerId?: string
     rationale?: string
     enforcementTip?: string
   }) => {
@@ -49,6 +53,8 @@ export function useFamilyRules() {
         user_id: user.id,
         rule: input.rule,
         applies_to: input.appliesTo || ['everyone'],
+        category: input.category || null,
+        layer_id: input.layerId || null,
         rationale: input.rationale || null,
         enforcement_tip: input.enforcementTip || null,
       })
@@ -61,10 +67,12 @@ export function useFamilyRules() {
     return newRule
   }, [])
 
-  const updateRule = useCallback(async (id: string, updates: Partial<Pick<FamilyRule, 'rule' | 'appliesTo' | 'status' | 'rationale' | 'enforcementTip'>>) => {
+  const updateRule = useCallback(async (id: string, updates: Partial<Pick<FamilyRule, 'rule' | 'appliesTo' | 'category' | 'layerId' | 'status' | 'rationale' | 'enforcementTip'>>) => {
     const dbUpdates: Record<string, unknown> = { updated_at: new Date().toISOString() }
     if (updates.rule !== undefined) dbUpdates.rule = updates.rule
     if (updates.appliesTo !== undefined) dbUpdates.applies_to = updates.appliesTo
+    if (updates.category !== undefined) dbUpdates.category = updates.category
+    if (updates.layerId !== undefined) dbUpdates.layer_id = updates.layerId
     if (updates.status !== undefined) dbUpdates.status = updates.status
     if (updates.rationale !== undefined) dbUpdates.rationale = updates.rationale
     if (updates.enforcementTip !== undefined) dbUpdates.enforcement_tip = updates.enforcementTip

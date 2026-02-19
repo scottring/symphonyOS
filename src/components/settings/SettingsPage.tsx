@@ -7,12 +7,15 @@ import { WaitlistAdmin } from './WaitlistAdmin'
 import { ThemeSelector } from './ThemeSelector'
 import { HomeAddressSettings } from './HomeAddressSettings'
 import { DemoControls } from './DemoControls'
+import { ImportPlaybook } from './ImportPlaybook'
 import type { FamilyMember } from '@/types/family'
+import type { CreateBlockInput } from '@/types/playbook'
 
 interface SettingsPageProps {
   onBack: () => void
   onFamilyMembersChanged?: () => void
   onNavigateToLayer?: (layerId: string) => void
+  onImportBlocks?: (blocks: CreateBlockInput[]) => Promise<void>
 }
 
 type Tab = 'general' | 'calendar' | 'layers' | 'admin'
@@ -93,6 +96,7 @@ export function SettingsPage({
   onBack,
   onFamilyMembersChanged,
   onNavigateToLayer,
+  onImportBlocks,
 }: SettingsPageProps) {
   const { members, addMember, updateMember, deleteMember } = useFamilyMembers()
   const { layersWithAssessments, activateLayer, deactivateLayer } = useIntelligenceLayers()
@@ -494,6 +498,11 @@ export function SettingsPage({
                 )}
               </div>
             </section>
+
+            {/* Import Playbook */}
+            {onImportBlocks && (
+              <ImportPlaybook onImport={onImportBlocks} />
+            )}
           </div>
         )}
 

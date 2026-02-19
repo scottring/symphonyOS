@@ -75,6 +75,9 @@ interface HomeViewProps {
   onPlaybookReact?: (instanceId: string, react: QuickReact | null) => void
   onPlaybookTag?: (instanceId: string, tags: string[]) => void
   onPlaybookNote?: (instanceId: string, notes: string | null) => void
+  onPlaybookEdit?: (block: PlaybookInstance['block']) => void
+  onPlaybookDelete?: (blockId: string) => void
+  onPlaybookSuppress?: (blockId: string, date: string) => void
 }
 
 export function HomeView({
@@ -130,6 +133,9 @@ export function HomeView({
   onPlaybookReact,
   onPlaybookTag,
   onPlaybookNote,
+  onPlaybookEdit,
+  onPlaybookDelete,
+  onPlaybookSuppress,
 }: HomeViewProps) {
   const { currentView, setCurrentView } = useHomeView()
   const isMobile = useMobile()
@@ -420,6 +426,9 @@ export function HomeView({
         onPlaybookReact={onPlaybookReact}
         onPlaybookTag={onPlaybookTag}
         onPlaybookNote={onPlaybookNote}
+        onPlaybookEdit={onPlaybookEdit}
+        onPlaybookDelete={onPlaybookDelete}
+        onPlaybookSuppress={onPlaybookSuppress}
       />
     )
   }

@@ -27,7 +27,7 @@ export const FollowUpInput = memo(function FollowUpInput({
   }, [])
 
   // Auto-dismiss after 8 seconds of no interaction
-  const dismissTimer = useRef<ReturnType<typeof setTimeout>>()
+  const dismissTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const resetDismissTimer = useCallback(() => {
     if (dismissTimer.current) clearTimeout(dismissTimer.current)
     dismissTimer.current = setTimeout(onDismiss, 8000)

@@ -170,7 +170,17 @@ export function WeeklyReviewTab({
   const isPastWeek = weekOf < thisMonday
 
   const activeRules = useMemo(() => rules.filter(r => r.status === 'active'), [rules])
-  const pendingCount = aiResult?.suggestions.filter(s => s.status === 'pending').length || 0
+  const pendingSuggestions = useMemo(() => aiResult?.suggestions.filter(s => s.status === 'pending') || [], [aiResult])
+  const pendingCount = pendingSuggestions.length
+
+  // Sort block summaries: flagged first, then by completion rate
+  const sortedSummaries = useMemo(() => {
+    return [...blockSummaries].sort((a, b) => {
+      if (a.flagged && !b.flagged) return -1
+      if (!a.flagged && b.flagged) return 1
+      return a.completionRate - b.completionRate
+    })
+  }, [blockSummaries])
 
   const handleEditBlockFromFeedback = (blockId: string) => {
     const block = blocks.find(b => b.id === blockId)
@@ -304,7 +314,7 @@ export function WeeklyReviewTab({
                 <>
                   <WeeklyStats stats={overallStats} />
                   <div className="space-y-2">
-                    {blockSummaries.map(summary => (
+                    {sortedSummaries.map(summary => (
                       <BlockFeedbackCard
                         key={summary.blockId}
                         summary={summary}
@@ -349,6 +359,35 @@ export function WeeklyReviewTab({
                     <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider mb-1">{aiResult.weeklyTheme}</p>
                   )}
                   <p className="text-[12px] text-neutral-600 leading-relaxed">{aiResult.coachingInsights}</p>
+                </div>
+              )}
+
+              {/* Quick actions for pending suggestions */}
+              {pendingCount >= 2 && (
+                <div className="flex gap-2 pb-1">
+                  <button
+                    onClick={() => {
+                      pendingSuggestions.forEach((s) => {
+                        const realIndex = aiResult!.suggestions.indexOf(s)
+                        onAcceptSuggestion(realIndex)
+                        handleApplySuggestion(s)
+                      })
+                    }}
+                    className="flex-1 px-3 py-2 rounded-lg border border-green-300 text-green-700 text-xs font-medium hover:bg-green-50 transition-colors"
+                  >
+                    Accept all ({pendingCount})
+                  </button>
+                  <button
+                    onClick={() => {
+                      pendingSuggestions.forEach((s) => {
+                        const realIndex = aiResult!.suggestions.indexOf(s)
+                        onRejectSuggestion(realIndex)
+                      })
+                    }}
+                    className="flex-1 px-3 py-2 rounded-lg border border-neutral-300 text-neutral-500 text-xs font-medium hover:bg-neutral-50 transition-colors"
+                  >
+                    Dismiss all
+                  </button>
                 </div>
               )}
 

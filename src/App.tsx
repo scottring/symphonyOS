@@ -56,6 +56,7 @@ import {
 } from '@/components/lazy'
 import { useGoals } from '@/hooks/useGoals'
 import { usePlaybook } from '@/hooks/usePlaybook'
+import { useIntelligenceLayers } from '@/hooks/useIntelligenceLayers'
 import { useFamilyRules } from '@/hooks/useFamilyRules'
 import { useResponsibilities } from '@/hooks/useResponsibilities'
 import { usePlanningResources } from '@/hooks/usePlanningResources'
@@ -63,7 +64,14 @@ import { useResearchWorkspaces } from '@/hooks/useResearchWorkspaces'
 import { useWeeklyFeedback } from '@/hooks/useWeeklyFeedback'
 import { useAIPlaybookSuggestions } from '@/hooks/useAIPlaybookSuggestions'
 import { useScheduleActions } from '@/hooks/useScheduleActions'
+import { useDomainAssessments } from '@/hooks/useDomainAssessments'
+import { getLayerConfig } from '@/config/layers'
+import { LayerHub, QuickAssessment, DomainDetail } from '@/components/layer'
+import { DeepAssessmentChat } from '@/components/layer/DeepAssessmentChat'
+import { useDeepAssessment } from '@/hooks/useDeepAssessment'
+import { BlockEditor } from '@/components/playbook/BlockEditor'
 import { RulesView } from '@/components/rules/RulesView'
+import { WeeklyPlannerGrid } from '@/components/playbook/WeeklyPlannerGrid'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import type { ViewType } from '@/components/layout/Sidebar'
 import type { ActionableInstance, Routine } from '@/types/actionable'
@@ -116,7 +124,8 @@ function App() {
   const isOnline = useOnlineStatus()
   const focusMode = useFocusMode()
 
-  // Playbook
+  // Intelligence Layers + Playbook
+  const { layersWithAssessments: layersList } = useIntelligenceLayers()
   const playbook = usePlaybook()
 
   // Weekly Review — track which week is being reviewed
@@ -135,9 +144,34 @@ function App() {
   const familyRules = useFamilyRules()
   const responsibilities = useResponsibilities()
 
+  // Deep Assessment (AI chat per domain)
+  const deepAssessment = useDeepAssessment()
+
   // Planning Resources + Research Workspaces
   const planningResources = usePlanningResources()
   const researchWorkspaces = useResearchWorkspaces()
+
+  // Layer Hub state
+  const [activeLayerSlug, setActiveLayerSlug] = useState<string | null>(null)
+  const [layerSubView, setLayerSubView] = useState<'hub' | 'rules' | 'assessment' | 'domain' | 'deep-assessment' | 'research' | 'review' | 'playbook'>('hub')
+  const [activeDomainSlug, setActiveDomainSlug] = useState<string | null>(null)
+
+  // Block editing from timeline
+  const [timelineEditingBlock, setTimelineEditingBlock] = useState<import('@/types/playbook').PlaybookBlock | null>(null)
+
+  // Get the DB ID for the active layer (needed for assessments hook)
+  const activeLayerDbId = useMemo(() => {
+    if (!activeLayerSlug) return null
+    const match = layersList.find(l => l.layer.slug === activeLayerSlug)
+    return match?.layer.id ?? null
+  }, [activeLayerSlug, layersList])
+
+  const activeLayerConfig = useMemo(() => {
+    if (!activeLayerSlug) return null
+    return getLayerConfig(activeLayerSlug)
+  }, [activeLayerSlug])
+
+  const domainAssessments = useDomainAssessments(activeLayerDbId)
 
   // Lists state
   const [selectedListId, setSelectedListId] = useState<string | null>(null)
@@ -227,7 +261,7 @@ function App() {
   const params = useParams<{ projectId?: string; routineId?: string; contactId?: string; goalId?: string }>()
 
   // State for non-URL-routed views
-  const [stateView, setStateView] = useState<'today' | 'lists' | 'notes' | 'history' | 'rules' | 'planning' | 'settings' | 'task-detail' | null>(null)
+  const [stateView, setStateView] = useState<'today' | 'lists' | 'notes' | 'history' | 'rules' | 'planning' | 'settings' | 'task-detail' | 'layer-hub' | null>(null)
 
   // Derive view from URL path or state
   const activeView: ViewType = useMemo(() => {
@@ -731,7 +765,7 @@ function App() {
       navigate('/contacts')
     }
     // Handle state-based views
-    else if (view === 'lists' || view === 'notes' || view === 'history' || view === 'rules' || view === 'planning' || view === 'settings' || view === 'task-detail') {
+    else if (view === 'lists' || view === 'notes' || view === 'history' || view === 'rules' || view === 'planning' || view === 'settings' || view === 'task-detail' || view === 'layer-hub') {
       setStateView(view)
       navigate('/') // Navigate to home URL but show state view
     } else {
@@ -1391,8 +1425,29 @@ function App() {
             onPlaybookReact={playbook.reactToBlock}
             onPlaybookTag={playbook.tagBlock}
             onPlaybookNote={playbook.noteBlock}
+            onPlaybookEdit={(block: import('@/types/playbook').PlaybookBlock | undefined) => block && setTimelineEditingBlock(block)}
+            onPlaybookDelete={playbook.deleteBlock}
+            onPlaybookSuppress={playbook.suppressBlock}
           />
         </div>
+      )}
+
+      {/* Block Editor modal (from timeline overflow menu) */}
+      {timelineEditingBlock && (
+        <BlockEditor
+          block={timelineEditingBlock}
+          onSave={async (input) => {
+            if ('id' in input) {
+              await playbook.updateBlock(input.id, input.updates)
+            }
+            setTimelineEditingBlock(null)
+          }}
+          onDelete={async (id) => {
+            await playbook.deleteBlock(id)
+            setTimelineEditingBlock(null)
+          }}
+          onClose={() => setTimelineEditingBlock(null)}
+        />
       )}
 
       {/* Planning Session - fullscreen overlay */}
@@ -1727,6 +1782,228 @@ function App() {
         />
       )}
 
+      {activeView === 'layer-hub' && activeLayerConfig && (
+        <>
+          {layerSubView === 'hub' && (
+            <LayerHub
+              config={activeLayerConfig}
+              assessments={domainAssessments.assessments}
+              assessmentsLoading={domainAssessments.loading}
+              rules={familyRules.rules.filter(r => r.status === 'active')}
+              workspaces={researchWorkspaces.workspaces}
+              blocks={playbook.blocks}
+              onBack={() => handleViewChange('settings')}
+              onOpenRules={() => setLayerSubView('rules')}
+              onOpenResearch={() => setLayerSubView('research')}
+              onOpenWeeklyReview={() => setLayerSubView('review')}
+              onOpenPlaybook={() => setLayerSubView('playbook')}
+              onOpenAssessment={() => setLayerSubView('assessment')}
+              onOpenDomain={(slug) => {
+                setActiveDomainSlug(slug)
+                setLayerSubView('domain')
+              }}
+            />
+          )}
+
+          {layerSubView === 'assessment' && (
+            <QuickAssessment
+              config={activeLayerConfig}
+              existingAssessments={domainAssessments.assessments}
+              onSave={domainAssessments.saveQuickAssessment}
+              onBack={() => setLayerSubView('hub')}
+            />
+          )}
+
+          {layerSubView === 'domain' && activeDomainSlug && (() => {
+            const domainConfig = activeLayerConfig.domains.find(d => d.slug === activeDomainSlug)
+            const assessment = domainAssessments.getAssessment(activeDomainSlug)
+            if (!domainConfig || !assessment) {
+              // Domain not assessed yet — go to assessment
+              return (
+                <QuickAssessment
+                  config={activeLayerConfig}
+                  existingAssessments={domainAssessments.assessments}
+                  onSave={domainAssessments.saveQuickAssessment}
+                  onBack={() => setLayerSubView('hub')}
+                />
+              )
+            }
+            return (
+              <DomainDetail
+                domain={domainConfig}
+                assessment={assessment}
+                accentColor={activeLayerConfig.accentColor}
+                onBack={() => setLayerSubView('hub')}
+                onReassess={() => setLayerSubView('assessment')}
+                onGoDeeper={() => {
+                  setLayerSubView('deep-assessment')
+                }}
+              />
+            )
+          })()}
+
+          {layerSubView === 'deep-assessment' && activeDomainSlug && (() => {
+            const domainConfig = activeLayerConfig.domains.find(d => d.slug === activeDomainSlug)
+            const quickAssessment = domainAssessments.getAssessment(activeDomainSlug)
+            if (!domainConfig) return null
+            return (
+              <DeepAssessmentChat
+                config={activeLayerConfig}
+                domain={domainConfig}
+                quickAssessment={quickAssessment ?? undefined}
+                messages={deepAssessment.messages}
+                loading={deepAssessment.loading}
+                readyToFinish={deepAssessment.readyToFinish}
+                result={deepAssessment.result}
+                error={deepAssessment.error}
+                onStart={() => {
+                  deepAssessment.start({
+                    layerId: activeLayerDbId || '',
+                    layerName: activeLayerConfig.name,
+                    domainSlug: activeDomainSlug,
+                    domainName: domainConfig.name,
+                    domainSubtitle: domainConfig.subtitle,
+                    quickAssessment: quickAssessment ?? undefined,
+                  })
+                }}
+                onSend={deepAssessment.respond}
+                onFinish={deepAssessment.finish}
+                onBack={() => {
+                  deepAssessment.reset()
+                  setLayerSubView('domain')
+                }}
+                onDone={() => {
+                  // Refresh assessments to pick up the new data
+                  domainAssessments.refetch()
+                  deepAssessment.reset()
+                  setLayerSubView('domain')
+                }}
+              />
+            )
+          })()}
+
+          {layerSubView === 'rules' && (
+            <RulesView
+              rules={familyRules.rules}
+              responsibilities={responsibilities.responsibilities}
+              onAddRule={familyRules.addRule}
+              onUpdateRule={familyRules.updateRule}
+              onDeleteRule={familyRules.deleteRule}
+              onAddResponsibility={responsibilities.addResponsibility}
+              getResponsibilitiesForRule={responsibilities.getForRule}
+              loading={familyRules.loading}
+              onBack={() => setLayerSubView('hub')}
+              title={activeLayerConfig.rulesLabel}
+              description={activeLayerConfig.rulesDescription}
+              layerLabel={activeLayerConfig.name}
+              categories={activeLayerConfig.ruleCategories}
+            />
+          )}
+
+          {layerSubView === 'research' && (
+            <Suspense fallback={<LoadingFallback />}>
+              <PlanningWorkspace
+                resources={planningResources.resources}
+                loading={planningResources.loading}
+                onAddResource={planningResources.addResource}
+                onUpdateResource={planningResources.updateResource}
+                onDeleteResource={planningResources.deleteResource}
+                onUploadFile={planningResources.uploadFile}
+                onGetSignedUrl={planningResources.getSignedUrl}
+                workspaces={researchWorkspaces.workspaces}
+                workspacesLoading={researchWorkspaces.loading}
+                onCreateWorkspace={researchWorkspaces.addWorkspace}
+                onUpdateWorkspace={researchWorkspaces.updateWorkspace}
+                onDeleteWorkspace={researchWorkspaces.deleteWorkspace}
+                onMarkWorkspaceSynthesized={researchWorkspaces.markSynthesized}
+                rules={familyRules.rules}
+                onAddRule={familyRules.addRule}
+                onUpdateRule={familyRules.updateRule}
+                onDeleteRule={familyRules.deleteRule}
+                onViewPublishedRules={() => setLayerSubView('rules')}
+                weeklyReview={{
+                  blockSummaries: weeklyFeedback.blockSummaries,
+                  overallStats: weeklyFeedback.overallStats,
+                  flaggedBlocks: weeklyFeedback.flaggedBlocks,
+                  feedbackLoading: weeklyFeedback.loading,
+                  weekOf: reviewWeekOf,
+                  onWeekChange: setReviewWeekOf,
+                  blocks: playbook.blocks,
+                  onAddBlock: playbook.addBlock,
+                  onUpdateBlock: playbook.updateBlock,
+                  onDeleteBlock: playbook.deleteBlock,
+                  onReorderBlocks: playbook.reorderBlocks,
+                  aiResult: aiSuggestions.result,
+                  aiLoading: aiSuggestions.loading,
+                  aiError: aiSuggestions.error,
+                  onGenerateAI: aiSuggestions.generateSuggestions,
+                  onAcceptSuggestion: aiSuggestions.acceptSuggestion,
+                  onRejectSuggestion: aiSuggestions.rejectSuggestion,
+                }}
+                onBack={() => setLayerSubView('hub')}
+                initialTab="research"
+              />
+            </Suspense>
+          )}
+
+          {layerSubView === 'review' && (
+            <Suspense fallback={<LoadingFallback />}>
+              <PlanningWorkspace
+                resources={planningResources.resources}
+                loading={planningResources.loading}
+                onAddResource={planningResources.addResource}
+                onUpdateResource={planningResources.updateResource}
+                onDeleteResource={planningResources.deleteResource}
+                onUploadFile={planningResources.uploadFile}
+                onGetSignedUrl={planningResources.getSignedUrl}
+                workspaces={researchWorkspaces.workspaces}
+                workspacesLoading={researchWorkspaces.loading}
+                onCreateWorkspace={researchWorkspaces.addWorkspace}
+                onUpdateWorkspace={researchWorkspaces.updateWorkspace}
+                onDeleteWorkspace={researchWorkspaces.deleteWorkspace}
+                onMarkWorkspaceSynthesized={researchWorkspaces.markSynthesized}
+                rules={familyRules.rules}
+                onAddRule={familyRules.addRule}
+                onUpdateRule={familyRules.updateRule}
+                onDeleteRule={familyRules.deleteRule}
+                onViewPublishedRules={() => setLayerSubView('rules')}
+                weeklyReview={{
+                  blockSummaries: weeklyFeedback.blockSummaries,
+                  overallStats: weeklyFeedback.overallStats,
+                  flaggedBlocks: weeklyFeedback.flaggedBlocks,
+                  feedbackLoading: weeklyFeedback.loading,
+                  weekOf: reviewWeekOf,
+                  onWeekChange: setReviewWeekOf,
+                  blocks: playbook.blocks,
+                  onAddBlock: playbook.addBlock,
+                  onUpdateBlock: playbook.updateBlock,
+                  onDeleteBlock: playbook.deleteBlock,
+                  onReorderBlocks: playbook.reorderBlocks,
+                  aiResult: aiSuggestions.result,
+                  aiLoading: aiSuggestions.loading,
+                  aiError: aiSuggestions.error,
+                  onGenerateAI: aiSuggestions.generateSuggestions,
+                  onAcceptSuggestion: aiSuggestions.acceptSuggestion,
+                  onRejectSuggestion: aiSuggestions.rejectSuggestion,
+                }}
+                onBack={() => setLayerSubView('hub')}
+                initialTab="weekly-review"
+              />
+            </Suspense>
+          )}
+
+          {layerSubView === 'playbook' && (
+            <WeeklyPlannerGrid
+              blocks={playbook.blocks}
+              onAddBlock={playbook.addBlock}
+              onUpdateBlock={playbook.updateBlock}
+              onDeleteBlock={playbook.deleteBlock}
+              onBack={() => setLayerSubView('hub')}
+            />
+          )}
+        </>
+      )}
+
       {activeView === 'settings' && (
         <Suspense fallback={<LoadingFallback />}>
           <SettingsPage
@@ -1735,8 +2012,15 @@ function App() {
               handleViewChange('today')
             }}
             onFamilyMembersChanged={refetchFamilyMembers}
-            onNavigateToLayer={(layerId) => {
-              if (layerId === 'relish') handleViewChange('rules')
+            onNavigateToLayer={(layerSlug) => {
+              setActiveLayerSlug(layerSlug)
+              setLayerSubView('hub')
+              handleViewChange('layer-hub')
+            }}
+            onImportBlocks={async (blocks) => {
+              for (const block of blocks) {
+                await playbook.addBlock(block)
+              }
             }}
           />
         </Suspense>
