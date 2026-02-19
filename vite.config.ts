@@ -43,6 +43,10 @@ export default defineConfig({
             '@dnd-kit/sortable',
             '@dnd-kit/utilities',
           ],
+          'vendor-sentry': [
+            '@sentry/react',
+            '@sentry/browser',
+          ],
         },
       },
     },

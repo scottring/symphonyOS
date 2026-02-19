@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@/test/test-utils'
+import { render, screen, waitFor } from '@/test/test-utils'
 import { QuickCapture } from './QuickCapture'
 
 describe('QuickCapture', () => {
@@ -53,7 +53,9 @@ describe('QuickCapture', () => {
       const input = screen.getByPlaceholderText("What's on your mind?")
       await user.type(input, '{Escape}')
 
-      expect(onClose).toHaveBeenCalled()
+      await waitFor(() => {
+        expect(onClose).toHaveBeenCalled()
+      })
     })
 
     it('closes modal when clicking overlay', async () => {
@@ -66,7 +68,9 @@ describe('QuickCapture', () => {
       const overlay = screen.getByPlaceholderText("What's on your mind?").closest('.bg-black\\/40')
       if (overlay) {
         await user.click(overlay)
-        expect(onClose).toHaveBeenCalled()
+        await waitFor(() => {
+          expect(onClose).toHaveBeenCalled()
+        })
       }
     })
   })

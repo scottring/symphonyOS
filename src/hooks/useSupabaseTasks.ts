@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useFamilyMembers } from './useFamilyMembers'
 import { useToast } from './useToast'
+import { logger } from '@/lib/logger'
 import type { Task, TaskLink, TaskContext, TaskCategory, LinkedActivity, LinkType, LinkedActivityType } from '@/types/task'
 
 interface DbTask {
@@ -157,14 +158,14 @@ export function useSupabaseTasks() {
       }
 
       // Debug: log raw data from DB to check if notes are present
-      console.log('[fetchTasks] Raw data from DB, tasks with notes:',
+      logger.debug('[fetchTasks] Raw data from DB, tasks with notes:',
         (data as DbTask[]).filter(t => t.notes).map(t => ({ id: t.id, title: t.title, notes: t.notes }))
       )
 
       const allTasks = (data as DbTask[]).map(dbTaskToTask)
 
       // Debug: log converted tasks with notes
-      console.log('[fetchTasks] Converted tasks with notes:',
+      logger.debug('[fetchTasks] Converted tasks with notes:',
         allTasks.filter(t => t.notes).map(t => ({ id: t.id, title: t.title, notes: t.notes }))
       )
 
@@ -185,7 +186,7 @@ export function useSupabaseTasks() {
           table: 'tasks',
         },
         (payload) => {
-          console.log('[useSupabaseTasks] Real-time update:', payload)
+          logger.debug('[useSupabaseTasks] Real-time update:', payload)
 
           if (payload.eventType === 'INSERT') {
             const newTask = dbTaskToTask(payload.new as DbTask)
@@ -583,10 +584,10 @@ export function useSupabaseTasks() {
   }, [tasks])
 
   const updateTask = useCallback(async (id: string, updates: Partial<Task>) => {
-    console.log('[updateTask] Called with:', { id, updates })
+    logger.debug('[updateTask] Called with:', { id, updates })
     const task = tasks.find((t) => t.id === id)
     if (!task) {
-      console.log('[updateTask] Task not found!')
+      logger.debug('[updateTask] Task not found!')
       return
     }
 
@@ -594,7 +595,7 @@ export function useSupabaseTasks() {
     if ('assignedTo' in updates && updates.assignedTo) {
       const isFamilyMember = familyMembers.some(m => m.id === updates.assignedTo)
       if (isFamilyMember && !('context' in updates)) {
-        console.log('[updateTask] Auto-setting context to family for family member assignment')
+        logger.debug('[updateTask] Auto-setting context to family for family member assignment')
         updates = { ...updates, context: 'family' }
 
         // Show toast notification
@@ -646,14 +647,14 @@ export function useSupabaseTasks() {
     if ('isWaiting' in updates) dbUpdates.is_waiting = updates.isWaiting ?? false
     if ('waitingSince' in updates) dbUpdates.waiting_since = updates.waitingSince?.toISOString() ?? null
 
-    console.log('[updateTask] Sending to DB:', { id, dbUpdates })
+    logger.debug('[updateTask] Sending to DB:', { id, dbUpdates })
     const { data, error: updateError, status, count } = await supabase
       .from('tasks')
       .update(dbUpdates)
       .eq('id', id)
       .select()
 
-    console.log('[updateTask] DB response:', { data, status, count, error: updateError?.message })
+    logger.debug('[updateTask] DB response:', { data, status, count, error: updateError?.message })
 
     if (updateError) {
       console.error('[updateTask] DB error:', updateError.message)
@@ -663,7 +664,7 @@ export function useSupabaseTasks() {
       )
       setError(updateError.message)
     } else if (data && data.length > 0) {
-      console.log('[updateTask] DB update successful, returned notes:', (data[0] as DbTask).notes)
+      logger.debug('[updateTask] DB update successful, returned notes:', (data[0] as DbTask).notes)
     } else {
       console.warn('[updateTask] DB update returned no data!')
     }
@@ -673,13 +674,13 @@ export function useSupabaseTasks() {
   const updateTasksBulk = useCallback(async (taskIds: string[], updates: Partial<Task>) => {
     if (taskIds.length === 0) return
 
-    console.log('[updateTasksBulk] Called with:', { taskIds, updates })
+    logger.debug('[updateTasksBulk] Called with:', { taskIds, updates })
 
     // Save original tasks for rollback
     const tasksToUpdate = tasks.filter(t => taskIds.includes(t.id))
     const rollbackMap = new Map(tasksToUpdate.map(t => [t.id, { ...t }]))
 
-    console.log('[updateTasksBulk] Tasks to update:', tasksToUpdate.length)
+    logger.debug('[updateTasksBulk] Tasks to update:', tasksToUpdate.length)
 
     // Optimistic update
     setTasks(prev => prev.map(t =>
@@ -723,7 +724,7 @@ export function useSupabaseTasks() {
     if ('isWaiting' in updates) dbUpdates.is_waiting = updates.isWaiting ?? false
     if ('waitingSince' in updates) dbUpdates.waiting_since = updates.waitingSince?.toISOString() ?? null
 
-    console.log('[updateTasksBulk] Sending to DB:', { taskIds, dbUpdates })
+    logger.debug('[updateTasksBulk] Sending to DB:', { taskIds, dbUpdates })
 
     // Bulk update with .in()
     const { error: updateError } = await supabase
@@ -731,7 +732,7 @@ export function useSupabaseTasks() {
       .update(dbUpdates)
       .in('id', taskIds)
 
-    console.log('[updateTasksBulk] DB response:', { error: updateError?.message })
+    logger.debug('[updateTasksBulk] DB response:', { error: updateError?.message })
 
     if (updateError) {
       console.error('[updateTasksBulk] DB error:', updateError.message)

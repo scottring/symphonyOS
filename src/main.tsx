@@ -71,6 +71,7 @@ if (ACTIVE_THEME === 'kinetic') {
 
 import App from './App.tsx'
 import { CalendarCallback } from './pages/CalendarCallback'
+import { NotFound } from './components/NotFound'
 import { GoogleCalendarProvider } from './hooks/useGoogleCalendar'
 import { DomainProvider } from './hooks/useDomain'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -93,6 +94,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/contacts" element={<App />} />
               <Route path="/contacts/:contactId" element={<App />} />
               <Route path="/calendar-callback" element={<CalendarCallback />} />
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </GoogleCalendarProvider>
         </BrowserRouter>

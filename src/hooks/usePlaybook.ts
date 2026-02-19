@@ -57,6 +57,22 @@ export function usePlaybook() {
   const [loading, setLoading] = useState(true)
   const [seeding, setSeeding] = useState(false)
 
+  // Fire-and-forget helper to insert coaching observations from feedback
+  const insertObservation = useCallback(async (
+    observation: string, tags: string[], sourceId: string, layerId?: string | null
+  ) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    await supabase.from('coaching_observations').insert({
+      user_id: user.id,
+      observation,
+      tags,
+      source_type: 'feedback',
+      source_id: sourceId,
+      layer_id: layerId || null,
+    })
+  }, [])
+
   // Fetch all blocks for this user
   const fetchBlocks = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -177,7 +193,23 @@ export function usePlaybook() {
     setInstances(prev => prev.map(i =>
       i.id === instanceId ? { ...i, react } : i
     ))
-  }, [])
+
+    // Fire-and-forget observation
+    if (react) {
+      const instance = instances.find(i => i.id === instanceId)
+      const block = instance ? blocks.find(b => b.id === instance.blockId) : null
+      if (block) {
+        const reactLabels: Record<string, string> = { 'nailed-it': 'went well', 'okay': 'was okay', 'tough': 'was challenging' }
+        const label = reactLabels[react] ?? react
+        insertObservation(
+          `"${block.label}" ${label}`,
+          [react, block.blockType],
+          instanceId,
+          block.layerId
+        )
+      }
+    }
+  }, [instances, blocks, insertObservation])
 
   // Tag block
   const tagBlock = useCallback(async (instanceId: string, tags: string[]) => {
@@ -190,7 +222,21 @@ export function usePlaybook() {
     setInstances(prev => prev.map(i =>
       i.id === instanceId ? { ...i, tags } : i
     ))
-  }, [])
+
+    // Fire-and-forget observation
+    if (tags.length > 0) {
+      const instance = instances.find(i => i.id === instanceId)
+      const block = instance ? blocks.find(b => b.id === instance.blockId) : null
+      if (block) {
+        insertObservation(
+          `"${block.label}" tagged: ${tags.join(', ')}`,
+          [...tags, block.blockType],
+          instanceId,
+          block.layerId
+        )
+      }
+    }
+  }, [instances, blocks, insertObservation])
 
   // Note on block
   const noteBlock = useCallback(async (instanceId: string, notes: string | null) => {
@@ -203,7 +249,21 @@ export function usePlaybook() {
     setInstances(prev => prev.map(i =>
       i.id === instanceId ? { ...i, notes } : i
     ))
-  }, [])
+
+    // Fire-and-forget observation
+    if (notes) {
+      const instance = instances.find(i => i.id === instanceId)
+      const block = instance ? blocks.find(b => b.id === instance.blockId) : null
+      if (block) {
+        insertObservation(
+          `Note on "${block.label}": ${notes.substring(0, 200)}`,
+          ['user-note', block.blockType],
+          instanceId,
+          block.layerId
+        )
+      }
+    }
+  }, [instances, blocks, insertObservation])
 
   // Toggle per-kid item completion
   const toggleItem = useCallback(async (instanceId: string, itemId: string) => {

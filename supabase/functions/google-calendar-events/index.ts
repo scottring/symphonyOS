@@ -162,40 +162,51 @@ serve(async (req) => {
 
     let calendars: GoogleCalendar[] = calendarListData.items || []
 
-    // Filter calendars by domain if domain is specified and not 'universal'
+    // Get all of this user's calendar domain mappings
+    const { data: allMappings, error: mappingsError } = await supabaseAdmin
+      .from('calendar_domain_mappings')
+      .select('calendar_id, domain')
+      .eq('user_id', user.id)
+
+    if (mappingsError) {
+      console.error('Error fetching calendar domain mappings:', mappingsError)
+    }
+
+    const hasMappings = allMappings && allMappings.length > 0
+
     if (domain && domain !== 'universal') {
-      // Query calendar_domain_mappings to get calendars assigned to this domain
-      const { data: mappings, error: mappingsError } = await supabaseAdmin
-        .from('calendar_domain_mappings')
-        .select('calendar_id')
-        .eq('user_id', user.id)
-        .eq('domain', domain)
-
-      if (mappingsError) {
-        console.error('Error fetching calendar domain mappings:', mappingsError)
-        // Don't fail the request - just return empty events
-        return new Response(JSON.stringify({ events: [] }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
-
-      // If no calendars are assigned to this domain, return empty events
-      if (!mappings || mappings.length === 0) {
+      // Specific domain: only show calendars mapped to this domain
+      if (!hasMappings) {
         console.log(`No calendars assigned to domain: ${domain}`)
         return new Response(JSON.stringify({ events: [] }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
 
-      // Extract calendar IDs from mappings
-      const assignedCalendarIds = new Set(mappings.map(m => m.calendar_id))
+      const domainCalendarIds = new Set(
+        allMappings.filter(m => m.domain === domain).map(m => m.calendar_id)
+      )
 
-      // Filter calendars to only include those assigned to this domain
-      calendars = calendars.filter(c => assignedCalendarIds.has(c.id))
+      if (domainCalendarIds.size === 0) {
+        console.log(`No calendars assigned to domain: ${domain}`)
+        return new Response(JSON.stringify({ events: [] }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
 
+      calendars = calendars.filter(c => domainCalendarIds.has(c.id))
       console.log(`Fetching events for domain "${domain}" from ${calendars.length} assigned calendars`)
+    } else if (hasMappings) {
+      // Universal/unspecified domain BUT user has mappings configured:
+      // Only show calendars that have been mapped to ANY domain.
+      // This prevents shared calendars (e.g. a partner's work calendar)
+      // from leaking into the user's view if they haven't explicitly mapped them.
+      const allMappedCalendarIds = new Set(allMappings.map(m => m.calendar_id))
+      calendars = calendars.filter(c => allMappedCalendarIds.has(c.id))
+      console.log(`Fetching events from ${calendars.length} mapped calendars (domain: universal)`)
     } else {
-      console.log(`Fetching events from all ${calendars.length} calendars (domain: ${domain || 'not specified'})`)
+      // No mappings at all: show all calendars (first-time / unconfigured user)
+      console.log(`Fetching events from all ${calendars.length} calendars (no domain mappings configured)`)
     }
 
     // Log which calendars we're fetching from

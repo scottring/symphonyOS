@@ -517,8 +517,8 @@ describe('useFamilyMembers', () => {
     })
 
     it('returns undefined if no full user exists', async () => {
-      const member1 = createMockFamilyMember({ name: 'Iris', is_full_user: false })
-      const member2 = createMockFamilyMember({ name: 'Ella', is_full_user: false })
+      const member1 = createMockFamilyMember({ name: 'Iris', is_full_user: false, user_id: 'unrelated-user-1' })
+      const member2 = createMockFamilyMember({ name: 'Ella', is_full_user: false, user_id: 'unrelated-user-2' })
       mockFetchResult = [member1, member2]
 
       const { result } = renderHook(() => useFamilyMembers())

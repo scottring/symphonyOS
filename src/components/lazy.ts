@@ -66,3 +66,55 @@ export const SettingsPage = lazy(() =>
 export const PlanningWorkspace = lazy(() =>
   import('./planning-workspace/PlanningWorkspace').then(m => ({ default: m.PlanningWorkspace }))
 )
+
+// Coaching / Intelligence Layer views
+export const CoachingHub = lazy(() =>
+  import('./coaching/CoachingHub').then(m => ({ default: m.CoachingHub }))
+)
+export const QuickAssessment = lazy(() =>
+  import('./layer/QuickAssessment').then(m => ({ default: m.QuickAssessment }))
+)
+export const DomainDetail = lazy(() =>
+  import('./layer/DomainDetail').then(m => ({ default: m.DomainDetail }))
+)
+export const DeepAssessmentChat = lazy(() =>
+  import('./layer/DeepAssessmentChat').then(m => ({ default: m.DeepAssessmentChat }))
+)
+export const RulesView = lazy(() =>
+  import('./rules/RulesView').then(m => ({ default: m.RulesView }))
+)
+export const BlockEditor = lazy(() =>
+  import('./playbook/BlockEditor').then(m => ({ default: m.BlockEditor }))
+)
+export const WeeklyPlannerGrid = lazy(() =>
+  import('./playbook/WeeklyPlannerGrid').then(m => ({ default: m.WeeklyPlannerGrid }))
+)
+export const FocusMode = lazy(() =>
+  import('./focus/FocusMode').then(m => ({ default: m.FocusMode }))
+)
+export const PlanningSession = lazy(() =>
+  import('./planning/PlanningSession').then(m => ({ default: m.PlanningSession }))
+)
+
+// Detail panel (only renders when an item is selected)
+export const DetailPanelRedesign = lazy(() =>
+  import('./detail/DetailPanelRedesign').then(m => ({ default: m.DetailPanelRedesign }))
+)
+
+// Lists views
+export const ListsList = lazy(() =>
+  import('./list/ListsList').then(m => ({ default: m.ListsList }))
+)
+export const ListView = lazy(() =>
+  import('./list/ListView').then(m => ({ default: m.ListView }))
+)
+
+// Notes page
+export const NotesPage = lazy(() =>
+  import('./notes/NotesPage').then(m => ({ default: m.NotesPage }))
+)
+
+// History
+export const CompletedTasksView = lazy(() =>
+  import('./history/CompletedTasksView').then(m => ({ default: m.CompletedTasksView }))
+)

@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { logger } from '@/lib/logger'
 import type { TimelineItem } from '@/types/timeline'
 import type { Task, TaskLink, LinkedActivity, LinkType, LinkedActivityType } from '@/types/task'
 import type { Contact } from '@/types/contact'
@@ -1937,7 +1938,7 @@ export function DetailPanelRedesign({
                     const eventId = item.originalEvent?.google_event_id
                     const calendarId = item.originalEvent?.calendar_id || item.originalEvent?.calendarId
                     
-                    console.log('PlacesAutocomplete onSelect - Event data:', {
+                    logger.debug('PlacesAutocomplete onSelect - Event data:', {
                       eventId,
                       calendarId,
                       originalEvent: item.originalEvent,
@@ -1959,7 +1960,7 @@ export function DetailPanelRedesign({
                     const eventId = item.originalEvent?.google_event_id
                     const calendarId = item.originalEvent?.calendar_id || item.originalEvent?.calendarId
                     
-                    console.log('PlacesAutocomplete onClear - Event data:', {
+                    logger.debug('PlacesAutocomplete onClear - Event data:', {
                       eventId,
                       calendarId,
                       originalEvent: item.originalEvent,

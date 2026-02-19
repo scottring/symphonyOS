@@ -9,6 +9,7 @@ import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
 import type { PlaybookInstance, QuickReact, FamilyRule } from '@/types/playbook'
 import type { TaskContext } from '@/types/task'
+import type { EveningReflectionData } from '@/types/coaching'
 import { useHomeView } from '@/hooks/useHomeView'
 import { useMobile } from '@/hooks/useMobile'
 import { useUndo } from '@/hooks/useUndo'
@@ -91,6 +92,11 @@ interface HomeViewProps {
   // Day type override
   dayType?: import('@/types/playbook').DayType
   onDayTypeChange?: (dayType: import('@/types/playbook').DayType) => void
+  // Evening reflections
+  onSaveReflection?: (reflection: { highlight: string; notes: string }) => void
+  todayReflection?: EveningReflectionData | null
+  // Weekly review navigation
+  onOpenWeeklyReview?: () => void
 }
 
 export function HomeView({
@@ -156,6 +162,9 @@ export function HomeView({
   onUpdateEventContext,
   dayType,
   onDayTypeChange,
+  onSaveReflection,
+  todayReflection,
+  onOpenWeeklyReview,
 }: HomeViewProps) {
   const { currentView, setCurrentView } = useHomeView()
   const isMobile = useMobile()
@@ -457,6 +466,9 @@ export function HomeView({
         onUpdateEventContext={onUpdateEventContext}
         dayType={dayType}
         onDayTypeChange={onDayTypeChange}
+        onSaveReflection={onSaveReflection}
+        todayReflection={todayReflection}
+        onOpenWeeklyReview={onOpenWeeklyReview}
       />
     )
   }

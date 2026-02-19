@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { logger } from '@/lib/logger'
 import type {
   Note,
   DisplayNote,
@@ -73,7 +74,7 @@ export function useNotes() {
   // Fetch notes and task notes on mount and when user changes
   useEffect(() => {
     if (!user) {
-      console.log('[useNotes] No user, setting empty notes and loading=false')
+      logger.debug('[useNotes] No user, setting empty notes and loading=false')
       setNotes([])
       setTaskNotes([])
       setLoading(false)
@@ -83,7 +84,7 @@ export function useNotes() {
     async function fetchNotesAndTasks() {
       if (!user) return
 
-      console.log('[useNotes] Fetching notes and task notes for user:', user.id)
+      logger.debug('[useNotes] Fetching notes and task notes for user:', user.id)
       setLoading(true)
       setError(null)
 
@@ -126,7 +127,7 @@ export function useNotes() {
         } as Task)
       )
 
-      console.log('[useNotes] Successfully fetched', secondBrainNotes.length, 'notes and', taskNotesConverted.length, 'task notes')
+      logger.debug('[useNotes] Successfully fetched', secondBrainNotes.length, 'notes and', taskNotesConverted.length, 'task notes')
       setNotes(secondBrainNotes)
       setTaskNotes(taskNotesConverted)
       setLoading(false)

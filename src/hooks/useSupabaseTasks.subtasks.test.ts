@@ -14,6 +14,24 @@ vi.mock('@/hooks/useAuth', () => ({
   }),
 }))
 
+vi.mock('@/hooks/useFamilyMembers', () => ({
+  useFamilyMembers: () => ({
+    members: [],
+    loading: false,
+    error: null,
+    getCurrentUserMember: () => undefined,
+    addMember: vi.fn(),
+    updateMember: vi.fn(),
+    deleteMember: vi.fn(),
+  }),
+}))
+
+vi.mock('@/hooks/useToast', () => ({
+  useToast: () => ({
+    showToast: vi.fn(),
+  }),
+}))
+
 // Mock Supabase data storage - this needs to be in module scope for vi.mock
 interface MockDbTask {
   id: string
@@ -71,6 +89,14 @@ function createMockDbTask(overrides: Partial<MockDbTask> = {}): MockDbTask {
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
+    channel: vi.fn(() => {
+      const ch: Record<string, unknown> = {
+        on: vi.fn().mockReturnThis(),
+        unsubscribe: vi.fn(),
+      }
+      ch.subscribe = vi.fn(() => ch)
+      return ch
+    }),
     from: () => ({
       select: () => ({
         eq: () => ({

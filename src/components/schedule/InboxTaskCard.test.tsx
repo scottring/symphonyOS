@@ -72,9 +72,10 @@ describe('InboxTaskCard', () => {
     it('calls onUpdate with completed:true when clicking incomplete task checkbox', () => {
       render(<InboxTaskCard {...defaultProps} />)
 
-      // Find and click the checkbox button (first button should be checkbox)
+      // TaskCheckbox uses useLongPress which binds onMouseDown/onMouseUp, not onClick
       const checkboxButton = screen.getAllByRole('button')[0]
-      fireEvent.click(checkboxButton)
+      fireEvent.mouseDown(checkboxButton)
+      fireEvent.mouseUp(checkboxButton)
 
       expect(mockOnUpdate).toHaveBeenCalledWith({ completed: true })
     })
@@ -83,8 +84,10 @@ describe('InboxTaskCard', () => {
       const completedTask = createMockTask({ ...mockTask, completed: true })
       render(<InboxTaskCard {...defaultProps} task={completedTask} />)
 
+      // TaskCheckbox uses useLongPress which binds onMouseDown/onMouseUp, not onClick
       const checkboxButton = screen.getAllByRole('button')[0]
-      fireEvent.click(checkboxButton)
+      fireEvent.mouseDown(checkboxButton)
+      fireEvent.mouseUp(checkboxButton)
 
       expect(mockOnUpdate).toHaveBeenCalledWith({ completed: false })
     })

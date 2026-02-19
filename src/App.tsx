@@ -26,15 +26,10 @@ import { supabase } from '@/lib/supabase'
 import { DomainPageOutline } from '@/components/domain/DomainPageOutline'
 import { AppShell } from '@/components/layout/AppShell'
 import { HomeView } from '@/components/home'
-import { FocusMode } from '@/components/focus'
 import { useFocusMode } from '@/hooks/useFocusMode'
-import { PlanningSession } from '@/components/planning'
-import { DetailPanelRedesign as DetailPanel } from '@/components/detail/DetailPanelRedesign'
 import { SearchModal } from '@/components/search/SearchModal'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
-import { ListsList, ListView } from '@/components/list'
-import { NotesPage } from '@/components/notes'
-import { CompletedTasksView } from '@/components/history/CompletedTasksView'
+import { SectionErrorBoundary } from '@/components/SectionErrorBoundary'
 import { Toast, ConfirmationToast, type ConfirmationToastMessage } from '@/components/toast'
 import { UndoToast } from '@/components/undo/UndoToast'
 import {
@@ -53,6 +48,20 @@ import {
   GoalsList,
   GoalView,
   PlanningWorkspace,
+  CoachingHub,
+  QuickAssessment,
+  DomainDetail,
+  DeepAssessmentChat,
+  RulesView,
+  BlockEditor,
+  WeeklyPlannerGrid,
+  FocusMode,
+  PlanningSession,
+  DetailPanelRedesign as DetailPanel,
+  ListsList,
+  ListView,
+  NotesPage,
+  CompletedTasksView,
 } from '@/components/lazy'
 import { useGoals } from '@/hooks/useGoals'
 import { usePlaybook } from '@/hooks/usePlaybook'
@@ -67,13 +76,8 @@ import { useScheduleActions } from '@/hooks/useScheduleActions'
 import { useDomainAssessments } from '@/hooks/useDomainAssessments'
 import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings'
 import { getLayerConfig } from '@/config/layers'
-import { CoachingHub } from '@/components/coaching'
-import { QuickAssessment, DomainDetail } from '@/components/layer'
-import { DeepAssessmentChat } from '@/components/layer/DeepAssessmentChat'
 import { useDeepAssessment } from '@/hooks/useDeepAssessment'
-import { BlockEditor } from '@/components/playbook/BlockEditor'
-import { RulesView } from '@/components/rules/RulesView'
-import { WeeklyPlannerGrid } from '@/components/playbook/WeeklyPlannerGrid'
+import { useEveningReflections } from '@/hooks/useEveningReflections'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import type { ViewType } from '@/components/layout/Sidebar'
 import type { ActionableInstance, Routine } from '@/types/actionable'
@@ -130,6 +134,9 @@ function App() {
   const { layersWithAssessments: layersList } = useIntelligenceLayers()
   const playbook = usePlaybook()
   const { getDomainForCalendar } = useCalendarDomainMappings()
+
+  // Evening Reflections
+  const eveningReflections = useEveningReflections()
 
   // Event context overrides: extract from event notes map
   const eventContextOverrides = useMemo(() => {
@@ -437,6 +444,13 @@ function App() {
     refreshDateInstances,
     pushAction: undo.pushAction,
   })
+
+  // Open weekly review from Sunday nudge banner
+  const handleOpenWeeklyReview = useCallback(() => {
+    setStateView('coaching')
+    setCoachingSubView('review')
+    navigate('/')
+  }, [navigate])
 
   // Day type override state (localStorage-persisted, keyed by date)
   const [dayTypeOverrides, setDayTypeOverrides] = useState<Record<string, import('@/types/playbook').DayType>>(() => {
@@ -1338,6 +1352,7 @@ function App() {
             />
           </Suspense>
         ) : (
+          <Suspense fallback={<LoadingFallback variant="card" />}>
           <DetailPanel
             item={selectedItem}
             onClose={() => setSelectedItemId(null)}
@@ -1415,6 +1430,7 @@ function App() {
             }}
             onOpenBlockEditor={(prefill) => setTimelineEditingBlock(prefill as import('@/types/playbook').PlaybookBlock)}
           />
+          </Suspense>
         )
       }
     >
@@ -1493,12 +1509,16 @@ function App() {
             onUpdateEventContext={updateEventContext}
             dayType={effectiveDayType}
             onDayTypeChange={handleDayTypeChange}
+            onSaveReflection={eveningReflections.saveReflection}
+            todayReflection={eveningReflections.todayReflection}
+            onOpenWeeklyReview={handleOpenWeeklyReview}
           />
         </div>
       )}
 
       {/* Block Editor modal (from timeline overflow menu) */}
       {timelineEditingBlock && (
+        <Suspense fallback={<LoadingFallback />}>
         <BlockEditor
           block={timelineEditingBlock}
           onSave={async (input) => {
@@ -1513,10 +1533,12 @@ function App() {
           }}
           onClose={() => setTimelineEditingBlock(null)}
         />
+        </Suspense>
       )}
 
       {/* Planning Session - fullscreen overlay */}
       {planningOpen && (
+        <Suspense fallback={<LoadingFallback />}>
         <PlanningSession
           tasks={tasks}
           events={events}
@@ -1528,6 +1550,7 @@ function App() {
           familyMembers={familyMembers}
           eventNotesMap={eventNotesMap}
         />
+        </Suspense>
       )}
 
       {activeView === 'task-detail' && selectedTask && (
@@ -1723,15 +1746,18 @@ function App() {
       )}
 
       {activeView === 'lists' && !selectedListId && (
+        <Suspense fallback={<LoadingFallback />}>
         <ListsList
           lists={lists}
           listsByCategory={listsByCategory}
           onSelectList={setSelectedListId}
           onAddList={addList}
         />
+        </Suspense>
       )}
 
       {activeView === 'lists' && selectedList && (
+        <Suspense fallback={<LoadingFallback />}>
         <ListView
           list={selectedList}
           items={listItems}
@@ -1747,9 +1773,11 @@ function App() {
           onPin={() => pinnedItems.pin('list', selectedList.id)}
           onUnpin={() => pinnedItems.unpin('list', selectedList.id)}
         />
+        </Suspense>
       )}
 
       {activeView === 'history' && (
+        <Suspense fallback={<LoadingFallback />}>
         <CompletedTasksView
           tasks={tasks}
           contactsMap={contactsMap}
@@ -1757,9 +1785,11 @@ function App() {
           onSelectTask={(taskId) => handleSelectItem(`task-${taskId}`)}
           onBack={() => handleViewChange('today')}
         />
+        </Suspense>
       )}
 
       {activeView === 'notes' && (
+        <Suspense fallback={<LoadingFallback />}>
         <NotesPage
           notes={notes}
           notesByDate={notesByDate}
@@ -1786,9 +1816,11 @@ function App() {
           onRemoveEntityLink={removeEntityLink}
           onNavigateToTask={(taskId) => handleSelectItem(`task-${taskId}`)}
         />
+        </Suspense>
       )}
 
       {activeView === 'rules' && (
+        <Suspense fallback={<LoadingFallback />}>
         <RulesView
           rules={familyRules.rules}
           responsibilities={responsibilities.responsibilities}
@@ -1800,10 +1832,12 @@ function App() {
           loading={familyRules.loading}
           onBack={() => handleViewChange('settings')}
         />
+        </Suspense>
       )}
 
       {activeView === 'coaching' && (
-        <>
+        <SectionErrorBoundary sectionName="Coaching" onReset={() => setCoachingSubView('hub')}>
+        <Suspense fallback={<LoadingFallback />}>
           {coachingSubView === 'hub' && (
             <CoachingHub
               assessments={domainAssessments.assessments}
@@ -2020,7 +2054,8 @@ function App() {
               onBack={() => setCoachingSubView('hub')}
             />
           )}
-        </>
+        </Suspense>
+        </SectionErrorBoundary>
       )}
 
       {activeView === 'settings' && (
@@ -2141,13 +2176,15 @@ function App() {
       </DomainPageOutline>
 
       {/* Focus Mode - scratch pad */}
-      <FocusMode
-        isOpen={focusMode.isOpen}
-        onClose={focusMode.close}
-        onAddNote={addNote}
-        onUpdateNote={updateNoteContent}
-        notes={notes.filter((n): n is Note => !n.sourceTaskId)}
-      />
+      <Suspense fallback={null}>
+        <FocusMode
+          isOpen={focusMode.isOpen}
+          onClose={focusMode.close}
+          onAddNote={addNote}
+          onUpdateNote={updateNoteContent}
+          notes={notes.filter((n): n is Note => !n.sourceTaskId)}
+        />
+      </Suspense>
     </AppShell>
   )
 }

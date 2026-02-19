@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback, useRef, useEffect, forwardRef } from 'react'
+import { logger } from '@/lib/logger'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
@@ -10,6 +11,7 @@ import type { EventNote } from '@/hooks/useEventNotes'
 import type { ScheduleContextItem } from '@/components/triage'
 import type { PlaybookInstance, QuickReact, FamilyRule } from '@/types/playbook'
 import type { TaskContext } from '@/types/task'
+import type { EveningReflectionData } from '@/types/coaching'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem, playbookInstanceToTimelineItem } from '@/types/timeline'
 import { PlaybookBlockCard } from '@/components/playbook/PlaybookBlockCard'
 import { EveningReflection } from '@/components/playbook/EveningReflection'
@@ -26,6 +28,7 @@ import { InboxTaskCard } from './InboxTaskCard'
 import { OverdueSection } from './OverdueSection'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { hasCoachingForItem } from '@/lib/coachingMatcher'
+import { SundayNudgeBanner } from './SundayNudgeBanner'
 import { useSystemHealth } from '@/hooks/useSystemHealth'
 import { MultiAssigneeDropdown } from '@/components/family/MultiAssigneeDropdown'
 // import { CalendarClock } from 'lucide-react' // Hidden - Plan button removed
@@ -543,6 +546,11 @@ interface TodayScheduleProps {
   // Day type override
   dayType?: import('@/types/playbook').DayType
   onDayTypeChange?: (dayType: import('@/types/playbook').DayType) => void
+  // Evening reflections
+  onSaveReflection?: (reflection: { highlight: string; notes: string }) => void
+  todayReflection?: EveningReflectionData | null
+  // Weekly review navigation (Sunday nudge)
+  onOpenWeeklyReview?: () => void
 }
 
 function LoadingSkeleton() {
@@ -646,6 +654,9 @@ export function TodaySchedule({
   onUpdateEventContext,
   dayType,
   onDayTypeChange,
+  onSaveReflection,
+  todayReflection,
+  onOpenWeeklyReview,
 }: TodayScheduleProps) {
   void _onCreateTask // Reserved - was used by ReviewSection
   void _onDeleteTask // Available for future inline delete
@@ -1368,6 +1379,11 @@ export function TodaySchedule({
         />
       )}
 
+      {/* Sunday nudge banner - shown on Sundays when coaching is visible */}
+      {isToday && !hideCoaching && viewedDate.getDay() === 0 && onOpenWeeklyReview && (
+        <SundayNudgeBanner onOpenWeeklyReview={onOpenWeeklyReview} />
+      )}
+
       {/* Inline collapsible inbox section */}
       {isToday && showInlineInbox && inboxTasks.length > 0 && onUpdateTask && onPushTask && (
         <div className="mb-4 md:mb-8 animate-fade-in-up">
@@ -1659,8 +1675,14 @@ export function TodaySchedule({
           {isToday && !hideCoaching && (playbookInstances ?? []).length > 0 && new Date().getHours() >= 19 && (
             <EveningReflection
               onSave={(reflection) => {
-                console.log('Evening reflection saved:', reflection)
+                if (onSaveReflection) {
+                  onSaveReflection(reflection)
+                } else {
+                  logger.debug('Evening reflection saved (no handler):', reflection)
+                }
               }}
+              initialHighlight={todayReflection?.highlight ?? ''}
+              initialNotes={todayReflection?.notes ?? ''}
             />
           )}
 

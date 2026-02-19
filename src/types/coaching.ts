@@ -29,3 +29,10 @@ export interface ConversationMessage {
   content: string
   timestamp: string
 }
+
+export interface EveningReflectionData {
+  id: string
+  date: string
+  highlight: string | null
+  notes: string | null
+}

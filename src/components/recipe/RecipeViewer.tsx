@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import DOMPurify from 'dompurify'
 
 interface RecipeViewerProps {
   url: string
@@ -450,7 +451,7 @@ export function RecipeViewer({ url, onClose }: RecipeViewerProps) {
                       <p
                         className="flex-1 text-neutral-700 leading-relaxed pt-1"
                         dangerouslySetInnerHTML={{
-                          __html: step.replace(/\*\*([^*]+)\*\*/g, '<strong class="text-primary-700">$1</strong>')
+                          __html: DOMPurify.sanitize(step.replace(/\*\*([^*]+)\*\*/g, '<strong class="text-primary-700">$1</strong>'))
                         }}
                       />
                     </div>

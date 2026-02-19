@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useDomain } from '@/hooks/useDomain'
+import { logger } from '@/lib/logger'
 
 export interface CreateEventParams {
   title: string
@@ -387,7 +388,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     }
 
     // Log the parameters being sent for debugging
-    console.log('Updating event location:', {
+    logger.debug('Updating event location:', {
       eventId: params.eventId,
       calendarId: params.calendarId || 'primary',
       location: params.location,

@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
+import DOMPurify from 'dompurify'
 import type { Note, NoteTopic, NoteEntityLink, NoteEntityType, UpdateNoteInput } from '@/types/note'
 import { noteTypeLabels, noteTypeDotColors } from '@/types/note'
 import { formatRelativeTime } from '@/lib/timeUtils'
@@ -282,7 +283,7 @@ export function NoteDetail({
         ) : (
           <div
             className="prose prose-neutral max-w-none"
-            dangerouslySetInnerHTML={{ __html: note.content }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(note.content) }}
           />
         )}
 

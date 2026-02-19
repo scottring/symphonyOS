@@ -400,9 +400,10 @@ describe('TodaySchedule', () => {
 
       render(<TodaySchedule {...defaultProps} tasks={tasks} onToggleTask={onToggleTask} />)
 
-      // Find and click the checkbox
+      // TaskCheckbox uses useLongPress with mouseDown/mouseUp, not click
       const checkbox = screen.getByLabelText(/Mark complete/i)
-      fireEvent.click(checkbox)
+      fireEvent.mouseDown(checkbox)
+      fireEvent.mouseUp(checkbox)
 
       expect(onToggleTask).toHaveBeenCalledWith('1')
     })
@@ -421,9 +422,10 @@ describe('TodaySchedule', () => {
         />
       )
 
-      // Find and click the checkbox for the routine
+      // TaskCheckbox uses useLongPress with mouseDown/mouseUp, not click
       const checkbox = screen.getByLabelText(/Mark complete/i)
-      fireEvent.click(checkbox)
+      fireEvent.mouseDown(checkbox)
+      fireEvent.mouseUp(checkbox)
 
       expect(onCompleteRoutine).toHaveBeenCalledWith('routine-1', true)
     })

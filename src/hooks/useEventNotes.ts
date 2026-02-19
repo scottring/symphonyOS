@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { detectRecipeUrl } from '@/lib/recipeDetection'
+import { logger } from '@/lib/logger'
 import type { TaskContext } from '@/types/task'
 
 export interface EventNote {
@@ -94,9 +95,9 @@ export function useEventNotes() {
 
   // Update or create note for an event (upsert)
   const updateNote = useCallback(async (googleEventId: string, noteText: string | null) => {
-    console.log('[updateNote] Called with:', { googleEventId, noteText: noteText?.substring(0, 50) })
+    logger.debug('[updateNote] Called with:', { googleEventId, noteText: noteText?.substring(0, 50) })
     if (!user) {
-      console.log('[updateNote] No user, returning early')
+      logger.debug('[updateNote] No user, returning early')
       return
     }
 
@@ -117,7 +118,7 @@ export function useEventNotes() {
     setNotes((prev) => new Map(prev).set(googleEventId, optimisticNote))
 
     // Upsert to database
-    console.log('[updateNote] Upserting:', { user_id: user.id, google_event_id: googleEventId, notes: noteText?.substring(0, 50) })
+    logger.debug('[updateNote] Upserting:', { user_id: user.id, google_event_id: googleEventId, notes: noteText?.substring(0, 50) })
     const { data, error: upsertError } = await supabase
       .from('event_notes')
       .upsert(
@@ -133,7 +134,7 @@ export function useEventNotes() {
       .select()
       .single()
 
-    console.log('[updateNote] Upsert result:', { data, error: upsertError?.message })
+    logger.debug('[updateNote] Upsert result:', { data, error: upsertError?.message })
 
     if (upsertError) {
       // Rollback on error
