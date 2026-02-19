@@ -77,37 +77,38 @@ export function InlineChatThread({ messages, loading, readyToFinish, error, onSe
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input / Finish button */}
-      {readyToFinish ? (
+      {/* Generate button - appears after first user response */}
+      {readyToFinish && (
         <button
           onClick={onFinish}
           disabled={loading}
-          className="w-full py-2.5 rounded-xl text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors disabled:opacity-50"
+          className="w-full py-2.5 mb-2 rounded-xl text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors disabled:opacity-50"
         >
-          {loading ? 'Generating...' : 'Generate Block'}
+          {loading ? 'Generating...' : 'Generate Coaching Block'}
         </button>
-      ) : (
-        <div className="flex gap-2">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Type your thoughts..."
-            rows={1}
-            disabled={loading}
-            className="flex-1 px-3 py-2 rounded-xl bg-neutral-50 border border-neutral-200 text-sm text-neutral-700 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-amber-300/50 focus:border-amber-300 transition-all resize-none disabled:opacity-50"
-          />
-          <button
-            onClick={handleSend}
-            disabled={!input.trim() || loading}
-            className="px-3 rounded-xl text-white bg-amber-600 hover:bg-amber-700 transition-colors disabled:opacity-30"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-            </svg>
-          </button>
-        </div>
       )}
+
+      {/* Chat input - always visible */}
+      <div className="flex gap-2">
+        <textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={readyToFinish ? "Continue chatting or generate..." : "Type your thoughts..."}
+          rows={1}
+          disabled={loading}
+          className="flex-1 px-3 py-2 rounded-xl bg-neutral-50 border border-neutral-200 text-sm text-neutral-700 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-amber-300/50 focus:border-amber-300 transition-all resize-none disabled:opacity-50"
+        />
+        <button
+          onClick={handleSend}
+          disabled={!input.trim() || loading}
+          className="px-3 rounded-xl text-white bg-amber-600 hover:bg-amber-700 transition-colors disabled:opacity-30"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+          </svg>
+        </button>
+      </div>
     </div>
   )
 }

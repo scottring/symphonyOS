@@ -1,15 +1,9 @@
 import { useState, useMemo, useCallback } from 'react'
 import type { Task } from '@/types/task'
-import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
-import type { FamilyMember } from '@/types/family'
-import type { List, ListCategory } from '@/types/list'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
-import type { EventNote } from '@/hooks/useEventNotes'
-import type { PlaybookInstance, QuickReact, FamilyRule } from '@/types/playbook'
-import type { TaskContext } from '@/types/task'
-import type { EveningReflectionData } from '@/types/coaching'
+import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useHomeView } from '@/hooks/useHomeView'
 import { useMobile } from '@/hooks/useMobile'
 import { useUndo } from '@/hooks/useUndo'
@@ -26,146 +20,28 @@ interface HomeViewProps {
   tasks: Task[]
   events: CalendarEvent[]
   routines: Routine[]
+  projects: Project[]
   dateInstances: ActionableInstance[]
   selectedItemId: string | null
   onSelectItem: (id: string | null) => void
-  onToggleTask: (taskId: string) => void
-  onToggleWaiting?: (taskId: string) => void
-  onUpdateTask?: (id: string, updates: Partial<Task>) => void
-  onPushTask?: (id: string, date: Date) => void
-  onDeleteTask?: (id: string) => void
   loading?: boolean
   viewedDate: Date
   onDateChange: (date: Date) => void
-  contactsMap?: Map<string, Contact>
-  projectsMap?: Map<string, Project>
-  projects: Project[]
-  contacts: Contact[]
-  onSearchContacts?: (query: string) => Contact[]
-  onAddContact?: (name: string) => Promise<Contact | null>
-  eventNotesMap?: Map<string, EventNote>
-  onRefreshInstances?: () => void
-  recentlyCreatedTaskId?: string | null
-  onTriageCardCollapse?: () => void
-  onOpenProject?: (projectId: string) => void
-  familyMembers: FamilyMember[]
-  onAssignTask?: (taskId: string, memberId: string | null) => void
-  onAssignTaskAll?: (taskId: string, memberIds: string[]) => void
-  onAssignEvent?: (eventId: string, memberId: string | null) => void
-  onAssignEventAll?: (eventId: string, memberIds: string[]) => void
-  onAssignRoutine?: (routineId: string, memberId: string | null) => void
-  onAssignRoutineAll?: (routineId: string, memberIds: string[]) => void
-  onCompleteRoutine?: (routineId: string, completed: boolean) => void
-  onSkipRoutine?: (routineId: string) => void
-  onPushRoutine?: (routineId: string, date: Date) => void
-  onUpdateRoutine?: (id: string, updates: Partial<Routine>) => void
-  onCompleteEvent?: (eventId: string, completed: boolean) => void
-  onSkipEvent?: (eventId: string) => void
-  onPushEvent?: (eventId: string, date: Date) => void
-  onOpenPlanning?: () => void
-  onCreateTask?: (title: string) => void
-  onCreateFollowUp?: (title: string, sourceTaskId: string) => void
-  onAddProject?: (project: { name: string }) => Promise<Project | null>
-  // List picker props
-  lists?: List[]
-  listsByCategory?: Record<ListCategory, List[]>
-  onSendToList?: (taskId: string, listId: string) => void
-  onCreateList?: (title: string, category: ListCategory) => Promise<string | null>
-  // Playbook coaching
-  playbookInstances?: PlaybookInstance[]
-  onPlaybookToggleItem?: (instanceId: string, itemId: string) => void
-  onPlaybookMarkDone?: (instanceId: string, completed?: boolean) => void
-  onPlaybookReact?: (instanceId: string, react: QuickReact | null) => void
-  onPlaybookTag?: (instanceId: string, tags: string[]) => void
-  onPlaybookNote?: (instanceId: string, notes: string | null) => void
-  onPlaybookEdit?: (block: PlaybookInstance['block']) => void
-  onPlaybookDelete?: (blockId: string) => void
-  onPlaybookSuppress?: (blockId: string, date: string) => void
-  // Calendar domain mapping for event context resolution
-  getDomainForCalendar?: (calendarId?: string | null, calendarName?: string | null) => TaskContext | null
-  // Active coaching rules
-  activeRules?: FamilyRule[]
-  // Event context overrides
-  eventContextOverrides?: Map<string, TaskContext>
-  // Event context change handler
-  onUpdateEventContext?: (eventId: string, context: TaskContext | null) => void
-  // Day type override
-  dayType?: import('@/types/playbook').DayType
-  onDayTypeChange?: (dayType: import('@/types/playbook').DayType) => void
-  // Evening reflections
-  onSaveReflection?: (reflection: { highlight: string; notes: string }) => void
-  todayReflection?: EveningReflectionData | null
-  // Weekly review navigation
-  onOpenWeeklyReview?: () => void
 }
 
 export function HomeView({
   tasks,
   events,
   routines,
+  projects,
   dateInstances,
   selectedItemId,
   onSelectItem,
-  onToggleTask,
-  onToggleWaiting,
-  onUpdateTask,
-  onPushTask,
-  onDeleteTask,
   loading,
   viewedDate,
   onDateChange,
-  contactsMap,
-  projectsMap,
-  projects,
-  contacts,
-  onSearchContacts,
-  onAddContact,
-  eventNotesMap,
-  onRefreshInstances,
-  recentlyCreatedTaskId,
-  onTriageCardCollapse,
-  onOpenProject,
-  familyMembers,
-  onAssignTask,
-  onAssignTaskAll,
-  onAssignEvent,
-  onAssignEventAll,
-  onAssignRoutine,
-  onAssignRoutineAll,
-  onCompleteRoutine,
-  onSkipRoutine,
-  onPushRoutine,
-  onUpdateRoutine,
-  onCompleteEvent,
-  onSkipEvent,
-  onPushEvent,
-  onOpenPlanning,
-  onCreateTask,
-  onCreateFollowUp,
-  onAddProject,
-  lists = [],
-  listsByCategory,
-  onSendToList,
-  onCreateList,
-  playbookInstances,
-  onPlaybookToggleItem,
-  onPlaybookMarkDone,
-  onPlaybookReact,
-  onPlaybookTag,
-  onPlaybookNote,
-  onPlaybookEdit,
-  onPlaybookDelete,
-  onPlaybookSuppress,
-  getDomainForCalendar,
-  activeRules,
-  eventContextOverrides,
-  onUpdateEventContext,
-  dayType,
-  onDayTypeChange,
-  onSaveReflection,
-  todayReflection,
-  onOpenWeeklyReview,
 }: HomeViewProps) {
+  const ctx = useScheduleActionsContext()
   const { currentView, setCurrentView } = useHomeView()
   const isMobile = useMobile()
   const { currentAction, pushAction, executeUndo, dismiss } = useUndo({ duration: 5000 })
@@ -174,102 +50,84 @@ export function HomeView({
   // Filter tasks, routines, and projects by current domain
   const filteredTasks = useMemo(() => {
     if (currentDomain === 'universal') return tasks
-    // Show items with matching context OR null context (for backwards compatibility)
     return tasks.filter(task => task.context === currentDomain || task.context === null)
   }, [tasks, currentDomain])
 
   const filteredRoutines = useMemo(() => {
     if (currentDomain === 'universal') return routines
-    // Show routines with matching context OR null context (for backwards compatibility)
     return routines.filter(routine => routine.context === currentDomain || routine.context === null)
   }, [routines, currentDomain])
 
   const filteredProjects = useMemo(() => {
     if (currentDomain === 'universal') return projects
-    // Show projects with matching context OR null context (for backwards compatibility)
     return projects.filter(project => project.context === currentDomain || project.context === null)
   }, [projects, currentDomain])
 
-  // Assignee filter state - now supports multi-select
-  // Empty array = "All", single id = single filter, multiple ids = river view
+  // Assignee filter state
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
 
-  // Check if we should show river view (2+ real members selected, not counting 'unassigned')
   const showRiverView = useMemo(() => {
     const realMemberCount = selectedAssignees.filter(id => id !== 'unassigned').length
     return realMemberCount >= 2
   }, [selectedAssignees])
 
-  // Reset filter when view changes
   const handleViewChange = useCallback((view: typeof currentView) => {
     setSelectedAssignees([])
     setCurrentView(view)
   }, [setCurrentView])
 
-  // Convert multi-select to single-select format for TodaySchedule compatibility
-  // When single member selected or 'unassigned', pass that. Otherwise null for 'all'.
   const selectedAssigneeForSchedule = useMemo(() => {
-    if (selectedAssignees.length === 0) return null // All
-    if (selectedAssignees.length === 1) return selectedAssignees[0] // Single
-    return null // Multi-select uses river view, schedule shows all
+    if (selectedAssignees.length === 0) return null
+    if (selectedAssignees.length === 1) return selectedAssignees[0]
+    return null
   }, [selectedAssignees])
 
   // Bulk update handler for inbox triage
   const handleUpdateTasksBulk = useCallback(async (taskIds: string[], updates: Partial<Task>) => {
-    if (!onUpdateTask) return
-
-    // Update each task individually
+    if (!ctx.onUpdateTask) return
     for (const taskId of taskIds) {
-      onUpdateTask(taskId, updates)
+      ctx.onUpdateTask(taskId, updates)
     }
-  }, [onUpdateTask])
+  }, [ctx.onUpdateTask])
 
-  // Check if there are any unassigned tasks/events/routines for the filter dropdown
+  // Check for unassigned tasks/events/routines
   const hasUnassignedTasks = useMemo(() => {
-    // Check tasks (use filtered tasks)
     for (const task of filteredTasks) {
       if (!task.completed && !task.assignedTo && (!task.assignedToAll || task.assignedToAll.length === 0)) {
         return true
       }
     }
-
-    // Check events (already filtered by domain via useGoogleCalendar)
     for (const event of events) {
       const eventId = event.google_event_id || event.id
-      const eventNote = eventNotesMap?.get(eventId)
+      const eventNote = ctx.eventNotesMap?.get(eventId)
       if (!eventNote?.assignedTo && (!eventNote?.assignedToAll || eventNote.assignedToAll.length === 0)) {
         return true
       }
     }
-
-    // Check routines (use filtered routines)
     for (const routine of filteredRoutines) {
       if (!routine.assigned_to && (!routine.assigned_to_all || routine.assigned_to_all.length === 0)) {
         return true
       }
     }
-
     return false
-  }, [filteredTasks, events, filteredRoutines, eventNotesMap])
+  }, [filteredTasks, events, filteredRoutines, ctx.eventNotesMap])
 
   // Week view state
   const [weekStart, setWeekStart] = useState(() => {
     const today = new Date()
     const day = today.getDay()
-    const diff = today.getDate() - day + (day === 0 ? -6 : 1) // Monday start
+    const diff = today.getDate() - day + (day === 0 ? -6 : 1)
     const monday = new Date(today)
     monday.setDate(diff)
     monday.setHours(0, 0, 0, 0)
     return monday
   })
 
-  // Month view state
   const [monthStart, setMonthStart] = useState(() => {
     const today = new Date()
     return new Date(today.getFullYear(), today.getMonth(), 1)
   })
 
-  // Handle day selection from week view
   const handleSelectDay = (date: Date) => {
     onDateChange(date)
     setCurrentView('today')
@@ -279,53 +137,40 @@ export function HomeView({
   const handleToggleTaskWithUndo = useCallback((taskId: string) => {
     const task = filteredTasks.find(t => t.id === taskId)
     if (!task) return
-
     const wasCompleted = task.completed
-    onToggleTask(taskId)
-
+    ctx.onToggleTask(taskId)
     pushAction(
       wasCompleted ? 'Task marked incomplete' : 'Task completed',
-      () => onToggleTask(taskId)
+      () => ctx.onToggleTask(taskId)
     )
-  }, [filteredTasks, onToggleTask, pushAction])
+  }, [filteredTasks, ctx.onToggleTask, pushAction])
 
   const handleDeleteTaskWithUndo = useCallback((taskId: string) => {
-    if (!onDeleteTask) return
-
+    if (!ctx.onDeleteTask) return
     const task = filteredTasks.find(t => t.id === taskId)
     if (!task) return
-
-    onDeleteTask(taskId)
-    pushAction(
-      `Deleted "${task.title}"`,
-      () => {
-        // Note: This would require an onRestoreTask callback
-        // For now, just show the message
-      }
-    )
-  }, [tasks, onDeleteTask, pushAction])
+    ctx.onDeleteTask(taskId)
+    pushAction(`Deleted "${task.title}"`, () => {})
+  }, [filteredTasks, ctx.onDeleteTask, pushAction])
 
   const handleCompleteRoutineWithUndo = useCallback((routineId: string, completed: boolean) => {
-    if (!onCompleteRoutine) return
-
-    onCompleteRoutine(routineId, completed)
+    if (!ctx.onCompleteRoutine) return
+    ctx.onCompleteRoutine(routineId, completed)
     pushAction(
       completed ? 'Routine completed' : 'Routine marked incomplete',
-      () => onCompleteRoutine(routineId, !completed)
+      () => ctx.onCompleteRoutine!(routineId, !completed)
     )
-  }, [onCompleteRoutine, pushAction])
+  }, [ctx.onCompleteRoutine, pushAction])
 
   const handleCompleteEventWithUndo = useCallback((eventId: string, completed: boolean) => {
-    if (!onCompleteEvent) return
-
-    onCompleteEvent(eventId, completed)
+    if (!ctx.onCompleteEvent) return
+    ctx.onCompleteEvent(eventId, completed)
     pushAction(
       completed ? 'Event completed' : 'Event marked incomplete',
-      () => onCompleteEvent(eventId, !completed)
+      () => ctx.onCompleteEvent!(eventId, !completed)
     )
-  }, [onCompleteEvent, pushAction])
+  }, [ctx.onCompleteEvent, pushAction])
 
-  // Render the appropriate view
   const renderContent = () => {
     if (currentView === 'month') {
       return (
@@ -338,7 +183,7 @@ export function HomeView({
           onMonthChange={setMonthStart}
           onSelectDay={handleSelectDay}
           selectedAssignee={selectedAssigneeForSchedule}
-          eventNotesMap={eventNotesMap}
+          eventNotesMap={ctx.eventNotesMap}
         />
       )
     }
@@ -354,12 +199,11 @@ export function HomeView({
           onWeekChange={setWeekStart}
           onSelectDay={handleSelectDay}
           selectedAssignee={selectedAssigneeForSchedule}
-          eventNotesMap={eventNotesMap}
+          eventNotesMap={ctx.eventNotesMap}
         />
       )
     }
 
-    // River view when 2+ family members selected
     if (showRiverView) {
       return (
         <CascadingRiverView
@@ -370,31 +214,31 @@ export function HomeView({
           selectedItemId={selectedItemId}
           onSelectItem={onSelectItem}
           onToggleTask={handleToggleTaskWithUndo}
-          onToggleWaiting={onToggleWaiting}
-          onUpdateTask={onUpdateTask}
-          onPushTask={onPushTask}
+          onToggleWaiting={ctx.onToggleWaiting}
+          onUpdateTask={ctx.onUpdateTask}
+          onPushTask={ctx.onPushTask}
           onDeleteTask={handleDeleteTaskWithUndo}
           viewedDate={viewedDate}
           onDateChange={onDateChange}
-          contactsMap={contactsMap}
-          projectsMap={projectsMap}
-          eventNotesMap={eventNotesMap}
-          familyMembers={familyMembers}
+          contactsMap={ctx.contactsMap}
+          projectsMap={ctx.projectsMap}
+          eventNotesMap={ctx.eventNotesMap}
+          familyMembers={ctx.familyMembers}
           selectedAssignees={selectedAssignees}
-          onAssignTask={onAssignTask}
-          onAssignEvent={onAssignEvent}
-          onAssignRoutine={onAssignRoutine}
+          onAssignTask={ctx.onAssignTask}
+          onAssignEvent={ctx.onAssignEvent}
+          onAssignRoutine={ctx.onAssignRoutine}
           onCompleteRoutine={handleCompleteRoutineWithUndo}
-          onSkipRoutine={onSkipRoutine}
-          onPushRoutine={onPushRoutine}
+          onSkipRoutine={ctx.onSkipRoutine}
+          onPushRoutine={ctx.onPushRoutine}
           onCompleteEvent={handleCompleteEventWithUndo}
-          onSkipEvent={onSkipEvent}
-          onPushEvent={onPushEvent}
+          onSkipEvent={ctx.onSkipEvent}
+          onPushEvent={ctx.onPushEvent}
         />
       )
     }
 
-    // Today view uses TodaySchedule
+    // Today view uses TodaySchedule — it reads most props from context
     return (
       <TodaySchedule
         tasks={filteredTasks}
@@ -404,84 +248,28 @@ export function HomeView({
         selectedItemId={selectedItemId}
         onSelectItem={onSelectItem}
         onToggleTask={handleToggleTaskWithUndo}
-        onToggleWaiting={onToggleWaiting}
-        onUpdateTask={onUpdateTask}
-        onPushTask={onPushTask}
-        onDeleteTask={handleDeleteTaskWithUndo}
+        onCompleteRoutine={handleCompleteRoutineWithUndo}
+        onCompleteEvent={handleCompleteEventWithUndo}
         loading={loading}
         viewedDate={viewedDate}
         onDateChange={onDateChange}
-        contactsMap={contactsMap}
-        projectsMap={projectsMap}
         projects={filteredProjects}
-        contacts={contacts}
-        onSearchContacts={onSearchContacts}
-        onAddContact={onAddContact}
-        eventNotesMap={eventNotesMap}
-        onRefreshInstances={onRefreshInstances}
-        recentlyCreatedTaskId={recentlyCreatedTaskId}
-        onTriageCardCollapse={onTriageCardCollapse}
-        onOpenProject={onOpenProject}
-        familyMembers={familyMembers}
-        onAssignTask={onAssignTask}
-        onAssignTaskAll={onAssignTaskAll}
-        onAssignEvent={onAssignEvent}
-        onAssignEventAll={onAssignEventAll}
-        onAssignRoutine={onAssignRoutine}
-        onAssignRoutineAll={onAssignRoutineAll}
-        onCompleteRoutine={handleCompleteRoutineWithUndo}
-        onSkipRoutine={onSkipRoutine}
-        onPushRoutine={onPushRoutine}
-        onUpdateRoutine={onUpdateRoutine}
-        onCompleteEvent={handleCompleteEventWithUndo}
-        onSkipEvent={onSkipEvent}
-        onPushEvent={onPushEvent}
-        onOpenPlanning={onOpenPlanning}
-        onCreateTask={onCreateTask}
-        onCreateFollowUp={onCreateFollowUp}
-        onAddProject={onAddProject}
         selectedAssignee={selectedAssigneeForSchedule}
         onSelectAssignee={(id) => setSelectedAssignees(id ? [id] : [])}
-        assigneesWithTasks={familyMembers}
+        assigneesWithTasks={ctx.familyMembers}
         hasUnassignedTasks={hasUnassignedTasks}
-        lists={lists}
-        listsByCategory={listsByCategory}
-        onSendToList={onSendToList}
-        onCreateList={onCreateList}
-        onUpdateTasksBulk={handleUpdateTasksBulk}
         panelOpen={selectedItemId !== null}
         onClosePanel={() => onSelectItem(null)}
-        playbookInstances={playbookInstances}
-        onPlaybookToggleItem={onPlaybookToggleItem}
-        onPlaybookMarkDone={onPlaybookMarkDone}
-        onPlaybookReact={onPlaybookReact}
-        onPlaybookTag={onPlaybookTag}
-        onPlaybookNote={onPlaybookNote}
-        onPlaybookEdit={onPlaybookEdit}
-        onPlaybookDelete={onPlaybookDelete}
-        onPlaybookSuppress={onPlaybookSuppress}
-        getDomainForCalendar={getDomainForCalendar}
-        activeRules={activeRules}
-        eventContextOverrides={eventContextOverrides}
-        onUpdateEventContext={onUpdateEventContext}
-        dayType={dayType}
-        onDayTypeChange={onDayTypeChange}
-        onSaveReflection={onSaveReflection}
-        todayReflection={todayReflection}
-        onOpenWeeklyReview={onOpenWeeklyReview}
+        onUpdateTasksBulk={handleUpdateTasksBulk}
       />
     )
   }
 
   return (
     <div className="relative flex flex-col h-full">
-      {/* Header controls - floating in upper right on desktop only */}
       {!isMobile && (
         <div className="absolute top-4 right-6 z-20 flex items-center gap-3">
-          {/* Domain switcher */}
           <DomainSwitcher />
-
-          {/* View switcher (Day/Week) */}
           <HomeViewSwitcher
             currentView={currentView}
             onViewChange={handleViewChange}
@@ -489,12 +277,10 @@ export function HomeView({
         </div>
       )}
 
-      {/* Main content area */}
       <div className="flex-1 overflow-y-auto">
         {renderContent()}
       </div>
 
-      {/* Undo toast */}
       <UndoToast
         action={currentAction}
         onUndo={executeUndo}

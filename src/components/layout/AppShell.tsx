@@ -26,7 +26,6 @@ interface AppShellProps {
   sidebarCollapsed: boolean
   onSidebarToggle: () => void
   panelOpen: boolean
-  onPanelClose?: () => void
   focusModeOpen?: boolean
   userEmail?: string
   userName?: string
@@ -69,7 +68,6 @@ export function AppShell({
   sidebarCollapsed,
   onSidebarToggle,
   panelOpen,
-  onPanelClose,
   focusModeOpen = false,
   userEmail,
   userName,
@@ -91,7 +89,6 @@ export function AppShell({
   onPinMarkAccessed,
   onPinRefreshStale,
 }: AppShellProps) {
-  void onPanelClose // No longer used - panel closing handled by smart handlers in schedule components
   const isMobile = useMobile()
   const { theme } = useTheme()
   const [moreSheetOpen, setMoreSheetOpen] = useState(false)

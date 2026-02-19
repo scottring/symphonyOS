@@ -14,6 +14,9 @@ const ACCENT_COLORS: Record<string, string> = {
   together: 'bg-blue-400',
   buffer: 'bg-neutral-300',
   departure: 'bg-orange-400',
+  partner: 'bg-rose-400',
+  sibling: 'bg-violet-400',
+  household: 'bg-teal-400',
 }
 
 interface PlaybookBlockCardProps {
@@ -42,7 +45,6 @@ export const PlaybookBlockCard = memo(function PlaybookBlockCard({
   onSuppress,
 }: PlaybookBlockCardProps) {
   const block = instance.block
-  if (!block) return null
 
   const [showAddNote, setShowAddNote] = useState(false)
   const [noteText, setNoteText] = useState(instance.notes || '')
@@ -50,18 +52,19 @@ export const PlaybookBlockCard = memo(function PlaybookBlockCard({
   const [showMenu, setShowMenu] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
-  const config = BLOCK_TYPE_CONFIG[block.blockType]
-
-  const accentColor = ACCENT_COLORS[block.blockType] || 'bg-neutral-300'
-
   // Check if all items are done
   const allItemsDone = useMemo(() => {
-    if (block.items.length === 0) return false
+    if (!block || block.items.length === 0) return false
     return block.items.every(item => instance.itemsState?.[item.id])
-  }, [block.items, instance.itemsState])
+  }, [block, instance.itemsState])
 
   // Available tags for this block
-  const availableTags = useMemo(() => generateTagsForBlock(block.items), [block.items])
+  const availableTags = useMemo(() => block ? generateTagsForBlock(block.items) : [], [block])
+
+  if (!block) return null
+
+  const config = BLOCK_TYPE_CONFIG[block.blockType]
+  const accentColor = ACCENT_COLORS[block.blockType] || 'bg-neutral-300'
 
   // Handle note save
   const handleSaveNote = () => {

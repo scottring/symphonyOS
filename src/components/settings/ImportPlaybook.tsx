@@ -107,7 +107,7 @@ export function ImportPlaybook({ onImport }: ImportPlaybookProps) {
       setJsonText('')
       setParsedBlocks(null)
       setTimeout(() => setSuccess(false), 3000)
-    } catch (err) {
+    } catch {
       setParseError('Import failed. Please try again.')
     } finally {
       setImporting(false)

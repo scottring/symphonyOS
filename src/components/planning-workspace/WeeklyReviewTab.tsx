@@ -152,7 +152,6 @@ export function WeeklyReviewTab({
   onAddBlock,
   onUpdateBlock,
   onDeleteBlock,
-  onReorderBlocks: _onReorderBlocks,
   rules,
   aiResult,
   aiLoading,

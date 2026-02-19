@@ -85,12 +85,18 @@ Deno.serve(async (req) => {
       { data: lastWeekInstances },
       { data: activeRules },
       { data: responsibilities },
+      { data: coachingObservations },
+      { data: eveningReflections },
+      { data: domainAssessments },
     ] = await Promise.all([
       supabase.from('family_members').select('name, color, is_full_user, member_type, role_label').order('display_order'),
       supabase.from('playbook_blocks').select('*').eq('user_id', user.id).order('sort_order'),
       supabase.from('playbook_instances').select('*, playbook_blocks(label, block_type)').gte('date', lastWeekStart).lte('date', lastWeekEnd),
       supabase.from('family_rules').select('*').eq('user_id', user.id).eq('status', 'active'),
       supabase.from('responsibilities').select('*').eq('user_id', user.id).eq('status', 'active'),
+      supabase.from('coaching_observations').select('observation, tags, source_type, created_at').eq('user_id', user.id).gte('created_at', lastWeekStart).order('created_at', { ascending: false }).limit(30),
+      supabase.from('evening_reflections').select('date, highlight, notes').eq('user_id', user.id).gte('date', lastWeekStart).lte('date', lastWeekEnd).order('date'),
+      supabase.from('domain_assessments').select('domain, score, strengths, issues, opportunities').eq('user_id', user.id).order('updated_at', { ascending: false }).limit(20),
     ])
 
     // Build feedback summary per block
@@ -162,14 +168,40 @@ Deno.serve(async (req) => {
       frequency: r.frequency,
     }))
 
+    // Build coaching observations summary (distilled insights from daily feedback)
+    const observationsSummary = (coachingObservations || []).map(o => ({
+      observation: o.observation,
+      tags: o.tags,
+      source: o.source_type,
+    }))
+
+    // Build evening reflections summary
+    const reflectionsSummary = (eveningReflections || []).filter(r => r.highlight || r.notes).map(r => ({
+      date: r.date,
+      highlight: r.highlight,
+      notes: r.notes,
+    }))
+
+    // Build domain assessment summary (strengths/issues from self-assessment)
+    const assessmentSummary = (domainAssessments || []).filter(a => a.score != null).map(a => ({
+      domain: a.domain,
+      score: a.score,
+      strengths: a.strengths,
+      issues: a.issues,
+      opportunities: a.opportunities,
+    }))
+
     // Build the AI prompt
     const systemPrompt = `You are a family coaching AI for Symphony, a daily life operating system. Your role is to review a family's weekly playbook performance and suggest refinements for next week.
 
 You understand family dynamics deeply. Your suggestions should be:
 - Warm and encouraging, never judgmental
 - Specific to the family members' needs
-- Grounded in what the feedback data tells you
+- Grounded in what the feedback data tells you (block feedback, coaching observations, evening reflections, and self-assessment scores)
 - Focused on one or two key improvements, not overwhelming changes
+- Informed by accumulated coaching observations — these are distilled insights from daily interactions and represent patterns over time
+- Responsive to evening reflections — these capture what parents found most meaningful or challenging each day
+- Aware of self-assessment domain scores — low-scoring domains need more coaching attention
 
 RELATIONSHIP TYPES you should coach across:
 - Parent-child: Daily routines, coaching moments, educational play
@@ -236,7 +268,20 @@ ${rulesSummary.length > 0 ? JSON.stringify(rulesSummary, null, 2) : 'No rules es
 RESPONSIBILITIES (${responsibilitiesSummary.length}):
 ${responsibilitiesSummary.length > 0 ? JSON.stringify(responsibilitiesSummary, null, 2) : 'No responsibilities assigned yet.'}
 
-Based on this data, provide your suggestions for next week's playbook. Focus on what would make the biggest positive impact.`
+COACHING OBSERVATIONS FROM DAILY FEEDBACK (${observationsSummary.length} insights):
+${observationsSummary.length > 0 ? JSON.stringify(observationsSummary, null, 2) : 'No observations collected yet.'}
+
+EVENING REFLECTIONS FROM LAST WEEK (${reflectionsSummary.length} entries):
+${reflectionsSummary.length > 0 ? JSON.stringify(reflectionsSummary, null, 2) : 'No evening reflections recorded.'}
+
+SELF-ASSESSMENT SCORES (${assessmentSummary.length} domains assessed):
+${assessmentSummary.length > 0 ? JSON.stringify(assessmentSummary, null, 2) : 'No domain assessments completed yet.'}
+
+Based on this data, provide your suggestions for next week's playbook. Pay special attention to:
+- Patterns in the coaching observations (recurring struggles or wins)
+- Themes from evening reflections (what parents highlight or note)
+- Low-scoring assessment domains (areas that need coaching attention)
+Focus on what would make the biggest positive impact.`
 
     // Call OpenAI
     const openAiResponse = await fetch('https://api.openai.com/v1/chat/completions', {

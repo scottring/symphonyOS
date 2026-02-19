@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useRoutines } from '@/hooks/useRoutines'
 import { useProjects } from '@/hooks/useProjects'
@@ -6,6 +6,7 @@ import { useContacts } from '@/hooks/useContacts'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { TodaySchedule } from '@/components/schedule/TodaySchedule'
+import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
 
 interface TodayPreviewProps {
   onContinue: () => void
@@ -65,6 +66,31 @@ export function TodayPreview({ onContinue }: TodayPreviewProps) {
 
   const loading = tasksLoading || routinesLoading
 
+  const contextValue: ScheduleActionsValue = useMemo(() => ({
+    onToggleTask: handleToggleTask,
+    onUpdateTask: updateTask,
+    onPushTask: pushTask,
+    onDeleteTask: deleteTask,
+    contactsMap,
+    projectsMap,
+    projects,
+    contacts,
+    familyMembers,
+    lists: [],
+    onSearchContacts: searchContacts,
+    onAddContact: (name: string) => addContact({ name }),
+    onRefreshInstances: refreshDateInstances,
+    onAssignTask: handleAssignTask,
+    onAssignRoutine: handleAssignRoutine,
+    onCompleteRoutine: handleCompleteRoutine,
+    onSkipRoutine: handleSkipRoutine,
+  }), [
+    handleToggleTask, updateTask, pushTask, deleteTask,
+    contactsMap, projectsMap, projects, contacts, familyMembers,
+    searchContacts, addContact, refreshDateInstances,
+    handleAssignTask, handleAssignRoutine, handleCompleteRoutine, handleSkipRoutine,
+  ])
+
   return (
     <div className="min-h-screen flex flex-col bg-bg-base">
       {/* Header */}
@@ -80,33 +106,21 @@ export function TodayPreview({ onContinue }: TodayPreviewProps) {
       {/* Actual TodaySchedule */}
       <div className="flex-1 overflow-hidden">
         <div className="h-full overflow-y-auto">
+          <ScheduleActionsProvider value={contextValue}>
           <TodaySchedule
             tasks={tasks}
-            events={[]} // No calendar events during onboarding
+            events={[]}
             routines={todaysRoutines}
             dateInstances={dateInstances}
             selectedItemId={selectedItemId}
             onSelectItem={setSelectedItemId}
             onToggleTask={handleToggleTask}
-            onUpdateTask={updateTask}
-            onPushTask={pushTask}
-            onDeleteTask={deleteTask}
+            onCompleteRoutine={handleCompleteRoutine}
             loading={loading}
             viewedDate={viewedDate}
-            onDateChange={() => {}} // Don't allow date change in onboarding
-            contactsMap={contactsMap}
-            projectsMap={projectsMap}
-            projects={projects}
-            contacts={contacts}
-            onSearchContacts={searchContacts}
-            onAddContact={(name) => addContact({ name })}
-            onRefreshInstances={refreshDateInstances}
-            familyMembers={familyMembers}
-            onAssignTask={handleAssignTask}
-            onAssignRoutine={handleAssignRoutine}
-            onCompleteRoutine={handleCompleteRoutine}
-            onSkipRoutine={handleSkipRoutine}
+            onDateChange={() => {}}
           />
+          </ScheduleActionsProvider>
         </div>
       </div>
 

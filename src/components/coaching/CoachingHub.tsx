@@ -46,6 +46,7 @@ export function CoachingHub({
 
   const activeRulesCount = rules.filter(r => r.status === 'active').length
   const activeWorkspacesCount = workspaces.filter(w => w.status === 'active').length
+  const hasAnyAssessments = assessments.length > 0
 
   return (
     <div className="h-full overflow-auto">
@@ -55,6 +56,17 @@ export function CoachingHub({
           <h1 className="font-display text-2xl font-semibold text-neutral-800">Coaching</h1>
           <p className="text-sm text-neutral-500 mt-1">Your personal coaching dashboard</p>
         </div>
+
+        {/* Getting started banner for new users */}
+        {!hasAnyAssessments && !assessmentsLoading && (
+          <div className="mb-8 bg-amber-50 border border-amber-200 rounded-xl p-5">
+            <p className="text-sm font-medium text-amber-900 mb-1">Get started</p>
+            <p className="text-sm text-amber-700">
+              Start by rating each domain below. This gives coaching a baseline to work from, then
+              you can add rules and build your weekly playbook.
+            </p>
+          </div>
+        )}
 
         {/* ── BASELINE ───────────────────────────────────────── */}
         <section>

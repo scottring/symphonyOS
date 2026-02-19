@@ -541,7 +541,6 @@ export function CascadingRiverView({
   selectedItemId,
   onSelectItem,
   onToggleTask,
-  onToggleWaiting: _onToggleWaiting,
   viewedDate,
   onDateChange,
   contactsMap,

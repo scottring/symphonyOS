@@ -51,10 +51,6 @@ export function ProjectViewRedesign({
   familyMembers = [],
   getScheduleItemsForDate,
   linkedEvents = [],
-  isPinned: _isPinned,
-  canPin: _canPin,
-  onPin: _onPin,
-  onUnpin: _onUnpin,
 }: ProjectViewProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState('')

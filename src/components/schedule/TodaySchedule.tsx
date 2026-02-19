@@ -1,17 +1,12 @@
 import { useMemo, useState, useCallback, useRef, useEffect, forwardRef } from 'react'
 import { logger } from '@/lib/logger'
 import type { Task } from '@/types/task'
-import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
-import type { List, ListCategory } from '@/types/list'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
-import type { EventNote } from '@/hooks/useEventNotes'
 import type { ScheduleContextItem } from '@/components/triage'
-import type { PlaybookInstance, QuickReact, FamilyRule } from '@/types/playbook'
-import type { TaskContext } from '@/types/task'
-import type { EveningReflectionData } from '@/types/coaching'
+import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem, playbookInstanceToTimelineItem } from '@/types/timeline'
 import { PlaybookBlockCard } from '@/components/playbook/PlaybookBlockCard'
 import { EveningReflection } from '@/components/playbook/EveningReflection'
@@ -460,97 +455,31 @@ function ProgressIndicator({ completed, total, percent }: ProgressIndicatorProps
 }
 
 interface TodayScheduleProps {
+  // View-specific data
   tasks: Task[]
   events: CalendarEvent[]
   routines?: Routine[]
   dateInstances?: ActionableInstance[]
+  projects?: Project[]
   selectedItemId: string | null
   onSelectItem: (id: string | null) => void
-  onToggleTask: (taskId: string) => void
-  onToggleWaiting?: (taskId: string) => void
-  onUpdateTask?: (id: string, updates: Partial<Task>) => void
-  onPushTask?: (id: string, date: Date) => void
-  onDeleteTask?: (id: string) => void
   loading?: boolean
   viewedDate: Date
   onDateChange: (date: Date) => void
-  contactsMap?: Map<string, Contact>
-  projectsMap?: Map<string, Project>
-  projects?: Project[]
-  contacts?: Contact[]
-  onSearchContacts?: (query: string) => Contact[]
-  onAddContact?: (name: string) => Promise<Contact | null>
-  eventNotesMap?: Map<string, EventNote>
-  onRefreshInstances?: () => void
-  recentlyCreatedTaskId?: string | null
-  onTriageCardCollapse?: () => void
-  onOpenProject?: (projectId: string) => void
-  // Family member assignment
-  familyMembers?: FamilyMember[]
-  onAssignTask?: (taskId: string, memberId: string | null) => void
-  onAssignTaskAll?: (taskId: string, memberIds: string[]) => void
-  onAssignEvent?: (eventId: string, memberId: string | null) => void
-  onAssignEventAll?: (eventId: string, memberIds: string[]) => void
-  onAssignRoutine?: (routineId: string, memberId: string | null) => void
-  onAssignRoutineAll?: (routineId: string, memberIds: string[]) => void
-  // Routine completion
+  // Undo-wrapped handlers from HomeView
+  onToggleTask: (taskId: string) => void
   onCompleteRoutine?: (routineId: string, completed: boolean) => void
-  onSkipRoutine?: (routineId: string) => void
-  onPushRoutine?: (routineId: string, date: Date) => void
-  onUpdateRoutine?: (id: string, updates: Partial<Routine>) => void
-  // Event completion/skip
   onCompleteEvent?: (eventId: string, completed: boolean) => void
-  onSkipEvent?: (eventId: string) => void
-  onPushEvent?: (eventId: string, date: Date) => void
-  // Planning session
-  onOpenPlanning?: () => void
-  onCreateTask?: (title: string) => void
-  onAddProject?: (project: { name: string }) => Promise<Project | null>
-  // Assignee filter
-  selectedAssignee?: string | null  // null = "All", "unassigned" = unassigned only
+  // Assignee filter (managed by HomeView)
+  selectedAssignee?: string | null
   onSelectAssignee?: (id: string | null) => void
   assigneesWithTasks?: FamilyMember[]
   hasUnassignedTasks?: boolean
-  // Parent task navigation (for subtasks shown on timeline)
-  onOpenTask?: (taskId: string) => void
-  // List picker props
-  lists?: List[]
-  listsByCategory?: Record<ListCategory, List[]>
-  onSendToList?: (taskId: string, listId: string) => void
-  onCreateList?: (title: string, category: ListCategory) => Promise<string | null>
-  // Panel state (for smart close behavior)
+  // Panel state
   panelOpen?: boolean
   onClosePanel?: () => void
-  // Bulk actions
+  // Bulk actions (managed by HomeView)
   onUpdateTasksBulk?: (taskIds: string[], updates: Partial<Task>) => Promise<void>
-  // Follow-up task creation
-  onCreateFollowUp?: (title: string, sourceTaskId: string) => void
-  // Playbook coaching
-  playbookInstances?: PlaybookInstance[]
-  onPlaybookToggleItem?: (instanceId: string, itemId: string) => void
-  onPlaybookMarkDone?: (instanceId: string, completed?: boolean) => void
-  onPlaybookReact?: (instanceId: string, react: QuickReact | null) => void
-  onPlaybookTag?: (instanceId: string, tags: string[]) => void
-  onPlaybookNote?: (instanceId: string, notes: string | null) => void
-  onPlaybookEdit?: (block: PlaybookInstance['block']) => void
-  onPlaybookDelete?: (blockId: string) => void
-  onPlaybookSuppress?: (blockId: string, date: string) => void
-  // Calendar domain mapping for event context resolution
-  getDomainForCalendar?: (calendarId?: string | null, calendarName?: string | null) => TaskContext | null
-  // Active coaching rules (for sparkle indicator)
-  activeRules?: FamilyRule[]
-  // Event context overrides (from event_notes.context)
-  eventContextOverrides?: Map<string, TaskContext>
-  // Event context change handler
-  onUpdateEventContext?: (eventId: string, context: TaskContext | null) => void
-  // Day type override
-  dayType?: import('@/types/playbook').DayType
-  onDayTypeChange?: (dayType: import('@/types/playbook').DayType) => void
-  // Evening reflections
-  onSaveReflection?: (reflection: { highlight: string; notes: string }) => void
-  todayReflection?: EveningReflectionData | null
-  // Weekly review navigation (Sunday nudge)
-  onOpenWeeklyReview?: () => void
 }
 
 function LoadingSkeleton() {
@@ -589,85 +518,42 @@ export function TodaySchedule({
   events,
   routines = [],
   dateInstances = [],
+  projects = [],
   selectedItemId,
   onSelectItem,
   onToggleTask,
-  onToggleWaiting,
-  onUpdateTask,
-  onPushTask,
-  onDeleteTask: _onDeleteTask,
+  onCompleteRoutine,
+  onCompleteEvent,
   loading,
   viewedDate,
   onDateChange,
-  contactsMap,
-  projectsMap,
-  projects = [],
-  contacts: _contacts = [],
-  onSearchContacts: _onSearchContacts,
-  onAddContact: _onAddContact,
-  eventNotesMap,
-  recentlyCreatedTaskId: _recentlyCreatedTaskId,
-  onTriageCardCollapse: _onTriageCardCollapse,
-  onOpenProject,
-  familyMembers = [],
-  onAssignTask,
-  onAssignTaskAll,
-  onAssignEvent,
-  onAssignEventAll,
-  onAssignRoutine,
-  onAssignRoutineAll,
-  onCompleteRoutine,
-  onSkipRoutine,
-  onPushRoutine,
-  onUpdateRoutine,
-  onCompleteEvent,
-  onSkipEvent,
-  onPushEvent,
-  onOpenPlanning,
-  onCreateTask: _onCreateTask,
-  onAddProject: _onAddProject,
   selectedAssignee,
   onSelectAssignee,
   assigneesWithTasks = [],
   hasUnassignedTasks = false,
-  onOpenTask,
-  lists = [],
-  listsByCategory,
-  onSendToList,
-  onCreateList,
   panelOpen,
   onClosePanel,
   onUpdateTasksBulk,
-  onCreateFollowUp,
-  playbookInstances,
-  onPlaybookToggleItem,
-  onPlaybookMarkDone,
-  onPlaybookReact,
-  onPlaybookTag,
-  onPlaybookNote,
-  onPlaybookEdit,
-  onPlaybookDelete,
-  onPlaybookSuppress,
-  getDomainForCalendar,
-  activeRules = [],
-  eventContextOverrides,
-  onUpdateEventContext,
-  dayType,
-  onDayTypeChange,
-  onSaveReflection,
-  todayReflection,
-  onOpenWeeklyReview,
 }: TodayScheduleProps) {
-  void _onCreateTask // Reserved - was used by ReviewSection
-  void _onDeleteTask // Available for future inline delete
-  void _contacts // Available for future inline triage
-  void _onSearchContacts // Available for future inline triage
-  void _onAddContact // Available for future inline triage
-  void _recentlyCreatedTaskId // Available for future triage card
-  void _onTriageCardCollapse // Available for future triage card
-  void _onAddProject // Available for future inline project creation
-  void onUpdateTasksBulk // Available for bulk actions in inline inbox
-  void onOpenPlanning // Hidden - Plan button removed
+  // Get actions + reference data from context
+  const {
+    onToggleWaiting, onUpdateTask, onPushTask,
+    onAssignTask, onAssignTaskAll, onAssignEvent, onAssignEventAll,
+    onAssignRoutine, onAssignRoutineAll,
+    onSkipRoutine, onPushRoutine, onUpdateRoutine,
+    onSkipEvent, onPushEvent, onUpdateEventContext,
+    onCreateFollowUp, onOpenTask,
+    contactsMap, projectsMap, familyMembers = [], eventNotesMap,
+    lists = [], listsByCategory, onSendToList, onCreateList,
+    onOpenProject,
+    playbookInstances, onPlaybookToggleItem, onPlaybookMarkDone,
+    onPlaybookReact, onPlaybookTag, onPlaybookNote,
+    onPlaybookEdit, onPlaybookDelete, onPlaybookSuppress,
+    getDomainForCalendar, activeRules = [], eventContextOverrides,
+    dayType, onDayTypeChange,
+    onSaveReflection, todayReflection,
+    onOpenWeeklyReview,
+  } = useScheduleActionsContext()
 
   const isMobile = useMobile()
 
@@ -727,6 +613,13 @@ export function TodaySchedule({
       localStorage.setItem('symphony-hide-coaching', String(newValue))
       return newValue
     })
+  }, [])
+
+  // Auto-show coaching when a block is created from the coaching section
+  useEffect(() => {
+    const handler = () => setHideCoaching(false)
+    window.addEventListener('symphony-show-coaching', handler)
+    return () => window.removeEventListener('symphony-show-coaching', handler)
   }, [])
 
   // Completed inbox items - collapsed by default

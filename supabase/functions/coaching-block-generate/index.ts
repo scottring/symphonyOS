@@ -148,14 +148,16 @@ Return JSON only:
   "suggestion": {
     "label": "short block name",
     "blockType": "connection",
-    "timeSlot": "${item.startTime || '08:00'}",
+    "timeSlot": "6:30",
     "narrative": "warm narrative text",
     "coachingNote": "personalized coaching insight",
     "items": [{ "who": "name", "action": "what to do", "context": "why" }],
-    "dayTypes": ["school-day"]
+    "dayTypes": ["school-day", "weekend"]
   },
   "observations": [{ "observation": "insight text", "tags": ["tag1", "tag2"] }]
-}`
+}
+IMPORTANT: timeSlot MUST be in "H:MM" or "HH:MM" 24-hour format (e.g. "6:30", "15:00"). Never use ISO timestamps.
+dayTypes must be from: "school-day", "weekend", "holiday", "half-day". Use ["school-day", "weekend"] for blocks that should appear daily.`
 
       const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -318,7 +320,7 @@ Start a brief coaching conversation. Acknowledge the item, reference relevant ru
       existingMessages.push({ role: 'user', content: userMessage, timestamp: now })
 
       const userMsgCount = existingMessages.filter((m: ConversationMessage) => m.role === 'user').length
-      const readyToFinish = userMsgCount >= 2
+      const readyToFinish = userMsgCount >= 1
 
       const systemPrompt = `You are a warm, insightful coaching assistant for Symphony.
 You're discussing coaching for "${item.title}" at ${item.startTime || 'unscheduled'} (${item.context || 'no context'} domain).
@@ -419,14 +421,16 @@ Return JSON only:
   "suggestion": {
     "label": "short block name",
     "blockType": "connection",
-    "timeSlot": "${item.startTime || '08:00'}",
+    "timeSlot": "6:30",
     "narrative": "warm narrative text referencing conversation",
     "coachingNote": "personalized insight from discussion",
     "items": [{ "who": "name", "action": "what to do", "context": "why" }],
-    "dayTypes": ["school-day"]
+    "dayTypes": ["school-day", "weekend"]
   },
   "observations": [{ "observation": "insight text", "tags": ["tag1", "tag2"] }]
-}`
+}
+IMPORTANT: timeSlot MUST be in "H:MM" or "HH:MM" 24-hour format (e.g. "6:30", "15:00"). Never use ISO timestamps.
+dayTypes must be from: "school-day", "weekend", "holiday", "half-day". Use ["school-day", "weekend"] for blocks that should appear daily.`
 
       const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',

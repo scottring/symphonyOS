@@ -158,7 +158,7 @@ export function usePlaybook() {
 
     if (newInstances.length === 0) return
 
-    const { error } = await supabase.from('playbook_instances').insert(newInstances)
+    const { error } = await supabase.from('playbook_instances').upsert(newInstances, { onConflict: 'block_id,date', ignoreDuplicates: true })
     if (error) { console.error('instantiateDay:', error); return }
 
     await fetchInstancesForDate(date)
@@ -314,7 +314,7 @@ export function usePlaybook() {
       .select()
       .single()
 
-    if (error) { console.error('addBlock:', error); return null }
+    if (error) { console.error('addBlock error:', error, 'row:', JSON.stringify(row)); return null }
 
     const newBlock = rowToBlock(data)
     setBlocks(prev => [...prev, newBlock].sort((a, b) => a.sortOrder - b.sortOrder))

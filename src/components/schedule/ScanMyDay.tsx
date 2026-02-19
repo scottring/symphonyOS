@@ -38,9 +38,6 @@ export function ScanMyDay({
   const [collapsed, setCollapsed] = useState(false)
   const [showDayTypePicker, setShowDayTypePicker] = useState(false)
 
-  // Only show during morning hours
-  if (!isMorningHours()) return null
-
   // Use prop or auto-detect
   const today = new Date()
   const dayOfWeek = today.getDay()
@@ -63,6 +60,9 @@ export function ScanMyDay({
       i => i.date === yesterdayStr && i.react === 'tough'
     )
   }, [playbookInstances, yesterdayStr])
+
+  // Only show during morning hours
+  if (!isMorningHours()) return null
 
   if (collapsed) {
     return (

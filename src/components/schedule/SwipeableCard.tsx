@@ -58,13 +58,6 @@ export const SwipeableCard = memo(function SwipeableCard({
     return formatTime(item.startTime)
   }, [item.allDay, item.startTime])
 
-  // Get assigned family member
-  const assignedMember = useMemo(() => {
-    if (!assignedTo || familyMembers.length === 0) return undefined
-    return familyMembers.find(m => m.id === assignedTo)
-  }, [assignedTo, familyMembers])
-  void assignedMember // Will be used for avatar display
-
   // Get project color for left edge indicator
   const projectColor = item.projectId ? getProjectColor(item.projectId) : null
 

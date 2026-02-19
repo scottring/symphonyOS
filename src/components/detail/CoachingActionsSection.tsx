@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import type { TimelineItem } from '@/types/timeline'
-import type { PlaybookBlock, CreateBlockInput, UpdateBlockInput } from '@/types/playbook'
+import type { PlaybookBlock, CreateBlockInput, UpdateBlockInput, DayType } from '@/types/playbook'
 import type { CoachingMatch } from '@/lib/coachingMatcher'
 import { useCoachingInjection } from '@/hooks/useCoachingInjection'
 import { getItemSourceId, getItemType, formatTimeSlot, inferBlockType } from '@/lib/coachingInjectionUtils'
@@ -61,35 +61,45 @@ export function CoachingActionsSection({
     const suggestion = injection.confirmSuggestion()
     if (!suggestion) return
 
+    // Always use the item's actual time — don't trust AI-generated timeSlots
+    const timeSlot = formatTimeSlot(item.startTime) || suggestion.timeSlot || '8:00'
+
+    // Ensure dayTypes contains valid values, default to both if empty/invalid
+    const validDayTypes = new Set<string>(['school-day', 'weekend', 'holiday', 'half-day'])
+    const dayTypes = (suggestion.dayTypes || []).filter((d) => validDayTypes.has(d)) as DayType[]
+    const safeDayTypes: DayType[] = dayTypes.length > 0 ? dayTypes : ['school-day', 'weekend']
+
     const sourceItemRef = {
       type: getItemType(item),
       id: getItemSourceId(item),
     }
 
-    if (existingBlock) {
-      // Update existing block
-      await onUpdateBlock(existingBlock.id, {
-        label: suggestion.label,
-        blockType: suggestion.blockType,
-        timeSlot: suggestion.timeSlot,
-        narrative: suggestion.narrative,
-        coachingNote: suggestion.coachingNote || null,
-        items: suggestion.items.map((it, i) => ({ ...it, id: `item-${Date.now()}-${i}` })),
-        dayTypes: suggestion.dayTypes,
-      })
-    } else {
-      // Create new block
-      const input: CreateBlockInput = {
-        label: suggestion.label,
-        blockType: suggestion.blockType,
-        timeSlot: suggestion.timeSlot,
-        narrative: suggestion.narrative,
-        coachingNote: suggestion.coachingNote || null,
-        items: suggestion.items,
-        dayTypes: suggestion.dayTypes,
-        sourceItemRef,
+    try {
+      if (existingBlock) {
+        await onUpdateBlock(existingBlock.id, {
+          label: suggestion.label,
+          blockType: suggestion.blockType,
+          timeSlot,
+          narrative: suggestion.narrative,
+          coachingNote: suggestion.coachingNote || null,
+          items: suggestion.items.map((it, i) => ({ ...it, id: `item-${Date.now()}-${i}` })),
+          dayTypes: safeDayTypes,
+        })
+      } else {
+        const input: CreateBlockInput = {
+          label: suggestion.label,
+          blockType: suggestion.blockType,
+          timeSlot,
+          narrative: suggestion.narrative,
+          coachingNote: suggestion.coachingNote || null,
+          items: suggestion.items,
+          dayTypes: safeDayTypes,
+          sourceItemRef,
+        }
+        await onAddBlock(input)
       }
-      await onAddBlock(input)
+    } catch (err) {
+      console.error('handleConfirmSuggestion error:', err)
     }
 
     injection.reset()

@@ -7,6 +7,20 @@ import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
+import type { ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
+
+// Mock the context — tests set values via mockContextValue
+const mockContextValue: ScheduleActionsValue = {
+  onToggleTask: vi.fn(),
+  projects: [],
+  contacts: [],
+  familyMembers: [],
+  lists: [],
+}
+
+vi.mock('@/contexts/ScheduleActionsContext', () => ({
+  useScheduleActionsContext: () => mockContextValue,
+}))
 
 // Mock useMobile hook
 vi.mock('@/hooks/useMobile', () => ({
@@ -113,6 +127,17 @@ describe('TodaySchedule', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    // Reset context to defaults
+    mockContextValue.onToggleTask = vi.fn()
+    mockContextValue.onUpdateTask = undefined
+    mockContextValue.onPushTask = undefined
+    mockContextValue.contactsMap = undefined
+    mockContextValue.projectsMap = undefined
+    mockContextValue.familyMembers = []
+    mockContextValue.onAssignTask = undefined
+    mockContextValue.projects = []
+    mockContextValue.contacts = []
+    mockContextValue.lists = []
     // Mock the current date to match our mockToday
     vi.useFakeTimers()
     vi.setSystemTime(mockToday)
@@ -192,8 +217,6 @@ describe('TodaySchedule', () => {
         <TodaySchedule
           {...defaultProps}
           tasks={tasks}
-          onUpdateTask={vi.fn()}
-          onPushTask={vi.fn()}
         />
       )
 
@@ -302,8 +325,6 @@ describe('TodaySchedule', () => {
         <TodaySchedule
           {...defaultProps}
           tasks={tasks}
-          onUpdateTask={vi.fn()}
-          onPushTask={vi.fn()}
         />
       )
 
@@ -323,8 +344,6 @@ describe('TodaySchedule', () => {
           {...defaultProps}
           viewedDate={futureDate}
           tasks={tasks}
-          onUpdateTask={vi.fn()}
-          onPushTask={vi.fn()}
         />
       )
 
@@ -346,8 +365,6 @@ describe('TodaySchedule', () => {
         <TodaySchedule
           {...defaultProps}
           tasks={tasks}
-          onUpdateTask={vi.fn()}
-          onPushTask={vi.fn()}
         />
       )
 
@@ -368,8 +385,6 @@ describe('TodaySchedule', () => {
         <TodaySchedule
           {...defaultProps}
           tasks={tasks}
-          onUpdateTask={vi.fn()}
-          onPushTask={vi.fn()}
         />
       )
 
@@ -442,8 +457,6 @@ describe('TodaySchedule', () => {
         <TodaySchedule
           {...defaultProps}
           tasks={tasks}
-          onUpdateTask={vi.fn()}
-          onPushTask={vi.fn()}
         />
       )
 
@@ -476,9 +489,9 @@ describe('TodaySchedule', () => {
       const tasks = [
         createMockTask({ id: '1', title: 'Task with contact', scheduledFor: mockToday, contactId: 'contact-1' }),
       ]
-      const contactsMap = new Map([['contact-1', mockContact]])
+      mockContextValue.contactsMap = new Map([['contact-1', mockContact]])
 
-      render(<TodaySchedule {...defaultProps} tasks={tasks} contactsMap={contactsMap} />)
+      render(<TodaySchedule {...defaultProps} tasks={tasks} />)
 
       expect(screen.getByText('John Doe')).toBeInTheDocument()
     })
@@ -487,9 +500,9 @@ describe('TodaySchedule', () => {
       const tasks = [
         createMockTask({ id: '1', title: 'Task with project', scheduledFor: mockToday, projectId: 'project-1' }),
       ]
-      const projectsMap = new Map([['project-1', mockProject]])
+      mockContextValue.projectsMap = new Map([['project-1', mockProject]])
 
-      render(<TodaySchedule {...defaultProps} tasks={tasks} projectsMap={projectsMap} />)
+      render(<TodaySchedule {...defaultProps} tasks={tasks} />)
 
       // Project name now appears in both tooltip and context label
       const projectNameElements = screen.getAllByText('Test Project')
@@ -503,12 +516,13 @@ describe('TodaySchedule', () => {
         createMockTask({ id: '1', title: 'Assigned task', scheduledFor: mockToday, assignedTo: 'member-1' }),
       ]
 
+      mockContextValue.familyMembers = [mockFamilyMember]
+      mockContextValue.onAssignTask = vi.fn()
+
       render(
         <TodaySchedule
           {...defaultProps}
           tasks={tasks}
-          familyMembers={[mockFamilyMember]}
-          onAssignTask={vi.fn()}
         />
       )
 

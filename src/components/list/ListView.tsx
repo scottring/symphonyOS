@@ -29,7 +29,6 @@ export function ListView({
   onAddItem,
   onUpdateItem,
   onDeleteItem,
-  onReorderItems: _onReorderItems,
   isPinned,
   canPin,
   onPin,
