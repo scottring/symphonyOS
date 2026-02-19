@@ -69,7 +69,7 @@ function dbTaskToTask(dbTask: DbTask): Task {
     deferCount: dbTask.defer_count ?? undefined,
     isAllDay: dbTask.is_all_day ?? undefined,
     isSomeday: dbTask.is_someday ?? undefined,
-    context: dbTask.context ?? undefined,
+    context: dbTask.context ?? null,
     category: (dbTask.category as TaskCategory) ?? 'task',
     notes: dbTask.notes ?? undefined,
     links: normalizeLinks(dbTask.links),
@@ -241,7 +241,7 @@ export function useSupabaseTasks() {
     linkType?: LinkType
     assignedTo?: string | null  // Family member ID to assign task to (null = no assignment, undefined = use default)
     category?: TaskCategory  // What kind of family item
-    context?: TaskContext  // Life domain for filtering
+    context?: TaskContext | null  // Life domain for filtering (null = private/untagged)
     location?: string  // Address or place name
     locationPlaceId?: string  // Google Place ID for precise directions
     defaultAssigneeId?: string  // Default assignee if assignedTo is undefined
@@ -280,7 +280,7 @@ export function useSupabaseTasks() {
       linkType: options?.linkType,
       assignedTo: effectiveAssignedTo ?? undefined,
       category: options?.category ?? 'task',
-      context: options?.context,
+      context: options?.context ?? null,
       location: options?.location,
       locationPlaceId: options?.locationPlaceId,
     }

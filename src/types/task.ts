@@ -32,7 +32,7 @@ export interface Task {
   isSomeday?: boolean // True = in someday/maybe list, not in inbox
   isWaiting?: boolean // True = waiting on someone else (all actions done, pending response)
   waitingSince?: Date // When the task entered waiting state
-  context?: TaskContext // Context: work, family, personal
+  context?: TaskContext | null // Context: work, family, personal (null = untagged/private)
   category?: TaskCategory // What kind of family item (default: 'task')
   notes?: string
   links?: TaskLink[]

@@ -72,6 +72,7 @@ if (ACTIVE_THEME === 'kinetic') {
 import App from './App.tsx'
 import { CalendarCallback } from './pages/CalendarCallback'
 import { NotFound } from './components/NotFound'
+import { JoinHousehold } from './components/JoinHousehold'
 import { GoogleCalendarProvider } from './hooks/useGoogleCalendar'
 import { DomainProvider } from './hooks/useDomain'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -93,6 +94,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/routines/:routineId" element={<App />} />
               <Route path="/contacts" element={<App />} />
               <Route path="/contacts/:contactId" element={<App />} />
+              <Route path="/join/:token" element={<JoinHousehold />} />
               <Route path="/calendar-callback" element={<CalendarCallback />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

@@ -416,6 +416,17 @@ function App() {
     }
   }, [user, onboardingComplete])
 
+  // Redirect to join page if user just authenticated and has a pending join token
+  useEffect(() => {
+    if (user) {
+      const joinToken = sessionStorage.getItem('symphony-join-token')
+      if (joinToken) {
+        sessionStorage.removeItem('symphony-join-token')
+        navigate(`/join/${joinToken}`)
+      }
+    }
+  }, [user, navigate])
+
   // Fetch calendar events when connected or date changes
   useEffect(() => {
     if (isConnected) {

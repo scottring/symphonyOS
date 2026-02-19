@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import type { TaskContext } from '@/types/task'
 
 interface ContextPickerProps {
-  value?: TaskContext
+  value?: TaskContext | null
   onChange: (context: TaskContext | undefined) => void
 }
 
@@ -56,7 +56,7 @@ export function ContextPicker({ value, onChange }: ContextPickerProps) {
     setIsOpen(false)
   }
 
-  const hasValue = value !== undefined
+  const hasValue = value != null
   const selectedContext = CONTEXTS.find(ctx => ctx.value === value)
 
   // Map context colors to match domain switcher

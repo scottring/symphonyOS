@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useIntelligenceLayers } from '@/hooks/useIntelligenceLayers'
+import { useHouseholdInvitations } from '@/hooks/useHouseholdInvitations'
 import { LAYER_CONFIG } from '@/types/intelligence-layer'
 import { CalendarSettings } from './CalendarSettings'
 import { WaitlistAdmin } from './WaitlistAdmin'
@@ -98,6 +99,7 @@ export function SettingsPage({
 }: SettingsPageProps) {
   const { members, addMember, updateMember, deleteMember } = useFamilyMembers()
   const { layersWithAssessments, activateLayer, deactivateLayer } = useIntelligenceLayers()
+  const { invitations, createInvitation, deleteInvitation } = useHouseholdInvitations()
   const [activeTab, setActiveTab] = useState<Tab>('general')
 
   // Add member state
@@ -105,6 +107,12 @@ export function SettingsPage({
   const [newName, setNewName] = useState('')
   const [newColor, setNewColor] = useState('blue')
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Invite partner state
+  const [isInviting, setIsInviting] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteError, setInviteError] = useState<string | null>(null)
+  const [inviteCopied, setInviteCopied] = useState<string | null>(null)
 
   // Edit member state
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -197,6 +205,35 @@ export function SettingsPage({
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const handleInvite = async () => {
+    if (!inviteEmail.trim() || isSubmitting) return
+    setIsSubmitting(true)
+    setInviteError(null)
+
+    try {
+      const inv = await createInvitation(inviteEmail)
+      if (inv) {
+        const link = `${window.location.origin}/join/${inv.token}`
+        await navigator.clipboard.writeText(link)
+        setInviteCopied(inv.token)
+        setTimeout(() => setInviteCopied(null), 3000)
+      }
+      setInviteEmail('')
+      setIsInviting(false)
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : 'Failed to create invitation')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleCopyLink = async (token: string) => {
+    const link = `${window.location.origin}/join/${token}`
+    await navigator.clipboard.writeText(link)
+    setInviteCopied(token)
+    setTimeout(() => setInviteCopied(null), 3000)
   }
 
   const mainUser = members.find(m => m.is_full_user)
@@ -493,6 +530,95 @@ export function SettingsPage({
                   >
                     + Add family member
                   </button>
+                )}
+              </div>
+
+              {/* Invite Partner Section */}
+              <div className="mt-6 pt-6 border-t border-neutral-100">
+                <label className="block text-sm text-neutral-500 mb-2">Invite partner</label>
+                <p className="text-xs text-neutral-400 mb-3">
+                  Invite someone with their own account to share tasks, events, and routines.
+                </p>
+
+                {isInviting ? (
+                  <div className="p-4 bg-neutral-50 rounded-lg border border-neutral-200">
+                    <input
+                      type="email"
+                      value={inviteEmail}
+                      onChange={(e) => { setInviteEmail(e.target.value); setInviteError(null) }}
+                      placeholder="partner@email.com"
+                      className="input-base w-full mb-3"
+                      autoFocus
+                      onKeyDown={(e) => e.key === 'Enter' && handleInvite()}
+                    />
+                    {inviteError && (
+                      <p className="text-xs text-red-600 mb-3">{inviteError}</p>
+                    )}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { setIsInviting(false); setInviteEmail(''); setInviteError(null) }}
+                        className="btn-secondary flex-1"
+                        disabled={isSubmitting}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleInvite}
+                        disabled={!inviteEmail.trim() || isSubmitting}
+                        className="btn-primary flex-1 disabled:opacity-50"
+                      >
+                        {isSubmitting ? 'Creating...' : 'Create invite link'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setIsInviting(true)}
+                    className="w-full p-3 border-2 border-dashed border-primary-200 rounded-lg text-primary-600 hover:border-primary-300 hover:bg-primary-50/50 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z" />
+                    </svg>
+                    Invite partner
+                  </button>
+                )}
+
+                {/* Pending invitations */}
+                {invitations.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {invitations.map((inv) => {
+                      const isExpired = new Date(inv.expires_at) < new Date()
+                      return (
+                        <div
+                          key={inv.id}
+                          className="flex items-center gap-3 p-3 bg-white rounded-lg border border-neutral-100"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-neutral-700 truncate">{inv.email}</p>
+                            <p className={`text-xs ${isExpired ? 'text-red-500' : 'text-neutral-400'}`}>
+                              {isExpired ? 'Expired' : `Expires ${new Date(inv.expires_at).toLocaleDateString()}`}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => handleCopyLink(inv.token)}
+                            className="text-xs font-medium text-primary-600 hover:text-primary-700 px-2 py-1 rounded hover:bg-primary-50 transition-colors whitespace-nowrap"
+                            title="Copy invite link"
+                          >
+                            {inviteCopied === inv.token ? 'Copied!' : 'Copy link'}
+                          </button>
+                          <button
+                            onClick={() => deleteInvitation(inv.id)}
+                            className="text-neutral-400 hover:text-red-500 p-1 transition-colors"
+                            title="Remove invitation"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
                 )}
               </div>
             </section>
