@@ -199,6 +199,70 @@ export function getLayerConfig(slug: string): LayerHubConfig | null {
   return LAYER_HUB_CONFIGS[slug] ?? null
 }
 
+// ── Cross-layer aggregation helpers ───────────────────────────────
+
+export interface CoachingSection {
+  slug: string
+  name: string
+  tagline: string
+  color: string
+  bgColor: string
+  borderColor: string
+  accentColor: string
+  domains: LayerDomainConfig[]
+  ruleCategories: LayerRuleCategoryConfig[]
+  rulesLabel: string
+}
+
+export interface AnnotatedDomain extends LayerDomainConfig {
+  layerSlug: string
+  layerColor: string
+  layerBgColor: string
+  layerBorderColor: string
+}
+
+export interface AnnotatedRuleCategory extends LayerRuleCategoryConfig {
+  layerSlug: string
+  layerLabel: string
+}
+
+/** All 4 layer configs as sections (ordered: relish, work, organization, wellness) */
+export function getAllCoachingSections(): CoachingSection[] {
+  return ['relish', 'work', 'organization', 'wellness']
+    .map(slug => LAYER_HUB_CONFIGS[slug])
+    .filter(Boolean) as CoachingSection[]
+}
+
+/** Flat list of all domains annotated with layer info */
+export function getAllDomains(): AnnotatedDomain[] {
+  const sections = getAllCoachingSections()
+  const result: AnnotatedDomain[] = []
+  for (const s of sections) {
+    for (const d of s.domains) {
+      result.push({
+        ...d,
+        layerSlug: s.slug,
+        layerColor: s.color,
+        layerBgColor: s.bgColor,
+        layerBorderColor: s.borderColor,
+      })
+    }
+  }
+  return result
+}
+
+/** Flat list of all rule categories annotated with layer info */
+export function getAllRuleCategories(): AnnotatedRuleCategory[] {
+  const sections = getAllCoachingSections()
+  const result: AnnotatedRuleCategory[] = []
+  for (const s of sections) {
+    for (const c of s.ruleCategories) {
+      result.push({ ...c, layerSlug: s.slug, layerLabel: s.name })
+    }
+  }
+  return result
+}
+
 // ── Score helpers ──────────────────────────────────────────────────
 
 export function ratingToScore(rating: number): number {

@@ -13,6 +13,7 @@ export interface TimelineItem {
   endTime: Date | null
   completed: boolean
   skipped?: boolean
+  isWaiting?: boolean
   // Context (from tasks)
   notes?: string
   links?: TaskLink[]
@@ -56,6 +57,7 @@ export function taskToTimelineItem(task: Task): TimelineItem {
     startTime: task.scheduledFor || null,
     endTime: null, // Tasks don't have duration/end time
     completed: task.completed,
+    isWaiting: task.isWaiting,
     notes: task.notes,
     links: task.links,
     phoneNumber: task.phoneNumber,

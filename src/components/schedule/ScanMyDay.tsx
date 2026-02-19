@@ -1,14 +1,25 @@
 import { useState, useMemo } from 'react'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
-import type { PlaybookInstance } from '@/types/playbook'
+import type { PlaybookInstance, DayType } from '@/types/playbook'
 import { QUICK_REACT_CONFIG } from '@/types/playbook'
+
+const DAY_TYPE_LABELS: Record<DayType, string> = {
+  'school-day': 'School Day',
+  'weekend': 'Weekend',
+  'holiday': 'Holiday',
+  'half-day': 'Half Day',
+}
+
+const DAY_TYPE_OPTIONS: DayType[] = ['school-day', 'weekend', 'holiday', 'half-day']
 
 interface ScanMyDayProps {
   tasks: Task[]
   events: CalendarEvent[]
   playbookInstances: PlaybookInstance[]
   onReviewYesterday?: () => void
+  dayType?: DayType
+  onDayTypeChange?: (dayType: DayType) => void
 }
 
 function isMorningHours(): boolean {
@@ -21,16 +32,21 @@ export function ScanMyDay({
   events,
   playbookInstances,
   onReviewYesterday,
+  dayType: dayTypeProp,
+  onDayTypeChange,
 }: ScanMyDayProps) {
   const [collapsed, setCollapsed] = useState(false)
+  const [showDayTypePicker, setShowDayTypePicker] = useState(false)
 
   // Only show during morning hours
   if (!isMorningHours()) return null
 
+  // Use prop or auto-detect
   const today = new Date()
   const dayOfWeek = today.getDay()
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
-  const dayType = isWeekend ? 'Weekend' : 'School Day'
+  const effectiveDayType = dayTypeProp ?? (isWeekend ? 'weekend' as const : 'school-day' as const)
+  const dayTypeLabel = DAY_TYPE_LABELS[effectiveDayType]
 
   // Count today's items
   const taskCount = tasks.length
@@ -59,7 +75,7 @@ export function ScanMyDay({
             <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6z" />
           </svg>
         </span>
-        <span className="text-xs font-medium text-amber-700">{dayType}</span>
+        <span className="text-xs font-medium text-amber-700">{dayTypeLabel}</span>
         <span className="text-xs text-neutral-400">
           {taskCount} tasks, {eventCount} events
           {coachingCount > 0 && `, ${coachingCount} coaching`}
@@ -77,9 +93,50 @@ export function ScanMyDay({
             <h3 className="font-display text-lg font-semibold text-neutral-800">
               Good morning
             </h3>
-            <p className="text-sm text-neutral-500 mt-0.5">
-              It's a <span className="font-medium text-amber-700">{dayType.toLowerCase()}</span>
-            </p>
+            <div className="text-sm text-neutral-500 mt-0.5 relative">
+              It's a{' '}
+              {onDayTypeChange ? (
+                <button
+                  onClick={() => setShowDayTypePicker(!showDayTypePicker)}
+                  className="inline-flex items-center gap-1 font-medium text-amber-700 hover:text-amber-800 transition-colors border-b border-dashed border-amber-300"
+                >
+                  {dayTypeLabel.toLowerCase()}
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              ) : (
+                <span className="font-medium text-amber-700">{dayTypeLabel.toLowerCase()}</span>
+              )}
+
+              {/* Day type picker dropdown */}
+              {showDayTypePicker && onDayTypeChange && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowDayTypePicker(false)}
+                  />
+                  <div className="absolute left-0 top-full mt-1 z-50 bg-white rounded-lg shadow-lg border border-neutral-200 py-1 min-w-[140px]">
+                    {DAY_TYPE_OPTIONS.map((dt) => (
+                      <button
+                        key={dt}
+                        onClick={() => {
+                          onDayTypeChange(dt)
+                          setShowDayTypePicker(false)
+                        }}
+                        className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${
+                          dt === effectiveDayType
+                            ? 'bg-amber-50 text-amber-700 font-medium'
+                            : 'text-neutral-600 hover:bg-neutral-50'
+                        }`}
+                      >
+                        {DAY_TYPE_LABELS[dt]}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
           <button
             onClick={() => setCollapsed(true)}

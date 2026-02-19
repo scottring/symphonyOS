@@ -12,6 +12,7 @@ import { BulkActionToolbar } from './BulkActionToolbar'
 interface InboxSectionProps {
   tasks: Task[]
   onUpdateTask: (id: string, updates: Partial<Task>) => void
+  onToggleWaiting?: (taskId: string) => void
   onPushTask: (id: string, date: Date) => void
   onSelectTask: (taskId: string) => void
   onDeleteTask?: (taskId: string) => void
@@ -45,6 +46,7 @@ interface InboxSectionProps {
 export function InboxSection({
   tasks,
   onUpdateTask,
+  onToggleWaiting,
   onPushTask,
   onSelectTask,
   onDeleteTask,
@@ -239,6 +241,7 @@ export function InboxSection({
             key={task.id}
             task={task}
             onUpdate={(updates) => onUpdateTask(task.id, updates)}
+            onToggleWaiting={onToggleWaiting ? () => onToggleWaiting(task.id) : undefined}
             onSelect={() => onSelectTask(task.id)}
             onDefer={(date) => {
               if (date) {

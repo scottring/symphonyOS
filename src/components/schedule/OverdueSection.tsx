@@ -14,6 +14,7 @@ interface OverdueSectionProps {
   selectedItemId: string | null
   onSelectTask: (taskId: string) => void
   onToggleTask: (taskId: string) => void
+  onToggleWaiting?: (taskId: string) => void
   onPushTask?: (taskId: string, date: Date) => void
   contactsMap?: Map<string, Contact>
   projectsMap?: Map<string, Project>
@@ -36,6 +37,7 @@ export function OverdueSection({
   selectedItemId,
   onSelectTask,
   onToggleTask,
+  onToggleWaiting,
   onPushTask,
   contactsMap,
   projectsMap,
@@ -110,6 +112,7 @@ export function OverdueSection({
                   selected={selectedItemId === `task-${task.id}`}
                   onSelect={() => onSelectTask(`task-${task.id}`)}
                   onComplete={() => handleToggle(taskId, !!task.completed)}
+                  onToggleWaiting={onToggleWaiting ? () => onToggleWaiting(taskId) : undefined}
                   onDefer={onPushTask ? (date: Date) => onPushTask(taskId, date) : undefined}
                   familyMembers={familyMembers}
                   assignedTo={task.assignedTo}
@@ -139,6 +142,7 @@ export function OverdueSection({
                 item={item}
                 selected={selectedItemId === `task-${task.id}`}
                 onSelect={() => onSelectTask(`task-${task.id}`)}
+                onToggleWaiting={onToggleWaiting ? () => onToggleWaiting(taskId) : undefined}
                 onToggleComplete={() => handleToggle(taskId, !!task.completed)}
                 onPush={onPushTask ? (date: Date) => onPushTask(taskId, date) : undefined}
                 contactName={contactName || undefined}

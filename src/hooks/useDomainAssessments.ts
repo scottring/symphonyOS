@@ -20,24 +20,29 @@ function rowToAssessment(row: Record<string, unknown>): DomainAssessment {
   }
 }
 
-export function useDomainAssessments(layerId: string | null) {
+/**
+ * Fetch domain assessments.
+ * - Pass a layerId string to fetch assessments for a single layer.
+ * - Pass undefined/null to fetch ALL assessments across all layers.
+ */
+export function useDomainAssessments(layerId?: string | null) {
   const [assessments, setAssessments] = useState<DomainAssessment[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetchAssessments = useCallback(async () => {
-    if (!layerId) {
-      setAssessments([])
-      setLoading(false)
-      return
-    }
-
     setLoading(true)
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('domain_assessments')
         .select('*')
-        .eq('layer_id', layerId)
         .order('domain_slug')
+
+      // Only filter by layer when a specific layerId is provided
+      if (layerId) {
+        query = query.eq('layer_id', layerId)
+      }
+
+      const { data, error } = await query
 
       if (error) {
         console.error('fetchDomainAssessments error:', error)
@@ -67,22 +72,30 @@ export function useDomainAssessments(layerId: string | null) {
     return assessments.find(a => a.domainSlug === domainSlug) ?? null
   }, [assessments])
 
+  // Get assessments for a specific layer (filtering from cached array)
+  const getAssessmentsForLayer = useCallback((targetLayerId: string): DomainAssessment[] => {
+    return assessments.filter(a => a.layerId === targetLayerId)
+  }, [assessments])
+
   // Count assessed domains
   const assessedCount = assessments.length
 
   // Save quick assessment (batch of domain ratings)
+  // targetLayerId: explicit layer ID for the batch (required)
   const saveQuickAssessment = useCallback(async (
-    ratings: QuickAssessmentInput[]
+    ratings: QuickAssessmentInput[],
+    targetLayerId?: string
   ) => {
+    const effectiveLayerId = targetLayerId || layerId
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user || !layerId) return false
+    if (!user || !effectiveLayerId) return false
 
     const now = new Date().toISOString()
     const rows = ratings
       .filter(r => r.rating > 0)
       .map(r => ({
         user_id: user.id,
-        layer_id: layerId,
+        layer_id: effectiveLayerId,
         domain_slug: r.domainSlug,
         harmony_score: ratingToScore(r.rating),
         challenge_note: r.challengeNote || null,
@@ -110,18 +123,21 @@ export function useDomainAssessments(layerId: string | null) {
   }, [layerId, fetchAssessments])
 
   // Update a single domain's assessment (after deep assessment)
+  // targetLayerId: explicit layer ID (falls back to hook's layerId)
   const updateAssessment = useCallback(async (
     domainSlug: string,
-    updates: Partial<Pick<DomainAssessment, 'harmonyScore' | 'summary' | 'strengths' | 'issues' | 'opportunities' | 'challengeNote'>>
+    updates: Partial<Pick<DomainAssessment, 'harmonyScore' | 'summary' | 'strengths' | 'issues' | 'opportunities' | 'challengeNote'>>,
+    targetLayerId?: string
   ) => {
+    const effectiveLayerId = targetLayerId || layerId
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user || !layerId) return false
+    if (!user || !effectiveLayerId) return false
 
     const { error } = await supabase
       .from('domain_assessments')
       .upsert({
         user_id: user.id,
-        layer_id: layerId,
+        layer_id: effectiveLayerId,
         domain_slug: domainSlug,
         ...(updates.harmonyScore !== undefined && { harmony_score: updates.harmonyScore }),
         ...(updates.summary !== undefined && { summary: updates.summary }),
@@ -147,6 +163,7 @@ export function useDomainAssessments(layerId: string | null) {
     loading,
     getScore,
     getAssessment,
+    getAssessmentsForLayer,
     assessedCount,
     saveQuickAssessment,
     updateAssessment,

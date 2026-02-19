@@ -30,6 +30,8 @@ export interface Task {
   deferCount?: number // Times this task has been deferred
   isAllDay?: boolean // True = all day task, false/undefined = specific time
   isSomeday?: boolean // True = in someday/maybe list, not in inbox
+  isWaiting?: boolean // True = waiting on someone else (all actions done, pending response)
+  waitingSince?: Date // When the task entered waiting state
   context?: TaskContext // Context: work, family, personal
   category?: TaskCategory // What kind of family item (default: 'task')
   notes?: string

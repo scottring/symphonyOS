@@ -5,13 +5,14 @@ import { formatTime } from '@/lib/timeUtils'
 import { getProjectColor } from '@/lib/projectUtils'
 import { TypeIcon } from './TypeIcon'
 import { AssigneeDropdown } from '@/components/family'
-import { ArrowRightToLine, Redo2, MoreHorizontal } from 'lucide-react'
+import { ArrowRightToLine, Redo2, MoreHorizontal, Clock } from 'lucide-react'
 
 interface SwipeableCardProps {
   item: TimelineItem
   selected?: boolean
   onSelect: () => void
   onComplete: () => void
+  onToggleWaiting?: () => void
   onDefer?: (date: Date) => void
   onSkip?: () => void
   onOpenDetail?: () => void
@@ -29,6 +30,7 @@ export const SwipeableCard = memo(function SwipeableCard({
   item,
   selected,
   onComplete,
+  onToggleWaiting,
   onDefer,
   onSkip,
   onOpenDetail,
@@ -147,7 +149,7 @@ export const SwipeableCard = memo(function SwipeableCard({
     setTranslateX(0)
   }, [])
 
-  const handleAction = useCallback((action: 'tomorrow' | 'skip' | 'more') => {
+  const handleAction = useCallback((action: 'tomorrow' | 'skip' | 'wait' | 'more') => {
     if (action === 'tomorrow' && onDefer) {
       const tomorrow = new Date()
       tomorrow.setDate(tomorrow.getDate() + 1)
@@ -155,11 +157,13 @@ export const SwipeableCard = memo(function SwipeableCard({
       onDefer(tomorrow)
     } else if (action === 'skip' && onSkip) {
       onSkip()
+    } else if (action === 'wait' && onToggleWaiting) {
+      onToggleWaiting()
     } else if (action === 'more' && onOpenDetail) {
       onOpenDetail()
     }
     closeActions()
-  }, [onDefer, onSkip, onOpenDetail, closeActions])
+  }, [onDefer, onSkip, onToggleWaiting, onOpenDetail, closeActions])
 
   // Visual state calculations
   // For LEFT swipe (negative translateX), show completion indicator on RIGHT
@@ -206,13 +210,27 @@ export const SwipeableCard = memo(function SwipeableCard({
           <ArrowRightToLine className="w-5 h-5" />
           <span>Push</span>
         </button>
-        <button
-          onClick={() => handleAction('skip')}
-          className="w-[60px] flex flex-col items-center justify-center gap-1 bg-neutral-500 text-white text-xs font-medium active:bg-neutral-600"
-        >
-          <Redo2 className="w-5 h-5" />
-          <span>Skip</span>
-        </button>
+        {isTask && onToggleWaiting ? (
+          <button
+            onClick={() => handleAction('wait')}
+            className={`w-[60px] flex flex-col items-center justify-center gap-1 text-white text-xs font-medium ${
+              item.isWaiting
+                ? 'bg-neutral-500 active:bg-neutral-600'
+                : 'bg-amber-500 active:bg-amber-600'
+            }`}
+          >
+            <Clock className="w-5 h-5" />
+            <span>{item.isWaiting ? 'Unwait' : 'Wait'}</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => handleAction('skip')}
+            className="w-[60px] flex flex-col items-center justify-center gap-1 bg-neutral-500 text-white text-xs font-medium active:bg-neutral-600"
+          >
+            <Redo2 className="w-5 h-5" />
+            <span>Skip</span>
+          </button>
+        )}
         <button
           onClick={() => handleAction('more')}
           className="w-[60px] flex flex-col items-center justify-center gap-1 bg-blue-500 text-white text-xs font-medium active:bg-blue-600"
@@ -236,7 +254,7 @@ export const SwipeableCard = memo(function SwipeableCard({
             ? 'border-primary-200 shadow-md ring-1 ring-primary-200'
             : 'border-neutral-100'
           }
-          ${item.completed ? 'opacity-60' : ''}
+          ${item.completed ? 'opacity-60' : item.isWaiting ? 'opacity-80' : ''}
         `}
         style={{ transform: `translateX(${translateX}px)` }}
       >
@@ -256,7 +274,7 @@ export const SwipeableCard = memo(function SwipeableCard({
 
           {/* Type icon - non-interactive indicator */}
           <div className="w-5 shrink-0 flex items-center justify-center">
-            <TypeIcon type={item.type} completed={item.completed} />
+            <TypeIcon type={item.type} completed={item.completed} isWaiting={item.isWaiting} />
           </div>
 
           {/* Title */}
@@ -264,10 +282,18 @@ export const SwipeableCard = memo(function SwipeableCard({
             <span
               className={`
                 text-sm font-medium leading-snug line-clamp-2
-                ${item.completed ? 'line-through text-neutral-400' : 'text-neutral-800'}
+                ${item.completed
+                  ? 'line-through text-neutral-400'
+                  : item.isWaiting
+                    ? 'text-amber-600/70 italic'
+                    : 'text-neutral-800'
+                }
               `}
             >
               {item.title}
+              {item.isWaiting && !item.completed && (
+                <span className="ml-1.5 text-xs text-amber-500 not-italic font-normal">waiting</span>
+              )}
             </span>
           </div>
 

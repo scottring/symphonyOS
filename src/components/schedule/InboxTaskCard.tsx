@@ -7,10 +7,12 @@ import { MultiAssigneeDropdown } from '@/components/family'
 import { SchedulePopover, DeferPicker, ContextPicker } from '@/components/triage'
 import { ListPicker } from '@/components/triage/ListPicker'
 import type { ScheduleContextItem } from '@/components/triage'
+import { TaskCheckbox } from './TaskCheckbox'
 
 interface InboxTaskCardProps {
   task: Task
   onUpdate: (updates: Partial<Task>) => void
+  onToggleWaiting?: () => void
   onSelect: () => void
   onDefer: (date: Date | undefined) => void
   projects?: Project[]
@@ -35,6 +37,7 @@ interface InboxTaskCardProps {
 export const InboxTaskCard = memo(function InboxTaskCard({
   task,
   onUpdate,
+  onToggleWaiting,
   onSelect,
   onDefer,
   projects = [],
@@ -81,52 +84,55 @@ export const InboxTaskCard = memo(function InboxTaskCard({
       {/* Main row: checkbox | title | triage buttons */}
       <div className="flex items-center gap-0.5">
         {/* Checkbox */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-
-            if (selectionMode && onToggleSelection) {
-              // Selection mode: toggle selection
-              onToggleSelection()
-            } else {
-              // Normal mode: toggle completion
-              if (panelOpen && onClosePanel) {
-                onClosePanel()
-              }
-              onUpdate({ completed: !task.completed })
-            }
-          }}
-          className="shrink-0 flex items-center justify-center"
-        >
-          <span
-            className={`
-              w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors
-              ${selectionMode
-                ? isSelected
+        {selectionMode ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggleSelection?.()
+            }}
+            className="shrink-0 flex items-center justify-center"
+          >
+            <span
+              className={`
+                w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors
+                ${isSelected
                   ? 'bg-primary-500/50 border-primary-500/50'
                   : 'border-primary-300 hover:border-primary-400'
-                : task.completed
-                  ? 'bg-primary-500 border-primary-500 text-white'
-                  : 'border-neutral-300 hover:border-primary-400'
-              }
-            `}
-          >
-            {/* Show checkmark only for completion, not for selection */}
-            {!selectionMode && task.completed && (
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-              </svg>
-            )}
-          </span>
-        </button>
+                }
+              `}
+            />
+          </button>
+        ) : (
+          <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+            <TaskCheckbox
+              completed={task.completed}
+              isWaiting={task.isWaiting}
+              onToggleComplete={() => {
+                if (panelOpen && onClosePanel) onClosePanel()
+                onUpdate({ completed: !task.completed })
+              }}
+              onToggleWaiting={() => {
+                if (panelOpen && onClosePanel) onClosePanel()
+                onToggleWaiting?.()
+              }}
+            />
+          </div>
+        )}
 
         {/* Title - takes all available space, allow 2 lines */}
         <span
           className={`flex-1 min-w-0 text-sm leading-snug line-clamp-2 ${
-            task.completed ? 'text-neutral-400 line-through' : 'text-neutral-800'
+            task.completed
+              ? 'text-neutral-400 line-through'
+              : task.isWaiting
+                ? 'text-amber-600/70 italic'
+                : 'text-neutral-800'
           }`}
         >
           {task.title}
+          {task.isWaiting && !task.completed && (
+            <span className="ml-1.5 text-xs text-amber-500 not-italic font-normal">waiting</span>
+          )}
         </span>
 
         {/* Triage actions - hidden in selection mode */}

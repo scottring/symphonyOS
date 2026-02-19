@@ -21,6 +21,9 @@ import type { FamilyMember } from '@/types/family'
 import { TaskQuickActions, type ScheduleContextItem } from '@/components/triage'
 import { TiptapEditor } from '@/components/notes/TiptapEditor'
 import { NotesEditorModal } from '@/components/notes/NotesEditorModal'
+import type { FamilyRule } from '@/types/playbook'
+import { getCoachingForItem } from '@/lib/coachingMatcher'
+import { CoachingTipsSection } from './CoachingTipsSection'
 
 // Component to render text with clickable links (handles HTML links and plain URLs)
 function RichText({ text }: { text: string }) {
@@ -143,6 +146,9 @@ interface DetailPanelRedesignProps {
   onUpdateEventProject?: (googleEventId: string, projectId: string | null, eventTitle?: string | null, eventStartTime?: Date | null) => void
   // Quick action support for linked tasks
   getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
+  // Coaching tips
+  activeRules?: FamilyRule[]
+  hideCoaching?: boolean
 }
 
 function ActionIcon({ type }: { type: DetectedAction['icon'] }) {
@@ -514,7 +520,15 @@ export function DetailPanelRedesign({
   eventProjectId,
   onUpdateEventProject,
   getScheduleItemsForDate,
+  activeRules = [],
+  hideCoaching = false,
 }: DetailPanelRedesignProps) {
+  // Coaching matches for the current item
+  const coachingMatches = useMemo(() => {
+    if (!item) return []
+    return getCoachingForItem(item, activeRules, hideCoaching)
+  }, [item, activeRules, hideCoaching])
+
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [editedTitle, setEditedTitle] = useState(item?.title || '')
@@ -1998,6 +2012,9 @@ export function DetailPanelRedesign({
             onTogglePrepTask={onTogglePrepTask}
           />
         )}
+
+        {/* Coaching Tips - contextual coaching rules for this item */}
+        <CoachingTipsSection matches={coachingMatches} />
 
         {/* ========================================
             ZONE 4: LINKED TASKS (Prep & Follow-up)

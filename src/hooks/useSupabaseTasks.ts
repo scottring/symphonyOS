@@ -33,6 +33,8 @@ interface DbTask {
   estimated_duration: number | null
   location: string | null
   location_place_id: string | null
+  is_waiting: boolean | null
+  waiting_since: string | null
   created_at: string
   updated_at: string
 }
@@ -82,6 +84,8 @@ function dbTaskToTask(dbTask: DbTask): Task {
     estimatedDuration: dbTask.estimated_duration ?? undefined,
     location: dbTask.location ?? undefined,
     locationPlaceId: dbTask.location_place_id ?? undefined,
+    isWaiting: dbTask.is_waiting ?? undefined,
+    waitingSince: dbTask.waiting_since ? new Date(dbTask.waiting_since) : undefined,
   }
 }
 
@@ -480,6 +484,8 @@ export function useSupabaseTasks() {
             return {
               ...t,
               completed: newCompleted,
+              // Clear waiting state when completing
+              ...(newCompleted && t.isWaiting ? { isWaiting: false, waitingSince: undefined } : {}),
               subtasks: newCompleted
                 ? t.subtasks?.map((s) => ({ ...s, completed: true }))
                 : t.subtasks,
@@ -489,10 +495,15 @@ export function useSupabaseTasks() {
         })
       )
 
-      // Update parent in DB
+      // Update parent in DB — also clear waiting state if completing
+      const dbUpdate: Record<string, unknown> = { completed: newCompleted }
+      if (newCompleted && task.isWaiting) {
+        dbUpdate.is_waiting = false
+        dbUpdate.waiting_since = null
+      }
       const { error: updateError } = await supabase
         .from('tasks')
-        .update({ completed: newCompleted })
+        .update(dbUpdate)
         .eq('id', id)
 
       if (updateError) {
@@ -517,6 +528,39 @@ export function useSupabaseTasks() {
       }
     }
   }, [findTaskById, findParentOfSubtask])
+
+  const toggleWaiting = useCallback(async (id: string) => {
+    const task = findTaskById(id)
+    if (!task) return
+
+    const newIsWaiting = !task.isWaiting
+    const now = new Date()
+
+    // Optimistic update
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === id
+          ? { ...t, isWaiting: newIsWaiting, waitingSince: newIsWaiting ? now : undefined }
+          : t
+      )
+    )
+
+    const { error: updateError } = await supabase
+      .from('tasks')
+      .update({
+        is_waiting: newIsWaiting,
+        waiting_since: newIsWaiting ? now.toISOString() : null,
+      })
+      .eq('id', id)
+
+    if (updateError) {
+      // Rollback
+      setTasks((prev) =>
+        prev.map((t) => (t.id === id ? task : t))
+      )
+      setError(updateError.message)
+    }
+  }, [findTaskById])
 
   const deleteTask = useCallback(async (id: string) => {
     // Save for rollback
@@ -599,6 +643,8 @@ export function useSupabaseTasks() {
     if ('estimatedDuration' in updates) dbUpdates.estimated_duration = updates.estimatedDuration ?? null
     if ('location' in updates) dbUpdates.location = updates.location ?? null
     if ('locationPlaceId' in updates) dbUpdates.location_place_id = updates.locationPlaceId ?? null
+    if ('isWaiting' in updates) dbUpdates.is_waiting = updates.isWaiting ?? false
+    if ('waitingSince' in updates) dbUpdates.waiting_since = updates.waitingSince?.toISOString() ?? null
 
     console.log('[updateTask] Sending to DB:', { id, dbUpdates })
     const { data, error: updateError, status, count } = await supabase
@@ -674,6 +720,8 @@ export function useSupabaseTasks() {
     if ('estimatedDuration' in updates) dbUpdates.estimated_duration = updates.estimatedDuration ?? null
     if ('location' in updates) dbUpdates.location = updates.location ?? null
     if ('locationPlaceId' in updates) dbUpdates.location_place_id = updates.locationPlaceId ?? null
+    if ('isWaiting' in updates) dbUpdates.is_waiting = updates.isWaiting ?? false
+    if ('waitingSince' in updates) dbUpdates.waiting_since = updates.waitingSince?.toISOString() ?? null
 
     console.log('[updateTasksBulk] Sending to DB:', { taskIds, dbUpdates })
 
@@ -803,5 +851,5 @@ export function useSupabaseTasks() {
     }
   }, [tasks])
 
-  return { tasks, loading, error, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, deleteTask, updateTask, updateTasksBulk, scheduleTask, pushTask }
+  return { tasks, loading, error, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, scheduleTask, pushTask }
 }

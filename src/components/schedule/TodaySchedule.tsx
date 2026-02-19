@@ -8,7 +8,8 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
 import type { ScheduleContextItem } from '@/components/triage'
-import type { PlaybookInstance, QuickReact } from '@/types/playbook'
+import type { PlaybookInstance, QuickReact, FamilyRule } from '@/types/playbook'
+import type { TaskContext } from '@/types/task'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem, playbookInstanceToTimelineItem } from '@/types/timeline'
 import { PlaybookBlockCard } from '@/components/playbook/PlaybookBlockCard'
 import { EveningReflection } from '@/components/playbook/EveningReflection'
@@ -24,6 +25,7 @@ import { InboxSection } from './InboxSection'
 import { InboxTaskCard } from './InboxTaskCard'
 import { OverdueSection } from './OverdueSection'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
+import { hasCoachingForItem } from '@/lib/coachingMatcher'
 import { useSystemHealth } from '@/hooks/useSystemHealth'
 import { MultiAssigneeDropdown } from '@/components/family/MultiAssigneeDropdown'
 // import { CalendarClock } from 'lucide-react' // Hidden - Plan button removed
@@ -462,6 +464,7 @@ interface TodayScheduleProps {
   selectedItemId: string | null
   onSelectItem: (id: string | null) => void
   onToggleTask: (taskId: string) => void
+  onToggleWaiting?: (taskId: string) => void
   onUpdateTask?: (id: string, updates: Partial<Task>) => void
   onPushTask?: (id: string, date: Date) => void
   onDeleteTask?: (id: string) => void
@@ -529,6 +532,17 @@ interface TodayScheduleProps {
   onPlaybookEdit?: (block: PlaybookInstance['block']) => void
   onPlaybookDelete?: (blockId: string) => void
   onPlaybookSuppress?: (blockId: string, date: string) => void
+  // Calendar domain mapping for event context resolution
+  getDomainForCalendar?: (calendarId?: string | null, calendarName?: string | null) => TaskContext | null
+  // Active coaching rules (for sparkle indicator)
+  activeRules?: FamilyRule[]
+  // Event context overrides (from event_notes.context)
+  eventContextOverrides?: Map<string, TaskContext>
+  // Event context change handler
+  onUpdateEventContext?: (eventId: string, context: TaskContext | null) => void
+  // Day type override
+  dayType?: import('@/types/playbook').DayType
+  onDayTypeChange?: (dayType: import('@/types/playbook').DayType) => void
 }
 
 function LoadingSkeleton() {
@@ -570,6 +584,7 @@ export function TodaySchedule({
   selectedItemId,
   onSelectItem,
   onToggleTask,
+  onToggleWaiting,
   onUpdateTask,
   onPushTask,
   onDeleteTask: _onDeleteTask,
@@ -625,6 +640,12 @@ export function TodaySchedule({
   onPlaybookEdit,
   onPlaybookDelete,
   onPlaybookSuppress,
+  getDomainForCalendar,
+  activeRules = [],
+  eventContextOverrides,
+  onUpdateEventContext,
+  dayType,
+  onDayTypeChange,
 }: TodayScheduleProps) {
   void _onCreateTask // Reserved - was used by ReviewSection
   void _onDeleteTask // Available for future inline delete
@@ -964,6 +985,18 @@ export function TodaySchedule({
         if (eventNote?.assignedTo) {
           item.assignedTo = eventNote.assignedTo
         }
+        // Resolve event context: override → calendar domain mapping → null
+        const contextOverride = eventContextOverrides?.get(eventId)
+        if (contextOverride) {
+          item.context = contextOverride
+        } else if (getDomainForCalendar) {
+          const calendarId = event.calendar_id || event.calendarId
+          const calendarName = event.calendar_name || event.calendarName
+          const resolved = getDomainForCalendar(calendarId, calendarName)
+          if (resolved) {
+            item.context = resolved
+          }
+        }
         // Check if event is completed via actionable_instances
         const instance = eventStatusMap.get(eventId)
         if (instance?.status === 'completed') {
@@ -1014,7 +1047,21 @@ export function TodaySchedule({
 
     const allItems = [...taskItems, ...eventItems, ...routineItems, ...playbookItems]
     return groupByDaySection(allItems)
-  }, [allFilteredTasks, filteredEvents, visibleRoutines, viewedDate, routineStatusMap, eventStatusMap, eventNotesMap, selectedAssignee, hideCoaching, playbookInstances])
+  }, [allFilteredTasks, filteredEvents, visibleRoutines, viewedDate, routineStatusMap, eventStatusMap, eventNotesMap, selectedAssignee, hideCoaching, playbookInstances, getDomainForCalendar, eventContextOverrides])
+
+  // Compute which items have coaching available (for sparkle indicator)
+  const coachingItemIds = useMemo(() => {
+    if (hideCoaching || activeRules.length === 0) return new Set<string>()
+    const ids = new Set<string>()
+    for (const section of Object.values(grouped)) {
+      for (const item of section) {
+        if (item.type !== 'playbook' && hasCoachingForItem(item, activeRules)) {
+          ids.add(item.id)
+        }
+      }
+    }
+    return ids
+  }, [grouped, activeRules, hideCoaching])
 
   const sections: DaySection[] = ['allday', 'morning', 'afternoon', 'evening', 'unscheduled']
 
@@ -1316,6 +1363,8 @@ export function TodaySchedule({
           tasks={allFilteredTasks}
           events={filteredEvents}
           playbookInstances={playbookInstances ?? []}
+          dayType={dayType}
+          onDayTypeChange={onDayTypeChange}
         />
       )}
 
@@ -1339,6 +1388,7 @@ export function TodaySchedule({
               <InboxSection
                 tasks={inboxTasks}
                 onUpdateTask={onUpdateTask}
+                onToggleWaiting={onToggleWaiting}
                 onPushTask={onPushTask}
                 onSelectTask={(taskId) => handleSelectItem(`task-${taskId}`)}
                 projects={projects}
@@ -1395,6 +1445,7 @@ export function TodaySchedule({
               selectedItemId={selectedItemId}
               onSelectTask={onSelectItem}
               onToggleTask={onToggleTask}
+              onToggleWaiting={onToggleWaiting}
               onPushTask={onPushTask}
               contactsMap={contactsMap}
               projectsMap={projectsMap}
@@ -1456,6 +1507,11 @@ export function TodaySchedule({
                               onCompleteEvent(eventId, !item.completed)
                             }
                           }}
+                          onToggleWaiting={
+                            item.type === 'task' && taskId && onToggleWaiting
+                              ? () => onToggleWaiting(taskId)
+                              : undefined
+                          }
                           onDefer={item.type === 'task' && taskId && onPushTask
                             ? (date: Date) => onPushTask(taskId, date)
                             : undefined
@@ -1499,6 +1555,11 @@ export function TodaySchedule({
                       item={item}
                       selected={selectedItemId === item.id}
                       onSelect={() => handleSelectItem(item.id)}
+                      onToggleWaiting={
+                        item.type === 'task' && taskId && onToggleWaiting
+                          ? () => onToggleWaiting(taskId)
+                          : undefined
+                      }
                       onToggleComplete={() => {
                         if (item.type === 'task' && taskId) {
                           handleToggleTaskWithFollowUp(taskId, !!item.completed)
@@ -1570,11 +1631,14 @@ export function TodaySchedule({
                           ? (context) => onUpdateTask(taskId, { context })
                           : item.type === 'routine' && onUpdateRoutine
                           ? (context) => onUpdateRoutine(item.id.replace('routine-', ''), { context })
+                          : item.type === 'event' && onUpdateEventContext
+                          ? (context) => onUpdateEventContext(item.id.replace('event-', ''), context ?? null)
                           : undefined
                       }
                       getScheduleItemsForDate={getScheduleItemsForDate}
                       panelOpen={panelOpen}
                       onClosePanel={onClosePanel}
+                      hasCoaching={coachingItemIds.has(item.id)}
                     />
                     {followUpTaskId === taskId && taskId && sourceTaskForFollowUp && (
                       <FollowUpInput
@@ -1632,6 +1696,7 @@ export function TodaySchedule({
                   key={task.id}
                   task={task}
                   onUpdate={(updates) => onUpdateTask(task.id, updates)}
+                  onToggleWaiting={onToggleWaiting ? () => onToggleWaiting(task.id) : undefined}
                   onSelect={() => handleSelectItem(`task-${task.id}`)}
                   onDefer={(date) => {
                     if (date && onPushTask) {

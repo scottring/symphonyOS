@@ -465,6 +465,54 @@ body {
 }
 
 /* =============================================================================
+   WAITING STATE - Amber clock indicator + long-press animation
+   ============================================================================= */
+
+.checkbox-waiting {
+  border-color: var(--color-amber-500, #f59e0b) !important;
+  background: var(--color-amber-50, #fffbeb) !important;
+}
+
+.checkbox-waiting svg {
+  color: var(--color-amber-600, #d97706);
+}
+
+/* Radial fill animation during long press */
+@keyframes long-press-fill {
+  from {
+    background: conic-gradient(
+      var(--color-amber-400, #fbbf24) 0deg,
+      transparent 0deg
+    );
+  }
+  to {
+    background: conic-gradient(
+      var(--color-amber-400, #fbbf24) 360deg,
+      transparent 360deg
+    );
+  }
+}
+
+.long-press-ring {
+  position: relative;
+}
+
+.long-press-ring::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  background: conic-gradient(
+    var(--color-amber-400, #fbbf24) 0deg,
+    transparent 0deg
+  );
+  animation: long-press-fill 1.5s linear forwards;
+  opacity: 0.4;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* =============================================================================
    PROGRESS BAR - Elegant, minimal
    ============================================================================= */
 

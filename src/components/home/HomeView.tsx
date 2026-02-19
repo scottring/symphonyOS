@@ -7,7 +7,8 @@ import type { List, ListCategory } from '@/types/list'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
-import type { PlaybookInstance, QuickReact } from '@/types/playbook'
+import type { PlaybookInstance, QuickReact, FamilyRule } from '@/types/playbook'
+import type { TaskContext } from '@/types/task'
 import { useHomeView } from '@/hooks/useHomeView'
 import { useMobile } from '@/hooks/useMobile'
 import { useUndo } from '@/hooks/useUndo'
@@ -28,6 +29,7 @@ interface HomeViewProps {
   selectedItemId: string | null
   onSelectItem: (id: string | null) => void
   onToggleTask: (taskId: string) => void
+  onToggleWaiting?: (taskId: string) => void
   onUpdateTask?: (id: string, updates: Partial<Task>) => void
   onPushTask?: (id: string, date: Date) => void
   onDeleteTask?: (id: string) => void
@@ -78,6 +80,17 @@ interface HomeViewProps {
   onPlaybookEdit?: (block: PlaybookInstance['block']) => void
   onPlaybookDelete?: (blockId: string) => void
   onPlaybookSuppress?: (blockId: string, date: string) => void
+  // Calendar domain mapping for event context resolution
+  getDomainForCalendar?: (calendarId?: string | null, calendarName?: string | null) => TaskContext | null
+  // Active coaching rules
+  activeRules?: FamilyRule[]
+  // Event context overrides
+  eventContextOverrides?: Map<string, TaskContext>
+  // Event context change handler
+  onUpdateEventContext?: (eventId: string, context: TaskContext | null) => void
+  // Day type override
+  dayType?: import('@/types/playbook').DayType
+  onDayTypeChange?: (dayType: import('@/types/playbook').DayType) => void
 }
 
 export function HomeView({
@@ -88,6 +101,7 @@ export function HomeView({
   selectedItemId,
   onSelectItem,
   onToggleTask,
+  onToggleWaiting,
   onUpdateTask,
   onPushTask,
   onDeleteTask,
@@ -136,6 +150,12 @@ export function HomeView({
   onPlaybookEdit,
   onPlaybookDelete,
   onPlaybookSuppress,
+  getDomainForCalendar,
+  activeRules,
+  eventContextOverrides,
+  onUpdateEventContext,
+  dayType,
+  onDayTypeChange,
 }: HomeViewProps) {
   const { currentView, setCurrentView } = useHomeView()
   const isMobile = useMobile()
@@ -341,6 +361,7 @@ export function HomeView({
           selectedItemId={selectedItemId}
           onSelectItem={onSelectItem}
           onToggleTask={handleToggleTaskWithUndo}
+          onToggleWaiting={onToggleWaiting}
           onUpdateTask={onUpdateTask}
           onPushTask={onPushTask}
           onDeleteTask={handleDeleteTaskWithUndo}
@@ -374,6 +395,7 @@ export function HomeView({
         selectedItemId={selectedItemId}
         onSelectItem={onSelectItem}
         onToggleTask={handleToggleTaskWithUndo}
+        onToggleWaiting={onToggleWaiting}
         onUpdateTask={onUpdateTask}
         onPushTask={onPushTask}
         onDeleteTask={handleDeleteTaskWithUndo}
@@ -429,6 +451,12 @@ export function HomeView({
         onPlaybookEdit={onPlaybookEdit}
         onPlaybookDelete={onPlaybookDelete}
         onPlaybookSuppress={onPlaybookSuppress}
+        getDomainForCalendar={getDomainForCalendar}
+        activeRules={activeRules}
+        eventContextOverrides={eventContextOverrides}
+        onUpdateEventContext={onUpdateEventContext}
+        dayType={dayType}
+        onDayTypeChange={onDayTypeChange}
       />
     )
   }

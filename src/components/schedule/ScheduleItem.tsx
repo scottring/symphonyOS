@@ -8,6 +8,7 @@ import { PushDropdown, SchedulePopover, ContextPicker, type ScheduleContextItem 
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
 import { Redo2 } from 'lucide-react'
 import { useMobile } from '@/hooks/useMobile'
+import { TaskCheckbox } from './TaskCheckbox'
 
 // Nordic Journal calendar icon - minimal, elegant design
 // Uses the event's context color (Work/Family/Personal) or falls back to primary teal-forest
@@ -92,6 +93,7 @@ interface ScheduleItemProps {
   selected?: boolean
   onSelect: () => void
   onToggleComplete: () => void
+  onToggleWaiting?: () => void
   onPush?: (date: Date) => void
   onSchedule?: (date: Date, isAllDay: boolean) => void
   onSkip?: () => void
@@ -118,6 +120,8 @@ interface ScheduleItemProps {
   // Panel state (for smart close behavior)
   panelOpen?: boolean
   onClosePanel?: () => void
+  // Coaching indicator
+  hasCoaching?: boolean
 }
 
 // Warm amber color tokens for overdue styling
@@ -148,6 +152,7 @@ export const ScheduleItem = memo(function ScheduleItem({
   selected,
   onSelect,
   onToggleComplete,
+  onToggleWaiting,
   onPush,
   onSchedule,
   onSkip,
@@ -168,6 +173,7 @@ export const ScheduleItem = memo(function ScheduleItem({
   getScheduleItemsForDate,
   panelOpen,
   onClosePanel,
+  hasCoaching,
 }: ScheduleItemProps) {
   const isMobile = useMobile()
   const isTask = item.type === 'task'
@@ -382,28 +388,16 @@ export const ScheduleItem = memo(function ScheduleItem({
               </button>
             ) : isActionable ? (
               // Tasks and routines show checkbox (square for tasks, circle for routines)
-              <button
-                onClick={handleCheckboxClick}
-                className="touch-target flex items-center justify-center -m-2 p-2"
-                aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
-              >
-                <span
-                  className={`
-                    w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors
-                    ${isRoutine ? 'rounded-full' : ''}
-                    ${item.completed
-                      ? 'bg-primary-500 border-primary-500 text-white'
-                      : 'border-neutral-300 hover:border-primary-400'
-                    }
-                  `}
-                >
-                  {item.completed && (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </span>
-              </button>
+              <TaskCheckbox
+                completed={item.completed}
+                isWaiting={isTask ? item.isWaiting : undefined}
+                onToggleComplete={() => handleCheckboxClick({ stopPropagation: () => {} } as React.MouseEvent)}
+                onToggleWaiting={() => {
+                  if (panelOpen && onClosePanel) onClosePanel()
+                  onToggleWaiting?.()
+                }}
+                isRoutine={isRoutine}
+              />
             ) : null}
           </div>
         )}
@@ -424,10 +418,18 @@ export const ScheduleItem = memo(function ScheduleItem({
             <span
               className={`
                 text-base font-medium line-clamp-2 transition-colors
-                ${item.completed || item.skipped ? 'line-through text-neutral-400' : 'text-neutral-800 group-hover:text-neutral-900'}
+                ${item.completed || item.skipped
+                  ? 'line-through text-neutral-400'
+                  : item.isWaiting
+                    ? 'text-amber-600/70 italic'
+                    : 'text-neutral-800 group-hover:text-neutral-900'
+                }
               `}
             >
               {item.title}
+              {item.isWaiting && !item.completed && (
+                <span className="ml-1.5 text-xs text-amber-500 not-italic font-normal">waiting</span>
+              )}
             </span>
             {/* Category chip - only show for non-task categories */}
             {item.category && item.category !== 'task' && (
@@ -437,6 +439,14 @@ export const ScheduleItem = memo(function ScheduleItem({
                 {item.category === 'event' && '📅'}
                 {item.category === 'activity' && '⚽'}
                 <span className="hidden sm:inline">{item.category}</span>
+              </span>
+            )}
+            {/* Coaching sparkle indicator */}
+            {hasCoaching && (
+              <span className="shrink-0 text-amber-400 opacity-60" title="Coaching tips available">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
+                </svg>
               </span>
             )}
             {/* Subtask indicator */}
@@ -483,7 +493,7 @@ export const ScheduleItem = memo(function ScheduleItem({
         )}
 
         {/* Context picker - hidden by default, shown on hover */}
-        {(isTask || isRoutine) && onContextChange && (
+        {(isTask || isRoutine || isEvent) && onContextChange && (
           <div
             className="shrink-0 opacity-0 md:group-hover:opacity-100 transition-opacity duration-200"
             onClick={(e) => {

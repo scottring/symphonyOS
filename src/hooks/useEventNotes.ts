@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { detectRecipeUrl } from '@/lib/recipeDetection'
+import type { TaskContext } from '@/types/task'
 
 export interface EventNote {
   id: string
@@ -13,6 +14,7 @@ export interface EventNote {
   projectId?: string | null // Linked project
   eventTitle?: string | null // Stored event title for display
   eventStartTime?: Date | null // Stored event start time for display
+  context?: TaskContext | null // Domain context override (work/family/personal)
   createdAt: Date
   updatedAt: Date
 }
@@ -28,6 +30,7 @@ interface DbEventNote {
   project_id: string | null
   event_title: string | null
   event_start_time: string | null
+  context: string | null
   created_at: string
   updated_at: string
 }
@@ -43,6 +46,7 @@ function dbNoteToEventNote(dbNote: DbEventNote): EventNote {
     projectId: dbNote.project_id,
     eventTitle: dbNote.event_title,
     eventStartTime: dbNote.event_start_time ? new Date(dbNote.event_start_time) : null,
+    context: dbNote.context as TaskContext | null,
     createdAt: new Date(dbNote.created_at),
     updatedAt: new Date(dbNote.updated_at),
   }
@@ -487,6 +491,53 @@ export function useEventNotes() {
     }
   }, [user, notes])
 
+  // Update context override for an event
+  const updateEventContext = useCallback(async (googleEventId: string, context: TaskContext | null) => {
+    if (!user) return
+
+    // Optimistic update
+    const existingNote = notes.get(googleEventId)
+    const optimistic: EventNote = existingNote
+      ? { ...existingNote, context }
+      : {
+          id: '',
+          googleEventId,
+          notes: null,
+          assignedToAll: [],
+          context,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }
+    setNotes((prev) => new Map(prev).set(googleEventId, optimistic))
+
+    const { data, error: upsertError } = await supabase
+      .from('event_notes')
+      .upsert(
+        {
+          user_id: user.id,
+          google_event_id: googleEventId,
+          context,
+        },
+        { onConflict: 'user_id,google_event_id' }
+      )
+      .select()
+      .single()
+
+    if (upsertError) {
+      // Revert on error
+      if (existingNote) {
+        setNotes((prev) => new Map(prev).set(googleEventId, existingNote))
+      }
+      setError(upsertError.message)
+      return
+    }
+
+    if (data) {
+      const realNote = dbNoteToEventNote(data as DbEventNote)
+      setNotes((prev) => new Map(prev).set(googleEventId, realNote))
+    }
+  }, [user, notes])
+
   // Get event notes linked to a specific project
   const getEventNotesForProject = useCallback(async (projectId: string): Promise<EventNote[]> => {
     if (!user) return []
@@ -533,5 +584,6 @@ export function useEventNotes() {
     deleteNote,
     getNote,
     getEventNotesForProject,
+    updateEventContext,
   }
 }

@@ -21,6 +21,7 @@ interface CascadingRiverViewProps {
   selectedItemId: string | null
   onSelectItem: (id: string | null) => void
   onToggleTask: (taskId: string) => void
+  onToggleWaiting?: (taskId: string) => void
   onUpdateTask?: (id: string, updates: Partial<Task>) => void
   onPushTask?: (id: string, date: Date) => void
   onDeleteTask?: (id: string) => void
@@ -540,6 +541,7 @@ export function CascadingRiverView({
   selectedItemId,
   onSelectItem,
   onToggleTask,
+  onToggleWaiting: _onToggleWaiting,
   viewedDate,
   onDateChange,
   contactsMap,

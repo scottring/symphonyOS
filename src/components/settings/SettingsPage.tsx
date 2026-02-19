@@ -14,7 +14,6 @@ import type { CreateBlockInput } from '@/types/playbook'
 interface SettingsPageProps {
   onBack: () => void
   onFamilyMembersChanged?: () => void
-  onNavigateToLayer?: (layerId: string) => void
   onImportBlocks?: (blocks: CreateBlockInput[]) => Promise<void>
 }
 
@@ -95,7 +94,6 @@ function generateInitials(name: string): string {
 export function SettingsPage({
   onBack,
   onFamilyMembersChanged,
-  onNavigateToLayer,
   onImportBlocks,
 }: SettingsPageProps) {
   const { members, addMember, updateMember, deleteMember } = useFamilyMembers()
@@ -526,23 +524,17 @@ export function SettingsPage({
                     return (
                       <div
                         key={layer.id}
-                        className="w-full text-left p-5 bg-white rounded-xl border border-neutral-150 hover:border-primary-200 hover:shadow-sm transition-all group"
+                        className="w-full text-left p-5 bg-white rounded-xl border border-neutral-150 transition-all"
                       >
                         <div className="flex items-start gap-4">
-                          <button
-                            onClick={() => onNavigateToLayer?.(layer.slug)}
-                            className={`w-10 h-10 rounded-lg ${config.bgColor} flex items-center justify-center shrink-0`}
-                          >
+                          <div className={`w-10 h-10 rounded-lg ${config.bgColor} flex items-center justify-center shrink-0`}>
                             <svg xmlns="http://www.w3.org/2000/svg" className={`w-5 h-5 ${config.color}`} viewBox="0 0 20 20" fill="currentColor">
                               <path d="M10.75 16.82A7.462 7.462 0 0115 15.5c.71 0 1.396.098 2.046.282A.75.75 0 0018 15.06v-11a.75.75 0 00-.546-.721A9.006 9.006 0 0015 3a8.963 8.963 0 00-4.25 1.065V16.82zM9.25 4.065A8.963 8.963 0 005 3c-.85 0-1.673.118-2.454.339A.75.75 0 002 4.06v11a.75.75 0 00.954.721A7.506 7.506 0 015 15.5c1.579 0 3.042.487 4.25 1.32V4.065z" />
                             </svg>
-                          </button>
-                          <button
-                            onClick={() => onNavigateToLayer?.(layer.slug)}
-                            className="flex-1 min-w-0 text-left"
-                          >
+                          </div>
+                          <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <h3 className="font-semibold text-neutral-800 group-hover:text-primary-700 transition-colors">{layer.name}</h3>
+                              <h3 className="font-semibold text-neutral-800">{layer.name}</h3>
                               <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
                                 isActive ? 'text-green-700 bg-green-100' : 'text-neutral-500 bg-neutral-100'
                               }`}>
@@ -552,11 +544,10 @@ export function SettingsPage({
                             <p className="text-sm text-neutral-500 leading-relaxed">
                               {layer.description || `${layer.name} intelligence layer`}
                             </p>
-                          </button>
+                          </div>
                           {/* Activate/Deactivate toggle */}
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation()
+                            onClick={() => {
                               if (isActive) {
                                 deactivateLayer(layer.id)
                               } else {

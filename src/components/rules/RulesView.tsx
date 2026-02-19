@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import type { FamilyRule, Responsibility } from '@/types/playbook'
+import { getAllCoachingSections } from '@/config/layers'
 import type { LayerRuleCategoryConfig } from '@/config/layers'
 
 interface RulesViewProps {
@@ -23,6 +24,7 @@ interface RulesViewProps {
   description?: string
   layerLabel?: string
   categories?: LayerRuleCategoryConfig[]
+  crossLayerMode?: boolean
 }
 
 export function RulesView({
@@ -38,6 +40,7 @@ export function RulesView({
   description = 'Coaching guidance for everyday moments',
   layerLabel,
   categories,
+  crossLayerMode,
 }: RulesViewProps) {
   const [showAddForm, setShowAddForm] = useState(false)
   const [newRule, setNewRule] = useState('')
@@ -57,13 +60,64 @@ export function RulesView({
   const activeRules = rules.filter(r => r.status === 'active')
   const retiredRules = rules.filter(r => r.status === 'paused' || r.status === 'retired')
 
-  // Group active rules by category
+  // Group active rules by category (or by layer→category in cross-layer mode)
   const groupedRules = useMemo(() => {
+    if (crossLayerMode) {
+      // Cross-layer: group by layer section, then by category within each
+      const sections = getAllCoachingSections()
+      const groups: { slug: string; label: string; sectionLabel?: string; rules: FamilyRule[] }[] = []
+
+      for (const section of sections) {
+        const sectionRules = activeRules.filter(r => r.layerId && r.layerId === section.slug)
+        // Also match by category slug belonging to this section
+        const sectionCategorySlugs = new Set(section.ruleCategories.map(c => c.slug))
+        const sectionRulesByCategory = activeRules.filter(r =>
+          !r.layerId && r.category && sectionCategorySlugs.has(r.category)
+        )
+        const allSectionRules = [...sectionRules, ...sectionRulesByCategory]
+        // Deduplicate
+        const seen = new Set<string>()
+        const deduped = allSectionRules.filter(r => {
+          if (seen.has(r.id)) return false
+          seen.add(r.id)
+          return true
+        })
+
+        if (deduped.length === 0) continue
+
+        const sorted = [...section.ruleCategories].sort((a, b) => a.sortOrder - b.sortOrder)
+        for (const cat of sorted) {
+          const catRules = deduped.filter(r => r.category === cat.slug)
+          if (catRules.length > 0) {
+            groups.push({ slug: `${section.slug}-${cat.slug}`, label: cat.label, sectionLabel: section.name, rules: catRules })
+          }
+        }
+        // Uncategorized within this section
+        const uncategorized = deduped.filter(r => !r.category || !sorted.some(c => c.slug === r.category))
+        if (uncategorized.length > 0) {
+          groups.push({ slug: `${section.slug}-uncategorized`, label: 'Other', sectionLabel: section.name, rules: uncategorized })
+        }
+      }
+
+      // Rules not belonging to any layer
+      const allLayerSlugs = new Set(sections.map(s => s.slug))
+      const allCategorySlugs = new Set(sections.flatMap(s => s.ruleCategories.map(c => c.slug)))
+      const orphanRules = activeRules.filter(r =>
+        (!r.layerId || !allLayerSlugs.has(r.layerId)) &&
+        (!r.category || !allCategorySlugs.has(r.category))
+      )
+      if (orphanRules.length > 0) {
+        groups.push({ slug: 'uncategorized', label: 'Uncategorized', rules: orphanRules })
+      }
+
+      return groups
+    }
+
     if (!categories || categories.length === 0) {
       return [{ slug: '', label: '', rules: activeRules }]
     }
 
-    const groups: { slug: string; label: string; rules: FamilyRule[] }[] = []
+    const groups: { slug: string; label: string; sectionLabel?: string; rules: FamilyRule[] }[] = []
     const sorted = [...categories].sort((a, b) => a.sortOrder - b.sortOrder)
 
     for (const cat of sorted) {
@@ -80,7 +134,7 @@ export function RulesView({
     }
 
     return groups
-  }, [activeRules, categories])
+  }, [activeRules, categories, crossLayerMode])
 
   const handleAddRule = async () => {
     if (!newRule.trim()) return
@@ -198,9 +252,9 @@ export function RulesView({
           <div className="space-y-8">
             {groupedRules.map((group) => (
               <section key={group.slug || 'uncategorized'}>
-                {group.label && categories && categories.length > 0 && (
+                {(group.label && (categories && categories.length > 0 || crossLayerMode)) && (
                   <h2 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3">
-                    {group.label}
+                    {group.sectionLabel ? `${group.sectionLabel} — ${group.label}` : group.label}
                   </h2>
                 )}
 
