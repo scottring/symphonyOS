@@ -19,6 +19,7 @@ export interface PlaybookBlock {
   templateId?: string | null
   layerId?: string | null
   sourceRuleIds?: string[]
+  sourceItemRef?: { type: 'task' | 'event' | 'routine'; id: string } | null
   visibility?: 'self' | 'family' | 'shared'
   timeSlot: string       // "6:50" or "5:30-6:45"
   label: string
@@ -43,6 +44,18 @@ export interface CreateBlockInput {
   dayTypes: DayType[]
   sortOrder?: number
   templateId?: string | null
+  sourceItemRef?: { type: 'task' | 'event' | 'routine'; id: string } | null
+}
+
+export interface CoachingBlockSuggestion {
+  label: string
+  blockType: BlockType
+  timeSlot: string
+  narrative: string
+  coachingNote?: string
+  items: Omit<PlaybookItem, 'id'>[]
+  dayTypes: DayType[]
+  sourceRuleIds?: string[]
 }
 
 export interface UpdateBlockInput {

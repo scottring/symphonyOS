@@ -19,6 +19,7 @@ function rowToBlock(row: Record<string, unknown>): PlaybookBlock {
     templateId: row.template_id as string | null,
     layerId: row.layer_id as string | null,
     sourceRuleIds: (row.source_rule_ids || []) as string[],
+    sourceItemRef: row.source_item_ref as PlaybookBlock['sourceItemRef'] ?? null,
     visibility: (row.visibility || 'self') as PlaybookBlock['visibility'],
     timeSlot: row.time_slot as string,
     label: row.label as string,
@@ -231,7 +232,7 @@ export function usePlaybook() {
 
     const maxSort = blocks.length > 0 ? Math.max(...blocks.map(b => b.sortOrder)) + 1 : 0
 
-    const row = {
+    const row: Record<string, unknown> = {
       user_id: user.id,
       template_id: input.templateId || null,
       time_slot: input.timeSlot,
@@ -242,6 +243,9 @@ export function usePlaybook() {
       items: input.items.map((item, i) => ({ ...item, id: `item-${Date.now()}-${i}` })),
       day_types: input.dayTypes,
       sort_order: input.sortOrder ?? maxSort,
+    }
+    if (input.sourceItemRef) {
+      row.source_item_ref = input.sourceItemRef
     }
 
     const { data, error } = await supabase
@@ -359,6 +363,13 @@ export function usePlaybook() {
     })
   }, [])
 
+  // Find block linked to a specific timeline item via sourceItemRef
+  const findBlockForItem = useCallback((itemType: string, itemId: string): PlaybookBlock | undefined => {
+    return blocks.find(b =>
+      b.sourceItemRef?.type === itemType && b.sourceItemRef?.id === itemId
+    )
+  }, [blocks])
+
   // Joined instances with their blocks
   const instancesWithBlocks = useMemo(() => {
     const blockMap = new Map(blocks.map(b => [b.id, b]))
@@ -405,6 +416,7 @@ export function usePlaybook() {
     tagBlock,
     noteBlock,
     toggleItem,
+    findBlockForItem,
     seedFallbackBlocks,
   }
 }

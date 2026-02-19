@@ -21,9 +21,10 @@ import type { FamilyMember } from '@/types/family'
 import { TaskQuickActions, type ScheduleContextItem } from '@/components/triage'
 import { TiptapEditor } from '@/components/notes/TiptapEditor'
 import { NotesEditorModal } from '@/components/notes/NotesEditorModal'
-import type { FamilyRule } from '@/types/playbook'
+import type { FamilyRule, PlaybookBlock, CreateBlockInput, UpdateBlockInput } from '@/types/playbook'
 import { getCoachingForItem } from '@/lib/coachingMatcher'
 import { CoachingTipsSection } from './CoachingTipsSection'
+import { CoachingActionsSection } from './CoachingActionsSection'
 
 // Component to render text with clickable links (handles HTML links and plain URLs)
 function RichText({ text }: { text: string }) {
@@ -149,6 +150,11 @@ interface DetailPanelRedesignProps {
   // Coaching tips
   activeRules?: FamilyRule[]
   hideCoaching?: boolean
+  // Coaching injection
+  blocks?: PlaybookBlock[]
+  onAddBlock?: (input: CreateBlockInput) => Promise<PlaybookBlock | null>
+  onUpdateBlock?: (id: string, updates: UpdateBlockInput) => Promise<void>
+  onOpenBlockEditor?: (prefill: Partial<PlaybookBlock>) => void
 }
 
 function ActionIcon({ type }: { type: DetectedAction['icon'] }) {
@@ -522,6 +528,10 @@ export function DetailPanelRedesign({
   getScheduleItemsForDate,
   activeRules = [],
   hideCoaching = false,
+  blocks,
+  onAddBlock,
+  onUpdateBlock,
+  onOpenBlockEditor,
 }: DetailPanelRedesignProps) {
   // Coaching matches for the current item
   const coachingMatches = useMemo(() => {
@@ -2015,6 +2025,19 @@ export function DetailPanelRedesign({
 
         {/* Coaching Tips - contextual coaching rules for this item */}
         <CoachingTipsSection matches={coachingMatches} />
+
+        {/* Coaching Actions - AI-powered coaching injection */}
+        {!hideCoaching && item && onAddBlock && onUpdateBlock && onOpenBlockEditor && (
+          <CoachingActionsSection
+            item={item}
+            matches={coachingMatches}
+            blocks={blocks ?? []}
+            onAddBlock={onAddBlock}
+            onUpdateBlock={onUpdateBlock}
+            onOpenBlockEditor={onOpenBlockEditor}
+            hideCoaching={hideCoaching}
+          />
+        )}
 
         {/* ========================================
             ZONE 4: LINKED TASKS (Prep & Follow-up)

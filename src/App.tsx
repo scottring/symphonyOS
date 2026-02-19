@@ -1399,6 +1399,21 @@ function App() {
             eventProjectId={selectedEventProjectId}
             onUpdateEventProject={updateEventProject}
             activeRules={familyRules.rules.filter(r => r.status === 'active')}
+            blocks={playbook.blocks}
+            onAddBlock={async (input) => {
+              const block = await playbook.addBlock(input)
+              if (block) {
+                const dateStr = new Date().toISOString().split('T')[0]
+                await playbook.fetchInstancesForDate(dateStr)
+              }
+              return block
+            }}
+            onUpdateBlock={async (id, updates) => {
+              await playbook.updateBlock(id, updates)
+              const dateStr = new Date().toISOString().split('T')[0]
+              await playbook.fetchInstancesForDate(dateStr)
+            }}
+            onOpenBlockEditor={(prefill) => setTimelineEditingBlock(prefill as import('@/types/playbook').PlaybookBlock)}
           />
         )
       }
