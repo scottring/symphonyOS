@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useMemo, useEffect, type TouchEvent } from 'react'
+import { useRef, useState, useCallback, useMemo, useEffect, memo, type TouchEvent } from 'react'
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
 import { formatTime } from '@/lib/timeUtils'
@@ -25,7 +25,7 @@ const COMPLETE_THRESHOLD = 80
 const ACTION_THRESHOLD = 60
 const RESISTANCE = 0.4
 
-export function SwipeableCard({
+export const SwipeableCard = memo(function SwipeableCard({
   item,
   selected,
   onComplete,
@@ -328,4 +328,4 @@ export function SwipeableCard({
       </div>
     </div>
   )
-}
+})

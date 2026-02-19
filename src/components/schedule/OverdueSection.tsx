@@ -4,6 +4,7 @@ import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
 import { ScheduleItem } from './ScheduleItem'
 import { SwipeableCard } from './SwipeableCard'
+import { FollowUpInput } from './FollowUpInput'
 import { taskToTimelineItem } from '@/types/timeline'
 import { formatOverdueDate } from '@/lib/timeUtils'
 import { useMobile } from '@/hooks/useMobile'
@@ -18,6 +19,11 @@ interface OverdueSectionProps {
   projectsMap?: Map<string, Project>
   familyMembers?: FamilyMember[]
   onAssignTask?: (taskId: string, memberId: string | null) => void
+  // Follow-up support
+  followUpTaskId?: string | null
+  onToggleWithFollowUp?: (taskId: string, wasCompleted: boolean) => void
+  onFollowUpSubmit?: (title: string, sourceTaskId: string) => void
+  onFollowUpDismiss?: () => void
 }
 
 // Warm amber color for overdue header
@@ -35,17 +41,33 @@ export function OverdueSection({
   projectsMap,
   familyMembers = [],
   onAssignTask,
+  followUpTaskId,
+  onToggleWithFollowUp,
+  onFollowUpSubmit,
+  onFollowUpDismiss,
 }: OverdueSectionProps) {
   const isMobile = useMobile()
 
   if (tasks.length === 0) return null
 
-  // Sort by oldest first (most overdue at top)
+  const incompleteCount = tasks.filter(t => !t.completed).length
+
+  // Sort: incomplete first (oldest at top), then completed at bottom
   const sortedTasks = [...tasks].sort((a, b) => {
+    if (a.completed !== b.completed) return a.completed ? 1 : -1
     const dateA = a.scheduledFor ? new Date(a.scheduledFor).getTime() : 0
     const dateB = b.scheduledFor ? new Date(b.scheduledFor).getTime() : 0
     return dateA - dateB
   })
+
+  // Use the follow-up aware handler if available, otherwise fall back
+  const handleToggle = (taskId: string, wasCompleted: boolean) => {
+    if (onToggleWithFollowUp) {
+      onToggleWithFollowUp(taskId, wasCompleted)
+    } else {
+      onToggleTask(taskId)
+    }
+  }
 
   return (
     <div
@@ -65,7 +87,7 @@ export function OverdueSection({
             clipRule="evenodd"
           />
         </svg>
-        Overdue ({tasks.length})
+        Overdue{incompleteCount > 0 ? ` (${incompleteCount})` : ''}
       </h3>
 
       {/* Overdue task items */}
@@ -82,13 +104,46 @@ export function OverdueSection({
           // Use SwipeableCard on mobile for better touch interactions
           if (isMobile) {
             return (
-              <SwipeableCard
-                key={task.id}
+              <div key={task.id}>
+                <SwipeableCard
+                  item={item}
+                  selected={selectedItemId === `task-${task.id}`}
+                  onSelect={() => onSelectTask(`task-${task.id}`)}
+                  onComplete={() => handleToggle(taskId, !!task.completed)}
+                  onDefer={onPushTask ? (date: Date) => onPushTask(taskId, date) : undefined}
+                  familyMembers={familyMembers}
+                  assignedTo={task.assignedTo}
+                  onAssign={
+                    onAssignTask
+                      ? (memberId) => onAssignTask(taskId, memberId)
+                      : undefined
+                  }
+                  onOpenDetail={() => onSelectTask(`task-${task.id}`)}
+                />
+                {followUpTaskId === taskId && onFollowUpSubmit && onFollowUpDismiss && (
+                  <FollowUpInput
+                    sourceTask={task}
+                    onSubmit={(title) => onFollowUpSubmit(title, taskId)}
+                    onDismiss={onFollowUpDismiss}
+                    projectName={projectName || undefined}
+                  />
+                )}
+              </div>
+            )
+          }
+
+          // Desktop view - use ScheduleItem
+          return (
+            <div key={task.id}>
+              <ScheduleItem
                 item={item}
                 selected={selectedItemId === `task-${task.id}`}
                 onSelect={() => onSelectTask(`task-${task.id}`)}
-                onComplete={() => onToggleTask(taskId)}
-                onDefer={onPushTask ? (date: Date) => onPushTask(taskId, date) : undefined}
+                onToggleComplete={() => handleToggle(taskId, !!task.completed)}
+                onPush={onPushTask ? (date: Date) => onPushTask(taskId, date) : undefined}
+                contactName={contactName || undefined}
+                projectName={projectName || undefined}
+                projectId={task.projectId || undefined}
                 familyMembers={familyMembers}
                 assignedTo={task.assignedTo}
                 onAssign={
@@ -96,33 +151,18 @@ export function OverdueSection({
                     ? (memberId) => onAssignTask(taskId, memberId)
                     : undefined
                 }
-                onOpenDetail={() => onSelectTask(`task-${task.id}`)}
+                isOverdue={!task.completed}
+                overdueLabel={task.completed ? undefined : overdueLabel}
               />
-            )
-          }
-
-          // Desktop view - use ScheduleItem
-          return (
-            <ScheduleItem
-              key={task.id}
-              item={item}
-              selected={selectedItemId === `task-${task.id}`}
-              onSelect={() => onSelectTask(`task-${task.id}`)}
-              onToggleComplete={() => onToggleTask(taskId)}
-              onPush={onPushTask ? (date: Date) => onPushTask(taskId, date) : undefined}
-              contactName={contactName || undefined}
-              projectName={projectName || undefined}
-              projectId={task.projectId || undefined}
-              familyMembers={familyMembers}
-              assignedTo={task.assignedTo}
-              onAssign={
-                onAssignTask
-                  ? (memberId) => onAssignTask(taskId, memberId)
-                  : undefined
-              }
-              isOverdue
-              overdueLabel={overdueLabel}
-            />
+              {followUpTaskId === taskId && onFollowUpSubmit && onFollowUpDismiss && (
+                <FollowUpInput
+                  sourceTask={task}
+                  onSubmit={(title) => onFollowUpSubmit(title, taskId)}
+                  onDismiss={onFollowUpDismiss}
+                  projectName={projectName || undefined}
+                />
+              )}
+            </div>
           )
         })}
       </div>

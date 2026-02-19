@@ -1,8 +1,9 @@
 import type { Task, TaskLink, TaskCategory } from './task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, RecurrencePattern } from './actionable'
+import type { PlaybookInstance } from './playbook'
 
-export type TimelineItemType = 'task' | 'event' | 'routine'
+export type TimelineItemType = 'task' | 'event' | 'routine' | 'playbook'
 
 export interface TimelineItem {
   id: string
@@ -38,6 +39,8 @@ export interface TimelineItem {
   originalTask?: Task
   originalEvent?: CalendarEvent
   originalRoutine?: Routine
+  // Playbook-specific
+  originalPlaybookInstance?: PlaybookInstance
 }
 
 export type TimeSection = 'now' | 'soon' | 'later' | 'unscheduled'
@@ -100,6 +103,47 @@ export function eventToTimelineItem(event: CalendarEvent): TimelineItem {
     calendarName: calendarName || undefined,
     calendarColor: calendarColor || undefined,
     originalEvent: event,
+  }
+}
+
+/**
+ * Convert a PlaybookInstance (with joined block) to a TimelineItem.
+ * Parses the block's timeSlot to get a start time for sorting.
+ */
+export function playbookInstanceToTimelineItem(instance: PlaybookInstance, date: Date): TimelineItem {
+  const block = instance.block
+  if (!block) {
+    return {
+      id: `playbook-${instance.id}`,
+      type: 'playbook',
+      title: 'Unknown block',
+      startTime: null,
+      endTime: null,
+      completed: instance.completed,
+      originalPlaybookInstance: instance,
+    }
+  }
+
+  // Parse timeSlot: "6:50" or "5:30-6:45" or "15:30"
+  let startTime: Date | null = null
+  const timeStr = block.timeSlot.split('-')[0].trim()
+  const match = timeStr.match(/^(\d{1,2}):(\d{2})$/)
+  if (match) {
+    const hours = parseInt(match[1], 10)
+    const minutes = parseInt(match[2], 10)
+    startTime = new Date(date)
+    startTime.setHours(hours, minutes, 0, 0)
+  }
+
+  return {
+    id: `playbook-${instance.id}`,
+    type: 'playbook',
+    title: block.label,
+    startTime,
+    endTime: null,
+    completed: instance.completed,
+    context: 'family', // Playbook blocks are always family context
+    originalPlaybookInstance: instance,
   }
 }
 

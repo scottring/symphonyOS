@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
 import type { TaskContext } from '@/types/task'
@@ -142,7 +143,7 @@ const contextColors = {
   },
 }
 
-export function ScheduleItem({
+export const ScheduleItem = memo(function ScheduleItem({
   item,
   selected,
   onSelect,
@@ -600,4 +601,4 @@ export function ScheduleItem({
       )}
     </div>
   )
-}
+})

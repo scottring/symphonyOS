@@ -1,0 +1,200 @@
+import Foundation
+import SwiftData
+import SwiftUI
+
+/// Builds the blended timeline for a given date from tasks, routines, and playbook blocks.
+@Observable
+final class TimelineViewModel {
+    var timelineItems: [TimelineItem] = []
+    var inboxTasks: [SymphonyTask] = []
+
+    enum TimeSection: String, CaseIterable {
+        case morning = "Morning"
+        case afternoon = "Afternoon"
+        case evening = "Evening"
+        case allDay = "All Day"
+    }
+
+    func buildTimeline(
+        tasks: [SymphonyTask],
+        routines: [Routine],
+        instances: [ActionableInstance],
+        playbookBlocks: [PlaybookBlock],
+        playbookInstances: [PlaybookInstance],
+        date: Date,
+        domainFilter: DomainFilter,
+        showCoaching: Bool
+    ) {
+        var items: [TimelineItem] = []
+        var inbox: [SymphonyTask] = []
+
+        let cal = Calendar.current
+        let startOfDay = cal.startOfDay(for: date)
+
+        // Tasks scheduled for this date
+        for task in tasks {
+            // Apply domain filter
+            if let contextValue = domainFilter.contextValue, task.context != contextValue { continue }
+
+            // Skip subtasks (they show under parent)
+            if task.parentTaskId != nil { continue }
+
+            guard let scheduled = task.scheduledFor,
+                  cal.isDate(scheduled, inSameDayAs: date) else {
+                // Unscheduled, not someday → inbox
+                if task.scheduledFor == nil && !task.isSomeday && !task.completed {
+                    if let contextValue = domainFilter.contextValue {
+                        if task.context == contextValue { inbox.append(task) }
+                    } else {
+                        inbox.append(task)
+                    }
+                }
+                continue
+            }
+
+            items.append(TimelineItem(
+                id: "task-\(task.id.uuidString)",
+                type: .task,
+                title: task.title,
+                startTime: task.isAllDay ? nil : task.scheduledFor,
+                isAllDay: task.isAllDay,
+                completed: task.completed,
+                context: task.context,
+                entityId: task.id
+            ))
+        }
+
+        // Routines that should appear today
+        for routine in routines {
+            if let contextValue = domainFilter.contextValue, routine.context != contextValue { continue }
+            guard shouldShowRoutine(routine, on: date) else { continue }
+
+            // Check if there's an instance for this routine+date
+            let instanceStatus = instances.first {
+                $0.entityType == "routine" && $0.entityId == routine.id.uuidString &&
+                cal.isDate($0.date, inSameDayAs: date)
+            }?.status
+
+            let startTime: Date? = {
+                guard let timeStr = routine.timeOfDay else { return nil }
+                let parts = timeStr.split(separator: ":").compactMap { Int($0) }
+                guard parts.count >= 2 else { return nil }
+                return cal.date(bySettingHour: parts[0], minute: parts[1], second: 0, of: startOfDay)
+            }()
+
+            items.append(TimelineItem(
+                id: "routine-\(routine.id.uuidString)",
+                type: .routine,
+                title: routine.name,
+                startTime: startTime,
+                isAllDay: false,
+                completed: instanceStatus == "completed",
+                context: routine.context,
+                entityId: routine.id
+            ))
+        }
+
+        // Playbook blocks (if coaching is ON)
+        if showCoaching {
+            let dayType = date.isWeekend ? "weekend" : "school-day"
+
+            for block in playbookBlocks {
+                guard block.dayTypes.contains(dayType) else { continue }
+
+                // Check for instance
+                let instance = playbookInstances.first {
+                    $0.blockId == block.id && cal.isDate($0.date, inSameDayAs: date)
+                }
+
+                let startTime: Date? = {
+                    let timeStr = block.timeSlot.split(separator: "-").first.map(String.init) ?? block.timeSlot
+                    let parts = timeStr.trimmingCharacters(in: .whitespaces).split(separator: ":").compactMap { Int($0) }
+                    guard parts.count >= 2 else { return nil }
+                    return cal.date(bySettingHour: parts[0], minute: parts[1], second: 0, of: startOfDay)
+                }()
+
+                items.append(TimelineItem(
+                    id: "playbook-\(block.id.uuidString)",
+                    type: .playbook,
+                    title: block.label,
+                    startTime: startTime,
+                    isAllDay: false,
+                    completed: instance?.completed ?? false,
+                    context: "family",
+                    entityId: block.id,
+                    blockType: block.blockType
+                ))
+            }
+        }
+
+        // Sort: all-day first, then by time, then untimed
+        items.sort { a, b in
+            if a.isAllDay && !b.isAllDay { return true }
+            if !a.isAllDay && b.isAllDay { return false }
+            guard let aTime = a.startTime, let bTime = b.startTime else {
+                return a.startTime != nil
+            }
+            return aTime < bTime
+        }
+
+        self.timelineItems = items
+        self.inboxTasks = inbox
+    }
+
+    func section(for item: TimelineItem) -> TimeSection {
+        guard !item.isAllDay else { return .allDay }
+        guard let time = item.startTime else { return .morning }
+        let hour = Calendar.current.component(.hour, from: time)
+        if hour < 12 { return .morning }
+        if hour < 17 { return .afternoon }
+        return .evening
+    }
+
+    private func shouldShowRoutine(_ routine: Routine, on date: Date) -> Bool {
+        guard routine.visibility == "active" else { return false }
+
+        let pattern = routine.recurrencePattern
+        switch pattern.type {
+        case "daily":
+            return true
+        case "weekly":
+            guard let days = pattern.days else { return false }
+            return days.contains(date.dayOfWeek)
+        case "monthly":
+            if let dom = pattern.dayOfMonth {
+                return Calendar.current.component(.day, from: date) == dom
+            }
+            return false
+        default:
+            return false
+        }
+    }
+}
+
+// MARK: - Timeline Item
+
+struct TimelineItem: Identifiable {
+    let id: String
+    let type: ItemType
+    let title: String
+    let startTime: Date?
+    let isAllDay: Bool
+    var completed: Bool
+    let context: String?
+    let entityId: UUID
+    var blockType: String? = nil
+
+    enum ItemType: String {
+        case task
+        case routine
+        case event
+        case playbook
+    }
+
+    var timeString: String? {
+        guard let time = startTime else { return nil }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a"
+        return formatter.string(from: time)
+    }
+}

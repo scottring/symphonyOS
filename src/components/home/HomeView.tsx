@@ -7,6 +7,7 @@ import type { List, ListCategory } from '@/types/list'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
+import type { PlaybookInstance, QuickReact } from '@/types/playbook'
 import { useHomeView } from '@/hooks/useHomeView'
 import { useMobile } from '@/hooks/useMobile'
 import { useUndo } from '@/hooks/useUndo'
@@ -60,12 +61,20 @@ interface HomeViewProps {
   onPushEvent?: (eventId: string, date: Date) => void
   onOpenPlanning?: () => void
   onCreateTask?: (title: string) => void
+  onCreateFollowUp?: (title: string, sourceTaskId: string) => void
   onAddProject?: (project: { name: string }) => Promise<Project | null>
   // List picker props
   lists?: List[]
   listsByCategory?: Record<ListCategory, List[]>
   onSendToList?: (taskId: string, listId: string) => void
   onCreateList?: (title: string, category: ListCategory) => Promise<string | null>
+  // Playbook coaching
+  playbookInstances?: PlaybookInstance[]
+  onPlaybookToggleItem?: (instanceId: string, itemId: string) => void
+  onPlaybookMarkDone?: (instanceId: string, completed?: boolean) => void
+  onPlaybookReact?: (instanceId: string, react: QuickReact | null) => void
+  onPlaybookTag?: (instanceId: string, tags: string[]) => void
+  onPlaybookNote?: (instanceId: string, notes: string | null) => void
 }
 
 export function HomeView({
@@ -109,11 +118,18 @@ export function HomeView({
   onPushEvent,
   onOpenPlanning,
   onCreateTask,
+  onCreateFollowUp,
   onAddProject,
   lists = [],
   listsByCategory,
   onSendToList,
   onCreateList,
+  playbookInstances,
+  onPlaybookToggleItem,
+  onPlaybookMarkDone,
+  onPlaybookReact,
+  onPlaybookTag,
+  onPlaybookNote,
 }: HomeViewProps) {
   const { currentView, setCurrentView } = useHomeView()
   const isMobile = useMobile()
@@ -385,6 +401,7 @@ export function HomeView({
         onPushEvent={onPushEvent}
         onOpenPlanning={onOpenPlanning}
         onCreateTask={onCreateTask}
+        onCreateFollowUp={onCreateFollowUp}
         onAddProject={onAddProject}
         selectedAssignee={selectedAssigneeForSchedule}
         onSelectAssignee={(id) => setSelectedAssignees(id ? [id] : [])}
@@ -397,6 +414,12 @@ export function HomeView({
         onUpdateTasksBulk={handleUpdateTasksBulk}
         panelOpen={selectedItemId !== null}
         onClosePanel={() => onSelectItem(null)}
+        playbookInstances={playbookInstances}
+        onPlaybookToggleItem={onPlaybookToggleItem}
+        onPlaybookMarkDone={onPlaybookMarkDone}
+        onPlaybookReact={onPlaybookReact}
+        onPlaybookTag={onPlaybookTag}
+        onPlaybookNote={onPlaybookNote}
       />
     )
   }

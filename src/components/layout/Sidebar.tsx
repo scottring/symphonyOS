@@ -13,7 +13,31 @@ const FEATURES = {
   lists: true, // Lists feature enabled - reference lists for books, movies, ideas, etc.
 }
 
-export type ViewType = 'home' | 'today' | 'goals' | 'projects' | 'routines' | 'lists' | 'notes' | 'history' | 'task-detail' | 'contact-detail' | 'settings'
+// Subtle domain theming (module-level to avoid re-creation each render)
+const DOMAIN_THEME = {
+  universal: {
+    bg: 'bg-bg-elevated/80',
+    border: '',
+    glow: '',
+  },
+  work: {
+    bg: 'bg-bg-elevated/80',
+    border: 'border-l-2 border-blue-200/30',
+    glow: 'shadow-[inset_4px_0_12px_-8px_rgba(59,130,246,0.15)]',
+  },
+  family: {
+    bg: 'bg-bg-elevated/80',
+    border: 'border-l-2 border-amber-200/30',
+    glow: 'shadow-[inset_4px_0_12px_-8px_rgba(251,191,36,0.15)]',
+  },
+  personal: {
+    bg: 'bg-bg-elevated/80',
+    border: 'border-l-2 border-purple-200/30',
+    glow: 'shadow-[inset_4px_0_12px_-8px_rgba(168,85,247,0.15)]',
+  },
+} as const
+
+export type ViewType = 'home' | 'today' | 'goals' | 'projects' | 'routines' | 'rules' | 'planning' | 'lists' | 'notes' | 'history' | 'task-detail' | 'contact-detail' | 'settings'
 
 interface EntityData {
   tasks: Task[]
@@ -56,32 +80,7 @@ export function Sidebar({
   onPinRefreshStale,
 }: SidebarProps) {
   const { currentDomain } = useDomain()
-
-  // Define subtle domain theming
-  const domainTheme = {
-    universal: {
-      bg: 'bg-bg-elevated/80',
-      border: '',
-      glow: '',
-    },
-    work: {
-      bg: 'bg-bg-elevated/80',
-      border: 'border-l-2 border-blue-200/30',
-      glow: 'shadow-[inset_4px_0_12px_-8px_rgba(59,130,246,0.15)]',
-    },
-    family: {
-      bg: 'bg-bg-elevated/80',
-      border: 'border-l-2 border-amber-200/30',
-      glow: 'shadow-[inset_4px_0_12px_-8px_rgba(251,191,36,0.15)]',
-    },
-    personal: {
-      bg: 'bg-bg-elevated/80',
-      border: 'border-l-2 border-purple-200/30',
-      glow: 'shadow-[inset_4px_0_12px_-8px_rgba(168,85,247,0.15)]',
-    },
-  }
-
-  const theme = domainTheme[currentDomain]
+  const theme = DOMAIN_THEME[currentDomain]
 
   return (
     <aside
@@ -230,6 +229,23 @@ export function Sidebar({
             <path fillRule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clipRule="evenodd" />
           </svg>
           {!collapsed && <span className="text-[15px]">Goals</span>}
+        </button>
+
+        <button
+          onClick={() => onViewChange('planning')}
+          className={`
+            w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
+            ${activeView === 'planning'
+              ? 'text-primary-700 bg-primary-50/80 font-medium'
+              : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
+            }
+            ${collapsed ? 'justify-center' : ''}
+          `}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
+          </svg>
+          {!collapsed && <span className="text-[15px]">Planning</span>}
         </button>
 
         {/* ── REFERENCE ── */}

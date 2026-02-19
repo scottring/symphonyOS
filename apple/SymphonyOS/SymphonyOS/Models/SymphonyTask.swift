@@ -1,0 +1,137 @@
+import Foundation
+import SwiftData
+
+// MARK: - Codable Types
+
+struct TaskLink: Codable, Hashable {
+    var url: String
+    var title: String?
+}
+
+struct LinkedActivity: Codable, Hashable {
+    var type: String // "task", "routine_instance", "calendar_event"
+    var id: String
+}
+
+// MARK: - SymphonyTask
+
+@Model
+final class SymphonyTask {
+    // Primary
+    @Attribute(.unique) var id: UUID
+    var userId: UUID
+    var title: String
+    var completed: Bool
+
+    // Scheduling
+    var scheduledFor: Date?
+    var deferredUntil: Date?
+    var deferCount: Int
+    var isAllDay: Bool
+    var isSomeday: Bool
+    var estimatedDuration: Int? // minutes
+
+    // Context
+    var context: String? // "work", "family", "personal"
+    var category: String? // "task", "chore", "errand", "event", "activity"
+
+    // Rich content
+    var notes: String?
+    var links: [TaskLink]?
+    var phoneNumber: String?
+    var location: String?
+    var locationPlaceId: String?
+
+    // Relationships (stored as UUIDs, resolved at query time)
+    var contactId: UUID?
+    var assignedTo: UUID? // single family member
+    var assignedToAll: [UUID]? // multi-member assignment
+    var projectId: UUID?
+    var parentTaskId: UUID?
+
+    // Linked activity
+    var linkedTo: LinkedActivity?
+    var linkType: String? // "prep", "followup"
+
+    // Sync
+    var syncStatus: SyncStatus
+    var lastSyncedAt: Date?
+    var createdAt: Date
+    var updatedAt: Date
+
+    init(
+        id: UUID = UUID(),
+        userId: UUID,
+        title: String,
+        completed: Bool = false,
+        scheduledFor: Date? = nil,
+        context: String? = nil,
+        notes: String? = nil,
+        syncStatus: SyncStatus = .pending
+    ) {
+        self.id = id
+        self.userId = userId
+        self.title = title
+        self.completed = completed
+        self.scheduledFor = scheduledFor
+        self.deferredUntil = nil
+        self.deferCount = 0
+        self.isAllDay = false
+        self.isSomeday = false
+        self.estimatedDuration = nil
+        self.context = context
+        self.category = nil
+        self.notes = notes
+        self.links = nil
+        self.phoneNumber = nil
+        self.location = nil
+        self.locationPlaceId = nil
+        self.contactId = nil
+        self.assignedTo = nil
+        self.assignedToAll = nil
+        self.projectId = nil
+        self.parentTaskId = nil
+        self.linkedTo = nil
+        self.linkType = nil
+        self.syncStatus = syncStatus
+        self.lastSyncedAt = nil
+        self.createdAt = Date()
+        self.updatedAt = Date()
+    }
+}
+
+// MARK: - Supabase Column Mapping
+
+extension SymphonyTask {
+    static let tableName = "tasks"
+
+    /// Maps Swift property names to Supabase column names
+    static let columnMap: [String: String] = [
+        "id": "id",
+        "userId": "user_id",
+        "title": "title",
+        "completed": "completed",
+        "scheduledFor": "scheduled_for",
+        "deferredUntil": "deferred_until",
+        "deferCount": "defer_count",
+        "isAllDay": "is_all_day",
+        "isSomeday": "is_someday",
+        "estimatedDuration": "estimated_duration",
+        "context": "context",
+        "category": "category",
+        "notes": "notes",
+        "links": "links",
+        "phoneNumber": "phone_number",
+        "location": "location",
+        "locationPlaceId": "location_place_id",
+        "contactId": "contact_id",
+        "assignedTo": "assigned_to",
+        "assignedToAll": "assigned_to_all",
+        "projectId": "project_id",
+        "parentTaskId": "parent_task_id",
+        "linkedTo": "linked_to",
+        "linkType": "link_type",
+        "createdAt": "created_at",
+        "updatedAt": "updated_at",
+    ]
+}

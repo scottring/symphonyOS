@@ -52,8 +52,18 @@ import {
   AuthForm,
   GoalsList,
   GoalView,
+  PlanningWorkspace,
 } from '@/components/lazy'
 import { useGoals } from '@/hooks/useGoals'
+import { usePlaybook } from '@/hooks/usePlaybook'
+import { useFamilyRules } from '@/hooks/useFamilyRules'
+import { useResponsibilities } from '@/hooks/useResponsibilities'
+import { usePlanningResources } from '@/hooks/usePlanningResources'
+import { useResearchWorkspaces } from '@/hooks/useResearchWorkspaces'
+import { useWeeklyFeedback } from '@/hooks/useWeeklyFeedback'
+import { useAIPlaybookSuggestions } from '@/hooks/useAIPlaybookSuggestions'
+import { useScheduleActions } from '@/hooks/useScheduleActions'
+import { RulesView } from '@/components/rules/RulesView'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import type { ViewType } from '@/components/layout/Sidebar'
 import type { ActionableInstance, Routine } from '@/types/actionable'
@@ -105,6 +115,29 @@ function App() {
   const { members: familyMembers, getCurrentUserMember, refetch: refetchFamilyMembers } = useFamilyMembers()
   const isOnline = useOnlineStatus()
   const focusMode = useFocusMode()
+
+  // Playbook
+  const playbook = usePlaybook()
+
+  // Weekly Review — track which week is being reviewed
+  const [reviewWeekOf, setReviewWeekOf] = useState(() => {
+    const now = new Date()
+    const day = now.getDay()
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1) // Monday
+    const monday = new Date(now)
+    monday.setDate(diff)
+    return monday.toISOString().split('T')[0]
+  })
+  const weeklyFeedback = useWeeklyFeedback(reviewWeekOf)
+  const aiSuggestions = useAIPlaybookSuggestions()
+
+  // Family Rules
+  const familyRules = useFamilyRules()
+  const responsibilities = useResponsibilities()
+
+  // Planning Resources + Research Workspaces
+  const planningResources = usePlanningResources()
+  const researchWorkspaces = useResearchWorkspaces()
 
   // Lists state
   const [selectedListId, setSelectedListId] = useState<string | null>(null)
@@ -194,7 +227,7 @@ function App() {
   const params = useParams<{ projectId?: string; routineId?: string; contactId?: string; goalId?: string }>()
 
   // State for non-URL-routed views
-  const [stateView, setStateView] = useState<'today' | 'lists' | 'notes' | 'history' | 'settings' | 'task-detail' | null>(null)
+  const [stateView, setStateView] = useState<'today' | 'lists' | 'notes' | 'history' | 'rules' | 'planning' | 'settings' | 'task-detail' | null>(null)
 
   // Derive view from URL path or state
   const activeView: ViewType = useMemo(() => {
@@ -336,6 +369,37 @@ function App() {
   useEffect(() => {
     refreshDateInstances()
   }, [refreshDateInstances])
+
+  // Schedule action handlers (assign, complete, skip, push for tasks/events/routines)
+  const scheduleActions = useScheduleActions({
+    tasks,
+    events,
+    allRoutines,
+    familyMembers,
+    viewedDate,
+    updateTask,
+    updateRoutine,
+    updateEventAssignment,
+    updateEventAssignmentAll,
+    markDone,
+    undoDone,
+    skip,
+    reschedule,
+    refreshDateInstances,
+    pushAction: undo.pushAction,
+  })
+
+  // Fetch playbook instances when viewed date changes + instantiate day
+  useEffect(() => {
+    if (playbook.loading) return
+    const dateStr = viewedDate.toISOString().split('T')[0]
+    playbook.fetchInstancesForDate(dateStr).then(() => {
+      // Determine day type (simple: weekday = school-day, weekend = weekend)
+      const dayOfWeek = viewedDate.getDay()
+      const dayType = (dayOfWeek === 0 || dayOfWeek === 6) ? 'weekend' as const : 'school-day' as const
+      playbook.instantiateDay(dateStr, dayType)
+    })
+  }, [viewedDate, playbook.loading, playbook.blocks.length])
 
   // Filter events to exclude skipped/completed items
   const filteredEvents = useMemo(() => {
@@ -667,7 +731,7 @@ function App() {
       navigate('/contacts')
     }
     // Handle state-based views
-    else if (view === 'lists' || view === 'notes' || view === 'history' || view === 'settings' || view === 'task-detail') {
+    else if (view === 'lists' || view === 'notes' || view === 'history' || view === 'rules' || view === 'planning' || view === 'settings' || view === 'task-detail') {
       setStateView(view)
       navigate('/') // Navigate to home URL but show state view
     } else {
@@ -849,6 +913,24 @@ function App() {
       await recalculateProjectStatus(projectId, projectTasks)
     }
   }, [tasks, toggleTask, pinnedItems, undo, recalculateProjectStatus])
+
+  // Handler for creating a follow-up task after completing a task
+  const handleCreateFollowUp = useCallback(async (title: string, sourceTaskId: string) => {
+    const sourceTask = tasks.find(t => t.id === sourceTaskId)
+    if (!sourceTask) return
+
+    await addTask(
+      title,
+      sourceTask.contactId, // Inherit contact
+      sourceTask.projectId, // Inherit project
+      viewedDate, // Schedule for today
+      {
+        assignedTo: sourceTask.assignedTo ?? getCurrentUserMember()?.id,
+        context: sourceTask.context,
+        category: sourceTask.category,
+      }
+    )
+  }, [tasks, addTask, viewedDate, getCurrentUserMember])
 
   // Handler for adding linked prep/followup tasks from DetailPanel
   const handleAddLinkedTask = useCallback(async (
@@ -1283,126 +1365,32 @@ function App() {
             onTriageCardCollapse={() => setRecentlyCreatedTaskId(null)}
             onOpenProject={handleOpenProject}
             familyMembers={familyMembers}
-            onAssignTask={(taskId, memberId) => {
-              const task = tasks.find(t => t.id === taskId)
-              const prevAssignedTo = task?.assignedTo
-              const taskTitle = task?.title || 'Task'
-              updateTask(taskId, { assignedTo: memberId ?? undefined })
-
-              const memberName = memberId ? familyMembers.find(m => m.id === memberId)?.name : null
-              const message = memberName ? `Assigned "${taskTitle}" to ${memberName}` : `Unassigned "${taskTitle}"`
-              undo.pushAction(message, () => {
-                updateTask(taskId, { assignedTo: prevAssignedTo ?? undefined })
-              })
-            }}
-            onAssignTaskAll={(taskId, memberIds) => {
-              const task = tasks.find(t => t.id === taskId)
-              const prevAssignedToAll = task?.assignedToAll || []
-              const prevAssignedTo = task?.assignedTo
-              const taskTitle = task?.title || 'Task'
-              updateTask(taskId, { assignedToAll: memberIds, assignedTo: memberIds[0] ?? undefined })
-
-              const memberNames = memberIds.map(id => familyMembers.find(m => m.id === id)?.name).filter(Boolean)
-              const message = memberIds.length > 0
-                ? `Assigned "${taskTitle}" to ${memberNames.join(', ')}`
-                : `Unassigned "${taskTitle}"`
-              undo.pushAction(message, () => {
-                updateTask(taskId, { assignedToAll: prevAssignedToAll, assignedTo: prevAssignedTo ?? undefined })
-              })
-            }}
-            onAssignEvent={(eventId, memberId) => {
-              updateEventAssignment(eventId, memberId)
-            }}
-            onAssignEventAll={(eventId, memberIds) => {
-              updateEventAssignmentAll(eventId, memberIds)
-            }}
-            onAssignRoutine={(routineId, memberId) => {
-              updateRoutine(routineId, { assigned_to: memberId })
-            }}
-            onAssignRoutineAll={(routineId, memberIds) => {
-              updateRoutine(routineId, { assigned_to_all: memberIds, assigned_to: memberIds[0] ?? null })
-            }}
-            onCompleteRoutine={async (routineId, completed) => {
-              const routine = allRoutines.find(r => r.id === routineId)
-              const routineName = routine?.name || 'Routine'
-
-              if (completed) {
-                await markDone('routine', routineId, viewedDate)
-                undo.pushAction(`Completed "${routineName}"`, async () => {
-                  await undoDone('routine', routineId, viewedDate)
-                  refreshDateInstances()
-                })
-              } else {
-                await undoDone('routine', routineId, viewedDate)
-              }
-              refreshDateInstances()
-            }}
-            onSkipRoutine={async (routineId) => {
-              const routine = allRoutines.find(r => r.id === routineId)
-              const routineName = routine?.name || 'Routine'
-
-              await skip('routine', routineId, viewedDate)
-              undo.pushAction(`Skipped "${routineName}"`, async () => {
-                await undoDone('routine', routineId, viewedDate)
-                refreshDateInstances()
-              })
-              refreshDateInstances()
-            }}
-            onPushRoutine={async (routineId, date) => {
-              const routine = allRoutines.find(r => r.id === routineId)
-              const routineName = routine?.name || 'Routine'
-
-              await reschedule('routine', routineId, viewedDate, date)
-              undo.pushAction(`Rescheduled "${routineName}"`, async () => {
-                await undoDone('routine', routineId, viewedDate)
-                refreshDateInstances()
-              })
-              refreshDateInstances()
-            }}
+            onAssignTask={scheduleActions.onAssignTask}
+            onAssignTaskAll={scheduleActions.onAssignTaskAll}
+            onAssignEvent={scheduleActions.onAssignEvent}
+            onAssignEventAll={scheduleActions.onAssignEventAll}
+            onAssignRoutine={scheduleActions.onAssignRoutine}
+            onAssignRoutineAll={scheduleActions.onAssignRoutineAll}
+            onCompleteRoutine={scheduleActions.onCompleteRoutine}
+            onSkipRoutine={scheduleActions.onSkipRoutine}
+            onPushRoutine={scheduleActions.onPushRoutine}
             onUpdateRoutine={updateRoutine}
-            onCompleteEvent={async (eventId, completed) => {
-              const event = events.find(e => (e.google_event_id || e.id) === eventId)
-              const eventName = event?.title || 'Event'
-              
-              if (completed) {
-                await markDone('calendar_event', eventId, viewedDate)
-                undo.pushAction(`Completed "${eventName}"`, async () => {
-                  await undoDone('calendar_event', eventId, viewedDate)
-                  refreshDateInstances()
-                })
-              } else {
-                await undoDone('calendar_event', eventId, viewedDate)
-              }
-              refreshDateInstances()
-            }}
-            onSkipEvent={async (eventId) => {
-              const event = events.find(e => (e.google_event_id || e.id) === eventId)
-              const eventName = event?.title || 'Event'
-
-              await skip('calendar_event', eventId, viewedDate)
-              undo.pushAction(`Skipped "${eventName}"`, async () => {
-                await undoDone('calendar_event', eventId, viewedDate)
-                refreshDateInstances()
-              })
-              refreshDateInstances()
-            }}
-            onPushEvent={async (eventId, date) => {
-              const event = events.find(e => (e.google_event_id || e.id) === eventId)
-              const eventName = event?.title || 'Event'
-
-              await reschedule('calendar_event', eventId, viewedDate, date)
-              undo.pushAction(`Rescheduled "${eventName}"`, async () => {
-                await undoDone('calendar_event', eventId, viewedDate)
-                refreshDateInstances()
-              })
-              refreshDateInstances()
-            }}
+            onCompleteEvent={scheduleActions.onCompleteEvent}
+            onSkipEvent={scheduleActions.onSkipEvent}
+            onPushEvent={scheduleActions.onPushEvent}
             onOpenPlanning={() => setPlanningOpen(true)}
+            onCreateFollowUp={handleCreateFollowUp}
             onAddProject={addProject}
             lists={lists}
             listsByCategory={listsByCategory}
             onSendToList={handleSendToList}
             onCreateList={handleCreateListInTriage}
+            playbookInstances={playbook.instances}
+            onPlaybookToggleItem={playbook.toggleItem}
+            onPlaybookMarkDone={playbook.markBlockDone}
+            onPlaybookReact={playbook.reactToBlock}
+            onPlaybookTag={playbook.tagBlock}
+            onPlaybookNote={playbook.noteBlock}
           />
         </div>
       )}
@@ -1680,6 +1668,65 @@ function App() {
         />
       )}
 
+      {activeView === 'planning' && (
+        <Suspense fallback={<LoadingFallback />}>
+          <PlanningWorkspace
+            resources={planningResources.resources}
+            loading={planningResources.loading}
+            onAddResource={planningResources.addResource}
+            onUpdateResource={planningResources.updateResource}
+            onDeleteResource={planningResources.deleteResource}
+            onUploadFile={planningResources.uploadFile}
+            onGetSignedUrl={planningResources.getSignedUrl}
+            workspaces={researchWorkspaces.workspaces}
+            workspacesLoading={researchWorkspaces.loading}
+            onCreateWorkspace={researchWorkspaces.addWorkspace}
+            onUpdateWorkspace={researchWorkspaces.updateWorkspace}
+            onDeleteWorkspace={researchWorkspaces.deleteWorkspace}
+            onMarkWorkspaceSynthesized={researchWorkspaces.markSynthesized}
+            rules={familyRules.rules}
+            onAddRule={familyRules.addRule}
+            onUpdateRule={familyRules.updateRule}
+            onDeleteRule={familyRules.deleteRule}
+            onViewPublishedRules={() => handleViewChange('rules')}
+            weeklyReview={{
+              blockSummaries: weeklyFeedback.blockSummaries,
+              overallStats: weeklyFeedback.overallStats,
+              flaggedBlocks: weeklyFeedback.flaggedBlocks,
+              feedbackLoading: weeklyFeedback.loading,
+              weekOf: reviewWeekOf,
+              onWeekChange: setReviewWeekOf,
+              blocks: playbook.blocks,
+              onAddBlock: playbook.addBlock,
+              onUpdateBlock: playbook.updateBlock,
+              onDeleteBlock: playbook.deleteBlock,
+              onReorderBlocks: playbook.reorderBlocks,
+              aiResult: aiSuggestions.result,
+              aiLoading: aiSuggestions.loading,
+              aiError: aiSuggestions.error,
+              onGenerateAI: aiSuggestions.generateSuggestions,
+              onAcceptSuggestion: aiSuggestions.acceptSuggestion,
+              onRejectSuggestion: aiSuggestions.rejectSuggestion,
+            }}
+            onBack={() => handleViewChange('today')}
+          />
+        </Suspense>
+      )}
+
+      {activeView === 'rules' && (
+        <RulesView
+          rules={familyRules.rules}
+          responsibilities={responsibilities.responsibilities}
+          onAddRule={familyRules.addRule}
+          onUpdateRule={familyRules.updateRule}
+          onDeleteRule={familyRules.deleteRule}
+          onAddResponsibility={responsibilities.addResponsibility}
+          getResponsibilitiesForRule={responsibilities.getForRule}
+          loading={familyRules.loading}
+          onBack={() => handleViewChange('settings')}
+        />
+      )}
+
       {activeView === 'settings' && (
         <Suspense fallback={<LoadingFallback />}>
           <SettingsPage
@@ -1688,6 +1735,9 @@ function App() {
               handleViewChange('today')
             }}
             onFamilyMembersChanged={refetchFamilyMembers}
+            onNavigateToLayer={(layerId) => {
+              if (layerId === 'relish') handleViewChange('rules')
+            }}
           />
         </Suspense>
       )}

@@ -8,12 +8,16 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
 import type { ScheduleContextItem } from '@/components/triage'
-import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
+import type { PlaybookInstance, QuickReact } from '@/types/playbook'
+import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem, playbookInstanceToTimelineItem } from '@/types/timeline'
+import { PlaybookBlockCard } from '@/components/playbook/PlaybookBlockCard'
+import { EveningReflection } from '@/components/playbook/EveningReflection'
 import { groupByDaySection, type DaySection } from '@/lib/timeUtils'
 import { useMobile } from '@/hooks/useMobile'
 import { TimeGroup } from './TimeGroup'
 import { ScheduleItem } from './ScheduleItem'
 import { SwipeableCard } from './SwipeableCard'
+import { FollowUpInput } from './FollowUpInput'
 import { DateNavigator } from './DateNavigator'
 import { InboxSection } from './InboxSection'
 import { InboxTaskCard } from './InboxTaskCard'
@@ -512,6 +516,15 @@ interface TodayScheduleProps {
   onClosePanel?: () => void
   // Bulk actions
   onUpdateTasksBulk?: (taskIds: string[], updates: Partial<Task>) => Promise<void>
+  // Follow-up task creation
+  onCreateFollowUp?: (title: string, sourceTaskId: string) => void
+  // Playbook coaching
+  playbookInstances?: PlaybookInstance[]
+  onPlaybookToggleItem?: (instanceId: string, itemId: string) => void
+  onPlaybookMarkDone?: (instanceId: string, completed?: boolean) => void
+  onPlaybookReact?: (instanceId: string, react: QuickReact | null) => void
+  onPlaybookTag?: (instanceId: string, tags: string[]) => void
+  onPlaybookNote?: (instanceId: string, notes: string | null) => void
 }
 
 function LoadingSkeleton() {
@@ -598,6 +611,13 @@ export function TodaySchedule({
   panelOpen,
   onClosePanel,
   onUpdateTasksBulk,
+  onCreateFollowUp,
+  playbookInstances,
+  onPlaybookToggleItem,
+  onPlaybookMarkDone,
+  onPlaybookReact,
+  onPlaybookTag,
+  onPlaybookNote,
 }: TodayScheduleProps) {
   void _onCreateTask // Reserved - was used by ReviewSection
   void _onDeleteTask // Available for future inline delete
@@ -612,10 +632,35 @@ export function TodaySchedule({
 
   const isMobile = useMobile()
 
+  // Follow-up task state: tracks which task just got completed and should show the follow-up input
+  const [followUpTaskId, setFollowUpTaskId] = useState<string | null>(null)
+
   // Handle item selection
   const handleSelectItem = useCallback((itemId: string | null) => {
     onSelectItem(itemId)
   }, [onSelectItem])
+
+  // Handle task toggle with follow-up support
+  const handleToggleTaskWithFollowUp = useCallback((taskId: string, wasCompleted: boolean) => {
+    onToggleTask(taskId)
+    // Only show follow-up when completing (not uncompleting)
+    if (!wasCompleted && onCreateFollowUp) {
+      setFollowUpTaskId(taskId)
+    }
+  }, [onToggleTask, onCreateFollowUp])
+
+  // Handle follow-up submission
+  const handleFollowUpSubmit = useCallback((title: string, sourceTaskId: string) => {
+    if (onCreateFollowUp) {
+      onCreateFollowUp(title, sourceTaskId)
+    }
+    setFollowUpTaskId(null)
+  }, [onCreateFollowUp])
+
+  // Dismiss follow-up input
+  const handleFollowUpDismiss = useCallback(() => {
+    setFollowUpTaskId(null)
+  }, [])
 
   // Hide routines toggle with localStorage persistence
   const [hideRoutines, setHideRoutines] = useState(() => {
@@ -627,6 +672,20 @@ export function TodaySchedule({
     setHideRoutines(prev => {
       const newValue = !prev
       localStorage.setItem('symphony-hide-routines', String(newValue))
+      return newValue
+    })
+  }, [])
+
+  // Hide coaching toggle with localStorage persistence (hidden by default)
+  const [hideCoaching, setHideCoaching] = useState(() => {
+    const stored = localStorage.getItem('symphony-hide-coaching')
+    return stored === null ? true : stored === 'true'
+  })
+
+  const toggleHideCoaching = useCallback(() => {
+    setHideCoaching(prev => {
+      const newValue = !prev
+      localStorage.setItem('symphony-hide-coaching', String(newValue))
       return newValue
     })
   }, [])
@@ -723,7 +782,8 @@ export function TodaySchedule({
     return () => window.removeEventListener('symphony:inbox-add', handleInboxAdd as EventListener)
   }, [isToday])
 
-  // Overdue tasks: scheduled for past days, not completed - only shown on today's view
+  // Overdue tasks: scheduled for past days - only shown on today's view
+  // Includes completed tasks so they remain visible after checking off
   const overdueTasks = useMemo(() => {
     if (!isToday) return []
 
@@ -731,12 +791,20 @@ export function TodaySchedule({
     today.setHours(0, 0, 0, 0)
 
     return tasks.filter((task) => {
-      if (task.completed) return false
       if (!task.scheduledFor) return false
       if (!matchesAssigneeFilter(task.assignedTo)) return false
 
       const taskDate = new Date(task.scheduledFor)
       taskDate.setHours(0, 0, 0, 0)
+
+      // Only include tasks completed today (not historically completed ones)
+      if (task.completed) {
+        const completedDate = new Date(task.updatedAt)
+        completedDate.setHours(0, 0, 0, 0)
+        const todayDate = new Date()
+        todayDate.setHours(0, 0, 0, 0)
+        if (completedDate.getTime() !== todayDate.getTime()) return false
+      }
 
       return taskDate < today
     })
@@ -933,9 +1001,13 @@ export function TodaySchedule({
         return item
       })
 
-    const allItems = [...taskItems, ...eventItems, ...routineItems]
+    // Map playbook instances (if coaching is visible)
+    const playbookItems = hideCoaching ? [] : (playbookInstances ?? [])
+      .map(instance => playbookInstanceToTimelineItem(instance, viewedDate))
+
+    const allItems = [...taskItems, ...eventItems, ...routineItems, ...playbookItems]
     return groupByDaySection(allItems)
-  }, [allFilteredTasks, filteredEvents, visibleRoutines, viewedDate, routineStatusMap, eventStatusMap, eventNotesMap, selectedAssignee])
+  }, [allFilteredTasks, filteredEvents, visibleRoutines, viewedDate, routineStatusMap, eventStatusMap, eventNotesMap, selectedAssignee, hideCoaching, playbookInstances])
 
   const sections: DaySection[] = ['allday', 'morning', 'afternoon', 'evening', 'unscheduled']
 
@@ -950,8 +1022,10 @@ export function TodaySchedule({
   // Calculate completion stats (only scheduled tasks, not inbox)
   const completedTasks = allFilteredTasks.filter((t) => t.completed).length
   const completedRoutines = visibleRoutines.filter((r) => routineStatusMap.get(r.id)?.status === 'completed').length
-  const completedCount = completedTasks + completedRoutines
-  const actionableCount = allFilteredTasks.length + visibleRoutines.length + overdueTasks.length
+  const completedOverdue = overdueTasks.filter((t) => t.completed).length
+  const completedCount = completedTasks + completedRoutines + completedOverdue
+  const incompleteOverdue = overdueTasks.filter((t) => !t.completed).length
+  const actionableCount = allFilteredTasks.length + visibleRoutines.length + incompleteOverdue + completedOverdue
   const totalItems = allFilteredTasks.length + filteredEvents.length + visibleRoutines.length + inboxTasks.length + overdueTasks.length
   const progressPercent = actionableCount > 0 ? (completedCount / actionableCount) * 100 : 0
 
@@ -1083,6 +1157,25 @@ export function TodaySchedule({
                   )}
                 </button>
               )}
+              {/* Coaching toggle */}
+              {(playbookInstances ?? []).length > 0 && (
+                <button
+                  onClick={toggleHideCoaching}
+                  className={`relative flex items-center mr-2 transition-all ${
+                    hideCoaching ? 'text-neutral-300' : 'text-amber-500'
+                  }`}
+                  title={hideCoaching ? 'Show coaching' : 'Hide coaching'}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
+                  </svg>
+                  {hideCoaching && (
+                    <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <span className="w-3 h-0.5 bg-neutral-300 rotate-45" />
+                    </span>
+                  )}
+                </button>
+              )}
               {/* Progress */}
               {actionableCount > 0 && (
                 <span className="text-[11px] text-neutral-400 tabular-nums">{completedCount}/{actionableCount}</span>
@@ -1171,17 +1264,27 @@ export function TodaySchedule({
                 </button>
               )}
 
-              {/* Planning button - hidden */}
-              {/* {onOpenPlanning && (
+              {/* Coaching toggle - only show if there are playbook instances */}
+              {(playbookInstances ?? []).length > 0 && (
                 <button
-                  onClick={onOpenPlanning}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-neutral-600 hover:text-neutral-700 hover:bg-neutral-100 transition-all duration-200"
-                  title="Open multi-day planning view"
+                  onClick={toggleHideCoaching}
+                  className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm transition-all duration-200 ${
+                    hideCoaching
+                      ? 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100'
+                      : 'text-amber-500 hover:text-amber-600 hover:bg-amber-50'
+                  }`}
+                  title={hideCoaching ? 'Show coaching' : 'Hide coaching'}
                 >
-                  <CalendarClock className="w-4 h-4" />
-                  <span className="hidden sm:inline">Plan</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" className={`w-4 h-4 ${hideCoaching ? 'opacity-50' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
+                  </svg>
+                  {hideCoaching && (
+                    <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <span className="w-5 h-0.5 bg-neutral-400 rotate-45" />
+                    </span>
+                  )}
                 </button>
-              )} */}
+              )}
 
               {/* Clarity score - right side */}
               {isToday && !loading && tasks.length > 0 && (
@@ -1281,6 +1384,10 @@ export function TodaySchedule({
               projectsMap={projectsMap}
               familyMembers={familyMembers}
               onAssignTask={onAssignTask}
+              followUpTaskId={followUpTaskId}
+              onToggleWithFollowUp={handleToggleTaskWithFollowUp}
+              onFollowUpSubmit={onCreateFollowUp ? handleFollowUpSubmit : undefined}
+              onFollowUpDismiss={handleFollowUpDismiss}
             />
           )}
 
@@ -1295,61 +1402,87 @@ export function TodaySchedule({
                   const parentTaskName = parentTaskId ? tasksMap.get(parentTaskId)?.title : undefined
                   const taskId = item.id.startsWith('task-') ? item.id.replace('task-', '') : null
 
-                  // Use SwipeableCard on mobile for better touch interactions
-                  if (isMobile) {
+                  // Render PlaybookBlockCard for playbook items
+                  if (item.type === 'playbook' && item.originalPlaybookInstance) {
                     return (
-                      <SwipeableCard
+                      <PlaybookBlockCard
                         key={item.id}
-                        item={item}
-                        selected={selectedItemId === item.id}
-                        onSelect={() => {}} // Disabled - no action on tap
-                        onComplete={() => {
-                          if (item.type === 'task' && taskId) {
-                            onToggleTask(taskId)
-                          } else if (item.type === 'routine' && onCompleteRoutine) {
-                            const routineId = item.id.replace('routine-', '')
-                            onCompleteRoutine(routineId, !item.completed)
-                          } else if (item.type === 'event' && onCompleteEvent) {
-                            const eventId = item.id.replace('event-', '')
-                            onCompleteEvent(eventId, !item.completed)
-                          }
-                        }}
-                        onDefer={item.type === 'task' && taskId && onPushTask
-                          ? (date: Date) => onPushTask(taskId, date)
-                          : undefined
-                        }
-                        onSkip={
-                          item.type === 'routine' && onSkipRoutine
-                            ? () => onSkipRoutine(item.id.replace('routine-', ''))
-                            : item.type === 'event' && onSkipEvent
-                            ? () => onSkipEvent(item.id.replace('event-', ''))
-                            : undefined
-                        }
-                        onOpenDetail={() => handleSelectItem(item.id)}
-                        familyMembers={familyMembers}
-                        assignedTo={item.assignedTo}
-                        onAssign={
-                          item.type === 'task' && taskId && onAssignTask
-                            ? (memberId) => onAssignTask(taskId, memberId)
-                            : item.type === 'event' && onAssignEvent
-                            ? (memberId) => onAssignEvent(item.id.replace('event-', ''), memberId)
-                            : item.type === 'routine' && onAssignRoutine
-                            ? (memberId) => onAssignRoutine(item.id.replace('routine-', ''), memberId)
-                            : undefined
-                        }
+                        instance={item.originalPlaybookInstance}
+                        onToggleItem={onPlaybookToggleItem ?? (() => {})}
+                        onMarkDone={onPlaybookMarkDone ?? (() => {})}
+                        onReact={onPlaybookReact ?? (() => {})}
+                        onTag={onPlaybookTag ?? (() => {})}
+                        onNote={onPlaybookNote ?? (() => {})}
                       />
                     )
                   }
 
+                  // Use SwipeableCard on mobile for better touch interactions
+                  if (isMobile) {
+                    const sourceTask = taskId ? tasksMap.get(taskId) : undefined
+                    return (
+                      <div key={item.id}>
+                        <SwipeableCard
+                          item={item}
+                          selected={selectedItemId === item.id}
+                          onSelect={() => {}} // Disabled - no action on tap
+                          onComplete={() => {
+                            if (item.type === 'task' && taskId) {
+                              handleToggleTaskWithFollowUp(taskId, !!item.completed)
+                            } else if (item.type === 'routine' && onCompleteRoutine) {
+                              const routineId = item.id.replace('routine-', '')
+                              onCompleteRoutine(routineId, !item.completed)
+                            } else if (item.type === 'event' && onCompleteEvent) {
+                              const eventId = item.id.replace('event-', '')
+                              onCompleteEvent(eventId, !item.completed)
+                            }
+                          }}
+                          onDefer={item.type === 'task' && taskId && onPushTask
+                            ? (date: Date) => onPushTask(taskId, date)
+                            : undefined
+                          }
+                          onSkip={
+                            item.type === 'routine' && onSkipRoutine
+                              ? () => onSkipRoutine(item.id.replace('routine-', ''))
+                              : item.type === 'event' && onSkipEvent
+                              ? () => onSkipEvent(item.id.replace('event-', ''))
+                              : undefined
+                          }
+                          onOpenDetail={() => handleSelectItem(item.id)}
+                          familyMembers={familyMembers}
+                          assignedTo={item.assignedTo}
+                          onAssign={
+                            item.type === 'task' && taskId && onAssignTask
+                              ? (memberId) => onAssignTask(taskId, memberId)
+                              : item.type === 'event' && onAssignEvent
+                              ? (memberId) => onAssignEvent(item.id.replace('event-', ''), memberId)
+                              : item.type === 'routine' && onAssignRoutine
+                              ? (memberId) => onAssignRoutine(item.id.replace('routine-', ''), memberId)
+                              : undefined
+                          }
+                        />
+                        {followUpTaskId === taskId && taskId && sourceTask && (
+                          <FollowUpInput
+                            sourceTask={sourceTask}
+                            onSubmit={(title) => handleFollowUpSubmit(title, taskId)}
+                            onDismiss={handleFollowUpDismiss}
+                            projectName={projectName || undefined}
+                          />
+                        )}
+                      </div>
+                    )
+                  }
+
+                  const sourceTaskForFollowUp = taskId ? tasksMap.get(taskId) : undefined
                   return (
+                    <div key={item.id}>
                     <ScheduleItem
-                      key={item.id}
                       item={item}
                       selected={selectedItemId === item.id}
                       onSelect={() => handleSelectItem(item.id)}
                       onToggleComplete={() => {
                         if (item.type === 'task' && taskId) {
-                          onToggleTask(taskId)
+                          handleToggleTaskWithFollowUp(taskId, !!item.completed)
                         } else if (item.type === 'routine' && onCompleteRoutine) {
                           const routineId = item.id.replace('routine-', '')
                           onCompleteRoutine(routineId, !item.completed)
@@ -1424,11 +1557,29 @@ export function TodaySchedule({
                       panelOpen={panelOpen}
                       onClosePanel={onClosePanel}
                     />
+                    {followUpTaskId === taskId && taskId && sourceTaskForFollowUp && (
+                      <FollowUpInput
+                        sourceTask={sourceTaskForFollowUp}
+                        onSubmit={(title) => handleFollowUpSubmit(title, taskId)}
+                        onDismiss={handleFollowUpDismiss}
+                        projectName={projectName || undefined}
+                      />
+                    )}
+                    </div>
                   )
                 })}
               </TimeGroup>
             )
           })}
+
+          {/* Evening Reflection - shown on today's view, after 7pm, when coaching is visible and there are playbook instances */}
+          {isToday && !hideCoaching && (playbookInstances ?? []).length > 0 && new Date().getHours() >= 19 && (
+            <EveningReflection
+              onSave={(reflection) => {
+                console.log('Evening reflection saved:', reflection)
+              }}
+            />
+          )}
 
         </div>
       )}

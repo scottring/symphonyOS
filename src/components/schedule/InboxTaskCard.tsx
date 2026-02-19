@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
@@ -31,7 +32,7 @@ interface InboxTaskCardProps {
   onToggleSelection?: () => void
 }
 
-export function InboxTaskCard({
+export const InboxTaskCard = memo(function InboxTaskCard({
   task,
   onUpdate,
   onSelect,
@@ -225,4 +226,4 @@ export function InboxTaskCard({
       )}
     </div>
   )
-}
+})
