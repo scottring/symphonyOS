@@ -286,7 +286,7 @@ export function QuickCapture({
                      flex items-center justify-center
                      hover:bg-primary-600 active:bg-primary-700 active:scale-95
                      transition-all z-50"
-          style={{ bottom: 'calc(5.5rem + env(safe-area-inset-bottom, 0px))' }}
+          style={{ bottom: 'calc(4.75rem + env(safe-area-inset-bottom, 0px))' }}
           aria-label="Quick add task"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
