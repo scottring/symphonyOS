@@ -1,0 +1,76 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "symphony-os",
+  "title": "Symphony OS",
+  "description": "Quick capture, search, and navigation for Symphony OS",
+  "icon": "extension-icon.png",
+  "author": "scottkaufman",
+  "categories": ["Productivity"],
+  "license": "MIT",
+  "preferences": [
+    {
+      "name": "email",
+      "title": "Email",
+      "description": "Your Symphony OS account email",
+      "type": "textfield",
+      "required": true,
+      "placeholder": "you@example.com"
+    },
+    {
+      "name": "password",
+      "title": "Password",
+      "description": "Your Symphony OS account password",
+      "type": "password",
+      "required": true
+    }
+  ],
+  "commands": [
+    {
+      "name": "quick-capture",
+      "title": "Quick Capture",
+      "subtitle": "Symphony OS",
+      "description": "Capture a task to your Symphony inbox",
+      "mode": "view",
+      "keywords": ["task", "capture", "inbox", "add", "todo"]
+    },
+    {
+      "name": "search",
+      "title": "Search Everything",
+      "subtitle": "Symphony OS",
+      "description": "Search tasks, projects, contacts, routines, and more",
+      "mode": "view",
+      "keywords": ["search", "find", "task", "project", "contact"]
+    },
+    {
+      "name": "today",
+      "title": "Today's Tasks",
+      "subtitle": "Symphony OS",
+      "description": "View and manage today's scheduled tasks",
+      "mode": "view",
+      "keywords": ["today", "schedule", "daily"]
+    },
+    {
+      "name": "navigate",
+      "title": "Open Symphony",
+      "subtitle": "Symphony OS",
+      "description": "Navigate to a Symphony OS view in your browser",
+      "mode": "view",
+      "keywords": ["open", "navigate", "go", "projects", "routines", "goals"]
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^1.93.0",
+    "@raycast/utils": "^1.18.0",
+    "@supabase/supabase-js": "^2.49.0"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^1.0.11",
+    "typescript": "^5.8.0"
+  },
+  "scripts": {
+    "build": "ray build",
+    "dev": "ray develop",
+    "lint": "ray lint",
+    "fix-lint": "ray lint --fix"
+  }
+}

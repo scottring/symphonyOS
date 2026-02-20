@@ -230,6 +230,18 @@ nav .container {
   border-color: var(--text);
 }
 
+.nav-sign-in {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.nav-sign-in:hover {
+  color: var(--text);
+}
+
 /* ============================================
    HERO
    ============================================ */
@@ -1221,6 +1233,449 @@ footer {
   opacity: 0.55;
   transition: opacity 0.5s ease;
 }
+
+/* ============================================
+   FEATURES GRID SECTION
+   ============================================ */
+.features-section {
+  position: relative;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-top: 56px;
+}
+
+@media (min-width: 768px) {
+  .features-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+.feature-card {
+  padding: 28px;
+  background: var(--card);
+  border-radius: var(--radius);
+  border: 1px solid var(--card-border);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.feature-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 30px var(--card-shadow);
+}
+
+.feature-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  background: var(--bg-deep);
+  color: var(--text-secondary);
+}
+
+.feature-icon svg { width: 22px; height: 22px; }
+
+.feature-card h3 {
+  font-size: 18px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+}
+
+.feature-card p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* ============================================
+   CONTEXT SECTION — Rich Task Card
+   ============================================ */
+.context-section {
+  background: var(--bg-deep);
+  position: relative;
+}
+
+.context-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+}
+
+.task-mockup {
+  background: var(--card);
+  border-radius: var(--radius);
+  border: 1px solid var(--card-border);
+  overflow: hidden;
+  box-shadow: 0 12px 40px var(--card-shadow);
+  max-width: 440px;
+}
+
+.task-mockup-header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid rgba(224, 216, 206, 0.4);
+}
+
+.task-mockup-title {
+  font-family: 'Crimson Pro', serif;
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.task-mockup-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.task-mockup-meta span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.task-context-list {
+  padding: 16px 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.context-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--bg);
+  border-radius: var(--radius-xs);
+  font-size: 13px;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+}
+
+.context-item:hover {
+  background: var(--bg-deep);
+}
+
+.context-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.context-icon svg { width: 16px; height: 16px; }
+
+.context-icon.icon-link { background: var(--blue-bg); color: var(--blue); }
+.context-icon.icon-phone { background: var(--green-bg); color: var(--green); }
+.context-icon.icon-note { background: var(--amber-bg); color: var(--amber); }
+.context-icon.icon-project { background: #F3E8FF; color: #7C3AED; }
+
+.context-item-detail {
+  flex: 1;
+  min-width: 0;
+}
+
+.context-item-label {
+  font-size: 11px;
+  color: var(--text-light);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.context-item-value {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ============================================
+   DOMAINS SECTION
+   ============================================ */
+.domains-section {
+  text-align: center;
+}
+
+.domains-visual {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-top: 48px;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (min-width: 768px) {
+  .domains-visual { grid-template-columns: repeat(3, 1fr); }
+}
+
+.domain-card {
+  padding: 28px 24px;
+  background: var(--card);
+  border-radius: var(--radius);
+  border: 1px solid var(--card-border);
+  text-align: left;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.domain-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+}
+
+.domain-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 30px var(--card-shadow);
+}
+
+.domain-card.domain-work::before { background: var(--blue); }
+.domain-card.domain-personal::before { background: var(--green); }
+.domain-card.domain-family::before { background: var(--amber); }
+
+.domain-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.domain-work .domain-pill { background: var(--blue-bg); color: var(--blue); }
+.domain-personal .domain-pill { background: var(--green-bg); color: var(--green); }
+.domain-family .domain-pill { background: var(--amber-bg); color: var(--amber); }
+
+.domain-card h3 {
+  font-size: 20px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.domain-card p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 14px;
+}
+
+.domain-privacy {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.domain-work .domain-privacy,
+.domain-personal .domain-privacy { color: var(--text-muted); }
+.domain-family .domain-privacy { color: var(--amber); }
+
+.domain-privacy svg { width: 14px; height: 14px; }
+
+/* ============================================
+   FLYWHEEL SECTION
+   ============================================ */
+.flywheel-section {
+  position: relative;
+}
+
+.flywheel-steps {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+  margin-top: 48px;
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.flywheel-step {
+  display: flex;
+  gap: 20px;
+  padding: 24px 0;
+  position: relative;
+}
+
+.flywheel-step:not(:last-child) {
+  border-bottom: 1px solid rgba(224, 216, 206, 0.4);
+}
+
+.flywheel-num {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+  background: var(--amber-bg);
+  color: var(--amber);
+}
+
+.flywheel-step h4 {
+  font-family: 'Crimson Pro', serif;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.flywheel-step p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.flywheel-loop {
+  margin-top: 40px;
+  text-align: center;
+  padding: 24px;
+  background: var(--card);
+  border-radius: var(--radius);
+  border: 1px solid var(--card-border);
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.flywheel-loop p {
+  font-family: 'Crimson Pro', serif;
+  font-size: 17px;
+  font-style: italic;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.flywheel-arrow {
+  display: inline-block;
+  color: var(--amber);
+  font-style: normal;
+  font-weight: 500;
+  padding: 0 6px;
+}
+
+/* ============================================
+   PLAN / EXECUTE SECTION
+   ============================================ */
+.plan-section {
+  background: var(--bg-deep);
+  position: relative;
+}
+
+.plan-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+}
+
+.plan-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  margin-top: 48px;
+}
+
+@media (min-width: 768px) {
+  .plan-grid { grid-template-columns: 1fr 1fr; }
+}
+
+.plan-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  border: 1px solid var(--card-border);
+  overflow: hidden;
+}
+
+.plan-card-header {
+  padding: 24px 28px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.plan-card-header h3 {
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.plan-card-header .device-badge {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 4px 10px;
+  border-radius: 100px;
+  background: var(--bg);
+  color: var(--text-muted);
+}
+
+.plan-card-body {
+  padding: 0 28px 24px;
+}
+
+.plan-card-body p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.65;
+  margin-bottom: 16px;
+}
+
+.plan-features {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.plan-feature {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.plan-feature-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--amber);
+  flex-shrink: 0;
+}
 </style>
 </head>
 <body>
@@ -1229,7 +1684,10 @@ footer {
 <nav id="nav">
   <div class="container">
     <a href="#" class="wordmark">Symphony</a>
-    <a href="#waitlist" class="nav-cta">Get early access</a>
+    <div style="display:flex;align-items:center;gap:16px;">
+      <a href="https://app.symphony-os.com" class="nav-sign-in">Sign in</a>
+      <a href="#waitlist" class="nav-cta">Get early access</a>
+    </div>
   </div>
 </nav>
 
@@ -1237,16 +1695,16 @@ footer {
 <section class="hero">
   <div class="container" style="display:flex;flex-direction:column;align-items:center;">
     <div class="hero-badge">Introducing Symphony</div>
-    <h1>Your life,<br><em>orchestrated.</em></h1>
+    <h1>From to-do's<br>to <em>you-hoo's!</em></h1>
     <p class="hero-sub">
-      The planner that coaches you through your day.
+      The daily planner that coaches you through work, life, and family.
     </p>
     <div class="hero-cta-row">
       <a href="#waitlist" class="btn-primary">
         Join the waitlist
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10m0 0L9 4m4 4L9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </a>
-      <a href="#layers" class="btn-secondary">See how it works</a>
+      <a href="#features" class="btn-secondary">See how it works</a>
     </div>
 
     <!-- Toggle -->
@@ -1455,6 +1913,133 @@ footer {
   </div>
 </section>
 
+<!-- ========== FEATURES GRID ========== -->
+<section class="features-section" id="features">
+  <div class="container">
+    <div class="animate-on-scroll" style="text-align:center;">
+      <div class="section-eyebrow">Built for real life</div>
+      <h2 class="section-heading">Everything you need.<br><em style="font-style:italic;color:var(--amber)">Nothing you don't.</em></h2>
+      <p class="section-sub" style="margin:0 auto;text-align:center;">
+        Tasks, events, routines, and coaching blocks — blended into a single daily timeline. Plan on desktop. Execute on mobile. Stay in sync across your whole life.
+      </p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card animate-on-scroll stagger-1">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="4" x2="9" y2="10"/></svg>
+        </div>
+        <h3>Blended Timeline</h3>
+        <p>Tasks, Google Calendar events, routines, and coaching blocks in one chronological view. One place to see your entire day.</p>
+      </div>
+      <div class="feature-card animate-on-scroll stagger-2">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/><line x1="10" y1="13" x2="14" y2="13"/></svg>
+        </div>
+        <h3>Context on Every Task</h3>
+        <p>Links, phone numbers, notes, and project context attach to tasks and surface when you need them. No searching, no switching apps.</p>
+      </div>
+      <div class="feature-card animate-on-scroll stagger-3">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        </div>
+        <h3>Projects as Containers</h3>
+        <p>Projects hold vendor links, phone numbers, and background notes. Every task inherits its project's context automatically.</p>
+      </div>
+      <div class="feature-card animate-on-scroll stagger-1">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </div>
+        <h3>Quick Capture</h3>
+        <p>Brain dump in seconds. Items land in your inbox. Triage them later with date, domain, and assignee pickers. Nothing slips through.</p>
+      </div>
+      <div class="feature-card animate-on-scroll stagger-2">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+        </div>
+        <h3>Routines</h3>
+        <p>Daily or weekly recurring routines with time-of-day anchoring. Track completion, skip, or reschedule. Assign routines to family members.</p>
+      </div>
+      <div class="feature-card animate-on-scroll stagger-3">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <h3>Family Sharing</h3>
+        <p>Work and personal stay private. Family tasks are shared with assignment, visibility, and collaborative planning. Personal OS, multiplayer mode.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== CONTEXT SECTION — Rich Task Card ========== -->
+<section class="context-section" id="context">
+  <div class="container">
+    <div style="display:grid;grid-template-columns:1fr;gap:48px;align-items:center;">
+      <div class="animate-on-scroll" style="text-align:center;">
+        <div class="section-eyebrow">The Symphony difference</div>
+        <h2 class="section-heading">Context is <em style="font-style:italic;color:var(--amber)">first-class.</em></h2>
+        <p class="section-sub" style="margin:0 auto 40px;text-align:center;">
+          The contractor's number is in contacts. The measurements are in Notes. The product link is in a browser tab. Symphony puts it all on the task card — right where you need it.
+        </p>
+      </div>
+      <div class="animate-on-scroll stagger-2" style="display:flex;justify-content:center;">
+        <div class="task-mockup">
+          <div class="task-mockup-header">
+            <div class="task-mockup-title">Replace kitchen backsplash</div>
+            <div class="task-mockup-meta">
+              <span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                Tomorrow
+              </span>
+              <span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                Home Renovation
+              </span>
+            </div>
+          </div>
+          <div class="task-context-list">
+            <div class="context-item">
+              <div class="context-icon icon-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              </div>
+              <div class="context-item-detail">
+                <div class="context-item-label">Product Link</div>
+                <div class="context-item-value">Subway tile — Lowe's</div>
+              </div>
+            </div>
+            <div class="context-item">
+              <div class="context-icon icon-phone">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              </div>
+              <div class="context-item-detail">
+                <div class="context-item-label">Contractor</div>
+                <div class="context-item-value">(555) 234-8910 — Mike's Tile</div>
+              </div>
+            </div>
+            <div class="context-item">
+              <div class="context-icon icon-note">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              </div>
+              <div class="context-item-detail">
+                <div class="context-item-label">Notes</div>
+                <div class="context-item-value">Backsplash: 42" x 18". White grout.</div>
+              </div>
+            </div>
+            <div class="context-item">
+              <div class="context-icon icon-project">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              </div>
+              <div class="context-item-detail">
+                <div class="context-item-label">Project</div>
+                <div class="context-item-value">Home Renovation — 3 more tasks</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ========== PROBLEM / BEFORE-AFTER ========== -->
 <section class="problem-section" id="problem">
   <div class="container">
@@ -1502,6 +2087,126 @@ footer {
                 </div>
               </div>
               <div class="plain-item"><div class="plain-check"></div> School pickup</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== THREE DOMAINS ========== -->
+<section class="domains-section" id="domains">
+  <div class="container">
+    <div class="animate-on-scroll">
+      <div class="section-eyebrow" style="text-align:center;">Three domains, one view</div>
+      <h2 class="section-heading" style="text-align:center;">Your life doesn't fit<br>in one <em style="font-style:italic;color:var(--amber)">category.</em></h2>
+      <p class="section-sub" style="margin:0 auto;text-align:center;">
+        Work stays private. Personal stays private. Family is shared. Filter by domain to focus, or see everything blended on your timeline.
+      </p>
+    </div>
+    <div class="domains-visual">
+      <div class="domain-card domain-work animate-on-scroll stagger-1">
+        <div class="domain-pill">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+          Work
+        </div>
+        <h3>Deep focus</h3>
+        <p>Projects, deadlines, and focused work blocks. Visible only to you. Stays out of your family's view entirely.</p>
+        <div class="domain-privacy">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Private
+        </div>
+      </div>
+      <div class="domain-card domain-personal animate-on-scroll stagger-2">
+        <div class="domain-pill">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Personal
+        </div>
+        <h3>Your space</h3>
+        <p>Health appointments, personal goals, errands. The stuff that's yours. Private by default, always.</p>
+        <div class="domain-privacy">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Private
+        </div>
+      </div>
+      <div class="domain-card domain-family animate-on-scroll stagger-3">
+        <div class="domain-pill">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Family
+        </div>
+        <h3>Shared life</h3>
+        <p>Family tasks, shared routines, kid activities. Visible to everyone in your household with assignment and collaborative planning.</p>
+        <div class="domain-privacy">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Shared
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== PLAN / EXECUTE ========== -->
+<section class="plan-section" id="plan-execute">
+  <div class="container">
+    <div class="animate-on-scroll" style="text-align:center;">
+      <div class="section-eyebrow">Two modes of engagement</div>
+      <h2 class="section-heading">Plan deep.<br><em style="font-style:italic;color:var(--amber)">Execute fast.</em></h2>
+      <p class="section-sub" style="margin:0 auto;text-align:center;">
+        Desktop is for thinking. Mobile is for doing. Symphony is designed for both.
+      </p>
+    </div>
+    <div class="plan-grid">
+      <div class="plan-card animate-on-scroll stagger-1">
+        <div class="plan-card-header">
+          <h3>Desktop</h3>
+          <span class="device-badge">Planning</span>
+        </div>
+        <div class="plan-card-body">
+          <p>When you have time to think, use the full-page experience. Process your inbox, attach rich context, schedule your week, review projects, run a weekly family sync.</p>
+          <div class="plan-features">
+            <div class="plan-feature">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Full-page task editors with rich context
+            </div>
+            <div class="plan-feature">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Project views with inherited context
+            </div>
+            <div class="plan-feature">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Weekly planning workspace
+            </div>
+            <div class="plan-feature">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Research, rules, and coaching setup
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="plan-card animate-on-scroll stagger-2">
+        <div class="plan-card-header">
+          <h3>Mobile</h3>
+          <span class="device-badge">Execution</span>
+        </div>
+        <div class="plan-card-body">
+          <p>When life happens, open your day view and see exactly what's next. Context is right there on the card. Quick-capture anything in seconds. Swipe to complete.</p>
+          <div class="plan-features">
+            <div class="plan-feature">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Quick-add tasks in seconds
+            </div>
+            <div class="plan-feature">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Day view with everything you need
+            </div>
+            <div class="plan-feature">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Coaching blocks auto-expand at the right time
+            </div>
+            <div class="plan-feature">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+              One-tap feedback after each block
             </div>
           </div>
         </div>
@@ -1641,6 +2346,54 @@ footer {
   </div>
 </section>
 
+<!-- ========== COACHING FLYWHEEL ========== -->
+<section class="flywheel-section" id="flywheel">
+  <div class="container">
+    <div class="animate-on-scroll" style="text-align:center;">
+      <div class="section-eyebrow">The coaching flywheel</div>
+      <h2 class="section-heading">It gets smarter<br><em style="font-style:italic;color:var(--amber)">every week.</em></h2>
+      <p class="section-sub" style="margin:0 auto;text-align:center;">
+        Your feedback drives a continuous improvement cycle. The coaching layer isn't static — it learns from your reality and adapts.
+      </p>
+    </div>
+    <div class="flywheel-steps animate-on-scroll stagger-1">
+      <div class="flywheel-step">
+        <div class="flywheel-num">1</div>
+        <div>
+          <h4>Live your day</h4>
+          <p>Coaching blocks guide you through time-specific moments. After each block, tap a quick reaction: nailed it, okay, or tough.</p>
+        </div>
+      </div>
+      <div class="flywheel-step">
+        <div class="flywheel-num">2</div>
+        <div>
+          <h4>Feedback accumulates</h4>
+          <p>Reactions, tags, and notes flow into a coaching observations table. The AI remembers what worked and what didn't.</p>
+        </div>
+      </div>
+      <div class="flywheel-step">
+        <div class="flywheel-num">3</div>
+        <div>
+          <h4>Weekly review</h4>
+          <p>On Sunday, review the week's patterns. The AI reads your observations, published household rules, and research to generate next week's playbook.</p>
+        </div>
+      </div>
+      <div class="flywheel-step">
+        <div class="flywheel-num">4</div>
+        <div>
+          <h4>Better next week</h4>
+          <p>New coaching blocks reflect what you learned. Difficult transitions get more support. Smooth routines stay lean. The cycle continues.</p>
+        </div>
+      </div>
+    </div>
+    <div class="flywheel-loop animate-on-scroll stagger-2">
+      <p>
+        Daily feedback <span class="flywheel-arrow">&rarr;</span> Coaching observations <span class="flywheel-arrow">&rarr;</span> AI-generated playbook <span class="flywheel-arrow">&rarr;</span> Better coaching <span class="flywheel-arrow">&rarr;</span> Repeat
+      </p>
+    </div>
+  </div>
+</section>
+
 <!-- ========== PHILOSOPHY ========== -->
 <section class="philosophy-section">
   <div class="container animate-on-scroll">
@@ -1672,7 +2425,7 @@ footer {
 <!-- ========== FOOTER ========== -->
 <footer>
   <div class="container">
-    <p>&copy; 2026 Symphony. Your life, orchestrated.</p>
+    <p>&copy; 2026 Symphony. From to-dos to you-dos.</p>
   </div>
 </footer>
 
