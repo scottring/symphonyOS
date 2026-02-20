@@ -342,6 +342,23 @@ body {
 }
 
 /* =============================================================================
+   LARGE TEXT MODE - Accessibility scaling
+   Bumps root font-size so all rem-based sizes scale proportionally
+   ============================================================================= */
+
+@media (max-width: 768px) {
+  html.large-text {
+    font-size: 21px;
+  }
+}
+
+@media (min-width: 769px) {
+  html.large-text {
+    font-size: 18px;
+  }
+}
+
+/* =============================================================================
    FOCUS STYLES
    ============================================================================= */
 

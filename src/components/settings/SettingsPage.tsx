@@ -6,6 +6,7 @@ import { LAYER_CONFIG } from '@/types/intelligence-layer'
 import { CalendarSettings } from './CalendarSettings'
 import { WaitlistAdmin } from './WaitlistAdmin'
 import { ThemeSelector } from './ThemeSelector'
+import { useTextSize } from '@/hooks/useTextSize'
 import { HomeAddressSettings } from './HomeAddressSettings'
 import { DemoControls } from './DemoControls'
 import { ImportPlaybook } from './ImportPlaybook'
@@ -236,6 +237,8 @@ export function SettingsPage({
     setTimeout(() => setInviteCopied(null), 3000)
   }
 
+  const { largeText, setLargeText } = useTextSize()
+
   const mainUser = members.find(m => m.is_full_user)
   const otherMembers = members.filter(m => !m.is_full_user)
 
@@ -317,6 +320,29 @@ export function SettingsPage({
           <div className="space-y-8">
             {/* Theme Selector */}
             <ThemeSelector />
+
+            {/* Text Size */}
+            <section>
+              <h2 className="text-lg font-semibold text-neutral-700 mb-2">Text Size</h2>
+              <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-neutral-100">
+                <div>
+                  <p className="text-neutral-700 font-medium">Large text</p>
+                  <p className="text-sm text-neutral-500">Increase font sizes for easier reading</p>
+                </div>
+                <button
+                  onClick={() => setLargeText(!largeText)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full shrink-0 transition-colors duration-200 ${
+                    largeText ? 'bg-primary-500' : 'bg-neutral-200'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                      largeText ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            </section>
 
             {/* Home Address */}
             <HomeAddressSettings />

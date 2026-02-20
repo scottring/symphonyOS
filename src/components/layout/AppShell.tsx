@@ -231,7 +231,7 @@ export function AppShell({
       {/* Mobile bottom navigation — 4 tabs */}
       {isMobile && !panelOpen && (
         <nav className="fixed bottom-0 left-0 right-0 z-40 bg-bg-elevated/95 backdrop-blur-lg border-t border-neutral-200/50"
-             style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+             style={{ paddingBottom: 'max(0px, calc(env(safe-area-inset-bottom, 0px) - 8px))' }}>
           <div className="flex items-center justify-around px-4 py-0.5">
             {/* Today */}
             <button
@@ -247,7 +247,7 @@ export function AppShell({
               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
               </svg>
-              <span className={`text-[10px] font-medium ${activeView === 'today' ? 'font-semibold' : ''}`}>Today</span>
+              <span className={`text-[0.625rem] font-medium ${activeView === 'today' ? 'font-semibold' : ''}`}>Today</span>
             </button>
 
             {/* Projects */}
@@ -264,7 +264,7 @@ export function AppShell({
               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
               </svg>
-              <span className={`text-[10px] font-medium ${activeView === 'projects' ? 'font-semibold' : ''}`}>Projects</span>
+              <span className={`text-[0.625rem] font-medium ${activeView === 'projects' ? 'font-semibold' : ''}`}>Projects</span>
             </button>
 
             {/* More → opens MoreSheet */}
@@ -281,7 +281,7 @@ export function AppShell({
               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
               </svg>
-              <span className="text-[10px] font-medium">More</span>
+              <span className="text-[0.625rem] font-medium">More</span>
             </button>
           </div>
         </nav>
