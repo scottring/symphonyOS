@@ -601,6 +601,20 @@ export function TodaySchedule({
     })
   }, [])
 
+  // Current minute for coaching block auto-expand (updates every 60s)
+  const [currentMinute, setCurrentMinute] = useState(() => {
+    const now = new Date()
+    return now.getHours() * 60 + now.getMinutes()
+  })
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date()
+      setCurrentMinute(now.getHours() * 60 + now.getMinutes())
+    }, 60_000)
+    return () => clearInterval(interval)
+  }, [])
+
   // Hide coaching toggle with localStorage persistence (hidden by default)
   const [hideCoaching, setHideCoaching] = useState(() => {
     const stored = localStorage.getItem('symphony-hide-coaching')
@@ -1384,6 +1398,7 @@ export function TodaySchedule({
                       <PlaybookBlockCard
                         key={item.id}
                         instance={item.originalPlaybookInstance}
+                        currentMinute={isToday ? currentMinute : undefined}
                         onToggleItem={onPlaybookToggleItem ?? (() => {})}
                         onMarkDone={onPlaybookMarkDone ?? (() => {})}
                         onReact={onPlaybookReact ?? (() => {})}

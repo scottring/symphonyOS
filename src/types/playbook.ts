@@ -8,6 +8,7 @@ export interface PlaybookItem {
   id: string
   who: string           // "kaleb", "ella", "both", "partner", "self"
   action: string
+  time?: string         // optional per-item time, e.g. "6:15"
   context?: string      // why this matters
   coaching?: string     // personalized note
   completed?: boolean

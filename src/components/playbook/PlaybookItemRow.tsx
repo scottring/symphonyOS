@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import type { PlaybookItem } from '@/types/playbook'
 
 interface PlaybookItemRowProps {
@@ -6,72 +5,70 @@ interface PlaybookItemRowProps {
   checked: boolean
   onToggle: () => void
   categoryColor?: string // Tailwind bg class for the accent
+  showCoaching?: boolean // parent-controlled coaching visibility
 }
 
-export function PlaybookItemRow({ item, checked, onToggle, categoryColor }: PlaybookItemRowProps) {
-  const [showCoaching, setShowCoaching] = useState(false)
+// Who initial colors
+const WHO_COLORS: Record<string, { bg: string; text: string }> = {
+  kaleb: { bg: 'bg-blue-100', text: 'text-blue-700' },
+  liam: { bg: 'bg-blue-100', text: 'text-blue-700' },
+  ella: { bg: 'bg-purple-100', text: 'text-purple-700' },
+  mia: { bg: 'bg-purple-100', text: 'text-purple-700' },
+  both: { bg: 'bg-teal-100', text: 'text-teal-700' },
+  partner: { bg: 'bg-pink-100', text: 'text-pink-700' },
+  iris: { bg: 'bg-pink-100', text: 'text-pink-700' },
+  self: { bg: 'bg-stone-100', text: 'text-stone-600' },
+}
 
-  // Who pill colors
-  const whoColors: Record<string, { bg: string; text: string }> = {
-    kaleb: { bg: 'bg-blue-100', text: 'text-blue-700' },
-    ella: { bg: 'bg-purple-100', text: 'text-purple-700' },
-    both: { bg: 'bg-teal-100', text: 'text-teal-700' },
-    partner: { bg: 'bg-pink-100', text: 'text-pink-700' },
-    iris: { bg: 'bg-pink-100', text: 'text-pink-700' },
-    self: { bg: 'bg-stone-100', text: 'text-stone-600' },
-  }
-
-  const colors = whoColors[item.who.toLowerCase()] || { bg: 'bg-neutral-100', text: 'text-neutral-600' }
+export function PlaybookItemRow({ item, checked, onToggle, categoryColor, showCoaching }: PlaybookItemRowProps) {
+  const colors = WHO_COLORS[item.who.toLowerCase()] || { bg: 'bg-neutral-100', text: 'text-neutral-600' }
+  const initial = item.who.charAt(0).toUpperCase()
 
   return (
-    <div className="group">
-      <div className="flex items-start gap-3 py-1.5">
-        {/* Round checkbox */}
+    <div>
+      <div className="flex items-center gap-2 py-1">
+        {/* Compact checkbox */}
         <button
           onClick={onToggle}
-          className={`mt-0.5 w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all duration-200 ${
+          style={{ width: 16, height: 16, minWidth: 16, minHeight: 16, padding: 0 }}
+          className={`rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all duration-200 ${
             checked
               ? `${categoryColor || 'bg-sage-500'} border-transparent`
               : 'border-neutral-300 hover:border-neutral-400'
           }`}
         >
           {checked && (
-            <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
+            <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 12 12" fill="none">
               <path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           )}
         </button>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Who pill */}
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize ${colors.bg} ${colors.text}`}>
-              {item.who}
-            </span>
-            {/* Action */}
-            <span className={`text-sm ${checked ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>
-              {item.action}
-            </span>
-          </div>
+        {/* Per-item time (if present) */}
+        {item.time && (
+          <span className="text-[10px] text-neutral-400 tabular-nums flex-shrink-0">
+            {item.time}
+          </span>
+        )}
 
-          {/* Context / coaching expandable */}
-          {(item.context || item.coaching) && (
-            <button
-              onClick={() => setShowCoaching(!showCoaching)}
-              className="text-[11px] text-neutral-400 hover:text-neutral-500 mt-0.5 transition-colors"
-            >
-              {showCoaching ? 'hide context' : 'why this matters'}
-            </button>
-          )}
+        {/* Who initial */}
+        <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${colors.bg} ${colors.text}`}>
+          {initial}
+        </span>
 
-          {showCoaching && (
-            <div className="mt-1 text-xs text-neutral-500 leading-relaxed">
-              {item.context && <p>{item.context}</p>}
-              {item.coaching && <p className="italic mt-0.5">{item.coaching}</p>}
-            </div>
-          )}
-        </div>
+        {/* Action */}
+        <span className={`text-sm flex-1 min-w-0 ${checked ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>
+          {item.action}
+        </span>
       </div>
+
+      {/* Coaching text (parent-controlled) */}
+      {showCoaching && (item.context || item.coaching) && (
+        <div className="ml-6 pl-5 text-xs text-neutral-500 leading-relaxed pb-0.5">
+          {item.context && <p>{item.context}</p>}
+          {item.coaching && <p className="italic mt-0.5">{item.coaching}</p>}
+        </div>
+      )}
     </div>
   )
 }

@@ -57,6 +57,11 @@ if (import.meta.env.PROD && import.meta.env.VITE_SENTRY_DSN) {
   })
 }
 
+// Handle Vite CSS preload errors gracefully — don't crash the entire app
+window.addEventListener('vite:preloadError', (e) => {
+  e.preventDefault()
+})
+
 // Load theme from localStorage, default to Nordic Journal
 const THEME_STORAGE_KEY = 'symphony-theme'
 const savedTheme = localStorage.getItem(THEME_STORAGE_KEY)

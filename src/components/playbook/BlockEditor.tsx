@@ -66,6 +66,7 @@ export function BlockEditor({ block, onSave, onDelete, onClose }: BlockEditorPro
           id: item.id || generateItemId(),
           who: item.who,
           action: item.action,
+          ...(item.time && { time: item.time }),
           ...(item.context && { context: item.context }),
           ...(item.coaching && { coaching: item.coaching }),
         }))
@@ -82,6 +83,7 @@ export function BlockEditor({ block, onSave, onDelete, onClose }: BlockEditorPro
         items: items.map(item => ({
           who: item.who,
           action: item.action,
+          ...(item.time && { time: item.time }),
           ...(item.context && { context: item.context }),
           ...(item.coaching && { coaching: item.coaching }),
         })),
@@ -241,6 +243,15 @@ export function BlockEditor({ block, onSave, onDelete, onClose }: BlockEditorPro
                         onChange={(e) => updateItem(index, 'who', e.target.value)}
                         placeholder="who"
                         className="w-full px-2 py-1.5 rounded-lg bg-neutral-50 border border-neutral-200 text-xs text-neutral-600 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-amber-300/50 transition-all"
+                      />
+                    </div>
+                    <div className="flex-shrink-0 w-16">
+                      <input
+                        type="text"
+                        value={item.time || ''}
+                        onChange={(e) => updateItem(index, 'time', e.target.value)}
+                        placeholder="time"
+                        className="w-full px-2 py-1.5 rounded-lg bg-neutral-50 border border-neutral-200 text-xs text-neutral-600 tabular-nums placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-amber-300/50 transition-all"
                       />
                     </div>
                     <div className="flex-1">
