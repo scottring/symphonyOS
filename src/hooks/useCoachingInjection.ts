@@ -205,6 +205,41 @@ export function useCoachingInjection() {
     }
   }, [state.conversationId])
 
+  const refineSuggestion = useCallback(async (
+    item: TimelineItem,
+    matches: CoachingMatch[],
+  ) => {
+    if (!state.suggestion) return
+
+    setState(prev => ({ ...prev, mode: 'chat', loading: true, error: null, messages: [] }))
+
+    try {
+      const data = await invokeEdgeFunction({
+        action: 'refine-start',
+        item: buildItemPayload(item),
+        itemId: getItemSourceId(item),
+        matchedRules: buildMatchedRulesPayload(matches),
+        currentSuggestion: state.suggestion,
+      })
+
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        conversationId: data.conversationId,
+        messages: data.messages,
+        readyToFinish: true, // Already have a suggestion, so can finish anytime
+      }))
+    } catch (err) {
+      // Fall back to preview if refine fails
+      setState(prev => ({
+        ...prev,
+        mode: 'auto-preview',
+        loading: false,
+        error: err instanceof Error ? err.message : 'Failed to start refinement',
+      }))
+    }
+  }, [state.suggestion])
+
   const confirmSuggestion = useCallback((): CoachingBlockSuggestion | null => {
     return state.suggestion
   }, [state.suggestion])
@@ -219,6 +254,7 @@ export function useCoachingInjection() {
     chatStart,
     chatRespond,
     chatFinish,
+    refineSuggestion,
     confirmSuggestion,
     reset,
   }

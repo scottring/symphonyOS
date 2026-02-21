@@ -25,19 +25,24 @@ export function MultiAssigneeDropdown({
   label = 'Assign to family members'
 }: MultiAssigneeDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 })
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0, placeAbove: false })
   const triggerRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
   const selectedMembers = members.filter(m => selectedIds.includes(m.id))
 
-  // Calculate menu position when opening
+  // Calculate menu position when opening — flip above if near bottom of viewport
   useEffect(() => {
     if (isOpen && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect()
+      const menuHeight = 300 // approximate max height of the dropdown
+      const spaceBelow = window.innerHeight - rect.bottom
+      const placeAbove = spaceBelow < menuHeight && rect.top > menuHeight
+
       setMenuPosition({
-        top: rect.bottom + 8,
+        top: placeAbove ? rect.top - 8 : rect.bottom + 8,
         right: window.innerWidth - rect.right,
+        placeAbove,
       })
     }
   }, [isOpen])
@@ -97,7 +102,9 @@ export function MultiAssigneeDropdown({
       ref={menuRef}
       className="fixed z-[9999] bg-white rounded-xl shadow-lg border border-neutral-200 py-2 min-w-[220px] animate-fade-in-up"
       style={{
-        top: menuPosition.top,
+        ...(menuPosition.placeAbove
+          ? { bottom: window.innerHeight - menuPosition.top }
+          : { top: menuPosition.top }),
         right: menuPosition.right,
       }}
     >

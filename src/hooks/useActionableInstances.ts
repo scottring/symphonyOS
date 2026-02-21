@@ -284,6 +284,7 @@ export function useActionableInstances() {
   }, [getOrCreateInstance])
 
   // Reschedule to a new date/time (smart - handles same-day vs different-day)
+  // Also handles routines that were deferred FROM another date (finds the correct instance)
   const reschedule = useCallback(async (
     entityType: EntityType,
     entityId: string,
@@ -294,16 +295,43 @@ export function useActionableInstances() {
     setError(null)
 
     try {
-      const instance = await getOrCreateInstance(entityType, entityId, fromDate)
+      // First try to find an existing instance for this date (read-only, no create)
+      let instance = await getInstance(entityType, entityId, fromDate)
+
+      // If no instance with date=fromDate, look for one deferred TO fromDate.
+      // This handles routines that were pushed from another date to this one.
+      if (!instance) {
+        const startOfDay = new Date(fromDate)
+        startOfDay.setHours(0, 0, 0, 0)
+        const endOfDay = new Date(fromDate)
+        endOfDay.setHours(23, 59, 59, 999)
+
+        const { data } = await supabase
+          .from('actionable_instances')
+          .select('*')
+          .eq('entity_type', entityType)
+          .eq('entity_id', entityId)
+          .eq('status', 'deferred')
+          .gte('deferred_to', startOfDay.toISOString())
+          .lte('deferred_to', endOfDay.toISOString())
+          .maybeSingle()
+
+        if (data) instance = data as ActionableInstance
+      }
+
+      // Still nothing — create one as fallback
+      if (!instance) {
+        instance = await getOrCreateInstance(entityType, entityId, fromDate)
+      }
+
       if (!instance) throw new Error('Failed to get instance')
 
-      // Check if same day (just a time change) vs different day
-      const fromDateStr = toDateString(fromDate)
+      // Determine if we're moving back to the instance's original date
       const toDateStr = toDateString(toDateTime)
-      const isSameDay = fromDateStr === toDateStr
+      const originalDateStr = instance.date as string
 
-      if (isSameDay) {
-        // Same day - just update the override time, keep status pending
+      if (originalDateStr === toDateStr) {
+        // Moving back to original date — reset to pending with time override
         const { error: updateError } = await supabase
           .from('actionable_instances')
           .update({
@@ -314,7 +342,7 @@ export function useActionableInstances() {
 
         if (updateError) throw updateError
       } else {
-        // Different day - mark as deferred (hides from today, will show on new day)
+        // Different day - mark as deferred (hides from original date, shows on new day)
         const { error: updateError } = await supabase
           .from('actionable_instances')
           .update({
@@ -335,7 +363,7 @@ export function useActionableInstances() {
     } finally {
       setIsLoading(false)
     }
-  }, [getOrCreateInstance])
+  }, [getInstance, getOrCreateInstance])
 
   // ============================================================================
   // NOTES

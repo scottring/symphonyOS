@@ -5,11 +5,12 @@ interface BlockPreviewCardProps {
   suggestion: CoachingBlockSuggestion
   isUpdate?: boolean
   onConfirm: () => void
+  onRefine: () => void
   onDiscard: () => void
   loading?: boolean
 }
 
-export function BlockPreviewCard({ suggestion, isUpdate, onConfirm, onDiscard, loading }: BlockPreviewCardProps) {
+export function BlockPreviewCard({ suggestion, isUpdate, onConfirm, onRefine, onDiscard, loading }: BlockPreviewCardProps) {
   const typeConfig = BLOCK_TYPE_CONFIG[suggestion.blockType] || BLOCK_TYPE_CONFIG.routine
 
   return (
@@ -59,6 +60,13 @@ export function BlockPreviewCard({ suggestion, isUpdate, onConfirm, onDiscard, l
           className="flex-1 py-2 rounded-lg text-xs font-medium text-white bg-primary-600 hover:bg-primary-700 transition-colors disabled:opacity-50"
         >
           {loading ? 'Adding...' : isUpdate ? 'Update on Timeline' : 'Add to Timeline'}
+        </button>
+        <button
+          onClick={onRefine}
+          disabled={loading}
+          className="px-4 py-2 rounded-lg text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors disabled:opacity-50"
+        >
+          Refine
         </button>
         <button
           onClick={onDiscard}

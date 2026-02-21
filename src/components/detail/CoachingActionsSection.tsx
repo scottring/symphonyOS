@@ -57,6 +57,10 @@ export function CoachingActionsSection({
     injection.chatFinish(item, matches)
   }, [injection, item, matches])
 
+  const handleRefine = useCallback(() => {
+    injection.refineSuggestion(item, matches)
+  }, [injection, item, matches])
+
   const handleConfirmSuggestion = useCallback(async () => {
     const suggestion = injection.confirmSuggestion()
     if (!suggestion) return
@@ -185,6 +189,7 @@ export function CoachingActionsSection({
           suggestion={injection.suggestion}
           isUpdate={!!existingBlock}
           onConfirm={handleConfirmSuggestion}
+          onRefine={handleRefine}
           onDiscard={injection.reset}
         />
       )}

@@ -80,13 +80,14 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json()
-    const { action, item, matchedRules, existingBlock, conversationId, userMessage } = body as {
-      action: 'auto' | 'chat-start' | 'chat-respond' | 'chat-finish'
+    const { action, item, matchedRules, existingBlock, conversationId, userMessage, currentSuggestion } = body as {
+      action: 'auto' | 'chat-start' | 'chat-respond' | 'chat-finish' | 'refine-start'
       item: ItemContext
       matchedRules: MatchedRule[]
       existingBlock?: { id: string; label: string; narrative: string; items: unknown[] } | null
       conversationId?: string
       userMessage?: string
+      currentSuggestion?: CoachingBlockSuggestion | null
     }
 
     // Fetch family members for context
@@ -500,7 +501,94 @@ dayTypes must be from: "school-day", "weekend", "holiday", "half-day". Use ["sch
       })
     }
 
-    return new Response(JSON.stringify({ error: 'Invalid action. Use auto, chat-start, chat-respond, or chat-finish.' }), {
+    // ── REFINE-START: Begin a conversation to refine an existing suggestion ──
+    if (action === 'refine-start') {
+      if (!currentSuggestion) {
+        return new Response(JSON.stringify({ error: 'Missing currentSuggestion' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const suggestionSummary = `"${currentSuggestion.label}" — ${currentSuggestion.narrative}\nItems: ${currentSuggestion.items.map((it: { who: string; action: string }) => `${it.who}: ${it.action}`).join('; ')}`
+
+      const systemPrompt = `You are a warm, insightful coaching assistant for Symphony, a daily life operating system.
+The user generated a coaching block and wants to refine it before adding it to their timeline.
+
+ITEM: "${item.title}" at ${item.startTime || 'unscheduled'} (${item.context || 'no context'} domain)
+${item.notes ? `NOTES: ${item.notes}` : ''}
+
+CURRENT SUGGESTION:
+${suggestionSummary}
+${currentSuggestion.coachingNote ? `Coaching note: ${currentSuggestion.coachingNote}` : ''}
+
+MATCHED RULES:
+${rulesContext}
+
+FAMILY: ${familyContext || 'No family members configured'}
+
+YOUR MEMORY (observations from past interactions):
+${memoryContext}
+
+The user wants to discuss or adjust this coaching block before committing. Briefly acknowledge what was generated (1 sentence), then ask what they'd like to change or discuss further. Keep it to 2-3 sentences total. Be warm and specific.`
+
+      const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `I'd like to refine this coaching block before adding it.` },
+          ],
+          temperature: 0.7,
+          max_tokens: 300,
+        }),
+      })
+
+      const aiData = await aiResponse.json()
+      const aiMessage = aiData.choices?.[0]?.message?.content || 'I see the coaching block that was generated. What would you like to adjust?'
+
+      const now = new Date().toISOString()
+      const initialMessages: ConversationMessage[] = [
+        { role: 'assistant', content: aiMessage, timestamp: now },
+      ]
+
+      const { data: conversation, error: insertErr } = await supabase
+        .from('coaching_conversations')
+        .insert({
+          user_id: user.id,
+          item_type: item.type,
+          item_id: body.itemId || '',
+          item_title: item.title,
+          item_context: item.context || null,
+          item_time: item.startTime || null,
+          messages: initialMessages,
+          status: 'in_progress',
+        })
+        .select()
+        .single()
+
+      if (insertErr) {
+        return new Response(JSON.stringify({ error: 'Failed to create conversation' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      return new Response(JSON.stringify({
+        conversationId: conversation.id,
+        message: aiMessage,
+        messages: initialMessages,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    return new Response(JSON.stringify({ error: 'Invalid action' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
