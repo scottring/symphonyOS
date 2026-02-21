@@ -122,7 +122,7 @@ function App() {
     updateMilestoneLocal,
     removeMilestoneLocal,
   } = useGoals()
-  const { updateProgress: updateMilestoneProgress, deleteMilestone: deleteGoalMilestone } = useGoalMilestones({
+  const { addMilestone: addGoalMilestone, updateMilestone: updateGoalMilestone, updateProgress: updateMilestoneProgress, deleteMilestone: deleteGoalMilestone } = useGoalMilestones({
     addMilestoneLocal,
     updateMilestoneLocal,
     removeMilestoneLocal,
@@ -1769,6 +1769,8 @@ function App() {
                 goalPlanning.startPlanning(g.id, g.name, g.notes, areaName)
               }
             }}
+            onAddMilestone={addGoalMilestone}
+            onUpdateMilestone={updateGoalMilestone}
             onUpdateMilestoneProgress={updateMilestoneProgress}
             onDeleteMilestone={deleteGoalMilestone}
           />
