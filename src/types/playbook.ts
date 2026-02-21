@@ -21,6 +21,7 @@ export interface PlaybookBlock {
   layerId?: string | null
   sourceRuleIds?: string[]
   sourceItemRef?: { type: 'task' | 'event' | 'routine'; id: string } | null
+  goalId?: string | null
   visibility?: 'self' | 'family' | 'shared'
   timeSlot: string       // "6:50" or "5:30-6:45"
   label: string
@@ -46,6 +47,7 @@ export interface CreateBlockInput {
   sortOrder?: number
   templateId?: string | null
   sourceItemRef?: { type: 'task' | 'event' | 'routine'; id: string } | null
+  goalId?: string | null
 }
 
 export interface CoachingBlockSuggestion {

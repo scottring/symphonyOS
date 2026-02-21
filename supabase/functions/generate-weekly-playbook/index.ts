@@ -88,6 +88,8 @@ Deno.serve(async (req) => {
       { data: coachingObservations },
       { data: eveningReflections },
       { data: domainAssessments },
+      { data: activeGoals },
+      { data: goalMilestones },
     ] = await Promise.all([
       supabase.from('family_members').select('name, color, is_full_user, member_type, role_label').order('display_order'),
       supabase.from('playbook_blocks').select('*').eq('user_id', user.id).order('sort_order'),
@@ -97,6 +99,8 @@ Deno.serve(async (req) => {
       supabase.from('coaching_observations').select('observation, tags, source_type, created_at').eq('user_id', user.id).gte('created_at', lastWeekStart).order('created_at', { ascending: false }).limit(30),
       supabase.from('evening_reflections').select('date, highlight, notes').eq('user_id', user.id).gte('date', lastWeekStart).lte('date', lastWeekEnd).order('date'),
       supabase.from('domain_assessments').select('domain, score, strengths, issues, opportunities').eq('user_id', user.id).order('updated_at', { ascending: false }).limit(20),
+      supabase.from('goals').select('id, name, strategy, status').eq('user_id', user.id).eq('status', 'active'),
+      supabase.from('goal_milestones').select('goal_id, title, target_value, current_value, unit, status, target_date').eq('user_id', user.id).in('status', ['pending', 'in_progress']),
     ])
 
     // Build feedback summary per block
@@ -191,6 +195,21 @@ Deno.serve(async (req) => {
       opportunities: a.opportunities,
     }))
 
+    // Build active goals summary with milestones
+    const goalsSummary = (activeGoals || []).map(g => {
+      const milestones = (goalMilestones || []).filter(m => m.goal_id === g.id)
+      return {
+        name: g.name,
+        strategy: g.strategy,
+        milestones: milestones.map(m => ({
+          title: m.title,
+          progress: m.target_value ? `${m.current_value || 0}/${m.target_value} ${m.unit || ''}` : m.status,
+          targetDate: m.target_date,
+          status: m.status,
+        })),
+      }
+    })
+
     // Build the AI prompt
     const systemPrompt = `You are a family coaching AI for Symphony, a daily life operating system. Your role is to review a family's weekly playbook performance and suggest refinements for next week.
 
@@ -202,6 +221,7 @@ You understand family dynamics deeply. Your suggestions should be:
 - Informed by accumulated coaching observations — these are distilled insights from daily interactions and represent patterns over time
 - Responsive to evening reflections — these capture what parents found most meaningful or challenging each day
 - Aware of self-assessment domain scores — low-scoring domains need more coaching attention
+- Goal-oriented: when users have active goals with strategies and milestones, prioritize blocks that drive progress toward those goals
 
 RELATIONSHIP TYPES you should coach across:
 - Parent-child: Daily routines, coaching moments, educational play
@@ -248,6 +268,8 @@ RULES:
 - For "remove" suggestions, include blockId, label, and reason
 - If feedback shows a block with 2+ "tough" reacts, prioritize modifying it
 - If no partner blocks exist and there are 2+ family members, suggest adding one
+- If the user has active goals with milestones, suggest blocks that directly support goal progress (e.g., exercise block for weight loss goal, reading block for reading goal)
+- Reference specific goals and milestones in your coaching narratives
 - If completion rate is very low (<30%) for a block, consider removing or simplifying it
 - Always ground your coaching narrative in the specific family member names`
 
@@ -277,10 +299,14 @@ ${reflectionsSummary.length > 0 ? JSON.stringify(reflectionsSummary, null, 2) : 
 SELF-ASSESSMENT SCORES (${assessmentSummary.length} domains assessed):
 ${assessmentSummary.length > 0 ? JSON.stringify(assessmentSummary, null, 2) : 'No domain assessments completed yet.'}
 
+ACTIVE GOALS WITH MILESTONES (${goalsSummary.length} goals):
+${goalsSummary.length > 0 ? JSON.stringify(goalsSummary, null, 2) : 'No active goals set.'}
+
 Based on this data, provide your suggestions for next week's playbook. Pay special attention to:
 - Patterns in the coaching observations (recurring struggles or wins)
 - Themes from evening reflections (what parents highlight or note)
 - Low-scoring assessment domains (areas that need coaching attention)
+- Active goals and milestone progress (suggest blocks that drive goal progress)
 Focus on what would make the biggest positive impact.`
 
     // Call OpenAI

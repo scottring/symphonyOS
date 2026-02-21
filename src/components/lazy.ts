@@ -56,6 +56,9 @@ export const GoalsList = lazy(() =>
 export const GoalView = lazy(() =>
   import('./goals/GoalView').then(m => ({ default: m.GoalView }))
 )
+export const GoalPlanningChat = lazy(() =>
+  import('./goals/GoalPlanningChat').then(m => ({ default: m.GoalPlanningChat }))
+)
 
 // Settings
 export const SettingsPage = lazy(() =>

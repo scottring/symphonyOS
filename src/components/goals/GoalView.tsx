@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import type { Goal, GoalArea, Quarter } from '@/types/goal'
+import type { Goal, GoalArea, GoalMilestone, Quarter } from '@/types/goal'
 
 const QUARTERS: Quarter[] = ['Q1', 'Q2', 'Q3', 'Q4']
 
@@ -8,12 +8,15 @@ interface GoalViewProps {
   area: GoalArea | undefined
   currentQuarter: Quarter
   onBack: () => void
-  onUpdateGoal: (id: string, updates: Partial<Pick<Goal, 'name' | 'notes' | 'status'>>) => void
+  onUpdateGoal: (id: string, updates: Partial<Pick<Goal, 'name' | 'notes' | 'status' | 'strategy' | 'domainSlug' | 'layerId'>>) => void
   onDeleteGoal: (id: string) => void
   onAddAction: (goalId: string, description: string, quarter: Quarter) => Promise<unknown>
   onUpdateAction: (id: string, updates: { description?: string; completed?: boolean; notes?: string }) => void
   onToggleAction: (id: string) => void
   onDeleteAction: (id: string) => void
+  onStartPlanning: () => void
+  onUpdateMilestoneProgress: (id: string, currentValue: number, targetValue?: number) => void
+  onDeleteMilestone: (id: string) => void
 }
 
 export function GoalView({
@@ -27,6 +30,9 @@ export function GoalView({
   onUpdateAction,
   onToggleAction,
   onDeleteAction,
+  onStartPlanning,
+  onUpdateMilestoneProgress,
+  onDeleteMilestone,
 }: GoalViewProps) {
   const [editingName, setEditingName] = useState(false)
   const [name, setName] = useState(goal.name)
@@ -35,6 +41,8 @@ export function GoalView({
   const [newActionText, setNewActionText] = useState('')
   const [editingActionId, setEditingActionId] = useState<string | null>(null)
   const [editingActionText, setEditingActionText] = useState('')
+  const [editingMilestoneId, setEditingMilestoneId] = useState<string | null>(null)
+  const [milestoneInputValue, setMilestoneInputValue] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const nameInputRef = useRef<HTMLInputElement>(null)
   const actionInputRef = useRef<HTMLInputElement>(null)
@@ -42,7 +50,6 @@ export function GoalView({
   const notesTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing local form state when navigating between goals
     setName(goal.name)
     setNotes(goal.notes ?? '')
   }, [goal.id, goal.name, goal.notes])
@@ -78,7 +85,6 @@ export function GoalView({
     if (!addingActionQuarter || !newActionText.trim()) return
     await onAddAction(goal.id, newActionText.trim(), addingActionQuarter)
     setNewActionText('')
-    // Keep the input open for rapid entry
     actionInputRef.current?.focus()
   }
 
@@ -90,9 +96,23 @@ export function GoalView({
     setEditingActionText('')
   }
 
+  const handleMilestoneProgressSave = (milestone: GoalMilestone) => {
+    const val = parseFloat(milestoneInputValue)
+    if (!isNaN(val)) {
+      onUpdateMilestoneProgress(milestone.id, val, milestone.targetValue)
+    }
+    setEditingMilestoneId(null)
+    setMilestoneInputValue('')
+  }
+
   const handleDelete = () => {
     onDeleteGoal(goal.id)
     onBack()
+  }
+
+  const milestoneProgress = (m: GoalMilestone) => {
+    if (m.targetValue == null || m.targetValue === 0) return 0
+    return Math.min(100, Math.round((m.currentValue / m.targetValue) * 100))
   }
 
   return (
@@ -162,6 +182,136 @@ export function GoalView({
           </div>
         </div>
 
+        {/* AI Planning CTA */}
+        {!goal.strategy && (
+          <button
+            onClick={onStartPlanning}
+            className="w-full mb-8 p-5 rounded-2xl border-2 border-dashed border-primary-200 bg-primary-50/50
+                       hover:border-primary-300 hover:bg-primary-50 transition-all group text-left"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center shrink-0 group-hover:bg-primary-200 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-primary-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-primary-700">Plan with AI</h3>
+                <p className="text-xs text-primary-600/70 mt-0.5">Have a conversation with AI to create a strategy with milestones and coaching blocks</p>
+              </div>
+            </div>
+          </button>
+        )}
+
+        {/* Strategy section */}
+        {goal.strategy && (
+          <section className="mb-8">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Strategy</h2>
+              <button
+                onClick={onStartPlanning}
+                className="text-xs text-primary-600 hover:text-primary-700 font-medium transition-colors"
+              >
+                Re-plan
+              </button>
+            </div>
+            <p className="text-sm text-neutral-600 leading-relaxed italic px-1">
+              &ldquo;{goal.strategy}&rdquo;
+            </p>
+          </section>
+        )}
+
+        {/* Milestones section */}
+        {goal.milestones.length > 0 && (
+          <section className="mb-8">
+            <h2 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3">Milestones</h2>
+            <div className="space-y-3">
+              {goal.milestones.map((milestone) => {
+                const pct = milestoneProgress(milestone)
+                const isEditing = editingMilestoneId === milestone.id
+
+                return (
+                  <div key={milestone.id} className="p-4 rounded-xl bg-white border border-neutral-100 group">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          {milestone.status === 'achieved' ? (
+                            <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : (
+                            <div className={`w-3 h-3 rounded-full shrink-0 ${milestone.status === 'in_progress' ? 'bg-amber-400' : 'bg-neutral-200'}`} />
+                          )}
+                          <h3 className={`text-sm font-medium ${milestone.status === 'achieved' ? 'text-green-700' : 'text-neutral-800'}`}>
+                            {milestone.title}
+                          </h3>
+                        </div>
+                        {milestone.description && (
+                          <p className="text-xs text-neutral-500 mt-1 pl-5">{milestone.description}</p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {milestone.targetDate && (
+                          <span className="text-xs text-neutral-400">
+                            {new Date(milestone.targetDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </span>
+                        )}
+                        <button
+                          onClick={() => onDeleteMilestone(milestone.id)}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-neutral-300 hover:text-red-500 rounded transition-all"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Progress bar for measurable milestones */}
+                    {milestone.targetValue != null && (
+                      <div className="mt-3 pl-5">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 h-2 bg-neutral-100 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${milestone.status === 'achieved' ? 'bg-green-500' : 'bg-primary-500'}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          {isEditing ? (
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                value={milestoneInputValue}
+                                onChange={(e) => setMilestoneInputValue(e.target.value)}
+                                onBlur={() => handleMilestoneProgressSave(milestone)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleMilestoneProgressSave(milestone)
+                                  if (e.key === 'Escape') { setEditingMilestoneId(null); setMilestoneInputValue('') }
+                                }}
+                                autoFocus
+                                className="w-16 text-xs text-neutral-700 px-2 py-1 rounded border border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                              />
+                              <span className="text-xs text-neutral-400">/ {milestone.targetValue} {milestone.unit}</span>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => { setEditingMilestoneId(milestone.id); setMilestoneInputValue(String(milestone.currentValue)) }}
+                              className="text-xs text-neutral-500 hover:text-primary-600 tabular-nums transition-colors"
+                            >
+                              {milestone.currentValue} / {milestone.targetValue} {milestone.unit}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
+
         {/* Notes */}
         <div className="mb-8">
           <label className="text-sm font-medium text-neutral-500 mb-2 block">Notes</label>
@@ -221,7 +371,6 @@ export function GoalView({
                       key={action.id}
                       className="flex items-start gap-3 p-3 rounded-xl hover:bg-white hover:shadow-sm transition-all group"
                     >
-                      {/* Checkbox */}
                       <button
                         onClick={() => onToggleAction(action.id)}
                         className={`w-5 h-5 mt-0.5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-all
@@ -237,7 +386,6 @@ export function GoalView({
                         )}
                       </button>
 
-                      {/* Description */}
                       <div className="flex-1 min-w-0">
                         {editingActionId === action.id ? (
                           <input
@@ -263,7 +411,6 @@ export function GoalView({
                         )}
                       </div>
 
-                      {/* Delete button (visible on hover) */}
                       <button
                         onClick={() => onDeleteAction(action.id)}
                         className="opacity-0 group-hover:opacity-100 p-1 text-neutral-300 hover:text-red-500 rounded transition-all"
@@ -275,7 +422,6 @@ export function GoalView({
                     </div>
                   ))}
 
-                  {/* Inline add action */}
                   {addingActionQuarter === quarter && (
                     <div className="flex items-center gap-3 p-3 rounded-xl bg-white border border-primary-100 shadow-sm">
                       <div className="w-5 h-5 rounded border-2 border-neutral-200 flex-shrink-0" />
@@ -321,7 +467,7 @@ export function GoalView({
             </button>
           ) : (
             <div className="flex items-center gap-3">
-              <span className="text-sm text-red-600">Delete "{goal.name}" and all its actions?</span>
+              <span className="text-sm text-red-600">Delete &ldquo;{goal.name}&rdquo; and all its actions?</span>
               <button
                 onClick={handleDelete}
                 className="px-3 py-1.5 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors"

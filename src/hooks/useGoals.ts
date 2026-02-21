@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import type {
-  Goal, GoalAction, GoalArea, Quarter,
-  DbGoal, DbGoalAction, DbGoalArea,
+  Goal, GoalAction, GoalArea, GoalMilestone, Quarter,
+  DbGoal, DbGoalAction, DbGoalArea, DbGoalMilestone,
 } from '@/types/goal'
 
 // ============================================================================
@@ -19,16 +19,38 @@ function dbAreaToArea(db: DbGoalArea): GoalArea {
   }
 }
 
-function dbGoalToGoal(db: DbGoal, actions: GoalAction[]): Goal {
+function dbMilestoneToMilestone(db: DbGoalMilestone): GoalMilestone {
+  return {
+    id: db.id,
+    goalId: db.goal_id,
+    userId: db.user_id,
+    title: db.title,
+    description: db.description ?? undefined,
+    targetDate: db.target_date ?? undefined,
+    targetValue: db.target_value ?? undefined,
+    currentValue: db.current_value ?? 0,
+    unit: db.unit ?? undefined,
+    status: db.status,
+    sortOrder: db.sort_order,
+    createdAt: new Date(db.created_at),
+    updatedAt: new Date(db.updated_at),
+  }
+}
+
+function dbGoalToGoal(db: DbGoal, actions: GoalAction[], milestones: GoalMilestone[]): Goal {
   return {
     id: db.id,
     areaId: db.area_id,
     name: db.name,
     year: db.year,
     notes: db.notes ?? undefined,
+    strategy: db.strategy ?? undefined,
+    domainSlug: db.domain_slug ?? undefined,
+    layerId: db.layer_id ?? undefined,
     status: db.status,
     sortOrder: db.sort_order,
     actions: actions.filter(a => a.goalId === db.id),
+    milestones: milestones.filter(m => m.goalId === db.id),
     createdAt: new Date(db.created_at),
     updatedAt: new Date(db.updated_at),
   }
@@ -59,6 +81,7 @@ export function useGoals(year?: number) {
   const [areas, setAreas] = useState<GoalArea[]>([])
   const [goals, setGoals] = useState<Goal[]>([])
   const [allActions, setAllActions] = useState<GoalAction[]>([])
+  const [allMilestones, setAllMilestones] = useState<GoalMilestone[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -68,6 +91,7 @@ export function useGoals(year?: number) {
       setAreas([])
       setGoals([])
       setAllActions([])
+      setAllMilestones([])
       setLoading(false)
       return
     }
@@ -78,31 +102,36 @@ export function useGoals(year?: number) {
       setError(null)
 
       try {
-        // Fetch areas, goals, and actions in parallel
-        const [areasRes, goalsRes, actionsRes] = await Promise.all([
+        // Fetch areas, goals, actions, and milestones in parallel
+        const [areasRes, goalsRes, actionsRes, milestonesRes] = await Promise.all([
           supabase.from('goal_areas').select('*').order('sort_order'),
           supabase.from('goals').select('*').eq('year', currentYear).order('sort_order'),
           supabase.from('goal_actions').select('*').order('sort_order'),
+          supabase.from('goal_milestones').select('*').order('sort_order'),
         ])
 
         if (areasRes.error) throw areasRes.error
         if (goalsRes.error) throw goalsRes.error
         if (actionsRes.error) throw actionsRes.error
+        if (milestonesRes.error) throw milestonesRes.error
 
         const mappedAreas = (areasRes.data as DbGoalArea[]).map(dbAreaToArea)
         const mappedActions = (actionsRes.data as DbGoalAction[]).map(dbActionToAction)
+        const mappedMilestones = (milestonesRes.data as DbGoalMilestone[]).map(dbMilestoneToMilestone)
 
-        // Filter actions to only include those belonging to fetched goals
+        // Filter actions/milestones to only include those belonging to fetched goals
         const goalIds = new Set((goalsRes.data as DbGoal[]).map(g => g.id))
         const relevantActions = mappedActions.filter(a => goalIds.has(a.goalId))
+        const relevantMilestones = mappedMilestones.filter(m => goalIds.has(m.goalId))
 
         const mappedGoals = (goalsRes.data as DbGoal[]).map(db =>
-          dbGoalToGoal(db, relevantActions)
+          dbGoalToGoal(db, relevantActions, relevantMilestones)
         )
 
         setAreas(mappedAreas)
         setGoals(mappedGoals)
         setAllActions(relevantActions)
+        setAllMilestones(relevantMilestones)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch goals')
       } finally {
@@ -113,13 +142,14 @@ export function useGoals(year?: number) {
     fetchAll()
   }, [user, currentYear])
 
-  // Rebuild goals when allActions changes (to keep actions in sync)
-  const goalsWithActions = useMemo(() => {
+  // Rebuild goals when allActions/allMilestones changes (to keep in sync)
+  const goalsWithData = useMemo(() => {
     return goals.map(g => ({
       ...g,
       actions: allActions.filter(a => a.goalId === g.id),
+      milestones: allMilestones.filter(m => m.goalId === g.id),
     }))
-  }, [goals, allActions])
+  }, [goals, allActions, allMilestones])
 
   // ============================================================================
   // AREA CRUD
@@ -215,6 +245,7 @@ export function useGoals(year?: number) {
       status: 'active',
       sortOrder: goals.filter(g => g.areaId === areaId).length,
       actions: [],
+      milestones: [],
       createdAt: new Date(),
       updatedAt: new Date(),
     }
@@ -238,12 +269,12 @@ export function useGoals(year?: number) {
       return null
     }
 
-    const real = dbGoalToGoal(data as DbGoal, [])
+    const real = dbGoalToGoal(data as DbGoal, [], [])
     setGoals(prev => prev.map(g => g.id === tempId ? real : g))
     return real
   }, [user, currentYear, goals])
 
-  const updateGoal = useCallback(async (id: string, updates: Partial<Pick<Goal, 'name' | 'notes' | 'status' | 'areaId' | 'sortOrder'>>) => {
+  const updateGoal = useCallback(async (id: string, updates: Partial<Pick<Goal, 'name' | 'notes' | 'status' | 'areaId' | 'sortOrder' | 'strategy' | 'domainSlug' | 'layerId'>>) => {
     const goal = goals.find(g => g.id === id)
     if (!goal) return
 
@@ -255,6 +286,9 @@ export function useGoals(year?: number) {
     if (updates.status !== undefined) dbUpdates.status = updates.status
     if (updates.areaId !== undefined) dbUpdates.area_id = updates.areaId
     if (updates.sortOrder !== undefined) dbUpdates.sort_order = updates.sortOrder
+    if (updates.strategy !== undefined) dbUpdates.strategy = updates.strategy ?? null
+    if (updates.domainSlug !== undefined) dbUpdates.domain_slug = updates.domainSlug ?? null
+    if (updates.layerId !== undefined) dbUpdates.layer_id = updates.layerId ?? null
 
     const { error: updateError } = await supabase
       .from('goals')
@@ -379,12 +413,12 @@ export function useGoals(year?: number) {
   // ============================================================================
 
   const getGoalsByArea = useCallback((areaId: string) => {
-    return goalsWithActions.filter(g => g.areaId === areaId)
-  }, [goalsWithActions])
+    return goalsWithData.filter(g => g.areaId === areaId)
+  }, [goalsWithData])
 
   const getGoalById = useCallback((id: string) => {
-    return goalsWithActions.find(g => g.id === id)
-  }, [goalsWithActions])
+    return goalsWithData.find(g => g.id === id)
+  }, [goalsWithData])
 
   const getCurrentQuarter = useCallback((): Quarter => {
     const month = new Date().getMonth() // 0-indexed
@@ -394,9 +428,22 @@ export function useGoals(year?: number) {
     return 'Q4'
   }, [])
 
+  // Allow external updates to milestones (used by useGoalMilestones)
+  const addMilestoneLocal = useCallback((milestone: GoalMilestone) => {
+    setAllMilestones(prev => [...prev, milestone])
+  }, [])
+
+  const updateMilestoneLocal = useCallback((id: string, updates: Partial<GoalMilestone>) => {
+    setAllMilestones(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m))
+  }, [])
+
+  const removeMilestoneLocal = useCallback((id: string) => {
+    setAllMilestones(prev => prev.filter(m => m.id !== id))
+  }, [])
+
   return {
     areas,
-    goals: goalsWithActions,
+    goals: goalsWithData,
     loading,
     error,
     // Area CRUD
@@ -412,6 +459,10 @@ export function useGoals(year?: number) {
     updateAction,
     toggleAction,
     deleteAction,
+    // Milestone state helpers (for useGoalMilestones)
+    addMilestoneLocal,
+    updateMilestoneLocal,
+    removeMilestoneLocal,
     // Helpers
     getGoalsByArea,
     getGoalById,

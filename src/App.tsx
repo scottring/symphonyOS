@@ -47,6 +47,7 @@ import {
   AuthForm,
   GoalsList,
   GoalView,
+  GoalPlanningChat,
   PlanningWorkspace,
   CoachingHub,
   QuickAssessment,
@@ -64,6 +65,8 @@ import {
   CompletedTasksView,
 } from '@/components/lazy'
 import { useGoals } from '@/hooks/useGoals'
+import { useGoalMilestones } from '@/hooks/useGoalMilestones'
+import { useGoalPlanning } from '@/hooks/useGoalPlanning'
 import { usePlaybook } from '@/hooks/usePlaybook'
 import { useIntelligenceLayers } from '@/hooks/useIntelligenceLayers'
 import { useFamilyRules } from '@/hooks/useFamilyRules'
@@ -115,7 +118,17 @@ function App() {
     deleteAction: deleteGoalAction,
     getGoalById,
     getCurrentQuarter,
+    addMilestoneLocal,
+    updateMilestoneLocal,
+    removeMilestoneLocal,
   } = useGoals()
+  const { updateProgress: updateMilestoneProgress, deleteMilestone: deleteGoalMilestone } = useGoalMilestones({
+    addMilestoneLocal,
+    updateMilestoneLocal,
+    removeMilestoneLocal,
+  })
+  const goalPlanning = useGoalPlanning()
+  const [planningGoalId, setPlanningGoalId] = useState<string | null>(null)
   const {
     routines: allRoutines,
     activeRoutines,
@@ -1735,7 +1748,7 @@ function App() {
         </Suspense>
       )}
 
-      {activeView === 'goals' && selectedGoalId && getGoalById(selectedGoalId) && (
+      {activeView === 'goals' && selectedGoalId && getGoalById(selectedGoalId) && !planningGoalId && (
         <Suspense fallback={<LoadingFallback />}>
           <GoalView
             goal={getGoalById(selectedGoalId)!}
@@ -1748,6 +1761,63 @@ function App() {
             onUpdateAction={updateGoalAction}
             onToggleAction={toggleGoalAction}
             onDeleteAction={deleteGoalAction}
+            onStartPlanning={() => {
+              setPlanningGoalId(selectedGoalId)
+              const g = getGoalById(selectedGoalId)
+              if (g) {
+                const areaName = goalAreas.find(a => a.id === g.areaId)?.name
+                goalPlanning.startPlanning(g.id, g.name, g.notes, areaName)
+              }
+            }}
+            onUpdateMilestoneProgress={updateMilestoneProgress}
+            onDeleteMilestone={deleteGoalMilestone}
+          />
+        </Suspense>
+      )}
+
+      {activeView === 'goals' && planningGoalId && (
+        <Suspense fallback={<LoadingFallback />}>
+          <GoalPlanningChat
+            goalName={getGoalById(planningGoalId)?.name ?? 'Goal'}
+            messages={goalPlanning.messages}
+            loading={goalPlanning.loading}
+            readyToFinish={goalPlanning.readyToFinish}
+            planningResult={goalPlanning.planningResult}
+            error={goalPlanning.error}
+            onStart={() => {
+              const g = getGoalById(planningGoalId)
+              if (g) {
+                const areaName = goalAreas.find(a => a.id === g.areaId)?.name
+                goalPlanning.startPlanning(g.id, g.name, g.notes, areaName)
+              }
+            }}
+            onSend={goalPlanning.sendMessage}
+            onFinish={goalPlanning.finishPlanning}
+            onBack={() => {
+              setPlanningGoalId(null)
+              goalPlanning.reset()
+            }}
+            onAcceptBlock={async (block) => {
+              await playbook.addBlock({
+                label: block.label,
+                blockType: block.blockType as 'solo' | 'routine' | 'connection' | 'together',
+                timeSlot: block.timeSlot,
+                narrative: block.narrative,
+                coachingNote: block.coachingNote ?? null,
+                items: (block.items ?? []).map(item => ({
+                  who: item.who,
+                  action: item.action,
+                  context: item.context,
+                  coaching: item.coaching,
+                })),
+                dayTypes: block.dayTypes as ('school-day' | 'weekend' | 'holiday' | 'half-day')[],
+                goalId: planningGoalId,
+              })
+            }}
+            onDone={() => {
+              setPlanningGoalId(null)
+              goalPlanning.reset()
+            }}
           />
         </Suspense>
       )}

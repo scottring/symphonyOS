@@ -20,6 +20,7 @@ function rowToBlock(row: Record<string, unknown>): PlaybookBlock {
     layerId: row.layer_id as string | null,
     sourceRuleIds: (row.source_rule_ids || []) as string[],
     sourceItemRef: row.source_item_ref as PlaybookBlock['sourceItemRef'] ?? null,
+    goalId: row.goal_id as string | null,
     visibility: (row.visibility || 'self') as PlaybookBlock['visibility'],
     timeSlot: row.time_slot as string,
     label: row.label as string,
@@ -306,6 +307,9 @@ export function usePlaybook() {
     }
     if (input.sourceItemRef) {
       row.source_item_ref = input.sourceItemRef
+    }
+    if (input.goalId) {
+      row.goal_id = input.goalId
     }
 
     const { data, error } = await supabase
