@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useWallData } from '@/hooks/useWallData'
 import { FAMILY_COLORS, type FamilyMemberColor } from '@/types/family'
-import { WallDayColumn } from './WallDayColumn'
+import { WallItem } from './WallItem'
 import { WallDinnerWidget } from './WallDinnerWidget'
 import { WallScreenTimeWidget } from './WallScreenTimeWidget'
-import { WallItem } from './WallItem'
+import { WallLookAhead } from './WallLookAhead'
 import type { DaySection } from '@/lib/timeUtils'
 
 const SECTION_ORDER: DaySection[] = ['allday', 'morning', 'afternoon', 'evening']
@@ -49,8 +49,8 @@ export function WallCalendar() {
     return (
       <div className="h-screen w-screen bg-bg-base flex items-center justify-center">
         <div className="text-center">
-          <div className="font-display text-5xl text-neutral-400 mb-2">Symphony</div>
-          <div className="text-xl text-neutral-400">Loading...</div>
+          <div className="font-display text-[4rem] text-neutral-400 mb-2">Symphony</div>
+          <div className="text-[1.25rem] text-neutral-400">Loading...</div>
         </div>
       </div>
     )
@@ -61,13 +61,13 @@ export function WallCalendar() {
     return (
       <div className="h-screen w-screen bg-bg-base flex items-center justify-center">
         <div className="text-center max-w-md">
-          <div className="font-display text-5xl text-neutral-700 mb-4">Symphony</div>
-          <div className="text-xl text-neutral-500 mb-8">
+          <div className="font-display text-[4rem] text-neutral-700 mb-4">Symphony</div>
+          <div className="text-[1.25rem] text-neutral-500 mb-8">
             Sign in to view your family calendar
           </div>
           <a
             href="/"
-            className="inline-block px-8 py-3 bg-primary-500 text-white rounded-xl text-lg font-medium hover:bg-primary-600 transition-colors"
+            className="inline-block px-8 py-3 bg-primary-500 text-white rounded-xl text-[1.15rem] font-medium"
           >
             Sign In
           </a>
@@ -81,49 +81,51 @@ export function WallCalendar() {
     return (
       <div className="h-screen w-screen bg-bg-base flex items-center justify-center">
         <div className="text-center">
-          <div className="font-display text-5xl text-neutral-400 mb-3">
+          <div className="font-display text-[5rem] text-neutral-400 mb-3 leading-none">
             {formatWallTime(currentTime)}
           </div>
-          <div className="text-xl text-neutral-400">Loading your week...</div>
+          <div className="text-[1.25rem] text-neutral-400">Loading your day...</div>
         </div>
       </div>
     )
   }
 
   const todayData = wallData.days.find(d => d.isToday)
-  const upcomingDays = wallData.days.filter(d => !d.isToday)
 
   // Count today's items
   const todayItemCount = todayData
     ? SECTION_ORDER.reduce((sum, s) => sum + (todayData.items[s]?.length || 0), 0)
     : 0
 
+  // Cap overdue display at 4 items
+  const MAX_OVERDUE_SHOWN = 4
+  const overdueShown = wallData.overdueTasks.slice(0, MAX_OVERDUE_SHOWN)
+  const overdueRemaining = wallData.overdueTasks.length - overdueShown.length
+
   return (
     <div className="wall-calendar h-screen w-screen bg-bg-base overflow-hidden flex flex-col select-none">
 
-      {/* ═══ TOP BAR: Clock + Date + Family ═══ */}
-      <header className="shrink-0 flex items-center justify-between px-8 py-4 border-b border-neutral-200/40">
-        <div className="flex items-baseline gap-5">
-          <time className="font-display text-[4.5rem] leading-none text-neutral-800 tracking-tight">
+      {/* ═══ HEADER: Clock + Date + Family Legend ═══ */}
+      <header className="shrink-0 flex items-center justify-between px-10 py-4 border-b border-neutral-200/40">
+        <div className="flex items-baseline gap-6">
+          <time className="font-display text-[5rem] leading-none text-neutral-800 tracking-tight">
             {formatWallTime(currentTime)}
           </time>
-          <div className="flex flex-col gap-0.5">
-            <span className="text-[1.5rem] text-neutral-600 font-medium leading-tight">
-              {formatWallDate(currentTime)}
-            </span>
-          </div>
+          <span className="text-[1.75rem] text-neutral-500 font-medium">
+            {formatWallDate(currentTime)}
+          </span>
         </div>
 
-        {/* Family member legend */}
+        {/* Family legend */}
         <div className="flex items-center gap-5">
           {wallData.familyMembers
             .filter(m => m.member_type === 'core')
             .map(member => {
               const colors = FAMILY_COLORS[member.color as FamilyMemberColor]
               return (
-                <div key={member.id} className="flex items-center gap-2">
-                  <div className={`w-4 h-4 rounded-full ${colors?.bg || 'bg-neutral-200'} ring-2 ${colors?.ring || 'ring-neutral-300'}`} />
-                  <span className="text-[1.1rem] text-neutral-600 font-medium">
+                <div key={member.id} className="flex items-center gap-2.5">
+                  <div className={`w-5 h-5 rounded-full ${colors?.bg || 'bg-neutral-200'} ring-2 ${colors?.ring || 'ring-neutral-300'}`} />
+                  <span className="text-[1.25rem] text-neutral-600 font-medium">
                     {member.name}
                   </span>
                 </div>
@@ -132,32 +134,59 @@ export function WallCalendar() {
         </div>
       </header>
 
-      {/* ═══ MAIN CONTENT: Today (hero) + Upcoming (sidebar) ═══ */}
+      {/* ═══ MAIN: Today (left) + Widgets (right) ═══ */}
       <main className="flex-1 flex overflow-hidden min-h-0">
 
-        {/* ─── TODAY: Hero column ─── */}
-        <div className="w-[42%] flex flex-col border-r border-neutral-200/40 bg-bg-elevated">
+        {/* ─── TODAY: Full schedule ─── */}
+        <div className="w-[55%] flex flex-col border-r border-neutral-200/40">
           {/* Today header */}
-          <div className="shrink-0 px-8 pt-5 pb-3 border-b border-primary-200/40 bg-primary-50/30">
+          <div className="shrink-0 px-10 pt-5 pb-3 bg-primary-50/25 border-b border-primary-200/30">
             <div className="flex items-baseline gap-3">
-              <span className="text-[1rem] font-semibold uppercase tracking-[0.2em] text-primary-500">
+              <span className="text-[1.1rem] font-semibold uppercase tracking-[0.2em] text-primary-500">
                 Today
               </span>
               {todayItemCount > 0 && (
-                <span className="text-[0.9rem] text-primary-400 font-medium">
+                <span className="text-[1rem] text-primary-400 font-medium">
                   {todayItemCount} {todayItemCount === 1 ? 'item' : 'items'}
                 </span>
               )}
             </div>
           </div>
 
-          {/* Today items */}
-          <div className="flex-1 overflow-y-auto px-6 py-3">
-            {todayData && todayItemCount === 0 && (
-              <div className="text-center mt-12">
-                <div className="font-display text-[2rem] text-neutral-300 italic">
+          {/* Schedule items */}
+          <div className="flex-1 overflow-y-auto px-8 py-4">
+            {/* Overdue tasks */}
+            {overdueShown.length > 0 && (
+              <div className="mb-5">
+                <div className="flex items-center gap-4 mb-2">
+                  <span className="text-[1rem] font-semibold uppercase tracking-[0.15em] text-amber-500">
+                    Overdue
+                  </span>
+                  <div className="h-px flex-1 bg-amber-300/40" />
+                </div>
+                <div className="space-y-0.5 border-l-2 border-amber-400/50 pl-3">
+                  {overdueShown.map(item => (
+                    <WallItem
+                      key={item.id}
+                      item={item}
+                      familyMembers={wallData.familyMembers}
+                    />
+                  ))}
+                  {overdueRemaining > 0 && (
+                    <div className="text-[1.1rem] text-amber-400 py-1 px-2">
+                      +{overdueRemaining} more
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {todayData && todayItemCount === 0 && todayData.birthdays.length === 0 && todayData.milestones.length === 0 && overdueShown.length === 0 && wallData.inboxCount === 0 && (
+              <div className="text-center mt-16">
+                <div className="font-display text-[2.5rem] text-neutral-300 italic leading-tight">
                   Nothing scheduled
                 </div>
+                <div className="text-[1.25rem] text-neutral-300 mt-2">Enjoy the day</div>
               </div>
             )}
 
@@ -166,23 +195,22 @@ export function WallCalendar() {
               if (!items || items.length === 0) return null
 
               return (
-                <div key={section} className="mb-4">
+                <div key={section} className="mb-5">
                   {/* Section label */}
-                  <div className="flex items-center gap-3 mb-2 mt-1">
-                    <span className="text-[0.8rem] font-semibold uppercase tracking-[0.15em] text-neutral-400">
+                  <div className="flex items-center gap-4 mb-2">
+                    <span className="text-[1rem] font-semibold uppercase tracking-[0.15em] text-neutral-400">
                       {SECTION_LABELS[section]}
                     </span>
-                    <div className="h-px flex-1 bg-neutral-200/60" />
+                    <div className="h-px flex-1 bg-neutral-200/50" />
                   </div>
 
                   {/* Items */}
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     {items.map(item => (
                       <WallItem
                         key={item.id}
                         item={item}
                         familyMembers={wallData.familyMembers}
-                        size="large"
                       />
                     ))}
                   </div>
@@ -192,11 +220,11 @@ export function WallCalendar() {
 
             {/* Birthdays */}
             {todayData && todayData.birthdays.length > 0 && (
-              <div className="mt-4 px-2">
+              <div className="mt-4">
                 {todayData.birthdays.map((b, i) => (
-                  <div key={i} className="flex items-center gap-3 py-2">
-                    <span className="text-[1.8rem]">&#127874;</span>
-                    <span className="text-[1.3rem] font-medium text-accent-500">{b.name}'s Birthday</span>
+                  <div key={i} className="flex items-center gap-3 py-2 px-2">
+                    <span className="text-[1.75rem]">&#127874;</span>
+                    <span className="text-[1.5rem] font-medium text-accent-500">{b.name}'s Birthday</span>
                   </div>
                 ))}
               </div>
@@ -204,49 +232,47 @@ export function WallCalendar() {
 
             {/* Milestones */}
             {todayData && todayData.milestones.length > 0 && (
-              <div className="mt-2 px-2">
+              <div className="mt-2">
                 {todayData.milestones.map((m, i) => (
-                  <div key={i} className="flex items-center gap-3 py-2">
-                    <span className="text-[1.8rem]">&#127919;</span>
-                    <span className="text-[1.3rem] font-medium text-sage-600">{m.title}</span>
+                  <div key={i} className="flex items-center gap-3 py-2 px-2">
+                    <span className="text-[1.75rem]">&#127919;</span>
+                    <span className="text-[1.5rem] font-medium text-sage-600">{m.title}</span>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Inbox count */}
+            {wallData.inboxCount > 0 && (
+              <div className="mt-6 pt-4 border-t border-neutral-200/40">
+                <div className="flex items-center gap-3 px-2">
+                  <span className="text-[1.3rem] text-neutral-400">
+                    {wallData.inboxCount} {wallData.inboxCount === 1 ? 'item' : 'items'} in inbox
+                  </span>
+                </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* ─── UPCOMING: 6-day strip ─── */}
-        <div className="flex-1 grid grid-cols-6 overflow-hidden">
-          {upcomingDays.map(day => (
-            <WallDayColumn
-              key={day.date.toISOString()}
-              day={day}
-              familyMembers={wallData.familyMembers}
-            />
-          ))}
+        {/* ─── WIDGETS: Stacked cards ─── */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <WallDinnerWidget calendarEvents={wallData.calendarEvents} days={wallData.days} />
+          <WallScreenTimeWidget summaries={wallData.screenTimeSummaries} />
+          <WallLookAhead days={wallData.days} familyMembers={wallData.familyMembers} />
         </div>
       </main>
 
-      {/* ═══ FOOTER: Widget bar ═══ */}
-      <footer className="shrink-0 flex items-stretch border-t border-neutral-200/40 bg-bg-elevated">
-        <WallDinnerWidget calendarEvents={wallData.calendarEvents} days={wallData.days} />
-        <div className="w-px bg-neutral-200/30 my-3" />
-        <WallScreenTimeWidget summaries={wallData.screenTimeSummaries} />
-
-        {/* Refresh timestamp */}
-        {wallData.lastRefresh && (
-          <div className="flex items-end pb-3 pr-6 shrink-0">
-            <span className="text-[0.7rem] text-neutral-300">
-              {wallData.lastRefresh.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-            </span>
-          </div>
-        )}
-      </footer>
+      {/* Refresh timestamp — subtle bottom-right */}
+      {wallData.lastRefresh && (
+        <div className="fixed bottom-3 right-4 text-[0.75rem] text-neutral-300">
+          {wallData.lastRefresh.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+        </div>
+      )}
 
       {/* Error indicator */}
       {wallData.error && (
-        <div className="fixed bottom-6 right-6 bg-danger-50 text-danger-600 px-5 py-3 rounded-xl text-base shadow-lg border border-danger-500/20">
+        <div className="fixed bottom-6 right-6 bg-danger-50 text-danger-600 px-5 py-3 rounded-xl text-[1rem] shadow-lg border border-danger-500/20">
           {wallData.error}
         </div>
       )}

@@ -42,6 +42,8 @@ export interface UseWallDataReturn {
   familyMembers: FamilyMember[]
   calendarEvents: CalendarEvent[]
   screenTimeSummaries: ChildScreenTimeSummary[]
+  overdueTasks: TimelineItem[]
+  inboxCount: number
   loading: boolean
   error: string | null
   lastRefresh: Date | null
@@ -80,6 +82,8 @@ export function useWallData(): UseWallDataReturn {
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([])
   const [calendarEventsState, setCalendarEventsState] = useState<CalendarEvent[]>([])
   const [screenTimeSummaries, setScreenTimeSummaries] = useState<ChildScreenTimeSummary[]>([])
+  const [overdueTasks, setOverdueTasks] = useState<TimelineItem[]>([])
+  const [inboxCount, setInboxCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
@@ -106,6 +110,8 @@ export function useWallData(): UseWallDataReturn {
         stBudgetsRes,
         stEntriesRes,
         stAdjustmentsRes,
+        overdueRes,
+        inboxCountRes,
       ] = await Promise.all([
         // 1. Family members
         supabase.from('family_members').select('*').order('display_order'),
@@ -153,6 +159,21 @@ export function useWallData(): UseWallDataReturn {
         supabase.from('screen_time_budgets').select('*'),
         supabase.from('screen_time_entries').select('*').eq('date', todayStr),
         supabase.from('screen_time_adjustments').select('*').eq('date', todayStr),
+
+        // 11. Overdue tasks (scheduled before today, not completed)
+        supabase
+          .from('tasks')
+          .select('*')
+          .lt('scheduled_for', startDate.toISOString())
+          .eq('completed', false),
+
+        // 12. Inbox count (unscheduled, not completed, not someday)
+        supabase
+          .from('tasks')
+          .select('id', { count: 'exact', head: true })
+          .is('scheduled_for', null)
+          .eq('completed', false)
+          .neq('is_someday', true),
       ])
 
       if (!mountedRef.current) return
@@ -292,10 +313,42 @@ export function useWallData(): UseWallDataReturn {
         todayStr,
       )
 
+      // Transform overdue tasks to timeline items
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const overdueItems: TimelineItem[] = (overdueRes.data || []).map((t: any) => taskToTimelineItem({
+        id: t.id,
+        title: t.title,
+        completed: t.completed,
+        createdAt: new Date(t.created_at),
+        updatedAt: new Date(t.updated_at),
+        scheduledFor: t.scheduled_for ? new Date(t.scheduled_for) : undefined,
+        isAllDay: t.is_all_day ?? undefined,
+        isWaiting: t.is_waiting ?? undefined,
+        context: t.context ?? null,
+        category: t.category ?? 'task',
+        notes: t.notes ?? undefined,
+        phoneNumber: t.phone_number ?? undefined,
+        contactId: t.contact_id ?? undefined,
+        assignedTo: t.assigned_to ?? undefined,
+        projectId: t.project_id ?? undefined,
+        parentTaskId: t.parent_task_id ?? undefined,
+        location: t.location ?? undefined,
+        locationPlaceId: t.location_place_id ?? undefined,
+      }))
+
+      // Sort overdue by scheduled date (most recent first)
+      overdueItems.sort((a, b) => {
+        const aTime = a.startTime ? new Date(a.startTime).getTime() : 0
+        const bTime = b.startTime ? new Date(b.startTime).getTime() : 0
+        return bTime - aTime
+      })
+
       if (mountedRef.current) {
         setDays(wallDays)
         setCalendarEventsState(events)
         setScreenTimeSummaries(stSummaries)
+        setOverdueTasks(overdueItems)
+        setInboxCount(inboxCountRes.count ?? 0)
         setError(null)
         setLastRefresh(new Date())
         setLoading(false)
@@ -322,5 +375,5 @@ export function useWallData(): UseWallDataReturn {
     }
   }, [fetchAllData])
 
-  return { days, familyMembers, calendarEvents: calendarEventsState, screenTimeSummaries, loading, error, lastRefresh }
+  return { days, familyMembers, calendarEvents: calendarEventsState, screenTimeSummaries, overdueTasks, inboxCount, loading, error, lastRefresh }
 }

@@ -39,27 +39,27 @@ export function WallDinnerWidget({ calendarEvents, days }: WallDinnerWidgetProps
   const hasTomorrow = days.length > 1
 
   return (
-    <div className="flex-1 px-8 py-4 min-w-0">
-      <div className="text-[0.8rem] font-semibold uppercase tracking-[0.15em] text-neutral-400 mb-2">
+    <div className="px-8 py-5 border-b border-neutral-200/40">
+      <div className="text-[1rem] font-semibold uppercase tracking-[0.15em] text-neutral-400 mb-2">
         Tonight's Dinner
       </div>
 
       {tonightEvent ? (
-        <div className="font-display text-[1.8rem] text-neutral-800 truncate leading-tight">
+        <div className="font-display text-[2.1rem] text-neutral-800 truncate leading-tight">
           {getDinnerDisplayName(tonightEvent)}
         </div>
       ) : (
-        <div className="text-[1.3rem] text-neutral-300 italic">
+        <div className="text-[1.5rem] text-neutral-300 italic">
           No dinner planned
         </div>
       )}
 
       {hasTomorrow && tomorrowEvent && (
-        <div className="mt-2 flex items-baseline gap-2">
-          <span className="text-[0.75rem] font-semibold uppercase tracking-[0.12em] text-neutral-300">
+        <div className="mt-2 flex items-baseline gap-2.5">
+          <span className="text-[0.9rem] font-semibold uppercase tracking-[0.12em] text-neutral-300">
             Tomorrow
           </span>
-          <span className="text-[1.05rem] text-neutral-500 truncate">
+          <span className="text-[1.25rem] text-neutral-500 truncate">
             {getDinnerDisplayName(tomorrowEvent)}
           </span>
         </div>

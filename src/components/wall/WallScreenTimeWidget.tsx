@@ -21,8 +21,8 @@ export function WallScreenTimeWidget({ summaries }: WallScreenTimeWidgetProps) {
   if (summaries.length === 0) return null
 
   return (
-    <div className="flex-1 px-8 py-4 min-w-0">
-      <div className="text-[0.8rem] font-semibold uppercase tracking-[0.15em] text-neutral-400 mb-2.5">
+    <div className="px-8 py-5 border-b border-neutral-200/40">
+      <div className="text-[1rem] font-semibold uppercase tracking-[0.15em] text-neutral-400 mb-3">
         Screen Time
       </div>
 
@@ -35,20 +35,20 @@ export function WallScreenTimeWidget({ summaries }: WallScreenTimeWidgetProps) {
           return (
             <div key={child.familyMemberId}>
               {/* Name + usage */}
-              <div className="flex items-center gap-2.5 mb-1">
+              <div className="flex items-center gap-3 mb-1">
                 {colors && (
-                  <div className={`w-3.5 h-3.5 rounded-full shrink-0 ${colors.bg} ring-2 ${colors.ring}`} />
+                  <div className={`w-4 h-4 rounded-full shrink-0 ${colors.bg} ring-2 ${colors.ring}`} />
                 )}
-                <span className="text-[1.05rem] font-medium text-neutral-700 truncate">
+                <span className="text-[1.25rem] font-medium text-neutral-700 truncate">
                   {child.childName}
                 </span>
-                <span className="text-[1.05rem] text-neutral-400 ml-auto shrink-0 tabular-nums">
+                <span className="text-[1.25rem] text-neutral-400 ml-auto shrink-0 tabular-nums">
                   {child.usedMinutes}/{child.effectiveBudget}m
                 </span>
               </div>
 
               {/* Progress bar */}
-              <div className={`h-3 rounded-full ${STATUS_TRACK[child.status]} overflow-hidden`}>
+              <div className={`h-3.5 rounded-full ${STATUS_TRACK[child.status]} overflow-hidden`}>
                 <div
                   className={`h-full rounded-full transition-all ${STATUS_COLORS[child.status]}`}
                   style={{ width: `${barPercent}%` }}
@@ -59,7 +59,7 @@ export function WallScreenTimeWidget({ summaries }: WallScreenTimeWidgetProps) {
               {penalties.length > 0 && (
                 <div className="mt-1">
                   {penalties.map(p => (
-                    <div key={p.id} className="text-[0.8rem] text-red-500 truncate">
+                    <div key={p.id} className="text-[0.95rem] text-red-500 truncate">
                       {p.minutes}m: {p.reason}
                     </div>
                   ))}

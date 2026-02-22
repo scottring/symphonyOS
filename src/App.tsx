@@ -559,15 +559,14 @@ function App() {
       }
     }
 
-    // Find routines that were deferred TO this date
-    // These are instances with status='deferred' and deferred_to on this date
+    // Find routines that were deferred TO this date (any status — includes completed/skipped)
     const deferredToThisDate = new Set<string>()
     const viewedDateStr = viewedDate.toISOString().split('T')[0]
     for (const instance of dateInstances) {
       if (
         instance.entity_type === 'routine' &&
-        instance.status === 'deferred' &&
-        instance.deferred_to
+        instance.deferred_to &&
+        (instance.date as string) !== viewedDateStr // Only cross-day deferrals
       ) {
         const deferredToDateStr = new Date(instance.deferred_to).toISOString().split('T')[0]
         if (deferredToDateStr === viewedDateStr) {

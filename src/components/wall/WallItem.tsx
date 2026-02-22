@@ -5,10 +5,9 @@ import type { TimelineItem } from '@/types/timeline'
 interface WallItemProps {
   item: TimelineItem
   familyMembers: FamilyMember[]
-  size?: 'large' | 'compact'
 }
 
-export function WallItem({ item, familyMembers, size = 'compact' }: WallItemProps) {
+export function WallItem({ item, familyMembers }: WallItemProps) {
   const assignedMember = item.assignedTo
     ? familyMembers.find(m => m.id === item.assignedTo)
     : undefined
@@ -17,66 +16,49 @@ export function WallItem({ item, familyMembers, size = 'compact' }: WallItemProp
     ? FAMILY_COLORS[assignedMember.color as FamilyMemberColor]
     : null
 
-  const isLarge = size === 'large'
-
   return (
     <div
       className={`
-        flex items-start gap-3 rounded-xl
-        ${isLarge ? 'py-2.5 px-3' : 'py-1.5 px-2'}
-        ${item.completed ? 'opacity-35' : ''}
+        flex items-start gap-3.5 py-2 px-2 rounded-xl
+        ${item.completed ? 'opacity-30' : ''}
       `}
       data-item-id={item.id}
       data-item-type={item.type}
     >
-      {/* Color bar for family member */}
+      {/* Color dot for family member */}
       {colors ? (
         <div
-          className={`
-            rounded-full shrink-0
-            ${isLarge ? 'w-3 h-3 mt-2.5' : 'w-2.5 h-2.5 mt-2'}
-            ${colors.bg} ring-2 ${colors.ring}
-          `}
-          title={assignedMember?.name}
+          className={`w-4 h-4 rounded-full mt-2 shrink-0 ${colors.bg} ring-2 ${colors.ring}`}
         />
       ) : (
-        <div
-          className={`
-            rounded-full shrink-0 bg-neutral-200 ring-2 ring-neutral-300/60
-            ${isLarge ? 'w-3 h-3 mt-2.5' : 'w-2.5 h-2.5 mt-2'}
-          `}
-        />
+        <div className="w-4 h-4 rounded-full mt-2 shrink-0 bg-neutral-200 ring-2 ring-neutral-300/60" />
       )}
 
       {/* Item content */}
       <div className="min-w-0 flex-1">
-        <div className="flex items-baseline gap-2">
+        <div className="flex items-baseline gap-2.5">
           {/* Time */}
           {item.startTime && !item.allDay && (
-            <span className={`
-              font-medium text-neutral-400 shrink-0
-              ${isLarge ? 'text-[1.15rem]' : 'text-[0.95rem]'}
-            `}>
+            <span className="text-[1.4rem] font-medium text-neutral-400 shrink-0">
               {formatTime(item.startTime)}
             </span>
           )}
-          {/* Title */}
+          {/* Title + assigned name */}
           <span
             className={`
-              leading-snug truncate
-              ${isLarge ? 'text-[1.35rem]' : 'text-[1.05rem]'}
+              text-[1.75rem] leading-snug truncate
               ${item.completed ? 'line-through text-neutral-400' : 'text-neutral-800'}
             `}
           >
             {item.title}
+            {assignedMember && !item.completed && (
+              <span className="text-neutral-400 font-normal"> · {assignedMember.name}</span>
+            )}
           </span>
         </div>
         {/* Location for events */}
         {item.location && !item.completed && (
-          <div className={`
-            text-neutral-400 truncate mt-0.5
-            ${isLarge ? 'text-[0.95rem]' : 'text-[0.8rem]'}
-          `}>
+          <div className="text-[1.15rem] text-neutral-400 truncate mt-0.5 ml-0.5">
             {item.location}
           </div>
         )}

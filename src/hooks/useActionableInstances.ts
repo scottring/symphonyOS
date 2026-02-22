@@ -111,8 +111,8 @@ export function useActionableInstances() {
 
       if (fetchError) throw fetchError
 
-      // Query 2: Instances deferred TO this date
-      // These have status='deferred' and deferred_to starts with this date
+      // Query 2: Instances with deferred_to on this date (any status)
+      // This covers deferred routines still pending, plus ones already completed/skipped
       const startOfDay = new Date(date)
       startOfDay.setHours(0, 0, 0, 0)
       const endOfDay = new Date(date)
@@ -121,7 +121,6 @@ export function useActionableInstances() {
       const { data: deferredInstances, error: deferredError } = await supabase
         .from('actionable_instances')
         .select('*')
-        .eq('status', 'deferred')
         .gte('deferred_to', startOfDay.toISOString())
         .lte('deferred_to', endOfDay.toISOString())
 
