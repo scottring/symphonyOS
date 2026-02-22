@@ -10,121 +10,58 @@ interface WallDayColumnProps {
 
 const SECTION_ORDER: DaySection[] = ['allday', 'morning', 'afternoon', 'evening']
 
-const SECTION_LABELS: Record<string, string> = {
-  allday: 'All Day',
-  morning: 'Morning',
-  afternoon: 'Afternoon',
-  evening: 'Evening',
-}
-
 export function WallDayColumn({ day, familyMembers }: WallDayColumnProps) {
   const weekday = day.date.toLocaleDateString('en-US', { weekday: 'short' })
   const dayNum = day.date.getDate()
 
-  // Check if there are any items
-  const hasItems = SECTION_ORDER.some(s => day.items[s]?.length > 0)
+  // Flatten all items for this day (compact view — no section dividers needed)
+  const allItems = SECTION_ORDER.flatMap(s => day.items[s] || [])
+  const hasContent = allItems.length > 0 || day.birthdays.length > 0 || day.milestones.length > 0
 
   return (
-    <div
-      className={`
-        flex flex-col overflow-hidden border-r border-neutral-200/40 last:border-r-0
-        ${day.isToday
-          ? 'bg-primary-50/30 ring-2 ring-primary-300/40 ring-inset'
-          : 'bg-bg-elevated'
-        }
-      `}
-    >
+    <div className="flex flex-col overflow-hidden border-r border-neutral-200/30 last:border-r-0">
       {/* Day header */}
-      <div
-        className={`
-          px-3 py-2.5 text-center border-b shrink-0
-          ${day.isToday ? 'border-primary-200/60 bg-primary-50/50' : 'border-neutral-100'}
-        `}
-      >
-        <div
-          className={`
-            text-[0.7rem] font-semibold uppercase tracking-widest
-            ${day.isToday ? 'text-primary-600' : 'text-neutral-400'}
-          `}
-        >
-          {day.isToday ? 'Today' : weekday}
+      <div className="px-3 py-3 text-center border-b border-neutral-100/60 shrink-0">
+        <div className="text-[0.75rem] font-semibold uppercase tracking-[0.15em] text-neutral-400">
+          {weekday}
         </div>
-        <div
-          className={`
-            text-2xl font-display leading-tight
-            ${day.isToday ? 'text-primary-700' : 'text-neutral-700'}
-          `}
-        >
+        <div className="text-[1.8rem] font-display leading-tight text-neutral-700">
           {dayNum}
         </div>
       </div>
 
-      {/* Scrollable items area */}
-      <div className="flex-1 overflow-y-auto px-1.5 py-1">
-        {!hasItems && (
-          <div className="text-center text-neutral-300 text-sm mt-4 italic">
-            Nothing scheduled
+      {/* Items */}
+      <div className="flex-1 overflow-y-auto px-1 py-1">
+        {!hasContent && (
+          <div className="text-center text-neutral-300 text-[0.85rem] mt-6 italic">
+            Clear
           </div>
         )}
 
-        {SECTION_ORDER.map(section => {
-          const items = day.items[section]
-          if (!items || items.length === 0) return null
+        {allItems.map(item => (
+          <WallItem
+            key={item.id}
+            item={item}
+            familyMembers={familyMembers}
+            size="compact"
+          />
+        ))}
 
-          return (
-            <div key={section} className="mb-1">
-              {/* Section divider — only show if there are multiple sections with content */}
-              {section !== 'allday' && (
-                <div className="flex items-center gap-1.5 px-2 pt-1.5 pb-0.5">
-                  <div className="h-px flex-1 bg-neutral-200/60" />
-                  <span className="text-[0.6rem] font-medium uppercase tracking-wider text-neutral-300">
-                    {SECTION_LABELS[section]}
-                  </span>
-                  <div className="h-px flex-1 bg-neutral-200/60" />
-                </div>
-              )}
-
-              {/* Items */}
-              {items.map(item => (
-                <WallItem
-                  key={item.id}
-                  item={item}
-                  familyMembers={familyMembers}
-                />
-              ))}
-            </div>
-          )
-        })}
-
-        {/* Birthday indicators */}
-        {day.birthdays.length > 0 && (
-          <div className="mt-2 px-2">
-            {day.birthdays.map((b, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-1.5 py-1 text-sm text-accent-600"
-              >
-                <span className="text-base">🎂</span>
-                <span className="truncate font-medium">{b.name}</span>
-              </div>
-            ))}
+        {/* Birthdays */}
+        {day.birthdays.map((b, i) => (
+          <div key={`bday-${i}`} className="flex items-center gap-2 py-1.5 px-2">
+            <span className="text-[1.1rem]">&#127874;</span>
+            <span className="text-[0.95rem] font-medium text-accent-500 truncate">{b.name}</span>
           </div>
-        )}
+        ))}
 
-        {/* Milestone indicators */}
-        {day.milestones.length > 0 && (
-          <div className="mt-1 px-2">
-            {day.milestones.map((m, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-1.5 py-1 text-sm text-sage-600"
-              >
-                <span className="text-base">🎯</span>
-                <span className="truncate">{m.title}</span>
-              </div>
-            ))}
+        {/* Milestones */}
+        {day.milestones.map((m, i) => (
+          <div key={`ms-${i}`} className="flex items-center gap-2 py-1.5 px-2">
+            <span className="text-[1.1rem]">&#127919;</span>
+            <span className="text-[0.95rem] text-sage-600 truncate">{m.title}</span>
           </div>
-        )}
+        ))}
       </div>
     </div>
   )
