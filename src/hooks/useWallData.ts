@@ -47,6 +47,7 @@ export interface UseWallDataReturn {
   loading: boolean
   error: string | null
   lastRefresh: Date | null
+  refetch: () => Promise<void>
 }
 
 function toDateString(date: Date): string {
@@ -375,5 +376,5 @@ export function useWallData(): UseWallDataReturn {
     }
   }, [fetchAllData])
 
-  return { days, familyMembers, calendarEvents: calendarEventsState, screenTimeSummaries, overdueTasks, inboxCount, loading, error, lastRefresh }
+  return { days, familyMembers, calendarEvents: calendarEventsState, screenTimeSummaries, overdueTasks, inboxCount, loading, error, lastRefresh, refetch: fetchAllData }
 }

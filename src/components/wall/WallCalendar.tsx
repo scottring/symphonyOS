@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useWallData } from '@/hooks/useWallData'
+import { useActionableInstances } from '@/hooks/useActionableInstances'
+import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { FAMILY_COLORS, type FamilyMemberColor } from '@/types/family'
+import type { TimelineItem } from '@/types/timeline'
 import { WallItem } from './WallItem'
 import { WallDinnerWidget } from './WallDinnerWidget'
 import { WallScreenTimeWidget } from './WallScreenTimeWidget'
@@ -36,7 +39,37 @@ function formatWallDate(date: Date): string {
 export function WallCalendar() {
   const { user, loading: authLoading } = useAuth()
   const wallData = useWallData()
+  const { markDone, undoDone } = useActionableInstances()
+  const { updateTask } = useSupabaseTasks()
   const [currentTime, setCurrentTime] = useState(new Date())
+  const [overdueExpanded, setOverdueExpanded] = useState(false)
+
+  // Complete/uncomplete a wall item
+  const handleComplete = useCallback(async (item: TimelineItem) => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    if (item.type === 'task') {
+      const taskId = item.id.replace('task-', '')
+      await updateTask(taskId, { completed: !item.completed })
+    } else if (item.type === 'routine') {
+      const routineId = item.id.replace('routine-', '')
+      if (item.completed) {
+        await undoDone('routine', routineId, today)
+      } else {
+        await markDone('routine', routineId, today)
+      }
+    } else if (item.type === 'event') {
+      const eventId = item.id.replace('event-', '')
+      if (item.completed) {
+        await undoDone('calendar_event', eventId, today)
+      } else {
+        await markDone('calendar_event', eventId, today)
+      }
+    }
+    // Refresh wall data
+    wallData.refetch()
+  }, [updateTask, markDone, undoDone, wallData])
 
   // Update clock every minute
   useEffect(() => {
@@ -97,10 +130,12 @@ export function WallCalendar() {
     ? SECTION_ORDER.reduce((sum, s) => sum + (todayData.items[s]?.length || 0), 0)
     : 0
 
-  // Cap overdue display at 4 items
+  // Cap overdue display at 4 items unless expanded
   const MAX_OVERDUE_SHOWN = 4
-  const overdueShown = wallData.overdueTasks.slice(0, MAX_OVERDUE_SHOWN)
-  const overdueRemaining = wallData.overdueTasks.length - overdueShown.length
+  const overdueShown = overdueExpanded
+    ? wallData.overdueTasks
+    : wallData.overdueTasks.slice(0, MAX_OVERDUE_SHOWN)
+  const overdueRemaining = wallData.overdueTasks.length - MAX_OVERDUE_SHOWN
 
   return (
     <div className="wall-calendar h-screen w-screen bg-bg-base overflow-hidden flex flex-col select-none">
@@ -170,12 +205,16 @@ export function WallCalendar() {
                       key={item.id}
                       item={item}
                       familyMembers={wallData.familyMembers}
+                      onComplete={() => handleComplete(item)}
                     />
                   ))}
                   {overdueRemaining > 0 && (
-                    <div className="text-[1.1rem] text-amber-400 py-1 px-2">
-                      +{overdueRemaining} more
-                    </div>
+                    <button
+                      onClick={() => setOverdueExpanded(!overdueExpanded)}
+                      className="text-[1.1rem] text-amber-400 hover:text-amber-500 py-1 px-2 cursor-pointer transition-colors"
+                    >
+                      {overdueExpanded ? 'Show less' : `+${overdueRemaining} more`}
+                    </button>
                   )}
                 </div>
               </div>
@@ -211,6 +250,7 @@ export function WallCalendar() {
                         key={item.id}
                         item={item}
                         familyMembers={wallData.familyMembers}
+                        onComplete={() => handleComplete(item)}
                       />
                     ))}
                   </div>

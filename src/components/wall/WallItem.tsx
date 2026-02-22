@@ -5,9 +5,10 @@ import type { TimelineItem } from '@/types/timeline'
 interface WallItemProps {
   item: TimelineItem
   familyMembers: FamilyMember[]
+  onComplete?: () => void
 }
 
-export function WallItem({ item, familyMembers }: WallItemProps) {
+export function WallItem({ item, familyMembers, onComplete }: WallItemProps) {
   const assignedMember = item.assignedTo
     ? familyMembers.find(m => m.id === item.assignedTo)
     : undefined
@@ -25,8 +26,31 @@ export function WallItem({ item, familyMembers }: WallItemProps) {
       data-item-id={item.id}
       data-item-type={item.type}
     >
-      {/* Color dot for family member */}
-      {colors ? (
+      {/* Checkbox / color dot */}
+      {onComplete ? (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onComplete()
+          }}
+          className="mt-1.5 shrink-0 flex items-center justify-center cursor-pointer"
+          aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
+        >
+          {item.completed ? (
+            <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
+              <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M2.5 6L5 8.5L9.5 3.5" />
+              </svg>
+            </div>
+          ) : (
+            <div
+              className={`w-5 h-5 rounded-full border-2 transition-colors hover:border-green-400 ${
+                colors ? `${colors.ring} border-current` : 'border-neutral-300'
+              }`}
+            />
+          )}
+        </button>
+      ) : colors ? (
         <div
           className={`w-4 h-4 rounded-full mt-2 shrink-0 ${colors.bg} ring-2 ${colors.ring}`}
         />
