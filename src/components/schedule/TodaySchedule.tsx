@@ -858,11 +858,22 @@ export function TodaySchedule({
   }, [events, viewedDate])
 
   // Build instance status map for routines
+  // When multiple instances exist for the same routine (e.g. deferred + completed),
+  // prefer completed/skipped over deferred/pending
   const routineStatusMap = useMemo(() => {
+    const statusPriority: Record<string, number> = {
+      completed: 3,
+      skipped: 2,
+      deferred: 1,
+      pending: 0,
+    }
     const map = new Map<string, ActionableInstance>()
     for (const instance of dateInstances) {
       if (instance.entity_type === 'routine') {
-        map.set(instance.entity_id, instance)
+        const existing = map.get(instance.entity_id)
+        if (!existing || (statusPriority[instance.status] ?? 0) > (statusPriority[existing.status] ?? 0)) {
+          map.set(instance.entity_id, instance)
+        }
       }
     }
     return map

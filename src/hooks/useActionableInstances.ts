@@ -150,6 +150,35 @@ export function useActionableInstances() {
   // ACTIONS
   // ============================================================================
 
+  // Find the correct instance for an entity on a date, checking deferred instances too.
+  // This handles routines/events that were deferred FROM another date TO this date.
+  const findInstanceForDate = useCallback(async (
+    entityType: EntityType,
+    entityId: string,
+    date: Date
+  ): Promise<ActionableInstance | null> => {
+    // First try direct date match
+    let instance = await getInstance(entityType, entityId, date)
+    if (instance) return instance
+
+    // Check for an instance deferred TO this date
+    const startOfDay = new Date(date)
+    startOfDay.setHours(0, 0, 0, 0)
+    const endOfDay = new Date(date)
+    endOfDay.setHours(23, 59, 59, 999)
+
+    const { data } = await supabase
+      .from('actionable_instances')
+      .select('*')
+      .eq('entity_type', entityType)
+      .eq('entity_id', entityId)
+      .gte('deferred_to', startOfDay.toISOString())
+      .lte('deferred_to', endOfDay.toISOString())
+      .maybeSingle()
+
+    return (data as ActionableInstance) ?? null
+  }, [getInstance])
+
   // Mark as done
   const markDone = useCallback(async (
     entityType: EntityType,
@@ -160,7 +189,12 @@ export function useActionableInstances() {
     setError(null)
 
     try {
-      const instance = await getOrCreateInstance(entityType, entityId, date)
+      // Find existing instance (including deferred-to instances)
+      let instance = await findInstanceForDate(entityType, entityId, date)
+      // Fall back to creating a new instance if none exists
+      if (!instance) {
+        instance = await getOrCreateInstance(entityType, entityId, date)
+      }
       if (!instance) throw new Error('Failed to get instance')
 
       const { error: updateError } = await supabase
@@ -181,9 +215,9 @@ export function useActionableInstances() {
     } finally {
       setIsLoading(false)
     }
-  }, [getOrCreateInstance])
+  }, [findInstanceForDate, getOrCreateInstance])
 
-  // Undo done (back to pending)
+  // Undo done (back to pending, or back to deferred if it was a deferred instance)
   const undoDone = useCallback(async (
     entityType: EntityType,
     entityId: string,
@@ -193,14 +227,21 @@ export function useActionableInstances() {
     setError(null)
 
     try {
-      const instance = await getInstance(entityType, entityId, date)
+      const instance = await findInstanceForDate(entityType, entityId, date)
       if (!instance) return true // No instance means it's already not done
+
+      // If the instance was deferred from another date, restore to 'deferred'
+      // Otherwise restore to 'pending'
+      const dateStr = toDateString(date)
+      const wasDeferred = instance.deferred_to && (instance.date as string) !== dateStr
+      const restoreStatus: ActionableStatus = wasDeferred ? 'deferred' : 'pending'
 
       const { error: updateError } = await supabase
         .from('actionable_instances')
         .update({
-          status: 'pending' as ActionableStatus,
+          status: restoreStatus,
           completed_at: null,
+          skipped_at: null,
         })
         .eq('id', instance.id)
 
@@ -214,7 +255,7 @@ export function useActionableInstances() {
     } finally {
       setIsLoading(false)
     }
-  }, [getInstance])
+  }, [findInstanceForDate])
 
   // Skip (this instance only)
   const skip = useCallback(async (
@@ -226,7 +267,11 @@ export function useActionableInstances() {
     setError(null)
 
     try {
-      const instance = await getOrCreateInstance(entityType, entityId, date)
+      // Find existing instance (including deferred-to instances)
+      let instance = await findInstanceForDate(entityType, entityId, date)
+      if (!instance) {
+        instance = await getOrCreateInstance(entityType, entityId, date)
+      }
       if (!instance) throw new Error('Failed to get instance')
 
       const { error: updateError } = await supabase
@@ -247,7 +292,7 @@ export function useActionableInstances() {
     } finally {
       setIsLoading(false)
     }
-  }, [getOrCreateInstance])
+  }, [findInstanceForDate, getOrCreateInstance])
 
   // Defer to a new date/time
   const defer = useCallback(async (
