@@ -24,12 +24,16 @@ export function PushDropdown({ onPush, size = 'md', showTodayOption = false }: P
   const buttonRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Calculate dropdown position when opening
+  // Calculate dropdown position when opening (flip upward if near bottom)
   useEffect(() => {
     if (isOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect()
+      const estimatedHeight = 320 // approximate dropdown height
+      const spaceBelow = window.innerHeight - rect.bottom - 4
+      const flipUp = spaceBelow < estimatedHeight && rect.top > estimatedHeight
+
       setDropdownPosition({
-        top: rect.bottom + 4,
+        top: flipUp ? rect.top - estimatedHeight - 4 : rect.bottom + 4,
         right: window.innerWidth - rect.right,
       })
     }

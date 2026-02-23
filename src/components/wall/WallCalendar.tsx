@@ -39,7 +39,7 @@ function formatWallDate(date: Date): string {
 export function WallCalendar() {
   const { user, loading: authLoading } = useAuth()
   const wallData = useWallData()
-  const { markDone, undoDone } = useActionableInstances()
+  const { markDone, undoDone, reschedule } = useActionableInstances()
   const { updateTask } = useSupabaseTasks()
   const [currentTime, setCurrentTime] = useState(new Date())
   const [overdueExpanded, setOverdueExpanded] = useState(false)
@@ -70,6 +70,27 @@ export function WallCalendar() {
     // Refresh wall data
     wallData.refetch()
   }, [updateTask, markDone, undoDone, wallData])
+
+  // Push a routine to tomorrow (same time)
+  const handlePushTomorrow = useCallback(async (item: TimelineItem) => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    // Preserve the routine's time of day
+    if (item.startTime) {
+      tomorrow.setHours(item.startTime.getHours(), item.startTime.getMinutes(), 0, 0)
+    }
+
+    const entityId = item.id.replace(/^(routine|task|event)-/, '')
+    const entityType = item.type === 'routine' ? 'routine' as const
+      : item.type === 'event' ? 'calendar_event' as const
+      : 'routine' as const
+
+    await reschedule(entityType, entityId, today, tomorrow)
+    wallData.refetch()
+  }, [reschedule, wallData])
 
   // Update clock every minute
   useEffect(() => {
@@ -206,6 +227,7 @@ export function WallCalendar() {
                       item={item}
                       familyMembers={wallData.familyMembers}
                       onComplete={() => handleComplete(item)}
+                      onPushTomorrow={item.type === 'routine' ? () => handlePushTomorrow(item) : undefined}
                     />
                   ))}
                   {overdueRemaining > 0 && (
@@ -251,6 +273,7 @@ export function WallCalendar() {
                         item={item}
                         familyMembers={wallData.familyMembers}
                         onComplete={() => handleComplete(item)}
+                        onPushTomorrow={item.type === 'routine' ? () => handlePushTomorrow(item) : undefined}
                       />
                     ))}
                   </div>

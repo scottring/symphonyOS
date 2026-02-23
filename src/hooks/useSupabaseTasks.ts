@@ -762,10 +762,10 @@ export function useSupabaseTasks() {
     const currentCount = task?.deferCount ?? 0
 
     if (task.scheduledFor) {
-      // Scheduled task: move to new date (preserve time if set, otherwise all-day)
+      // Scheduled task: move to new date (preserve time only if explicitly non-all-day)
       const newScheduledFor = new Date(date)
-      if (!task.isAllDay && task.scheduledFor) {
-        // Preserve the original time
+      if (task.isAllDay === false && task.scheduledFor) {
+        // Preserve the original time for tasks with a specific time
         newScheduledFor.setHours(task.scheduledFor.getHours(), task.scheduledFor.getMinutes(), 0, 0)
       }
       await updateTask(id, {

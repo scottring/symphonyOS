@@ -6,9 +6,10 @@ interface WallItemProps {
   item: TimelineItem
   familyMembers: FamilyMember[]
   onComplete?: () => void
+  onPushTomorrow?: () => void
 }
 
-export function WallItem({ item, familyMembers, onComplete }: WallItemProps) {
+export function WallItem({ item, familyMembers, onComplete, onPushTomorrow }: WallItemProps) {
   const assignedMember = item.assignedTo
     ? familyMembers.find(m => m.id === item.assignedTo)
     : undefined
@@ -87,6 +88,23 @@ export function WallItem({ item, familyMembers, onComplete }: WallItemProps) {
           </div>
         )}
       </div>
+
+      {/* Push to tomorrow button — routines only, not completed */}
+      {onPushTomorrow && !item.completed && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onPushTomorrow()
+          }}
+          className="mt-1.5 shrink-0 p-1 rounded-lg text-neutral-300 hover:text-neutral-500 hover:bg-neutral-100 transition-colors cursor-pointer"
+          aria-label="Push to tomorrow"
+          title="Push to tomorrow"
+        >
+          <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 10h12M12 6l4 4-4 4" />
+          </svg>
+        </button>
+      )}
     </div>
   )
 }

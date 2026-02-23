@@ -476,8 +476,8 @@ export const ScheduleItem = memo(function ScheduleItem({
           </button>
         )}
 
-        {/* Push button - for tasks, always visible on mobile when overdue, hover on desktop */}
-        {isTask && onPush && (
+        {/* Push button - for tasks and routines, hover on desktop */}
+        {(isTask || isRoutine) && onPush && (
           <div
             className={`shrink-0 ${isMobile && isOverdue ? '' : 'hidden md:block opacity-0 group-hover:opacity-100'} transition-opacity`}
             onClick={(e) => {
