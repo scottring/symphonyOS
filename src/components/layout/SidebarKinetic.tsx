@@ -63,7 +63,8 @@ export function SidebarKinetic({
     >
       {/* Header */}
       <div className="p-5 flex items-center justify-between">
-        <div className={`flex items-center gap-3 ${collapsed ? 'justify-center w-full' : ''}`}>
+        <div className={`flex items-center gap-2 ${collapsed ? 'justify-center w-full' : ''}`}>
+          <img src="/symphony-logo.jpg" alt="Symphony" className="w-8 h-8 rounded-full object-cover" />
           {!collapsed && (
             <span className="font-display text-xl font-semibold text-gradient leading-tight">
               Symphony
