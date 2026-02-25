@@ -9,6 +9,9 @@ interface WallDinnerWidgetProps {
 
 const DINNER_KEYWORDS = /\b(dinner|supper|meal\s*prep)\b/i
 
+// Food keywords — if an evening event title matches any of these, treat it as dinner
+const FOOD_KEYWORDS = /\b(chicken|pasta|spaghetti|penne|linguine|fettuccine|lasagna|taco|burrito|pizza|burger|hamburger|salad|sushi|poke|soup|stew|chili|chowder|steak|beef|rib|fish|salmon|tilapia|cod|shrimp|curry|rice|sandwich|sub|waffle|pancake|bbq|grill|barbecue|pie|fry|fries|fried|noodle|ramen|pho|lobster|crab|meatball|casserole|roast|bake|stir.?fry|enchilada|quesadilla|wings|nuggets|mac.?and.?cheese|hot.?dog|pot.?roast|pulled.?pork|kabob|kebab|teriyaki|pad.?thai)\b/i
+
 // Map meal keywords → emoji for visual flair
 const MEAL_ICONS: [RegExp, string][] = [
     [/\bchicken\b/i, '🍗'],
@@ -38,22 +41,39 @@ function getMealIcon(name: string): string {
     return DEFAULT_MEAL_ICON
 }
 
-function findDinnerEvent(events: CalendarEvent[], date: Date): CalendarEvent | null {
+function toLocalDateStr(date: Date): string {
     const year = date.getFullYear()
     const month = String(date.getMonth() + 1).padStart(2, '0')
     const day = String(date.getDate()).padStart(2, '0')
-    const dateStr = `${year}-${month}-${day}`
+    return `${year}-${month}-${day}`
+}
 
-    return events.find(event => {
-        if (!DINNER_KEYWORDS.test(event.title)) return false
-        const startStr = event.start_time || event.startTime
-        if (!startStr) return false
+function isOnDate(event: CalendarEvent, dateStr: string): boolean {
+    const startStr = event.start_time || event.startTime
+    if (!startStr) return false
+    return startStr.substring(0, 10) === dateStr
+}
 
-        // Ensure we parse the event start in local bounds too if it has a time, 
-        // or just substring the first 10 characters for full day events.
-        const eventDateStr = startStr.substring(0, 10)
-        return eventDateStr === dateStr
-    }) || null
+function isEveningEvent(event: CalendarEvent): boolean {
+    const startStr = event.start_time || event.startTime
+    if (!startStr || startStr.length <= 10) return false // all-day events aren't evening
+    const eventDate = new Date(startStr)
+    return eventDate.getHours() >= 16 // 4 PM or later
+}
+
+function findDinnerEvent(events: CalendarEvent[], date: Date): CalendarEvent | null {
+    const dateStr = toLocalDateStr(date)
+    const todayEvents = events.filter(e => isOnDate(e, dateStr))
+
+    // 1. Explicit dinner/supper/meal prep event
+    const explicit = todayEvents.find(e => DINNER_KEYWORDS.test(e.title))
+    if (explicit) return explicit
+
+    // 2. Any evening event whose title contains food keywords
+    const eveningFood = todayEvents.find(e => isEveningEvent(e) && FOOD_KEYWORDS.test(e.title))
+    if (eveningFood) return eveningFood
+
+    return null
 }
 
 export function WallDinnerWidget({ calendarEvents }: WallDinnerWidgetProps) {
