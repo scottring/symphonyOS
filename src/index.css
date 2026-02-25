@@ -920,3 +920,74 @@ body {
     padding: 0.375rem 0.75rem;
   }
 }
+
+/* =============================================================================
+   WALL DISPLAY - Premium smart home dashboard
+   ============================================================================= */
+
+/* Time-of-day dark backgrounds */
+.wall-bg-morning {
+  background: linear-gradient(145deg, hsl(35 25% 14%) 0%, hsl(25 20% 9%) 100%);
+}
+.wall-bg-afternoon {
+  background: linear-gradient(145deg, hsl(30 18% 12%) 0%, hsl(28 14% 8%) 100%);
+}
+.wall-bg-evening {
+  background: linear-gradient(145deg, hsl(25 22% 11%) 0%, hsl(20 18% 7%) 100%);
+}
+.wall-bg-night {
+  background: linear-gradient(145deg, hsl(220 18% 10%) 0%, hsl(215 14% 6%) 100%);
+}
+
+/* Smooth background transitions between time periods */
+.wall-calendar {
+  transition: background 120s ease;
+}
+
+/* Floating frosted-glass card */
+.wall-card {
+  background: hsl(48 30% 98% / 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 1.5rem;
+  box-shadow:
+    0 0 0 1px hsl(38 20% 90% / 0.15),
+    0 8px 32px -4px hsl(25 20% 10% / 0.3),
+    0 2px 8px hsl(25 20% 10% / 0.08);
+  overflow: hidden;
+}
+
+/* Wall item touch feedback */
+.wall-item-tap {
+  transition: background-color 150ms ease;
+}
+.wall-item-tap:active {
+  background-color: hsl(168 30% 94% / 0.6);
+}
+
+/* Progress ring */
+.wall-progress-ring {
+  transform: rotate(-90deg);
+}
+.wall-progress-fill {
+  transition: stroke-dashoffset 800ms cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+/* Hidden scrollbar for ambient display */
+.wall-scroll-hidden::-webkit-scrollbar {
+  display: none;
+}
+.wall-scroll-hidden {
+  scrollbar-width: none;
+}
+
+/* Wall card staggered entrance */
+.wall-stagger > * {
+  animation: fade-in-up 0.4s cubic-bezier(0.25, 0.1, 0.25, 1) backwards;
+}
+.wall-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.wall-stagger > *:nth-child(2) { animation-delay: 60ms; }
+.wall-stagger > *:nth-child(3) { animation-delay: 120ms; }
+.wall-stagger > *:nth-child(4) { animation-delay: 180ms; }
+.wall-stagger > *:nth-child(5) { animation-delay: 240ms; }
+.wall-stagger > *:nth-child(6) { animation-delay: 300ms; }

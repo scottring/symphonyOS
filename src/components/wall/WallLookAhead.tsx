@@ -1,12 +1,12 @@
 import type { WallDayData } from '@/hooks/useWallData'
 import type { FamilyMember } from '@/types/family'
-import { FAMILY_COLORS, type FamilyMemberColor } from '@/types/family'
+
 import { formatTime } from '@/lib/timeUtils'
-import type { DaySection } from '@/lib/timeUtils'
 
 interface WallLookAheadProps {
   days: WallDayData[]
   familyMembers: FamilyMember[]
+  className?: string
 }
 
 interface Highlight {
@@ -14,129 +14,94 @@ interface Highlight {
   dayLabel: string
   title: string
   time: string | null
-  assignedMember: FamilyMember | null
-  kind: 'event' | 'task' | 'birthday' | 'milestone'
+  colorClass: string
 }
 
-const SECTION_ORDER: DaySection[] = ['allday', 'morning', 'afternoon', 'evening']
-const MAX_HIGHLIGHTS = 8
+const MAX_HIGHLIGHTS = 4
 
-function getHighlights(days: WallDayData[], familyMembers: FamilyMember[]): Highlight[] {
+function getHighlights(days: WallDayData[], _familyMembers: FamilyMember[]): Highlight[] {
   const highlights: Highlight[] = []
-  const futureDays = days.filter(d => !d.isToday)
 
-  for (const day of futureDays) {
-    const dayLabel = day.date.toLocaleDateString('en-US', { weekday: 'short' })
+  // Custom colors for nodes
+  const COLORS = ['bg-[#6DC4A7]', 'bg-[#F26E63]', 'bg-[#F9C35C]', 'bg-[#6DC4A7]']
 
-    // Collect events and tasks (skip routines — they repeat daily)
-    for (const section of SECTION_ORDER) {
+  for (let i = 0; i < days.length; i++) {
+    const day = days[i]
+    let dayLabel = day.date.toLocaleDateString('en-US', { weekday: 'long' })
+    if (day.isToday) dayLabel = 'TODAY'
+    else if (i === 1) dayLabel = 'TOMORROW'
+
+    // Find the first interesting event/task for the day
+    let bestItem = null
+    for (const section of ['morning', 'afternoon', 'evening', 'allday'] as const) {
+      if (bestItem) break
       const items = day.items[section] || []
-      for (const item of items) {
-        if (item.type === 'routine' || item.type === 'playbook') continue
-        if (item.completed || item.skipped) continue
-
-        const member = item.assignedTo
-          ? familyMembers.find(m => m.id === item.assignedTo) || null
-          : null
-
-        highlights.push({
-          date: day.date,
-          dayLabel,
-          title: item.title,
-          time: item.startTime && !item.allDay ? formatTime(item.startTime) : null,
-          assignedMember: member,
-          kind: item.type === 'event' ? 'event' : 'task',
-        })
-      }
+      bestItem = items.find(item => item.type !== 'routine' && !item.completed) || null
     }
 
-    // Birthdays — always noteworthy
-    for (const b of day.birthdays) {
+    if (bestItem) {
       highlights.push({
         date: day.date,
-        dayLabel,
-        title: b.name,
+        dayLabel: dayLabel.toUpperCase(),
+        title: bestItem.title.toUpperCase(),
+        time: bestItem.startTime && !bestItem.allDay ? formatTime(bestItem.startTime) : null,
+        colorClass: COLORS[highlights.length % COLORS.length]
+      })
+    } else if (day.birthdays.length > 0) {
+      highlights.push({
+        date: day.date,
+        dayLabel: dayLabel.toUpperCase(),
+        title: `${day.birthdays[0].name.toUpperCase()}'S BIRTHDAY`,
         time: null,
-        assignedMember: null,
-        kind: 'birthday',
+        colorClass: COLORS[highlights.length % COLORS.length]
       })
     }
 
-    // Milestones — always noteworthy
-    for (const m of day.milestones) {
-      highlights.push({
-        date: day.date,
-        dayLabel,
-        title: m.title,
-        time: null,
-        assignedMember: null,
-        kind: 'milestone',
-      })
-    }
+    if (highlights.length >= MAX_HIGHLIGHTS) break
   }
 
-  // Already sorted by date (days are in order), then by appearance
-  return highlights.slice(0, MAX_HIGHLIGHTS)
+  return highlights
 }
 
-export function WallLookAhead({ days, familyMembers }: WallLookAheadProps) {
+export function WallLookAhead({ days, familyMembers, className = '' }: WallLookAheadProps) {
   const highlights = getHighlights(days, familyMembers)
 
   return (
-    <div className="flex-1 px-8 py-5 min-h-0 overflow-hidden">
-      <div className="text-[1rem] font-semibold uppercase tracking-[0.15em] text-neutral-400 mb-3">
+    <div className={`flex flex-col pl-8 ${className}`}>
+      <div className="text-[1.3rem] font-bold uppercase tracking-[0.2em] text-white mb-8 mt-2">
         Look Ahead
       </div>
 
-      {highlights.length === 0 ? (
-        <div className="text-[1.25rem] text-neutral-300 italic mt-2">
-          Clear week ahead
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {highlights.map((h, i) => {
-            const memberColors = h.assignedMember
-              ? FAMILY_COLORS[h.assignedMember.color as FamilyMemberColor]
-              : null
+      <div className="relative pl-6 flex-1 flex flex-col justify-between py-2">
+        {/* Continuous vertical timeline line */}
+        <div className="absolute left-[7px] top-4 bottom-4 w-1 bg-white/20 rounded-full" />
 
-            return (
-              <div key={i} className="flex items-center gap-3 min-w-0">
-                {/* Day label */}
-                <span className="text-[1.15rem] font-medium text-neutral-400 w-[3.5rem] shrink-0">
-                  {h.dayLabel}
-                </span>
+        {highlights.map((h, i) => (
+          <div key={i} className="relative mb-10 last:mb-0">
+            {/* Timeline Node */}
+            <div className={`absolute -left-[30px] top-1.5 w-5 h-5 rounded-full ${h.colorClass} shadow-md border-[3px] border-[#1e293b]`} />
 
-                {/* Color dot */}
-                {memberColors ? (
-                  <div className={`w-3 h-3 rounded-full shrink-0 ${memberColors.bg} ring-1 ${memberColors.ring}`} />
-                ) : (
-                  <div className="w-3 h-3 shrink-0" />
-                )}
+            <div className="flex flex-col">
+              <span className="text-[1.3rem] font-bold text-white tracking-widest leading-none">
+                {h.dayLabel}
+              </span>
+              <span className="text-[1.1rem] font-medium text-white/70 mt-1 uppercase tracking-wide">
+                {h.time ? `${h.time}: ` : ''}{h.title}
+              </span>
+            </div>
 
-                {/* Icon for special types */}
-                {h.kind === 'birthday' && (
-                  <span className="text-[1.25rem] shrink-0">&#127874;</span>
-                )}
-                {h.kind === 'milestone' && (
-                  <span className="text-[1.25rem] shrink-0">&#127919;</span>
-                )}
+            {/* Horizontal line extending from yesterday/today - aesthetic touch mimicking the mock */}
+            {i === 0 && (
+              <div className="absolute top-2 left-6 right-[-20px] h-1 bg-[#2e3e57] rounded-full -z-10" />
+            )}
+          </div>
+        ))}
 
-                {/* Title */}
-                <span className="text-[1.25rem] text-neutral-700 truncate">
-                  {h.title}
-                </span>
-
-                {/* Time */}
-                {h.time && (
-                  <span className="text-[1.15rem] text-neutral-400 shrink-0 ml-auto">
-                    {h.time}
-                  </span>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
+        {/* Placeholder if empty */}
+        {highlights.length === 0 && (
+          <div className="text-white/50 italic text-[1.2rem]">Nothing scheduled</div>
+        )}
+      </div>
     </div>
   )
 }

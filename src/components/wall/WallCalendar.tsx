@@ -1,48 +1,37 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useWallData } from '@/hooks/useWallData'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
-import { FAMILY_COLORS, type FamilyMemberColor } from '@/types/family'
 import type { TimelineItem } from '@/types/timeline'
-import { WallItem } from './WallItem'
-import { WallDinnerWidget } from './WallDinnerWidget'
-import { WallScreenTimeWidget } from './WallScreenTimeWidget'
+import { WallChoresWidget } from './WallChoresWidget'
 import { WallLookAhead } from './WallLookAhead'
-import type { DaySection } from '@/lib/timeUtils'
+import { WallRewardWidget } from './WallRewardWidget'
+import { WallScribbleWidget } from './WallScribbleWidget'
+import { WallDinnerWidget } from './WallDinnerWidget'
 
-const SECTION_ORDER: DaySection[] = ['allday', 'morning', 'afternoon', 'evening']
-
-const SECTION_LABELS: Record<string, string> = {
-  allday: 'All Day',
-  morning: 'Morning',
-  afternoon: 'Afternoon',
-  evening: 'Evening',
-}
-
-function formatWallTime(date: Date): string {
+function formatWallTime(date: Date): { time: string, period: string, dateStr: string } {
   const hours = date.getHours()
   const minutes = date.getMinutes()
   const period = hours >= 12 ? 'PM' : 'AM'
   const displayHour = hours % 12 || 12
-  return `${displayHour}:${minutes.toString().padStart(2, '0')} ${period}`
-}
+  const time = `${displayHour}:${minutes.toString().padStart(2, '0')}`
 
-function formatWallDate(date: Date): string {
-  return date.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  })
+  const dateStr = date.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric'
+  }).toUpperCase()
+
+  return { time, period, dateStr }
 }
 
 export function WallCalendar() {
   const { user, loading: authLoading } = useAuth()
   const wallData = useWallData()
-  const { markDone, undoDone, reschedule } = useActionableInstances()
+  const { markDone, undoDone } = useActionableInstances()
   const { updateTask } = useSupabaseTasks()
   const [currentTime, setCurrentTime] = useState(new Date())
-  const [overdueExpanded, setOverdueExpanded] = useState(false)
 
   // Complete/uncomplete a wall item
   const handleComplete = useCallback(async (item: TimelineItem) => {
@@ -67,30 +56,10 @@ export function WallCalendar() {
         await markDone('calendar_event', eventId, today)
       }
     }
-    // Refresh wall data
     wallData.refetch()
   }, [updateTask, markDone, undoDone, wallData])
 
-  // Push a routine to tomorrow (same time)
-  const handlePushTomorrow = useCallback(async (item: TimelineItem) => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
 
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    // Preserve the routine's time of day
-    if (item.startTime) {
-      tomorrow.setHours(item.startTime.getHours(), item.startTime.getMinutes(), 0, 0)
-    }
-
-    const entityId = item.id.replace(/^(routine|task|event)-/, '')
-    const entityType = item.type === 'routine' ? 'routine' as const
-      : item.type === 'event' ? 'calendar_event' as const
-      : 'routine' as const
-
-    await reschedule(entityType, entityId, today, tomorrow)
-    wallData.refetch()
-  }, [reschedule, wallData])
 
   // Update clock every minute
   useEffect(() => {
@@ -98,13 +67,27 @@ export function WallCalendar() {
     return () => clearInterval(interval)
   }, [])
 
-  // Auth loading state
+  // Flatten active items for the chores widget
+  const activeItems = useMemo(() => {
+    if (!wallData.days.length) return []
+    const today = wallData.days.find(d => d.isToday)
+    if (!today) return []
+    const items: TimelineItem[] = []
+    for (const section of ['morning', 'afternoon', 'evening', 'allday'] as const) {
+      if (today.items[section]) {
+        items.push(...today.items[section].filter(i => i.type !== 'event' && !i.completed && !i.skipped))
+      }
+    }
+    return items
+  }, [wallData.days])
+
+  // Auth loading
   if (authLoading) {
     return (
-      <div className="h-screen w-screen bg-bg-base flex items-center justify-center">
+      <div className="wall-calendar h-screen w-screen bg-[#1e293b] flex items-center justify-center select-none">
         <div className="text-center">
-          <div className="font-display text-[4rem] text-neutral-400 mb-2">Symphony</div>
-          <div className="text-[1.25rem] text-neutral-400">Loading...</div>
+          <div className="font-display text-[4rem] text-white/60 mb-2">Symphony</div>
+          <div className="text-[1.25rem] text-white/40">Loading...</div>
         </div>
       </div>
     )
@@ -113,18 +96,12 @@ export function WallCalendar() {
   // Not authenticated
   if (!user) {
     return (
-      <div className="h-screen w-screen bg-bg-base flex items-center justify-center">
+      <div className="wall-calendar h-screen w-screen bg-[#1e293b] flex items-center justify-center select-none">
         <div className="text-center max-w-md">
-          <div className="font-display text-[4rem] text-neutral-700 mb-4">Symphony</div>
-          <div className="text-[1.25rem] text-neutral-500 mb-8">
+          <div className="font-display text-[4rem] text-white/80 mb-4">Symphony</div>
+          <div className="text-[1.25rem] text-white/50 mb-8">
             Sign in to view your family calendar
           </div>
-          <a
-            href="/"
-            className="inline-block px-8 py-3 bg-primary-500 text-white rounded-xl text-[1.15rem] font-medium"
-          >
-            Sign In
-          </a>
         </div>
       </div>
     )
@@ -133,209 +110,124 @@ export function WallCalendar() {
   // Data loading
   if (wallData.loading) {
     return (
-      <div className="h-screen w-screen bg-bg-base flex items-center justify-center">
+      <div className="wall-calendar h-screen w-screen bg-[#1e293b] flex items-center justify-center select-none">
         <div className="text-center">
-          <div className="font-display text-[5rem] text-neutral-400 mb-3 leading-none">
-            {formatWallTime(currentTime)}
+          <div className="font-display text-[6rem] text-white/90 mb-3 leading-none tracking-tight">
+            {formatWallTime(currentTime).time}
           </div>
-          <div className="text-[1.25rem] text-neutral-400">Loading your day...</div>
+          <div className="text-[1.25rem] text-white/40">Loading your day...</div>
         </div>
       </div>
     )
   }
 
-  const todayData = wallData.days.find(d => d.isToday)
-
-  // Count today's items
-  const todayItemCount = todayData
-    ? SECTION_ORDER.reduce((sum, s) => sum + (todayData.items[s]?.length || 0), 0)
-    : 0
-
-  // Cap overdue display at 4 items unless expanded
-  const MAX_OVERDUE_SHOWN = 4
-  const overdueShown = overdueExpanded
-    ? wallData.overdueTasks
-    : wallData.overdueTasks.slice(0, MAX_OVERDUE_SHOWN)
-  const overdueRemaining = wallData.overdueTasks.length - MAX_OVERDUE_SHOWN
+  const { time, period, dateStr } = formatWallTime(currentTime)
 
   return (
-    <div className="wall-calendar h-screen w-screen bg-bg-base overflow-hidden flex flex-col select-none">
+    <div className="wall-calendar w-[1920px] h-[1080px] bg-[#1e293b] overflow-hidden flex flex-col select-none relative p-12 mx-auto">
 
-      {/* ═══ HEADER: Clock + Date + Family Legend ═══ */}
-      <header className="shrink-0 flex items-center justify-between px-10 py-4 border-b border-neutral-200/40">
-        <div className="flex items-baseline gap-6">
-          <time className="font-display text-[5rem] leading-none text-neutral-800 tracking-tight">
-            {formatWallTime(currentTime)}
+      {/* ═══ TOP HEADER ═══ */}
+      <header className="flex items-center justify-between mb-8 z-10 w-full pr-12">
+        <div className="flex items-baseline gap-4">
+          <time className="font-bold text-[8rem] leading-none text-white tracking-tight">
+            {time}
           </time>
-          <span className="text-[1.75rem] text-neutral-500 font-medium">
-            {formatWallDate(currentTime)}
+          <span className="text-[3.5rem] font-bold text-white tracking-tight mr-4">
+            {period}
+          </span>
+          <div className="text-[2.5rem] font-bold text-white/50 tracking-wider">
+            {dateStr}
+          </div>
+          <span className="text-[5rem] ml-4 animate-pulse-soft hidden sm:block">
+            🌞
           </span>
         </div>
 
-        {/* Family legend */}
-        <div className="flex items-center gap-5">
-          {wallData.familyMembers
-            .filter(m => m.member_type === 'core')
-            .map(member => {
-              const colors = FAMILY_COLORS[member.color as FamilyMemberColor]
-              return (
-                <div key={member.id} className="flex items-center gap-2.5">
-                  <div className={`w-5 h-5 rounded-full ${colors?.bg || 'bg-neutral-200'} ring-2 ${colors?.ring || 'ring-neutral-300'}`} />
-                  <span className="text-[1.25rem] text-neutral-600 font-medium">
-                    {member.name}
-                  </span>
-                </div>
-              )
-            })}
+        {/* Who's Home Avatars */}
+        <div className="flex flex-col items-end gap-2">
+          <span className="text-white font-black uppercase tracking-widest text-[1rem]">
+            WHO'S HOME
+          </span>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 bg-white/10 rounded-full px-3 py-1.5 text-white mr-4">
+              <span className="w-2.5 h-2.5 bg-green-400 rounded-full" />
+              <span className="font-bold text-[1.2rem]">4/4</span>
+            </div>
+
+            {/* Example Avatars (Using placeholders or distinct colors) */}
+            <div className="w-[4.5rem] h-[4.5rem] rounded-full bg-[#f87171] border-4 border-[#34d399] flex justify-center items-center text-[2rem] shadow-lg relative">
+              👨
+              <div className="absolute -top-2 bg-white text-slate-900 text-[0.7rem] px-2 py-0.5 rounded-full font-bold uppercase">Dad</div>
+            </div>
+            <div className="w-[4.5rem] h-[4.5rem] rounded-full bg-[#60a5fa] border-4 border-[#34d399] flex justify-center items-center text-[2rem] shadow-lg relative">
+              👩
+              <div className="absolute -top-2 bg-white text-slate-900 text-[0.7rem] px-2 py-0.5 rounded-full font-bold uppercase">Mom</div>
+            </div>
+          </div>
         </div>
       </header>
 
-      {/* ═══ MAIN: Today (left) + Widgets (right) ═══ */}
-      <main className="flex-1 flex overflow-hidden min-h-0">
+      {/* ═══ MAIN LAYOUT ═══ */}
+      <main className="flex-1 flex gap-12 min-h-0 relative z-10 w-full">
 
-        {/* ─── TODAY: Full schedule ─── */}
-        <div className="w-[55%] flex flex-col border-r border-neutral-200/40">
-          {/* Today header */}
-          <div className="shrink-0 px-10 pt-5 pb-3 bg-primary-50/25 border-b border-primary-200/30">
-            <div className="flex items-baseline gap-3">
-              <span className="text-[1.1rem] font-semibold uppercase tracking-[0.2em] text-primary-500">
-                Today
-              </span>
-              {todayItemCount > 0 && (
-                <span className="text-[1rem] text-primary-400 font-medium">
-                  {todayItemCount} {todayItemCount === 1 ? 'item' : 'items'}
-                </span>
-              )}
+        {/* ─── LEFT COLUMN (60%) ─── */}
+        <div className="w-[60%] flex flex-col h-full justify-between pb-4">
+
+          <div className="flex flex-col flex-1">
+            <h1 className="text-white text-[3rem] font-black uppercase tracking-wide mb-8 drop-shadow-sm">
+              CHORES & TASKS TODAY!
+            </h1>
+
+            {/* Chores Bento Box Widget */}
+            <WallChoresWidget items={activeItems} onComplete={handleComplete} />
+          </div>
+
+          {/* Bottom Area: Rewards & Fun Widgets */}
+          <div className="flex items-end mt-12 mb-4 h-[160px]">
+            <WallScribbleWidget />
+            <WallRewardWidget />
+          </div>
+
+        </div>
+
+        {/* ─── RIGHT COLUMN (40%) ─── */}
+        <div className="w-[40%] flex flex-col justify-start pt-16 relative h-full">
+          {/* Prevent overlap by restricting overflow behind the alien */}
+          <div className="flex-1 overflow-hidden pb-[160px]">
+            <WallLookAhead days={wallData.days} familyMembers={wallData.familyMembers} />
+
+            <div className="pl-8 w-full mt-2">
+              <WallDinnerWidget calendarEvents={wallData.calendarEvents} days={wallData.days} />
             </div>
           </div>
 
-          {/* Schedule items */}
-          <div className="flex-1 overflow-y-auto px-8 py-4">
-            {/* Overdue tasks */}
-            {overdueShown.length > 0 && (
-              <div className="mb-5">
-                <div className="flex items-center gap-4 mb-2">
-                  <span className="text-[1rem] font-semibold uppercase tracking-[0.15em] text-amber-500">
-                    Overdue
-                  </span>
-                  <div className="h-px flex-1 bg-amber-300/40" />
-                </div>
-                <div className="space-y-0.5 border-l-2 border-amber-400/50 pl-3">
-                  {overdueShown.map(item => (
-                    <WallItem
-                      key={item.id}
-                      item={item}
-                      familyMembers={wallData.familyMembers}
-                      onComplete={() => handleComplete(item)}
-                      onPushTomorrow={item.type === 'routine' ? () => handlePushTomorrow(item) : undefined}
-                    />
-                  ))}
-                  {overdueRemaining > 0 && (
-                    <button
-                      onClick={() => setOverdueExpanded(!overdueExpanded)}
-                      className="text-[1.1rem] text-amber-400 hover:text-amber-500 py-1 px-2 cursor-pointer transition-colors"
-                    >
-                      {overdueExpanded ? 'Show less' : `+${overdueRemaining} more`}
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {todayData && todayItemCount === 0 && todayData.birthdays.length === 0 && todayData.milestones.length === 0 && overdueShown.length === 0 && wallData.inboxCount === 0 && (
-              <div className="text-center mt-16">
-                <div className="font-display text-[2.5rem] text-neutral-300 italic leading-tight">
-                  Nothing scheduled
-                </div>
-                <div className="text-[1.25rem] text-neutral-300 mt-2">Enjoy the day</div>
-              </div>
-            )}
-
-            {todayData && SECTION_ORDER.map(section => {
-              const items = todayData.items[section]
-              if (!items || items.length === 0) return null
-
-              return (
-                <div key={section} className="mb-5">
-                  {/* Section label */}
-                  <div className="flex items-center gap-4 mb-2">
-                    <span className="text-[1rem] font-semibold uppercase tracking-[0.15em] text-neutral-400">
-                      {SECTION_LABELS[section]}
-                    </span>
-                    <div className="h-px flex-1 bg-neutral-200/50" />
-                  </div>
-
-                  {/* Items */}
-                  <div className="space-y-0.5">
-                    {items.map(item => (
-                      <WallItem
-                        key={item.id}
-                        item={item}
-                        familyMembers={wallData.familyMembers}
-                        onComplete={() => handleComplete(item)}
-                        onPushTomorrow={item.type === 'routine' ? () => handlePushTomorrow(item) : undefined}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
-
-            {/* Birthdays */}
-            {todayData && todayData.birthdays.length > 0 && (
-              <div className="mt-4">
-                {todayData.birthdays.map((b, i) => (
-                  <div key={i} className="flex items-center gap-3 py-2 px-2">
-                    <span className="text-[1.75rem]">&#127874;</span>
-                    <span className="text-[1.5rem] font-medium text-accent-500">{b.name}'s Birthday</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Milestones */}
-            {todayData && todayData.milestones.length > 0 && (
-              <div className="mt-2">
-                {todayData.milestones.map((m, i) => (
-                  <div key={i} className="flex items-center gap-3 py-2 px-2">
-                    <span className="text-[1.75rem]">&#127919;</span>
-                    <span className="text-[1.5rem] font-medium text-sage-600">{m.title}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Inbox count */}
-            {wallData.inboxCount > 0 && (
-              <div className="mt-6 pt-4 border-t border-neutral-200/40">
-                <div className="flex items-center gap-3 px-2">
-                  <span className="text-[1.3rem] text-neutral-400">
-                    {wallData.inboxCount} {wallData.inboxCount === 1 ? 'item' : 'items'} in inbox
-                  </span>
-                </div>
-              </div>
-            )}
+          {/* Alien Mascot with Speech Bubble */}
+          <div className="absolute bottom-0 right-[-20px] flex items-end translate-y-8">
+            <div className="bg-white rounded-3xl rounded-br-none p-5 max-w-[340px] shadow-xl relative -top-32 right-12 z-30">
+              <p className="text-[#1e293b] font-black uppercase tracking-wider text-[1.1rem] leading-snug">
+                WHY DID THE SCARECROW WIN THE AWARD? BECAUSE HE WAS OUTSTANDING IN HIS FIELD!
+              </p>
+              {/* Speech bubble tail */}
+              <div className="absolute -bottom-4 right-4 w-8 h-8 bg-white" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%)' }} />
+            </div>
+            <div className="text-[12rem] leading-none drop-shadow-2xl z-20" style={{ transform: 'scaleX(-1)' }}>
+              👽
+            </div>
           </div>
         </div>
 
-        {/* ─── WIDGETS: Stacked cards ─── */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <WallDinnerWidget calendarEvents={wallData.calendarEvents} days={wallData.days} />
-          <WallScreenTimeWidget summaries={wallData.screenTimeSummaries} />
-          <WallLookAhead days={wallData.days} familyMembers={wallData.familyMembers} />
-        </div>
       </main>
 
-      {/* Refresh timestamp — subtle bottom-right */}
+      {/* Refresh timestamp */}
       {wallData.lastRefresh && (
-        <div className="fixed bottom-3 right-4 text-[0.75rem] text-neutral-300">
-          {wallData.lastRefresh.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+        <div className="fixed top-6 right-6 text-[0.8rem] text-white/20 z-0">
+          Last updated: {wallData.lastRefresh.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
         </div>
       )}
 
       {/* Error indicator */}
       {wallData.error && (
-        <div className="fixed bottom-6 right-6 bg-danger-50 text-danger-600 px-5 py-3 rounded-xl text-[1rem] shadow-lg border border-danger-500/20">
+        <div className="fixed top-6 right-6 bg-red-900/80 text-red-200 px-5 py-3 rounded-xl text-[1rem] shadow-lg border border-red-500/30 backdrop-blur z-0">
           {wallData.error}
         </div>
       )}

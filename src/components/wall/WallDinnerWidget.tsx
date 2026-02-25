@@ -3,67 +3,85 @@ import type { WallDayData } from '@/hooks/useWallData'
 import { extractRecipeNameHint } from '@/lib/recipeDetection'
 
 interface WallDinnerWidgetProps {
-  calendarEvents: CalendarEvent[]
-  days: WallDayData[]
+    calendarEvents: CalendarEvent[]
+    days: WallDayData[]
 }
 
 const DINNER_KEYWORDS = /\b(dinner|supper|meal\s*prep)\b/i
 
+// Map meal keywords → emoji for visual flair
+const MEAL_ICONS: [RegExp, string][] = [
+    [/\bchicken\b/i, '🍗'],
+    [/\bpasta|spaghetti|penne|linguine|lasagna\b/i, '🍝'],
+    [/\btaco/i, '🌮'],
+    [/\bburrito/i, '🌯'],
+    [/\bpizza/i, '🍕'],
+    [/\bburger|hamburger/i, '🍔'],
+    [/\bsalad/i, '🥗'],
+    [/\bsushi|poke/i, '🍣'],
+    [/\bsoup|stew|chili|chowder/i, '🍲'],
+    [/\bsteak|beef|rib/i, '🥩'],
+    [/\bfish|salmon|shrimp/i, '🐟'],
+    [/\bcurry/i, '🍛'],
+    [/\brice\b/i, '🍚'],
+    [/\bsandwich|sub\b/i, '🥪'],
+    [/\bpie\b/i, '🥧'],
+    [/\bnoodle|ramen|pho/i, '🍜'],
+]
+
+const DEFAULT_MEAL_ICON = '🍽️'
+
+function getMealIcon(name: string): string {
+    for (const [pattern, emoji] of MEAL_ICONS) {
+        if (pattern.test(name)) return emoji
+    }
+    return DEFAULT_MEAL_ICON
+}
+
 function findDinnerEvent(events: CalendarEvent[], date: Date): CalendarEvent | null {
-  const dateStr = date.toISOString().split('T')[0]
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const dateStr = `${year}-${month}-${day}`
 
-  return events.find(event => {
-    if (!DINNER_KEYWORDS.test(event.title)) return false
+    return events.find(event => {
+        if (!DINNER_KEYWORDS.test(event.title)) return false
+        const startStr = event.start_time || event.startTime
+        if (!startStr) return false
 
-    const startStr = event.start_time || event.startTime
-    if (!startStr) return false
-    const eventDateStr = new Date(startStr).toISOString().split('T')[0]
-    return eventDateStr === dateStr
-  }) || null
+        // Ensure we parse the event start in local bounds too if it has a time, 
+        // or just substring the first 10 characters for full day events.
+        const eventDateStr = startStr.substring(0, 10)
+        return eventDateStr === dateStr
+    }) || null
 }
 
-function getDinnerDisplayName(event: CalendarEvent): string {
-  const title = event.title
-  const hint = extractRecipeNameHint(title)
-  return hint || title
-}
+export function WallDinnerWidget({ calendarEvents }: WallDinnerWidgetProps) {
+    const today = new Date()
+    const tonightEvent = findDinnerEvent(calendarEvents, today)
 
-export function WallDinnerWidget({ calendarEvents, days }: WallDinnerWidgetProps) {
-  const today = new Date()
-  const tomorrow = new Date(today)
-  tomorrow.setDate(tomorrow.getDate() + 1)
+    const tonightName = tonightEvent ? extractRecipeNameHint(tonightEvent.title) || tonightEvent.title : ''
+    const icon = getMealIcon(tonightName)
 
-  const tonightEvent = findDinnerEvent(calendarEvents, today)
-  const tomorrowEvent = findDinnerEvent(calendarEvents, tomorrow)
-
-  const hasTomorrow = days.length > 1
-
-  return (
-    <div className="px-8 py-5 border-b border-neutral-200/40">
-      <div className="text-[1rem] font-semibold uppercase tracking-[0.15em] text-neutral-400 mb-2">
-        Tonight's Dinner
-      </div>
-
-      {tonightEvent ? (
-        <div className="font-display text-[2.1rem] text-neutral-800 truncate leading-tight">
-          {getDinnerDisplayName(tonightEvent)}
+    return (
+        <div className="flex bg-[#6DC4A7]/20 rounded-3xl p-4 items-center gap-4 mt-6 border-2 border-[#6DC4A7]/30">
+            <div className="w-16 h-16 bg-[#6DC4A7] rounded-2xl flex items-center justify-center text-[2.5rem] shadow-lg shrink-0">
+                {icon}
+            </div>
+            <div className="flex flex-col min-w-0">
+                <span className="text-[#6DC4A7] font-black uppercase tracking-widest text-[0.9rem] mb-0.5">
+                    Tonight's Dinner
+                </span>
+                {tonightEvent ? (
+                    <span className="text-white font-bold text-[1.4rem] truncate leading-tight">
+                        {tonightName}
+                    </span>
+                ) : (
+                    <span className="text-white/50 font-medium text-[1.2rem] italic">
+                        No dinner planned
+                    </span>
+                )}
+            </div>
         </div>
-      ) : (
-        <div className="text-[1.5rem] text-neutral-300 italic">
-          No dinner planned
-        </div>
-      )}
-
-      {hasTomorrow && tomorrowEvent && (
-        <div className="mt-2 flex items-baseline gap-2.5">
-          <span className="text-[0.9rem] font-semibold uppercase tracking-[0.12em] text-neutral-300">
-            Tomorrow
-          </span>
-          <span className="text-[1.25rem] text-neutral-500 truncate">
-            {getDinnerDisplayName(tomorrowEvent)}
-          </span>
-        </div>
-      )}
-    </div>
-  )
+    )
 }
