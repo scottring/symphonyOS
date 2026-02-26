@@ -335,34 +335,25 @@ export function WallCalendar() {
     return () => clearInterval(interval)
   }, [])
 
-  // Today's chores/routines only (no overdue — those go in the status card)
-  const activeItems = useMemo(() => {
+  // Split today's items into chores (routines) and tasks
+  const { choreItems, taskItems } = useMemo(() => {
     const today = wallData.days.find(d => d.isToday)
-    if (!today) return []
-    const items: TimelineItem[] = []
-    for (const section of ['morning', 'afternoon', 'evening', 'allday'] as const) {
-      if (today.items[section]) {
-        items.push(...today.items[section].filter(i => i.type !== 'event' && !i.completed && !i.skipped))
-      }
-    }
-    return items
-  }, [wallData.days])
-
-  // Count today's completed vs total (non-event items)
-  const { completedCount, totalCount } = useMemo(() => {
-    const today = wallData.days.find(d => d.isToday)
-    if (!today) return { completedCount: 0, totalCount: 0 }
-    let completed = 0
-    let total = 0
+    if (!today) return { choreItems: [] as TimelineItem[], taskItems: [] as TimelineItem[] }
+    const chores: TimelineItem[] = []
+    const tasks: TimelineItem[] = []
     for (const section of ['morning', 'afternoon', 'evening', 'allday'] as const) {
       for (const item of (today.items[section] || [])) {
         if (item.type === 'event' || item.skipped) continue
-        total++
-        if (item.completed) completed++
+        if (item.type === 'routine') {
+          chores.push(item)
+        } else if (item.type === 'task') {
+          tasks.push(item)
+        }
       }
     }
-    return { completedCount: completed, totalCount: total }
+    return { choreItems: chores, taskItems: tasks }
   }, [wallData.days])
+
 
   // Auth loading
   if (authLoading) {
@@ -456,19 +447,13 @@ export function WallCalendar() {
         {/* ─── LEFT COLUMN (60%) ─── */}
         <div className="w-[60%] flex flex-col h-full justify-start pb-4">
 
-          <div className="flex flex-col">
-            <h1 className="text-white text-[3rem] font-black uppercase tracking-wide mb-8 drop-shadow-sm">
-              CHORES & TASKS TODAY!
-            </h1>
-
-            {/* Chores Bento Box Widget */}
+          <div className="flex flex-col mt-[75px]">
+            {/* Chores + Tasks Widget */}
             <WallChoresWidget
-              items={activeItems}
+              choreItems={choreItems}
+              taskItems={taskItems}
               onComplete={handleComplete}
               overdueItems={wallData.overdueTasks}
-              inboxCount={wallData.inboxCount}
-              completedCount={completedCount}
-              totalCount={totalCount}
             />
           </div>
 
