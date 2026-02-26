@@ -174,7 +174,7 @@ export function useWallData(): UseWallDataReturn {
           .select('id', { count: 'exact', head: true })
           .is('scheduled_for', null)
           .eq('completed', false)
-          .neq('is_someday', true),
+          .or('is_someday.is.null,is_someday.eq.false'),
       ])
 
       if (!mountedRef.current) return
