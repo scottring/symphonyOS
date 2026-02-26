@@ -446,10 +446,10 @@ export function WallCalendar() {
       <main className="flex-1 flex gap-12 min-h-0 relative z-10 w-full">
 
         {/* ─── LEFT COLUMN (60%) ─── */}
-        <div className="w-[60%] flex flex-col h-full justify-start pb-4">
+        <div className="w-[60%] flex flex-col h-full justify-between pb-2">
 
-          <div className="flex flex-col">
-            {/* Chores + Tasks Widget */}
+          {/* Top: Chores + Tasks */}
+          <div className="flex-shrink-0">
             <WallChoresWidget
               choreItems={choreItems}
               taskItems={taskItems}
@@ -458,14 +458,14 @@ export function WallCalendar() {
             />
           </div>
 
-          {/* Bottom Area: Today's horizontal timeline */}
-          <div className="mt-8 h-[200px]">
+          {/* Middle: Today's horizontal timeline */}
+          <div className="flex-shrink-0 h-[200px]">
             <WallTodayTimeline todayData={wallData.days.find(d => d.isToday)} />
           </div>
 
-          {/* Bottom bar: Quick Capture + Mood Meter */}
-          <div className="mt-4">
-            <WallBottomBar onTaskAdded={wallData.refetch} />
+          {/* Bottom: Family Mood Meter */}
+          <div className="flex-shrink-0">
+            <WallBottomBar />
           </div>
 
         </div>
