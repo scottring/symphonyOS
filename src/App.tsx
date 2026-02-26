@@ -25,6 +25,7 @@ import type { PinnableEntityType } from '@/types/pin'
 import { supabase } from '@/lib/supabase'
 import { DomainPageOutline } from '@/components/domain/DomainPageOutline'
 import { AppShell } from '@/components/layout/AppShell'
+import { PuppyEasterEgg } from '@/components/PuppyEasterEgg'
 import { HomeView } from '@/components/home'
 import { useFocusMode } from '@/hooks/useFocusMode'
 import { SearchModal } from '@/components/search/SearchModal'
@@ -1473,846 +1474,846 @@ function App() {
           </Suspense>
         ) : (
           <Suspense fallback={<LoadingFallback variant="card" />}>
-          <DetailPanel
-            item={selectedItem}
-            onClose={() => setSelectedItemId(null)}
-            onUpdate={updateTask}
-            onDelete={deleteTask}
-            onToggleComplete={handleToggleTask}
-            onUpdateEventNote={updateNote}
-            onUpdateEventLocation={async (eventId: string, location: string | null, calendarId?: string) => {
-              try {
-                await updateEvent({ eventId, location, calendarId })
-                showToast('Location updated successfully')
-              } catch (error) {
-                console.error('Failed to update event location:', error)
-                showToast(error instanceof Error ? error.message : 'Failed to update location', 'warning')
-              }
-            }}
-            eventRecipeUrl={selectedEventRecipeUrl}
-            onUpdateRecipeUrl={updateRecipeUrl}
-            onOpenRecipe={setRecipeUrl}
-            contact={selectedContact}
-            contacts={contacts}
-            onSearchContacts={searchContacts}
-            onUpdateContact={updateContact}
-            onOpenContact={handleOpenContact}
-            onAddContact={addContact}
-            project={selectedItemProject}
-            projects={projects}
-            onSearchProjects={searchProjects}
-            onUpdateProject={handleUpdateProject}
-            onOpenProject={handleOpenProject}
-            onAddProject={addProject}
-            onAddSubtask={addSubtask}
-            onActionComplete={refreshDateInstances}
-            prepTasks={tasks}
-            onAddPrepTask={addPrepTask}
-            onTogglePrepTask={handleToggleTask}
-            attachments={selectedItemAttachments}
-            onUploadAttachment={attachments.uploadAttachment}
-            onDeleteAttachment={attachments.deleteAttachment}
-            onOpenAttachment={async (attachment) => {
-              const url = await attachments.getSignedUrl(attachment.storagePath)
-              if (url) window.open(url, '_blank')
-            }}
-            isUploadingAttachment={attachments.isLoading}
-            attachmentError={attachments.error}
-            isPinned={selectedItem?.originalTask ? pinnedItems.isPinned('task', selectedItem.originalTask.id) : false}
-            canPin={pinnedItems.canPin()}
-            onPin={pinnedItems.pin}
-            onUnpin={pinnedItems.unpin}
-            linkedTasks={selectedItemLinkedTasks}
-            onAddLinkedTask={handleAddLinkedTask}
-            onToggleLinkedTask={handleToggleLinkedTask}
-            onDeleteLinkedTask={handleDeleteLinkedTask}
-            routine={selectedItemRoutine}
-            onUpdateRoutine={updateRoutine}
-            familyMembers={familyMembers}
-            eventAssignedToAll={selectedEventAssignedToAll}
-            onUpdateEventAssignment={updateEventAssignmentAll}
-            eventProjectId={selectedEventProjectId}
-            onUpdateEventProject={updateEventProject}
-            activeRules={familyRules.rules.filter(r => r.status === 'active')}
-            blocks={playbook.blocks}
-            onAddBlock={async (input) => {
-              const block = await playbook.addBlock(input)
-              if (block) {
+            <DetailPanel
+              item={selectedItem}
+              onClose={() => setSelectedItemId(null)}
+              onUpdate={updateTask}
+              onDelete={deleteTask}
+              onToggleComplete={handleToggleTask}
+              onUpdateEventNote={updateNote}
+              onUpdateEventLocation={async (eventId: string, location: string | null, calendarId?: string) => {
+                try {
+                  await updateEvent({ eventId, location, calendarId })
+                  showToast('Location updated successfully')
+                } catch (error) {
+                  console.error('Failed to update event location:', error)
+                  showToast(error instanceof Error ? error.message : 'Failed to update location', 'warning')
+                }
+              }}
+              eventRecipeUrl={selectedEventRecipeUrl}
+              onUpdateRecipeUrl={updateRecipeUrl}
+              onOpenRecipe={setRecipeUrl}
+              contact={selectedContact}
+              contacts={contacts}
+              onSearchContacts={searchContacts}
+              onUpdateContact={updateContact}
+              onOpenContact={handleOpenContact}
+              onAddContact={addContact}
+              project={selectedItemProject}
+              projects={projects}
+              onSearchProjects={searchProjects}
+              onUpdateProject={handleUpdateProject}
+              onOpenProject={handleOpenProject}
+              onAddProject={addProject}
+              onAddSubtask={addSubtask}
+              onActionComplete={refreshDateInstances}
+              prepTasks={tasks}
+              onAddPrepTask={addPrepTask}
+              onTogglePrepTask={handleToggleTask}
+              attachments={selectedItemAttachments}
+              onUploadAttachment={attachments.uploadAttachment}
+              onDeleteAttachment={attachments.deleteAttachment}
+              onOpenAttachment={async (attachment) => {
+                const url = await attachments.getSignedUrl(attachment.storagePath)
+                if (url) window.open(url, '_blank')
+              }}
+              isUploadingAttachment={attachments.isLoading}
+              attachmentError={attachments.error}
+              isPinned={selectedItem?.originalTask ? pinnedItems.isPinned('task', selectedItem.originalTask.id) : false}
+              canPin={pinnedItems.canPin()}
+              onPin={pinnedItems.pin}
+              onUnpin={pinnedItems.unpin}
+              linkedTasks={selectedItemLinkedTasks}
+              onAddLinkedTask={handleAddLinkedTask}
+              onToggleLinkedTask={handleToggleLinkedTask}
+              onDeleteLinkedTask={handleDeleteLinkedTask}
+              routine={selectedItemRoutine}
+              onUpdateRoutine={updateRoutine}
+              familyMembers={familyMembers}
+              eventAssignedToAll={selectedEventAssignedToAll}
+              onUpdateEventAssignment={updateEventAssignmentAll}
+              eventProjectId={selectedEventProjectId}
+              onUpdateEventProject={updateEventProject}
+              activeRules={familyRules.rules.filter(r => r.status === 'active')}
+              blocks={playbook.blocks}
+              onAddBlock={async (input) => {
+                const block = await playbook.addBlock(input)
+                if (block) {
+                  const dateStr = new Date().toISOString().split('T')[0]
+                  await playbook.instantiateDay(dateStr, effectiveDayType)
+                  // Ensure coaching is visible on the timeline
+                  localStorage.setItem('symphony-hide-coaching', 'false')
+                  window.dispatchEvent(new CustomEvent('symphony-show-coaching'))
+                  showToast('Coaching block added to timeline')
+                } else {
+                  showToast('Failed to create coaching block — check console', 'warning')
+                }
+                return block
+              }}
+              onUpdateBlock={async (id, updates) => {
+                await playbook.updateBlock(id, updates)
                 const dateStr = new Date().toISOString().split('T')[0]
+                // Refresh instances + create any missing ones
+                await playbook.fetchInstancesForDate(dateStr)
                 await playbook.instantiateDay(dateStr, effectiveDayType)
                 // Ensure coaching is visible on the timeline
                 localStorage.setItem('symphony-hide-coaching', 'false')
                 window.dispatchEvent(new CustomEvent('symphony-show-coaching'))
-                showToast('Coaching block added to timeline')
-              } else {
-                showToast('Failed to create coaching block — check console', 'warning')
-              }
-              return block
-            }}
-            onUpdateBlock={async (id, updates) => {
-              await playbook.updateBlock(id, updates)
-              const dateStr = new Date().toISOString().split('T')[0]
-              // Refresh instances + create any missing ones
-              await playbook.fetchInstancesForDate(dateStr)
-              await playbook.instantiateDay(dateStr, effectiveDayType)
-              // Ensure coaching is visible on the timeline
-              localStorage.setItem('symphony-hide-coaching', 'false')
-              window.dispatchEvent(new CustomEvent('symphony-show-coaching'))
-            }}
-            onOpenBlockEditor={(prefill) => setTimelineEditingBlock(prefill as import('@/types/playbook').PlaybookBlock)}
-          />
+              }}
+              onOpenBlockEditor={(prefill) => setTimelineEditingBlock(prefill as import('@/types/playbook').PlaybookBlock)}
+            />
           </Suspense>
         )
       }
     >
       <DomainPageOutline>
-      <SectionErrorBoundary sectionName="Content" onReset={() => handleViewChange('today')}>
-      {activeView === 'today' && (
-        <div className="h-full flex flex-col overflow-hidden">
-          {/* Calendar connect banner if needed */}
-          {!isConnected && (
-            <div className="p-4 border-b border-neutral-100 shrink-0">
-              <Suspense fallback={<LoadingFallback />}>
-                <CalendarConnect />
-              </Suspense>
-            </div>
-          )}
+        <SectionErrorBoundary sectionName="Content" onReset={() => handleViewChange('today')}>
+          {activeView === 'today' && (
+            <div className="h-full flex flex-col overflow-hidden">
+              {/* Calendar connect banner if needed */}
+              {!isConnected && (
+                <div className="p-4 border-b border-neutral-100 shrink-0">
+                  <Suspense fallback={<LoadingFallback />}>
+                    <CalendarConnect />
+                  </Suspense>
+                </div>
+              )}
 
-          {/* Zone 3: Today's schedule */}
-          <ScheduleActionsProvider value={scheduleActionsValue}>
-          <HomeView
-            tasks={tasks}
-            events={filteredEvents}
-            routines={filteredRoutines}
-            projects={projects}
-            dateInstances={dateInstances}
-            selectedItemId={selectedItemId}
-            onSelectItem={handleSelectItem}
-            loading={tasksLoading || eventsFetching || routinesLoading}
-            viewedDate={viewedDate}
-            onDateChange={setViewedDate}
-          />
-          </ScheduleActionsProvider>
-        </div>
-      )}
-
-      {/* Block Editor modal (from timeline overflow menu) */}
-      {timelineEditingBlock && (
-        <Suspense fallback={<LoadingFallback />}>
-        <BlockEditor
-          block={timelineEditingBlock}
-          onSave={async (input) => {
-            if ('id' in input) {
-              await playbook.updateBlock(input.id, input.updates)
-            }
-            setTimelineEditingBlock(null)
-          }}
-          onDelete={async (id) => {
-            await playbook.deleteBlock(id)
-            setTimelineEditingBlock(null)
-          }}
-          onClose={() => setTimelineEditingBlock(null)}
-        />
-        </Suspense>
-      )}
-
-      {/* Planning Session - fullscreen overlay */}
-      {planningOpen && (
-        <Suspense fallback={<LoadingFallback />}>
-        <PlanningSession
-          tasks={tasks}
-          events={events}
-          routines={filteredRoutines}
-          initialDate={viewedDate}
-          onClose={() => setPlanningOpen(false)}
-          onUpdateTask={updateTask}
-          onPushTask={pushTask}
-          familyMembers={familyMembers}
-          eventNotesMap={eventNotesMap}
-        />
-        </Suspense>
-      )}
-
-      {activeView === 'task-detail' && selectedTask && (
-        <Suspense fallback={<LoadingFallback />}>
-          <TaskView
-            task={selectedTask}
-            onBack={() => {
-              setSelectedTaskId(null)
-              setStateView(null)
-            }}
-            onUpdate={updateTask}
-            onDelete={(id) => {
-              deleteTask(id)
-              setSelectedTaskId(null)
-              setStateView(null)
-            }}
-            onToggleComplete={handleToggleTask}
-            onPush={pushTask}
-            contact={selectedTaskContact}
-            contacts={contacts}
-            onSearchContacts={searchContacts}
-            onAddContact={addContact}
-            onOpenContact={handleOpenContact}
-            project={selectedTaskProject}
-            projects={projects}
-            onSearchProjects={searchProjects}
-            onOpenProject={handleOpenProject}
-            onAddProject={addProject}
-            onAddSubtask={addSubtask}
-            entityNotes={selectedTaskNotes}
-            entityNotesLoading={selectedTaskNotesLoading}
-            onAddEntityNote={handleAddTaskNote}
-          />
-        </Suspense>
-      )}
-
-      {activeView === 'contact-detail' && selectedContactForView && (
-        <Suspense fallback={<LoadingFallback />}>
-          <ContactView
-            contact={selectedContactForView}
-            onBack={() => {
-              navigate('/contacts')
-            }}
-            onUpdate={updateContact}
-            onDelete={async (id) => {
-              await deleteContact(id)
-              navigate('/contacts')
-            }}
-            tasks={tasks}
-            onSelectTask={(taskId) => {
-              setSelectedTaskId(taskId)
-              setStateView('task-detail')
-            }}
-            isPinned={pinnedItems.isPinned('contact', selectedContactForView.id)}
-            canPin={pinnedItems.canPin()}
-            onPin={() => pinnedItems.pin('contact', selectedContactForView.id)}
-            onUnpin={() => pinnedItems.unpin('contact', selectedContactForView.id)}
-            entityNotes={selectedContactNotes}
-            entityNotesLoading={selectedContactNotesLoading}
-            onAddEntityNote={handleAddContactNote}
-          />
-        </Suspense>
-      )}
-
-      {activeView === 'projects' && !selectedProjectId && (
-        <Suspense fallback={<LoadingFallback />}>
-          <ProjectsList
-            projects={projects}
-            tasks={tasks}
-            onSelectProject={(id) => navigate(`/projects/${id}`)}
-            onAddProject={addProject}
-          />
-        </Suspense>
-      )}
-
-      {activeView === 'projects' && selectedProject && (
-        <Suspense fallback={<LoadingFallback />}>
-          <ProjectView
-            project={selectedProject}
-            tasks={tasks}
-            contactsMap={contactsMap}
-            onBack={() => navigate('/projects')}
-            onUpdateProject={handleUpdateProject}
-            onDeleteProject={deleteProject}
-            onAddTask={(title, projectId) => addTask(title, undefined, projectId, undefined, { assignedTo: getCurrentUserMember()?.id })}
-            onDeleteTask={deleteTask}
-            onSelectTask={handleSelectItem}
-            onToggleTask={handleToggleTask}
-            onUpdateTask={handleUpdateTaskWithToast}
-            familyMembers={familyMembers}
-            selectedTaskId={selectedItemId}
-            linkedEvents={linkedEventsForProject}
-            isPinned={pinnedItems.isPinned('project', selectedProject.id)}
-            canPin={pinnedItems.canPin()}
-            onPin={() => pinnedItems.pin('project', selectedProject.id)}
-            onUnpin={() => pinnedItems.unpin('project', selectedProject.id)}
-          />
-        </Suspense>
-      )}
-
-      {activeView === 'goals' && !selectedGoalId && (
-        <Suspense fallback={<LoadingFallback />}>
-          <GoalsList
-            areas={goalAreas}
-            goals={goals}
-            currentQuarter={getCurrentQuarter()}
-            year={new Date().getFullYear()}
-            onSelectGoal={(id) => navigate(`/goals/${id}`)}
-            onAddArea={addGoalArea}
-            onAddGoal={addGoal}
-            onToggleAction={toggleGoalAction}
-            onDeleteArea={deleteGoalArea}
-          />
-        </Suspense>
-      )}
-
-      {activeView === 'goals' && selectedGoalId && getGoalById(selectedGoalId) && !planningGoalId && (
-        <Suspense fallback={<LoadingFallback />}>
-          <GoalView
-            goal={getGoalById(selectedGoalId)!}
-            area={goalAreas.find(a => a.id === getGoalById(selectedGoalId)!.areaId)}
-            currentQuarter={getCurrentQuarter()}
-            onBack={() => navigate('/goals')}
-            onUpdateGoal={updateGoal}
-            onDeleteGoal={deleteGoal}
-            onAddAction={addGoalAction}
-            onUpdateAction={updateGoalAction}
-            onToggleAction={toggleGoalAction}
-            onDeleteAction={deleteGoalAction}
-            onStartPlanning={() => {
-              setPlanningGoalId(selectedGoalId)
-              const g = getGoalById(selectedGoalId)
-              if (g) {
-                const areaName = goalAreas.find(a => a.id === g.areaId)?.name
-                goalPlanning.startPlanning(g.id, g.name, g.notes, areaName)
-              }
-            }}
-            onAddMilestone={addGoalMilestone}
-            onUpdateMilestone={updateGoalMilestone}
-            onUpdateMilestoneProgress={updateMilestoneProgress}
-            onDeleteMilestone={deleteGoalMilestone}
-          />
-        </Suspense>
-      )}
-
-      {activeView === 'goals' && planningGoalId && (
-        <Suspense fallback={<LoadingFallback />}>
-          <GoalPlanningChat
-            goalName={getGoalById(planningGoalId)?.name ?? 'Goal'}
-            messages={goalPlanning.messages}
-            loading={goalPlanning.loading}
-            readyToFinish={goalPlanning.readyToFinish}
-            planningResult={goalPlanning.planningResult}
-            error={goalPlanning.error}
-            onStart={() => {
-              const g = getGoalById(planningGoalId)
-              if (g) {
-                const areaName = goalAreas.find(a => a.id === g.areaId)?.name
-                goalPlanning.startPlanning(g.id, g.name, g.notes, areaName)
-              }
-            }}
-            onSend={goalPlanning.sendMessage}
-            onFinish={goalPlanning.finishPlanning}
-            onBack={() => {
-              setPlanningGoalId(null)
-              goalPlanning.reset()
-            }}
-            onAcceptBlock={async (block) => {
-              await playbook.addBlock({
-                label: block.label,
-                blockType: block.blockType as 'solo' | 'routine' | 'connection' | 'together',
-                timeSlot: block.timeSlot,
-                narrative: block.narrative,
-                coachingNote: block.coachingNote ?? null,
-                items: (block.items ?? []).map(item => ({
-                  who: item.who,
-                  action: item.action,
-                  context: item.context,
-                  coaching: item.coaching,
-                })),
-                dayTypes: block.dayTypes as ('school-day' | 'weekend' | 'holiday' | 'half-day')[],
-                goalId: planningGoalId,
-              })
-            }}
-            onDone={() => {
-              setPlanningGoalId(null)
-              goalPlanning.reset()
-            }}
-          />
-        </Suspense>
-      )}
-
-      {activeView === 'routines' && !selectedRoutineId && !creatingRoutine && (
-        <Suspense fallback={<LoadingFallback />}>
-          <RoutinesList
-            routines={allRoutines}
-            contacts={contacts}
-            familyMembers={familyMembers}
-            onSelectRoutine={(routine) => navigate(`/routines/${routine.id}`)}
-            onCreateRoutine={() => navigate('/routines/new')}
-            onUpdateRoutine={updateRoutine}
-          />
-        </Suspense>
-      )}
-
-      {activeView === 'routines' && creatingRoutine && (
-        <div className="h-full overflow-auto">
-          <div className="max-w-2xl mx-auto">
-            {/* Header */}
-            <div className="flex items-center gap-3 p-6 pb-0">
-              <button
-                onClick={() => navigate('/routines')}
-                className="p-2 -ml-2 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
-                </svg>
-              </button>
-              <h1 className="text-xl font-semibold text-neutral-800">New Routine</h1>
-            </div>
-            <Suspense fallback={<LoadingFallback />}>
-              <RoutineInput
-                contacts={contacts}
-                onSave={async (input) => {
-                  await addRoutine(input)
-                  navigate('/routines')
-                }}
-                onCancel={() => navigate('/routines')}
-              />
-            </Suspense>
-          </div>
-        </div>
-      )}
-
-      {activeView === 'routines' && selectedRoutine && (
-        <Suspense fallback={<LoadingFallback />}>
-          <RoutineForm
-            key={selectedRoutine.id}
-            routine={selectedRoutine}
-            contacts={contacts}
-            familyMembers={familyMembers}
-            onBack={() => navigate('/routines')}
-            onUpdate={updateRoutine}
-            onDelete={deleteRoutine}
-            onToggleVisibility={toggleRoutineVisibility}
-            isPinned={pinnedItems.isPinned('routine', selectedRoutine.id)}
-            canPin={pinnedItems.canPin()}
-            onPin={() => pinnedItems.pin('routine', selectedRoutine.id)}
-            onUnpin={() => pinnedItems.unpin('routine', selectedRoutine.id)}
-          />
-        </Suspense>
-      )}
-
-      {activeView === 'lists' && !selectedListId && (
-        <Suspense fallback={<LoadingFallback />}>
-        <ListsList
-          lists={lists}
-          listsByCategory={listsByCategory}
-          onSelectList={setSelectedListId}
-          onAddList={addList}
-        />
-        </Suspense>
-      )}
-
-      {activeView === 'lists' && selectedList && (
-        <Suspense fallback={<LoadingFallback />}>
-        <ListView
-          list={selectedList}
-          items={listItems}
-          onBack={() => setSelectedListId(null)}
-          onUpdateList={updateList}
-          onDeleteList={deleteList}
-          onAddItem={addListItem}
-          onUpdateItem={updateListItem}
-          onDeleteItem={deleteListItem}
-          onReorderItems={reorderListItems}
-          isPinned={pinnedItems.isPinned('list', selectedList.id)}
-          canPin={pinnedItems.canPin()}
-          onPin={() => pinnedItems.pin('list', selectedList.id)}
-          onUnpin={() => pinnedItems.unpin('list', selectedList.id)}
-        />
-        </Suspense>
-      )}
-
-      {activeView === 'history' && (
-        <Suspense fallback={<LoadingFallback />}>
-        <CompletedTasksView
-          tasks={tasks}
-          contactsMap={contactsMap}
-          projectsMap={projectsMap}
-          onSelectTask={(taskId) => handleSelectItem(`task-${taskId}`)}
-          onBack={() => handleViewChange('today')}
-        />
-        </Suspense>
-      )}
-
-      {activeView === 'notes' && (
-        <Suspense fallback={<LoadingFallback />}>
-        <NotesPage
-          notes={notes}
-          notesByDate={notesByDate}
-          topics={activeTopics}
-          topicsMap={topicsMap}
-          loading={notesLoading}
-          tasks={tasks}
-          projects={projects}
-          contacts={contacts}
-          onAddNote={async (content, topicId) => {
-            return addNote({ content, topicId })
-          }}
-          onUpdateNote={async (id, updates) => {
-            await updateNoteContent(id, updates)
-          }}
-          onDeleteNote={deleteNote}
-          onAddTopic={async (name) => {
-            return addTopic({ name })
-          }}
-          getEntityLinks={getEntityLinks}
-          onAddEntityLink={async (noteId, entityType, entityId) => {
-            await addEntityLink(noteId, { entityType, entityId })
-          }}
-          onRemoveEntityLink={removeEntityLink}
-          onNavigateToTask={(taskId) => handleSelectItem(`task-${taskId}`)}
-        />
-        </Suspense>
-      )}
-
-      {activeView === 'rules' && (
-        <Suspense fallback={<LoadingFallback />}>
-        <RulesView
-          rules={familyRules.rules}
-          responsibilities={responsibilities.responsibilities}
-          onAddRule={familyRules.addRule}
-          onUpdateRule={familyRules.updateRule}
-          onDeleteRule={familyRules.deleteRule}
-          onAddResponsibility={responsibilities.addResponsibility}
-          getResponsibilitiesForRule={responsibilities.getForRule}
-          loading={familyRules.loading}
-          onBack={() => handleViewChange('settings')}
-        />
-        </Suspense>
-      )}
-
-      {activeView === 'coaching' && (
-        <SectionErrorBoundary sectionName="Coaching" onReset={() => setCoachingNavStack(['hub'])}>
-        <Suspense fallback={<LoadingFallback />}>
-          {coachingSubView === 'hub' && (
-            <CoachingHub
-              assessments={domainAssessments.assessments}
-              assessmentsLoading={domainAssessments.loading}
-              rules={familyRules.rules.filter(r => r.status === 'active')}
-              workspaces={researchWorkspaces.workspaces}
-              blocks={playbook.blocks}
-              onOpenRules={() => pushCoachingView('rules')}
-              onOpenResearch={() => pushCoachingView('research')}
-              onOpenWeeklyReview={() => pushCoachingView('review')}
-              onOpenPlaybook={() => pushCoachingView('playbook')}
-              onOpenAssessment={(layerSlug) => {
-                setActiveLayerSlug(layerSlug)
-                pushCoachingView('assessment')
-              }}
-              onOpenDomain={(layerSlug, domainSlug) => {
-                setActiveLayerSlug(layerSlug)
-                setActiveDomainSlug(domainSlug)
-                pushCoachingView('domain')
-              }}
-            />
-          )}
-
-          {coachingSubView === 'assessment' && activeLayerConfig && (
-            <QuickAssessment
-              config={activeLayerConfig}
-              existingAssessments={domainAssessments.assessments}
-              onSave={(ratings) => domainAssessments.saveQuickAssessment(ratings, activeLayerDbId || undefined)}
-              onBack={popCoachingView}
-            />
-          )}
-
-          {coachingSubView === 'domain' && activeDomainSlug && activeLayerConfig && (() => {
-            const domainConfig = activeLayerConfig.domains.find(d => d.slug === activeDomainSlug)
-            const assessment = domainAssessments.getAssessment(activeDomainSlug)
-            if (!domainConfig || !assessment) {
-              return (
-                <QuickAssessment
-                  config={activeLayerConfig}
-                  existingAssessments={domainAssessments.assessments}
-                  onSave={(ratings) => domainAssessments.saveQuickAssessment(ratings, activeLayerDbId || undefined)}
-                  onBack={popCoachingView}
+              {/* Zone 3: Today's schedule */}
+              <ScheduleActionsProvider value={scheduleActionsValue}>
+                <HomeView
+                  tasks={tasks}
+                  events={filteredEvents}
+                  routines={filteredRoutines}
+                  projects={projects}
+                  dateInstances={dateInstances}
+                  selectedItemId={selectedItemId}
+                  onSelectItem={handleSelectItem}
+                  loading={tasksLoading || eventsFetching || routinesLoading}
+                  viewedDate={viewedDate}
+                  onDateChange={setViewedDate}
                 />
-              )
-            }
-            return (
-              <DomainDetail
-                domain={domainConfig}
-                assessment={assessment}
-                accentColor={activeLayerConfig.accentColor}
-                onBack={popCoachingView}
-                onReassess={() => pushCoachingView('assessment')}
-                onGoDeeper={() => {
-                  pushCoachingView('deep-assessment')
-                }}
-              />
-            )
-          })()}
-
-          {coachingSubView === 'deep-assessment' && activeDomainSlug && activeLayerConfig && (() => {
-            const domainConfig = activeLayerConfig.domains.find(d => d.slug === activeDomainSlug)
-            const quickAssessment = domainAssessments.getAssessment(activeDomainSlug)
-            if (!domainConfig) return null
-            return (
-              <DeepAssessmentChat
-                config={activeLayerConfig}
-                domain={domainConfig}
-                quickAssessment={quickAssessment ?? undefined}
-                messages={deepAssessment.messages}
-                loading={deepAssessment.loading}
-                readyToFinish={deepAssessment.readyToFinish}
-                result={deepAssessment.result}
-                error={deepAssessment.error}
-                onStart={() => {
-                  deepAssessment.start({
-                    layerId: activeLayerDbId || '',
-                    layerName: activeLayerConfig.name,
-                    domainSlug: activeDomainSlug,
-                    domainName: domainConfig.name,
-                    domainSubtitle: domainConfig.subtitle,
-                    quickAssessment: quickAssessment ?? undefined,
-                  })
-                }}
-                onSend={deepAssessment.respond}
-                onFinish={deepAssessment.finish}
-                onBack={() => {
-                  deepAssessment.reset()
-                  popCoachingView()
-                }}
-                onDone={() => {
-                  domainAssessments.refetch()
-                  deepAssessment.reset()
-                  popCoachingView()
-                }}
-              />
-            )
-          })()}
-
-          {coachingSubView === 'rules' && (
-            <RulesView
-              rules={familyRules.rules}
-              responsibilities={responsibilities.responsibilities}
-              onAddRule={familyRules.addRule}
-              onUpdateRule={familyRules.updateRule}
-              onDeleteRule={familyRules.deleteRule}
-              onAddResponsibility={responsibilities.addResponsibility}
-              getResponsibilitiesForRule={responsibilities.getForRule}
-              loading={familyRules.loading}
-              onBack={popCoachingView}
-              title="Rules"
-              description="Coaching guidance across all domains"
-              crossLayerMode
-            />
-          )}
-
-          {coachingSubView === 'research' && (
-            <Suspense fallback={<LoadingFallback />}>
-              <PlanningWorkspace
-                resources={planningResources.resources}
-                loading={planningResources.loading}
-                onAddResource={planningResources.addResource}
-                onUpdateResource={planningResources.updateResource}
-                onDeleteResource={planningResources.deleteResource}
-                onUploadFile={planningResources.uploadFile}
-                onGetSignedUrl={planningResources.getSignedUrl}
-                workspaces={researchWorkspaces.workspaces}
-                workspacesLoading={researchWorkspaces.loading}
-                onCreateWorkspace={researchWorkspaces.addWorkspace}
-                onUpdateWorkspace={researchWorkspaces.updateWorkspace}
-                onDeleteWorkspace={researchWorkspaces.deleteWorkspace}
-                onMarkWorkspaceSynthesized={researchWorkspaces.markSynthesized}
-                rules={familyRules.rules}
-                onAddRule={familyRules.addRule}
-                onUpdateRule={familyRules.updateRule}
-                onDeleteRule={familyRules.deleteRule}
-                onViewPublishedRules={() => pushCoachingView('rules')}
-                weeklyReview={{
-                  blockSummaries: weeklyFeedback.blockSummaries,
-                  overallStats: weeklyFeedback.overallStats,
-                  flaggedBlocks: weeklyFeedback.flaggedBlocks,
-                  feedbackLoading: weeklyFeedback.loading,
-                  weekOf: reviewWeekOf,
-                  onWeekChange: setReviewWeekOf,
-                  blocks: playbook.blocks,
-                  onAddBlock: playbook.addBlock,
-                  onUpdateBlock: playbook.updateBlock,
-                  onDeleteBlock: playbook.deleteBlock,
-                  onReorderBlocks: playbook.reorderBlocks,
-                  aiResult: aiSuggestions.result,
-                  aiLoading: aiSuggestions.loading,
-                  aiError: aiSuggestions.error,
-                  onGenerateAI: aiSuggestions.generateSuggestions,
-                  onAcceptSuggestion: aiSuggestions.acceptSuggestion,
-                  onRejectSuggestion: aiSuggestions.rejectSuggestion,
-                }}
-                onBack={popCoachingView}
-                initialTab="research"
-              />
-            </Suspense>
-          )}
-
-          {coachingSubView === 'review' && (
-            <Suspense fallback={<LoadingFallback />}>
-              <PlanningWorkspace
-                resources={planningResources.resources}
-                loading={planningResources.loading}
-                onAddResource={planningResources.addResource}
-                onUpdateResource={planningResources.updateResource}
-                onDeleteResource={planningResources.deleteResource}
-                onUploadFile={planningResources.uploadFile}
-                onGetSignedUrl={planningResources.getSignedUrl}
-                workspaces={researchWorkspaces.workspaces}
-                workspacesLoading={researchWorkspaces.loading}
-                onCreateWorkspace={researchWorkspaces.addWorkspace}
-                onUpdateWorkspace={researchWorkspaces.updateWorkspace}
-                onDeleteWorkspace={researchWorkspaces.deleteWorkspace}
-                onMarkWorkspaceSynthesized={researchWorkspaces.markSynthesized}
-                rules={familyRules.rules}
-                onAddRule={familyRules.addRule}
-                onUpdateRule={familyRules.updateRule}
-                onDeleteRule={familyRules.deleteRule}
-                onViewPublishedRules={() => pushCoachingView('rules')}
-                weeklyReview={{
-                  blockSummaries: weeklyFeedback.blockSummaries,
-                  overallStats: weeklyFeedback.overallStats,
-                  flaggedBlocks: weeklyFeedback.flaggedBlocks,
-                  feedbackLoading: weeklyFeedback.loading,
-                  weekOf: reviewWeekOf,
-                  onWeekChange: setReviewWeekOf,
-                  blocks: playbook.blocks,
-                  onAddBlock: playbook.addBlock,
-                  onUpdateBlock: playbook.updateBlock,
-                  onDeleteBlock: playbook.deleteBlock,
-                  onReorderBlocks: playbook.reorderBlocks,
-                  aiResult: aiSuggestions.result,
-                  aiLoading: aiSuggestions.loading,
-                  aiError: aiSuggestions.error,
-                  onGenerateAI: aiSuggestions.generateSuggestions,
-                  onAcceptSuggestion: aiSuggestions.acceptSuggestion,
-                  onRejectSuggestion: aiSuggestions.rejectSuggestion,
-                }}
-                onBack={popCoachingView}
-                initialTab="weekly-review"
-              />
-            </Suspense>
-          )}
-
-          {coachingSubView === 'playbook' && (
-            <WeeklyPlannerGrid
-              blocks={playbook.blocks}
-              onAddBlock={playbook.addBlock}
-              onUpdateBlock={playbook.updateBlock}
-              onDeleteBlock={playbook.deleteBlock}
-              onBack={popCoachingView}
-            />
-          )}
-        </Suspense>
-        </SectionErrorBoundary>
-      )}
-
-      {activeView === 'settings' && (
-        <Suspense fallback={<LoadingFallback />}>
-          <SettingsPage
-            onBack={() => {
-              refetchFamilyMembers() // Refresh family members in case they were edited
-              handleViewChange('today')
-            }}
-            onFamilyMembersChanged={refetchFamilyMembers}
-            onImportBlocks={async (blocks) => {
-              for (const block of blocks) {
-                await playbook.addBlock(block)
-              }
-            }}
-          />
-        </Suspense>
-      )}
-      </SectionErrorBoundary>
-
-      {/* Search Modal */}
-      <SearchModal
-        isOpen={searchOpen}
-        onClose={handleSearchClose}
-        query={searchQuery}
-        onQueryChange={setSearchQuery}
-        results={searchResults}
-        totalResults={searchTotalResults}
-        isSearching={isSearching}
-        onSelectResult={handleSearchSelect}
-      />
-
-      {/* Toast notifications */}
-      <Toast toast={toast} onDismiss={dismissToast} />
-      <ConfirmationToast
-        toast={confirmationToast}
-        onDismiss={() => setConfirmationToast(null)}
-      />
-      <UndoToast
-        action={undo.currentAction}
-        onUndo={undo.executeUndo}
-        onDismiss={undo.dismiss}
-      />
-
-      {/* Offline banner */}
-      {!isOnline && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-white px-4 py-2 text-center text-sm font-medium flex items-center justify-center gap-2 shadow-md">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414" />
-          </svg>
-          You're offline. Check your connection.
-        </div>
-      )}
-
-      {/* Calendar reconnect prompt */}
-      {pendingEventData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 animate-scale-up">
-            <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
-              <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
+              </ScheduleActionsProvider>
             </div>
-            <h3 className="text-lg font-semibold text-neutral-800 text-center mb-2">
-              Calendar Not Connected
-            </h3>
-            <p className="text-sm text-neutral-500 text-center mb-6">
-              Your Google Calendar is disconnected. This event will only be saved locally in Symphony and won't appear in your Google Calendar.
-            </p>
-            <div className="flex flex-col gap-3">
-              <button
-                onClick={async () => {
-                  // Store the pending data before redirect
-                  sessionStorage.setItem('pendingEventData', JSON.stringify({
-                    ...pendingEventData,
-                    scheduledFor: pendingEventData.scheduledFor?.toISOString(),
-                  }))
-                  await connectCalendar()
-                }}
-                className="w-full px-4 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors"
-              >
-                Connect Google Calendar
-              </button>
-              <button
-                onClick={async () => {
-                  // Create event locally only
-                  const data = pendingEventData
-                  setPendingEventData(null)
+          )}
 
-                  const taskId = await addTask(
-                    data.title,
-                    data.contactId,
-                    data.projectId,
-                    data.scheduledFor,
-                    {
-                      assignedTo: getCurrentUserMember()?.id,
-                      category: data.category,
-                    }
-                  )
-                  if (taskId) {
-                    setRecentlyCreatedTaskId(taskId)
-                    showToast('Event saved locally (not in Google Calendar)', 'info')
+          {/* Block Editor modal (from timeline overflow menu) */}
+          {timelineEditingBlock && (
+            <Suspense fallback={<LoadingFallback />}>
+              <BlockEditor
+                block={timelineEditingBlock}
+                onSave={async (input) => {
+                  if ('id' in input) {
+                    await playbook.updateBlock(input.id, input.updates)
+                  }
+                  setTimelineEditingBlock(null)
+                }}
+                onDelete={async (id) => {
+                  await playbook.deleteBlock(id)
+                  setTimelineEditingBlock(null)
+                }}
+                onClose={() => setTimelineEditingBlock(null)}
+              />
+            </Suspense>
+          )}
+
+          {/* Planning Session - fullscreen overlay */}
+          {planningOpen && (
+            <Suspense fallback={<LoadingFallback />}>
+              <PlanningSession
+                tasks={tasks}
+                events={events}
+                routines={filteredRoutines}
+                initialDate={viewedDate}
+                onClose={() => setPlanningOpen(false)}
+                onUpdateTask={updateTask}
+                onPushTask={pushTask}
+                familyMembers={familyMembers}
+                eventNotesMap={eventNotesMap}
+              />
+            </Suspense>
+          )}
+
+          {activeView === 'task-detail' && selectedTask && (
+            <Suspense fallback={<LoadingFallback />}>
+              <TaskView
+                task={selectedTask}
+                onBack={() => {
+                  setSelectedTaskId(null)
+                  setStateView(null)
+                }}
+                onUpdate={updateTask}
+                onDelete={(id) => {
+                  deleteTask(id)
+                  setSelectedTaskId(null)
+                  setStateView(null)
+                }}
+                onToggleComplete={handleToggleTask}
+                onPush={pushTask}
+                contact={selectedTaskContact}
+                contacts={contacts}
+                onSearchContacts={searchContacts}
+                onAddContact={addContact}
+                onOpenContact={handleOpenContact}
+                project={selectedTaskProject}
+                projects={projects}
+                onSearchProjects={searchProjects}
+                onOpenProject={handleOpenProject}
+                onAddProject={addProject}
+                onAddSubtask={addSubtask}
+                entityNotes={selectedTaskNotes}
+                entityNotesLoading={selectedTaskNotesLoading}
+                onAddEntityNote={handleAddTaskNote}
+              />
+            </Suspense>
+          )}
+
+          {activeView === 'contact-detail' && selectedContactForView && (
+            <Suspense fallback={<LoadingFallback />}>
+              <ContactView
+                contact={selectedContactForView}
+                onBack={() => {
+                  navigate('/contacts')
+                }}
+                onUpdate={updateContact}
+                onDelete={async (id) => {
+                  await deleteContact(id)
+                  navigate('/contacts')
+                }}
+                tasks={tasks}
+                onSelectTask={(taskId) => {
+                  setSelectedTaskId(taskId)
+                  setStateView('task-detail')
+                }}
+                isPinned={pinnedItems.isPinned('contact', selectedContactForView.id)}
+                canPin={pinnedItems.canPin()}
+                onPin={() => pinnedItems.pin('contact', selectedContactForView.id)}
+                onUnpin={() => pinnedItems.unpin('contact', selectedContactForView.id)}
+                entityNotes={selectedContactNotes}
+                entityNotesLoading={selectedContactNotesLoading}
+                onAddEntityNote={handleAddContactNote}
+              />
+            </Suspense>
+          )}
+
+          {activeView === 'projects' && !selectedProjectId && (
+            <Suspense fallback={<LoadingFallback />}>
+              <ProjectsList
+                projects={projects}
+                tasks={tasks}
+                onSelectProject={(id) => navigate(`/projects/${id}`)}
+                onAddProject={addProject}
+              />
+            </Suspense>
+          )}
+
+          {activeView === 'projects' && selectedProject && (
+            <Suspense fallback={<LoadingFallback />}>
+              <ProjectView
+                project={selectedProject}
+                tasks={tasks}
+                contactsMap={contactsMap}
+                onBack={() => navigate('/projects')}
+                onUpdateProject={handleUpdateProject}
+                onDeleteProject={deleteProject}
+                onAddTask={(title, projectId) => addTask(title, undefined, projectId, undefined, { assignedTo: getCurrentUserMember()?.id })}
+                onDeleteTask={deleteTask}
+                onSelectTask={handleSelectItem}
+                onToggleTask={handleToggleTask}
+                onUpdateTask={handleUpdateTaskWithToast}
+                familyMembers={familyMembers}
+                selectedTaskId={selectedItemId}
+                linkedEvents={linkedEventsForProject}
+                isPinned={pinnedItems.isPinned('project', selectedProject.id)}
+                canPin={pinnedItems.canPin()}
+                onPin={() => pinnedItems.pin('project', selectedProject.id)}
+                onUnpin={() => pinnedItems.unpin('project', selectedProject.id)}
+              />
+            </Suspense>
+          )}
+
+          {activeView === 'goals' && !selectedGoalId && (
+            <Suspense fallback={<LoadingFallback />}>
+              <GoalsList
+                areas={goalAreas}
+                goals={goals}
+                currentQuarter={getCurrentQuarter()}
+                year={new Date().getFullYear()}
+                onSelectGoal={(id) => navigate(`/goals/${id}`)}
+                onAddArea={addGoalArea}
+                onAddGoal={addGoal}
+                onToggleAction={toggleGoalAction}
+                onDeleteArea={deleteGoalArea}
+              />
+            </Suspense>
+          )}
+
+          {activeView === 'goals' && selectedGoalId && getGoalById(selectedGoalId) && !planningGoalId && (
+            <Suspense fallback={<LoadingFallback />}>
+              <GoalView
+                goal={getGoalById(selectedGoalId)!}
+                area={goalAreas.find(a => a.id === getGoalById(selectedGoalId)!.areaId)}
+                currentQuarter={getCurrentQuarter()}
+                onBack={() => navigate('/goals')}
+                onUpdateGoal={updateGoal}
+                onDeleteGoal={deleteGoal}
+                onAddAction={addGoalAction}
+                onUpdateAction={updateGoalAction}
+                onToggleAction={toggleGoalAction}
+                onDeleteAction={deleteGoalAction}
+                onStartPlanning={() => {
+                  setPlanningGoalId(selectedGoalId)
+                  const g = getGoalById(selectedGoalId)
+                  if (g) {
+                    const areaName = goalAreas.find(a => a.id === g.areaId)?.name
+                    goalPlanning.startPlanning(g.id, g.name, g.notes, areaName)
                   }
                 }}
-                className="w-full px-4 py-3 border border-neutral-200 text-neutral-600 rounded-lg font-medium hover:bg-neutral-50 transition-colors"
-              >
-                Create Local Only
-              </button>
-              <button
-                onClick={() => setPendingEventData(null)}
-                className="w-full px-4 py-2 text-neutral-400 hover:text-neutral-600 text-sm transition-colors"
-              >
-                Cancel
-              </button>
+                onAddMilestone={addGoalMilestone}
+                onUpdateMilestone={updateGoalMilestone}
+                onUpdateMilestoneProgress={updateMilestoneProgress}
+                onDeleteMilestone={deleteGoalMilestone}
+              />
+            </Suspense>
+          )}
+
+          {activeView === 'goals' && planningGoalId && (
+            <Suspense fallback={<LoadingFallback />}>
+              <GoalPlanningChat
+                goalName={getGoalById(planningGoalId)?.name ?? 'Goal'}
+                messages={goalPlanning.messages}
+                loading={goalPlanning.loading}
+                readyToFinish={goalPlanning.readyToFinish}
+                planningResult={goalPlanning.planningResult}
+                error={goalPlanning.error}
+                onStart={() => {
+                  const g = getGoalById(planningGoalId)
+                  if (g) {
+                    const areaName = goalAreas.find(a => a.id === g.areaId)?.name
+                    goalPlanning.startPlanning(g.id, g.name, g.notes, areaName)
+                  }
+                }}
+                onSend={goalPlanning.sendMessage}
+                onFinish={goalPlanning.finishPlanning}
+                onBack={() => {
+                  setPlanningGoalId(null)
+                  goalPlanning.reset()
+                }}
+                onAcceptBlock={async (block) => {
+                  await playbook.addBlock({
+                    label: block.label,
+                    blockType: block.blockType as 'solo' | 'routine' | 'connection' | 'together',
+                    timeSlot: block.timeSlot,
+                    narrative: block.narrative,
+                    coachingNote: block.coachingNote ?? null,
+                    items: (block.items ?? []).map(item => ({
+                      who: item.who,
+                      action: item.action,
+                      context: item.context,
+                      coaching: item.coaching,
+                    })),
+                    dayTypes: block.dayTypes as ('school-day' | 'weekend' | 'holiday' | 'half-day')[],
+                    goalId: planningGoalId,
+                  })
+                }}
+                onDone={() => {
+                  setPlanningGoalId(null)
+                  goalPlanning.reset()
+                }}
+              />
+            </Suspense>
+          )}
+
+          {activeView === 'routines' && !selectedRoutineId && !creatingRoutine && (
+            <Suspense fallback={<LoadingFallback />}>
+              <RoutinesList
+                routines={allRoutines}
+                contacts={contacts}
+                familyMembers={familyMembers}
+                onSelectRoutine={(routine) => navigate(`/routines/${routine.id}`)}
+                onCreateRoutine={() => navigate('/routines/new')}
+                onUpdateRoutine={updateRoutine}
+              />
+            </Suspense>
+          )}
+
+          {activeView === 'routines' && creatingRoutine && (
+            <div className="h-full overflow-auto">
+              <div className="max-w-2xl mx-auto">
+                {/* Header */}
+                <div className="flex items-center gap-3 p-6 pb-0">
+                  <button
+                    onClick={() => navigate('/routines')}
+                    className="p-2 -ml-2 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                  <h1 className="text-xl font-semibold text-neutral-800">New Routine</h1>
+                </div>
+                <Suspense fallback={<LoadingFallback />}>
+                  <RoutineInput
+                    contacts={contacts}
+                    onSave={async (input) => {
+                      await addRoutine(input)
+                      navigate('/routines')
+                    }}
+                    onCancel={() => navigate('/routines')}
+                  />
+                </Suspense>
+              </div>
+            </div>
+          )}
+
+          {activeView === 'routines' && selectedRoutine && (
+            <Suspense fallback={<LoadingFallback />}>
+              <RoutineForm
+                key={selectedRoutine.id}
+                routine={selectedRoutine}
+                contacts={contacts}
+                familyMembers={familyMembers}
+                onBack={() => navigate('/routines')}
+                onUpdate={updateRoutine}
+                onDelete={deleteRoutine}
+                onToggleVisibility={toggleRoutineVisibility}
+                isPinned={pinnedItems.isPinned('routine', selectedRoutine.id)}
+                canPin={pinnedItems.canPin()}
+                onPin={() => pinnedItems.pin('routine', selectedRoutine.id)}
+                onUnpin={() => pinnedItems.unpin('routine', selectedRoutine.id)}
+              />
+            </Suspense>
+          )}
+
+          {activeView === 'lists' && !selectedListId && (
+            <Suspense fallback={<LoadingFallback />}>
+              <ListsList
+                lists={lists}
+                listsByCategory={listsByCategory}
+                onSelectList={setSelectedListId}
+                onAddList={addList}
+              />
+            </Suspense>
+          )}
+
+          {activeView === 'lists' && selectedList && (
+            <Suspense fallback={<LoadingFallback />}>
+              <ListView
+                list={selectedList}
+                items={listItems}
+                onBack={() => setSelectedListId(null)}
+                onUpdateList={updateList}
+                onDeleteList={deleteList}
+                onAddItem={addListItem}
+                onUpdateItem={updateListItem}
+                onDeleteItem={deleteListItem}
+                onReorderItems={reorderListItems}
+                isPinned={pinnedItems.isPinned('list', selectedList.id)}
+                canPin={pinnedItems.canPin()}
+                onPin={() => pinnedItems.pin('list', selectedList.id)}
+                onUnpin={() => pinnedItems.unpin('list', selectedList.id)}
+              />
+            </Suspense>
+          )}
+
+          {activeView === 'history' && (
+            <Suspense fallback={<LoadingFallback />}>
+              <CompletedTasksView
+                tasks={tasks}
+                contactsMap={contactsMap}
+                projectsMap={projectsMap}
+                onSelectTask={(taskId) => handleSelectItem(`task-${taskId}`)}
+                onBack={() => handleViewChange('today')}
+              />
+            </Suspense>
+          )}
+
+          {activeView === 'notes' && (
+            <Suspense fallback={<LoadingFallback />}>
+              <NotesPage
+                notes={notes}
+                notesByDate={notesByDate}
+                topics={activeTopics}
+                topicsMap={topicsMap}
+                loading={notesLoading}
+                tasks={tasks}
+                projects={projects}
+                contacts={contacts}
+                onAddNote={async (content, topicId) => {
+                  return addNote({ content, topicId })
+                }}
+                onUpdateNote={async (id, updates) => {
+                  await updateNoteContent(id, updates)
+                }}
+                onDeleteNote={deleteNote}
+                onAddTopic={async (name) => {
+                  return addTopic({ name })
+                }}
+                getEntityLinks={getEntityLinks}
+                onAddEntityLink={async (noteId, entityType, entityId) => {
+                  await addEntityLink(noteId, { entityType, entityId })
+                }}
+                onRemoveEntityLink={removeEntityLink}
+                onNavigateToTask={(taskId) => handleSelectItem(`task-${taskId}`)}
+              />
+            </Suspense>
+          )}
+
+          {activeView === 'rules' && (
+            <Suspense fallback={<LoadingFallback />}>
+              <RulesView
+                rules={familyRules.rules}
+                responsibilities={responsibilities.responsibilities}
+                onAddRule={familyRules.addRule}
+                onUpdateRule={familyRules.updateRule}
+                onDeleteRule={familyRules.deleteRule}
+                onAddResponsibility={responsibilities.addResponsibility}
+                getResponsibilitiesForRule={responsibilities.getForRule}
+                loading={familyRules.loading}
+                onBack={() => handleViewChange('settings')}
+              />
+            </Suspense>
+          )}
+
+          {activeView === 'coaching' && (
+            <SectionErrorBoundary sectionName="Coaching" onReset={() => setCoachingNavStack(['hub'])}>
+              <Suspense fallback={<LoadingFallback />}>
+                {coachingSubView === 'hub' && (
+                  <CoachingHub
+                    assessments={domainAssessments.assessments}
+                    assessmentsLoading={domainAssessments.loading}
+                    rules={familyRules.rules.filter(r => r.status === 'active')}
+                    workspaces={researchWorkspaces.workspaces}
+                    blocks={playbook.blocks}
+                    onOpenRules={() => pushCoachingView('rules')}
+                    onOpenResearch={() => pushCoachingView('research')}
+                    onOpenWeeklyReview={() => pushCoachingView('review')}
+                    onOpenPlaybook={() => pushCoachingView('playbook')}
+                    onOpenAssessment={(layerSlug) => {
+                      setActiveLayerSlug(layerSlug)
+                      pushCoachingView('assessment')
+                    }}
+                    onOpenDomain={(layerSlug, domainSlug) => {
+                      setActiveLayerSlug(layerSlug)
+                      setActiveDomainSlug(domainSlug)
+                      pushCoachingView('domain')
+                    }}
+                  />
+                )}
+
+                {coachingSubView === 'assessment' && activeLayerConfig && (
+                  <QuickAssessment
+                    config={activeLayerConfig}
+                    existingAssessments={domainAssessments.assessments}
+                    onSave={(ratings) => domainAssessments.saveQuickAssessment(ratings, activeLayerDbId || undefined)}
+                    onBack={popCoachingView}
+                  />
+                )}
+
+                {coachingSubView === 'domain' && activeDomainSlug && activeLayerConfig && (() => {
+                  const domainConfig = activeLayerConfig.domains.find(d => d.slug === activeDomainSlug)
+                  const assessment = domainAssessments.getAssessment(activeDomainSlug)
+                  if (!domainConfig || !assessment) {
+                    return (
+                      <QuickAssessment
+                        config={activeLayerConfig}
+                        existingAssessments={domainAssessments.assessments}
+                        onSave={(ratings) => domainAssessments.saveQuickAssessment(ratings, activeLayerDbId || undefined)}
+                        onBack={popCoachingView}
+                      />
+                    )
+                  }
+                  return (
+                    <DomainDetail
+                      domain={domainConfig}
+                      assessment={assessment}
+                      accentColor={activeLayerConfig.accentColor}
+                      onBack={popCoachingView}
+                      onReassess={() => pushCoachingView('assessment')}
+                      onGoDeeper={() => {
+                        pushCoachingView('deep-assessment')
+                      }}
+                    />
+                  )
+                })()}
+
+                {coachingSubView === 'deep-assessment' && activeDomainSlug && activeLayerConfig && (() => {
+                  const domainConfig = activeLayerConfig.domains.find(d => d.slug === activeDomainSlug)
+                  const quickAssessment = domainAssessments.getAssessment(activeDomainSlug)
+                  if (!domainConfig) return null
+                  return (
+                    <DeepAssessmentChat
+                      config={activeLayerConfig}
+                      domain={domainConfig}
+                      quickAssessment={quickAssessment ?? undefined}
+                      messages={deepAssessment.messages}
+                      loading={deepAssessment.loading}
+                      readyToFinish={deepAssessment.readyToFinish}
+                      result={deepAssessment.result}
+                      error={deepAssessment.error}
+                      onStart={() => {
+                        deepAssessment.start({
+                          layerId: activeLayerDbId || '',
+                          layerName: activeLayerConfig.name,
+                          domainSlug: activeDomainSlug,
+                          domainName: domainConfig.name,
+                          domainSubtitle: domainConfig.subtitle,
+                          quickAssessment: quickAssessment ?? undefined,
+                        })
+                      }}
+                      onSend={deepAssessment.respond}
+                      onFinish={deepAssessment.finish}
+                      onBack={() => {
+                        deepAssessment.reset()
+                        popCoachingView()
+                      }}
+                      onDone={() => {
+                        domainAssessments.refetch()
+                        deepAssessment.reset()
+                        popCoachingView()
+                      }}
+                    />
+                  )
+                })()}
+
+                {coachingSubView === 'rules' && (
+                  <RulesView
+                    rules={familyRules.rules}
+                    responsibilities={responsibilities.responsibilities}
+                    onAddRule={familyRules.addRule}
+                    onUpdateRule={familyRules.updateRule}
+                    onDeleteRule={familyRules.deleteRule}
+                    onAddResponsibility={responsibilities.addResponsibility}
+                    getResponsibilitiesForRule={responsibilities.getForRule}
+                    loading={familyRules.loading}
+                    onBack={popCoachingView}
+                    title="Rules"
+                    description="Coaching guidance across all domains"
+                    crossLayerMode
+                  />
+                )}
+
+                {coachingSubView === 'research' && (
+                  <Suspense fallback={<LoadingFallback />}>
+                    <PlanningWorkspace
+                      resources={planningResources.resources}
+                      loading={planningResources.loading}
+                      onAddResource={planningResources.addResource}
+                      onUpdateResource={planningResources.updateResource}
+                      onDeleteResource={planningResources.deleteResource}
+                      onUploadFile={planningResources.uploadFile}
+                      onGetSignedUrl={planningResources.getSignedUrl}
+                      workspaces={researchWorkspaces.workspaces}
+                      workspacesLoading={researchWorkspaces.loading}
+                      onCreateWorkspace={researchWorkspaces.addWorkspace}
+                      onUpdateWorkspace={researchWorkspaces.updateWorkspace}
+                      onDeleteWorkspace={researchWorkspaces.deleteWorkspace}
+                      onMarkWorkspaceSynthesized={researchWorkspaces.markSynthesized}
+                      rules={familyRules.rules}
+                      onAddRule={familyRules.addRule}
+                      onUpdateRule={familyRules.updateRule}
+                      onDeleteRule={familyRules.deleteRule}
+                      onViewPublishedRules={() => pushCoachingView('rules')}
+                      weeklyReview={{
+                        blockSummaries: weeklyFeedback.blockSummaries,
+                        overallStats: weeklyFeedback.overallStats,
+                        flaggedBlocks: weeklyFeedback.flaggedBlocks,
+                        feedbackLoading: weeklyFeedback.loading,
+                        weekOf: reviewWeekOf,
+                        onWeekChange: setReviewWeekOf,
+                        blocks: playbook.blocks,
+                        onAddBlock: playbook.addBlock,
+                        onUpdateBlock: playbook.updateBlock,
+                        onDeleteBlock: playbook.deleteBlock,
+                        onReorderBlocks: playbook.reorderBlocks,
+                        aiResult: aiSuggestions.result,
+                        aiLoading: aiSuggestions.loading,
+                        aiError: aiSuggestions.error,
+                        onGenerateAI: aiSuggestions.generateSuggestions,
+                        onAcceptSuggestion: aiSuggestions.acceptSuggestion,
+                        onRejectSuggestion: aiSuggestions.rejectSuggestion,
+                      }}
+                      onBack={popCoachingView}
+                      initialTab="research"
+                    />
+                  </Suspense>
+                )}
+
+                {coachingSubView === 'review' && (
+                  <Suspense fallback={<LoadingFallback />}>
+                    <PlanningWorkspace
+                      resources={planningResources.resources}
+                      loading={planningResources.loading}
+                      onAddResource={planningResources.addResource}
+                      onUpdateResource={planningResources.updateResource}
+                      onDeleteResource={planningResources.deleteResource}
+                      onUploadFile={planningResources.uploadFile}
+                      onGetSignedUrl={planningResources.getSignedUrl}
+                      workspaces={researchWorkspaces.workspaces}
+                      workspacesLoading={researchWorkspaces.loading}
+                      onCreateWorkspace={researchWorkspaces.addWorkspace}
+                      onUpdateWorkspace={researchWorkspaces.updateWorkspace}
+                      onDeleteWorkspace={researchWorkspaces.deleteWorkspace}
+                      onMarkWorkspaceSynthesized={researchWorkspaces.markSynthesized}
+                      rules={familyRules.rules}
+                      onAddRule={familyRules.addRule}
+                      onUpdateRule={familyRules.updateRule}
+                      onDeleteRule={familyRules.deleteRule}
+                      onViewPublishedRules={() => pushCoachingView('rules')}
+                      weeklyReview={{
+                        blockSummaries: weeklyFeedback.blockSummaries,
+                        overallStats: weeklyFeedback.overallStats,
+                        flaggedBlocks: weeklyFeedback.flaggedBlocks,
+                        feedbackLoading: weeklyFeedback.loading,
+                        weekOf: reviewWeekOf,
+                        onWeekChange: setReviewWeekOf,
+                        blocks: playbook.blocks,
+                        onAddBlock: playbook.addBlock,
+                        onUpdateBlock: playbook.updateBlock,
+                        onDeleteBlock: playbook.deleteBlock,
+                        onReorderBlocks: playbook.reorderBlocks,
+                        aiResult: aiSuggestions.result,
+                        aiLoading: aiSuggestions.loading,
+                        aiError: aiSuggestions.error,
+                        onGenerateAI: aiSuggestions.generateSuggestions,
+                        onAcceptSuggestion: aiSuggestions.acceptSuggestion,
+                        onRejectSuggestion: aiSuggestions.rejectSuggestion,
+                      }}
+                      onBack={popCoachingView}
+                      initialTab="weekly-review"
+                    />
+                  </Suspense>
+                )}
+
+                {coachingSubView === 'playbook' && (
+                  <WeeklyPlannerGrid
+                    blocks={playbook.blocks}
+                    onAddBlock={playbook.addBlock}
+                    onUpdateBlock={playbook.updateBlock}
+                    onDeleteBlock={playbook.deleteBlock}
+                    onBack={popCoachingView}
+                  />
+                )}
+              </Suspense>
+            </SectionErrorBoundary>
+          )}
+
+          {activeView === 'settings' && (
+            <Suspense fallback={<LoadingFallback />}>
+              <SettingsPage
+                onBack={() => {
+                  refetchFamilyMembers() // Refresh family members in case they were edited
+                  handleViewChange('today')
+                }}
+                onFamilyMembersChanged={refetchFamilyMembers}
+                onImportBlocks={async (blocks) => {
+                  for (const block of blocks) {
+                    await playbook.addBlock(block)
+                  }
+                }}
+              />
+            </Suspense>
+          )}
+        </SectionErrorBoundary>
+
+        {/* Search Modal */}
+        <SearchModal
+          isOpen={searchOpen}
+          onClose={handleSearchClose}
+          query={searchQuery}
+          onQueryChange={setSearchQuery}
+          results={searchResults}
+          totalResults={searchTotalResults}
+          isSearching={isSearching}
+          onSelectResult={handleSearchSelect}
+        />
+
+        {/* Toast notifications */}
+        <Toast toast={toast} onDismiss={dismissToast} />
+        <ConfirmationToast
+          toast={confirmationToast}
+          onDismiss={() => setConfirmationToast(null)}
+        />
+        <UndoToast
+          action={undo.currentAction}
+          onUndo={undo.executeUndo}
+          onDismiss={undo.dismiss}
+        />
+
+        {/* Offline banner */}
+        {!isOnline && (
+          <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-white px-4 py-2 text-center text-sm font-medium flex items-center justify-center gap-2 shadow-md">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414" />
+            </svg>
+            You're offline. Check your connection.
+          </div>
+        )}
+
+        {/* Calendar reconnect prompt */}
+        {pendingEventData && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 animate-scale-up">
+              <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
+                <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-neutral-800 text-center mb-2">
+                Calendar Not Connected
+              </h3>
+              <p className="text-sm text-neutral-500 text-center mb-6">
+                Your Google Calendar is disconnected. This event will only be saved locally in Symphony and won't appear in your Google Calendar.
+              </p>
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={async () => {
+                    // Store the pending data before redirect
+                    sessionStorage.setItem('pendingEventData', JSON.stringify({
+                      ...pendingEventData,
+                      scheduledFor: pendingEventData.scheduledFor?.toISOString(),
+                    }))
+                    await connectCalendar()
+                  }}
+                  className="w-full px-4 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors"
+                >
+                  Connect Google Calendar
+                </button>
+                <button
+                  onClick={async () => {
+                    // Create event locally only
+                    const data = pendingEventData
+                    setPendingEventData(null)
+
+                    const taskId = await addTask(
+                      data.title,
+                      data.contactId,
+                      data.projectId,
+                      data.scheduledFor,
+                      {
+                        assignedTo: getCurrentUserMember()?.id,
+                        category: data.category,
+                      }
+                    )
+                    if (taskId) {
+                      setRecentlyCreatedTaskId(taskId)
+                      showToast('Event saved locally (not in Google Calendar)', 'info')
+                    }
+                  }}
+                  className="w-full px-4 py-3 border border-neutral-200 text-neutral-600 rounded-lg font-medium hover:bg-neutral-50 transition-colors"
+                >
+                  Create Local Only
+                </button>
+                <button
+                  onClick={() => setPendingEventData(null)}
+                  className="w-full px-4 py-2 text-neutral-400 hover:text-neutral-600 text-sm transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
       </DomainPageOutline>
 
       {/* Focus Mode - scratch pad */}
@@ -2325,6 +2326,8 @@ function App() {
           notes={notes.filter((n): n is Note => !n.sourceTaskId)}
         />
       </Suspense>
+
+      <PuppyEasterEgg />
     </AppShell>
   )
 }

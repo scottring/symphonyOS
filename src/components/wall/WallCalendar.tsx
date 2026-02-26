@@ -9,6 +9,7 @@ import { WallLookAhead } from './WallLookAhead'
 import { WallTodayTimeline } from './WallTodayTimeline'
 import { WallDinnerWidget } from './WallDinnerWidget'
 import { WallBottomBar } from './WallBottomBar'
+import { PuppyEasterEgg } from '@/components/PuppyEasterEgg'
 
 const DAILY_JOKES = [
   'Why did the scarecrow win the award? Because he was outstanding in his field!',
@@ -511,6 +512,9 @@ export function WallCalendar() {
           {wallData.error}
         </div>
       )}
+
+      {/* Puppy easter egg — runs across the bottom every 30-90 min */}
+      <PuppyEasterEgg />
     </div>
   )
 }
