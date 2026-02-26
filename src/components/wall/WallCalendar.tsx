@@ -459,7 +459,7 @@ export function WallCalendar() {
           </div>
 
           {/* Middle: Today's horizontal timeline */}
-          <div className="flex-shrink-0 h-[200px]">
+          <div className="flex-shrink-0 h-[240px]">
             <WallTodayTimeline todayData={wallData.days.find(d => d.isToday)} />
           </div>
 
