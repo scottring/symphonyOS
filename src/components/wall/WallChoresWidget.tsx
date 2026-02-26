@@ -46,7 +46,7 @@ const GAP = 12
 
 export function WallChoresWidget({ items, onComplete, overdueItems, inboxCount, completedCount, totalCount }: WallChoresWidgetProps) {
   const displayItems = items.slice(0, 6)
-  const overdueDisplay = overdueItems.filter(i => !i.completed).slice(0, 5)
+  const overdueDisplay = overdueItems.filter(i => !i.completed)
 
   const [pressingId, setPressingId] = useState<string | null>(null)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -154,7 +154,7 @@ export function WallChoresWidget({ items, onComplete, overdueItems, inboxCount, 
                   Overdue ({overdueItems.filter(i => !i.completed).length})
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-2 flex-1 overflow-hidden">
+              <div className="grid grid-cols-2 gap-2 flex-1 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
                 {overdueDisplay.map((item) => {
                   const isPressing = pressingId === item.id
                   return (
