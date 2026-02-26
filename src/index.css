@@ -955,6 +955,49 @@ body {
   to { opacity: 1; transform: translateX(0); }
 }
 
+/* ─── Puppy Easter Egg Animations ─── */
+@keyframes puppyBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes tailWag {
+  0%, 100% { transform: rotate(-15deg); }
+  50% { transform: rotate(25deg); }
+}
+
+@keyframes tailWagSlow {
+  0%, 100% { transform: rotate(-10deg); }
+  50% { transform: rotate(20deg); }
+}
+
+@keyframes frontLegsRun {
+  0% { transform: rotate(-18deg); }
+  50% { transform: rotate(18deg); }
+  100% { transform: rotate(-18deg); }
+}
+
+@keyframes backLegsRun {
+  0% { transform: rotate(18deg); }
+  50% { transform: rotate(-18deg); }
+  100% { transform: rotate(18deg); }
+}
+
+@keyframes earFlop {
+  0%, 100% { transform: rotate(-5deg); }
+  50% { transform: rotate(8deg); }
+}
+
+@keyframes earPerk {
+  0%, 100% { transform: rotate(-3deg) translateY(-2px); }
+  50% { transform: rotate(3deg) translateY(-2px); }
+}
+
+@keyframes tongueFlap {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(5deg); }
+}
+
 /* Floating frosted-glass card */
 .wall-card {
   background: hsl(48 30% 98% / 0.95);
