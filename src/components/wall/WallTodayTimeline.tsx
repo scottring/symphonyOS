@@ -5,6 +5,7 @@ import type { TimelineItem } from '@/types/timeline'
 
 interface WallTodayTimelineProps {
   todayData: WallDayData | undefined
+  overdueTasks?: TimelineItem[]
 }
 
 const NODE_COLORS = ['bg-[#6DC4A7]', 'bg-[#F26E63]', 'bg-[#F9C35C]', 'bg-[#6DC4A7]']
@@ -20,13 +21,33 @@ interface TimelineNode {
   isPast: boolean
 }
 
-function getTimelineNodes(todayData: WallDayData | undefined): TimelineNode[] {
-  if (!todayData) return []
-
+function getTimelineNodes(todayData: WallDayData | undefined, overdueTasks?: TimelineItem[]): TimelineNode[] {
   const now = new Date()
   const nowMinutes = now.getHours() * 60 + now.getMinutes()
   const nodes: TimelineNode[] = []
   let colorIdx = 0
+
+  // Add overdue tasks first (sortKey = -2 so they appear at the start)
+  if (overdueTasks?.length) {
+    for (const item of overdueTasks) {
+      if (item.skipped || item.completed) continue
+      nodes.push({
+        id: item.id,
+        time: 'OVERDUE',
+        sortKey: -2,
+        title: item.title.toUpperCase(),
+        completed: false,
+        type: item.type,
+        colorClass: 'bg-[#F26E63]',
+        isPast: true,
+      })
+      colorIdx++
+    }
+  }
+
+  if (!todayData) {
+    return nodes
+  }
 
   for (const section of ['allday', 'morning', 'afternoon', 'evening'] as const) {
     const items: TimelineItem[] = todayData.items[section] || []
@@ -81,8 +102,8 @@ function getNowIndex(nodes: TimelineNode[]): number {
 const STEM_HEIGHT = 40
 const LABEL_AREA = 52
 
-export function WallTodayTimeline({ todayData }: WallTodayTimelineProps) {
-  const nodes = useMemo(() => getTimelineNodes(todayData), [todayData])
+export function WallTodayTimeline({ todayData, overdueTasks }: WallTodayTimelineProps) {
+  const nodes = useMemo(() => getTimelineNodes(todayData, overdueTasks), [todayData, overdueTasks])
   const nowIdx = useMemo(() => getNowIndex(nodes), [nodes])
 
   if (nodes.length === 0) {

@@ -335,9 +335,8 @@ export function WallCalendar() {
     return () => clearInterval(interval)
   }, [])
 
-  // Flatten active items for the chores widget
+  // Today's chores/routines only (no overdue — those go in the status card)
   const activeItems = useMemo(() => {
-    if (!wallData.days.length) return []
     const today = wallData.days.find(d => d.isToday)
     if (!today) return []
     const items: TimelineItem[] = []
@@ -347,6 +346,22 @@ export function WallCalendar() {
       }
     }
     return items
+  }, [wallData.days])
+
+  // Count today's completed vs total (non-event items)
+  const { completedCount, totalCount } = useMemo(() => {
+    const today = wallData.days.find(d => d.isToday)
+    if (!today) return { completedCount: 0, totalCount: 0 }
+    let completed = 0
+    let total = 0
+    for (const section of ['morning', 'afternoon', 'evening', 'allday'] as const) {
+      for (const item of (today.items[section] || [])) {
+        if (item.type === 'event' || item.skipped) continue
+        total++
+        if (item.completed) completed++
+      }
+    }
+    return { completedCount: completed, totalCount: total }
   }, [wallData.days])
 
   // Auth loading
@@ -447,7 +462,14 @@ export function WallCalendar() {
             </h1>
 
             {/* Chores Bento Box Widget */}
-            <WallChoresWidget items={activeItems} onComplete={handleComplete} />
+            <WallChoresWidget
+              items={activeItems}
+              onComplete={handleComplete}
+              overdueItems={wallData.overdueTasks}
+              inboxCount={wallData.inboxCount}
+              completedCount={completedCount}
+              totalCount={totalCount}
+            />
           </div>
 
           {/* Bottom Area: Today's horizontal timeline */}
