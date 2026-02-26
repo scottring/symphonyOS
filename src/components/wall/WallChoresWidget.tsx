@@ -96,9 +96,9 @@ export function WallChoresWidget({ choreItems, taskItems, onComplete, overdueIte
     <div className="flex gap-8 w-full">
       {/* ── LEFT: Chores Section ── */}
       <div className="flex-shrink-0 flex flex-col">
-        <h2 className="text-white text-[1.8rem] font-black uppercase tracking-widest mb-4">
+        <div className="text-[1.3rem] font-bold uppercase tracking-[0.2em] text-white mb-4">
           Chores
-        </h2>
+        </div>
 
         {displayChores.length > 0 ? (
           <div
@@ -151,9 +151,9 @@ export function WallChoresWidget({ choreItems, taskItems, onComplete, overdueIte
 
       {/* ── RIGHT: Tasks Section ── */}
       <div className="flex-1 flex flex-col min-w-0">
-        <h2 className="text-white text-[1.8rem] font-black uppercase tracking-widest mb-4">
+        <div className="text-[1.3rem] font-bold uppercase tracking-[0.2em] text-white mb-4">
           Tasks
-        </h2>
+        </div>
 
         {allTasks.length > 0 ? (
           <div className="flex flex-col gap-2 overflow-y-auto" style={{ maxHeight: SQ * 2 + GAP + 30, scrollbarWidth: 'none' }}>

@@ -8,6 +8,7 @@ import { WallChoresWidget } from './WallChoresWidget'
 import { WallLookAhead } from './WallLookAhead'
 import { WallTodayTimeline } from './WallTodayTimeline'
 import { WallDinnerWidget } from './WallDinnerWidget'
+import { WallBottomBar } from './WallBottomBar'
 
 const DAILY_JOKES = [
   'Why did the scarecrow win the award? Because he was outstanding in his field!',
@@ -447,7 +448,7 @@ export function WallCalendar() {
         {/* ─── LEFT COLUMN (60%) ─── */}
         <div className="w-[60%] flex flex-col h-full justify-start pb-4">
 
-          <div className="flex flex-col mt-[75px]">
+          <div className="flex flex-col">
             {/* Chores + Tasks Widget */}
             <WallChoresWidget
               choreItems={choreItems}
@@ -458,8 +459,13 @@ export function WallCalendar() {
           </div>
 
           {/* Bottom Area: Today's horizontal timeline */}
-          <div className="mt-[100px] h-[220px]">
+          <div className="mt-8 h-[200px]">
             <WallTodayTimeline todayData={wallData.days.find(d => d.isToday)} />
+          </div>
+
+          {/* Bottom bar: Quick Capture + Mood Meter */}
+          <div className="mt-4">
+            <WallBottomBar onTaskAdded={wallData.refetch} />
           </div>
 
         </div>
