@@ -12,6 +12,20 @@ import { WallBottomBar } from './WallBottomBar'
 import { PuppyEasterEgg } from '@/components/PuppyEasterEgg'
 import { useContextEngine, ContextDock, ContextOverlay } from './contexts'
 import type { ContextEvalData } from './contexts'
+import { useWeather } from '@/hooks/useWeather'
+
+function getWeatherEmoji(code: number): string {
+  if (code === 0) return '☀️'
+  if (code <= 3) return '⛅'
+  if (code <= 48) return '🌫️'
+  if (code <= 57) return '🌧️'
+  if (code <= 67) return '🌧️'
+  if (code <= 77) return '❄️'
+  if (code <= 82) return '🌦️'
+  if (code <= 86) return '🌨️'
+  if (code >= 95) return '⛈️'
+  return '🌤️'
+}
 
 const DAILY_JOKES = [
   'Why did the scarecrow win the award? Because he was outstanding in his field!',
@@ -303,6 +317,7 @@ export function WallCalendar() {
   const wallData = useWallData()
   const { markDone, undoDone } = useActionableInstances()
   const { updateTask } = useSupabaseTasks()
+  const { weather } = useWeather()
   const [currentTime, setCurrentTime] = useState(new Date())
 
   // Complete/uncomplete a wall item
@@ -455,9 +470,14 @@ export function WallCalendar() {
           <div className="text-[2.5rem] font-bold text-white/50 tracking-wider">
             {dateStr}
           </div>
-          <span className="text-[5rem] ml-4 animate-pulse-soft hidden sm:block">
-            🌞
-          </span>
+          {weather ? (
+            <span className="text-[3.5rem] ml-4 flex items-baseline gap-2">
+              <span>{getWeatherEmoji(weather.weatherCode)}</span>
+              <span className="text-white font-bold">{weather.currentTemp}°</span>
+            </span>
+          ) : (
+            <span className="text-[3.5rem] ml-4 animate-pulse-soft">🌤️</span>
+          )}
         </div>
 
         {/* Who's Home Avatars */}
@@ -540,12 +560,21 @@ export function WallCalendar() {
 
       </main>
 
-      {/* Refresh timestamp */}
-      {wallData.lastRefresh && (
-        <div className="fixed top-6 right-6 text-[0.8rem] text-white/20 z-0">
-          Last updated: {wallData.lastRefresh.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-        </div>
-      )}
+      {/* Refresh button + timestamp */}
+      <button
+        onClick={() => window.location.reload()}
+        className="fixed bottom-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-lg
+                   bg-white/5 hover:bg-white/10 border border-white/10
+                   text-white/30 hover:text-white/60 transition-all z-10 text-[0.8rem]"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M4.5 9A8 8 0 0119.8 7.5M19.5 15A8 8 0 014.2 16.5" />
+        </svg>
+        {wallData.lastRefresh
+          ? wallData.lastRefresh.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+          : 'Refresh'
+        }
+      </button>
 
       {/* Error indicator */}
       {wallData.error && (
