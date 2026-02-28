@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
+import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/hooks/useAuth'
 
 // Local storage key for home location (shared with DirectionsBuilder)
 const HOME_LOCATION_KEY = 'symphony_home_location'
@@ -45,6 +47,7 @@ function clearHomeLocation() {
 }
 
 export function HomeAddressSettings() {
+  const { user } = useAuth()
   const [homeLocation, setHomeLocation] = useState<SavedLocation | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -103,22 +106,53 @@ export function HomeAddressSettings() {
     }
   }, [searchQuery])
 
+  const saveToSupabase = async (address: string, placeId: string, lat?: number, lng?: number) => {
+    if (!user) return
+    const updates: Record<string, unknown> = {
+      user_id: user.id,
+      home_location: address,
+      home_place_id: placeId,
+      updated_at: new Date().toISOString(),
+    }
+    if (lat != null && lng != null) {
+      updates.home_lat = lat
+      updates.home_lng = lng
+    }
+    await supabase.from('user_profiles').upsert(updates, { onConflict: 'user_id' })
+  }
+
+  const clearFromSupabase = async () => {
+    if (!user) return
+    await supabase.from('user_profiles').update({
+      home_location: null,
+      home_lat: null,
+      home_lng: null,
+      home_place_id: null,
+      updated_at: new Date().toISOString(),
+    }).eq('user_id', user.id)
+  }
+
   const handleSelectPlace = async (result: PlaceAutocompleteResult) => {
     try {
       const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${result.placeId}&fields=formatted_address&key=${apiKey}`
+        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${result.placeId}&fields=formatted_address,geometry&key=${apiKey}`
       )
       const data = await response.json()
 
+      const address = data.result?.formatted_address || result.description
+      const lat = data.result?.geometry?.location?.lat
+      const lng = data.result?.geometry?.location?.lng
+
       const newLocation: SavedLocation = {
         name: 'Home',
-        address: data.result?.formatted_address || result.description,
+        address,
         placeId: result.placeId,
       }
 
       saveHomeLocation(newLocation)
       setHomeLocation(newLocation)
+      saveToSupabase(address, result.placeId, lat, lng)
       setIsEditing(false)
       setSearchQuery('')
       setSearchResults([])
@@ -132,6 +166,7 @@ export function HomeAddressSettings() {
 
       saveHomeLocation(newLocation)
       setHomeLocation(newLocation)
+      saveToSupabase(result.description, result.placeId)
       setIsEditing(false)
       setSearchQuery('')
       setSearchResults([])
@@ -141,6 +176,7 @@ export function HomeAddressSettings() {
   const handleClear = () => {
     clearHomeLocation()
     setHomeLocation(null)
+    clearFromSupabase()
   }
 
   return (

@@ -31,68 +31,152 @@ function getCondition(code: number): string {
   return 'Unknown'
 }
 
+function getCoordinatesFromBrowser(): Promise<{ lat: number; lng: number }> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('Geolocation not supported'))
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      (err) => reject(err),
+      { timeout: 10000, maximumAge: 300000 }
+    )
+  })
+}
+
+async function fetchWeatherData(lat: number, lng: number): Promise<WeatherData> {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code&hourly=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&timezone=auto&forecast_hours=8&forecast_days=1`
+
+  const res = await fetch(url)
+  if (!res.ok) throw new Error('Weather API error')
+
+  const data = await res.json()
+  const currentHour = new Date().getHours()
+  const hourlyForecast = (data.hourly?.time || [])
+    .map((t: string, i: number) => ({
+      hour: new Date(t).getHours(),
+      temp: Math.round(data.hourly.temperature_2m[i]),
+      code: data.hourly.weather_code[i],
+    }))
+    .filter((h: { hour: number }) => h.hour >= currentHour)
+    .slice(0, 6)
+
+  return {
+    currentTemp: Math.round(data.current.temperature_2m),
+    weatherCode: data.current.weather_code,
+    condition: getCondition(data.current.weather_code),
+    highTemp: Math.round(data.daily.temperature_2m_max[0]),
+    lowTemp: Math.round(data.daily.temperature_2m_min[0]),
+    hourlyForecast,
+  }
+}
+
 export function useWeather() {
   const { user } = useAuth()
   const [weather, setWeather] = useState<WeatherData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const mountedRef = useRef(true)
+  const coordsRef = useRef<{ lat: number; lng: number } | null>(null)
 
   const fetchWeather = useCallback(async () => {
     if (!user) return
 
-    // Get home location from user_profiles
+    // If we already resolved coordinates, reuse them
+    if (coordsRef.current) {
+      try {
+        const data = await fetchWeatherData(coordsRef.current.lat, coordsRef.current.lng)
+        if (mountedRef.current) {
+          setWeather(data)
+          setError(null)
+        }
+      } catch {
+        if (mountedRef.current) setError('fetch-error')
+      } finally {
+        if (mountedRef.current) setLoading(false)
+      }
+      return
+    }
+
+    // 1. Try Supabase user_profiles
     const { data: profile } = await supabase
       .from('user_profiles')
       .select('home_lat, home_lng')
       .eq('user_id', user.id)
       .maybeSingle()
 
-    if (!profile?.home_lat || !profile?.home_lng) {
-      if (mountedRef.current) {
-        setError('no-location')
-        setLoading(false)
+    if (profile?.home_lat && profile?.home_lng) {
+      coordsRef.current = { lat: Number(profile.home_lat), lng: Number(profile.home_lng) }
+      try {
+        const data = await fetchWeatherData(coordsRef.current.lat, coordsRef.current.lng)
+        if (mountedRef.current) {
+          setWeather(data)
+          setError(null)
+        }
+      } catch {
+        if (mountedRef.current) setError('fetch-error')
+      } finally {
+        if (mountedRef.current) setLoading(false)
       }
       return
     }
 
+    // 2. Fallback: browser geolocation
     try {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${profile.home_lat}&longitude=${profile.home_lng}&current=temperature_2m,weather_code&hourly=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&timezone=auto&forecast_hours=8&forecast_days=1`
+      const coords = await getCoordinatesFromBrowser()
+      coordsRef.current = coords
 
-      const res = await fetch(url)
-      if (!res.ok) throw new Error('Weather API error')
+      // Save to Supabase for next time
+      await supabase
+        .from('user_profiles')
+        .upsert({
+          user_id: user.id,
+          home_lat: coords.lat,
+          home_lng: coords.lng,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' })
 
-      const data = await res.json()
-
-      if (!mountedRef.current) return
-
-      const currentHour = new Date().getHours()
-      const hourlyForecast = (data.hourly?.time || [])
-        .map((t: string, i: number) => ({
-          hour: new Date(t).getHours(),
-          temp: Math.round(data.hourly.temperature_2m[i]),
-          code: data.hourly.weather_code[i],
-        }))
-        .filter((h: { hour: number }) => h.hour >= currentHour)
-        .slice(0, 6)
-
-      setWeather({
-        currentTemp: Math.round(data.current.temperature_2m),
-        weatherCode: data.current.weather_code,
-        condition: getCondition(data.current.weather_code),
-        highTemp: Math.round(data.daily.temperature_2m_max[0]),
-        lowTemp: Math.round(data.daily.temperature_2m_min[0]),
-        hourlyForecast,
-      })
-      setError(null)
+      const data = await fetchWeatherData(coords.lat, coords.lng)
+      if (mountedRef.current) {
+        setWeather(data)
+        setError(null)
+      }
     } catch {
-      if (mountedRef.current) {
-        setError('fetch-error')
-      }
+      if (mountedRef.current) setError('no-location')
     } finally {
+      if (mountedRef.current) setLoading(false)
+    }
+  }, [user])
+
+  // Manual location setter — called from UI when user clicks "Use my location"
+  const requestLocation = useCallback(async () => {
+    if (!user) return
+    setLoading(true)
+    setError(null)
+
+    try {
+      const coords = await getCoordinatesFromBrowser()
+      coordsRef.current = coords
+
+      await supabase
+        .from('user_profiles')
+        .upsert({
+          user_id: user.id,
+          home_lat: coords.lat,
+          home_lng: coords.lng,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' })
+
+      const data = await fetchWeatherData(coords.lat, coords.lng)
       if (mountedRef.current) {
-        setLoading(false)
+        setWeather(data)
+        setError(null)
       }
+    } catch {
+      if (mountedRef.current) setError('no-location')
+    } finally {
+      if (mountedRef.current) setLoading(false)
     }
   }, [user])
 
@@ -107,5 +191,5 @@ export function useWeather() {
     }
   }, [fetchWeather])
 
-  return { weather, loading, error }
+  return { weather, loading, error, requestLocation }
 }

@@ -189,7 +189,7 @@ export function WallTodayTimeline({ todayData, overdueTasks }: WallTodayTimeline
                     className="absolute left-1/2 -translate-x-1/2 text-center"
                     style={isAbove
                       ? { top: lineY + 16 }
-                      : { top: lineY - 24 }
+                      : { top: lineY - 36 }
                     }
                   >
                     <span className="text-[0.85rem] font-bold text-white/50 tracking-wider">

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useWallData } from '@/hooks/useWallData'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
@@ -10,6 +10,8 @@ import { WallTodayTimeline } from './WallTodayTimeline'
 import { WallDinnerWidget } from './WallDinnerWidget'
 import { WallBottomBar } from './WallBottomBar'
 import { PuppyEasterEgg } from '@/components/PuppyEasterEgg'
+import { useContextEngine, ContextDock, ContextOverlay } from './contexts'
+import type { ContextEvalData } from './contexts'
 
 const DAILY_JOKES = [
   'Why did the scarecrow win the award? Because he was outstanding in his field!',
@@ -356,6 +358,42 @@ export function WallCalendar() {
     return { choreItems: chores, taskItems: tasks }
   }, [wallData.days])
 
+  // ═══ CONTEXTUAL VIEWS ENGINE ═══
+  const contextEvalData = useMemo((): ContextEvalData | null => {
+    if (wallData.loading) return null
+    return {
+      now: currentTime,
+      days: wallData.days,
+      calendarEvents: wallData.calendarEvents,
+      familyMembers: wallData.familyMembers,
+      overdueTasks: wallData.overdueTasks,
+      todayChores: choreItems,
+      todayTasks: taskItems,
+    }
+  }, [currentTime, wallData, choreItems, taskItems])
+
+  const {
+    surfacedRules,
+    activeContext,
+    activateContext,
+    dismissActiveContext,
+    dismissRule,
+    debugMode,
+    toggleDebugMode,
+  } = useContextEngine(contextEvalData)
+
+  // Triple-tap clock to toggle debug mode (surfaces all context buttons)
+  const tapCountRef = useRef(0)
+  const tapTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const handleClockTap = useCallback(() => {
+    tapCountRef.current += 1
+    if (tapCountRef.current >= 3) {
+      toggleDebugMode()
+      tapCountRef.current = 0
+    }
+    if (tapTimerRef.current) clearTimeout(tapTimerRef.current)
+    tapTimerRef.current = setTimeout(() => { tapCountRef.current = 0 }, 600)
+  }, [toggleDebugMode])
 
   // Auth loading
   if (authLoading) {
@@ -405,7 +443,10 @@ export function WallCalendar() {
       {/* ═══ TOP HEADER ═══ */}
       <header className="flex items-center justify-between mb-8 z-10 w-full pr-12">
         <div className="flex items-baseline gap-4">
-          <time className="font-bold text-[8rem] leading-none text-white tracking-tight">
+          <time
+            className="font-bold text-[8rem] leading-none text-white tracking-tight cursor-default"
+            onClick={handleClockTap}
+          >
             {time}
           </time>
           <span className="text-[3.5rem] font-bold text-white tracking-tight mr-4">
@@ -513,8 +554,34 @@ export function WallCalendar() {
         </div>
       )}
 
+      {/* Debug mode indicator */}
+      {debugMode && (
+        <div className="fixed top-6 left-6 bg-amber-500/20 text-amber-300 px-4 py-2 rounded-xl text-[0.85rem] font-bold uppercase tracking-widest border border-amber-500/30 z-50">
+          Debug: All Contexts
+        </div>
+      )}
+
       {/* Puppy easter egg — runs across the bottom every 30-90 min */}
       <PuppyEasterEgg />
+
+      {/* ═══ CONTEXTUAL VIEWS ═══ */}
+      {/* Smart button dock (surfaces when rules match, no active context) */}
+      {!activeContext && surfacedRules.length > 0 && (
+        <ContextDock
+          rules={surfacedRules}
+          onActivate={activateContext}
+          onDismiss={dismissRule}
+        />
+      )}
+
+      {/* Full-screen contextual view overlay */}
+      {activeContext && contextEvalData && (
+        <ContextOverlay
+          activeContext={activeContext}
+          data={contextEvalData}
+          onDismiss={dismissActiveContext}
+        />
+      )}
     </div>
   )
 }
