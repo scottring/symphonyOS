@@ -319,6 +319,8 @@ export function WallCalendar() {
   const { updateTask } = useSupabaseTasks()
   const { weather } = useWeather()
   const [currentTime, setCurrentTime] = useState(new Date())
+  const [nightWake, setNightWake] = useState(false)
+  const nightWakeTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Complete/uncomplete a wall item
   const handleComplete = useCallback(async (item: TimelineItem) => {
@@ -409,6 +411,46 @@ export function WallCalendar() {
     if (tapTimerRef.current) clearTimeout(tapTimerRef.current)
     tapTimerRef.current = setTimeout(() => { tapCountRef.current = 0 }, 600)
   }, [toggleDebugMode])
+
+  // ═══ NIGHTTIME SLEEP MODE (10:00 PM – 5:30 AM) ═══
+  const isNighttime = useMemo(() => {
+    const h = currentTime.getHours()
+    const m = currentTime.getMinutes()
+    return h >= 22 || h < 5 || (h === 5 && m < 30)
+  }, [currentTime])
+
+  // Clear wake timer when leaving nighttime
+  useEffect(() => {
+    if (!isNighttime) {
+      setNightWake(false)
+      if (nightWakeTimerRef.current) {
+        clearTimeout(nightWakeTimerRef.current)
+        nightWakeTimerRef.current = null
+      }
+    }
+  }, [isNighttime])
+
+  const handleNightTap = useCallback(() => {
+    setNightWake(true)
+    if (nightWakeTimerRef.current) clearTimeout(nightWakeTimerRef.current)
+    nightWakeTimerRef.current = setTimeout(() => setNightWake(false), 30_000)
+  }, [])
+
+  if (isNighttime && !nightWake) {
+    const { time: sleepTime, period: sleepPeriod } = formatWallTime(currentTime)
+    return (
+      <div
+        className="wall-calendar h-screen w-screen bg-black flex items-center justify-center select-none cursor-default"
+        onClick={handleNightTap}
+      >
+        <div className="text-center">
+          <div className="text-white/[0.04] font-bold text-[6rem] leading-none tracking-tight">
+            {sleepTime} {sleepPeriod}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   // Auth loading
   if (authLoading) {
@@ -580,6 +622,13 @@ export function WallCalendar() {
       {wallData.error && (
         <div className="fixed top-6 right-6 bg-red-900/80 text-red-200 px-5 py-3 rounded-xl text-[1rem] shadow-lg border border-red-500/30 backdrop-blur z-0">
           {wallData.error}
+        </div>
+      )}
+
+      {/* Nighttime wake indicator */}
+      {isNighttime && nightWake && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white/5 text-white/30 px-4 py-2 rounded-xl text-[0.85rem] font-bold uppercase tracking-widest border border-white/10 z-50">
+          Sleeping soon...
         </div>
       )}
 
