@@ -27,10 +27,10 @@ function getTimelineNodes(todayData: WallDayData | undefined, overdueTasks?: Tim
   const nodes: TimelineNode[] = []
   let colorIdx = 0
 
-  // Add overdue tasks first (sortKey = -2 so they appear at the start)
+  // Add overdue routines (not tasks — those show in the task list)
   if (overdueTasks?.length) {
     for (const item of overdueTasks) {
-      if (item.skipped || item.completed) continue
+      if (item.skipped || item.completed || item.type === 'task') continue
       nodes.push({
         id: item.id,
         time: 'OVERDUE',
@@ -52,7 +52,7 @@ function getTimelineNodes(todayData: WallDayData | undefined, overdueTasks?: Tim
   for (const section of ['allday', 'morning', 'afternoon', 'evening'] as const) {
     const items: TimelineItem[] = todayData.items[section] || []
     for (const item of items) {
-      if (item.skipped) continue
+      if (item.skipped || item.type === 'task') continue
 
       let sortKey = 0
       let timeStr: string | null = null
