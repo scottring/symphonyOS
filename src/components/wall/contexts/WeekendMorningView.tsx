@@ -99,7 +99,6 @@ export function WeekendMorningView({ data }: ContextViewProps) {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const todayEvents = useMemo(() => getTodayEvents(data.calendarEvents, data.now), [data.calendarEvents, data.now])
-  const todayData = data.days.find(d => d.isToday)
 
   // Get meal-related events
   const mealEvents = useMemo(() => {

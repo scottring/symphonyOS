@@ -1,35 +1,6 @@
 import type { ContextViewProps } from './types'
 
-const VIEW_INFO: Record<string, { title: string; icon: string; description: string; color: string }> = {
-  'morning-launch': {
-    title: 'Morning Launch',
-    icon: '🚀',
-    description: 'School prep checklist, bus countdown, what everyone needs today',
-    color: '#F9C35C',
-  },
-  'after-school': {
-    title: 'After School',
-    icon: '🎒',
-    description: 'Activities, homework tracker, snack ideas',
-    color: '#60A5FA',
-  },
-  'bedtime': {
-    title: 'Bedtime',
-    icon: '🌙',
-    description: 'Routine steps for Ella and Kaleb, tomorrow preview',
-    color: '#A78BFA',
-  },
-  'weekend-morning': {
-    title: 'Weekend Plan',
-    icon: '☀️',
-    description: 'Family activities, meal plan, chore assignments',
-    color: '#F9C35C',
-  },
-}
-
 export function PlaceholderContextView({ data, onDismiss }: ContextViewProps) {
-  // This is a placeholder for views not yet built
-  // We don't know the viewId here, so show a generic placeholder
   void data
 
   return (
