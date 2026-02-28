@@ -66,7 +66,7 @@ export function WallChoresWidget({ choreItems, taskItems, onComplete, overdueIte
   const [pressingId, setPressingId] = useState<string | null>(null)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>, item: TimelineItem) => {
+  const handleChorePointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>, item: TimelineItem) => {
     if (item.completed) {
       onComplete(item)
       return
@@ -114,7 +114,7 @@ export function WallChoresWidget({ choreItems, taskItems, onComplete, overdueIte
               return (
                 <button
                   key={item.id}
-                  onPointerDown={(e) => handlePointerDown(e, item)}
+                  onPointerDown={(e) => handleChorePointerDown(e, item)}
                   onPointerUp={handlePointerCancel}
                   onPointerLeave={handlePointerCancel}
                   onPointerCancel={handlePointerCancel}
@@ -158,36 +158,28 @@ export function WallChoresWidget({ choreItems, taskItems, onComplete, overdueIte
         {allTasks.length > 0 ? (
           <div className="flex flex-col gap-2 overflow-y-auto" style={{ maxHeight: SQ * 2 + GAP + 30, scrollbarWidth: 'none' }}>
             {allTasks.map((item) => {
-              const isPressing = pressingId === item.id
               const isOverdue = overdueIds.has(item.id)
               const icon = getEmojiIcon(item.title)
               const timeStr = formatItemTime(item)
 
               return (
-                <button
+                <div
                   key={item.id}
-                  onPointerDown={(e) => handlePointerDown(e, item)}
-                  onPointerUp={handlePointerCancel}
-                  onPointerLeave={handlePointerCancel}
-                  onPointerCancel={handlePointerCancel}
-                  className={`flex items-center gap-3 bg-white/6 rounded-xl px-4 py-2.5 relative overflow-hidden transition-all duration-300 select-none text-left ${isPressing ? 'scale-[0.98]' : 'active:scale-[0.98]'}`}
-                  style={{ touchAction: 'none' }}
+                  className="flex items-center gap-3 bg-white/6 rounded-xl px-4 py-2.5 select-none"
                 >
-                  {/* Hold fill */}
-                  <div className={`absolute inset-0 bg-[#6DC4A7]/30 origin-left transition-all pointer-events-none ${isPressing ? 'scale-x-100 duration-700 ease-linear' : 'scale-x-0 duration-150 ease-out'}`} />
                   {/* Icon */}
-                  <span className="text-[1.1rem] flex-shrink-0 relative z-10">{icon}</span>
+                  <span className="text-[1.1rem] flex-shrink-0">{icon}</span>
                   {/* Title */}
-                  <span className="text-[0.95rem] font-bold text-white/85 truncate relative z-10 flex-1">{item.title}</span>
+                  <span className="text-[0.95rem] font-bold text-white/85 truncate flex-1">{item.title}</span>
                   {/* Time */}
                   {timeStr && (
-                    <span className="text-[0.75rem] font-bold text-white/40 uppercase flex-shrink-0 relative z-10">{timeStr}</span>
+                    <span className="text-[0.75rem] font-bold text-white/40 uppercase flex-shrink-0">{timeStr}</span>
                   )}
-                  {/* Overdue indicator — orange dot on far right */}
+                  {/* Overdue indicator */}
                   {isOverdue && (
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#F9A825] flex-shrink-0 relative z-10 animate-pulse" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#F9A825] flex-shrink-0 animate-pulse" />
                   )}
-                </button>
+                </div>
               )
             })}
           </div>

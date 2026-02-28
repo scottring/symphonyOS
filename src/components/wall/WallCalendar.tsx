@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useWallData } from '@/hooks/useWallData'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
-import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import type { TimelineItem } from '@/types/timeline'
 import { WallChoresWidget } from './WallChoresWidget'
 import { WallLookAhead } from './WallLookAhead'
@@ -316,21 +315,18 @@ export function WallCalendar() {
   const { user, loading: authLoading } = useAuth()
   const wallData = useWallData()
   const { markDone, undoDone } = useActionableInstances()
-  const { updateTask } = useSupabaseTasks()
+
   const { weather } = useWeather()
   const [currentTime, setCurrentTime] = useState(new Date())
   const [nightWake, setNightWake] = useState(false)
   const nightWakeTimerRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Complete/uncomplete a wall item
+  // Complete/uncomplete a wall item (chores only — tasks are read-only on the wall)
   const handleComplete = useCallback(async (item: TimelineItem) => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
-    if (item.type === 'task') {
-      const taskId = item.id.replace('task-', '')
-      await updateTask(taskId, { completed: !item.completed })
-    } else if (item.type === 'routine') {
+    if (item.type === 'routine') {
       const routineId = item.id.replace('routine-', '')
       if (item.completed) {
         await undoDone('routine', routineId, today)
@@ -346,7 +342,7 @@ export function WallCalendar() {
       }
     }
     wallData.refetch()
-  }, [updateTask, markDone, undoDone, wallData])
+  }, [markDone, undoDone, wallData])
 
 
 
@@ -660,6 +656,7 @@ export function WallCalendar() {
           onDismiss={dismissActiveContext}
         />
       )}
+
     </div>
   )
 }

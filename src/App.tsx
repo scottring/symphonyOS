@@ -25,7 +25,6 @@ import type { PinnableEntityType } from '@/types/pin'
 import { supabase } from '@/lib/supabase'
 import { DomainPageOutline } from '@/components/domain/DomainPageOutline'
 import { AppShell } from '@/components/layout/AppShell'
-import { PuppyEasterEgg } from '@/components/PuppyEasterEgg'
 import { HomeView } from '@/components/home'
 import { useFocusMode } from '@/hooks/useFocusMode'
 import { SearchModal } from '@/components/search/SearchModal'
@@ -2327,7 +2326,6 @@ function App() {
         />
       </Suspense>
 
-      <PuppyEasterEgg />
     </AppShell>
   )
 }
