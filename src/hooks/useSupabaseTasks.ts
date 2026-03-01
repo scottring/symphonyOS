@@ -240,6 +240,7 @@ export function useSupabaseTasks() {
     linkedTo?: LinkedActivity
     linkType?: LinkType
     assignedTo?: string | null  // Family member ID to assign task to (null = no assignment, undefined = use default)
+    assignedToAll?: string[]  // Multiple family member IDs (for shared tasks)
     category?: TaskCategory  // What kind of family item
     context?: TaskContext | null  // Life domain for filtering (null = private/untagged)
     location?: string  // Address or place name
@@ -279,6 +280,7 @@ export function useSupabaseTasks() {
       linkedTo: options?.linkedTo,
       linkType: options?.linkType,
       assignedTo: effectiveAssignedTo ?? undefined,
+      assignedToAll: options?.assignedToAll,
       category: options?.category ?? 'task',
       context: options?.context ?? null,
       location: options?.location,
@@ -299,6 +301,7 @@ export function useSupabaseTasks() {
         linked_activity_id: options?.linkedTo?.id ?? null,
         link_type: options?.linkType ?? null,
         assigned_to: effectiveAssignedTo,
+        assigned_to_all: options?.assignedToAll ?? null,
         category: options?.category ?? 'task',
         context: options?.context ?? null,
         location: options?.location ?? null,

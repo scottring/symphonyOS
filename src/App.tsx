@@ -1415,13 +1415,20 @@ function App() {
         }
 
         // Create task/event locally for non-events or when calendar not connected
+        // Use explicit assignment from -name syntax, or default to current user
+        const explicitAssignment = data.assignedMemberIds?.length
+          ? data.assignedMemberIds[0]
+          : getCurrentUserMember()?.id
         const taskId = await addTask(
           data.title,
           data.contactId,
           data.projectId,
           data.scheduledFor,
           {
-            assignedTo: getCurrentUserMember()?.id,
+            assignedTo: explicitAssignment,
+            assignedToAll: data.assignedMemberIds?.length && data.assignedMemberIds.length > 1
+              ? data.assignedMemberIds
+              : undefined,
             category: data.category,
             context: data.context,
           }
@@ -1452,6 +1459,7 @@ function App() {
       }}
       quickAddProjects={projects.map(p => ({ id: p.id, name: p.name }))}
       quickAddContacts={contacts.map(c => ({ id: c.id, name: c.name }))}
+      quickAddFamilyMembers={familyMembers.map(m => ({ id: m.id, name: m.name }))}
       quickAddOpen={quickAddOpen}
       onOpenQuickAdd={openQuickAdd}
       onCloseQuickAdd={closeQuickAdd}

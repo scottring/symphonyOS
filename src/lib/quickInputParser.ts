@@ -15,11 +15,14 @@ export interface ParsedQuickInput {
   isNote?: boolean                   // True if this is a note (not a task)
   noteContent?: string               // Clean note content (without prefix)
   topicName?: string                 // Topic name if specified with @topic
+  assignedMemberIds?: string[]       // Family members assigned via -name
+  assignedMatches?: string[]         // What text matched (e.g., ["-scott", "-iris"])
 }
 
 export interface ParserContext {
   projects: Array<{ id: string; name: string }>
   contacts: Array<{ id: string; name: string }>
+  familyMembers?: Array<{ id: string; name: string }>
 }
 
 export function parseQuickInput(
@@ -163,7 +166,38 @@ export function parseQuickInput(
     workingText = workingText.replace(/\b(medium\s*priority)\b/i, '').trim()
   }
 
-  // 5. Clean up title
+  // 5. Check for -name assignment patterns (e.g., "-scott", "-iris -scott")
+  if (context.familyMembers && context.familyMembers.length > 0) {
+    const assignedIds: string[] = []
+    const assignedMatches: string[] = []
+
+    // Match all -name patterns (word boundary, not part of a longer hyphenated word)
+    const dashNameRegex = /(?:^|\s)-(\S+)/gi
+    let dashMatch: RegExpExecArray | null
+    while ((dashMatch = dashNameRegex.exec(workingText)) !== null) {
+      const nameQuery = dashMatch[1].toLowerCase()
+      const member = context.familyMembers.find(m => {
+        const firstName = m.name.split(/\s+/)[0].toLowerCase()
+        return firstName === nameQuery || m.name.toLowerCase() === nameQuery
+      })
+      if (member && !assignedIds.includes(member.id)) {
+        assignedIds.push(member.id)
+        assignedMatches.push(dashMatch[0].trimStart()) // e.g., "-scott"
+      }
+    }
+
+    if (assignedIds.length > 0) {
+      result.assignedMemberIds = assignedIds
+      result.assignedMatches = assignedMatches
+      // Remove matched patterns from working text
+      for (const match of assignedMatches) {
+        workingText = workingText.replace(match, '')
+      }
+      workingText = workingText.replace(/\s+/g, ' ').trim()
+    }
+  }
+
+  // 6. Clean up title
   result.title = workingText
     .replace(/\s+/g, ' ')           // Normalize whitespace
     .replace(/^[-–—]\s*/, '')       // Remove leading dashes
@@ -179,5 +213,5 @@ export function parseQuickInput(
 
 // Helper to check if anything was parsed beyond the title
 export function hasParsedFields(parsed: ParsedQuickInput): boolean {
-  return !!(parsed.projectId || parsed.contactId || parsed.dueDate || parsed.priority || parsed.category || parsed.isNote)
+  return !!(parsed.projectId || parsed.contactId || parsed.dueDate || parsed.priority || parsed.category || parsed.isNote || parsed.assignedMemberIds?.length)
 }

@@ -39,6 +39,7 @@ interface AppShellProps {
     scheduledFor?: Date
     category?: 'task' | 'chore' | 'errand' | 'event' | 'activity'
     context?: 'work' | 'family' | 'personal'
+    assignedMemberIds?: string[]
   }) => void
   // Note creation
   onQuickAddNote?: (data: {
@@ -48,6 +49,7 @@ interface AppShellProps {
   // Context for QuickCapture parser
   quickAddProjects?: Array<{ id: string; name: string }>
   quickAddContacts?: Array<{ id: string; name: string }>
+  quickAddFamilyMembers?: Array<{ id: string; name: string }>
   quickAddOpen?: boolean
   onOpenQuickAdd?: () => void
   onCloseQuickAdd?: () => void
@@ -77,6 +79,7 @@ export function AppShell({
   onQuickAddNote,
   quickAddProjects,
   quickAddContacts,
+  quickAddFamilyMembers,
   quickAddOpen = false,
   onOpenQuickAdd,
   onCloseQuickAdd,
@@ -194,6 +197,7 @@ export function AppShell({
           onAddNote={onQuickAddNote}
           projects={quickAddProjects}
           contacts={quickAddContacts}
+          familyMembers={quickAddFamilyMembers}
           isOpen={quickAddOpen}
           onOpen={onOpenQuickAdd}
           onClose={onCloseQuickAdd}

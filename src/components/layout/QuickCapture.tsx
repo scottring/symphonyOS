@@ -13,6 +13,7 @@ interface QuickCaptureProps {
     scheduledFor?: Date
     category?: TaskCategory
     context?: TaskContext
+    assignedMemberIds?: string[]
   }) => void
   // Note creation
   onAddNote?: (data: {
@@ -22,6 +23,7 @@ interface QuickCaptureProps {
   // Context for parser
   projects?: Array<{ id: string; name: string }>
   contacts?: Array<{ id: string; name: string }>
+  familyMembers?: Array<{ id: string; name: string }>
   // Existing props
   isOpen?: boolean
   onOpen?: () => void
@@ -35,6 +37,7 @@ export function QuickCapture({
   onAddNote,
   projects = [],
   contacts = [],
+  familyMembers = [],
   isOpen: controlledIsOpen,
   onOpen,
   onClose,
@@ -59,6 +62,7 @@ export function QuickCapture({
     dueDate?: Date | null
     category?: TaskCategory | null
     context?: TaskContext | null
+    assignedMemberIds?: string[] | null
   }>({})
 
   const clearAutoCloseTimer = () => {
@@ -127,8 +131,8 @@ export function QuickCapture({
 
   // Parse input live
   const parsed = useMemo<ParsedQuickInput>(() => {
-    return parseQuickInput(title, { projects, contacts })
-  }, [title, projects, contacts])
+    return parseQuickInput(title, { projects, contacts, familyMembers })
+  }, [title, projects, contacts, familyMembers])
 
   // Apply overrides to determine final parsed result
   const effectiveParsed = useMemo(() => {
@@ -139,6 +143,7 @@ export function QuickCapture({
       dueDate: overrides.dueDate === null ? undefined : (overrides.dueDate ?? parsed.dueDate),
       category: overrides.category === null ? undefined : (overrides.category ?? parsed.category),
       context: overrides.context === null ? undefined : (overrides.context ?? undefined),
+      assignedMemberIds: overrides.assignedMemberIds === null ? undefined : (overrides.assignedMemberIds ?? parsed.assignedMemberIds),
     }
   }, [parsed, overrides])
 
@@ -154,6 +159,13 @@ export function QuickCapture({
     if (!effectiveParsed.contactId) return null
     return contacts.find(c => c.id === effectiveParsed.contactId)?.name ?? null
   }, [effectiveParsed.contactId, contacts])
+
+  const assignedNames = useMemo(() => {
+    if (!effectiveParsed.assignedMemberIds?.length) return []
+    return effectiveParsed.assignedMemberIds
+      .map(id => familyMembers.find(m => m.id === id)?.name)
+      .filter((n): n is string => !!n)
+  }, [effectiveParsed.assignedMemberIds, familyMembers])
 
   // Format date and time for display
   const formatDate = (date: Date) => {
@@ -226,6 +238,7 @@ export function QuickCapture({
         scheduledFor: effectiveParsed.dueDate,
         category: effectiveParsed.category,
         context: effectiveParsed.context,
+        assignedMemberIds: effectiveParsed.assignedMemberIds,
       })
     } else {
       // Fallback if onAddRich not provided
@@ -274,6 +287,7 @@ export function QuickCapture({
   const clearDate = () => setOverrides(prev => ({ ...prev, dueDate: null }))
   const clearCategory = () => setOverrides(prev => ({ ...prev, category: null }))
   const clearContext = () => setOverrides(prev => ({ ...prev, context: null }))
+  const clearAssignment = () => setOverrides(prev => ({ ...prev, assignedMemberIds: null }))
   const applyContext = (context: TaskContext) => setOverrides(prev => ({ ...prev, context }))
 
   return (
@@ -408,6 +422,23 @@ export function QuickCapture({
                           type="button"
                           onClick={clearDate}
                           className="ml-1 text-primary-400 hover:text-primary-600"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Assignment chip(s) */}
+                  {!effectiveParsed.isNote && assignedNames.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">👤</span>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-50 text-green-700 rounded-full text-xs font-medium border border-green-100">
+                        {assignedNames.join(', ')}
+                        <button
+                          type="button"
+                          onClick={clearAssignment}
+                          className="ml-1 text-green-400 hover:text-green-600"
                         >
                           ×
                         </button>
