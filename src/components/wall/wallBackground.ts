@@ -28,14 +28,14 @@ function getWeatherType(code: number): WeatherType {
   return 'cloudy'
 }
 
-// Base sky gradients by time of day
+// Base sky gradients by time of day — kept dark enough for white text
 const TIME_GRADIENTS: Record<TimeOfDay, string> = {
-  dawn:      'linear-gradient(180deg, #1a1a3e 0%, #4a3f6b 25%, #e8837c 55%, #f7c56e 80%, #fceabb 100%)',
-  morning:   'linear-gradient(180deg, #4facfe 0%, #7ec8e3 40%, #b8e6d0 70%, #e8f5e2 100%)',
-  midday:    'linear-gradient(180deg, #2196f3 0%, #42a5f5 30%, #64b5f6 60%, #90caf9 100%)',
-  afternoon: 'linear-gradient(180deg, #3d85c6 0%, #5c9fd4 35%, #87bde0 65%, #a8d5ba 100%)',
-  sunset:    'linear-gradient(180deg, #2c3e6b 0%, #7b4397 25%, #dc6b4f 50%, #f79d3d 75%, #f7c56e 100%)',
-  evening:   'linear-gradient(180deg, #0f1729 0%, #1a2744 30%, #2d3f6a 60%, #4a3f6b 100%)',
+  dawn:      'linear-gradient(180deg, #1a1a3e 0%, #3d2d5c 30%, #7a4a52 60%, #5c3d2e 100%)',
+  morning:   'linear-gradient(180deg, #1e4a6e 0%, #2a6080 35%, #2d5f5a 65%, #2a4a3f 100%)',
+  midday:    'linear-gradient(180deg, #1a4f8a 0%, #1e5a96 30%, #24628a 60%, #2a5a6e 100%)',
+  afternoon: 'linear-gradient(180deg, #1e3f6b 0%, #2a5578 40%, #2d5a60 70%, #2a4a42 100%)',
+  sunset:    'linear-gradient(180deg, #1e2a4a 0%, #4a2d5c 25%, #6e3a38 50%, #5c3d2a 80%, #3a3020 100%)',
+  evening:   'linear-gradient(180deg, #0f1729 0%, #1a2744 30%, #2d3f6a 60%, #3a2f5a 100%)',
   night:     'linear-gradient(180deg, #0a0e1a 0%, #111827 40%, #1e293b 100%)',
 }
 
