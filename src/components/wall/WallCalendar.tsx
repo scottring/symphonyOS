@@ -13,6 +13,7 @@ import { PuppyEasterEgg } from '@/components/PuppyEasterEgg'
 import { useContextEngine, ContextDock, ContextOverlay } from './contexts'
 import type { ContextEvalData } from './contexts'
 import { useWeather } from '@/hooks/useWeather'
+import { getWallBackground } from './wallBackground'
 
 function getWeatherEmoji(code: number): string {
   if (code === 0) return '☀️'
@@ -396,6 +397,11 @@ export function WallCalendar() {
     toggleDebugMode,
   } = useContextEngine(contextEvalData)
 
+  // Dynamic weather-based background
+  const wallBg = useMemo(() => {
+    return getWallBackground(currentTime.getHours(), weather?.weatherCode)
+  }, [currentTime, weather?.weatherCode])
+
   // Triple-tap clock to toggle debug mode (surfaces all context buttons)
   const tapCountRef = useRef(0)
   const tapTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -492,7 +498,17 @@ export function WallCalendar() {
   const { time, period, dateStr } = formatWallTime(currentTime)
 
   return (
-    <div className="wall-calendar w-[1920px] h-[1080px] bg-[#1e293b] overflow-hidden flex flex-col select-none relative p-12 mx-auto">
+    <div
+      className="wall-calendar w-[1920px] h-[1080px] overflow-hidden flex flex-col select-none relative p-12 mx-auto"
+      style={{ background: wallBg.background }}
+    >
+      {/* Weather overlay */}
+      {wallBg.overlay && (
+        <div
+          className="absolute inset-0 pointer-events-none z-0 transition-opacity duration-[3000ms]"
+          style={{ background: wallBg.overlay, opacity: wallBg.overlayOpacity }}
+        />
+      )}
 
       {/* ═══ TOP HEADER ═══ */}
       <header className="flex items-center justify-between mb-8 z-10 w-full pr-12">
