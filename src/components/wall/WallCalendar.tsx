@@ -8,6 +8,7 @@ import { WallLookAhead } from './WallLookAhead'
 import { WallTodayTimeline } from './WallTodayTimeline'
 import { WallDinnerWidget } from './WallDinnerWidget'
 import { WallBottomBar } from './WallBottomBar'
+import { WallJaxWidget } from './WallJaxWidget'
 import { PuppyEasterEgg } from '@/components/PuppyEasterEgg'
 import { useContextEngine, ContextDock, ContextOverlay } from './contexts'
 import type { ContextEvalData } from './contexts'
@@ -563,9 +564,11 @@ export function WallCalendar() {
             <WallTodayTimeline todayData={wallData.days.find(d => d.isToday)} />
           </div>
 
-          {/* Bottom: Family Mood Meter */}
-          <div className="flex-shrink-0">
+          {/* Bottom: Mood + Jax tracker */}
+          <div className="flex-shrink-0 flex items-center gap-8">
             <WallBottomBar />
+            <div className="w-px h-8 bg-white/10" />
+            <WallJaxWidget />
           </div>
 
         </div>
