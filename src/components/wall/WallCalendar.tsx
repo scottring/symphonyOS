@@ -510,6 +510,9 @@ export function WallCalendar() {
         />
       )}
 
+      {/* Dark scrim for text readability */}
+      <div className="absolute inset-0 pointer-events-none z-0 bg-black/40" />
+
       {/* ═══ TOP HEADER ═══ */}
       <header className="flex items-center justify-between mb-8 z-10 w-full pr-12">
         <div className="flex items-baseline gap-4">
