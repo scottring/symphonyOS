@@ -1,205 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import DOMPurify from 'dompurify'
+import { fetchRecipe, formatIngredientNarrative, toNarrativeStep } from '@/lib/recipeParser'
+import type { RecipeData } from '@/lib/recipeParser'
 
 interface RecipeViewerProps {
   url: string
   onClose: () => void
-}
-
-interface RecipeData {
-  title: string
-  description?: string
-  image?: string
-  prepTime?: string
-  cookTime?: string
-  totalTime?: string
-  servings?: string
-  ingredients: string[]
-  instructions: string[]
-  source: string
-}
-
-// Parse recipe from JSON-LD or microdata
-function parseRecipeFromHtml(html: string, url: string): RecipeData | null {
-  try {
-    // Try to find JSON-LD recipe data
-    const jsonLdMatch = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)
-
-    if (jsonLdMatch) {
-      for (const match of jsonLdMatch) {
-        const jsonContent = match.replace(/<script[^>]*>|<\/script>/gi, '')
-        try {
-          const data = JSON.parse(jsonContent)
-          const recipeData = findRecipeInJsonLd(data)
-          if (recipeData) {
-            return normalizeRecipe(recipeData, url)
-          }
-        } catch {
-          // Continue to next match
-        }
-      }
-    }
-
-    // Fallback: try to extract from meta tags and structured content
-    return parseRecipeFromMeta(html, url)
-  } catch {
-    return null
-  }
-}
-
-function findRecipeInJsonLd(data: unknown): unknown {
-  if (!data) return null
-
-  if (Array.isArray(data)) {
-    for (const item of data) {
-      const found = findRecipeInJsonLd(item)
-      if (found) return found
-    }
-    return null
-  }
-
-  if (typeof data === 'object' && data !== null) {
-    const obj = data as Record<string, unknown>
-    if (obj['@type'] === 'Recipe' || (Array.isArray(obj['@type']) && obj['@type'].includes('Recipe'))) {
-      return obj
-    }
-    if (obj['@graph'] && Array.isArray(obj['@graph'])) {
-      return findRecipeInJsonLd(obj['@graph'])
-    }
-  }
-
-  return null
-}
-
-function normalizeRecipe(data: unknown, url: string): RecipeData {
-  const recipe = data as Record<string, unknown>
-
-  // Parse ingredients
-  let ingredients: string[] = []
-  if (Array.isArray(recipe.recipeIngredient)) {
-    ingredients = recipe.recipeIngredient.map((i) => String(i).trim())
-  }
-
-  // Parse instructions
-  let instructions: string[] = []
-  if (Array.isArray(recipe.recipeInstructions)) {
-    instructions = recipe.recipeInstructions.map((step) => {
-      if (typeof step === 'string') return step.trim()
-      if (typeof step === 'object' && step !== null) {
-        const s = step as Record<string, unknown>
-        return String(s.text || s.name || '').trim()
-      }
-      return ''
-    }).filter(Boolean)
-  } else if (typeof recipe.recipeInstructions === 'string') {
-    instructions = recipe.recipeInstructions.split(/\n+/).map((s) => s.trim()).filter(Boolean)
-  }
-
-  // Parse image
-  let image: string | undefined
-  if (typeof recipe.image === 'string') {
-    image = recipe.image
-  } else if (Array.isArray(recipe.image) && recipe.image.length > 0) {
-    const first = recipe.image[0]
-    image = typeof first === 'string' ? first : (first as Record<string, unknown>)?.url as string
-  } else if (typeof recipe.image === 'object' && recipe.image !== null) {
-    image = (recipe.image as Record<string, unknown>).url as string
-  }
-
-  return {
-    title: String(recipe.name || 'Untitled Recipe'),
-    description: recipe.description ? String(recipe.description) : undefined,
-    image,
-    prepTime: parseDuration(recipe.prepTime),
-    cookTime: parseDuration(recipe.cookTime),
-    totalTime: parseDuration(recipe.totalTime),
-    servings: recipe.recipeYield ? String(recipe.recipeYield) : undefined,
-    ingredients,
-    instructions,
-    source: new URL(url).hostname.replace(/^www\./, ''),
-  }
-}
-
-function parseDuration(duration: unknown): string | undefined {
-  if (!duration || typeof duration !== 'string') return undefined
-
-  // Parse ISO 8601 duration (PT1H30M)
-  const match = String(duration).match(/PT(?:(\d+)H)?(?:(\d+)M)?/)
-  if (match) {
-    const hours = parseInt(match[1] || '0', 10)
-    const minutes = parseInt(match[2] || '0', 10)
-    if (hours && minutes) return `${hours}h ${minutes}m`
-    if (hours) return `${hours}h`
-    if (minutes) return `${minutes}m`
-  }
-  return undefined
-}
-
-function parseRecipeFromMeta(html: string, url: string): RecipeData | null {
-  // Extract title from og:title or <title>
-  const titleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
-    html.match(/<title>([^<]+)<\/title>/i)
-  const title = titleMatch ? titleMatch[1].trim() : 'Recipe'
-
-  // Extract description
-  const descMatch = html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i) ||
-    html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i)
-  const description = descMatch ? descMatch[1].trim() : undefined
-
-  // Extract image
-  const imageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i)
-  const image = imageMatch ? imageMatch[1] : undefined
-
-  return {
-    title,
-    description,
-    image,
-    ingredients: [],
-    instructions: [],
-    source: new URL(url).hostname.replace(/^www\./, ''),
-  }
-}
-
-// Convert to narrative Alice Waters style
-function toNarrativeStep(step: string, ingredients: string[]): string {
-  // Find ingredient amounts and highlight them inline
-  let narrative = step
-
-  // Bold ingredient names when they appear in instructions
-  for (const ing of ingredients) {
-    // Extract just the ingredient name (remove amounts like "1 cup", "2 tablespoons")
-    const nameMatch = ing.match(/(?:\d+[\d/\s]*(?:cup|tablespoon|teaspoon|pound|ounce|gram|ml|g|oz|lb|tsp|tbsp|c\.)?\s*)?(.+)/i)
-    if (nameMatch) {
-      const name = nameMatch[1].trim()
-      if (name.length > 2) {
-        // Create case-insensitive regex for the ingredient name
-        const regex = new RegExp(`\\b(${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})\\b`, 'gi')
-        narrative = narrative.replace(regex, '**$1**')
-      }
-    }
-  }
-
-  return narrative
-}
-
-// Format ingredient with amount inline in prose style
-function formatIngredientNarrative(ingredient: string): { amount: string; name: string; full: string } {
-  // Match patterns like "1 cup flour" or "2 large eggs" or "1/2 teaspoon salt"
-  const match = ingredient.match(/^([\d/\s]+(?:\s*(?:cup|tablespoon|teaspoon|pound|ounce|gram|ml|g|oz|lb|tsp|tbsp|c\.|large|medium|small|cloves?|heads?|bunch|can|package|stick)s?\s*(?:of)?)?)\s*(.+)$/i)
-
-  if (match) {
-    return {
-      amount: match[1].trim(),
-      name: match[2].trim(),
-      full: ingredient,
-    }
-  }
-
-  return {
-    amount: '',
-    name: ingredient,
-    full: ingredient,
-  }
 }
 
 export function RecipeViewer({ url, onClose }: RecipeViewerProps) {
@@ -209,27 +15,12 @@ export function RecipeViewer({ url, onClose }: RecipeViewerProps) {
   const [currentStep, setCurrentStep] = useState(0)
 
   useEffect(() => {
-    async function fetchRecipe() {
+    async function load() {
       setLoading(true)
       setError(null)
 
       try {
-        // Use a CORS proxy for fetching recipe pages
-        // In production, this would be an edge function
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
-        const response = await fetch(proxyUrl)
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch recipe')
-        }
-
-        const html = await response.text()
-        const parsed = parseRecipeFromHtml(html, url)
-
-        if (!parsed) {
-          throw new Error('Could not parse recipe from page')
-        }
-
+        const parsed = await fetchRecipe(url)
         setRecipe(parsed)
       } catch (err) {
         console.error('Recipe fetch error:', err)
@@ -239,7 +30,7 @@ export function RecipeViewer({ url, onClose }: RecipeViewerProps) {
       }
     }
 
-    fetchRecipe()
+    load()
   }, [url])
 
   const parsedIngredients = useMemo(() => {

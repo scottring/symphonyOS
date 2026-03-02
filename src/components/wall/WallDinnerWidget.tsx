@@ -5,6 +5,8 @@ import { extractRecipeNameHint } from '@/lib/recipeDetection'
 interface WallDinnerWidgetProps {
     calendarEvents: CalendarEvent[]
     days: WallDayData[]
+    recipeUrl?: string | null
+    onOpenRecipe?: () => void
 }
 
 const DINNER_KEYWORDS = /\b(dinner|supper|meal\s*prep)\b/i
@@ -76,19 +78,27 @@ function findDinnerEvent(events: CalendarEvent[], date: Date): CalendarEvent | n
     return null
 }
 
-export function WallDinnerWidget({ calendarEvents }: WallDinnerWidgetProps) {
+export function WallDinnerWidget({ calendarEvents, recipeUrl, onOpenRecipe }: WallDinnerWidgetProps) {
     const today = new Date()
     const tonightEvent = findDinnerEvent(calendarEvents, today)
 
     const tonightName = tonightEvent ? extractRecipeNameHint(tonightEvent.title) || tonightEvent.title : ''
     const icon = getMealIcon(tonightName)
 
+    const hasRecipe = !!recipeUrl && !!tonightEvent
+    const handleClick = hasRecipe ? onOpenRecipe : undefined
+
     return (
-        <div className="flex bg-[#6DC4A7]/20 rounded-3xl p-4 items-center gap-4 mt-6 border-2 border-[#6DC4A7]/30">
+        <div
+            className={`flex bg-[#6DC4A7]/20 rounded-3xl p-4 items-center gap-4 mt-6 border-2 border-[#6DC4A7]/30
+                ${hasRecipe ? 'cursor-pointer hover:bg-[#6DC4A7]/30 transition-colors' : ''}`}
+            onClick={handleClick}
+            role={hasRecipe ? 'button' : undefined}
+        >
             <div className="w-16 h-16 bg-[#6DC4A7] rounded-2xl flex items-center justify-center text-[2.5rem] shadow-lg shrink-0">
                 {icon}
             </div>
-            <div className="flex flex-col min-w-0">
+            <div className="flex flex-col min-w-0 flex-1">
                 <span className="text-[#6DC4A7] font-black uppercase tracking-widest text-[0.9rem] mb-0.5">
                     Tonight's Dinner
                 </span>
@@ -102,6 +112,17 @@ export function WallDinnerWidget({ calendarEvents }: WallDinnerWidgetProps) {
                     </span>
                 )}
             </div>
+            {hasRecipe && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#6DC4A7]/20 border border-[#6DC4A7]/30 shrink-0">
+                    <span className="text-[1rem]">📖</span>
+                    <span className="text-[#6DC4A7] font-black text-[0.75rem] uppercase tracking-widest">
+                        Recipe
+                    </span>
+                </div>
+            )}
         </div>
     )
 }
+
+// Re-export helpers for use by WallCalendar
+export { findDinnerEvent, getMealIcon }

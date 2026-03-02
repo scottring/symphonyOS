@@ -6,7 +6,10 @@ import type { TimelineItem } from '@/types/timeline'
 import { WallChoresWidget } from './WallChoresWidget'
 import { WallLookAhead } from './WallLookAhead'
 import { WallTodayTimeline } from './WallTodayTimeline'
-import { WallDinnerWidget } from './WallDinnerWidget'
+import { WallDinnerWidget, findDinnerEvent, getMealIcon } from './WallDinnerWidget'
+import { WallRecipeViewer } from './WallRecipeViewer'
+import { useEventNotes } from '@/hooks/useEventNotes'
+import { extractRecipeNameHint } from '@/lib/recipeDetection'
 import { WallBottomBar } from './WallBottomBar'
 import { WallJaxWidget } from './WallJaxWidget'
 import { PuppyEasterEgg } from '@/components/PuppyEasterEgg'
@@ -319,9 +322,12 @@ export function WallCalendar() {
   const { markDone, undoDone } = useActionableInstances()
 
   const { weather } = useWeather()
+  const { fetchNote } = useEventNotes()
   const [currentTime, setCurrentTime] = useState(new Date())
   const [nightWake, setNightWake] = useState(false)
   const nightWakeTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const [recipeUrl, setRecipeUrl] = useState<string | null>(null)
+  const [showRecipeViewer, setShowRecipeViewer] = useState(false)
 
   // Complete/uncomplete a wall item (chores only — tasks are read-only on the wall)
   const handleComplete = useCallback(async (item: TimelineItem) => {
@@ -372,6 +378,32 @@ export function WallCalendar() {
     }
     return { choreItems: chores, taskItems: tasks }
   }, [wallData.days])
+
+  // ═══ RECIPE URL LOOKUP ═══
+  const dinnerEvent = useMemo(() => findDinnerEvent(wallData.calendarEvents, currentTime), [wallData.calendarEvents, currentTime])
+  const dinnerMealName = dinnerEvent ? extractRecipeNameHint(dinnerEvent.title) || dinnerEvent.title : 'Dinner'
+
+  // Fetch recipe URL from event_notes when dinner event changes
+  useEffect(() => {
+    if (!dinnerEvent) {
+      setRecipeUrl(null)
+      return
+    }
+    const eventId = dinnerEvent.google_event_id || dinnerEvent.id
+    if (!eventId) return
+
+    fetchNote(eventId).then(note => {
+      setRecipeUrl(note?.recipeUrl ?? null)
+    })
+  }, [dinnerEvent, fetchNote])
+
+  const handleOpenRecipe = useCallback(() => {
+    if (recipeUrl) setShowRecipeViewer(true)
+  }, [recipeUrl])
+
+  const handleCloseRecipe = useCallback(() => {
+    setShowRecipeViewer(false)
+  }, [])
 
   // ═══ CONTEXTUAL VIEWS ENGINE ═══
   const contextEvalData = useMemo((): ContextEvalData | null => {
@@ -599,7 +631,12 @@ export function WallCalendar() {
             <WallLookAhead days={wallData.days} familyMembers={wallData.familyMembers} />
 
             <div className="pl-8 w-full mt-2">
-              <WallDinnerWidget calendarEvents={wallData.calendarEvents} days={wallData.days} />
+              <WallDinnerWidget
+                calendarEvents={wallData.calendarEvents}
+                days={wallData.days}
+                recipeUrl={recipeUrl}
+                onOpenRecipe={handleOpenRecipe}
+              />
             </div>
           </div>
 
@@ -676,6 +713,16 @@ export function WallCalendar() {
           activeContext={activeContext}
           data={contextEvalData}
           onDismiss={dismissActiveContext}
+        />
+      )}
+
+      {/* Recipe viewer overlay */}
+      {showRecipeViewer && recipeUrl && (
+        <WallRecipeViewer
+          url={recipeUrl}
+          mealName={dinnerMealName}
+          mealIcon={dinnerEvent ? getMealIcon(dinnerEvent.title) : '🍽️'}
+          onClose={handleCloseRecipe}
         />
       )}
 
