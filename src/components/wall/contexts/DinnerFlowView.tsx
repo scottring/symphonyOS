@@ -1,9 +1,12 @@
-import { useMemo, useState, useCallback, useRef } from 'react'
+import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 import confetti from 'canvas-confetti'
+import DOMPurify from 'dompurify'
 import type { ContextViewProps } from './types'
 import type { TimelineItem } from '@/types/timeline'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
-import { extractRecipeNameHint } from '@/lib/recipeDetection'
+import { extractRecipeNameHint, detectRecipeUrl } from '@/lib/recipeDetection'
+import { fetchRecipe, formatIngredientNarrative, toNarrativeStep } from '@/lib/recipeParser'
+import type { RecipeData } from '@/lib/recipeParser'
 
 // ============================================================================
 // HELPERS
@@ -52,74 +55,6 @@ function getMealIcon(name: string): string {
   return '🍽️'
 }
 
-// Generate prep steps from the meal name (smart defaults)
-function generatePrepSteps(mealName: string): string[] {
-  const lower = mealName.toLowerCase()
-
-  // Generic steps that work for most meals
-  const steps = [
-    'Wash hands, clear counter space',
-    'Gather ingredients and tools',
-  ]
-
-  if (/pasta|spaghetti|penne|linguine|fettuccine/i.test(lower)) {
-    steps.push('Boil water for pasta')
-    steps.push('Prep sauce ingredients')
-    steps.push('Cook sauce while pasta boils')
-    steps.push('Drain pasta, combine with sauce')
-  } else if (/chicken/i.test(lower)) {
-    steps.push('Season chicken')
-    steps.push('Preheat pan or oven')
-    steps.push('Cook chicken until internal temp 165F')
-    steps.push('Rest 5 minutes before serving')
-  } else if (/taco|burrito|enchilada|quesadilla/i.test(lower)) {
-    steps.push('Prep toppings and fillings')
-    steps.push('Heat protein')
-    steps.push('Warm tortillas')
-    steps.push('Set up assembly station')
-  } else if (/pizza/i.test(lower)) {
-    steps.push('Preheat oven to 450F')
-    steps.push('Prep toppings')
-    steps.push('Assemble pizza')
-    steps.push('Bake until crust is golden')
-  } else if (/stir.?fry|teriyaki|pad.?thai/i.test(lower)) {
-    steps.push('Slice vegetables and protein')
-    steps.push('Heat wok or large pan')
-    steps.push('Cook protein first, set aside')
-    steps.push('Stir-fry vegetables, combine')
-  } else {
-    steps.push('Prep and cut ingredients')
-    steps.push('Start cooking main dish')
-    steps.push('Prepare sides')
-    steps.push('Plate and serve')
-  }
-
-  steps.push('Set the table')
-  return steps
-}
-
-// Conversation starters for dinner
-const CONVERSATION_STARTERS = [
-  'What was the best part of your day?',
-  'What made you laugh today?',
-  'If you could have any superpower, what would it be?',
-  'What are you looking forward to tomorrow?',
-  'Tell us something new you learned today.',
-  'If you could go anywhere right now, where would you go?',
-  'What was the hardest thing you did today?',
-  'Who did you help today?',
-  'What would you do with a million dollars?',
-  'If you could invite anyone to dinner, who would it be?',
-  'What is your favorite thing about our family?',
-  'What made someone else smile today?',
-]
-
-function getDailyConversationStarter(): string {
-  const now = new Date()
-  const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86400000)
-  return CONVERSATION_STARTERS[dayOfYear % CONVERSATION_STARTERS.length]
-}
-
 // Table manners reminders (kid-friendly)
 const TABLE_MANNERS = [
   'Napkin on your lap',
@@ -132,10 +67,258 @@ const TABLE_MANNERS = [
 ]
 
 // ============================================================================
+// HOOK: useRecipeFromEvent
+// ============================================================================
+
+function useRecipeFromEvent(event: CalendarEvent | null) {
+  const [recipe, setRecipe] = useState<RecipeData | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  const recipeUrl = useMemo(() => {
+    if (!event) return null
+    return detectRecipeUrl(event.description)
+  }, [event])
+
+  useEffect(() => {
+    if (!recipeUrl) {
+      setRecipe(null)
+      return
+    }
+    let cancelled = false
+    setLoading(true)
+
+    fetchRecipe(recipeUrl).then(data => {
+      if (!cancelled) {
+        setRecipe(data)
+        setLoading(false)
+      }
+    }).catch(() => {
+      if (!cancelled) {
+        setRecipe(null)
+        setLoading(false)
+      }
+    })
+
+    return () => { cancelled = true }
+  }, [recipeUrl])
+
+  return { recipe, recipeUrl, loading }
+}
+
+// ============================================================================
 // SUB-COMPONENTS
 // ============================================================================
 
-function PrepColumn({
+// ── Ingredients Column (real recipe data) ──
+
+function IngredientsColumn({
+  recipe,
+  mealName,
+  mealIcon,
+}: {
+  recipe: RecipeData
+  mealName: string
+  mealIcon: string
+}) {
+  const [checked, setChecked] = useState<Set<number>>(new Set())
+  const parsed = useMemo(() => recipe.ingredients.map(formatIngredientNarrative), [recipe])
+
+  const toggle = useCallback((i: number) => {
+    setChecked(prev => {
+      const next = new Set(prev)
+      next.has(i) ? next.delete(i) : next.add(i)
+      return next
+    })
+  }, [])
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-5">
+        <div className="w-14 h-14 rounded-2xl bg-[#6DC4A7]/20 border-2 border-[#6DC4A7]/30 flex items-center justify-center text-[2rem]">
+          {mealIcon}
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-white font-black text-[1.4rem] uppercase tracking-wider leading-none">
+            Ingredients
+          </h2>
+          <p className="text-[#6DC4A7] font-bold text-[1rem] mt-1 uppercase tracking-wide truncate">
+            {mealName}
+          </p>
+        </div>
+        <span className="text-white/20 font-bold text-[0.85rem] ml-auto flex-shrink-0">
+          {checked.size}/{parsed.length}
+        </span>
+      </div>
+
+      {/* Meta (time/servings) */}
+      {(recipe.totalTime || recipe.servings) && (
+        <div className="flex items-center gap-4 mb-4 text-white/35 text-[0.85rem] font-bold">
+          {recipe.totalTime && <span>⏱ {recipe.totalTime}</span>}
+          {recipe.servings && <span>🍽 Serves {recipe.servings}</span>}
+        </div>
+      )}
+
+      {/* Scrollable ingredients */}
+      <div className="flex-1 overflow-y-auto space-y-1.5" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+        {parsed.map((ing, i) => {
+          const done = checked.has(i)
+          return (
+            <button
+              key={i}
+              onClick={() => toggle(i)}
+              className={`
+                w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left
+                transition-all duration-200 select-none
+                ${done
+                  ? 'bg-[#6DC4A7]/10 border border-[#6DC4A7]/20'
+                  : 'bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.07]'
+                }
+              `}
+            >
+              <div className={`
+                w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all
+                ${done ? 'bg-[#6DC4A7]' : 'border-2 border-white/20'}
+              `}>
+                {done && (
+                  <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <path d="M2.5 6L5 8.5L9.5 3.5" />
+                  </svg>
+                )}
+              </div>
+              <div className={`flex-1 transition-opacity ${done ? 'opacity-40' : ''}`}>
+                {ing.amount && (
+                  <span className="text-[#6DC4A7] font-black text-[1.05rem]">{ing.amount} </span>
+                )}
+                <span className={`font-bold text-[1.05rem] ${done ? 'text-white/40 line-through' : 'text-white/80'}`}>
+                  {ing.name}
+                </span>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── Steps Column (real recipe data) ──
+
+function StepsColumn({ recipe }: { recipe: RecipeData }) {
+  const [currentStep, setCurrentStep] = useState(0)
+
+  const steps = useMemo(
+    () => recipe.instructions.map(s => toNarrativeStep(s, recipe.ingredients)),
+    [recipe]
+  )
+
+  // Arrow key navigation
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'ArrowRight') setCurrentStep(s => Math.min(steps.length - 1, s + 1))
+      if (e.key === 'ArrowLeft') setCurrentStep(s => Math.max(0, s - 1))
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [steps.length])
+
+  if (steps.length === 0) {
+    return (
+      <div className="flex flex-col h-full items-center justify-center">
+        <span className="text-[3rem] mb-4">📋</span>
+        <p className="text-white/40 text-[1.1rem] font-bold">No steps found on the recipe page.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <span className="text-[1.6rem]">👩‍🍳</span>
+          <h2 className="text-[#F9C35C] font-black text-[1.4rem] uppercase tracking-widest">
+            Directions
+          </h2>
+        </div>
+        <span className="text-white/25 font-black text-[0.9rem] uppercase tracking-widest">
+          Step {currentStep + 1} / {steps.length}
+        </span>
+      </div>
+
+      {/* Current step — large prominent text */}
+      <div className="flex-1 flex items-start gap-5">
+        <div className="w-14 h-14 rounded-2xl bg-[#F9C35C] flex items-center justify-center flex-shrink-0">
+          <span className="text-[#0f172a] font-black text-[1.6rem]">{currentStep + 1}</span>
+        </div>
+        <p
+          className="flex-1 text-white/90 font-medium text-[1.35rem] leading-relaxed pt-2"
+          dangerouslySetInnerHTML={{
+            __html: DOMPurify.sanitize(
+              steps[currentStep].replace(
+                /\*\*([^*]+)\*\*/g,
+                '<strong class="text-[#6DC4A7] font-bold">$1</strong>'
+              )
+            )
+          }}
+        />
+      </div>
+
+      {/* Step dots */}
+      <div className="flex items-center justify-center gap-1.5 my-4">
+        {steps.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => setCurrentStep(i)}
+            className={`rounded-full transition-all duration-300 ${
+              i === currentStep
+                ? 'w-7 h-2.5 bg-[#F9C35C]'
+                : i < currentStep
+                  ? 'w-2.5 h-2.5 bg-[#6DC4A7]/50'
+                  : 'w-2.5 h-2.5 bg-white/15 hover:bg-white/25'
+            }`}
+          />
+        ))}
+      </div>
+
+      {/* Nav buttons */}
+      <div className="flex items-center justify-between pt-2">
+        <button
+          onClick={() => setCurrentStep(s => Math.max(0, s - 1))}
+          disabled={currentStep === 0}
+          className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-[1rem] uppercase tracking-wider transition-all ${
+            currentStep === 0
+              ? 'text-white/15 cursor-not-allowed'
+              : 'text-white/60 bg-white/5 border border-white/10 hover:bg-white/10'
+          }`}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+          </svg>
+          Prev
+        </button>
+        <button
+          onClick={() => setCurrentStep(s => Math.min(steps.length - 1, s + 1))}
+          disabled={currentStep === steps.length - 1}
+          className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-[1rem] uppercase tracking-wider transition-all ${
+            currentStep === steps.length - 1
+              ? 'text-white/15 cursor-not-allowed'
+              : 'bg-[#F9C35C] text-[#0f172a] hover:bg-[#f7b832]'
+          }`}
+        >
+          Next
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Generic Prep Column (fallback when no recipe URL) ──
+
+function GenericPrepColumn({
   mealName,
   mealIcon,
   steps,
@@ -182,7 +365,6 @@ function PrepColumn({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <div className="w-14 h-14 rounded-2xl bg-[#6DC4A7]/20 border-2 border-[#6DC4A7]/30 flex items-center justify-center text-[2rem]">
           {mealIcon}
@@ -197,7 +379,6 @@ function PrepColumn({
         </div>
       </div>
 
-      {/* Progress bar */}
       <div className="h-2 bg-white/10 rounded-full mb-6 overflow-hidden">
         <div
           className="h-full bg-[#6DC4A7] rounded-full transition-all duration-500 ease-out"
@@ -205,12 +386,10 @@ function PrepColumn({
         />
       </div>
 
-      {/* Steps list */}
       <div className="flex-1 flex flex-col gap-2 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
         {steps.map((step, i) => {
           const isDone = completedSteps.has(i)
           const isPressing = pressingIdx === i
-
           return (
             <button
               key={i}
@@ -221,52 +400,31 @@ function PrepColumn({
               className={`
                 relative flex items-center gap-4 px-5 py-4 rounded-xl text-left
                 transition-all duration-300 overflow-hidden select-none
-                ${isDone
-                  ? 'bg-[#6DC4A7]/10 border border-[#6DC4A7]/20'
-                  : 'bg-white/5 border border-white/8 hover:bg-white/8'
-                }
+                ${isDone ? 'bg-[#6DC4A7]/10 border border-[#6DC4A7]/20' : 'bg-white/5 border border-white/8 hover:bg-white/8'}
                 ${isPressing ? 'scale-[0.98]' : ''}
               `}
               style={{ touchAction: 'none' }}
             >
-              {/* Hold fill animation */}
-              <div
-                className={`absolute inset-0 bg-[#6DC4A7]/15 origin-left pointer-events-none transition-all ${
-                  isPressing ? 'scale-x-100 duration-500 ease-linear' : 'scale-x-0 duration-100'
-                }`}
-              />
-
-              {/* Step number / check */}
-              <div
-                className={`relative z-10 w-8 h-8 rounded-lg flex items-center justify-center text-[0.85rem] font-black flex-shrink-0 transition-all duration-300 ${
-                  isDone
-                    ? 'bg-[#6DC4A7] text-white'
-                    : 'bg-white/10 text-white/50'
-                }`}
-              >
+              <div className={`absolute inset-0 bg-[#6DC4A7]/15 origin-left pointer-events-none transition-all ${
+                isPressing ? 'scale-x-100 duration-500 ease-linear' : 'scale-x-0 duration-100'
+              }`} />
+              <div className={`relative z-10 w-8 h-8 rounded-lg flex items-center justify-center text-[0.85rem] font-black flex-shrink-0 transition-all duration-300 ${
+                isDone ? 'bg-[#6DC4A7] text-white' : 'bg-white/10 text-white/50'
+              }`}>
                 {isDone ? (
                   <svg className="w-4 h-4" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                     <path d="M2.5 6L5 8.5L9.5 3.5" />
                   </svg>
-                ) : (
-                  i + 1
-                )}
+                ) : i + 1}
               </div>
-
-              {/* Step text */}
-              <span
-                className={`relative z-10 font-bold text-[1.05rem] transition-all duration-300 ${
-                  isDone ? 'text-white/40 line-through' : 'text-white/90'
-                }`}
-              >
-                {step}
-              </span>
+              <span className={`relative z-10 font-bold text-[1.05rem] transition-all duration-300 ${
+                isDone ? 'text-white/40 line-through' : 'text-white/90'
+              }`}>{step}</span>
             </button>
           )
         })}
       </div>
 
-      {/* All done state */}
       {progress === 1 && (
         <div className="mt-4 text-center py-4 rounded-xl bg-[#6DC4A7]/15 border border-[#6DC4A7]/25">
           <span className="text-[2rem]">🎉</span>
@@ -279,39 +437,45 @@ function PrepColumn({
   )
 }
 
+// ── Dinner Conversation Column ──
+
 function DinnerColumn() {
-  const conversationStarter = useMemo(() => getDailyConversationStarter(), [])
+  const conversationStarter = useMemo(() => {
+    const now = new Date()
+    const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86400000)
+    const starters = [
+      'What was the best part of your day?',
+      'What made you laugh today?',
+      'If you could have any superpower, what would it be?',
+      'What are you looking forward to tomorrow?',
+      'Tell us something new you learned today.',
+      'If you could go anywhere right now, where would you go?',
+      'What was the hardest thing you did today?',
+      'Who did you help today?',
+      'What would you do with a million dollars?',
+      'If you could invite anyone to dinner, who would it be?',
+      'What is your favorite thing about our family?',
+      'What made someone else smile today?',
+    ]
+    return starters[dayOfYear % starters.length]
+  }, [])
   const [showManners, setShowManners] = useState(true)
 
   return (
     <div className="flex flex-col h-full items-center">
-      {/* Header */}
       <h2 className="text-white font-black text-[1.6rem] uppercase tracking-wider leading-none mb-6 text-center">
         Dinner Time
       </h2>
 
-      {/* Calming visual - animated gradient orb */}
       <div className="relative w-full flex-1 flex items-center justify-center mb-6">
         <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-3xl">
-          {/* Ambient nature-inspired animation */}
           <div className="absolute w-[300px] h-[300px] rounded-full animate-[orbFloat_8s_ease-in-out_infinite]"
-            style={{
-              background: 'radial-gradient(circle, rgba(109,196,167,0.15) 0%, rgba(109,196,167,0.05) 40%, transparent 70%)',
-            }}
-          />
+            style={{ background: 'radial-gradient(circle, rgba(109,196,167,0.15) 0%, rgba(109,196,167,0.05) 40%, transparent 70%)' }} />
           <div className="absolute w-[200px] h-[200px] rounded-full animate-[orbFloat_6s_ease-in-out_infinite_1s]"
-            style={{
-              background: 'radial-gradient(circle, rgba(249,195,92,0.1) 0%, rgba(249,195,92,0.04) 40%, transparent 70%)',
-            }}
-          />
+            style={{ background: 'radial-gradient(circle, rgba(249,195,92,0.1) 0%, rgba(249,195,92,0.04) 40%, transparent 70%)' }} />
           <div className="absolute w-[250px] h-[250px] rounded-full animate-[orbFloat_10s_ease-in-out_infinite_2s]"
-            style={{
-              background: 'radial-gradient(circle, rgba(167,139,250,0.08) 0%, transparent 60%)',
-            }}
-          />
+            style={{ background: 'radial-gradient(circle, rgba(167,139,250,0.08) 0%, transparent 60%)' }} />
         </div>
-
-        {/* Conversation starter card */}
         <div className="relative z-10 max-w-[320px] text-center">
           <div className="text-[3rem] mb-4">💬</div>
           <p className="text-white/80 font-bold text-[1.3rem] leading-relaxed italic">
@@ -323,34 +487,21 @@ function DinnerColumn() {
         </div>
       </div>
 
-      {/* Table manners toggle */}
-      <button
-        onClick={() => setShowManners(!showManners)}
-        className="w-full text-left"
-      >
+      <button onClick={() => setShowManners(!showManners)} className="w-full text-left">
         <div className={`rounded-2xl p-4 border transition-all duration-300 ${
-          showManners
-            ? 'bg-white/5 border-white/10'
-            : 'bg-transparent border-transparent'
+          showManners ? 'bg-white/5 border-white/10' : 'bg-transparent border-transparent'
         }`}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-white/50 font-black text-[0.8rem] uppercase tracking-widest">
-              Table Reminders
-            </span>
-            <svg
-              className={`w-4 h-4 text-white/30 transition-transform ${showManners ? 'rotate-180' : ''}`}
-              fill="none" stroke="currentColor" viewBox="0 0 24 24"
-            >
+            <span className="text-white/50 font-black text-[0.8rem] uppercase tracking-widest">Table Reminders</span>
+            <svg className={`w-4 h-4 text-white/30 transition-transform ${showManners ? 'rotate-180' : ''}`}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </div>
           {showManners && (
             <div className="flex flex-wrap gap-2 mt-2">
               {TABLE_MANNERS.map((manner, i) => (
-                <span
-                  key={i}
-                  className="px-3 py-1.5 rounded-lg bg-white/6 text-white/50 text-[0.8rem] font-bold"
-                >
+                <span key={i} className="px-3 py-1.5 rounded-lg bg-white/6 text-white/50 text-[0.8rem] font-bold">
                   {manner}
                 </span>
               ))}
@@ -370,6 +521,8 @@ function DinnerColumn() {
   )
 }
 
+// ── Cleanup + Bedtime Column ──
+
 function CleanupColumn({
   choreItems,
   bedtimeRoutines,
@@ -377,7 +530,6 @@ function CleanupColumn({
   choreItems: TimelineItem[]
   bedtimeRoutines: TimelineItem[]
 }) {
-  // Evening chores: anything not completed from the evening section or cleanup-related
   const cleanupItems = useMemo(() => {
     return choreItems.filter(item => {
       if (item.completed || item.skipped) return false
@@ -388,7 +540,6 @@ function CleanupColumn({
     })
   }, [choreItems])
 
-  // Bedtime routines
   const bedtimeItems = useMemo(() => {
     return bedtimeRoutines.filter(item => {
       if (item.completed || item.skipped) return false
@@ -401,28 +552,17 @@ function CleanupColumn({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Cleanup section */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-4">
           <span className="text-[1.8rem]">🧹</span>
-          <h2 className="text-white font-black text-[1.6rem] uppercase tracking-wider leading-none">
-            Cleanup
-          </h2>
+          <h2 className="text-white font-black text-[1.6rem] uppercase tracking-wider leading-none">Cleanup</h2>
         </div>
-
         {cleanupItems.length > 0 ? (
           <div className="flex flex-col gap-2">
             {cleanupItems.map(item => (
-              <div
-                key={item.id}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/5 border border-white/8"
-              >
-                <span className="text-[1.1rem]">
-                  {getCleanupIcon(item.title)}
-                </span>
-                <span className="text-white/80 font-bold text-[1rem]">
-                  {item.title}
-                </span>
+              <div key={item.id} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/5 border border-white/8">
+                <span className="text-[1.1rem]">{getCleanupIcon(item.title)}</span>
+                <span className="text-white/80 font-bold text-[1rem]">{item.title}</span>
               </div>
             ))}
           </div>
@@ -444,60 +584,42 @@ function CleanupColumn({
         )}
       </div>
 
-      {/* Divider with arrow */}
       <div className="flex items-center gap-3 mb-6 px-2">
         <div className="flex-1 h-px bg-[#A78BFA]/30" />
-        <span className="text-[#A78BFA]/60 text-[0.75rem] font-black uppercase tracking-widest">
-          Then
-        </span>
+        <span className="text-[#A78BFA]/60 text-[0.75rem] font-black uppercase tracking-widest">Then</span>
         <svg className="w-4 h-4 text-[#A78BFA]/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
         </svg>
         <div className="flex-1 h-px bg-[#A78BFA]/30" />
       </div>
 
-      {/* Bedtime section */}
       <div className="flex-1">
         <div className="flex items-center gap-3 mb-4">
           <span className="text-[1.8rem]">🌙</span>
-          <h2 className="text-[#A78BFA] font-black text-[1.4rem] uppercase tracking-wider leading-none">
-            Bedtime
-          </h2>
+          <h2 className="text-[#A78BFA] font-black text-[1.4rem] uppercase tracking-wider leading-none">Bedtime</h2>
         </div>
-
         {bedtimeItems.length > 0 ? (
           <div className="flex flex-col gap-2">
             {bedtimeItems.map(item => (
-              <div
-                key={item.id}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[#A78BFA]/8 border border-[#A78BFA]/15"
-              >
-                <span className="text-[1.1rem]">
-                  {getBedtimeIcon(item.title)}
-                </span>
-                <span className="text-white/70 font-bold text-[1rem]">
-                  {item.title}
-                </span>
+              <div key={item.id} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[#A78BFA]/8 border border-[#A78BFA]/15">
+                <span className="text-[1.1rem]">{getBedtimeIcon(item.title)}</span>
+                <span className="text-white/70 font-bold text-[1rem]">{item.title}</span>
               </div>
             ))}
           </div>
         ) : (
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[#A78BFA]/8 border border-[#A78BFA]/15">
-              <span className="text-[1.1rem]">🪥</span>
-              <span className="text-white/70 font-bold text-[1rem]">Brush teeth</span>
+              <span className="text-[1.1rem]">🪥</span><span className="text-white/70 font-bold text-[1rem]">Brush teeth</span>
             </div>
             <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[#A78BFA]/8 border border-[#A78BFA]/15">
-              <span className="text-[1.1rem]">👕</span>
-              <span className="text-white/70 font-bold text-[1rem]">Pajamas on</span>
+              <span className="text-[1.1rem]">👕</span><span className="text-white/70 font-bold text-[1rem]">Pajamas on</span>
             </div>
             <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[#A78BFA]/8 border border-[#A78BFA]/15">
-              <span className="text-[1.1rem]">📚</span>
-              <span className="text-white/70 font-bold text-[1rem]">Story time</span>
+              <span className="text-[1.1rem]">📚</span><span className="text-white/70 font-bold text-[1rem]">Story time</span>
             </div>
             <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[#A78BFA]/8 border border-[#A78BFA]/15">
-              <span className="text-[1.1rem]">🛏️</span>
-              <span className="text-white/70 font-bold text-[1rem]">Lights out</span>
+              <span className="text-[1.1rem]">🛏️</span><span className="text-white/70 font-bold text-[1rem]">Lights out</span>
             </div>
           </div>
         )}
@@ -525,6 +647,29 @@ function getBedtimeIcon(title: string): string {
   return '🌙'
 }
 
+// Generate fallback prep steps
+function generatePrepSteps(mealName: string): string[] {
+  const lower = mealName.toLowerCase()
+  const steps = ['Wash hands, clear counter space', 'Gather ingredients and tools']
+
+  if (/pasta|spaghetti|penne|linguine|fettuccine/i.test(lower)) {
+    steps.push('Boil water for pasta', 'Prep sauce ingredients', 'Cook sauce while pasta boils', 'Drain pasta, combine with sauce')
+  } else if (/chicken/i.test(lower)) {
+    steps.push('Season chicken', 'Preheat pan or oven', 'Cook chicken until internal temp 165F', 'Rest 5 minutes before serving')
+  } else if (/taco|burrito|enchilada|quesadilla/i.test(lower)) {
+    steps.push('Prep toppings and fillings', 'Heat protein', 'Warm tortillas', 'Set up assembly station')
+  } else if (/pizza/i.test(lower)) {
+    steps.push('Preheat oven to 450F', 'Prep toppings', 'Assemble pizza', 'Bake until crust is golden')
+  } else if (/stir.?fry|teriyaki|pad.?thai/i.test(lower)) {
+    steps.push('Slice vegetables and protein', 'Heat wok or large pan', 'Cook protein first, set aside', 'Stir-fry vegetables, combine')
+  } else {
+    steps.push('Prep and cut ingredients', 'Start cooking main dish', 'Prepare sides', 'Plate and serve')
+  }
+
+  steps.push('Set the table')
+  return steps
+}
+
 // ============================================================================
 // MAIN VIEW
 // ============================================================================
@@ -536,7 +681,12 @@ export function DinnerFlowView({ data }: ContextViewProps) {
     ? extractRecipeNameHint(dinnerEvent.title) || dinnerEvent.title
     : 'Dinner'
   const mealIcon = getMealIcon(mealName)
-  const prepSteps = useMemo(() => generatePrepSteps(mealName), [mealName])
+
+  // Try to fetch real recipe from the event description URL
+  const { recipe, loading: recipeLoading } = useRecipeFromEvent(dinnerEvent)
+
+  // Fallback generic steps (only used when no recipe)
+  const fallbackSteps = useMemo(() => generatePrepSteps(mealName), [mealName])
 
   // Get chores and bedtime routines from today's data
   const todayData = data.days.find(d => d.isToday)
@@ -552,34 +702,69 @@ export function DinnerFlowView({ data }: ContextViewProps) {
   const choreItems = useMemo(() => allItems.filter(i => i.type === 'routine'), [allItems])
   const bedtimeRoutines = useMemo(() => allItems.filter(i => i.type === 'routine'), [allItems])
 
+  const hasRecipe = !!recipe && recipe.ingredients.length > 0
+
+  // ── Layout: Recipe found → [Ingredients | Steps | Cleanup+Bedtime]
+  // ── Layout: No recipe   → [Generic Prep | Conversation | Cleanup+Bedtime]
+
   return (
     <div className="h-full flex gap-8">
-      {/* Column 1: Dinner Prep (left) */}
-      <div className="w-[36%] h-full">
-        <PrepColumn
-          mealName={mealName}
-          mealIcon={mealIcon}
-          steps={prepSteps}
-        />
-      </div>
+      {hasRecipe ? (
+        <>
+          {/* Column 1: Real Ingredients */}
+          <div className="w-[32%] h-full">
+            <IngredientsColumn recipe={recipe} mealName={mealName} mealIcon={mealIcon} />
+          </div>
 
-      {/* Divider */}
+          <div className="w-px bg-white/8 self-stretch my-4" />
+
+          {/* Column 2: Real Steps */}
+          <div className="w-[38%] h-full">
+            <StepsColumn recipe={recipe} />
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Column 1: Generic Prep (fallback) */}
+          <div className="w-[36%] h-full">
+            {recipeLoading ? (
+              <div className="flex flex-col h-full">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-14 h-14 rounded-2xl bg-[#6DC4A7]/20 border-2 border-[#6DC4A7]/30 flex items-center justify-center text-[2rem]">
+                    {mealIcon}
+                  </div>
+                  <div>
+                    <h2 className="text-white font-black text-[1.4rem] uppercase tracking-wider leading-none">{mealName}</h2>
+                    <p className="text-[#6DC4A7]/60 font-bold text-[0.9rem] mt-1 uppercase tracking-wide">Loading recipe...</p>
+                  </div>
+                </div>
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="flex items-center gap-3 text-white/30">
+                    <div className="w-2 h-2 rounded-full bg-[#6DC4A7] animate-pulse" />
+                    <span className="font-bold text-[1rem] uppercase tracking-widest">Fetching recipe</span>
+                    <div className="w-2 h-2 rounded-full bg-[#6DC4A7] animate-pulse" style={{ animationDelay: '300ms' }} />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <GenericPrepColumn mealName={mealName} mealIcon={mealIcon} steps={fallbackSteps} />
+            )}
+          </div>
+
+          <div className="w-px bg-white/8 self-stretch my-4" />
+
+          {/* Column 2: Dinner Conversation (fallback) */}
+          <div className="w-[28%] h-full">
+            <DinnerColumn />
+          </div>
+        </>
+      )}
+
       <div className="w-px bg-white/8 self-stretch my-4" />
 
-      {/* Column 2: During Dinner (center) */}
-      <div className="w-[28%] h-full">
-        <DinnerColumn />
-      </div>
-
-      {/* Divider */}
-      <div className="w-px bg-white/8 self-stretch my-4" />
-
-      {/* Column 3: Cleanup + Bedtime (right) */}
-      <div className="w-[36%] h-full">
-        <CleanupColumn
-          choreItems={choreItems}
-          bedtimeRoutines={bedtimeRoutines}
-        />
+      {/* Column 3: Cleanup + Bedtime (always shown) */}
+      <div className={hasRecipe ? 'w-[30%] h-full' : 'w-[36%] h-full'}>
+        <CleanupColumn choreItems={choreItems} bedtimeRoutines={bedtimeRoutines} />
       </div>
     </div>
   )
