@@ -26,14 +26,24 @@ export interface ParsedIngredient {
 // ── Fetching ────────────────────────────────────────────────────
 
 export async function fetchRecipe(url: string): Promise<RecipeData> {
-  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
-  const response = await fetch(proxyUrl)
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+  const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/fetch-recipe`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${supabaseKey}`,
+    },
+    body: JSON.stringify({ url }),
+  })
 
   if (!response.ok) {
-    throw new Error('Failed to fetch recipe')
+    const err = await response.json().catch(() => ({}))
+    throw new Error(err.error || 'Failed to fetch recipe')
   }
 
-  const html = await response.text()
+  const { html } = await response.json()
   const parsed = parseRecipeFromHtml(html, url)
 
   if (!parsed) {
