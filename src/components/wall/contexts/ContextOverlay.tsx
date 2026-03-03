@@ -59,7 +59,7 @@ export function ContextOverlay({ activeContext, data, onDismiss }: ContextOverla
       {/* Backdrop */}
       <div
         className={`absolute inset-0 bg-[#0f172a] transition-opacity duration-400 ${
-          visible && !exiting ? 'opacity-95' : 'opacity-0'
+          visible && !exiting ? 'opacity-100' : 'opacity-0'
         }`}
       />
 

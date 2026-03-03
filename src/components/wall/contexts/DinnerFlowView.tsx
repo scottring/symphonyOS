@@ -109,208 +109,106 @@ function useRecipeFromEvent(event: CalendarEvent | null) {
 // SUB-COMPONENTS
 // ============================================================================
 
-// ── Ingredients Column (real recipe data) ──
+// ── Full-width Recipe Layout (TV-optimized, readable from 6-10 ft) ──
 
-function IngredientsColumn({
+function RecipeFullView({
   recipe,
-  mealName,
   mealIcon,
 }: {
   recipe: RecipeData
-  mealName: string
   mealIcon: string
 }) {
-  const [checked, setChecked] = useState<Set<number>>(new Set())
   const parsed = useMemo(() => recipe.ingredients.map(formatIngredientNarrative), [recipe])
-
-  const toggle = useCallback((i: number) => {
-    setChecked(prev => {
-      const next = new Set(prev)
-      next.has(i) ? next.delete(i) : next.add(i)
-      return next
-    })
-  }, [])
-
-  return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center gap-4 mb-5">
-        <div className="w-14 h-14 rounded-2xl bg-[#6DC4A7]/20 border-2 border-[#6DC4A7]/30 flex items-center justify-center text-[2rem]">
-          {mealIcon}
-        </div>
-        <div className="min-w-0">
-          <h2 className="text-white font-black text-[1.4rem] uppercase tracking-wider leading-none">
-            Ingredients
-          </h2>
-          <p className="text-[#6DC4A7] font-bold text-[1rem] mt-1 uppercase tracking-wide truncate">
-            {mealName}
-          </p>
-        </div>
-        <span className="text-white/20 font-bold text-[0.85rem] ml-auto flex-shrink-0">
-          {checked.size}/{parsed.length}
-        </span>
-      </div>
-
-      {/* Meta (time/servings) */}
-      {(recipe.totalTime || recipe.servings) && (
-        <div className="flex items-center gap-4 mb-4 text-white/35 text-[0.85rem] font-bold">
-          {recipe.totalTime && <span>⏱ {recipe.totalTime}</span>}
-          {recipe.servings && <span>🍽 Serves {recipe.servings}</span>}
-        </div>
-      )}
-
-      {/* Scrollable ingredients */}
-      <div className="flex-1 overflow-y-auto space-y-1.5" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
-        {parsed.map((ing, i) => {
-          const done = checked.has(i)
-          return (
-            <button
-              key={i}
-              onClick={() => toggle(i)}
-              className={`
-                w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left
-                transition-all duration-200 select-none
-                ${done
-                  ? 'bg-[#6DC4A7]/10 border border-[#6DC4A7]/20'
-                  : 'bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.07]'
-                }
-              `}
-            >
-              <div className={`
-                w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all
-                ${done ? 'bg-[#6DC4A7]' : 'border-2 border-white/20'}
-              `}>
-                {done && (
-                  <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                    <path d="M2.5 6L5 8.5L9.5 3.5" />
-                  </svg>
-                )}
-              </div>
-              <div className={`flex-1 transition-opacity ${done ? 'opacity-40' : ''}`}>
-                {ing.amount && (
-                  <span className="text-[#6DC4A7] font-black text-[1.05rem]">{ing.amount} </span>
-                )}
-                <span className={`font-bold text-[1.05rem] ${done ? 'text-white/40 line-through' : 'text-white/80'}`}>
-                  {ing.name}
-                </span>
-              </div>
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-// ── Steps Column (real recipe data) ──
-
-function StepsColumn({ recipe }: { recipe: RecipeData }) {
-  const [currentStep, setCurrentStep] = useState(0)
-
   const steps = useMemo(
     () => recipe.instructions.map(s => toNarrativeStep(s, recipe.ingredients)),
     [recipe]
   )
 
-  // Arrow key navigation
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'ArrowRight') setCurrentStep(s => Math.min(steps.length - 1, s + 1))
-      if (e.key === 'ArrowLeft') setCurrentStep(s => Math.max(0, s - 1))
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [steps.length])
-
-  if (steps.length === 0) {
-    return (
-      <div className="flex flex-col h-full items-center justify-center">
-        <span className="text-[3rem] mb-4">📋</span>
-        <p className="text-white/40 text-[1.1rem] font-bold">No steps found on the recipe page.</p>
-      </div>
-    )
-  }
-
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-3">
-          <span className="text-[1.6rem]">👩‍🍳</span>
-          <h2 className="text-[#F9C35C] font-black text-[1.4rem] uppercase tracking-widest">
+    <div className="flex flex-col h-full w-full">
+      {/* ── Header row ── */}
+      <div className="flex items-center gap-5 mb-4 flex-shrink-0">
+        <span className="text-[3rem]">{mealIcon}</span>
+        <div className="min-w-0">
+          <h1 className="text-white font-black text-[2.2rem] uppercase tracking-wider leading-none truncate">
+            {recipe.title}
+          </h1>
+          <div className="flex items-center gap-5 mt-1">
+            {recipe.totalTime && (
+              <span className="text-white/40 font-bold text-[1.2rem]">
+                {recipe.totalTime}
+              </span>
+            )}
+            {recipe.servings && (
+              <span className="text-white/40 font-bold text-[1.2rem]">
+                Serves {recipe.servings}
+              </span>
+            )}
+            <span className="text-white/20 font-bold text-[1rem]">
+              {recipe.source}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Two-panel body ── */}
+      <div className="flex gap-6 flex-1 min-h-0">
+
+        {/* LEFT: Ingredients (~24%) */}
+        <div className="w-[24%] flex flex-col flex-shrink-0">
+          <h2 className="text-[#6DC4A7] font-black text-[1.3rem] uppercase tracking-widest mb-3 flex-shrink-0">
+            Ingredients
+          </h2>
+          <div className="flex-1 overflow-y-auto space-y-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+            {parsed.map((ing, i) => (
+              <div
+                key={i}
+                className="flex items-baseline gap-2 py-1.5 px-3 rounded-lg bg-white/[0.03]"
+              >
+                {ing.amount && (
+                  <span className="text-[#6DC4A7] font-black text-[1.2rem] flex-shrink-0">{ing.amount}</span>
+                )}
+                <span className="text-white/75 font-bold text-[1.2rem]">{ing.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div className="w-px bg-white/10 self-stretch flex-shrink-0" />
+
+        {/* RIGHT: All steps (~76%) */}
+        <div className="flex-1 flex flex-col min-w-0">
+          <h2 className="text-[#F9C35C] font-black text-[1.3rem] uppercase tracking-widest mb-3 flex-shrink-0">
             Directions
           </h2>
+          {steps.length > 0 ? (
+            <div className="flex-1 overflow-y-auto space-y-3" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+              {steps.map((step, i) => (
+                <div key={i} className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-[#F9C35C]/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-[#F9C35C] font-black text-[1.2rem]">{i + 1}</span>
+                  </div>
+                  <p
+                    className="text-white/85 font-medium text-[1.3rem] leading-snug pt-1 flex-1"
+                    dangerouslySetInnerHTML={{
+                      __html: DOMPurify.sanitize(
+                        step.replace(
+                          /\*\*([^*]+)\*\*/g,
+                          '<strong class="text-[#6DC4A7] font-bold">$1</strong>'
+                        )
+                      )
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center">
+              <p className="text-white/30 text-[1.3rem] font-bold">No step-by-step instructions found.</p>
+            </div>
+          )}
         </div>
-        <span className="text-white/25 font-black text-[0.9rem] uppercase tracking-widest">
-          Step {currentStep + 1} / {steps.length}
-        </span>
-      </div>
-
-      {/* Current step — large prominent text */}
-      <div className="flex-1 flex items-start gap-5">
-        <div className="w-14 h-14 rounded-2xl bg-[#F9C35C] flex items-center justify-center flex-shrink-0">
-          <span className="text-[#0f172a] font-black text-[1.6rem]">{currentStep + 1}</span>
-        </div>
-        <p
-          className="flex-1 text-white/90 font-medium text-[1.35rem] leading-relaxed pt-2"
-          dangerouslySetInnerHTML={{
-            __html: DOMPurify.sanitize(
-              steps[currentStep].replace(
-                /\*\*([^*]+)\*\*/g,
-                '<strong class="text-[#6DC4A7] font-bold">$1</strong>'
-              )
-            )
-          }}
-        />
-      </div>
-
-      {/* Step dots */}
-      <div className="flex items-center justify-center gap-1.5 my-4">
-        {steps.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => setCurrentStep(i)}
-            className={`rounded-full transition-all duration-300 ${
-              i === currentStep
-                ? 'w-7 h-2.5 bg-[#F9C35C]'
-                : i < currentStep
-                  ? 'w-2.5 h-2.5 bg-[#6DC4A7]/50'
-                  : 'w-2.5 h-2.5 bg-white/15 hover:bg-white/25'
-            }`}
-          />
-        ))}
-      </div>
-
-      {/* Nav buttons */}
-      <div className="flex items-center justify-between pt-2">
-        <button
-          onClick={() => setCurrentStep(s => Math.max(0, s - 1))}
-          disabled={currentStep === 0}
-          className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-[1rem] uppercase tracking-wider transition-all ${
-            currentStep === 0
-              ? 'text-white/15 cursor-not-allowed'
-              : 'text-white/60 bg-white/5 border border-white/10 hover:bg-white/10'
-          }`}
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-          </svg>
-          Prev
-        </button>
-        <button
-          onClick={() => setCurrentStep(s => Math.min(steps.length - 1, s + 1))}
-          disabled={currentStep === steps.length - 1}
-          className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-[1rem] uppercase tracking-wider transition-all ${
-            currentStep === steps.length - 1
-              ? 'text-white/15 cursor-not-allowed'
-              : 'bg-[#F9C35C] text-[#0f172a] hover:bg-[#f7b832]'
-          }`}
-        >
-          Next
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
       </div>
     </div>
   )
@@ -704,66 +602,50 @@ export function DinnerFlowView({ data }: ContextViewProps) {
 
   const hasRecipe = !!recipe && recipe.ingredients.length > 0
 
-  // ── Layout: Recipe found → [Ingredients | Steps | Cleanup+Bedtime]
-  // ── Layout: No recipe   → [Generic Prep | Conversation | Cleanup+Bedtime]
+  // ── Recipe found → Full-width recipe (TV-optimized, no interaction needed)
+  // ── No recipe    → [Generic Prep | Conversation | Cleanup+Bedtime]
 
+  if (hasRecipe) {
+    return (
+      <div className="h-full w-full">
+        <RecipeFullView recipe={recipe} mealIcon={mealIcon} />
+      </div>
+    )
+  }
+
+  // ── Loading state ──
+  if (recipeLoading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <span className="text-[4rem] block mb-4">{mealIcon}</span>
+          <h2 className="text-white font-black text-[2rem] uppercase tracking-wider mb-3">{mealName}</h2>
+          <div className="flex items-center gap-3 text-white/30 justify-center">
+            <div className="w-2.5 h-2.5 rounded-full bg-[#6DC4A7] animate-pulse" />
+            <span className="font-bold text-[1.2rem] uppercase tracking-widest">Loading recipe</span>
+            <div className="w-2.5 h-2.5 rounded-full bg-[#6DC4A7] animate-pulse" style={{ animationDelay: '300ms' }} />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Fallback: no recipe URL → 3-column layout ──
   return (
     <div className="h-full flex gap-8">
-      {hasRecipe ? (
-        <>
-          {/* Column 1: Real Ingredients */}
-          <div className="w-[32%] h-full">
-            <IngredientsColumn recipe={recipe} mealName={mealName} mealIcon={mealIcon} />
-          </div>
-
-          <div className="w-px bg-white/8 self-stretch my-4" />
-
-          {/* Column 2: Real Steps */}
-          <div className="w-[38%] h-full">
-            <StepsColumn recipe={recipe} />
-          </div>
-        </>
-      ) : (
-        <>
-          {/* Column 1: Generic Prep (fallback) */}
-          <div className="w-[36%] h-full">
-            {recipeLoading ? (
-              <div className="flex flex-col h-full">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-14 h-14 rounded-2xl bg-[#6DC4A7]/20 border-2 border-[#6DC4A7]/30 flex items-center justify-center text-[2rem]">
-                    {mealIcon}
-                  </div>
-                  <div>
-                    <h2 className="text-white font-black text-[1.4rem] uppercase tracking-wider leading-none">{mealName}</h2>
-                    <p className="text-[#6DC4A7]/60 font-bold text-[0.9rem] mt-1 uppercase tracking-wide">Loading recipe...</p>
-                  </div>
-                </div>
-                <div className="flex-1 flex items-center justify-center">
-                  <div className="flex items-center gap-3 text-white/30">
-                    <div className="w-2 h-2 rounded-full bg-[#6DC4A7] animate-pulse" />
-                    <span className="font-bold text-[1rem] uppercase tracking-widest">Fetching recipe</span>
-                    <div className="w-2 h-2 rounded-full bg-[#6DC4A7] animate-pulse" style={{ animationDelay: '300ms' }} />
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <GenericPrepColumn mealName={mealName} mealIcon={mealIcon} steps={fallbackSteps} />
-            )}
-          </div>
-
-          <div className="w-px bg-white/8 self-stretch my-4" />
-
-          {/* Column 2: Dinner Conversation (fallback) */}
-          <div className="w-[28%] h-full">
-            <DinnerColumn />
-          </div>
-        </>
-      )}
+      <div className="w-[36%] h-full">
+        <GenericPrepColumn mealName={mealName} mealIcon={mealIcon} steps={fallbackSteps} />
+      </div>
 
       <div className="w-px bg-white/8 self-stretch my-4" />
 
-      {/* Column 3: Cleanup + Bedtime (always shown) */}
-      <div className={hasRecipe ? 'w-[30%] h-full' : 'w-[36%] h-full'}>
+      <div className="w-[28%] h-full">
+        <DinnerColumn />
+      </div>
+
+      <div className="w-px bg-white/8 self-stretch my-4" />
+
+      <div className="w-[36%] h-full">
         <CleanupColumn choreItems={choreItems} bedtimeRoutines={bedtimeRoutines} />
       </div>
     </div>
