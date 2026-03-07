@@ -4,6 +4,7 @@ import { useWallData } from '@/hooks/useWallData'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import type { TimelineItem } from '@/types/timeline'
 import { WallChoresWidget } from './WallChoresWidget'
+import { WallJaxWidget } from './WallJaxWidget'
 import { WallLookAhead } from './WallLookAhead'
 import { WallDinnerWidget, findDinnerEvent, getMealIcon } from './WallDinnerWidget'
 import { WallRecipeViewer } from './WallRecipeViewer'
@@ -13,6 +14,8 @@ import type { ContextEvalData } from './contexts'
 import { useWeather } from '@/hooks/useWeather'
 import { getWallBackground } from './wallBackground'
 import { getWeatherMessage, getWeatherEmoji } from './weatherMessages'
+import { getDailyJoke } from './alienJokes'
+import { WeatherEffects } from './WeatherEffects'
 
 // ============================================================================
 // HELPERS
@@ -244,16 +247,15 @@ export function WallCalendar() {
       className="wall-calendar w-[1920px] h-[1080px] overflow-hidden flex flex-col select-none relative mx-auto"
       style={{ background: wallBg.background }}
     >
-      {/* Weather overlay */}
-      {wallBg.overlay && (
-        <div
-          className="absolute inset-0 pointer-events-none z-0 transition-opacity duration-[3000ms]"
-          style={{ background: wallBg.overlay, opacity: wallBg.overlayOpacity }}
-        />
+      {/* Animated weather effects */}
+      {weather && (
+        <div className="absolute inset-0 pointer-events-none z-0">
+          <WeatherEffects weatherCode={weather.weatherCode} hour={currentTime.getHours()} />
+        </div>
       )}
 
-      {/* Dark scrim for readability */}
-      <div className="absolute inset-0 pointer-events-none z-0 bg-black/30" />
+      {/* Light scrim for text readability */}
+      <div className="absolute inset-0 pointer-events-none z-0 bg-black/10" />
 
       {/* ═══ TOP: WEATHER HERO ═══ */}
       <header className="relative z-10 px-12 pt-10 pb-6 flex items-start justify-between">
@@ -325,7 +327,7 @@ export function WallCalendar() {
         <div className="w-[68%] flex flex-col h-full pr-8">
 
           {/* Chores + Tasks */}
-          <div className="flex-1 min-h-0">
+          <div className="flex-shrink-0">
             <WallChoresWidget
               choreItems={choreItems}
               taskItems={taskItems}
@@ -336,7 +338,7 @@ export function WallCalendar() {
 
           {/* Chore progress bar */}
           {choreProgress.total > 0 && (
-            <div className="mt-4 flex items-center gap-4">
+            <div className="mt-2 flex items-center gap-4 flex-shrink-0">
               <div className="flex-1 h-3 bg-white/10 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-[#6DC4A7] rounded-full transition-all duration-700 ease-out"
@@ -352,8 +354,13 @@ export function WallCalendar() {
             </div>
           )}
 
-          {/* Bottom row: Dinner + Weather suggestion */}
-          <div className="mt-4 flex-shrink-0">
+          {/* Who has Jax tonight */}
+          <div className="mt-4 flex-shrink-0 bg-white/[0.05] rounded-2xl px-5 py-3 border border-white/[0.08]">
+            <WallJaxWidget />
+          </div>
+
+          {/* Bottom row: Dinner */}
+          <div className="mt-3 flex-shrink-0">
             <WallDinnerWidget
               calendarEvents={wallData.calendarEvents}
               days={wallData.days}
@@ -366,9 +373,24 @@ export function WallCalendar() {
         {/* ─── Divider ─── */}
         <div className="w-px bg-white/10 self-stretch my-2 flex-shrink-0" />
 
-        {/* ─── RIGHT COLUMN (~32%): Look Ahead ─── */}
-        <div className="w-[32%] h-full overflow-hidden">
-          <WallLookAhead days={wallData.days} familyMembers={wallData.familyMembers} />
+        {/* ─── RIGHT COLUMN (~32%): Look Ahead + Alien ─── */}
+        <div className="w-[32%] h-full overflow-hidden relative">
+          <div className="h-full pb-[160px] overflow-hidden">
+            <WallLookAhead days={wallData.days} familyMembers={wallData.familyMembers} />
+          </div>
+
+          {/* Alien Mascot with Speech Bubble */}
+          <div className="absolute bottom-0 right-[-20px] flex items-end translate-y-8">
+            <div className="bg-white rounded-3xl rounded-br-none p-5 max-w-[340px] shadow-xl relative -top-[78px] right-12 z-30">
+              <p className="text-[#1e293b] font-black uppercase tracking-wider text-[1.1rem] leading-snug">
+                {getDailyJoke()}
+              </p>
+              <div className="absolute -bottom-4 right-4 w-8 h-8 bg-white" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%)' }} />
+            </div>
+            <div className="text-[12rem] leading-none drop-shadow-2xl z-20" style={{ transform: 'scaleX(-1)' }}>
+              👽
+            </div>
+          </div>
         </div>
       </main>
 

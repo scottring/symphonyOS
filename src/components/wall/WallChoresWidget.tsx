@@ -156,7 +156,7 @@ export function WallChoresWidget({ choreItems, taskItems, onComplete, overdueIte
         </div>
 
         {allTasks.length > 0 ? (
-          <div className="flex flex-col gap-2 overflow-y-auto" style={{ maxHeight: SQ * 2 + GAP + 30, scrollbarWidth: 'none' }}>
+          <div className="flex flex-col gap-2 overflow-y-auto" style={{ maxHeight: SQ * 2 + GAP + 30, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
             {allTasks.map((item) => {
               const isOverdue = overdueIds.has(item.id)
               const icon = getEmojiIcon(item.title)
