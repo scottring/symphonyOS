@@ -94,6 +94,9 @@ async function fetchWeatherData(lat: number, lng: number): Promise<WeatherData> 
   }
 }
 
+// Baltimore 21211 — hardcoded home coordinates
+const HOME_COORDS = { lat: 39.3285, lng: -76.6178 }
+
 export function useWeather() {
   const { user } = useAuth()
   const [weather, setWeather] = useState<WeatherData | null>(null)
@@ -103,12 +106,10 @@ export function useWeather() {
   const coordsRef = useRef<{ lat: number; lng: number } | null>(null)
 
   const fetchWeather = useCallback(async () => {
-    if (!user) return
-
     // If we already resolved coordinates, reuse them
     if (coordsRef.current) {
       try {
-        const data = await fetchWeatherData(coordsRef.current.lat, coordsRef.current.lng)
+        const data = await withTimeout(fetchWeatherData(coordsRef.current.lat, coordsRef.current.lng), 10000)
         if (mountedRef.current) {
           setWeather(data)
           setError(null)
@@ -125,12 +126,10 @@ export function useWeather() {
     let coords: { lat: number; lng: number } | null = null
 
     // 0. Try localStorage cache
-    if (!coords) {
-      coords = getCachedCoords()
-    }
+    coords = getCachedCoords()
 
-    // 1. Try Supabase user_profiles (5s timeout — this was hanging on kiosk)
-    if (!coords) {
+    // 1. Try Supabase user_profiles (only if user is available, 5s timeout)
+    if (!coords && user) {
       try {
         const { data: profile } = await withTimeout(
           Promise.resolve(
@@ -148,20 +147,22 @@ export function useWeather() {
       } catch { /* timeout or error — continue to next fallback */ }
     }
 
-    // 2. Try browser geolocation (10s timeout built into getCurrentPosition)
+    // 2. Try browser geolocation (12s timeout)
     if (!coords) {
       try {
         coords = await withTimeout(getCoordinatesFromBrowser(), 12000)
         // Save to Supabase for next time (fire-and-forget)
-        supabase
-          .from('user_profiles')
-          .upsert({
-            user_id: user.id,
-            home_lat: coords.lat,
-            home_lng: coords.lng,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'user_id' })
-          .then() // fire-and-forget
+        if (user) {
+          supabase
+            .from('user_profiles')
+            .upsert({
+              user_id: user.id,
+              home_lat: coords.lat,
+              home_lng: coords.lng,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'user_id' })
+            .then() // fire-and-forget
+        }
       } catch { /* geolocation blocked or timed out */ }
     }
 
@@ -178,9 +179,9 @@ export function useWeather() {
       } catch { /* blocked or timed out */ }
     }
 
-    // 4. Hardcoded fallback — Baltimore 21211
+    // 4. Hardcoded fallback — always works
     if (!coords) {
-      coords = { lat: 39.3285, lng: -76.6178 }
+      coords = HOME_COORDS
     }
 
     // Cache and fetch weather
@@ -199,9 +200,8 @@ export function useWeather() {
     }
   }, [user])
 
-  // Manual location setter — called from UI when user clicks "Use my location"
+  // Manual location setter
   const requestLocation = useCallback(async () => {
-    if (!user) return
     setLoading(true)
     setError(null)
 
@@ -210,14 +210,16 @@ export function useWeather() {
       coordsRef.current = coords
       cacheCoords(coords.lat, coords.lng)
 
-      await supabase
-        .from('user_profiles')
-        .upsert({
-          user_id: user.id,
-          home_lat: coords.lat,
-          home_lng: coords.lng,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'user_id' })
+      if (user) {
+        await supabase
+          .from('user_profiles')
+          .upsert({
+            user_id: user.id,
+            home_lat: coords.lat,
+            home_lng: coords.lng,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'user_id' })
+      }
 
       const data = await fetchWeatherData(coords.lat, coords.lng)
       if (mountedRef.current) {
@@ -231,6 +233,7 @@ export function useWeather() {
     }
   }, [user])
 
+  // Run immediately on mount — don't wait for auth
   useEffect(() => {
     mountedRef.current = true
     fetchWeather()
