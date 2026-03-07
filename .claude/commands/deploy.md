@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git add:*), Bash(git commit:*), Bash(git push), Bash(vercel:*)
+allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git add:*), Bash(git commit:*), Bash(git push), Bash(vercel:*), Bash(curl:*)
 description: Analyze changes, write commit message, push to remote, and deploy to Vercel production
 ---
 
@@ -76,9 +76,20 @@ Deploy to Vercel production:
 vercel deploy --prod
 ```
 
-### Step 4: Confirm Success
+### Step 4: Refresh Kiosk
+
+After a successful deploy, send a remote refresh to the wall kiosk via Supabase Realtime broadcast:
+
+```bash
+curl -s -X POST "https://mwadppyrqzuzgstmwpuy.supabase.co/realtime/v1/api/broadcast" \
+  -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13YWRwcHlycXp1emdzdG13cHV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ1MzU0MjcsImV4cCI6MjA4MDExMTQyN30._bWsOu6D-UAMKsxEMzN7PhMM4ENIXr2uZWdVLcoILk4" \
+  -H "Content-Type: application/json" \
+  -d '{"messages":[{"topic":"realtime:wall-refresh","event":"broadcast","payload":{"type":"broadcast","event":"refresh","payload":{}}}]}'
+```
+
+### Step 5: Confirm Success
 
 Show the user:
 - The commit message you created
 - The deployment URL from Vercel
-- Any relevant deployment information
+- Confirmation that kiosk refresh was sent

@@ -14,10 +14,8 @@ import { extractRecipeNameHint, detectRecipeUrl } from '@/lib/recipeDetection'
 import { useContextEngine, ContextDock, ContextOverlay } from './contexts'
 import type { ContextEvalData } from './contexts'
 import { useWeather } from '@/hooks/useWeather'
-import { getWallBackground } from './wallBackground'
 import { getWeatherMessage, getWeatherEmoji } from './weatherMessages'
 import { getDailyJoke } from './alienJokes'
-import { WeatherEffects } from './WeatherEffects'
 
 // ============================================================================
 // HELPERS
@@ -149,11 +147,6 @@ export function WallCalendar() {
   } = useContextEngine(contextEvalData)
 
   // ═══ WEATHER BACKGROUND ═══
-  const wallBg = useMemo(
-    () => getWallBackground(currentTime.getHours(), weather?.weatherCode),
-    [currentTime, weather?.weatherCode]
-  )
-
   const weatherMsg = useMemo(() => {
     if (!weather) return null
     return getWeatherMessage(weather.currentTemp, weather.weatherCode, currentTime.getHours())
@@ -260,18 +253,8 @@ export function WallCalendar() {
 
   return (
     <div
-      className="wall-calendar w-[1920px] h-[1080px] overflow-hidden flex flex-col select-none relative mx-auto"
-      style={{ background: wallBg.background }}
+      className="wall-calendar w-[1920px] h-[1080px] overflow-hidden flex flex-col select-none relative mx-auto bg-[#141414]"
     >
-      {/* Animated weather effects */}
-      {weather && (
-        <div className="absolute inset-0 pointer-events-none z-0">
-          <WeatherEffects weatherCode={weather.weatherCode} hour={currentTime.getHours()} />
-        </div>
-      )}
-
-      {/* Scrim */}
-      <div className="absolute inset-0 pointer-events-none z-0 bg-black/10" />
 
       {/* ═══ HEADER BAR ═══ */}
       <header className="relative z-10 px-10 pt-6 pb-4 flex items-center justify-between">
