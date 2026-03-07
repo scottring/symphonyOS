@@ -5,6 +5,7 @@ import { useActionableInstances } from '@/hooks/useActionableInstances'
 import type { TimelineItem } from '@/types/timeline'
 import { WallChoresWidget } from './WallChoresWidget'
 import { WallJaxWidget } from './WallJaxWidget'
+import { WallScreenTimeWidget } from './WallScreenTimeWidget'
 import { WallLookAhead } from './WallLookAhead'
 import { WallDinnerWidget, findDinnerEvent, getMealIcon } from './WallDinnerWidget'
 import { WallRecipeViewer } from './WallRecipeViewer'
@@ -356,9 +357,14 @@ export function WallCalendar() {
             </div>
           )}
 
-          {/* Who has Jax tonight */}
-          <div className="mt-4 flex-shrink-0 bg-white/[0.05] rounded-2xl px-5 py-3 border border-white/[0.08]">
-            <WallJaxWidget />
+          {/* Widget row: Jax + Screen Time */}
+          <div className="mt-4 flex-shrink-0 flex gap-3">
+            <div className="flex-1 bg-white/[0.05] rounded-2xl px-4 py-3 border border-white/[0.08]">
+              <WallJaxWidget />
+            </div>
+            <div className="flex-1 bg-white/[0.05] rounded-2xl px-4 py-3 border border-white/[0.08]">
+              <WallScreenTimeWidget />
+            </div>
           </div>
 
           {/* Bottom row: Dinner */}
