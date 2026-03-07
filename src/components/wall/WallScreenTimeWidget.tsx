@@ -62,8 +62,8 @@ export function WallScreenTimeWidget() {
           <div key={kid} className="flex items-center gap-2">
             <button
               onClick={() => adjust(kid, -STEP)}
-              className="w-7 h-7 rounded-lg bg-white/6 text-white/40 border border-white/10
-                         active:bg-white/15 font-black text-[0.9rem] flex items-center justify-center select-none"
+              className="w-10 h-10 rounded-xl bg-white/6 text-white/40 border border-white/10
+                         active:bg-white/15 font-black text-[1.1rem] flex items-center justify-center select-none"
             >
               -
             </button>
@@ -73,14 +73,14 @@ export function WallScreenTimeWidget() {
               }`}>
                 {formatMins(times[kid])}
               </span>
-              <span className="text-[0.55rem] font-bold text-white/25 uppercase tracking-widest">
+              <span className="text-[0.7rem] font-bold text-white/25 uppercase tracking-widest">
                 {kid}
               </span>
             </div>
             <button
               onClick={() => adjust(kid, STEP)}
-              className="w-7 h-7 rounded-lg bg-white/6 text-white/40 border border-white/10
-                         active:bg-white/15 font-black text-[0.9rem] flex items-center justify-center select-none"
+              className="w-10 h-10 rounded-xl bg-white/6 text-white/40 border border-white/10
+                         active:bg-white/15 font-black text-[1.1rem] flex items-center justify-center select-none"
             >
               +
             </button>

@@ -375,7 +375,7 @@ export function WallCalendar() {
               {dinnerEvent ? getMealIcon(dinnerEvent.title) : '🍽️'}
             </div>
             <div className="flex flex-col min-w-0 flex-1">
-              <span className="text-white/40 font-black uppercase tracking-widest text-[0.65rem]">
+              <span className="text-white/40 font-black uppercase tracking-widest text-[0.7rem]">
                 Tonight
               </span>
               {dinnerEvent ? (

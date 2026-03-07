@@ -52,7 +52,7 @@ export function WallJaxWidget() {
               Tonight: {tonightKid}
             </span>
           </div>
-          <span className="text-[0.6rem] font-bold text-white/25 uppercase tracking-widest">
+          <span className="text-[0.7rem] font-bold text-white/25 uppercase tracking-widest">
             {lastNight!.kid} had Jax {formatDate(lastNight!.date)}
           </span>
         </div>
@@ -62,11 +62,11 @@ export function WallJaxWidget() {
         </div>
       )}
 
-      {/* Tap to set / correct */}
-      <div className="flex gap-2 ml-auto">
+      {/* Tap to set / correct — 80px+ touch targets */}
+      <div className="flex gap-3 ml-auto">
         <button
           onClick={() => setKid('ella')}
-          className={`px-3 py-1.5 rounded-lg text-[0.75rem] font-black uppercase tracking-wider transition-all select-none ${
+          className={`px-5 py-3 rounded-xl text-[0.85rem] font-black uppercase tracking-wider transition-all select-none ${
             lastNight?.kid === 'ella'
               ? 'bg-pink-500/30 text-pink-300 border border-pink-400/30'
               : 'bg-white/6 text-white/40 border border-white/10 active:bg-white/15'
@@ -76,7 +76,7 @@ export function WallJaxWidget() {
         </button>
         <button
           onClick={() => setKid('kaleb')}
-          className={`px-3 py-1.5 rounded-lg text-[0.75rem] font-black uppercase tracking-wider transition-all select-none ${
+          className={`px-5 py-3 rounded-xl text-[0.85rem] font-black uppercase tracking-wider transition-all select-none ${
             lastNight?.kid === 'kaleb'
               ? 'bg-blue-500/30 text-blue-300 border border-blue-400/30'
               : 'bg-white/6 text-white/40 border border-white/10 active:bg-white/15'

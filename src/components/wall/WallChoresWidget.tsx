@@ -125,7 +125,7 @@ export function WallChoresWidget({ choreItems, taskItems, onComplete, overdueIte
                   <div className={`absolute inset-0 bg-white/20 origin-bottom transition-all pointer-events-none z-10 ${isPressing ? 'scale-y-100 duration-700 ease-linear' : 'scale-y-0 duration-150 ease-out'}`} />
                   {/* Time badge */}
                   {timeStr && (
-                    <div className="absolute top-1.5 right-2 text-[0.65rem] font-black text-white/70 uppercase z-20">
+                    <div className="absolute top-1.5 right-2 text-[0.7rem] font-black text-white/70 uppercase z-20">
                       {timeStr}
                     </div>
                   )}
