@@ -44,7 +44,7 @@ export function WallCalendar() {
   const { user, loading: authLoading } = useAuth()
   const wallData = useWallData()
   const { markDone, undoDone } = useActionableInstances()
-  const { weather } = useWeather()
+  const { weather, error: weatherError } = useWeather()
   const [currentTime, setCurrentTime] = useState(new Date())
   const [nightWake, setNightWake] = useState(false)
   const nightWakeTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -286,6 +286,11 @@ export function WallCalendar() {
             <div className="flex items-center gap-3">
               <span className="text-[3.5rem] leading-none">🌤️</span>
               <span className="text-white/30 font-bold text-[2rem]">--°</span>
+              {weatherError && (
+                <span className="text-red-400/60 font-bold text-[0.7rem] uppercase tracking-wider ml-2">
+                  {weatherError}
+                </span>
+              )}
             </div>
           )}
 

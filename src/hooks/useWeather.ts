@@ -104,8 +104,11 @@ export function useWeather() {
   const [error, setError] = useState<string | null>(null)
   const mountedRef = useRef(true)
   const coordsRef = useRef<{ lat: number; lng: number } | null>(null)
+  const retryCountRef = useRef(0)
 
   const fetchWeather = useCallback(async () => {
+    console.log('[weather] fetchWeather called, user:', !!user, 'cachedCoords:', !!coordsRef.current)
+
     // If we already resolved coordinates, reuse them
     if (coordsRef.current) {
       try {
@@ -113,9 +116,11 @@ export function useWeather() {
         if (mountedRef.current) {
           setWeather(data)
           setError(null)
+          retryCountRef.current = 0
         }
-      } catch {
-        if (mountedRef.current) setError('fetch-error')
+      } catch (e) {
+        console.error('[weather] refetch failed:', e)
+        if (mountedRef.current) setError(`refetch: ${e instanceof Error ? e.message : String(e)}`)
       } finally {
         if (mountedRef.current) setLoading(false)
       }
@@ -124,9 +129,11 @@ export function useWeather() {
 
     // Resolve coordinates through fallback chain (each step has a timeout)
     let coords: { lat: number; lng: number } | null = null
+    let coordSource = 'none'
 
     // 0. Try localStorage cache
     coords = getCachedCoords()
+    if (coords) coordSource = 'cache'
 
     // 1. Try Supabase user_profiles (only if user is available, 5s timeout)
     if (!coords && user) {
@@ -143,14 +150,18 @@ export function useWeather() {
         )
         if (profile?.home_lat && profile?.home_lng) {
           coords = { lat: Number(profile.home_lat), lng: Number(profile.home_lng) }
+          coordSource = 'supabase'
         }
-      } catch { /* timeout or error — continue to next fallback */ }
+      } catch (e) {
+        console.warn('[weather] supabase coords failed:', e)
+      }
     }
 
     // 2. Try browser geolocation (12s timeout)
     if (!coords) {
       try {
         coords = await withTimeout(getCoordinatesFromBrowser(), 12000)
+        coordSource = 'geolocation'
         // Save to Supabase for next time (fire-and-forget)
         if (user) {
           supabase
@@ -163,7 +174,9 @@ export function useWeather() {
             }, { onConflict: 'user_id' })
             .then() // fire-and-forget
         }
-      } catch { /* geolocation blocked or timed out */ }
+      } catch (e) {
+        console.warn('[weather] geolocation failed:', e)
+      }
     }
 
     // 3. Try IP-based geolocation (5s timeout)
@@ -174,27 +187,45 @@ export function useWeather() {
           const ipData = await ipRes.json()
           if (ipData.latitude && ipData.longitude) {
             coords = { lat: ipData.latitude, lng: ipData.longitude }
+            coordSource = 'ip'
           }
         }
-      } catch { /* blocked or timed out */ }
+      } catch (e) {
+        console.warn('[weather] IP geolocation failed:', e)
+      }
     }
 
     // 4. Hardcoded fallback — always works
     if (!coords) {
       coords = HOME_COORDS
+      coordSource = 'hardcoded-baltimore'
     }
+
+    console.log('[weather] coords resolved via:', coordSource, coords)
 
     // Cache and fetch weather
     coordsRef.current = coords
     cacheCoords(coords.lat, coords.lng)
     try {
       const data = await withTimeout(fetchWeatherData(coords.lat, coords.lng), 10000)
+      console.log('[weather] success:', data.currentTemp, '°F', data.condition)
       if (mountedRef.current) {
         setWeather(data)
         setError(null)
+        retryCountRef.current = 0
       }
-    } catch {
-      if (mountedRef.current) setError('fetch-error')
+    } catch (e) {
+      console.error('[weather] API fetch failed:', e)
+      if (mountedRef.current) {
+        setError(`api: ${e instanceof Error ? e.message : String(e)} [${coordSource}]`)
+        // Auto-retry up to 3 times with backoff
+        if (retryCountRef.current < 3) {
+          retryCountRef.current++
+          const delay = retryCountRef.current * 5000
+          console.log(`[weather] retrying in ${delay}ms (attempt ${retryCountRef.current})`)
+          setTimeout(() => { if (mountedRef.current) fetchWeather() }, delay)
+        }
+      }
     } finally {
       if (mountedRef.current) setLoading(false)
     }
