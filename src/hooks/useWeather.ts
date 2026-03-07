@@ -176,10 +176,9 @@ export function useWeather() {
       } catch { /* blocked or timed out */ }
     }
 
-    // 4. Hardcoded fallback — use a default location so weather always shows
+    // 4. Hardcoded fallback — Baltimore 21211
     if (!coords) {
-      // Default to a US location so the kiosk at least shows something
-      coords = { lat: 40.7128, lng: -74.006 } // New York
+      coords = { lat: 39.3285, lng: -76.6178 }
     }
 
     // Cache and fetch weather
