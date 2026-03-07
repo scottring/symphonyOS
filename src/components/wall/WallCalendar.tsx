@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { supabase } from '@/lib/supabase'
 import { useWallData } from '@/hooks/useWallData'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import type { TimelineItem } from '@/types/timeline'
@@ -76,6 +77,17 @@ export function WallCalendar() {
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 60_000)
     return () => clearInterval(interval)
+  }, [])
+
+  // ═══ REMOTE REFRESH via Supabase Realtime ═══
+  useEffect(() => {
+    const channel = supabase.channel('wall-refresh')
+      .on('broadcast', { event: 'refresh' }, () => {
+        console.log('[wall] remote refresh received')
+        window.location.reload()
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
   }, [])
 
   // ═══ ITEMS ═══

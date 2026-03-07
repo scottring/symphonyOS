@@ -10,19 +10,32 @@ function getToday(): string {
   return new Date().toISOString().split('T')[0]
 }
 
+function isWeekendOrHoliday(): boolean {
+  const d = new Date()
+  const day = d.getDay()
+  return day === 0 || day === 6 // Saturday or Sunday
+}
+
+function getDefaultTime(): Record<Kid, number> {
+  const base = isWeekendOrHoliday() ? 60 : 0
+  return { ella: base, kaleb: base }
+}
+
 function getStoredTime(): Record<Kid, number> {
   try {
     const date = localStorage.getItem(SCREEN_TIME_DATE_KEY)
     if (date !== getToday()) {
-      // Reset at midnight
+      // Reset at midnight with weekend/holiday default
       localStorage.removeItem(SCREEN_TIME_KEY)
       localStorage.setItem(SCREEN_TIME_DATE_KEY, getToday())
-      return { ella: 0, kaleb: 0 }
+      const defaults = getDefaultTime()
+      storeTime(defaults)
+      return defaults
     }
     const raw = localStorage.getItem(SCREEN_TIME_KEY)
     if (raw) return JSON.parse(raw)
   } catch { /* ignore */ }
-  return { ella: 0, kaleb: 0 }
+  return getDefaultTime()
 }
 
 function storeTime(times: Record<Kid, number>) {
