@@ -281,7 +281,9 @@ export function WallCalendar() {
               </div>
             </>
           ) : (
-            <div className="text-white/30 font-bold text-[1.5rem]">Loading weather...</div>
+            <div className="text-white/40 font-bold text-[2rem]">
+              🌤️ <span className="text-white/30 text-[1.5rem] ml-2">--°</span>
+            </div>
           )}
         </div>
 
@@ -374,20 +376,20 @@ export function WallCalendar() {
         <div className="w-px bg-white/10 self-stretch my-2 flex-shrink-0" />
 
         {/* ─── RIGHT COLUMN (~32%): Look Ahead + Alien ─── */}
-        <div className="w-[32%] h-full overflow-hidden relative">
-          <div className="h-full pb-[160px] overflow-hidden">
+        <div className="w-[32%] h-full relative flex flex-col">
+          <div className="flex-1 min-h-0 overflow-hidden">
             <WallLookAhead days={wallData.days} familyMembers={wallData.familyMembers} />
           </div>
 
           {/* Alien Mascot with Speech Bubble */}
-          <div className="absolute bottom-0 right-[-20px] flex items-end translate-y-8">
-            <div className="bg-white rounded-3xl rounded-br-none p-5 max-w-[340px] shadow-xl relative -top-[78px] right-12 z-30">
-              <p className="text-[#1e293b] font-black uppercase tracking-wider text-[1.1rem] leading-snug">
+          <div className="flex items-end justify-end mt-2 flex-shrink-0 pr-2">
+            <div className="bg-white rounded-3xl rounded-br-none p-4 max-w-[300px] shadow-xl relative mr-[-8px] mb-6 z-30">
+              <p className="text-[#1e293b] font-black uppercase tracking-wider text-[0.95rem] leading-snug">
                 {getDailyJoke()}
               </p>
-              <div className="absolute -bottom-4 right-4 w-8 h-8 bg-white" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%)' }} />
+              <div className="absolute -bottom-3 right-4 w-6 h-6 bg-white" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%)' }} />
             </div>
-            <div className="text-[12rem] leading-none drop-shadow-2xl z-20" style={{ transform: 'scaleX(-1)' }}>
+            <div className="text-[8rem] leading-none drop-shadow-2xl z-20 flex-shrink-0" style={{ transform: 'scaleX(-1)' }}>
               👽
             </div>
           </div>
