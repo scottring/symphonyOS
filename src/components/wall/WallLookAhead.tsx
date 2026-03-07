@@ -67,8 +67,8 @@ export function WallLookAhead({ days, familyMembers, className = '' }: WallLookA
   const highlights = getHighlights(days, familyMembers)
 
   return (
-    <div className={`flex flex-col pl-8 ${className}`}>
-      <div className="text-[1.3rem] font-bold uppercase tracking-[0.2em] text-white mb-8 mt-2">
+    <div className={`flex flex-col ${className}`}>
+      <div className="text-[1.1rem] font-black uppercase tracking-[0.25em] text-white/50 mb-6">
         Look Ahead
       </div>
 

@@ -7,7 +7,7 @@ import { WallChoresWidget } from './WallChoresWidget'
 import { WallJaxWidget } from './WallJaxWidget'
 import { WallScreenTimeWidget } from './WallScreenTimeWidget'
 import { WallLookAhead } from './WallLookAhead'
-import { WallDinnerWidget, findDinnerEvent, getMealIcon } from './WallDinnerWidget'
+import { findDinnerEvent, getMealIcon } from './WallDinnerWidget'
 import { WallRecipeViewer } from './WallRecipeViewer'
 import { extractRecipeNameHint, detectRecipeUrl } from '@/lib/recipeDetection'
 import { useContextEngine, ContextDock, ContextOverlay } from './contexts'
@@ -243,6 +243,9 @@ export function WallCalendar() {
 
   const { time, period, dateStr } = formatWallTime(currentTime)
 
+  // Glass card style — consistent across all modules
+  const glass = 'bg-white/[0.08] backdrop-blur-md border border-white/[0.1] rounded-[1.25rem]'
+
   return (
     <div
       className="wall-calendar w-[1920px] h-[1080px] overflow-hidden flex flex-col select-none relative mx-auto"
@@ -255,82 +258,89 @@ export function WallCalendar() {
         </div>
       )}
 
-      {/* Light scrim for text readability */}
+      {/* Scrim */}
       <div className="absolute inset-0 pointer-events-none z-0 bg-black/10" />
 
-      {/* ═══ TOP: WEATHER HERO ═══ */}
-      <header className="relative z-10 px-12 pt-10 pb-6 flex items-start justify-between">
-        {/* Left: Weather */}
-        <div className="flex items-center gap-6">
+      {/* ═══ HEADER BAR ═══ */}
+      <header className="relative z-10 px-10 pt-6 pb-4 flex items-center justify-between">
+        {/* Left: Weather cluster */}
+        <div className="flex items-center gap-5">
           {weather ? (
             <>
-              <span className="text-[5rem] leading-none drop-shadow-lg">
+              <span className="text-[3.5rem] leading-none drop-shadow-lg">
                 {getWeatherEmoji(weather.weatherCode)}
               </span>
-              <div>
-                <div className="flex items-baseline gap-3">
-                  <span className="text-white font-black text-[5rem] leading-none tracking-tight">
-                    {weather.currentTemp}°
-                  </span>
-                  <span className="text-white/60 font-bold text-[1.8rem] uppercase tracking-wider">
-                    {weather.condition}
-                  </span>
-                </div>
-                <div className="text-white/35 font-bold text-[1.3rem] mt-1 tracking-wide">
-                  High {weather.highTemp}° · Low {weather.lowTemp}°
-                </div>
+              <div className="flex items-baseline gap-2.5">
+                <span className="text-white font-black text-[3.5rem] leading-none tracking-tight">
+                  {weather.currentTemp}°
+                </span>
+                <span className="text-white/50 font-bold text-[1.3rem] uppercase tracking-wider">
+                  {weather.condition}
+                </span>
+              </div>
+              <div className="text-white/30 font-bold text-[1.05rem] tracking-wide ml-2">
+                {weather.highTemp}° / {weather.lowTemp}°
               </div>
             </>
           ) : (
-            <div className="text-white/40 font-bold text-[2rem]">
-              🌤️ <span className="text-white/30 text-[1.5rem] ml-2">--°</span>
+            <div className="flex items-center gap-3">
+              <span className="text-[3.5rem] leading-none">🌤️</span>
+              <span className="text-white/30 font-bold text-[2rem]">--°</span>
+            </div>
+          )}
+
+          {/* Weather message — inline */}
+          {weatherMsg && (
+            <div className="flex items-center gap-2.5 ml-6 px-4 py-1.5 rounded-xl bg-white/[0.06] border border-white/[0.08]">
+              <span className="text-[1.1rem]">{weatherMsg.icon}</span>
+              <span className="text-white/60 font-bold text-[1rem]">{weatherMsg.message}</span>
+              {weatherMsg.screenTimeAdvice === 'none' && (
+                <span className="text-[#6DC4A7] font-black text-[0.8rem] uppercase tracking-widest">No Screens</span>
+              )}
+              {weatherMsg.screenTimeAdvice === 'reading-first' && (
+                <span className="text-[#F9C35C] font-black text-[0.8rem] uppercase tracking-widest">Reading First</span>
+              )}
             </div>
           )}
         </div>
 
-        {/* Right: Time + Date */}
-        <div className="text-right">
-          <div className="flex items-baseline justify-end gap-2">
-            <time
-              className="font-bold text-[5rem] leading-none text-white tracking-tight cursor-default"
-              onClick={handleClockTap}
-            >
-              {time}
-            </time>
-            <span className="text-[2.2rem] font-bold text-white/70">{period}</span>
-          </div>
-          <div className="text-[1.5rem] font-bold text-white/40 tracking-wider mt-1">
-            {dateStr}
-          </div>
+        {/* Right: Clock */}
+        <div className="flex items-baseline gap-2">
+          <time
+            className="font-black text-[3.5rem] leading-none text-white tracking-tight cursor-default"
+            onClick={handleClockTap}
+          >
+            {time}
+          </time>
+          <span className="text-[1.5rem] font-bold text-white/50">{period}</span>
+          <span className="text-[1.1rem] font-bold text-white/30 tracking-wider ml-3">{dateStr}</span>
         </div>
       </header>
 
-      {/* Weather message banner */}
-      {weatherMsg && (
-        <div className="relative z-10 mx-12 mb-4 px-6 py-3 rounded-2xl bg-white/[0.07] border border-white/[0.1] backdrop-blur-sm">
-          <span className="text-[1.4rem] mr-3">{weatherMsg.icon}</span>
-          <span className="text-white/80 font-bold text-[1.4rem]">{weatherMsg.message}</span>
-          {weatherMsg.screenTimeAdvice === 'none' && (
-            <span className="text-[#6DC4A7] font-black text-[1rem] ml-4 uppercase tracking-widest">
-              No Screens
-            </span>
+      {/* ═══ MAIN CONTENT — CSS Grid ═══ */}
+      <main className="flex-1 grid min-h-0 relative z-10 px-10 pb-6 gap-4"
+        style={{ gridTemplateColumns: '1fr 380px', gridTemplateRows: '1fr auto' }}
+      >
+
+        {/* ─── PANEL: Chores + Tasks ─── */}
+        <div className={`${glass} p-6 min-h-0 flex flex-col`}>
+          {/* Progress integrated into header */}
+          {choreProgress.total > 0 && (
+            <div className="flex items-center gap-4 mb-4">
+              <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-[#6DC4A7] rounded-full transition-all duration-700 ease-out"
+                  style={{ width: `${choreProgress.pct * 100}%` }}
+                />
+              </div>
+              <span className="text-white/35 font-black text-[0.95rem] tabular-nums tracking-wide">
+                {choreProgress.done} of {choreProgress.total}
+              </span>
+              {choreProgress.pct === 1 && <span className="text-[1.1rem]">🎉</span>}
+            </div>
           )}
-          {weatherMsg.screenTimeAdvice === 'reading-first' && (
-            <span className="text-[#F9C35C] font-black text-[1rem] ml-4 uppercase tracking-widest">
-              Reading First
-            </span>
-          )}
-        </div>
-      )}
 
-      {/* ═══ MAIN CONTENT ═══ */}
-      <main className="flex-1 flex gap-0 min-h-0 relative z-10 px-12 pb-8">
-
-        {/* ─── LEFT COLUMN (~68%) ─── */}
-        <div className="w-[68%] flex flex-col h-full pr-8">
-
-          {/* Chores + Tasks */}
-          <div className="flex-shrink-0">
+          <div className="flex-1 min-h-0">
             <WallChoresWidget
               choreItems={choreItems}
               taskItems={taskItems}
@@ -338,80 +348,70 @@ export function WallCalendar() {
               overdueItems={wallData.overdueTasks}
             />
           </div>
-
-          {/* Chore progress bar */}
-          {choreProgress.total > 0 && (
-            <div className="mt-2 flex items-center gap-4 flex-shrink-0">
-              <div className="flex-1 h-3 bg-white/10 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-[#6DC4A7] rounded-full transition-all duration-700 ease-out"
-                  style={{ width: `${choreProgress.pct * 100}%` }}
-                />
-              </div>
-              <span className="text-white/40 font-black text-[1.1rem] tabular-nums">
-                {choreProgress.done}/{choreProgress.total}
-              </span>
-              {choreProgress.pct === 1 && (
-                <span className="text-[1.3rem]">🎉</span>
-              )}
-            </div>
-          )}
-
-          {/* Widget row: Jax + Screen Time */}
-          <div className="mt-4 flex-shrink-0 flex gap-3">
-            <div className="flex-1 bg-white/[0.05] rounded-2xl px-4 py-3 border border-white/[0.08]">
-              <WallJaxWidget />
-            </div>
-            <div className="flex-1 bg-white/[0.05] rounded-2xl px-4 py-3 border border-white/[0.08]">
-              <WallScreenTimeWidget />
-            </div>
-          </div>
-
-          {/* Bottom row: Dinner */}
-          <div className="mt-3 flex-shrink-0">
-            <WallDinnerWidget
-              calendarEvents={wallData.calendarEvents}
-              days={wallData.days}
-              recipeUrl={recipeUrl}
-              onOpenRecipe={handleOpenRecipe}
-            />
-          </div>
         </div>
 
-        {/* ─── Divider ─── */}
-        <div className="w-px bg-white/10 self-stretch my-2 flex-shrink-0" />
+        {/* ─── PANEL: Look Ahead ─── */}
+        <div className={`${glass} p-6 min-h-0 overflow-hidden flex flex-col`}>
+          <WallLookAhead days={wallData.days} familyMembers={wallData.familyMembers} />
+        </div>
 
-        {/* ─── RIGHT COLUMN (~32%): Look Ahead + Alien ─── */}
-        <div className="w-[32%] h-full relative flex flex-col">
-          <div className="flex-1 min-h-0 overflow-hidden">
-            <WallLookAhead days={wallData.days} familyMembers={wallData.familyMembers} />
+        {/* ─── BOTTOM ROW: Widget Strip ─── */}
+        <div className="flex gap-4 col-span-2">
+          {/* Jax Widget */}
+          <div className={`${glass} px-5 py-4 flex-1`}>
+            <WallJaxWidget />
           </div>
 
-          {/* Alien Mascot with Speech Bubble */}
-          <div className="flex items-end justify-end mt-2 flex-shrink-0 pr-2">
-            <div className="bg-white rounded-3xl rounded-br-none p-4 max-w-[300px] shadow-xl relative mr-[-8px] mb-6 z-30">
-              <p className="text-[#1e293b] font-black uppercase tracking-wider text-[0.95rem] leading-snug">
-                {getDailyJoke()}
-              </p>
-              <div className="absolute -bottom-3 right-4 w-6 h-6 bg-white" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%)' }} />
+          {/* Screen Time Widget */}
+          <div className={`${glass} px-5 py-4 flex-1`}>
+            <WallScreenTimeWidget />
+          </div>
+
+          {/* Dinner Widget */}
+          <div className={`${glass} px-5 py-4 flex-1 flex items-center gap-4 ${recipeUrl ? 'cursor-pointer' : ''}`}
+            onClick={recipeUrl ? handleOpenRecipe : undefined}
+          >
+            <div className="text-[2.2rem]">
+              {dinnerEvent ? getMealIcon(dinnerEvent.title) : '🍽️'}
             </div>
-            <div className="text-[8rem] leading-none drop-shadow-2xl z-20 flex-shrink-0" style={{ transform: 'scaleX(-1)' }}>
+            <div className="flex flex-col min-w-0 flex-1">
+              <span className="text-white/40 font-black uppercase tracking-widest text-[0.65rem]">
+                Tonight
+              </span>
+              {dinnerEvent ? (
+                <span className="text-white font-bold text-[1.1rem] truncate leading-tight">
+                  {dinnerMealName}
+                </span>
+              ) : (
+                <span className="text-white/30 text-[1rem] italic">No dinner planned</span>
+              )}
+            </div>
+            {recipeUrl && (
+              <span className="text-white/30 text-[1rem]">📖</span>
+            )}
+          </div>
+
+          {/* Alien Joke Widget */}
+          <div className={`${glass} px-5 py-4 flex items-center gap-3`} style={{ maxWidth: 420 }}>
+            <div className="text-[2.8rem] flex-shrink-0" style={{ transform: 'scaleX(-1)' }}>
               👽
             </div>
+            <p className="text-white/70 font-bold uppercase tracking-wider text-[0.7rem] leading-snug" style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+              {getDailyJoke()}
+            </p>
           </div>
         </div>
       </main>
 
       {/* ═══ UTILITIES ═══ */}
 
-      {/* Refresh button */}
       <button
         onClick={() => window.location.reload()}
-        className="fixed bottom-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-lg
+        className="fixed bottom-2 right-3 flex items-center gap-2 px-2.5 py-1 rounded-lg
                    bg-white/5 hover:bg-white/10 border border-white/10
-                   text-white/30 hover:text-white/60 transition-all z-10 text-[0.8rem]"
+                   text-white/20 hover:text-white/50 transition-all z-10 text-[0.7rem]"
       >
-        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M4.5 9A8 8 0 0119.8 7.5M19.5 15A8 8 0 014.2 16.5" />
         </svg>
         {wallData.lastRefresh
@@ -419,28 +419,24 @@ export function WallCalendar() {
           : 'Refresh'}
       </button>
 
-      {/* Error indicator */}
       {wallData.error && (
         <div className="fixed top-6 right-6 bg-red-900/80 text-red-200 px-5 py-3 rounded-xl text-[1rem] shadow-lg border border-red-500/30 backdrop-blur z-50">
           {wallData.error}
         </div>
       )}
 
-      {/* Nighttime wake indicator */}
       {isNighttime && nightWake && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white/5 text-white/30 px-4 py-2 rounded-xl text-[0.85rem] font-bold uppercase tracking-widest border border-white/10 z-50">
           Sleeping soon...
         </div>
       )}
 
-      {/* Debug mode */}
       {debugMode && (
         <div className="fixed top-6 left-6 bg-amber-500/20 text-amber-300 px-4 py-2 rounded-xl text-[0.85rem] font-bold uppercase tracking-widest border border-amber-500/30 z-50">
           Debug: All Contexts
         </div>
       )}
 
-      {/* ═══ CONTEXT ENGINE ═══ */}
       {!activeContext && surfacedRules.length > 0 && (
         <ContextDock
           rules={surfacedRules}
@@ -457,7 +453,6 @@ export function WallCalendar() {
         />
       )}
 
-      {/* Recipe viewer overlay */}
       {showRecipeViewer && recipeUrl && (
         <WallRecipeViewer
           url={recipeUrl}

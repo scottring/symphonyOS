@@ -35,7 +35,7 @@ export function WallScreenTimeWidget() {
 
   const adjust = useCallback((kid: Kid, delta: number) => {
     setTimes(prev => {
-      const next = { ...prev, [kid]: Math.max(0, prev[kid] + delta) }
+      const next = { ...prev, [kid]: prev[kid] + delta }
       storeTime(next)
       return next
     })
@@ -43,11 +43,14 @@ export function WallScreenTimeWidget() {
 
   const formatMins = (m: number) => {
     if (m === 0) return '0m'
-    const h = Math.floor(m / 60)
-    const r = m % 60
-    if (h > 0 && r > 0) return `${h}h ${r}m`
-    if (h > 0) return `${h}h`
-    return `${r}m`
+    const neg = m < 0
+    const abs = Math.abs(m)
+    const h = Math.floor(abs / 60)
+    const r = abs % 60
+    const sign = neg ? '-' : ''
+    if (h > 0 && r > 0) return `${sign}${h}h ${r}m`
+    if (h > 0) return `${sign}${h}h`
+    return `${sign}${r}m`
   }
 
   return (
@@ -66,7 +69,7 @@ export function WallScreenTimeWidget() {
             </button>
             <div className="flex flex-col items-center min-w-[50px]">
               <span className={`text-[1.1rem] font-black uppercase tracking-wider ${
-                times[kid] > 60 ? 'text-red-400' : times[kid] > 30 ? 'text-yellow-400' : 'text-white'
+                times[kid] < 0 ? 'text-green-400' : times[kid] > 60 ? 'text-red-400' : times[kid] > 30 ? 'text-yellow-400' : 'text-white'
               }`}>
                 {formatMins(times[kid])}
               </span>
