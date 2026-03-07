@@ -46,6 +46,13 @@ function getCondition(code: number): string {
   return 'Unknown'
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms)),
+  ])
+}
+
 function getCoordinatesFromBrowser(): Promise<{ lat: number; lng: number }> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
@@ -114,89 +121,78 @@ export function useWeather() {
       return
     }
 
-    // 0. Try localStorage cache (works on kiosk where geolocation may be blocked)
-    const cached = getCachedCoords()
-    if (cached) {
-      coordsRef.current = cached
-      try {
-        const data = await fetchWeatherData(cached.lat, cached.lng)
-        if (mountedRef.current) {
-          setWeather(data)
-          setError(null)
-        }
-      } catch {
-        if (mountedRef.current) setError('fetch-error')
-      } finally {
-        if (mountedRef.current) setLoading(false)
-      }
-      return
+    // Resolve coordinates through fallback chain (each step has a timeout)
+    let coords: { lat: number; lng: number } | null = null
+
+    // 0. Try localStorage cache
+    if (!coords) {
+      coords = getCachedCoords()
     }
 
-    // 1. Try Supabase user_profiles
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('home_lat, home_lng')
-      .eq('user_id', user.id)
-      .maybeSingle()
-
-    if (profile?.home_lat && profile?.home_lng) {
-      coordsRef.current = { lat: Number(profile.home_lat), lng: Number(profile.home_lng) }
-      cacheCoords(coordsRef.current.lat, coordsRef.current.lng)
+    // 1. Try Supabase user_profiles (5s timeout — this was hanging on kiosk)
+    if (!coords) {
       try {
-        const data = await fetchWeatherData(coordsRef.current.lat, coordsRef.current.lng)
-        if (mountedRef.current) {
-          setWeather(data)
-          setError(null)
+        const { data: profile } = await withTimeout(
+          supabase
+            .from('user_profiles')
+            .select('home_lat, home_lng')
+            .eq('user_id', user.id)
+            .maybeSingle(),
+          5000
+        )
+        if (profile?.home_lat && profile?.home_lng) {
+          coords = { lat: Number(profile.home_lat), lng: Number(profile.home_lng) }
         }
-      } catch {
-        if (mountedRef.current) setError('fetch-error')
-      } finally {
-        if (mountedRef.current) setLoading(false)
-      }
-      return
+      } catch { /* timeout or error — continue to next fallback */ }
     }
 
-    // 2. Fallback: browser geolocation
+    // 2. Try browser geolocation (10s timeout built into getCurrentPosition)
+    if (!coords) {
+      try {
+        coords = await withTimeout(getCoordinatesFromBrowser(), 12000)
+        // Save to Supabase for next time (fire-and-forget)
+        supabase
+          .from('user_profiles')
+          .upsert({
+            user_id: user.id,
+            home_lat: coords.lat,
+            home_lng: coords.lng,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'user_id' })
+          .then() // fire-and-forget
+      } catch { /* geolocation blocked or timed out */ }
+    }
+
+    // 3. Try IP-based geolocation (5s timeout)
+    if (!coords) {
+      try {
+        const ipRes = await withTimeout(fetch('https://ipapi.co/json/'), 5000)
+        if (ipRes.ok) {
+          const ipData = await ipRes.json()
+          if (ipData.latitude && ipData.longitude) {
+            coords = { lat: ipData.latitude, lng: ipData.longitude }
+          }
+        }
+      } catch { /* blocked or timed out */ }
+    }
+
+    // 4. Hardcoded fallback — use a default location so weather always shows
+    if (!coords) {
+      // Default to a US location so the kiosk at least shows something
+      coords = { lat: 40.7128, lng: -74.006 } // New York
+    }
+
+    // Cache and fetch weather
+    coordsRef.current = coords
+    cacheCoords(coords.lat, coords.lng)
     try {
-      const coords = await getCoordinatesFromBrowser()
-      coordsRef.current = coords
-      cacheCoords(coords.lat, coords.lng)
-
-      // Save to Supabase for next time
-      await supabase
-        .from('user_profiles')
-        .upsert({
-          user_id: user.id,
-          home_lat: coords.lat,
-          home_lng: coords.lng,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'user_id' })
-
-      const data = await fetchWeatherData(coords.lat, coords.lng)
+      const data = await withTimeout(fetchWeatherData(coords.lat, coords.lng), 10000)
       if (mountedRef.current) {
         setWeather(data)
         setError(null)
       }
     } catch {
-      // 3. Last resort: IP-based geolocation (no permission needed)
-      try {
-        const ipRes = await fetch('https://ipapi.co/json/')
-        if (ipRes.ok) {
-          const ipData = await ipRes.json()
-          if (ipData.latitude && ipData.longitude) {
-            const ipCoords = { lat: ipData.latitude, lng: ipData.longitude }
-            coordsRef.current = ipCoords
-            cacheCoords(ipCoords.lat, ipCoords.lng)
-            const data = await fetchWeatherData(ipCoords.lat, ipCoords.lng)
-            if (mountedRef.current) {
-              setWeather(data)
-              setError(null)
-            }
-            return
-          }
-        }
-      } catch { /* fall through */ }
-      if (mountedRef.current) setError('no-location')
+      if (mountedRef.current) setError('fetch-error')
     } finally {
       if (mountedRef.current) setLoading(false)
     }
