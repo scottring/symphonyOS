@@ -133,11 +133,13 @@ export function useWeather() {
     if (!coords) {
       try {
         const { data: profile } = await withTimeout(
-          supabase
-            .from('user_profiles')
-            .select('home_lat, home_lng')
-            .eq('user_id', user.id)
-            .maybeSingle(),
+          Promise.resolve(
+            supabase
+              .from('user_profiles')
+              .select('home_lat, home_lng')
+              .eq('user_id', user.id)
+              .maybeSingle()
+          ),
           5000
         )
         if (profile?.home_lat && profile?.home_lng) {
