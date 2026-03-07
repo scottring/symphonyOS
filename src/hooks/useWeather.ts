@@ -67,11 +67,16 @@ function getCoordinatesFromBrowser(): Promise<{ lat: number; lng: number }> {
   })
 }
 
-async function fetchWeatherData(lat: number, lng: number): Promise<WeatherData> {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code&hourly=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&timezone=auto&forecast_hours=8&forecast_days=1`
+const SUPABASE_URL = 'https://mwadppyrqzuzgstmwpuy.supabase.co'
 
-  const res = await fetch(url)
-  if (!res.ok) throw new Error('Weather API error')
+async function fetchWeatherData(lat: number, lng: number): Promise<WeatherData> {
+  // Proxy through Supabase edge function — kiosk browser blocks direct open-meteo calls
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/fetch-weather`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lat, lng }),
+  })
+  if (!res.ok) throw new Error(`Weather proxy ${res.status}`)
 
   const data = await res.json()
   const currentHour = new Date().getHours()
