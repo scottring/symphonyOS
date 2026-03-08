@@ -16,6 +16,10 @@ import type { ContextEvalData } from './contexts'
 import { useWeather } from '@/hooks/useWeather'
 import { getWeatherMessage, getWeatherEmoji } from './weatherMessages'
 import { getDailyJoke } from './alienJokes'
+import { getDailySoccerTip, getCategoryLabel, getCategoryColor } from './soccerTips'
+import { WallSoccerTipOverlay } from './WallSoccerTipOverlay'
+import { getDailyRunningTip, getRunningCategoryLabel, getRunningCategoryColor } from './runningTips'
+import { WallRunningTipOverlay } from './WallRunningTipOverlay'
 
 // ============================================================================
 // HELPERS
@@ -48,6 +52,8 @@ export function WallCalendar() {
   const [nightWake, setNightWake] = useState(false)
   const nightWakeTimerRef = useRef<NodeJS.Timeout | null>(null)
   const [showRecipeViewer, setShowRecipeViewer] = useState(false)
+  const [showSoccerTip, setShowSoccerTip] = useState(false)
+  const [showRunningTip, setShowRunningTip] = useState(false)
 
   // ═══ CHORE COMPLETION ═══
   const handleComplete = useCallback(async (item: TimelineItem) => {
@@ -391,8 +397,52 @@ export function WallCalendar() {
             )}
           </div>
 
+          {/* Soccer Tip Widget */}
+          {(() => {
+            const soccerTip = getDailySoccerTip()
+            const catColor = getCategoryColor(soccerTip.category)
+            return (
+              <div
+                className={`${glass} px-5 py-4 flex items-center gap-3 cursor-pointer hover:bg-white/[0.12] transition-colors`}
+                onClick={() => setShowSoccerTip(true)}
+              >
+                <div className="text-[2.2rem] flex-shrink-0">⚽</div>
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="font-black uppercase tracking-widest text-[0.6rem] mb-0.5" style={{ color: catColor }}>
+                    {getCategoryLabel(soccerTip.category)}
+                  </span>
+                  <span className="text-white font-bold text-[1rem] truncate leading-tight">
+                    {soccerTip.title}
+                  </span>
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Running Tip Widget */}
+          {(() => {
+            const runTip = getDailyRunningTip()
+            const runColor = getRunningCategoryColor(runTip.category)
+            return (
+              <div
+                className={`${glass} px-5 py-4 flex items-center gap-3 cursor-pointer hover:bg-white/[0.12] transition-colors`}
+                onClick={() => setShowRunningTip(true)}
+              >
+                <div className="text-[2.2rem] flex-shrink-0">🏃</div>
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="font-black uppercase tracking-widest text-[0.6rem] mb-0.5" style={{ color: runColor }}>
+                    {getRunningCategoryLabel(runTip.category)}
+                  </span>
+                  <span className="text-white font-bold text-[1rem] truncate leading-tight">
+                    {runTip.title}
+                  </span>
+                </div>
+              </div>
+            )
+          })()}
+
           {/* Alien Joke Widget */}
-          <div className={`${glass} px-5 py-4 flex items-center gap-3`} style={{ maxWidth: 420 }}>
+          <div className={`${glass} px-5 py-4 flex items-center gap-3`} style={{ maxWidth: 380 }}>
             <div className="text-[2.8rem] flex-shrink-0" style={{ transform: 'scaleX(-1)' }}>
               👽
             </div>
@@ -460,6 +510,14 @@ export function WallCalendar() {
           mealIcon={dinnerEvent ? getMealIcon(dinnerEvent.title) : '🍽️'}
           onClose={handleCloseRecipe}
         />
+      )}
+
+      {showSoccerTip && (
+        <WallSoccerTipOverlay onClose={() => setShowSoccerTip(false)} />
+      )}
+
+      {showRunningTip && (
+        <WallRunningTipOverlay onClose={() => setShowRunningTip(false)} />
       )}
     </div>
   )
