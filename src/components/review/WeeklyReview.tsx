@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
-import type { Contact } from '@/types/contact'
+import type { Contact, ContactCategory } from '@/types/contact'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { AssignPicker, PushDropdown, SchedulePopover, type ScheduleContextItem } from '@/components/triage'
 
@@ -12,7 +12,7 @@ interface WeeklyReviewProps {
   calendarEvents?: CalendarEvent[]
   allTasks?: Task[] // All tasks for timeline display
   onSearchContacts: (query: string) => Contact[]
-  onAddContact?: (name: string) => Promise<Contact | null>
+  onAddContact?: (name: string, details?: { phone?: string; category?: ContactCategory }) => Promise<Contact | null>
   onUpdateTask: (id: string, updates: Partial<Task>) => void
   onPushTask: (id: string, date: Date) => void
   onDeleteTask: (id: string) => void

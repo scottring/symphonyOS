@@ -1301,7 +1301,7 @@ function App() {
     onCreateList: handleCreateListInTriage,
     onAddProject: addProject,
     onSearchContacts: searchContacts,
-    onAddContact: (name: string) => addContact({ name }),
+    onAddContact: (name: string, details?: { phone?: string; category?: import('@/types/contact').ContactCategory }) => addContact({ name, ...details }),
     onOpenProject: handleOpenProject,
     onOpenPlanning: () => setPlanningOpen(true),
 

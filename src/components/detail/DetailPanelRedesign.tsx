@@ -3,6 +3,7 @@ import { logger } from '@/lib/logger'
 import type { TimelineItem } from '@/types/timeline'
 import type { Task, TaskLink, LinkedActivity, LinkType, LinkedActivityType } from '@/types/task'
 import type { Contact } from '@/types/contact'
+import { useGooglePlaces } from '@/hooks/useGooglePlaces'
 import type { Project } from '@/types/project'
 import type { ActionableInstance, Routine, PrepFollowupTemplate } from '@/types/actionable'
 import type { Attachment, AttachmentEntityType } from '@/types/attachment'
@@ -97,7 +98,7 @@ interface DetailPanelRedesignProps {
   onSearchContacts?: (query: string) => Contact[]
   onUpdateContact?: (contactId: string, updates: Partial<Contact>) => void
   onOpenContact?: (contactId: string) => void
-  onAddContact?: (contact: { name: string; phone?: string; email?: string }) => Promise<Contact | null>
+  onAddContact?: (contact: { name: string; phone?: string; email?: string; category?: Contact['category'] }) => Promise<Contact | null>
   project?: Project | null
   projects?: Project[]
   onSearchProjects?: (query: string) => Project[]
@@ -565,6 +566,7 @@ export function DetailPanelRedesign({
   const [newContactName, setNewContactName] = useState('')
   const [newContactPhone, setNewContactPhone] = useState('')
   const [isCreatingContactLoading, setIsCreatingContactLoading] = useState(false)
+  const { results: placeResults, loading: placesLoading, searchPlaces, getPlaceDetails, clearResults: clearPlaceResults } = useGooglePlaces()
 
   // Project picker state
   const [showProjectPicker, setShowProjectPicker] = useState(false)
@@ -704,6 +706,15 @@ export function DetailPanelRedesign({
     }
     return contacts.slice(0, 5)
   }, [contacts, contactSearchQuery, onSearchContacts])
+
+  // Search Google Places when contact search query changes
+  useEffect(() => {
+    if (showContactPicker && contactSearchQuery.trim()) {
+      searchPlaces(contactSearchQuery.trim())
+    } else {
+      clearPlaceResults()
+    }
+  }, [contactSearchQuery, showContactPicker, searchPlaces, clearPlaceResults])
 
   // Filter projects for picker
   const filteredProjects = useMemo(() => {
@@ -967,6 +978,27 @@ export function DetailPanelRedesign({
     }
     setShowContactPicker(false)
     setContactSearchQuery('')
+    clearPlaceResults()
+  }
+
+  const handleSelectPlace = async (placeId: string) => {
+    if (!onAddContact || !isTask || !item.originalTask || !onUpdate) return
+    setIsCreatingContactLoading(true)
+    const details = await getPlaceDetails(placeId)
+    if (details) {
+      const newContact = await onAddContact({
+        name: details.name,
+        phone: details.phone,
+        category: 'service_provider',
+      })
+      if (newContact) {
+        onUpdate(item.originalTask.id, { contactId: newContact.id })
+        setShowContactPicker(false)
+        setContactSearchQuery('')
+        clearPlaceResults()
+      }
+    }
+    setIsCreatingContactLoading(false)
   }
 
   const handleLinkProject = (selectedProject: Project) => {
@@ -2277,7 +2309,7 @@ export function DetailPanelRedesign({
             {!isCreatingContact && (
               <>
                 <div className="flex-1 overflow-auto">
-                  {filteredContacts.length > 0 ? (
+                  {filteredContacts.length > 0 && (
                     filteredContacts.map((c) => (
                       <button
                         key={c.id}
@@ -2295,9 +2327,47 @@ export function DetailPanelRedesign({
                         </div>
                       </button>
                     ))
-                  ) : (
+                  )}
+
+                  {/* Google Places results */}
+                  {contactSearchQuery.trim().length >= 3 && (placeResults.length > 0 || placesLoading) && (
+                    <>
+                      {filteredContacts.length > 0 && (
+                        <div className="px-4 py-2 bg-neutral-50 border-b border-neutral-100">
+                          <span className="text-xs font-medium text-neutral-400 uppercase tracking-wide">Businesses</span>
+                        </div>
+                      )}
+                      {placesLoading && placeResults.length === 0 ? (
+                        <div className="px-4 py-6 text-center text-neutral-400 text-sm">
+                          Searching businesses...
+                        </div>
+                      ) : (
+                        placeResults.map((place) => (
+                          <button
+                            key={place.placeId}
+                            onClick={() => handleSelectPlace(place.placeId)}
+                            disabled={isCreatingContactLoading}
+                            className="w-full px-4 py-3.5 flex items-center gap-3 active:bg-neutral-50 border-b border-neutral-100 disabled:opacity-50"
+                          >
+                            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                              <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                              </svg>
+                            </div>
+                            <div className="flex-1 text-left min-w-0">
+                              <div className="font-medium text-neutral-800 truncate">{place.name}</div>
+                              {place.address && <div className="text-sm text-neutral-500 truncate">{place.address}</div>}
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </>
+                  )}
+
+                  {filteredContacts.length === 0 && placeResults.length === 0 && !placesLoading && (
                     <div className="px-4 py-8 text-center text-neutral-400">
-                      No contacts found
+                      {contactSearchQuery.trim() ? 'No contacts or businesses found' : 'No contacts found'}
                     </div>
                   )}
                 </div>

@@ -1,6 +1,6 @@
 import { createContext, useContext, type ReactNode } from 'react'
 import type { Task, TaskContext } from '@/types/task'
-import type { Contact } from '@/types/contact'
+import type { Contact, ContactCategory } from '@/types/contact'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
 import type { List, ListCategory } from '@/types/list'
@@ -69,7 +69,7 @@ export interface ScheduleActionsValue {
   onCreateList?: (title: string, category: ListCategory) => Promise<string | null>
   onAddProject?: (project: { name: string }) => Promise<Project | null>
   onSearchContacts?: (query: string) => Contact[]
-  onAddContact?: (name: string) => Promise<Contact | null>
+  onAddContact?: (name: string, details?: { phone?: string; category?: ContactCategory }) => Promise<Contact | null>
   onOpenProject?: (projectId: string) => void
   onOpenPlanning?: () => void
 

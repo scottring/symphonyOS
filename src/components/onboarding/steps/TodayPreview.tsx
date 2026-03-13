@@ -78,7 +78,7 @@ export function TodayPreview({ onContinue }: TodayPreviewProps) {
     familyMembers,
     lists: [],
     onSearchContacts: searchContacts,
-    onAddContact: (name: string) => addContact({ name }),
+    onAddContact: (name: string, details?: { phone?: string; category?: import('@/types/contact').ContactCategory }) => addContact({ name, ...details }),
     onRefreshInstances: refreshDateInstances,
     onAssignTask: handleAssignTask,
     onAssignRoutine: handleAssignRoutine,

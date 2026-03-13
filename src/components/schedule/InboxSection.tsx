@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Task, TaskContext } from '@/types/task'
 import type { Project } from '@/types/project'
-import type { Contact } from '@/types/contact'
+import type { Contact, ContactCategory } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
 import type { List, ListCategory } from '@/types/list'
 import type { ScheduleContextItem } from '@/components/triage'
@@ -20,7 +20,7 @@ interface InboxSectionProps {
   projects?: Project[]
   contacts?: Contact[]
   onSearchContacts?: (query: string) => Contact[]
-  onAddContact?: (name: string) => Promise<Contact | null>
+  onAddContact?: (name: string, details?: { phone?: string; category?: ContactCategory }) => Promise<Contact | null>
   onAddProject?: (project: { name: string }) => Promise<Project | null>
   recentlyCreatedTaskId?: string | null
   onTriageCardCollapse?: () => void
