@@ -20,6 +20,8 @@ import { getDailySoccerTip, getCategoryLabel, getCategoryColor } from './soccerT
 import { WallSoccerTipOverlay } from './WallSoccerTipOverlay'
 import { getDailyRunningTip, getRunningCategoryLabel, getRunningCategoryColor } from './runningTips'
 import { WallRunningTipOverlay } from './WallRunningTipOverlay'
+import { useKioskCards } from '@/hooks/useKioskCards'
+import { WallAgentCards } from './WallAgentCards'
 
 // ============================================================================
 // HELPERS
@@ -54,6 +56,7 @@ export function WallCalendar() {
   const [showRecipeViewer, setShowRecipeViewer] = useState(false)
   const [showSoccerTip, setShowSoccerTip] = useState(false)
   const [showRunningTip, setShowRunningTip] = useState(false)
+  const { cards: agentCards, dismissCard } = useKioskCards()
 
   // ═══ CHORE COMPLETION ═══
   const handleComplete = useCallback(async (item: TimelineItem) => {
@@ -440,6 +443,13 @@ export function WallCalendar() {
               </div>
             )
           })()}
+
+          {/* Agent Cards Widget */}
+          {agentCards.length > 0 && (
+            <div className={`${glass} px-5 py-4 flex-1 flex flex-col justify-center`}>
+              <WallAgentCards cards={agentCards} onDismiss={dismissCard} />
+            </div>
+          )}
 
           {/* Alien Joke Widget */}
           <div className={`${glass} px-5 py-4 flex items-center gap-3`} style={{ maxWidth: 380 }}>
