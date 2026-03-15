@@ -27,6 +27,7 @@ import type { FamilyRule, PlaybookBlock, CreateBlockInput, UpdateBlockInput } fr
 import { getCoachingForItem } from '@/lib/coachingMatcher'
 import { CoachingTipsSection } from './CoachingTipsSection'
 import { CoachingActionsSection } from './CoachingActionsSection'
+import { AgentInsightsSection } from './AgentInsightsSection'
 
 // Component to render text with clickable links (handles HTML links and plain URLs)
 function RichText({ text }: { text: string }) {
@@ -1752,6 +1753,11 @@ export function DetailPanelRedesign({
               ))}
             </div>
           </div>
+        )}
+
+        {/* Agent Insights - proactive data fetched for this task */}
+        {isTask && item.id && (
+          <AgentInsightsSection taskId={item.id.replace('task-', '')} />
         )}
 
         {/* ========================================

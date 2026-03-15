@@ -7,19 +7,40 @@ const corsHeaders = {
 
 // ════════════════════════════════════════════════════════════════
 // KIOSK AGENT — Scans tasks/projects, fetches proactive insights
-// Currently supports: flight deals via SerpAPI Google Flights
+// Supports: flight deals via SerpAPI Google Flights
+// Natural language preferences → structured search → filtered results
 // ════════════════════════════════════════════════════════════════
 
 interface FlightResult {
   airline: string
   price: number
   currency: string
-  departure: string
-  arrival: string
-  duration: string
+  departure_time: string
+  arrival_time: string
+  duration_min: number
   stops: number
+  layover_min?: number
   departure_airport: string
   arrival_airport: string
+  booking_token?: string
+  booking_url?: string
+  booking_post_data?: string
+  book_with?: string
+}
+
+interface FlightSearchParams {
+  origins: string[]
+  destinations: string[]
+  date_pairs: Array<{ outbound: string; return: string }>
+  max_price?: number
+  max_stops?: number
+  max_layover_min?: number
+  preferred_departure_window?: { earliest: string; latest: string }
+  preferred_arrival_window?: { earliest: string; latest: string }
+  return_departure_window?: { earliest: string; latest: string }
+  return_arrival_window?: { earliest: string; latest: string }
+  passengers?: number
+  summary: string  // human-readable summary of preferences
 }
 
 interface TaskRow {
@@ -36,6 +57,95 @@ interface ProjectRow {
   notes?: string
 }
 
+function timeToMinutes(timeStr: string): number {
+  const match = timeStr.match(/(\d{1,2}):(\d{2})/)
+  if (!match) return -1
+  return parseInt(match[1]) * 60 + parseInt(match[2])
+}
+
+function isInTimeWindow(time: string, window?: { earliest: string; latest: string }): boolean {
+  if (!window) return true
+  const mins = timeToMinutes(time)
+  if (mins < 0) return true
+  const earliest = timeToMinutes(window.earliest)
+  const latest = timeToMinutes(window.latest)
+  return mins >= earliest && mins <= latest
+}
+
+// deno-lint-ignore no-explicit-any
+function parseFlights(rawFlights: any[], origin: string, destination: string): FlightResult[] {
+  // deno-lint-ignore no-explicit-any
+  return rawFlights.map((f: any) => {
+    const legs = f.flights || []
+    const firstLeg = legs[0] || {}
+    const lastLeg = legs[legs.length - 1] || firstLeg
+    const dep = firstLeg.departure_airport || {}
+    const arr = lastLeg.arrival_airport || {}
+
+    // Calculate layover time if multi-leg
+    let layoverMin = 0
+    if (legs.length > 1) {
+      for (let i = 0; i < legs.length - 1; i++) {
+        const arrTime = legs[i].arrival_airport?.time || ''
+        const depTime = legs[i + 1].departure_airport?.time || ''
+        if (arrTime && depTime) {
+          const diff = timeToMinutes(depTime) - timeToMinutes(arrTime)
+          if (diff > 0) layoverMin += diff
+        }
+      }
+      // Fallback: use layover info from API
+      if (layoverMin === 0 && f.layovers) {
+        // deno-lint-ignore no-explicit-any
+        for (const lo of f.layovers) {
+          layoverMin += (lo.duration || 0)
+        }
+      }
+    }
+
+    return {
+      airline: firstLeg.airline || 'Unknown',
+      price: f.price || 0,
+      currency: 'USD',
+      departure_time: dep.time || '',
+      arrival_time: arr.time || '',
+      duration_min: f.total_duration || 0,
+      stops: legs.length - 1,
+      layover_min: layoverMin || undefined,
+      departure_airport: dep.id || origin,
+      arrival_airport: arr.id || destination,
+      booking_token: f.booking_token || undefined,
+    }
+  }).filter((f: FlightResult) => f.price > 0)
+}
+
+function filterFlights(
+  flights: FlightResult[],
+  params: FlightSearchParams,
+  isReturn: boolean,
+): FlightResult[] {
+  return flights.filter(f => {
+    // Price filter
+    if (params.max_price && f.price > params.max_price) return false
+
+    // Stops filter
+    if (params.max_stops !== undefined && f.stops > params.max_stops) return false
+
+    // Layover filter
+    if (params.max_layover_min && f.layover_min && f.layover_min > params.max_layover_min) return false
+
+    // Time window filters
+    if (!isReturn) {
+      if (!isInTimeWindow(f.departure_time, params.preferred_departure_window)) return false
+      if (!isInTimeWindow(f.arrival_time, params.preferred_arrival_window)) return false
+    } else {
+      if (!isInTimeWindow(f.departure_time, params.return_departure_window)) return false
+      if (!isInTimeWindow(f.arrival_time, params.return_arrival_window)) return false
+    }
+
+    return true
+  })
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -48,7 +158,7 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Auth: get the user from the JWT
+    // Auth
     const authHeader = req.headers.get('authorization')
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Missing authorization header' }), {
@@ -66,7 +176,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Step 1: Fetch active (non-completed) tasks and their projects
+    // Step 1: Fetch active tasks and projects
     const { data: tasks } = await supabase
       .from('tasks')
       .select('id, title, notes, project_id, completed')
@@ -86,7 +196,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Step 2: Use AI to classify which tasks are "agentable"
+    // Step 2: AI classifies tasks with rich natural language understanding
     const projectMap = new Map<string, ProjectRow>()
     for (const p of (projects || [])) {
       projectMap.set(p.id, p)
@@ -117,20 +227,51 @@ Deno.serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4o',
         temperature: 0,
         response_format: { type: 'json_object' },
         messages: [
           {
             role: 'system',
-            content: `You analyze tasks and identify ones where you can proactively fetch useful information.
+            content: `You analyze tasks and extract detailed flight search parameters from natural language descriptions.
 
-Return JSON: { "agentable": [ { "task_id": "...", "type": "flight_search", "params": { "origin": "BWI", "destination": "SFO", "outbound_date": "2026-04-12", "return_date": "2026-04-16" } } ] }
+Return JSON: {
+  "agentable": [{
+    "task_id": "...",
+    "type": "flight_search",
+    "params": {
+      "origins": ["BWI", "DCA"],
+      "destinations": ["SFO", "OAK"],
+      "date_pairs": [
+        { "outbound": "2026-03-28", "return": "2026-04-04" },
+        { "outbound": "2026-03-31", "return": "2026-04-04" }
+      ],
+      "max_price": 400,
+      "max_stops": 1,
+      "max_layover_min": 120,
+      "preferred_departure_window": { "earliest": "05:00", "latest": "12:00" },
+      "preferred_arrival_window": { "earliest": "05:00", "latest": "21:00" },
+      "return_departure_window": { "earliest": "14:00", "latest": "21:00" },
+      "return_arrival_window": { "earliest": "14:00", "latest": "23:59" },
+      "passengers": 4,
+      "summary": "BWI/DCA to SFO/OAK, ~Mar 28-31 to Apr 2-6, nonstop preferred, budget $400 RT, daytime flights only"
+    }
+  }]
+}
 
-Types you can identify:
-- "flight_search": Task involves researching/booking flights. Extract origin (default BWI for Baltimore area), destination airport code, and approximate dates from task title, notes, or project context. If dates aren't clear, use 4 weeks from now for a weekend trip (Fri-Mon).
+Rules:
+- Extract ALL preferences from the task title and notes (which may be HTML — strip tags mentally)
+- "origins": array of airport codes to search from. Default: ["BWI"] for Baltimore area
+- "destinations": array of airport codes. Map city names to all nearby airports
+- "date_pairs": if user says "+/- N days", generate the most promising 3-4 date combinations
+- "max_price": per-person round trip budget if mentioned (null if not)
+- "max_stops": 0 for nonstop-only, 1 if they say "1 stop max" or "nonstop or 1 stop". null if no preference
+- "max_layover_min": max layover in minutes if they mention it. null if not
+- Time windows: extract departure/arrival time preferences. Use 24h format "HH:MM". null if no preference
+- "passengers": number of travelers if mentioned, null if not
+- "summary": brief human-readable summary of all preferences
 
-Only return tasks you're confident about. If no tasks are agentable, return { "agentable": [] }.
+Only return tasks that involve flight research. If no tasks are agentable, return { "agentable": [] }.
 Today's date: ${new Date().toISOString().split('T')[0]}`
           },
           {
@@ -151,7 +292,7 @@ Today's date: ${new Date().toISOString().split('T')[0]}`
       })
     }
 
-    // Step 3: Execute agent actions
+    // Step 3: Execute searches — run multiple origin/destination/date combos
     const newCards: Array<{
       card_type: string
       title: string
@@ -165,109 +306,127 @@ Today's date: ${new Date().toISOString().split('T')[0]}`
 
     for (const item of agentable) {
       if (item.type === 'flight_search' && serpApiKey) {
-        try {
-          const { origin, destination, outbound_date, return_date } = item.params
+        const params = item.params as FlightSearchParams
+        const allResults: Array<FlightResult & { outbound_date: string; return_date: string; route: string }> = []
 
-          // Call SerpAPI Google Flights
-          const params = new URLSearchParams({
-            engine: 'google_flights',
-            departure_id: origin,
-            arrival_id: destination,
-            outbound_date: outbound_date,
-            return_date: return_date,
-            currency: 'USD',
-            hl: 'en',
-            type: '1', // round trip
-            api_key: serpApiKey,
-          })
-
-          const flightRes = await fetch(`https://serpapi.com/search?${params}`)
-          const flightData = await flightRes.json()
-
-          // Extract best flights
-          const bestFlights: FlightResult[] = (flightData.best_flights || [])
-            .slice(0, 3)
-            .map((f: Record<string, unknown>) => {
-              const legs = f.flights as Array<Record<string, unknown>> || []
-              const firstLeg = legs[0] || {}
-              const dep = firstLeg.departure_airport as Record<string, string> || {}
-              const arr = (legs[legs.length - 1] || {}).arrival_airport as Record<string, string> || {}
-              return {
-                airline: (firstLeg.airline as string) || 'Unknown',
-                price: f.price as number || 0,
-                currency: 'USD',
-                departure: dep.time || '',
-                arrival: arr.time || '',
-                duration: `${f.total_duration}min`,
-                stops: legs.length - 1,
-                departure_airport: dep.id || origin,
-                arrival_airport: arr.id || destination,
-              }
-            })
-
-          // Also get "other" (cheaper) flights
-          const otherFlights: FlightResult[] = (flightData.other_flights || [])
-            .slice(0, 3)
-            .map((f: Record<string, unknown>) => {
-              const legs = f.flights as Array<Record<string, unknown>> || []
-              const firstLeg = legs[0] || {}
-              const dep = firstLeg.departure_airport as Record<string, string> || {}
-              const arr = (legs[legs.length - 1] || {}).arrival_airport as Record<string, string> || {}
-              return {
-                airline: (firstLeg.airline as string) || 'Unknown',
-                price: f.price as number || 0,
-                currency: 'USD',
-                departure: dep.time || '',
-                arrival: arr.time || '',
-                duration: `${f.total_duration}min`,
-                stops: legs.length - 1,
-                departure_airport: dep.id || origin,
-                arrival_airport: arr.id || destination,
-              }
-            })
-
-          const allFlights = [...bestFlights, ...otherFlights]
-            .filter(f => f.price > 0)
-            .sort((a, b) => a.price - b.price)
-
-          if (allFlights.length > 0) {
-            const cheapest = allFlights[0]
-            const expires = new Date()
-            expires.setHours(expires.getHours() + 12) // expire in 12 hours
-
-            newCards.push({
-              card_type: 'flight_deal',
-              title: `${origin} → ${destination} from $${cheapest.price}`,
-              subtitle: `${cheapest.airline} · ${cheapest.stops === 0 ? 'Nonstop' : `${cheapest.stops} stop${cheapest.stops > 1 ? 's' : ''}`} · ${outbound_date} – ${return_date}`,
-              body: {
-                flights: allFlights.slice(0, 5),
-                origin,
-                destination,
-                outbound_date,
-                return_date,
-                search_url: `https://www.google.com/travel/flights?q=flights+from+${origin}+to+${destination}+on+${outbound_date}+return+${return_date}`,
-              },
-              source_task_id: item.task_id,
-              icon: '✈️',
-              priority: 10,
-              expires_at: expires.toISOString(),
-            })
+        // Search all origin/destination/date combinations (limit to avoid API abuse)
+        const searches: Array<{ origin: string; dest: string; outbound: string; ret: string }> = []
+        for (const origin of params.origins) {
+          for (const dest of params.destinations) {
+            for (const dp of params.date_pairs.slice(0, 3)) {
+              searches.push({ origin, dest, outbound: dp.outbound, ret: dp.return })
+            }
           }
-        } catch (err) {
-          console.error('Flight search failed:', err)
+        }
+
+        // Cap at 6 searches to stay within SerpAPI free tier
+        const cappedSearches = searches.slice(0, 6)
+
+        for (const search of cappedSearches) {
+          try {
+            const serpParams = new URLSearchParams({
+              engine: 'google_flights',
+              departure_id: search.origin,
+              arrival_id: search.dest,
+              outbound_date: search.outbound,
+              return_date: search.ret,
+              currency: 'USD',
+              hl: 'en',
+              type: '1',
+              api_key: serpApiKey,
+            })
+
+            const flightRes = await fetch(`https://serpapi.com/search?${serpParams}`)
+            const flightData = await flightRes.json()
+
+            // Capture the exact Google Flights URL from search metadata
+            const googleFlightsUrl = flightData.search_metadata?.google_flights_url || null
+
+            const bestFlights = parseFlights(flightData.best_flights || [], search.origin, search.dest)
+            const otherFlights = parseFlights(flightData.other_flights || [], search.origin, search.dest)
+            const combined = [...bestFlights, ...otherFlights]
+
+            // Apply user's filters
+            const filtered = filterFlights(combined, params, false)
+
+            for (const f of filtered) {
+              allResults.push({
+                ...f,
+                outbound_date: search.outbound,
+                return_date: search.ret,
+                route: `${search.origin}→${search.dest}`,
+                // Store the exact Google Flights URL for this search
+                booking_url: googleFlightsUrl || undefined,
+              })
+            }
+          } catch (err) {
+            console.error(`Flight search ${search.origin}→${search.dest} failed:`, err)
+          }
+        }
+
+        // Sort by price and deduplicate
+        allResults.sort((a, b) => a.price - b.price)
+        const topResults = allResults.slice(0, 8)
+
+        if (topResults.length > 0) {
+          const cheapest = topResults[0]
+          const expires = new Date()
+          expires.setHours(expires.getHours() + 12)
+
+          // Group by route for display
+          const routes = [...new Set(topResults.map(r => r.route))]
+          const routeSummary = routes.join(' / ')
+
+          newCards.push({
+            card_type: 'flight_deal',
+            title: `${routeSummary} from $${cheapest.price}`,
+            subtitle: `${cheapest.airline} · ${cheapest.stops === 0 ? 'Nonstop' : `${cheapest.stops} stop`} · ${cheapest.outbound_date} – ${cheapest.return_date}`,
+            body: {
+              flights: topResults,
+              preferences: params.summary,
+              searches_run: cappedSearches.length,
+              total_found: allResults.length,
+              budget: params.max_price,
+              passengers: params.passengers,
+              search_url: `https://www.google.com/travel/flights?q=flights+from+${params.origins[0]}+to+${params.destinations[0]}+on+${params.date_pairs[0]?.outbound}+return+${params.date_pairs[0]?.return}`,
+            },
+            source_task_id: item.task_id,
+            icon: '✈️',
+            priority: topResults[0].price <= (params.max_price || 9999) ? 15 : 10,
+            expires_at: expires.toISOString(),
+          })
+        } else {
+          // No flights matched filters — still create a card saying so
+          const expires = new Date()
+          expires.setHours(expires.getHours() + 12)
+          newCards.push({
+            card_type: 'flight_deal',
+            title: `No flights match your criteria`,
+            subtitle: params.summary,
+            body: {
+              flights: [],
+              preferences: params.summary,
+              searches_run: cappedSearches.length,
+              total_found: 0,
+              budget: params.max_price,
+              search_url: `https://www.google.com/travel/flights?q=flights+from+${params.origins[0]}+to+${params.destinations[0]}`,
+            },
+            source_task_id: item.task_id,
+            icon: '✈️',
+            priority: 5,
+            expires_at: expires.toISOString(),
+          })
         }
       }
     }
 
-    // Step 4: Clear old cards for this user and insert new ones
-    // Delete expired or old flight cards
+    // Step 4: Clear old flight cards and insert new ones
     await supabase
       .from('kiosk_cards')
       .delete()
       .eq('user_id', user.id)
       .eq('card_type', 'flight_deal')
 
-    // Insert new cards
     if (newCards.length > 0) {
       const rows = newCards.map(card => ({
         ...card,
@@ -284,7 +443,7 @@ Today's date: ${new Date().toISOString().split('T')[0]}`
     }
 
     return new Response(JSON.stringify({
-      message: `Processed ${agentable.length} agentable tasks, created ${newCards.length} cards`,
+      message: `Processed ${agentable.length} agentable tasks, ran ${newCards.length} search groups, created ${newCards.length} cards`,
       cards: newCards,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

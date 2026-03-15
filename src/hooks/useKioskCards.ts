@@ -88,14 +88,22 @@ export function useKioskCards() {
 
   useEffect(() => {
     mountedRef.current = true
-    fetchCards()
-    runAgent()
+
+    // On mount: fetch cards, then run agent if no cards exist
+    fetchCards().then(() => {
+      // If no cards in DB, clear rate limit so agent runs immediately
+      if (cards.length === 0) {
+        localStorage.removeItem(AGENT_RUN_KEY)
+      }
+      runAgent()
+    })
 
     const interval = setInterval(fetchCards, POLL_INTERVAL_MS)
     return () => {
       mountedRef.current = false
       clearInterval(interval)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchCards, runAgent])
 
   return { cards, loading, dismissCard, refetchCards: fetchCards, runAgentNow: runAgent }
