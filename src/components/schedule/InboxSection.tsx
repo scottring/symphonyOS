@@ -13,7 +13,7 @@ interface InboxSectionProps {
   tasks: Task[]
   onUpdateTask: (id: string, updates: Partial<Task>) => void
   onToggleWaiting?: (taskId: string) => void
-  onPushTask: (id: string, date: Date) => void
+  onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
   onSelectTask: (taskId: string) => void
   onDeleteTask?: (taskId: string) => void
   onAddTask?: (task: { title: string; projectId?: string }) => Promise<Task | null>
@@ -85,24 +85,13 @@ export function InboxSection({
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
 
   // Bulk action handlers
-  const handleBulkDefer = async (date: Date | undefined) => {
+  const handleBulkDefer = async (target: 'week' | 'month' | 'quarter') => {
     if (!onUpdateTasksBulk) return
 
     const taskIds = Array.from(selectedTaskIds)
+    const updates: Partial<Task> = { bucket: target, scheduledFor: undefined }
 
-    // For each task, increment defer count
-    for (const taskId of taskIds) {
-      const task = tasks.find(t => t.id === taskId)
-      if (!task) continue
-
-      const updates: Partial<Task> = {
-        deferredUntil: date,
-        deferCount: (task.deferCount || 0) + 1,
-      }
-
-      // Update one at a time to preserve individual defer counts
-      await onUpdateTasksBulk([taskId], updates)
-    }
+    await onUpdateTasksBulk(taskIds, updates)
 
     // Clear selection and exit mode
     setSelectedTaskIds(new Set())
@@ -114,9 +103,9 @@ export function InboxSection({
 
     const taskIds = Array.from(selectedTaskIds)
     const updates: Partial<Task> = {
+      bucket: 'timed',
       scheduledFor: date,
       isAllDay,
-      deferredUntil: undefined,
     }
 
     await onUpdateTasksBulk(taskIds, updates)
@@ -217,13 +206,7 @@ export function InboxSection({
           <TriageCard
             task={recentlyCreatedTask}
             onUpdate={(updates) => onUpdateTask(recentlyCreatedTask.id, updates)}
-            onDefer={(date) => {
-              if (date) {
-                onPushTask(recentlyCreatedTask.id, date)
-              } else {
-                onUpdateTask(recentlyCreatedTask.id, { deferredUntil: undefined })
-              }
-            }}
+            onDefer={(target) => onPushTask(recentlyCreatedTask.id, target)}
             onCollapse={onTriageCardCollapse}
             projects={projects}
             familyMembers={familyMembers}
@@ -243,13 +226,7 @@ export function InboxSection({
             onUpdate={(updates) => onUpdateTask(task.id, updates)}
             onToggleWaiting={onToggleWaiting ? () => onToggleWaiting(task.id) : undefined}
             onSelect={() => onSelectTask(task.id)}
-            onDefer={(date) => {
-              if (date) {
-                onPushTask(task.id, date)
-              } else {
-                onUpdateTask(task.id, { deferredUntil: undefined })
-              }
-            }}
+            onDefer={(target) => onPushTask(task.id, target)}
             projects={projects}
             onOpenProject={onOpenProject}
             familyMembers={familyMembers}

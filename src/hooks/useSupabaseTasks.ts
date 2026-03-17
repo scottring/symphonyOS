@@ -4,13 +4,14 @@ import { useAuth } from '@/hooks/useAuth'
 import { useFamilyMembers } from './useFamilyMembers'
 import { useToast } from './useToast'
 import { logger } from '@/lib/logger'
-import type { Task, TaskLink, TaskContext, TaskCategory, LinkedActivity, LinkType, LinkedActivityType } from '@/types/task'
+import type { Task, TaskBucket, TaskLink, TaskContext, TaskCategory, LinkedActivity, LinkType, LinkedActivityType } from '@/types/task'
 
 interface DbTask {
   id: string
   user_id: string
   title: string
   completed: boolean
+  bucket: TaskBucket
   scheduled_for: string | null
   deferred_until: string | null
   defer_count: number | null
@@ -62,6 +63,7 @@ function dbTaskToTask(dbTask: DbTask): Task {
     id: dbTask.id,
     title: dbTask.title,
     completed: dbTask.completed,
+    bucket: (dbTask.bucket as TaskBucket) || 'inbox',
     createdAt: new Date(dbTask.created_at),
     updatedAt: new Date(dbTask.updated_at),
     scheduledFor: dbTask.scheduled_for ? new Date(dbTask.scheduled_for) : undefined,
@@ -272,6 +274,7 @@ export function useSupabaseTasks() {
       id: tempId,
       title,
       completed: false,
+      bucket: scheduledFor ? 'timed' : 'inbox',
       createdAt: now,
       updatedAt: now,
       contactId,
@@ -294,6 +297,7 @@ export function useSupabaseTasks() {
         user_id: user.id,
         title,
         completed: false,
+        bucket: scheduledFor ? 'timed' : 'inbox',
         contact_id: contactId ?? null,
         project_id: projectId ?? null,
         scheduled_for: scheduledFor?.toISOString() ?? null,
@@ -348,6 +352,7 @@ export function useSupabaseTasks() {
       id: tempId,
       title,
       completed: false,
+      bucket: 'inbox',
       createdAt: now,
       updatedAt: now,
       parentTaskId: parentId,
@@ -616,11 +621,11 @@ export function useSupabaseTasks() {
     const dbUpdates: Record<string, unknown> = {}
     if ('title' in updates) dbUpdates.title = updates.title
     if ('completed' in updates) dbUpdates.completed = updates.completed
+    if ('bucket' in updates) dbUpdates.bucket = updates.bucket ?? 'inbox'
     if ('scheduledFor' in updates) {
       dbUpdates.scheduled_for = updates.scheduledFor?.toISOString() ?? null
     }
     if ('deferredUntil' in updates) {
-      // Save full timestamp to support time-based deferrals (e.g., "in 3 hours")
       dbUpdates.deferred_until = updates.deferredUntil
         ? updates.deferredUntil.toISOString()
         : null
@@ -694,6 +699,7 @@ export function useSupabaseTasks() {
     const dbUpdates: Record<string, unknown> = {}
     if ('title' in updates) dbUpdates.title = updates.title
     if ('completed' in updates) dbUpdates.completed = updates.completed
+    if ('bucket' in updates) dbUpdates.bucket = updates.bucket ?? 'inbox'
     if ('scheduledFor' in updates) {
       dbUpdates.scheduled_for = updates.scheduledFor?.toISOString() ?? null
     }
@@ -746,43 +752,48 @@ export function useSupabaseTasks() {
     }
   }, [tasks])
 
-  // Schedule a task - sets scheduledFor, clears deferredUntil
+  // Schedule a task to a specific date — sets bucket to 'timed'
   const scheduleTask = useCallback(async (id: string, date: Date, isAllDay?: boolean) => {
     await updateTask(id, {
+      bucket: 'timed',
       scheduledFor: date,
       isAllDay: isAllDay ?? true,
-      deferredUntil: undefined, // Clear deferral when scheduling
     })
   }, [updateTask])
 
-  // Push a task - moves it to a future date
-  // For scheduled tasks: updates scheduledFor to the new date
-  // For inbox tasks: sets deferredUntil to hide until that date
-  const pushTask = useCallback(async (id: string, date: Date) => {
-    const task = tasks.find((t) => t.id === id)
-    if (!task) return
-
-    const currentCount = task?.deferCount ?? 0
-
-    if (task.scheduledFor) {
-      // Scheduled task: move to new date (preserve time only if explicitly non-all-day)
-      const newScheduledFor = new Date(date)
-      if (task.isAllDay === false && task.scheduledFor) {
-        // Preserve the original time for tasks with a specific time
+  // Move a task to a bucket (week, month, quarter) or reschedule to a date
+  const pushTask = useCallback(async (id: string, target: Date | 'week' | 'month' | 'quarter') => {
+    if (target === 'week' || target === 'month' || target === 'quarter') {
+      // Move to pool — clear scheduled date
+      await updateTask(id, {
+        bucket: target,
+        scheduledFor: undefined,
+      })
+    } else {
+      // Reschedule to a specific date
+      const task = tasks.find((t) => t.id === id)
+      const newScheduledFor = new Date(target)
+      if (task?.isAllDay === false && task?.scheduledFor) {
         newScheduledFor.setHours(task.scheduledFor.getHours(), task.scheduledFor.getMinutes(), 0, 0)
       }
       await updateTask(id, {
+        bucket: 'timed',
         scheduledFor: newScheduledFor,
-        deferCount: currentCount + 1,
-      })
-    } else {
-      // Inbox task: set deferredUntil to hide until that date
-      await updateTask(id, {
-        deferredUntil: date,
-        deferCount: currentCount + 1,
       })
     }
   }, [tasks, updateTask])
+
+  // Set a task's bucket directly (for triage: inbox → week, month, etc.)
+  const setBucket = useCallback(async (id: string, bucket: TaskBucket, scheduledFor?: Date, isAllDay?: boolean) => {
+    const updates: Partial<Task> = { bucket }
+    if (bucket === 'timed' && scheduledFor) {
+      updates.scheduledFor = scheduledFor
+      updates.isAllDay = isAllDay ?? true
+    } else if (bucket !== 'timed') {
+      updates.scheduledFor = undefined
+    }
+    await updateTask(id, updates)
+  }, [updateTask])
 
   // Add a prep task linked to an event (e.g., "Defrost chicken" for a dinner event)
   const addPrepTask = useCallback(async (
@@ -799,6 +810,7 @@ export function useSupabaseTasks() {
       id: tempId,
       title,
       completed: false,
+      bucket: 'timed',
       createdAt: now,
       updatedAt: now,
       scheduledFor,
@@ -812,6 +824,7 @@ export function useSupabaseTasks() {
         user_id: user.id,
         title,
         completed: false,
+        bucket: 'timed',
         scheduled_for: scheduledFor.toISOString(),
         linked_event_id: linkedEventId,
       })
@@ -855,5 +868,5 @@ export function useSupabaseTasks() {
     }
   }, [tasks])
 
-  return { tasks, loading, error, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, scheduleTask, pushTask }
+  return { tasks, loading, error, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, scheduleTask, pushTask, setBucket }
 }

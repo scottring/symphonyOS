@@ -1,64 +1,49 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { getBaseDate, getNextWeekend, getWeekendAfterNext, parseDateInput, parseTimeInput, formatDateLabel } from '@/lib/dateHelpers'
+import { getBaseDate, parseDateInput, parseTimeInput, formatDateLabel } from '@/lib/dateHelpers'
 import { DATE_INPUT_CLASS, TIME_INPUT_CLASS } from '@/lib/inputStyles'
+import type { TaskBucket } from '@/types/task'
 
 interface WhenPickerProps {
+  bucket?: TaskBucket
   value?: Date
   isAllDay?: boolean
-  onChange: (date: Date | undefined, isAllDay: boolean) => void
+  onChange: (bucket: TaskBucket, date?: Date, isAllDay?: boolean) => void
 }
 
-type Step = 'day' | 'time' | 'date-input' | 'time-input'
+type Step = 'bucket' | 'date-input' | 'time'| 'time-input'
 
-export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerProps) {
-  void _isAllDay // Reserved for future visual indicator
+export function WhenPicker({ bucket, value, isAllDay: _isAllDay, onChange }: WhenPickerProps) {
+  void _isAllDay
   const [isOpen, setIsOpen] = useState(false)
-  const [step, setStep] = useState<Step>('day')
+  const [step, setStep] = useState<Step>('bucket')
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [dropdownPosition, setDropdownPosition] = useState<{ top?: number; bottom?: number; right: number }>({ top: 0, right: 0 })
   const buttonRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Calculate dropdown position when opening
   useEffect(() => {
     if (isOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect()
-
-      // Estimate dropdown height (approximately 250px for day picker, more for time picker)
       const estimatedHeight = 250
       const spaceBelow = window.innerHeight - rect.bottom
       const spaceAbove = rect.top
-
-      // Position above if not enough space below and more space above
       const shouldPositionAbove = spaceBelow < estimatedHeight && spaceAbove > spaceBelow
 
       if (shouldPositionAbove) {
-        // Position above: use bottom to anchor to viewport bottom
-        setDropdownPosition({
-          bottom: window.innerHeight - rect.top + 4,
-          right: window.innerWidth - rect.right,
-        })
+        setDropdownPosition({ bottom: window.innerHeight - rect.top + 4, right: window.innerWidth - rect.right })
       } else {
-        // Position below: use top
-        setDropdownPosition({
-          top: rect.bottom + 4,
-          right: window.innerWidth - rect.right,
-        })
+        setDropdownPosition({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
       }
     }
   }, [isOpen])
 
-  // Close on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as Node
-      const clickedButton = buttonRef.current?.contains(target)
-      const clickedDropdown = dropdownRef.current?.contains(target)
-
-      if (!clickedButton && !clickedDropdown) {
+      if (!buttonRef.current?.contains(target) && !dropdownRef.current?.contains(target)) {
         setIsOpen(false)
-        setStep('day')
+        setStep('bucket')
         setSelectedDate(null)
       }
     }
@@ -68,18 +53,21 @@ export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerP
     }
   }, [isOpen])
 
-  // Reset step when opening
   useEffect(() => {
     if (isOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting on popover open is valid
-      setStep('day')
+      setStep('bucket')
       setSelectedDate(null)
     }
   }, [isOpen])
 
-  const handleDaySelect = (date: Date) => {
-    setSelectedDate(date)
-    setStep('time')
+  const handleBucketSelect = (newBucket: TaskBucket, date?: Date) => {
+    if (newBucket === 'timed' && date) {
+      setSelectedDate(date)
+      setStep('time')
+      return
+    }
+    onChange(newBucket, date)
+    setIsOpen(false)
   }
 
   const handleDateInputChange = (dateString: string) => {
@@ -92,17 +80,16 @@ export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerP
 
   const handleTimeSelect = (hour: number | 'all-day') => {
     if (!selectedDate) return
-
     const finalDate = new Date(selectedDate)
     if (hour === 'all-day') {
       finalDate.setHours(0, 0, 0, 0)
-      onChange(finalDate, true)
+      onChange('timed', finalDate, true)
     } else {
       finalDate.setHours(hour, 0, 0, 0)
-      onChange(finalDate, false)
+      onChange('timed', finalDate, false)
     }
     setIsOpen(false)
-    setStep('day')
+    setStep('bucket')
     setSelectedDate(null)
   }
 
@@ -110,38 +97,42 @@ export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerP
     if (!selectedDate) return
     const finalDate = parseTimeInput(timeString, selectedDate)
     if (finalDate) {
-      onChange(finalDate, false)
+      onChange('timed', finalDate, false)
       setIsOpen(false)
-      setStep('day')
+      setStep('bucket')
       setSelectedDate(null)
     }
   }
 
   const handleClear = () => {
-    onChange(undefined, false)
+    onChange('inbox')
     setIsOpen(false)
-    setStep('day')
-    setSelectedDate(null)
+    setStep('bucket')
   }
 
-  const hasValue = value !== undefined
+  const hasValue = bucket && bucket !== 'inbox'
 
   const formatSelectedDateLabel = () => {
     if (!selectedDate) return ''
     return formatDateLabel(selectedDate)
   }
 
+  // Icon color based on bucket
+  const iconColor = hasValue
+    ? bucket === 'timed'
+      ? 'text-primary-600 bg-primary-50 hover:bg-primary-100'
+      : bucket === 'week'
+        ? 'text-blue-600 bg-blue-50 hover:bg-blue-100'
+        : 'text-amber-600 bg-amber-50 hover:bg-amber-100'
+    : 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100'
+
   return (
     <div className="relative">
       <button
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
-        className={`p-1.5 rounded-lg transition-colors ${
-          hasValue
-            ? 'text-primary-600 bg-primary-50 hover:bg-primary-100'
-            : 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100'
-        }`}
-        aria-label="Set date"
+        className={`p-1.5 rounded-lg transition-colors ${iconColor}`}
+        aria-label="Set when"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -151,7 +142,7 @@ export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerP
       {isOpen && createPortal(
         <div
           ref={dropdownRef}
-          className="fixed z-[100] bg-white rounded-xl border border-neutral-200 shadow-lg p-2 min-w-[160px] max-h-[90vh] overflow-y-auto"
+          className="fixed z-[100] bg-white rounded-xl border border-neutral-200 shadow-lg p-2 min-w-[180px] max-h-[90vh] overflow-y-auto"
           style={{
             ...(dropdownPosition.top !== undefined ? { top: dropdownPosition.top } : { bottom: dropdownPosition.bottom }),
             right: dropdownPosition.right
@@ -160,43 +151,47 @@ export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerP
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Step 1: Pick the day */}
-          {step === 'day' && (
+          {/* Step 1: Pick bucket */}
+          {step === 'bucket' && (
             <div className="space-y-1">
               <button
-                onClick={() => handleDaySelect(getBaseDate(0))}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+                onClick={() => handleBucketSelect('timed', getBaseDate(0))}
+                className="w-full px-3 py-2 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700 font-medium"
               >
                 Today
               </button>
               <button
-                onClick={() => handleDaySelect(getBaseDate(1))}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+                onClick={() => handleBucketSelect('timed', getBaseDate(1))}
+                className="w-full px-3 py-2 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
               >
                 Tomorrow
               </button>
+              <div className="border-t border-neutral-100 my-1" />
               <button
-                onClick={() => handleDaySelect(getNextWeekend())}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+                onClick={() => handleBucketSelect('week')}
+                className="w-full px-3 py-2 text-sm text-left rounded-lg hover:bg-blue-50 text-neutral-700 flex items-center gap-2"
               >
-                This Weekend
+                <span className="w-2 h-2 rounded-full bg-blue-400" />
+                This Week
               </button>
               <button
-                onClick={() => handleDaySelect(getWeekendAfterNext())}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+                onClick={() => handleBucketSelect('month')}
+                className="w-full px-3 py-2 text-sm text-left rounded-lg hover:bg-amber-50 text-neutral-700 flex items-center gap-2"
               >
-                Next Weekend
+                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                This Month
               </button>
               <button
-                onClick={() => handleDaySelect(getBaseDate(7))}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+                onClick={() => handleBucketSelect('quarter')}
+                className="w-full px-3 py-2 text-sm text-left rounded-lg hover:bg-purple-50 text-neutral-700 flex items-center gap-2"
               >
-                Next Week
+                <span className="w-2 h-2 rounded-full bg-purple-400" />
+                This Quarter
               </button>
               <div className="border-t border-neutral-100 my-1" />
               <button
                 onClick={() => setStep('date-input')}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+                className="w-full px-3 py-2 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
               >
                 Pick date...
               </button>
@@ -205,9 +200,9 @@ export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerP
                   <div className="border-t border-neutral-100 my-1" />
                   <button
                     onClick={handleClear}
-                    className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-red-50 text-red-600"
+                    className="w-full px-3 py-2 text-sm text-left rounded-lg hover:bg-red-50 text-red-600"
                   >
-                    Clear
+                    Back to Inbox
                   </button>
                 </>
               )}
@@ -218,7 +213,7 @@ export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerP
           {step === 'date-input' && (
             <div className="space-y-2">
               <button
-                onClick={() => setStep('day')}
+                onClick={() => setStep('bucket')}
                 className="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-700"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -239,7 +234,7 @@ export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerP
           {step === 'time' && (
             <div className="space-y-1">
               <button
-                onClick={() => setStep('day')}
+                onClick={() => setStep('bucket')}
                 className="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-700 mb-2"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -249,32 +244,32 @@ export function WhenPicker({ value, isAllDay: _isAllDay, onChange }: WhenPickerP
               </button>
               <button
                 onClick={() => handleTimeSelect('all-day')}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+                className="w-full px-3 py-2 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
               >
                 All Day
               </button>
               <button
                 onClick={() => handleTimeSelect(9)}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+                className="w-full px-3 py-2 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
               >
                 Morning <span className="text-neutral-400">(9a)</span>
               </button>
               <button
                 onClick={() => handleTimeSelect(13)}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+                className="w-full px-3 py-2 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
               >
                 Afternoon <span className="text-neutral-400">(1p)</span>
               </button>
               <button
                 onClick={() => handleTimeSelect(18)}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+                className="w-full px-3 py-2 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
               >
                 Evening <span className="text-neutral-400">(6p)</span>
               </button>
               <div className="border-t border-neutral-100 my-1" />
               <button
                 onClick={() => setStep('time-input')}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
+                className="w-full px-3 py-2 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
               >
                 Pick time...
               </button>

@@ -10,7 +10,7 @@ import { useMobile } from '@/hooks/useMobile'
 
 interface BulkActionToolbarProps {
   selectedCount: number
-  onDefer: (date: Date | undefined) => void
+  onDefer: (target: 'week' | 'month' | 'quarter') => void
   onSchedule: (date: Date, isAllDay: boolean) => void
   onSetContext: (context: TaskContext | undefined) => void
   onAssign: (memberIds: string[]) => void
@@ -60,8 +60,6 @@ export function BulkActionToolbar({
         <div className={`flex items-center ${isMobile ? 'justify-around' : 'gap-2'}`}>
           {/* Defer */}
           <DeferPicker
-            deferredUntil={undefined}
-            deferCount={0}
             onDefer={onDefer}
           />
 

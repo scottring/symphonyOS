@@ -13,7 +13,7 @@ interface TaskViewProps {
   onUpdate: (id: string, updates: Partial<Task>) => void
   onDelete: (id: string) => void
   onToggleComplete: (id: string) => void
-  onPush?: (id: string, date: Date) => void
+  onPush?: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
   // Contact support
   contact?: Contact | null
   contacts?: Contact[]

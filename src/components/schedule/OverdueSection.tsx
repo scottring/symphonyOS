@@ -15,7 +15,8 @@ interface OverdueSectionProps {
   onSelectTask: (taskId: string) => void
   onToggleTask: (taskId: string) => void
   onToggleWaiting?: (taskId: string) => void
-  onPushTask?: (taskId: string, date: Date) => void
+  onPushTask?: (taskId: string, target: Date | 'week' | 'month' | 'quarter') => void
+  onUpdateTask?: (taskId: string, updates: Partial<Task>) => void
   contactsMap?: Map<string, Contact>
   projectsMap?: Map<string, Project>
   familyMembers?: FamilyMember[]
@@ -39,6 +40,7 @@ export function OverdueSection({
   onToggleTask,
   onToggleWaiting,
   onPushTask,
+  onUpdateTask,
   contactsMap,
   projectsMap,
   familyMembers = [],
@@ -113,7 +115,7 @@ export function OverdueSection({
                   onSelect={() => onSelectTask(`task-${task.id}`)}
                   onComplete={() => handleToggle(taskId, !!task.completed)}
                   onToggleWaiting={onToggleWaiting ? () => onToggleWaiting(taskId) : undefined}
-                  onDefer={onPushTask ? (date: Date) => onPushTask(taskId, date) : undefined}
+                  onDefer={onPushTask ? (target: Date | 'week' | 'month' | 'quarter') => onPushTask(taskId, target) : undefined}
                   familyMembers={familyMembers}
                   assignedTo={task.assignedTo}
                   onAssign={
@@ -144,7 +146,7 @@ export function OverdueSection({
                 onSelect={() => onSelectTask(`task-${task.id}`)}
                 onToggleWaiting={onToggleWaiting ? () => onToggleWaiting(taskId) : undefined}
                 onToggleComplete={() => handleToggle(taskId, !!task.completed)}
-                onPush={onPushTask ? (date: Date) => onPushTask(taskId, date) : undefined}
+                onPush={onPushTask ? (target: Date | 'week' | 'month' | 'quarter') => onPushTask(taskId, target) : undefined}
                 contactName={contactName || undefined}
                 projectName={projectName || undefined}
                 projectId={task.projectId || undefined}
@@ -155,6 +157,7 @@ export function OverdueSection({
                     ? (memberId) => onAssignTask(taskId, memberId)
                     : undefined
                 }
+                onContextChange={onUpdateTask ? (context) => onUpdateTask(taskId, { context }) : undefined}
                 isOverdue={!task.completed}
                 overdueLabel={task.completed ? undefined : overdueLabel}
               />

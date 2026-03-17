@@ -9,6 +9,7 @@ import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
 import { Redo2 } from 'lucide-react'
 import { useMobile } from '@/hooks/useMobile'
 import { TaskCheckbox } from './TaskCheckbox'
+import { DOMAIN_COLORS } from '@/lib/domainColors'
 
 // Nordic Journal calendar icon - minimal, elegant design
 // Uses the event's context color (Work/Family/Personal) or falls back to primary teal-forest
@@ -94,7 +95,7 @@ interface ScheduleItemProps {
   onSelect: () => void
   onToggleComplete: () => void
   onToggleWaiting?: () => void
-  onPush?: (date: Date) => void
+  onPush?: (target: Date | 'week' | 'month' | 'quarter') => void
   onSchedule?: (date: Date, isAllDay: boolean) => void
   onSkip?: () => void
   contactName?: string
@@ -131,21 +132,8 @@ const overdueColors = {
   warning600: 'hsl(32 80% 44%)',
 }
 
-// Domain context colors - matches domain switcher
-const contextColors = {
-  work: {
-    dot: 'rgb(37 99 235)', // Blue-600 (matches domain switcher)
-    bg: 'rgba(37, 99, 235, 0.08)',
-  },
-  family: {
-    dot: 'rgb(217 119 6)', // Amber-600 (matches domain switcher)
-    bg: 'rgba(217, 119, 6, 0.08)',
-  },
-  personal: {
-    dot: 'rgb(147 51 234)', // Purple-600 (matches domain switcher)
-    bg: 'rgba(147, 51, 234, 0.08)',
-  },
-}
+// Domain context colors - shared utility
+const contextColors: Record<string, { dot: string; bg: string }> = DOMAIN_COLORS
 
 export const ScheduleItem = memo(function ScheduleItem({
   item,
@@ -405,16 +393,6 @@ export const ScheduleItem = memo(function ScheduleItem({
         {/* Title */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            {/* Context indicator dot - hidden by default, shown on hover */}
-            {isTask && item.context && item.context in contextColors && (
-              <div
-                className="shrink-0 w-1.5 h-1.5 rounded-full opacity-0 md:group-hover:opacity-100 transition-opacity duration-200"
-                style={{
-                  backgroundColor: contextColors[item.context as keyof typeof contextColors].dot,
-                }}
-                title={`${item.context.charAt(0).toUpperCase() + item.context.slice(1)} context`}
-              />
-            )}
             <span
               className={`
                 text-base font-medium line-clamp-2 transition-colors
@@ -495,10 +473,9 @@ export const ScheduleItem = memo(function ScheduleItem({
         {/* Context picker - hidden by default, shown on hover */}
         {(isTask || isRoutine || isEvent) && onContextChange && (
           <div
-            className="shrink-0 opacity-0 md:group-hover:opacity-100 transition-opacity duration-200"
+            className="shrink-0"
             onClick={(e) => {
               e.stopPropagation()
-              // Close panel when opening context picker
               if (panelOpen && onClosePanel) {
                 onClosePanel()
               }

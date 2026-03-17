@@ -7,9 +7,10 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 
 interface ScheduleWithTimelineProps {
   // WhenPicker props
+  bucket?: import('@/types/task').TaskBucket
   value?: Date
   isAllDay?: boolean
-  onChange: (date: Date | undefined, isAllDay: boolean) => void
+  onChange: (bucket: import('@/types/task').TaskBucket, date?: Date, isAllDay?: boolean) => void
 
   // Timeline data
   familyMembers: FamilyMember[]
@@ -43,6 +44,7 @@ function transformCalendarEvents(events: CalendarEvent[]): TimelineCalendarEvent
 }
 
 export function ScheduleWithTimeline({
+  bucket,
   value,
   isAllDay,
   onChange,
@@ -116,6 +118,7 @@ export function ScheduleWithTimeline({
       onMouseLeave={handleMouseLeave}
     >
       <WhenPicker
+        bucket={bucket}
         value={value}
         isAllDay={isAllDay}
         onChange={onChange}

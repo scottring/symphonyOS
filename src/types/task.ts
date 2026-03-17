@@ -3,6 +3,8 @@ export interface TaskLink {
   title?: string // Fetched page title, falls back to URL if not available
 }
 
+export type TaskBucket = 'inbox' | 'week' | 'month' | 'quarter' | 'timed'
+
 export type TaskContext = 'work' | 'family' | 'personal'
 
 // Category represents what KIND of family item this is
@@ -25,11 +27,12 @@ export interface Task {
   completed: boolean
   createdAt: Date
   updatedAt: Date
-  scheduledFor?: Date // When this task is scheduled to be done (commitment)
-  deferredUntil?: Date // Show in inbox again on this date (punt)
+  bucket: TaskBucket // inbox, week, month, quarter, or timed
+  scheduledFor?: Date // When this task is scheduled (only set when bucket='timed')
+  deferredUntil?: Date // Legacy — kept for backwards compat, prefer bucket
   deferCount?: number // Times this task has been deferred
   isAllDay?: boolean // True = all day task, false/undefined = specific time
-  isSomeday?: boolean // True = in someday/maybe list, not in inbox
+  isSomeday?: boolean // Legacy — replaced by bucket system
   isWaiting?: boolean // True = waiting on someone else (all actions done, pending response)
   waitingSince?: Date // When the task entered waiting state
   context?: TaskContext | null // Context: work, family, personal (null = untagged/private)

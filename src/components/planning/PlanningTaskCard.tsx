@@ -8,7 +8,7 @@ interface PlanningTaskCardProps {
   task: Task
   isDragging?: boolean
   isPlaced?: boolean
-  onPushTask?: (id: string, date: Date) => void
+  onPushTask?: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
   assignee?: FamilyMember
 }
 

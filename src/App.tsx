@@ -77,6 +77,7 @@ import { useWeeklyFeedback } from '@/hooks/useWeeklyFeedback'
 import { useAIPlaybookSuggestions } from '@/hooks/useAIPlaybookSuggestions'
 import { useScheduleActions } from '@/hooks/useScheduleActions'
 import { useDomainAssessments } from '@/hooks/useDomainAssessments'
+import { useDomain } from '@/hooks/useDomain'
 import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings'
 import { getLayerConfig } from '@/config/layers'
 import { useDeepAssessment } from '@/hooks/useDeepAssessment'
@@ -218,6 +219,7 @@ function App() {
 
   // Fetch ALL assessments across all layers for the coaching hub
   const domainAssessments = useDomainAssessments()
+  const { currentDomain } = useDomain()
 
   // Lists state
   const [selectedListId, setSelectedListId] = useState<string | null>(null)
@@ -1370,7 +1372,10 @@ function App() {
       userName={getCurrentUserMember()?.name}
       onSignOut={signOut}
       onQuickAdd={async (title) => {
-        const taskId = await addTask(title, undefined, undefined, undefined, { assignedTo: getCurrentUserMember()?.id })
+        const taskId = await addTask(title, undefined, undefined, undefined, {
+          assignedTo: getCurrentUserMember()?.id,
+          context: currentDomain !== 'universal' ? currentDomain : undefined,
+        })
         if (taskId) {
           setRecentlyCreatedTaskId(taskId)
         }
@@ -1599,6 +1604,7 @@ function App() {
                   loading={tasksLoading || eventsFetching || routinesLoading}
                   viewedDate={viewedDate}
                   onDateChange={setViewedDate}
+                  currentUserMemberId={getCurrentUserMember()?.id}
                 />
               </ScheduleActionsProvider>
             </div>

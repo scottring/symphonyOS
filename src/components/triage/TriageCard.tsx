@@ -11,7 +11,7 @@ import { AgeIndicator } from '@/components/health'
 interface TriageCardProps {
   task: Task
   onUpdate: (updates: Partial<Task>) => void
-  onDefer: (date: Date | undefined) => void
+  onDefer: (target: 'week' | 'month' | 'quarter') => void
   onCollapse: () => void
   projects?: Project[]
   familyMembers?: FamilyMember[]
@@ -115,12 +115,9 @@ export function TriageCard({
 
         {/* Defer/Later button */}
         <DeferPicker
-          deferredUntil={task.deferredUntil}
-          deferCount={task.deferCount}
-          onDefer={(date) => {
-            onDefer(date)
-            // Collapse after deferring
-            if (date) setTimeout(onCollapse, 200)
+          onDefer={(target) => {
+            onDefer(target)
+            setTimeout(onCollapse, 200)
           }}
         />
 

@@ -142,12 +142,12 @@ export function QuickCapture({
       contactId: overrides.contactId === null ? undefined : (overrides.contactId ?? parsed.contactId),
       dueDate: overrides.dueDate === null ? undefined : (overrides.dueDate ?? parsed.dueDate),
       category: overrides.category === null ? undefined : (overrides.category ?? parsed.category),
-      context: overrides.context === null ? undefined : (overrides.context ?? undefined),
+      context: overrides.context === null ? undefined : (overrides.context ?? (currentDomain !== 'universal' ? currentDomain as TaskContext : undefined)),
       assignedMemberIds: overrides.assignedMemberIds === null ? undefined : (overrides.assignedMemberIds ?? parsed.assignedMemberIds),
     }
   }, [parsed, overrides])
 
-  const showPreview = hasParsedFields(effectiveParsed)
+  const showPreview = hasParsedFields(effectiveParsed) || !!effectiveParsed.context
 
   // Get display names for parsed fields
   const projectName = useMemo(() => {
@@ -226,11 +226,13 @@ export function QuickCapture({
     // Get input position for animation before any state changes
     const inputRect = inputRef.current?.getBoundingClientRect()
 
-    if (useRaw || !hasParsedFields(effectiveParsed)) {
+    const hasRichFields = hasParsedFields(effectiveParsed) || !!effectiveParsed.context
+
+    if (useRaw || (!hasRichFields)) {
       // Plain inbox add (current behavior)
       onAdd(trimmed)
     } else if (onAddRich) {
-      // Rich add with parsed fields (context only applied if user explicitly added it)
+      // Rich add with parsed fields + auto-applied domain context
       onAddRich({
         title: effectiveParsed.title,
         projectId: effectiveParsed.projectId,

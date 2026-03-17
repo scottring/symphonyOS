@@ -694,6 +694,7 @@ export function TodaySchedule({
 
   // Inline inbox collapsed/expanded state
   const [showInlineInbox, setShowInlineInbox] = useState(false)
+  const [showWeekPool, setShowWeekPool] = useState(false)
   // Check if we're viewing today
   const isToday = useMemo(() => {
     const today = new Date()
@@ -758,28 +759,36 @@ export function TodaySchedule({
 
   // Inbox tasks: needs triage - only shown on today's view
   // Includes: no scheduledFor, OR deferredUntil <= today
+  // Inbox tasks — bucket='inbox'
   const inboxTasks = useMemo(() => {
     if (!isToday) return []
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
     return tasks.filter((task) => {
       if (task.completed) return false
-      if (task.isSomeday) return false // Someday items are not in inbox
+      if (task.bucket !== 'inbox') return false
       if (!matchesAssigneeFilter(task.assignedTo)) return false
+      return true
+    })
+  }, [tasks, isToday, selectedAssignee, projectsMap])
 
-      // No scheduled date = inbox item
-      if (!task.scheduledFor) {
-        // If deferred to a future time, don't show yet
-        if (task.deferredUntil) {
-          const deferredDateTime = new Date(task.deferredUntil)
-          const now = new Date()
-          // Show only if the deferred time has passed
-          return deferredDateTime <= now
-        }
-        return true
-      }
-      return false
+  // This Week pool — bucket='week'
+  const weekTasks = useMemo(() => {
+    if (!isToday) return []
+    return tasks.filter((task) => {
+      if (task.completed) return false
+      if (task.bucket !== 'week') return false
+      if (!matchesAssigneeFilter(task.assignedTo)) return false
+      return true
+    })
+  }, [tasks, isToday, selectedAssignee, projectsMap])
+
+  // This Month pool — bucket='month'
+  const monthTasks = useMemo(() => {
+    if (!isToday) return []
+    return tasks.filter((task) => {
+      if (task.completed) return false
+      if (task.bucket !== 'month') return false
+      if (!matchesAssigneeFilter(task.assignedTo)) return false
+      return true
     })
   }, [tasks, isToday, selectedAssignee, projectsMap])
 
@@ -790,7 +799,7 @@ export function TodaySchedule({
     }
   }, [showInlineInbox, inboxTasks.length])
 
-  // Completed inbox tasks - tasks that were completed from inbox (never scheduled) on the viewed date
+  // Completed inbox tasks - tasks completed from inbox/week/month on the viewed date
   const completedInboxTasks = useMemo(() => {
     const startOfDay = new Date(viewedDate)
     startOfDay.setHours(0, 0, 0, 0)
@@ -798,12 +807,10 @@ export function TodaySchedule({
     endOfDay.setHours(23, 59, 59, 999)
 
     return tasks.filter((task) => {
-      if (!task.completed) return false  // Only completed
-      if (task.isSomeday) return false   // Not someday
-      if (task.scheduledFor) return false // Was never scheduled (pure inbox item)
+      if (!task.completed) return false
+      if (task.bucket === 'timed') return false // Timed tasks show in schedule
       if (!matchesAssigneeFilter(task.assignedTo)) return false
 
-      // Check if completed on the viewed date (using updatedAt as completion timestamp)
       const updatedDate = new Date(task.updatedAt)
       if (updatedDate < startOfDay || updatedDate > endOfDay) return false
 
@@ -811,7 +818,7 @@ export function TodaySchedule({
     })
   }, [tasks, viewedDate, selectedAssignee])
 
-  // Filter tasks for the viewed date (only tasks with scheduledFor)
+  // Filter timed tasks for the viewed date (bucket='timed')
   const filteredTasks = useMemo(() => {
     const startOfDay = new Date(viewedDate)
     startOfDay.setHours(0, 0, 0, 0)
@@ -820,12 +827,13 @@ export function TodaySchedule({
 
     return tasks.filter((task) => {
       if (!matchesAssigneeFilter(task.assignedTo)) return false
+      if (task.bucket !== 'timed') return false
 
       if (task.scheduledFor) {
         const taskDate = new Date(task.scheduledFor)
         return taskDate >= startOfDay && taskDate <= endOfDay
       }
-      return false // Unscheduled tasks go to inbox, not here
+      return false
     })
   }, [tasks, viewedDate, selectedAssignee, projectsMap])
 
@@ -1110,6 +1118,18 @@ export function TodaySchedule({
                   <span className="text-[11px] tabular-nums">{inboxTasks.length}</span>
                 </button>
               )}
+              {/* Week pool count */}
+              {isToday && weekTasks.length > 0 && (
+                <button
+                  onClick={() => setShowWeekPool(prev => !prev)}
+                  className={`flex items-center gap-0.5 mr-2 transition-all ${
+                    showWeekPool ? 'text-blue-600' : 'text-neutral-400'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-blue-400" />
+                  <span className="text-[11px] tabular-nums">{weekTasks.length}</span>
+                </button>
+              )}
               {/* Routines toggle */}
               {routines.length > 0 && (
                 <button
@@ -1343,6 +1363,52 @@ export function TodaySchedule({
         </div>
       )}
 
+      {/* This Week pool — pull tasks into today */}
+      {isToday && showWeekPool && weekTasks.length > 0 && onUpdateTask && (
+        <div className="mb-4 md:mb-8 animate-fade-in-up">
+          <div className="rounded-xl md:rounded-2xl border border-blue-200 bg-blue-50/30">
+            <div className="flex items-center justify-between px-3 py-2 md:px-4 md:py-3 border-b border-blue-200/60">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-400" />
+                <span className="text-sm font-medium text-blue-700">This Week</span>
+                <span className="text-xs text-blue-400">{weekTasks.length}</span>
+              </div>
+              <button
+                onClick={() => setShowWeekPool(false)}
+                className="p-1.5 rounded-lg text-blue-400 hover:text-blue-600 hover:bg-blue-100/50 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-2 md:p-3 space-y-1">
+              {weekTasks.map((task) => (
+                <div
+                  key={task.id}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/80 hover:bg-white transition-colors group cursor-pointer"
+                  onClick={() => handleSelectItem(`task-${task.id}`)}
+                >
+                  <span className="text-sm text-neutral-700 flex-1">{task.title}</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      const today = new Date()
+                      today.setHours(0, 0, 0, 0)
+                      onUpdateTask(task.id, { bucket: 'timed', scheduledFor: today, isAllDay: true })
+                    }}
+                    className="opacity-0 group-hover:opacity-100 px-2 py-1 rounded-md bg-primary-50 text-primary-600 text-xs font-medium
+                               hover:bg-primary-100 transition-all"
+                  >
+                    Pull to Today
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <LoadingSkeleton />
       ) : totalItems === 0 ? (
@@ -1381,6 +1447,7 @@ export function TodaySchedule({
               onToggleTask={onToggleTask}
               onToggleWaiting={onToggleWaiting}
               onPushTask={onPushTask}
+              onUpdateTask={onUpdateTask}
               contactsMap={contactsMap}
               projectsMap={projectsMap}
               familyMembers={familyMembers}
@@ -1516,7 +1583,7 @@ export function TodaySchedule({
                           : undefined
                       }
                       onSchedule={item.type === 'task' && taskId && onUpdateTask
-                        ? (date: Date, isAllDay: boolean) => onUpdateTask(taskId, { scheduledFor: date, isAllDay })
+                        ? (date: Date, isAllDay: boolean) => onUpdateTask(taskId, { bucket: 'timed', scheduledFor: date, isAllDay })
                         : undefined
                       }
                       onSkip={
@@ -1639,11 +1706,9 @@ export function TodaySchedule({
                   onUpdate={(updates) => onUpdateTask(task.id, updates)}
                   onToggleWaiting={onToggleWaiting ? () => onToggleWaiting(task.id) : undefined}
                   onSelect={() => handleSelectItem(`task-${task.id}`)}
-                  onDefer={(date) => {
-                    if (date && onPushTask) {
-                      onPushTask(task.id, date)
-                    } else if (onUpdateTask) {
-                      onUpdateTask(task.id, { deferredUntil: undefined })
+                  onDefer={(target) => {
+                    if (onPushTask) {
+                      onPushTask(task.id, target)
                     }
                   }}
                   projects={projects}

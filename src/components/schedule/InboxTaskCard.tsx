@@ -14,7 +14,7 @@ interface InboxTaskCardProps {
   onUpdate: (updates: Partial<Task>) => void
   onToggleWaiting?: () => void
   onSelect: () => void
-  onDefer: (date: Date | undefined) => void
+  onDefer: (target: 'week' | 'month' | 'quarter') => void
   projects?: Project[]
   onOpenProject?: (projectId: string) => void
   familyMembers?: FamilyMember[]
@@ -151,8 +151,6 @@ export const InboxTaskCard = memo(function InboxTaskCard({
           <div className="opacity-0 md:group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-0.5">
             {/* Defer */}
             <DeferPicker
-              deferredUntil={task.deferredUntil}
-              deferCount={task.deferCount}
               onDefer={onDefer}
             />
 
@@ -161,9 +159,9 @@ export const InboxTaskCard = memo(function InboxTaskCard({
               value={task.scheduledFor}
               isAllDay={task.isAllDay}
               onSchedule={(date, isAllDay) => {
-                onUpdate({ scheduledFor: date, isAllDay, deferredUntil: undefined })
+                onUpdate({ bucket: 'timed', scheduledFor: date, isAllDay })
               }}
-              onClear={() => onUpdate({ scheduledFor: undefined, isAllDay: undefined })}
+              onClear={() => onUpdate({ bucket: 'inbox', scheduledFor: undefined, isAllDay: undefined })}
               getItemsForDate={getScheduleItemsForDate}
               itemTitle={task.title}
             />
@@ -178,14 +176,13 @@ export const InboxTaskCard = memo(function InboxTaskCard({
               />
             )}
 
-            {/* Context picker - desktop only */}
-            <div className="hidden md:block">
-              <ContextPicker
-                value={task.context}
-                onChange={(context) => onUpdate({ context })}
-              />
-            </div>
           </div>
+
+          {/* Context picker - always visible */}
+          <ContextPicker
+            value={task.context}
+            onChange={(context) => onUpdate({ context })}
+          />
 
           {/* Always visible - avatars provide at-a-glance context */}
           {familyMembers.length > 0 && onAssignTaskAll && (

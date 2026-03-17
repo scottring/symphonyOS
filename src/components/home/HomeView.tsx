@@ -7,7 +7,8 @@ import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useHomeView } from '@/hooks/useHomeView'
 import { useMobile } from '@/hooks/useMobile'
 import { useUndo } from '@/hooks/useUndo'
-import { useDomain } from '@/hooks/useDomain'
+import { useDomain, type Domain } from '@/hooks/useDomain'
+import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings'
 import { HomeViewSwitcher } from './HomeViewSwitcher'
 import { WeekView } from './WeekView'
 import { MonthView } from './MonthView'
@@ -27,6 +28,7 @@ interface HomeViewProps {
   loading?: boolean
   viewedDate: Date
   onDateChange: (date: Date) => void
+  currentUserMemberId?: string
 }
 
 export function HomeView({
@@ -40,28 +42,51 @@ export function HomeView({
   loading,
   viewedDate,
   onDateChange,
+  currentUserMemberId,
 }: HomeViewProps) {
   const ctx = useScheduleActionsContext()
   const { currentView, setCurrentView } = useHomeView()
   const isMobile = useMobile()
   const { currentAction, pushAction, executeUndo, dismiss } = useUndo({ duration: 5000 })
   const { currentDomain } = useDomain()
+  const { getDomainForCalendar } = useCalendarDomainMappings()
 
-  // Filter tasks, routines, and projects by current domain
+  // Filter tasks, routines, projects, and events by current domain
+  // Specific domains show ONLY matching items — untagged items stay in universal
+  // For work/personal: hide tasks assigned to someone else (they're not yours)
   const filteredTasks = useMemo(() => {
     if (currentDomain === 'universal') return tasks
-    return tasks.filter(task => task.context === currentDomain || task.context === null)
-  }, [tasks, currentDomain])
+    return tasks.filter(task => {
+      if (task.context !== currentDomain) return false
+      // In work/personal (private domains), hide tasks assigned to other family members
+      if (currentDomain !== 'family' && currentUserMemberId) {
+        const assignee = task.assignedTo || (task.assignedToAll?.[0])
+        if (assignee && assignee !== currentUserMemberId) return false
+      }
+      return true
+    })
+  }, [tasks, currentDomain, currentUserMemberId])
 
   const filteredRoutines = useMemo(() => {
     if (currentDomain === 'universal') return routines
-    return routines.filter(routine => routine.context === currentDomain || routine.context === null)
+    return routines.filter(routine => routine.context === currentDomain)
   }, [routines, currentDomain])
 
   const filteredProjects = useMemo(() => {
     if (currentDomain === 'universal') return projects
-    return projects.filter(project => project.context === currentDomain || project.context === null)
+    return projects.filter(project => project.context === currentDomain)
   }, [projects, currentDomain])
+
+  const filteredEvents = useMemo(() => {
+    if (currentDomain === 'universal') return events
+    return events.filter(event => {
+      const calId = event.calendar_id || event.calendarId
+      const calName = event.calendar_name || event.calendarName
+      const eventDomain = getDomainForCalendar(calId, calName)
+      // Show events whose calendar maps to this domain, or events with no mapping
+      return eventDomain === currentDomain || eventDomain === null
+    })
+  }, [events, currentDomain, getDomainForCalendar])
 
   // Assignee filter state
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
@@ -97,7 +122,7 @@ export function HomeView({
         return true
       }
     }
-    for (const event of events) {
+    for (const event of filteredEvents) {
       const eventId = event.google_event_id || event.id
       const eventNote = ctx.eventNotesMap?.get(eventId)
       if (!eventNote?.assignedTo && (!eventNote?.assignedToAll || eventNote.assignedToAll.length === 0)) {
@@ -110,7 +135,7 @@ export function HomeView({
       }
     }
     return false
-  }, [filteredTasks, events, filteredRoutines, ctx.eventNotesMap])
+  }, [filteredTasks, filteredEvents, filteredRoutines, ctx.eventNotesMap])
 
   // Week view state
   const [weekStart, setWeekStart] = useState(() => {
@@ -176,7 +201,7 @@ export function HomeView({
       return (
         <MonthView
           tasks={filteredTasks}
-          events={events}
+          events={filteredEvents}
           routines={filteredRoutines}
           dateInstances={dateInstances}
           monthStart={monthStart}
@@ -192,7 +217,7 @@ export function HomeView({
       return (
         <WeekView
           tasks={filteredTasks}
-          events={events}
+          events={filteredEvents}
           routines={filteredRoutines}
           dateInstances={dateInstances}
           weekStart={weekStart}
@@ -208,7 +233,7 @@ export function HomeView({
       return (
         <CascadingRiverView
           tasks={filteredTasks}
-          events={events}
+          events={filteredEvents}
           routines={filteredRoutines}
           dateInstances={dateInstances}
           selectedItemId={selectedItemId}
@@ -242,7 +267,7 @@ export function HomeView({
     return (
       <TodaySchedule
         tasks={filteredTasks}
-        events={events}
+        events={filteredEvents}
         routines={filteredRoutines}
         dateInstances={dateInstances}
         selectedItemId={selectedItemId}
@@ -265,8 +290,16 @@ export function HomeView({
     )
   }
 
+  // Subtle domain background tint
+  const DOMAIN_BG: Record<Domain, string> = {
+    universal: '',
+    work: 'bg-blue-50/20',
+    family: 'bg-amber-50/20',
+    personal: 'bg-purple-50/20',
+  }
+
   return (
-    <div className="relative flex flex-col h-full">
+    <div className={`relative flex flex-col h-full transition-colors duration-500 ${DOMAIN_BG[currentDomain]}`}>
       {!isMobile && (
         <div className="absolute top-4 right-6 z-20 flex items-center gap-3">
           <DomainSwitcher />

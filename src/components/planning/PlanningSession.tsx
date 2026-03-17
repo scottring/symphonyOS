@@ -29,7 +29,7 @@ interface PlanningSessionProps {
   familyMembers?: FamilyMember[]
   eventNotesMap?: Map<string, EventNote>
   onUpdateTask: (id: string, updates: Partial<Task>) => void
-  onPushTask: (id: string, date: Date) => void
+  onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
   onClose: () => void
   initialDate?: Date
   getRoutinesForDate?: (date: Date) => Routine[]

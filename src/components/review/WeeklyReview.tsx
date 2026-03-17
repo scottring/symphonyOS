@@ -14,7 +14,7 @@ interface WeeklyReviewProps {
   onSearchContacts: (query: string) => Contact[]
   onAddContact?: (name: string, details?: { phone?: string; category?: ContactCategory }) => Promise<Contact | null>
   onUpdateTask: (id: string, updates: Partial<Task>) => void
-  onPushTask: (id: string, date: Date) => void
+  onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
   onDeleteTask: (id: string) => void
   onClose: () => void
 }

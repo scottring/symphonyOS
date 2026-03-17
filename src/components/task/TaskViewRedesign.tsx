@@ -3,7 +3,8 @@ import type { Task, TaskLink } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
 import type { Note, NoteEntityType } from '@/types/note'
-import { PushDropdown } from '@/components/triage'
+import { PushDropdown, ContextPicker } from '@/components/triage'
+import { DOMAIN_COLORS } from '@/lib/domainColors'
 import { EntityNotesSection } from '@/components/notes/EntityNotesSection'
 import { UnifiedNotesEditor } from '@/components/notes/UnifiedNotesEditor'
 
@@ -13,7 +14,7 @@ interface TaskViewProps {
   onUpdate: (id: string, updates: Partial<Task>) => void
   onDelete: (id: string) => void
   onToggleComplete: (id: string) => void
-  onPush?: (id: string, date: Date) => void
+  onPush?: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
   contact?: Contact | null
   contacts?: Contact[]
   onSearchContacts?: (query: string) => Contact[]
@@ -618,6 +619,30 @@ export function TaskViewRedesign({
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Context */}
+              <div className="pb-6 border-b border-neutral-200/60">
+                <h3 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3">
+                  Context
+                </h3>
+                <div className="flex items-center gap-3">
+                  <span
+                    className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
+                    style={task.context && DOMAIN_COLORS[task.context]
+                      ? { backgroundColor: DOMAIN_COLORS[task.context].bg }
+                      : undefined
+                    }
+                  >
+                    <svg className="w-4.5 h-4.5" fill="none" stroke={task.context && DOMAIN_COLORS[task.context] ? DOMAIN_COLORS[task.context].dot : 'currentColor'} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                  </span>
+                  <ContextPicker
+                    value={task.context}
+                    onChange={(context) => onUpdate(task.id, { context })}
+                  />
+                </div>
               </div>
 
               {/* Project */}

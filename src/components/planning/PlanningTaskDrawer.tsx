@@ -4,7 +4,7 @@ import { PlanningTaskCard } from './PlanningTaskCard'
 
 interface PlanningTaskDrawerProps {
   tasks: Task[]
-  onPushTask: (id: string, date: Date) => void
+  onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
 }
 
 export function PlanningTaskDrawer({ tasks, onPushTask }: PlanningTaskDrawerProps) {

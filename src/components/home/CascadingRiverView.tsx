@@ -23,7 +23,7 @@ interface CascadingRiverViewProps {
   onToggleTask: (taskId: string) => void
   onToggleWaiting?: (taskId: string) => void
   onUpdateTask?: (id: string, updates: Partial<Task>) => void
-  onPushTask?: (id: string, date: Date) => void
+  onPushTask?: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
   onDeleteTask?: (id: string) => void
   viewedDate: Date
   onDateChange: (date: Date) => void
