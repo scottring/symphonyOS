@@ -87,7 +87,7 @@ import type { ViewType } from '@/components/layout/Sidebar'
 import type { ActionableInstance, Routine } from '@/types/actionable'
 import type { LinkedActivityType } from '@/types/task'
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
-import { useHiddenCalendarEvents, getRecurringBaseId } from '@/hooks/useHiddenCalendarEvents'
+import { useHiddenCalendarEvents } from '@/hooks/useHiddenCalendarEvents'
 
 function App() {
   const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask } = useSupabaseTasks()
@@ -98,7 +98,7 @@ function App() {
   const pinnedItems = usePinnedItems()
   const undo = useUndo({ duration: 5000 })
   const { toast, showToast, dismissToast } = useToast()
-  const { isHidden: isEventHidden, hideEvent, unhideEvent } = useHiddenCalendarEvents()
+  const { isHidden: isEventHidden, hideEvent } = useHiddenCalendarEvents()
   const [confirmationToast, setConfirmationToast] = useState<ConfirmationToastMessage | null>(null)
 
   // Onboarding state

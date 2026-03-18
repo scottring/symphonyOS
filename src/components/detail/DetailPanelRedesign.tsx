@@ -108,6 +108,8 @@ interface DetailPanelRedesignProps {
   onAddProject?: (project: { name: string }) => Promise<Project | null>
   onAddSubtask?: (parentId: string, title: string) => Promise<string | undefined>
   onActionComplete?: () => void
+  // Hide recurring event permanently
+  onHideEvent?: (googleEventId: string, title?: string, calendarId?: string) => Promise<boolean>
   // Prep task support (for meal events)
   prepTasks?: Task[]
   onAddPrepTask?: (title: string, linkedEventId: string, scheduledFor: Date) => Promise<string | undefined>
@@ -503,6 +505,7 @@ export function DetailPanelRedesign({
   onAddProject,
   onAddSubtask,
   onActionComplete,
+  onHideEvent,
   prepTasks,
   onAddPrepTask,
   onTogglePrepTask,
@@ -1647,6 +1650,13 @@ export function DetailPanelRedesign({
               onDefer={handleEventDefer}
               onRequestCoverage={handleEventRequestCoverage}
               onAddNote={handleEventAddNote}
+              onHideEvent={onHideEvent ? async () => {
+                const event = item.originalEvent!
+                const eventId = event.google_event_id || event.id
+                const success = await onHideEvent(eventId, event.title, event.calendar_id || event.calendarId)
+                if (success) onClose()
+                return success
+              } : undefined}
               isLoading={actionable.isLoading}
             />
           </div>
