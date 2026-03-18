@@ -74,7 +74,7 @@ export function useProjects() {
     fetchProjects()
   }, [user])
 
-  const addProject = useCallback(async (project: { name: string; notes?: string; links?: import('@/types/task').TaskLink[]; phoneNumber?: string; parentId?: string }) => {
+  const addProject = useCallback(async (project: { name: string; notes?: string; links?: import('@/types/task').TaskLink[]; phoneNumber?: string; parentId?: string; context?: 'work' | 'family' | 'personal' }) => {
     if (!user) return null
 
     // Optimistic update
@@ -87,6 +87,7 @@ export function useProjects() {
       links: project.links,
       phoneNumber: project.phoneNumber,
       parentId: project.parentId,
+      context: project.context,
       createdAt: new Date(),
       updatedAt: new Date(),
     }
@@ -101,6 +102,7 @@ export function useProjects() {
         links: project.links ?? null,
         phone_number: project.phoneNumber ?? null,
         parent_id: project.parentId ?? null,
+        context: project.context ?? null,
       })
       .select()
       .single()

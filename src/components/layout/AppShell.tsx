@@ -5,6 +5,7 @@ import { MoreSheet } from './MoreSheet'
 import { QuickCapture } from './QuickCapture'
 import { useMobile } from '@/hooks/useMobile'
 import { useTheme } from '@/hooks/useTheme'
+import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
 import type { PinnedItem } from '@/types/pin'
 import type { PinnableEntityType } from '@/types/pin'
 import type { Task } from '@/types/task'
@@ -136,7 +137,7 @@ export function AppShell({
       {/* Main content area */}
       <main
         className={`
-          flex-1 overflow-auto overflow-x-hidden
+          relative flex-1 overflow-auto overflow-x-hidden
           transition-all duration-300 ease-in-out
           ${isMobile ? 'pb-14' : ''}
         `}
@@ -185,6 +186,12 @@ export function AppShell({
               </div>
             </div>
           </header>
+        )}
+        {/* Domain switcher on non-Today views (Today has its own in HomeView) */}
+        {!isMobile && activeView !== 'today' && (
+          <div className="absolute top-4 right-6 z-20">
+            <DomainSwitcher />
+          </div>
         )}
         {children}
       </main>

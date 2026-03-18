@@ -47,6 +47,7 @@ function dbGoalToGoal(db: DbGoal, actions: GoalAction[], milestones: GoalMilesto
     strategy: db.strategy ?? undefined,
     domainSlug: db.domain_slug ?? undefined,
     layerId: db.layer_id ?? undefined,
+    context: db.context as Goal['context'] ?? undefined,
     status: db.status,
     sortOrder: db.sort_order,
     actions: actions.filter(a => a.goalId === db.id),
@@ -233,7 +234,7 @@ export function useGoals(year?: number) {
   // GOAL CRUD
   // ============================================================================
 
-  const addGoal = useCallback(async (areaId: string, name: string) => {
+  const addGoal = useCallback(async (areaId: string, name: string, context?: 'work' | 'family' | 'personal') => {
     if (!user) return null
 
     const tempId = crypto.randomUUID()
@@ -242,6 +243,7 @@ export function useGoals(year?: number) {
       areaId,
       name,
       year: currentYear,
+      context: context ?? undefined,
       status: 'active',
       sortOrder: goals.filter(g => g.areaId === areaId).length,
       actions: [],
@@ -259,6 +261,7 @@ export function useGoals(year?: number) {
         name,
         year: currentYear,
         sort_order: optimistic.sortOrder,
+        context: context ?? null,
       })
       .select()
       .single()
@@ -274,7 +277,7 @@ export function useGoals(year?: number) {
     return real
   }, [user, currentYear, goals])
 
-  const updateGoal = useCallback(async (id: string, updates: Partial<Pick<Goal, 'name' | 'notes' | 'status' | 'areaId' | 'sortOrder' | 'strategy' | 'domainSlug' | 'layerId'>>) => {
+  const updateGoal = useCallback(async (id: string, updates: Partial<Pick<Goal, 'name' | 'notes' | 'status' | 'areaId' | 'sortOrder' | 'strategy' | 'domainSlug' | 'layerId' | 'context'>>) => {
     const goal = goals.find(g => g.id === id)
     if (!goal) return
 
@@ -289,6 +292,7 @@ export function useGoals(year?: number) {
     if (updates.strategy !== undefined) dbUpdates.strategy = updates.strategy ?? null
     if (updates.domainSlug !== undefined) dbUpdates.domain_slug = updates.domainSlug ?? null
     if (updates.layerId !== undefined) dbUpdates.layer_id = updates.layerId ?? null
+    if (updates.context !== undefined) dbUpdates.context = updates.context ?? null
 
     const { error: updateError } = await supabase
       .from('goals')

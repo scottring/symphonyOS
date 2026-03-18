@@ -50,6 +50,7 @@ export interface Goal {
   strategy?: string
   domainSlug?: string
   layerId?: string
+  context?: 'work' | 'family' | 'personal' | null
   status: GoalStatus
   sortOrder: number
   actions: GoalAction[]
@@ -80,6 +81,7 @@ export interface DbGoal {
   strategy: string | null
   domain_slug: string | null
   layer_id: string | null
+  context: string | null
   status: GoalStatus
   sort_order: number
   created_at: string

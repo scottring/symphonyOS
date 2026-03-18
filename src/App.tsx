@@ -1718,10 +1718,10 @@ function App() {
           {activeView === 'projects' && !selectedProjectId && (
             <Suspense fallback={<LoadingFallback />}>
               <ProjectsList
-                projects={projects}
+                projects={currentDomain === 'universal' ? projects : projects.filter(p => p.context === currentDomain)}
                 tasks={tasks}
                 onSelectProject={(id) => navigate(`/projects/${id}`)}
-                onAddProject={addProject}
+                onAddProject={(project) => addProject({ ...project, context: currentDomain !== 'universal' ? currentDomain : undefined })}
               />
             </Suspense>
           )}
@@ -1755,12 +1755,12 @@ function App() {
             <Suspense fallback={<LoadingFallback />}>
               <GoalsList
                 areas={goalAreas}
-                goals={goals}
+                goals={currentDomain === 'universal' ? goals : goals.filter(g => g.context === currentDomain)}
                 currentQuarter={getCurrentQuarter()}
                 year={new Date().getFullYear()}
                 onSelectGoal={(id) => navigate(`/goals/${id}`)}
                 onAddArea={addGoalArea}
-                onAddGoal={addGoal}
+                onAddGoal={(areaId, name) => addGoal(areaId, name, currentDomain !== 'universal' ? currentDomain : undefined)}
                 onToggleAction={toggleGoalAction}
                 onDeleteArea={deleteGoalArea}
               />
@@ -1846,7 +1846,7 @@ function App() {
           {activeView === 'routines' && !selectedRoutineId && !creatingRoutine && (
             <Suspense fallback={<LoadingFallback />}>
               <RoutinesList
-                routines={allRoutines}
+                routines={currentDomain === 'universal' ? allRoutines : allRoutines.filter(r => r.context === currentDomain)}
                 contacts={contacts}
                 familyMembers={familyMembers}
                 onSelectRoutine={(routine) => navigate(`/routines/${routine.id}`)}
@@ -1875,7 +1875,7 @@ function App() {
                   <RoutineInput
                     contacts={contacts}
                     onSave={async (input) => {
-                      await addRoutine(input)
+                      await addRoutine({ ...input, context: currentDomain !== 'universal' ? currentDomain : undefined })
                       navigate('/routines')
                     }}
                     onCancel={() => navigate('/routines')}

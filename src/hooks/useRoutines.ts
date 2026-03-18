@@ -14,6 +14,7 @@ export interface CreateRoutineInput {
   raw_input?: string | null
   prep_task_templates?: PrepFollowupTemplate[]
   followup_task_templates?: PrepFollowupTemplate[]
+  context?: 'work' | 'family' | 'personal'
   // Fallback assignee if assigned_to is undefined (not null)
   defaultFallbackAssignee?: string
 }
@@ -122,6 +123,7 @@ export function useRoutines() {
           raw_input: input.raw_input || null,
           prep_task_templates: input.prep_task_templates || [],
           followup_task_templates: input.followup_task_templates || [],
+          context: input.context || null,
         })
         .select()
         .single()
