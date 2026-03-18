@@ -87,6 +87,7 @@ import type { ViewType } from '@/components/layout/Sidebar'
 import type { ActionableInstance, Routine } from '@/types/actionable'
 import type { LinkedActivityType } from '@/types/task'
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
+import { useHiddenCalendarEvents, getRecurringBaseId } from '@/hooks/useHiddenCalendarEvents'
 
 function App() {
   const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask } = useSupabaseTasks()
@@ -97,6 +98,7 @@ function App() {
   const pinnedItems = usePinnedItems()
   const undo = useUndo({ duration: 5000 })
   const { toast, showToast, dismissToast } = useToast()
+  const { isHidden: isEventHidden, hideEvent, unhideEvent } = useHiddenCalendarEvents()
   const [confirmationToast, setConfirmationToast] = useState<ConfirmationToastMessage | null>(null)
 
   // Onboarding state
@@ -537,14 +539,16 @@ function App() {
       }
     }
 
-    // Filter out events that are skipped (completed events still show but marked done)
+    // Filter out events that are skipped, deferred, or permanently hidden
     return events.filter((event) => {
       const eventId = event.google_event_id || event.id
+      // Remove permanently hidden recurring events
+      if (isEventHidden(eventId)) return false
       const status = statusMap.get(eventId)
       // Remove if skipped or deferred
       return status !== 'skipped' && status !== 'deferred'
     })
-  }, [events, dateInstances])
+  }, [events, dateInstances, isEventHidden])
 
   // Get routines for the viewed date:
   // 1. Routines that normally occur on this date (by recurrence pattern)
@@ -1274,6 +1278,7 @@ function App() {
     onSkipEvent: scheduleActions.onSkipEvent,
     onPushEvent: scheduleActions.onPushEvent,
     onUpdateEventContext: updateEventContext,
+    onHideEvent: hideEvent,
 
     // Playbook
     playbookInstances: playbook.instances,
@@ -1323,7 +1328,7 @@ function App() {
     onRefreshInstances: refreshDateInstances,
   }), [
     handleToggleTask, toggleWaiting, handleUpdateTaskWithToast, pushTask, deleteTask, handleCreateFollowUp,
-    scheduleActions, updateRoutine, updateEventContext,
+    scheduleActions, updateRoutine, updateEventContext, hideEvent,
     playbook.instances, playbook.toggleItem, playbook.markBlockDone, playbook.reactToBlock,
     playbook.tagBlock, playbook.noteBlock, playbook.deleteBlock, playbook.suppressBlock,
     contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
@@ -1519,6 +1524,7 @@ function App() {
               onAddProject={addProject}
               onAddSubtask={addSubtask}
               onActionComplete={refreshDateInstances}
+              onHideEvent={hideEvent}
               prepTasks={tasks}
               onAddPrepTask={addPrepTask}
               onTogglePrepTask={handleToggleTask}

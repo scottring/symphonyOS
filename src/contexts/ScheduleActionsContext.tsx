@@ -40,6 +40,7 @@ export interface ScheduleActionsValue {
   onSkipEvent?: (eventId: string) => void
   onPushEvent?: (eventId: string, date: Date) => void
   onUpdateEventContext?: (eventId: string, context: TaskContext | null) => void
+  onHideEvent?: (googleEventId: string, title?: string, calendarId?: string) => Promise<boolean>
 
   // Playbook actions
   playbookInstances?: PlaybookInstance[]

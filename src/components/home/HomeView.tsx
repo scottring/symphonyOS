@@ -55,15 +55,16 @@ export function HomeView({
   // Specific domains show ONLY matching items — untagged items stay in universal
   // For work/personal: hide tasks assigned to someone else (they're not yours)
   const filteredTasks = useMemo(() => {
-    if (currentDomain === 'universal') return tasks
     return tasks.filter(task => {
-      if (task.context !== currentDomain) return false
-      // In work/personal (private domains), hide tasks assigned to other family members
-      if (currentDomain !== 'family' && currentUserMemberId) {
+      // Hide other members' work/personal tasks (private domains) in ALL views
+      if (currentUserMemberId && (task.context === 'work' || task.context === 'personal')) {
         const assignee = task.assignedTo || (task.assignedToAll?.[0])
         if (assignee && assignee !== currentUserMemberId) return false
       }
-      return true
+      // Universal shows everything that passes the privacy filter above
+      if (currentDomain === 'universal') return true
+      // Specific domains show ONLY matching items
+      return task.context === currentDomain
     })
   }, [tasks, currentDomain, currentUserMemberId])
 

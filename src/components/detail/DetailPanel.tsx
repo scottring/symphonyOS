@@ -113,6 +113,8 @@ interface DetailPanelProps {
   onAddSubtask?: (parentId: string, title: string) => Promise<string | undefined>
   // Actionable callback - called after skip/defer/done to refresh timeline
   onActionComplete?: () => void
+  // Hide recurring event permanently
+  onHideEvent?: (googleEventId: string, title?: string, calendarId?: string) => Promise<boolean>
   // Prep task support (for meal events)
   prepTasks?: Task[]
   onAddPrepTask?: (title: string, linkedEventId: string, scheduledFor: Date) => Promise<string | undefined>
@@ -202,7 +204,7 @@ function ActionButton({ action, onOpenRecipe }: { action: DetectedAction; onOpen
   )
 }
 
-export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplete, onUpdateEventNote, eventRecipeUrl, onUpdateRecipeUrl, onOpenRecipe, contact, contacts = [], onSearchContacts, onUpdateContact, onOpenContact, project, projects = [], onSearchProjects, onUpdateProject, onOpenProject, onAddProject, onAddSubtask, onActionComplete, prepTasks, onAddPrepTask, onTogglePrepTask }: DetailPanelProps) {
+export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplete, onUpdateEventNote, eventRecipeUrl, onUpdateRecipeUrl, onOpenRecipe, contact, contacts = [], onSearchContacts, onUpdateContact, onOpenContact, project, projects = [], onSearchProjects, onUpdateProject, onOpenProject, onAddProject, onAddSubtask, onActionComplete, onHideEvent, prepTasks, onAddPrepTask, onTogglePrepTask }: DetailPanelProps) {
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [editedTitle, setEditedTitle] = useState(item?.title || '')
@@ -862,6 +864,13 @@ export function DetailPanel({ item, onClose, onUpdate, onDelete, onToggleComplet
             onDefer={handleEventDefer}
             onRequestCoverage={handleEventRequestCoverage}
             onAddNote={handleEventAddNote}
+            onHideEvent={onHideEvent ? async () => {
+              const event = item.originalEvent!
+              const eventId = event.google_event_id || event.id
+              const success = await onHideEvent(eventId, event.title, event.calendar_id || event.calendarId)
+              if (success) onClose()
+              return success
+            } : undefined}
             isLoading={actionable.isLoading}
           />
         )}
