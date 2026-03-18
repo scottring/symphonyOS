@@ -8,6 +8,7 @@ import { SchedulePopover, DeferPicker, ContextPicker } from '@/components/triage
 import { ListPicker } from '@/components/triage/ListPicker'
 import type { ScheduleContextItem } from '@/components/triage'
 import { TaskCheckbox } from './TaskCheckbox'
+import { DOMAIN_COLORS } from '@/lib/domainColors'
 
 interface InboxTaskCardProps {
   task: Task
@@ -115,6 +116,7 @@ export const InboxTaskCard = memo(function InboxTaskCard({
                 if (panelOpen && onClosePanel) onClosePanel()
                 onToggleWaiting?.()
               }}
+              contextColor={task.context ? DOMAIN_COLORS[task.context]?.dot : undefined}
             />
           </div>
         )}

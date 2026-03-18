@@ -7,6 +7,7 @@ interface TaskCheckboxProps {
   onToggleComplete: () => void
   onToggleWaiting: () => void
   isRoutine?: boolean
+  contextColor?: string
   className?: string
 }
 
@@ -16,6 +17,7 @@ export const TaskCheckbox = memo(function TaskCheckbox({
   onToggleComplete,
   onToggleWaiting,
   isRoutine,
+  contextColor,
   className = '',
 }: TaskCheckboxProps) {
   const { pressing, handlers } = useLongPress({
@@ -45,9 +47,12 @@ export const TaskCheckbox = memo(function TaskCheckbox({
             ? 'bg-primary-500 border-primary-500 text-white'
             : isWaiting
               ? 'checkbox-waiting'
-              : 'border-neutral-300 hover:border-primary-400'
+              : contextColor
+                ? 'hover:opacity-80'
+                : 'border-neutral-300 hover:border-primary-400'
           }
         `}
+        style={!completed && !isWaiting && contextColor ? { borderColor: contextColor } : undefined}
       >
         {completed ? (
           // Checkmark

@@ -3,6 +3,7 @@ import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
 import { formatTime } from '@/lib/timeUtils'
 import { getProjectColor } from '@/lib/projectUtils'
+import { DOMAIN_COLORS } from '@/lib/domainColors'
 import { TypeIcon } from './TypeIcon'
 import { AssigneeDropdown } from '@/components/family'
 import { ArrowRightToLine, Redo2, MoreHorizontal, Clock } from 'lucide-react'
@@ -60,6 +61,7 @@ export const SwipeableCard = memo(function SwipeableCard({
 
   // Get project color for left edge indicator
   const projectColor = item.projectId ? getProjectColor(item.projectId) : null
+  const contextColor = item.context ? DOMAIN_COLORS[item.context]?.dot : undefined
 
   // Touch handlers
   const handleTouchStart = useCallback((e: TouchEvent) => {
@@ -267,7 +269,7 @@ export const SwipeableCard = memo(function SwipeableCard({
 
           {/* Type icon - non-interactive indicator */}
           <div className="w-5 shrink-0 flex items-center justify-center">
-            <TypeIcon type={item.type} completed={item.completed} isWaiting={item.isWaiting} />
+            <TypeIcon type={item.type} completed={item.completed} isWaiting={item.isWaiting} contextColor={contextColor} />
           </div>
 
           {/* Title */}

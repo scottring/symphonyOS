@@ -168,6 +168,7 @@ export const ScheduleItem = memo(function ScheduleItem({
   const isRoutine = item.type === 'routine'
   const isEvent = item.type === 'event'
   const isActionable = isTask || isRoutine || isEvent // Events are now checkable
+  const contextColor = item.context ? DOMAIN_COLORS[item.context]?.dot : undefined
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -385,6 +386,7 @@ export const ScheduleItem = memo(function ScheduleItem({
                   onToggleWaiting?.()
                 }}
                 isRoutine={isRoutine}
+                contextColor={contextColor}
               />
             ) : null}
           </div>
