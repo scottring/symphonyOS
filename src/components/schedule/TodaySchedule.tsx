@@ -1575,11 +1575,11 @@ export function TodaySchedule({
                       }}
                       onPush={
                         item.type === 'task' && taskId && onPushTask
-                          ? (date: Date) => onPushTask(taskId, date)
+                          ? (target: Date | 'week' | 'month' | 'quarter') => onPushTask(taskId, target)
                           : item.type === 'routine' && onPushRoutine
-                          ? (date: Date) => onPushRoutine(item.id.replace('routine-', ''), date)
+                          ? (date: Date | 'week' | 'month' | 'quarter') => { if (date instanceof Date) onPushRoutine(item.id.replace('routine-', ''), date) }
                           : item.type === 'event' && onPushEvent
-                          ? (date: Date) => onPushEvent(item.id.replace('event-', ''), date)
+                          ? (date: Date | 'week' | 'month' | 'quarter') => { if (date instanceof Date) onPushEvent(item.id.replace('event-', ''), date) }
                           : undefined
                       }
                       onSchedule={item.type === 'task' && taskId && onUpdateTask

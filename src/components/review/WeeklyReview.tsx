@@ -75,7 +75,7 @@ export function WeeklyReview({
     onUpdateTask(taskId, { scheduledFor: date, isAllDay, deferredUntil: undefined })
   }
 
-  const handlePush = (taskId: string, date: Date) => {
+  const handlePush = (taskId: string, date: Date | 'week' | 'month' | 'quarter') => {
     markProcessed(taskId)
     onPushTask(taskId, date)
   }

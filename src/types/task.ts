@@ -27,7 +27,7 @@ export interface Task {
   completed: boolean
   createdAt: Date
   updatedAt: Date
-  bucket: TaskBucket // inbox, week, month, quarter, or timed
+  bucket?: TaskBucket // inbox, week, month, quarter, or timed
   scheduledFor?: Date // When this task is scheduled (only set when bucket='timed')
   deferredUntil?: Date // Legacy — kept for backwards compat, prefer bucket
   deferCount?: number // Times this task has been deferred

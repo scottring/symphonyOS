@@ -92,7 +92,7 @@ export function ScheduleWithTimeline({
   }, [])
 
   const handleTimeSelect = useCallback((time: Date) => {
-    onChange(time, false)
+    onChange('timed', time, false)
     setShowTimeline(false)
     setHoveredTime(null)
   }, [onChange])
