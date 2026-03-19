@@ -347,10 +347,10 @@ export function WallCalendar() {
             <WallJaxWidget />
           </div>
 
-          {/* Screen Time Widget */}
-          <div className={`${glass} px-5 py-4 flex-1`}>
+          {/* Screen Time Widget — hidden to make room for dog meds */}
+          {/* <div className={`${glass} px-5 py-4 flex-1`}>
             <WallScreenTimeWidget />
-          </div>
+          </div> */}
 
           {/* Dinner Widget */}
           <div className={`${glass} px-5 py-4 flex-1 flex items-center gap-4 ${recipeUrl ? 'cursor-pointer' : ''}`}
