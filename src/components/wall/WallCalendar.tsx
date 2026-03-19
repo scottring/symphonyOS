@@ -376,6 +376,36 @@ export function WallCalendar() {
             )}
           </div>
 
+          {/* Dog Meds Weaning Widget */}
+          {(() => {
+            const WEAN_START = new Date(2026, 2, 19) // Mar 19, 2026
+            const today = new Date()
+            today.setHours(0, 0, 0, 0)
+            const dayNum = Math.floor((today.getTime() - WEAN_START.getTime()) / 86400000) + 1
+            if (dayNum < 1) return null // not started yet
+            const isHalfPhase = dayNum <= 14
+            const dose = isHalfPhase ? '½' : '¼'
+            const phase = isHalfPhase ? `Day ${dayNum} of 14` : `Day ${dayNum - 14} · taper`
+            const phasePct = isHalfPhase ? dayNum / 14 : Math.min((dayNum - 14) / 14, 1)
+            return (
+              <div className={`${glass} px-5 py-4 flex items-center gap-4`}>
+                <div className="text-[2.2rem] flex-shrink-0">💊</div>
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="text-white/40 font-black uppercase tracking-widest text-[0.6rem]">
+                    Jax Meds · AM
+                  </span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-white font-black text-[1.3rem] leading-tight">{dose} tab</span>
+                    <span className="text-white/40 font-bold text-[0.8rem]">{phase}</span>
+                  </div>
+                  <div className="h-1.5 bg-white/10 rounded-full mt-1.5 overflow-hidden" style={{ width: 100 }}>
+                    <div className="h-full bg-[#6DC4A7] rounded-full transition-all" style={{ width: `${phasePct * 100}%` }} />
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
           {/* Soccer Tip Widget */}
           {(() => {
             const soccerTip = getDailySoccerTip()
