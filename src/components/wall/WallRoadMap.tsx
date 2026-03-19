@@ -18,6 +18,8 @@ interface PlacedBuilding {
   item: TimelineItem
   x: number
   y: number
+  roadX: number  // point on the road (for time labels)
+  roadY: number
   side: 'left' | 'right'
   fraction: number
 }
@@ -116,84 +118,51 @@ function getNormalAtLength(path: SVGPathElement, len: number, totalLen: number):
 // BUILDING SVG COMPONENTS
 // ============================================================================
 
-function HouseBuilding({ colors }: { colors: { wall: string; roof: string; accent: string } }) {
+function HouseBuilding({ colors }: { colors: { wall: string; roof: string } }) {
   return (
     <g>
-      {/* Shadow */}
       <ellipse cx={0} cy={22} rx={24} ry={6} fill="rgba(0,0,0,0.12)" />
-      {/* Body */}
-      <rect x={-18} y={-10} width={36} height={32} rx={2} fill={colors.wall} />
-      {/* Roof */}
+      <rect x={-18} y={-10} width={36} height={32} rx={3} fill={colors.wall} />
       <polygon points="-22,-10 0,-30 22,-10" fill={colors.roof} />
-      {/* Door */}
-      <rect x={-5} y={6} width={10} height={16} rx={1.5} fill={colors.accent} opacity={0.7} />
-      {/* Window */}
-      <rect x={-15} y={-4} width={8} height={8} rx={1} fill={colors.accent} opacity={0.5} />
-      {/* Chimney */}
       <rect x={8} y={-28} width={6} height={12} rx={1} fill={colors.roof} />
     </g>
   )
 }
 
-function ShopBuilding({ colors }: { colors: { wall: string; roof: string; accent: string } }) {
+function ShopBuilding({ colors }: { colors: { wall: string; roof: string } }) {
   return (
     <g>
-      {/* Shadow */}
       <ellipse cx={0} cy={22} rx={26} ry={6} fill="rgba(0,0,0,0.12)" />
-      {/* Body */}
-      <rect x={-20} y={-8} width={40} height={30} rx={2} fill={colors.wall} />
-      {/* Awning */}
+      <rect x={-20} y={-8} width={40} height={30} rx={3} fill={colors.wall} />
       <path d="M-22,-8 L-22,-14 C-22,-14 -11,-6 0,-14 C11,-6 22,-14 22,-14 L22,-8 Z" fill={colors.roof} />
-      {/* Window/sign */}
-      <rect x={-14} y={0} width={28} height={10} rx={2} fill={colors.accent} opacity={0.6} />
-      {/* Door */}
-      <rect x={-5} y={12} width={10} height={10} rx={1} fill={colors.accent} opacity={0.7} />
     </g>
   )
 }
 
-function PublicBuilding({ colors }: { colors: { wall: string; roof: string; accent: string } }) {
+function PublicBuilding({ colors }: { colors: { wall: string; roof: string } }) {
   return (
     <g>
-      {/* Shadow */}
       <ellipse cx={0} cy={22} rx={28} ry={6} fill="rgba(0,0,0,0.12)" />
-      {/* Body */}
-      <rect x={-24} y={-6} width={48} height={28} rx={2} fill={colors.wall} />
-      {/* Pediment (triangle top) */}
+      <rect x={-24} y={-6} width={48} height={28} rx={3} fill={colors.wall} />
       <polygon points="-26,-6 0,-24 26,-6" fill={colors.roof} />
-      {/* Columns */}
-      <rect x={-18} y={-2} width={4} height={24} rx={1} fill={colors.accent} opacity={0.5} />
-      <rect x={14} y={-2} width={4} height={24} rx={1} fill={colors.accent} opacity={0.5} />
-      {/* Door */}
-      <rect x={-6} y={8} width={12} height={14} rx={2} fill={colors.accent} opacity={0.7} />
-      {/* Flag */}
       <line x1={0} y1={-24} x2={0} y2={-34} stroke={colors.roof} strokeWidth={1.5} />
       <polygon points="0,-34 10,-30 0,-26" fill={colors.roof} />
     </g>
   )
 }
 
-function CastleBuilding({ colors }: { colors: { wall: string; roof: string; accent: string } }) {
+function CastleBuilding({ colors }: { colors: { wall: string; roof: string } }) {
   return (
     <g>
-      {/* Shadow */}
       <ellipse cx={0} cy={22} rx={26} ry={6} fill="rgba(0,0,0,0.12)" />
-      {/* Main tower */}
-      <rect x={-14} y={-16} width={28} height={38} rx={2} fill={colors.wall} />
-      {/* Left turret */}
+      <rect x={-14} y={-16} width={28} height={38} rx={3} fill={colors.wall} />
       <rect x={-22} y={-10} width={10} height={32} rx={1} fill={colors.wall} />
       <polygon points="-22,-10 -17,-18 -12,-10" fill={colors.roof} />
-      {/* Right turret */}
       <rect x={12} y={-10} width={10} height={32} rx={1} fill={colors.wall} />
       <polygon points="12,-10 17,-18 22,-10" fill={colors.roof} />
-      {/* Battlements */}
       <rect x={-14} y={-20} width={6} height={4} fill={colors.roof} />
       <rect x={-2} y={-20} width={6} height={4} fill={colors.roof} />
       <rect x={8} y={-20} width={6} height={4} fill={colors.roof} />
-      {/* Door */}
-      <path d="M-5,22 L-5,10 A5,5 0 0 1 5,10 L5,22 Z" fill={colors.accent} opacity={0.7} />
-      {/* Window */}
-      <circle cx={0} cy={-4} r={4} fill={colors.accent} opacity={0.5} />
     </g>
   )
 }
@@ -247,12 +216,10 @@ function Cloud({ x, y, scale = 1 }: { x: number; y: number; scale?: number }) {
 function Signpost({ x, y, label }: { x: number; y: number; label: string }) {
   return (
     <g transform={`translate(${x}, ${y})`}>
-      {/* Post */}
-      <rect x={-2} y={-20} width={4} height={30} rx={1} fill="#8B6914" />
-      {/* Sign board */}
-      <rect x={-34} y={-32} width={68} height={18} rx={4} fill="#D4A033" />
-      <rect x={-32} y={-30} width={64} height={14} rx={3} fill="#F9C35C" />
-      <text x={0} y={-20} textAnchor="middle" fontSize={9} fontWeight="900" fill="#5C3D0A" letterSpacing={1}>
+      <rect x={-2} y={-24} width={4} height={34} rx={1} fill="#8B6914" />
+      <rect x={-42} y={-38} width={84} height={22} rx={5} fill="#D4A033" />
+      <rect x={-40} y={-36} width={80} height={18} rx={4} fill="#F9C35C" />
+      <text x={0} y={-23} textAnchor="middle" fontSize={12} fontWeight="900" fill="#5C3D0A" letterSpacing={1.5}>
         {label}
       </text>
     </g>
@@ -393,6 +360,8 @@ export function WallRoadMap({ choreItems, taskItems, onComplete, overdueItems, c
         item,
         x: point.x + nx * BUILDING_OFFSET * sign,
         y: point.y + ny * BUILDING_OFFSET * sign,
+        roadX: point.x,
+        roadY: point.y,
         side,
         fraction: targetLen / totalLen,
       })
@@ -528,6 +497,20 @@ export function WallRoadMap({ choreItems, taskItems, onComplete, overdueItems, c
           <Signpost key={i} x={sp.x + 40} y={sp.y - 50} label={sp.label} />
         ))}
 
+        {/* ═══ TIME LABELS ON ROAD ═══ */}
+        {placedBuildings.map((pb) => {
+          const timeStr = formatItemTime(pb.item)
+          if (!timeStr) return null
+          return (
+            <g key={`time-${pb.item.id}`} transform={`translate(${pb.roadX}, ${pb.roadY})`}>
+              <rect x={-14} y={-8} width={28} height={16} rx={6} fill="rgba(0,0,0,0.55)" />
+              <text x={0} y={4} textAnchor="middle" fontSize={10} fontWeight="800" fill="white" style={{ pointerEvents: 'none' }}>
+                {timeStr}
+              </text>
+            </g>
+          )
+        })}
+
         {/* ═══ BUILDINGS ═══ */}
         {placedBuildings.map((pb) => {
           const isPressing = pressingId === pb.item.id
@@ -552,35 +535,28 @@ export function WallRoadMap({ choreItems, taskItems, onComplete, overdueItems, c
               {/* Building shape */}
               <BuildingSVG item={pb.item} />
 
-              {/* Emoji icon */}
-              <text x={0} y={-2} textAnchor="middle" fontSize={18} style={{ pointerEvents: 'none' }}>
+              {/* Emoji icon centered on building face */}
+              <text x={0} y={10} textAnchor="middle" fontSize={24} style={{ pointerEvents: 'none' }}>
                 {getEmojiIcon(pb.item.title)}
               </text>
 
               {/* Completed flag */}
               {isCompleted && <CompletedFlag />}
 
-              {/* Title label */}
+              {/* Title label underneath */}
               <text
-                x={0} y={36}
+                x={0} y={38}
                 textAnchor="middle"
-                fontSize={8}
-                fontWeight="800"
+                fontSize={12}
+                fontWeight="900"
                 fill="white"
-                style={{ textShadow: '0 1px 3px rgba(0,0,0,0.5)', pointerEvents: 'none' }}
+                stroke="rgba(0,0,0,0.5)"
+                strokeWidth={2.5}
+                paintOrder="stroke"
+                style={{ pointerEvents: 'none' }}
               >
-                {pb.item.title.length > 14 ? pb.item.title.slice(0, 13) + '…' : pb.item.title}
+                {pb.item.title.length > 16 ? pb.item.title.slice(0, 15) + '…' : pb.item.title}
               </text>
-
-              {/* Time badge */}
-              {formatItemTime(pb.item) && (
-                <g>
-                  <rect x={-16} y={38} width={32} height={12} rx={4} fill="rgba(0,0,0,0.4)" />
-                  <text x={0} y={47} textAnchor="middle" fontSize={7} fontWeight="700" fill="white" style={{ pointerEvents: 'none' }}>
-                    {formatItemTime(pb.item)}
-                  </text>
-                </g>
-              )}
             </g>
           )
         })}
