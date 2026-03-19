@@ -68,22 +68,23 @@ export function useSystemHealth(tasksOrInput: Task[] | SystemHealthInput): Syste
     const incompleteTasks = tasks.filter(t => !t.completed)
     const now = new Date()
 
-    // Categorize tasks
-    // Inbox = no schedule, not someday, AND either no defer or defer time has passed
+    // Categorize tasks using the bucket system
+    // Inbox = bucket is 'inbox' or undefined/null (legacy tasks without bucket)
     const inboxTasks = incompleteTasks.filter(t => {
+      if (t.bucket && t.bucket !== 'inbox') return false
       if (t.scheduledFor) return false
       if (t.isSomeday) return false
-      // If deferred to a future time, not in inbox yet
-      if (t.deferredUntil) {
-        return new Date(t.deferredUntil) <= now
-      }
       return true
     })
-    const scheduledTasks = incompleteTasks.filter(t => t.scheduledFor)
-    // Deferred = has deferredUntil in the future (past deferrals are inbox items)
+    const scheduledTasks = incompleteTasks.filter(t => t.scheduledFor || t.bucket === 'timed')
+    // Deferred = bucket is week/month/quarter (temporal home but not scheduled to a specific time)
     const deferredTasks = incompleteTasks.filter(t => {
-      if (!t.deferredUntil) return false
-      return new Date(t.deferredUntil) > now
+      if (t.bucket === 'week' || t.bucket === 'month' || t.bucket === 'quarter') return true
+      // Legacy: deferredUntil in the future
+      if (t.deferredUntil && !t.bucket) {
+        return new Date(t.deferredUntil) > now
+      }
+      return false
     })
 
     // Calculate age categories for inbox items

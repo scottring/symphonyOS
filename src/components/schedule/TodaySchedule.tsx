@@ -87,6 +87,7 @@ interface ClarityIndicatorProps {
   familyMembers: FamilyMember[]
   projectsWithLinkedEvents?: Set<string>
   onScrollToInbox?: () => void
+  onClearAssigneeFilter?: () => void
   onOpenProject?: (projectId: string) => void
   onAssignTaskAll?: (taskId: string, memberIds: string[]) => void
 }
@@ -97,6 +98,7 @@ function ClarityIndicator({
   familyMembers,
   projectsWithLinkedEvents = new Set(),
   onScrollToInbox,
+  onClearAssigneeFilter,
   onOpenProject,
   onAssignTaskAll,
 }: ClarityIndicatorProps) {
@@ -231,6 +233,7 @@ function ClarityIndicator({
               {metrics.freshInboxItems > 0 && onScrollToInbox && (
                 <button
                   onClick={() => {
+                    onClearAssigneeFilter?.()
                     onScrollToInbox()
                     setIsExpanded(false)
                   }}
@@ -250,6 +253,7 @@ function ClarityIndicator({
               {metrics.agingItems > 0 && (
                 <button
                   onClick={() => {
+                    onClearAssigneeFilter?.()
                     if (onScrollToInbox) {
                       onScrollToInbox()
                     }
@@ -274,6 +278,7 @@ function ClarityIndicator({
               {metrics.staleItems > 0 && (
                 <button
                   onClick={() => {
+                    onClearAssigneeFilter?.()
                     if (onScrollToInbox) {
                       onScrollToInbox()
                     }
@@ -1297,6 +1302,7 @@ export function TodaySchedule({
                   familyMembers={familyMembers}
                   projectsWithLinkedEvents={projectsWithLinkedEvents}
                   onScrollToInbox={scrollToInbox}
+                  onClearAssigneeFilter={onSelectAssignee ? () => onSelectAssignee(null) : undefined}
                   onOpenProject={onOpenProject}
                   onAssignTaskAll={onAssignTaskAll}
                 />
