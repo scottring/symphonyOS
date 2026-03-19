@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useWallData } from '@/hooks/useWallData'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import type { TimelineItem } from '@/types/timeline'
-import { WallChoresWidget } from './WallChoresWidget'
+import { WallRoadMap } from './WallRoadMap'
 import { WallJaxWidget } from './WallJaxWidget'
 import { WallScreenTimeWidget } from './WallScreenTimeWidget'
 import { WallLookAhead } from './WallLookAhead'
@@ -197,13 +197,6 @@ export function WallCalendar() {
     nightWakeTimerRef.current = setTimeout(() => setNightWake(false), 30_000)
   }, [])
 
-  // ═══ CHORE PROGRESS ═══
-  const choreProgress = useMemo(() => {
-    const total = choreItems.length
-    const done = choreItems.filter(i => i.completed).length
-    return { total, done, pct: total > 0 ? done / total : 0 }
-  }, [choreItems])
-
   // ════════════════════════════════════════════════════════════════
   // RENDER: Night mode
   // ════════════════════════════════════════════════════════════════
@@ -331,32 +324,15 @@ export function WallCalendar() {
         style={{ gridTemplateColumns: '1fr 380px', gridTemplateRows: '1fr auto' }}
       >
 
-        {/* ─── PANEL: Chores + Tasks ─── */}
-        <div className={`${glass} p-6 min-h-0 flex flex-col`}>
-          {/* Progress integrated into header */}
-          {choreProgress.total > 0 && (
-            <div className="flex items-center gap-4 mb-4">
-              <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-[#6DC4A7] rounded-full transition-all duration-700 ease-out"
-                  style={{ width: `${choreProgress.pct * 100}%` }}
-                />
-              </div>
-              <span className="text-white/35 font-black text-[0.95rem] tabular-nums tracking-wide">
-                {choreProgress.done} of {choreProgress.total}
-              </span>
-              {choreProgress.pct === 1 && <span className="text-[1.1rem]">🎉</span>}
-            </div>
-          )}
-
-          <div className="flex-1 min-h-0">
-            <WallChoresWidget
-              choreItems={choreItems}
-              taskItems={taskItems}
-              onComplete={handleComplete}
-              overdueItems={wallData.overdueTasks}
-            />
-          </div>
+        {/* ─── PANEL: Road Map ─── */}
+        <div className={`${glass} p-0 min-h-0 flex flex-col overflow-hidden`}>
+          <WallRoadMap
+            choreItems={choreItems}
+            taskItems={taskItems}
+            onComplete={handleComplete}
+            overdueItems={wallData.overdueTasks}
+            currentTime={currentTime}
+          />
         </div>
 
         {/* ─── PANEL: Look Ahead ─── */}
