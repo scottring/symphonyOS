@@ -45,7 +45,7 @@ const DAY_SPAN = DAY_END_MIN - DAY_START_MIN // 900
 const BUILDING_OFFSET = 55
 
 // Min spacing between buildings along the path (in path-length units)
-const MIN_SPACING = 50
+const MIN_SPACING = 70
 
 // ============================================================================
 // HELPERS
@@ -101,6 +101,23 @@ function getBuildingColors(item: TimelineItem): { wall: string; roof: string; ac
     default:
       return { wall: '#F9C35C', roof: '#D4A033', accent: '#FFF3D0' }
   }
+}
+
+// Wrap text into lines of max ~12 chars each
+function wrapText(text: string, maxChars = 12): string[] {
+  const words = text.split(' ')
+  const lines: string[] = []
+  let current = ''
+  for (const word of words) {
+    if (current && (current.length + 1 + word.length) > maxChars) {
+      lines.push(current)
+      current = word
+    } else {
+      current = current ? current + ' ' + word : word
+    }
+  }
+  if (current) lines.push(current)
+  return lines
 }
 
 // Get normal vector at a point along the path (perpendicular to tangent)
@@ -543,11 +560,11 @@ export function WallRoadMap({ choreItems, taskItems, onComplete, overdueItems, c
               {/* Completed flag */}
               {isCompleted && <CompletedFlag />}
 
-              {/* Title label underneath */}
+              {/* Title label underneath (wrapped) */}
               <text
-                x={0} y={38}
+                x={0} y={36}
                 textAnchor="middle"
-                fontSize={12}
+                fontSize={11}
                 fontWeight="900"
                 fill="white"
                 stroke="rgba(0,0,0,0.5)"
@@ -555,7 +572,9 @@ export function WallRoadMap({ choreItems, taskItems, onComplete, overdueItems, c
                 paintOrder="stroke"
                 style={{ pointerEvents: 'none' }}
               >
-                {pb.item.title}
+                {wrapText(pb.item.title).map((line, i) => (
+                  <tspan key={i} x={0} dy={i === 0 ? 0 : 13}>{line}</tspan>
+                ))}
               </text>
             </g>
           )
