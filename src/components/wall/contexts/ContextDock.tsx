@@ -84,7 +84,7 @@ export function ContextDock({ rules, onActivate, onDismiss }: ContextDockProps) 
   if (rules.length === 0) return null
 
   return (
-    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3">
+    <div className="absolute bottom-[100px] left-1/2 -translate-x-1/2 z-40 flex items-center gap-3">
       {rules.map((rule, i) => (
         <ContextButton
           key={rule.id}
