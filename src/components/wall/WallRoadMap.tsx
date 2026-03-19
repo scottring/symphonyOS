@@ -555,7 +555,7 @@ export function WallRoadMap({ choreItems, taskItems, onComplete, overdueItems, c
                 paintOrder="stroke"
                 style={{ pointerEvents: 'none' }}
               >
-                {pb.item.title.length > 16 ? pb.item.title.slice(0, 15) + '…' : pb.item.title}
+                {pb.item.title}
               </text>
             </g>
           )
