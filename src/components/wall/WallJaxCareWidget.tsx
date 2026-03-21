@@ -28,8 +28,7 @@ interface CareItem {
 }
 
 const CARE_ITEMS: CareItem[] = [
-  { id: 'med-am', emoji: '💊', label: 'AM Meds' },
-  { id: 'med-pm', emoji: '💊', label: 'PM Meds' },
+  { id: 'med-am', emoji: '💊', label: 'Meds' },
   { id: 'fed-am', emoji: '🍖', label: 'Breakfast' },
   { id: 'fed-pm', emoji: '🍖', label: 'Dinner' },
   { id: 'bone',   emoji: '🦴', label: 'Bone' },
