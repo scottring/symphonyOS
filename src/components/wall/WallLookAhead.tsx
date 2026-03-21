@@ -9,21 +9,20 @@ interface WallLookAheadProps {
   className?: string
 }
 
-interface Highlight {
-  date: Date
+interface DayHighlight {
   dayLabel: string
-  title: string
-  time: string | null
   colorClass: string
+  items: { title: string; time: string | null }[]
 }
 
-const MAX_HIGHLIGHTS = 4
+const MAX_DAYS = 4
+const MAX_ITEMS_PER_DAY = 3
 
-function getHighlights(days: WallDayData[], _familyMembers: FamilyMember[]): Highlight[] {
-  const highlights: Highlight[] = []
+// Custom colors for nodes
+const COLORS = ['bg-[#6DC4A7]', 'bg-[#F26E63]', 'bg-[#F9C35C]', 'bg-[#6DC4A7]']
 
-  // Custom colors for nodes
-  const COLORS = ['bg-[#6DC4A7]', 'bg-[#F26E63]', 'bg-[#F9C35C]', 'bg-[#6DC4A7]']
+function getDayHighlights(days: WallDayData[], _familyMembers: FamilyMember[]): DayHighlight[] {
+  const highlights: DayHighlight[] = []
 
   for (let i = 0; i < days.length; i++) {
     const day = days[i]
@@ -31,40 +30,47 @@ function getHighlights(days: WallDayData[], _familyMembers: FamilyMember[]): Hig
     if (day.isToday) dayLabel = 'TODAY'
     else if (i === 1) dayLabel = 'TOMORROW'
 
-    // Find the first interesting event/task for the day
-    let bestItem = null
-    for (const section of ['morning', 'afternoon', 'evening', 'allday'] as const) {
-      if (bestItem) break
-      const items = day.items[section] || []
-      bestItem = items.find(item => item.type !== 'routine' && !item.completed) || null
+    // Collect all non-routine, non-completed items across all sections
+    const items: { title: string; time: string | null }[] = []
+    for (const section of ['allday', 'morning', 'afternoon', 'evening'] as const) {
+      const sectionItems = day.items[section] || []
+      for (const item of sectionItems) {
+        if (item.type !== 'routine' && !item.completed && items.length < MAX_ITEMS_PER_DAY) {
+          items.push({
+            title: item.title.toUpperCase(),
+            time: item.startTime && !item.allDay ? formatTime(item.startTime) : null,
+          })
+        }
+      }
     }
 
-    if (bestItem) {
+    // Add birthdays if no items or as extra
+    if (day.birthdays.length > 0 && items.length < MAX_ITEMS_PER_DAY) {
+      for (const bday of day.birthdays) {
+        if (items.length >= MAX_ITEMS_PER_DAY) break
+        items.push({
+          title: `${bday.name.toUpperCase()}'S BIRTHDAY`,
+          time: null,
+        })
+      }
+    }
+
+    if (items.length > 0) {
       highlights.push({
-        date: day.date,
         dayLabel: dayLabel.toUpperCase(),
-        title: bestItem.title.toUpperCase(),
-        time: bestItem.startTime && !bestItem.allDay ? formatTime(bestItem.startTime) : null,
-        colorClass: COLORS[highlights.length % COLORS.length]
-      })
-    } else if (day.birthdays.length > 0) {
-      highlights.push({
-        date: day.date,
-        dayLabel: dayLabel.toUpperCase(),
-        title: `${day.birthdays[0].name.toUpperCase()}'S BIRTHDAY`,
-        time: null,
-        colorClass: COLORS[highlights.length % COLORS.length]
+        colorClass: COLORS[highlights.length % COLORS.length],
+        items,
       })
     }
 
-    if (highlights.length >= MAX_HIGHLIGHTS) break
+    if (highlights.length >= MAX_DAYS) break
   }
 
   return highlights
 }
 
 export function WallLookAhead({ days, familyMembers, className = '' }: WallLookAheadProps) {
-  const highlights = getHighlights(days, familyMembers)
+  const highlights = getDayHighlights(days, familyMembers)
 
   return (
     <div className={`flex flex-col ${className}`}>
@@ -77,7 +83,7 @@ export function WallLookAhead({ days, familyMembers, className = '' }: WallLookA
         <div className="absolute left-[7px] top-4 bottom-4 w-1 bg-white/20 rounded-full" />
 
         {highlights.map((h, i) => (
-          <div key={i} className="relative mb-10 last:mb-0">
+          <div key={i} className="relative mb-8 last:mb-0">
             {/* Timeline Node */}
             <div className={`absolute -left-[30px] top-1.5 w-5 h-5 rounded-full ${h.colorClass} shadow-md border-[3px] border-[#1e293b]`} />
 
@@ -85,12 +91,14 @@ export function WallLookAhead({ days, familyMembers, className = '' }: WallLookA
               <span className="text-[1.3rem] font-bold text-white tracking-widest leading-none">
                 {h.dayLabel}
               </span>
-              <span className="text-[1.1rem] font-medium text-white/70 mt-1 uppercase tracking-wide">
-                {h.time ? `${h.time}: ` : ''}{h.title}
-              </span>
+              {h.items.map((item, j) => (
+                <span key={j} className="text-[1.05rem] font-medium text-white/70 mt-1 uppercase tracking-wide">
+                  {item.time ? `${item.time}: ` : ''}{item.title}
+                </span>
+              ))}
             </div>
 
-            {/* Horizontal line extending from yesterday/today - aesthetic touch mimicking the mock */}
+            {/* Horizontal line extending from first node - aesthetic touch */}
             {i === 0 && (
               <div className="absolute top-2 left-6 right-[-20px] h-1 bg-[#2e3e57] rounded-full -z-10" />
             )}
