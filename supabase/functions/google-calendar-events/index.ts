@@ -174,7 +174,10 @@ serve(async (req) => {
 
     const hasMappings = allMappings && allMappings.length > 0
 
-    if (domain && domain !== 'universal') {
+    if (domain === 'all') {
+      // 'all' = no filtering, show every calendar (used by kiosk/wall view)
+      console.log(`Fetching events from all ${calendars.length} calendars (domain: all)`)
+    } else if (domain && domain !== 'universal') {
       // Specific domain: only show calendars mapped to this domain
       if (!hasMappings) {
         console.log(`No calendars assigned to domain: ${domain}`)

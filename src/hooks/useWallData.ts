@@ -152,9 +152,9 @@ export function useWallData(): UseWallDataReturn {
           .lte('target_date', endStr)
           .in('status', ['pending', 'in_progress']),
 
-        // 7. Calendar events
+        // 7. Calendar events (fetch ALL calendars for kiosk, no domain filtering)
         isConnected
-          ? fetchEvents(startDate, endDate).catch(() => [] as CalendarEvent[])
+          ? fetchEvents(startDate, endDate, 'all').catch(() => [] as CalendarEvent[])
           : Promise.resolve([] as CalendarEvent[]),
 
         // 8–10. Screen time data (today only)

@@ -76,7 +76,7 @@ interface GoogleCalendarContextValue {
   error: string | null
   connect: () => Promise<void>
   disconnect: () => Promise<void>
-  fetchEvents: (startDate: Date, endDate: Date) => Promise<CalendarEvent[]>
+  fetchEvents: (startDate: Date, endDate: Date, domainOverride?: string) => Promise<CalendarEvent[]>
   fetchTodayEvents: () => Promise<CalendarEvent[]>
   fetchWeekEvents: () => Promise<CalendarEvent[]>
   fetchCalendarList: () => Promise<GoogleCalendarInfo[]>
@@ -228,7 +228,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // Fetch events for a date range
-  const fetchEvents = useCallback(async (startDate: Date, endDate: Date) => {
+  const fetchEvents = useCallback(async (startDate: Date, endDate: Date, domainOverride?: string) => {
     if (!isConnected) {
       setEvents([])
       return []
@@ -243,7 +243,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
         body: {
           startDate: startDate.toISOString(),
           endDate: endDate.toISOString(),
-          domain: currentDomain, // Pass current domain for filtering
+          domain: domainOverride ?? currentDomain, // Pass current domain for filtering
         },
       })
 
