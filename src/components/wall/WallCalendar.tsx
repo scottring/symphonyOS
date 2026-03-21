@@ -4,10 +4,11 @@ import { supabase } from '@/lib/supabase'
 import { useWallData } from '@/hooks/useWallData'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import type { TimelineItem } from '@/types/timeline'
+import { assignRoom } from './roomConfig'
 import { WallRoomsView } from './WallRoomsView'
 import { WallRoutineColumn } from './WallRoutineColumn'
 import { WallTaskColumn } from './WallTaskColumn'
-import { WallJaxWidget } from './WallJaxWidget'
+import { WallJaxCareWidget } from './WallJaxCareWidget'
 import { WallLookAhead } from './WallLookAhead'
 import { WallItemDetail } from './WallItemDetail'
 import { findDinnerEvent, getMealIcon } from './WallDinnerWidget'
@@ -119,31 +120,35 @@ export function WallCalendar() {
     return { choreItems: chores, taskItems: tasks }
   }, [wallData.days])
 
-  // ═══ SPLIT TASKS: room vs adult ═══
-  const { roomTasks, adultTasks } = useMemo(() => {
+  // ═══ SPLIT TASKS: room vs general vs adult ═══
+  const { roomTasks, generalTasks, adultTasks } = useMemo(() => {
     const parentMemberIds = new Set(
       wallData.familyMembers
         .filter(m => m.role_label?.toLowerCase() === 'parent')
         .map(m => m.id)
     )
     const room: TimelineItem[] = []
+    const general: TimelineItem[] = []
     const adult: TimelineItem[] = []
-    for (const task of taskItems) {
+
+    const classify = (task: TimelineItem) => {
       if (task.assignedTo && parentMemberIds.has(task.assignedTo)) {
         adult.push(task)
       } else {
-        room.push(task)
+        // Only put in rooms if it matches a real room keyword (not "general" catch-all)
+        const matched = assignRoom(task.title)
+        if (matched.id !== 'general') {
+          room.push(task)
+        } else {
+          general.push(task)
+        }
       }
     }
-    // Also include overdue tasks in rooms
-    for (const task of wallData.overdueTasks) {
-      if (task.assignedTo && parentMemberIds.has(task.assignedTo)) {
-        adult.push(task)
-      } else {
-        room.push(task)
-      }
-    }
-    return { roomTasks: room, adultTasks: adult }
+
+    for (const task of taskItems) classify(task)
+    for (const task of wallData.overdueTasks) classify(task)
+
+    return { roomTasks: room, generalTasks: general, adultTasks: adult }
   }, [taskItems, wallData.familyMembers, wallData.overdueTasks])
 
   // ═══ DETAIL OVERLAY ═══
@@ -386,7 +391,7 @@ export function WallCalendar() {
         {/* ─── PANEL: Tasks ─── */}
         <div className={`${glass} p-5 min-h-0 overflow-hidden flex flex-col`}>
           <WallTaskColumn
-            taskItems={taskItems}
+            taskItems={generalTasks}
             onComplete={handleComplete}
             onItemTap={handleItemTap}
           />
@@ -403,15 +408,10 @@ export function WallCalendar() {
 
         {/* ─── BOTTOM ROW: Widget Strip ─── */}
         <div className="flex gap-4 col-span-4">
-          {/* Jax Widget */}
-          <div className={`${glass} px-5 py-4 flex-1`}>
-            <WallJaxWidget />
+          {/* Jax Care Widget (meds + fed + bone + treat + sleep tracker) */}
+          <div className={`${glass} px-5 py-4`} style={{ flex: '2 1 0%' }}>
+            <WallJaxCareWidget />
           </div>
-
-          {/* Screen Time Widget — hidden to make room for dog meds */}
-          {/* <div className={`${glass} px-5 py-4 flex-1`}>
-            <WallScreenTimeWidget />
-          </div> */}
 
           {/* Dinner Widget */}
           <div className={`${glass} px-5 py-4 flex-1 flex items-center gap-4 ${recipeUrl ? 'cursor-pointer' : ''}`}
@@ -436,36 +436,6 @@ export function WallCalendar() {
               <span className="text-white/30 text-[1rem]">📖</span>
             )}
           </div>
-
-          {/* Dog Meds Weaning Widget */}
-          {(() => {
-            const WEAN_START = new Date(2026, 2, 19) // Mar 19, 2026
-            const today = new Date()
-            today.setHours(0, 0, 0, 0)
-            const dayNum = Math.floor((today.getTime() - WEAN_START.getTime()) / 86400000) + 1
-            if (dayNum < 1) return null // not started yet
-            const isHalfPhase = dayNum <= 14
-            const dose = isHalfPhase ? '½' : '¼'
-            const phase = isHalfPhase ? `Day ${dayNum} of 14` : `Day ${dayNum - 14} · taper`
-            const phasePct = isHalfPhase ? dayNum / 14 : Math.min((dayNum - 14) / 14, 1)
-            return (
-              <div className={`${glass} px-5 py-4 flex items-center gap-4`}>
-                <div className="text-[2.2rem] flex-shrink-0">💊</div>
-                <div className="flex flex-col min-w-0 flex-1">
-                  <span className="text-white/40 font-black uppercase tracking-widest text-[0.6rem]">
-                    Jax Meds · AM
-                  </span>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-white font-black text-[1.3rem] leading-tight">{dose} tab</span>
-                    <span className="text-white/40 font-bold text-[0.8rem]">{phase}</span>
-                  </div>
-                  <div className="h-1.5 bg-white/10 rounded-full mt-1.5 overflow-hidden" style={{ width: 100 }}>
-                    <div className="h-full bg-[#6DC4A7] rounded-full transition-all" style={{ width: `${phasePct * 100}%` }} />
-                  </div>
-                </div>
-              </div>
-            )
-          })()}
 
           {/* Soccer Tip Widget */}
           {(() => {

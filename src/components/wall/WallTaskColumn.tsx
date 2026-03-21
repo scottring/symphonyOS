@@ -8,6 +8,16 @@ interface WallTaskColumnProps {
   onItemTap?: (item: TimelineItem) => void
 }
 
+function formatItemTime(item: TimelineItem): string | null {
+  if (!item.startTime) return null
+  const d = new Date(item.startTime)
+  const h = d.getHours()
+  const m = d.getMinutes()
+  const period = h >= 12 ? 'p' : 'a'
+  const hour = h % 12 || 12
+  return m === 0 ? `${hour}${period}` : `${hour}:${m.toString().padStart(2, '0')}${period}`
+}
+
 function getEmojiIcon(title: string) {
   const lower = title.toLowerCase()
   if (lower.includes('grocery') || lower.includes('shop')) return '🛒'
@@ -102,6 +112,7 @@ export function WallTaskColumn({ taskItems, onComplete, onItemTap }: WallTaskCol
             const isPressing = pressingId === item.id
             const isDone = item.completed
             const icon = getEmojiIcon(item.title)
+            const timeStr = formatItemTime(item)
 
             return (
               <div
@@ -134,6 +145,12 @@ export function WallTaskColumn({ taskItems, onComplete, onItemTap }: WallTaskCol
                 >
                   {item.title}
                 </span>
+
+                {timeStr && !isDone && (
+                  <span className="text-[0.6rem] font-bold text-white/35 uppercase flex-shrink-0 relative z-10">
+                    {timeStr}
+                  </span>
+                )}
 
                 {isDone && (
                   <span className="text-[0.75rem] relative z-10">✅</span>
