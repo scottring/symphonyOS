@@ -6,6 +6,7 @@ import { useActionableInstances } from '@/hooks/useActionableInstances'
 import type { TimelineItem } from '@/types/timeline'
 import { WallRoomsView } from './WallRoomsView'
 import { WallRoutineColumn } from './WallRoutineColumn'
+import { WallTaskColumn } from './WallTaskColumn'
 import { WallJaxWidget } from './WallJaxWidget'
 import { WallLookAhead } from './WallLookAhead'
 import { WallItemDetail } from './WallItemDetail'
@@ -361,7 +362,7 @@ export function WallCalendar() {
 
       {/* ═══ MAIN CONTENT — CSS Grid ═══ */}
       <main className="flex-1 grid min-h-0 relative z-10 px-10 pb-6 gap-4"
-        style={{ gridTemplateColumns: '1fr 260px 380px', gridTemplateRows: '1fr auto' }}
+        style={{ gridTemplateColumns: '1fr 260px 260px 380px', gridTemplateRows: '1fr auto' }}
       >
 
         {/* ─── PANEL: Rooms ─── */}
@@ -382,6 +383,15 @@ export function WallCalendar() {
           />
         </div>
 
+        {/* ─── PANEL: Tasks ─── */}
+        <div className={`${glass} p-5 min-h-0 overflow-hidden flex flex-col`}>
+          <WallTaskColumn
+            taskItems={taskItems}
+            onComplete={handleComplete}
+            onItemTap={handleItemTap}
+          />
+        </div>
+
         {/* ─── PANEL: Look Ahead ─── */}
         <div className={`${glass} p-6 min-h-0 overflow-hidden flex flex-col`}>
           <WallLookAhead
@@ -392,7 +402,7 @@ export function WallCalendar() {
         </div>
 
         {/* ─── BOTTOM ROW: Widget Strip ─── */}
-        <div className="flex gap-4 col-span-3">
+        <div className="flex gap-4 col-span-4">
           {/* Jax Widget */}
           <div className={`${glass} px-5 py-4 flex-1`}>
             <WallJaxWidget />
