@@ -488,12 +488,35 @@ export function WallCalendar() {
             </div>
           )}
 
+          {/* Context Dock (inline) */}
+          {!activeContext && surfacedRules.length > 0 && (
+            <div className={`${glass} px-4 py-3 flex items-center gap-2`}>
+              {surfacedRules.map((rule) => (
+                <button
+                  key={rule.id}
+                  onClick={() => activateContext(rule.id)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl border backdrop-blur-md transition-all hover:scale-[1.03] active:scale-[0.97] select-none"
+                  style={{
+                    backgroundColor: rule.color + '20',
+                    borderColor: rule.color + '35',
+                    touchAction: 'manipulation',
+                  }}
+                >
+                  <span className="text-[1.2rem]">{rule.icon}</span>
+                  <span className="text-white font-black text-[0.7rem] uppercase tracking-wider leading-none">
+                    {rule.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Alien Joke Widget */}
-          <div className={`${glass} px-5 py-4 flex items-center gap-3`} style={{ maxWidth: 380 }}>
-            <div className="text-[2.8rem] flex-shrink-0" style={{ transform: 'scaleX(-1)' }}>
+          <div className={`${glass} px-4 py-3 flex items-center gap-2`} style={{ maxWidth: 280 }}>
+            <div className="text-[2rem] flex-shrink-0" style={{ transform: 'scaleX(-1)' }}>
               👽
             </div>
-            <p className="text-white/70 font-bold uppercase tracking-wider text-[0.7rem] leading-snug" style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+            <p className="text-white/60 font-bold uppercase tracking-wider text-[0.55rem] leading-snug" style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
               {getDailyJoke()}
             </p>
           </div>
@@ -534,13 +557,7 @@ export function WallCalendar() {
         </div>
       )}
 
-      {!activeContext && surfacedRules.length > 0 && (
-        <ContextDock
-          rules={surfacedRules}
-          onActivate={activateContext}
-          onDismiss={dismissRule}
-        />
-      )}
+      {/* ContextDock moved inline to widget strip */}
 
       {activeContext && contextEvalData && (
         <ContextOverlay
