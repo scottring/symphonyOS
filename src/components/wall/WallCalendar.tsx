@@ -117,7 +117,13 @@ export function WallCalendar() {
         else if (item.type === 'task') tasks.push(item)
       }
     }
-    return { choreItems: chores, taskItems: tasks }
+    // Filter Jax-related routines — handled by the Jax care widget
+    const JAX_KEYWORDS = ['jax', 'walk jax', 'feed jax', 'jax dinner', 'jax med']
+    const nonJaxChores = chores.filter(item => {
+      const lower = item.title.toLowerCase()
+      return !JAX_KEYWORDS.some(kw => lower.includes(kw))
+    })
+    return { choreItems: nonJaxChores, taskItems: tasks }
   }, [wallData.days])
 
   // ═══ SPLIT TASKS: room vs general vs adult ═══
