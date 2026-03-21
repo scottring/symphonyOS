@@ -1,18 +1,26 @@
 import type { WallDayData } from '@/hooks/useWallData'
 import type { FamilyMember } from '@/types/family'
+import type { TimelineItem } from '@/types/timeline'
 
 import { formatTime } from '@/lib/timeUtils'
 
 interface WallLookAheadProps {
   days: WallDayData[]
   familyMembers: FamilyMember[]
+  onItemTap?: (item: TimelineItem) => void
   className?: string
+}
+
+interface HighlightItem {
+  title: string
+  time: string | null
+  sourceItem: TimelineItem | null  // null for birthdays
 }
 
 interface DayHighlight {
   dayLabel: string
   colorClass: string
-  items: { title: string; time: string | null }[]
+  items: HighlightItem[]
 }
 
 const MAX_DAYS = 4
@@ -31,7 +39,7 @@ function getDayHighlights(days: WallDayData[], _familyMembers: FamilyMember[]): 
     else if (i === 1) dayLabel = 'TOMORROW'
 
     // Collect all non-routine, non-completed items across all sections
-    const items: { title: string; time: string | null }[] = []
+    const items: HighlightItem[] = []
     for (const section of ['allday', 'morning', 'afternoon', 'evening'] as const) {
       const sectionItems = day.items[section] || []
       for (const item of sectionItems) {
@@ -39,6 +47,7 @@ function getDayHighlights(days: WallDayData[], _familyMembers: FamilyMember[]): 
           items.push({
             title: item.title.toUpperCase(),
             time: item.startTime && !item.allDay ? formatTime(item.startTime) : null,
+            sourceItem: item,
           })
         }
       }
@@ -51,6 +60,7 @@ function getDayHighlights(days: WallDayData[], _familyMembers: FamilyMember[]): 
         items.push({
           title: `${bday.name.toUpperCase()}'S BIRTHDAY`,
           time: null,
+          sourceItem: null,
         })
       }
     }
@@ -69,7 +79,7 @@ function getDayHighlights(days: WallDayData[], _familyMembers: FamilyMember[]): 
   return highlights
 }
 
-export function WallLookAhead({ days, familyMembers, className = '' }: WallLookAheadProps) {
+export function WallLookAhead({ days, familyMembers, onItemTap, className = '' }: WallLookAheadProps) {
   const highlights = getDayHighlights(days, familyMembers)
 
   return (
@@ -92,7 +102,11 @@ export function WallLookAhead({ days, familyMembers, className = '' }: WallLookA
                 {h.dayLabel}
               </span>
               {h.items.map((item, j) => (
-                <span key={j} className="text-[1.05rem] font-medium text-white/70 mt-1 uppercase tracking-wide">
+                <span
+                  key={j}
+                  className={`text-[1.05rem] font-medium text-white/70 mt-1 uppercase tracking-wide ${item.sourceItem && onItemTap ? 'cursor-pointer hover:text-white/90 transition-colors' : ''}`}
+                  onClick={item.sourceItem && onItemTap ? () => onItemTap(item.sourceItem!) : undefined}
+                >
                   {item.time ? `${item.time}: ` : ''}{item.title}
                 </span>
               ))}

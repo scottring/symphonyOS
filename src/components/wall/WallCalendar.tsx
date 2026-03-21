@@ -4,10 +4,11 @@ import { supabase } from '@/lib/supabase'
 import { useWallData } from '@/hooks/useWallData'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import type { TimelineItem } from '@/types/timeline'
-import { WallRoadMap } from './WallRoadMap'
+import { WallRoomsView } from './WallRoomsView'
+import { WallRoutineColumn } from './WallRoutineColumn'
 import { WallJaxWidget } from './WallJaxWidget'
-import { WallScreenTimeWidget } from './WallScreenTimeWidget'
 import { WallLookAhead } from './WallLookAhead'
+import { WallItemDetail } from './WallItemDetail'
 import { findDinnerEvent, getMealIcon } from './WallDinnerWidget'
 import { WallRecipeViewer } from './WallRecipeViewer'
 import { extractRecipeNameHint, detectRecipeUrl } from '@/lib/recipeDetection'
@@ -56,9 +57,10 @@ export function WallCalendar() {
   const [showRecipeViewer, setShowRecipeViewer] = useState(false)
   const [showSoccerTip, setShowSoccerTip] = useState(false)
   const [showRunningTip, setShowRunningTip] = useState(false)
+  const [detailItem, setDetailItem] = useState<TimelineItem | null>(null)
   const { cards: agentCards, dismissCard } = useKioskCards()
 
-  // ═══ CHORE COMPLETION ═══
+  // ═══ COMPLETION ═══
   const handleComplete = useCallback(async (item: TimelineItem) => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -76,6 +78,9 @@ export function WallCalendar() {
       } else {
         await markDone('calendar_event', eventId, today)
       }
+    } else if (item.type === 'task') {
+      const taskId = item.id.replace('task-', '')
+      await supabase.from('tasks').update({ completed: !item.completed }).eq('id', taskId)
     }
     wallData.refetch()
   }, [markDone, undoDone, wallData])
@@ -112,6 +117,41 @@ export function WallCalendar() {
     }
     return { choreItems: chores, taskItems: tasks }
   }, [wallData.days])
+
+  // ═══ SPLIT TASKS: room vs adult ═══
+  const { roomTasks, adultTasks } = useMemo(() => {
+    const parentMemberIds = new Set(
+      wallData.familyMembers
+        .filter(m => m.role_label?.toLowerCase() === 'parent')
+        .map(m => m.id)
+    )
+    const room: TimelineItem[] = []
+    const adult: TimelineItem[] = []
+    for (const task of taskItems) {
+      if (task.assignedTo && parentMemberIds.has(task.assignedTo)) {
+        adult.push(task)
+      } else {
+        room.push(task)
+      }
+    }
+    // Also include overdue tasks in rooms
+    for (const task of wallData.overdueTasks) {
+      if (task.assignedTo && parentMemberIds.has(task.assignedTo)) {
+        adult.push(task)
+      } else {
+        room.push(task)
+      }
+    }
+    return { roomTasks: room, adultTasks: adult }
+  }, [taskItems, wallData.familyMembers, wallData.overdueTasks])
+
+  // ═══ DETAIL OVERLAY ═══
+  const handleItemTap = useCallback((item: TimelineItem) => {
+    setDetailItem(item)
+  }, [])
+  const handleCloseDetail = useCallback(() => {
+    setDetailItem(null)
+  }, [])
 
   // ═══ RECIPE ═══
   const dinnerEvent = useMemo(
@@ -321,27 +361,38 @@ export function WallCalendar() {
 
       {/* ═══ MAIN CONTENT — CSS Grid ═══ */}
       <main className="flex-1 grid min-h-0 relative z-10 px-10 pb-6 gap-4"
-        style={{ gridTemplateColumns: '1fr 380px', gridTemplateRows: '1fr auto' }}
+        style={{ gridTemplateColumns: '1fr 260px 380px', gridTemplateRows: '1fr auto' }}
       >
 
-        {/* ─── PANEL: Road Map ─── */}
-        <div className={`${glass} p-0 min-h-0 flex flex-col overflow-hidden`}>
-          <WallRoadMap
-            choreItems={choreItems}
-            taskItems={taskItems}
+        {/* ─── PANEL: Rooms ─── */}
+        <div className={`${glass} p-5 min-h-0 flex flex-col overflow-hidden`}>
+          <WallRoomsView
+            roomTasks={roomTasks}
+            adultTasks={adultTasks}
             onComplete={handleComplete}
-            overdueItems={wallData.overdueTasks}
-            currentTime={currentTime}
+            onItemTap={handleItemTap}
+          />
+        </div>
+
+        {/* ─── PANEL: Routines ─── */}
+        <div className={`${glass} p-5 min-h-0 overflow-hidden flex flex-col`}>
+          <WallRoutineColumn
+            choreItems={choreItems}
+            onComplete={handleComplete}
           />
         </div>
 
         {/* ─── PANEL: Look Ahead ─── */}
         <div className={`${glass} p-6 min-h-0 overflow-hidden flex flex-col`}>
-          <WallLookAhead days={wallData.days} familyMembers={wallData.familyMembers} />
+          <WallLookAhead
+            days={wallData.days}
+            familyMembers={wallData.familyMembers}
+            onItemTap={handleItemTap}
+          />
         </div>
 
         {/* ─── BOTTOM ROW: Widget Strip ─── */}
-        <div className="flex gap-4 col-span-2">
+        <div className="flex gap-4 col-span-3">
           {/* Jax Widget */}
           <div className={`${glass} px-5 py-4 flex-1`}>
             <WallJaxWidget />
@@ -534,6 +585,10 @@ export function WallCalendar() {
 
       {showRunningTip && (
         <WallRunningTipOverlay onClose={() => setShowRunningTip(false)} />
+      )}
+
+      {detailItem && (
+        <WallItemDetail item={detailItem} onClose={handleCloseDetail} />
       )}
     </div>
   )
