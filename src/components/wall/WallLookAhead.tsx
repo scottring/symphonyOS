@@ -43,7 +43,9 @@ function getDayHighlights(days: WallDayData[], _familyMembers: FamilyMember[]): 
     for (const section of ['allday', 'morning', 'afternoon', 'evening'] as const) {
       const sectionItems = day.items[section] || []
       for (const item of sectionItems) {
-        if (item.type !== 'routine' && !item.completed && items.length < MAX_ITEMS_PER_DAY) {
+        // Show tasks, events, and non-daily routines (weekly pickups, etc.)
+        const isNonDailyRoutine = item.type === 'routine' && item.recurrencePattern?.type && item.recurrencePattern.type !== 'daily'
+        if ((item.type !== 'routine' || isNonDailyRoutine) && !item.completed && items.length < MAX_ITEMS_PER_DAY) {
           items.push({
             title: item.title.toUpperCase(),
             time: item.startTime && !item.allDay ? formatTime(item.startTime) : null,

@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useRef, useEffect, forwardRef } from 'react'
+import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 import { logger } from '@/lib/logger'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
@@ -18,8 +18,9 @@ import { ScheduleItem } from './ScheduleItem'
 import { SwipeableCard } from './SwipeableCard'
 import { FollowUpInput } from './FollowUpInput'
 import { DateNavigator } from './DateNavigator'
-import { InboxSection } from './InboxSection'
 import { InboxTaskCard } from './InboxTaskCard'
+import { PullStrip } from './PullStrip'
+import { TodayAddInput } from './TodayAddInput'
 import { OverdueSection } from './OverdueSection'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { hasCoachingForItem } from '@/lib/coachingMatcher'
@@ -28,57 +29,6 @@ import { useSystemHealth } from '@/hooks/useSystemHealth'
 import { MultiAssigneeDropdown } from '@/components/family/MultiAssigneeDropdown'
 // import { CalendarClock } from 'lucide-react' // Hidden - Plan button removed
 
-// Inbox icon
-function InboxIcon({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 20 20" fill="currentColor">
-      <path fillRule="evenodd" d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 2h10v7h-2l-1 2H8l-1-2H5V5z" clipRule="evenodd" />
-    </svg>
-  )
-}
-
-// Check if current time is in "organize hours" (morning 6-9am or evening 6-9pm)
-function isOrganizeTime(): boolean {
-  const hour = new Date().getHours()
-  return (hour >= 6 && hour < 9) || (hour >= 18 && hour < 21)
-}
-
-interface InboxButtonProps {
-  onClick: () => void
-  inboxCount: number
-  isExpanded: boolean
-  pulse?: boolean
-}
-
-const InboxButton = forwardRef<HTMLButtonElement, InboxButtonProps>(
-  function InboxButton({ onClick, inboxCount, isExpanded, pulse }, ref) {
-    const emphasized = isOrganizeTime() && inboxCount > 0
-
-    return (
-      <button
-        ref={ref}
-        onClick={onClick}
-        className={`relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-          isExpanded
-            ? 'text-primary-700 bg-primary-100'
-            : emphasized
-            ? 'text-primary-700 bg-primary-50 hover:bg-primary-100'
-            : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100'
-        } ${pulse ? 'animate-pulse ring-2 ring-primary-400 ring-offset-2' : ''}`}
-      >
-        <InboxIcon className={`w-5 h-5 ${isExpanded || emphasized ? 'text-primary-600' : ''}`} />
-        <span className="hidden sm:inline">Inbox</span>
-        {inboxCount > 0 && (
-          <span className={`absolute -top-1.5 -right-1.5 min-w-[1.125rem] h-[1.125rem] px-1 flex items-center justify-center rounded-full text-white text-[10px] font-bold transition-transform ${
-            isExpanded || emphasized ? 'bg-primary-500' : 'bg-neutral-400'
-          } ${pulse ? 'scale-125' : ''}`}>
-            {inboxCount}
-          </span>
-        )}
-      </button>
-    )
-  }
-)
 
 // Inline Clarity indicator - clickable with expandable explanation
 interface ClarityIndicatorProps {
@@ -542,7 +492,7 @@ export function TodaySchedule({
 }: TodayScheduleProps) {
   // Get actions + reference data from context
   const {
-    onToggleWaiting, onUpdateTask, onPushTask,
+    onToggleWaiting, onUpdateTask, onPushTask, onCreateTask,
     onAssignTask, onAssignTaskAll, onAssignEvent, onAssignEventAll,
     onAssignRoutine, onAssignRoutineAll,
     onSkipRoutine, onPushRoutine, onUpdateRoutine,
@@ -663,9 +613,9 @@ export function TodaySchedule({
   } | null>(null)
   const [organizePulse, setOrganizePulse] = useState(false)
 
-  // Open inline inbox (was scroll to inbox)
+  // Scroll to pull strip (no-op now — pull strip is always visible)
   const scrollToInbox = useCallback(() => {
-    setShowInlineInbox(true)
+    // Pull strip is always visible, no toggle needed
   }, [])
 
   // Create a map for efficient task lookup by ID (for parent task names)
@@ -697,9 +647,7 @@ export function TodaySchedule({
     return assignedTo === selectedAssignee // Show items assigned to selected person
   }
 
-  // Inline inbox collapsed/expanded state
-  const [showInlineInbox, setShowInlineInbox] = useState(false)
-  const [showWeekPool, setShowWeekPool] = useState(false)
+  // (Pull strip replaces collapsed inbox/week pool)
   // Check if we're viewing today
   const isToday = useMemo(() => {
     const today = new Date()
@@ -721,11 +669,10 @@ export function TodaySchedule({
 
       setFlyingPill(e.detail)
 
-      // After animation completes, trigger pulse, expand inbox, and clear pill
+      // After animation completes, trigger pulse and clear pill
       setTimeout(() => {
         setFlyingPill(null)
         setOrganizePulse(true)
-        setShowInlineInbox(true) // Auto-expand to show where it landed
         setTimeout(() => setOrganizePulse(false), 600)
       }, 500) // Match the CSS animation duration
     }
@@ -797,12 +744,7 @@ export function TodaySchedule({
     })
   }, [tasks, isToday, selectedAssignee, projectsMap])
 
-  // Auto-close inbox when it becomes empty
-  useEffect(() => {
-    if (showInlineInbox && inboxTasks.length === 0) {
-      setShowInlineInbox(false)
-    }
-  }, [showInlineInbox, inboxTasks.length])
+
 
   // Completed inbox tasks - tasks completed from inbox/week/month on the viewed date
   const completedInboxTasks = useMemo(() => {
@@ -1110,31 +1052,6 @@ export function TodaySchedule({
             <div className="flex-1" />
             {/* Right side controls - unified group */}
             <div className="flex items-center pr-3">
-              {/* Inbox */}
-              {isToday && (
-                <button
-                  ref={organizeButtonRef}
-                  onClick={() => setShowInlineInbox(prev => !prev)}
-                  className={`flex items-center gap-0.5 mr-2 transition-all ${
-                    showInlineInbox ? 'text-primary-600' : 'text-neutral-400'
-                  } ${organizePulse ? 'animate-pulse' : ''}`}
-                >
-                  <InboxIcon className="w-3 h-3" />
-                  <span className="text-[11px] tabular-nums">{inboxTasks.length}</span>
-                </button>
-              )}
-              {/* Week pool count */}
-              {isToday && weekTasks.length > 0 && (
-                <button
-                  onClick={() => setShowWeekPool(prev => !prev)}
-                  className={`flex items-center gap-0.5 mr-2 transition-all ${
-                    showWeekPool ? 'text-blue-600' : 'text-neutral-400'
-                  }`}
-                >
-                  <span className="w-2 h-2 rounded-full bg-blue-400" />
-                  <span className="text-[11px] tabular-nums">{weekTasks.length}</span>
-                </button>
-              )}
               {/* Routines toggle */}
               {routines.length > 0 && (
                 <button
@@ -1207,20 +1124,9 @@ export function TodaySchedule({
               <DateNavigator date={viewedDate} onDateChange={onDateChange} showTodayButton={!isToday} />
             </div>
 
-            {/* Stats row: Inbox, Progress (centered), Clarity */}
+            {/* Stats row: Progress, Assignee, Toggles, Clarity */}
             <div className="flex items-center gap-4 pt-5 border-t border-neutral-200/60">
-              {/* Inbox button - left side */}
-              {isToday && (
-                <InboxButton
-                  ref={organizeButtonRef}
-                  onClick={() => setShowInlineInbox(prev => !prev)}
-                  inboxCount={inboxTasks.length}
-                  isExpanded={showInlineInbox}
-                  pulse={organizePulse}
-                />
-              )}
-
-              {/* Progress - centered with flex-1 */}
+              {/* Progress */}
               {actionableCount > 0 && (
                 <ProgressIndicator
                   completed={completedCount}
@@ -1328,90 +1234,24 @@ export function TodaySchedule({
         <SundayNudgeBanner onOpenWeeklyReview={onOpenWeeklyReview} />
       )}
 
-      {/* Inline collapsible inbox section */}
-      {isToday && showInlineInbox && inboxTasks.length > 0 && onUpdateTask && onPushTask && (
-        <div className="mb-4 md:mb-8 animate-fade-in-up">
-          <div className="rounded-xl md:rounded-2xl border border-neutral-200 bg-neutral-50/50">
-            {/* Inbox header */}
-            <div className="flex items-center justify-between px-3 py-2 md:px-4 md:py-3 border-b border-neutral-200/60">
-              <button
-                onClick={() => setShowInlineInbox(false)}
-                className="ml-auto p-1.5 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-200/50 transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </div>
-            {/* Inbox items with bulk select */}
-            <div className="p-2 md:p-3">
-              <InboxSection
-                tasks={inboxTasks}
-                onUpdateTask={onUpdateTask}
-                onToggleWaiting={onToggleWaiting}
-                onPushTask={onPushTask}
-                onSelectTask={(taskId) => handleSelectItem(`task-${taskId}`)}
-                projects={projects}
-                onOpenProject={onOpenProject}
-                familyMembers={familyMembers}
-                onAssignTaskAll={onAssignTaskAll}
-                getScheduleItemsForDate={getScheduleItemsForDate}
-                lists={lists}
-                listsByCategory={listsByCategory}
-                onSendToList={onSendToList}
-                onCreateList={onCreateList}
-                onUpdateTasksBulk={onUpdateTasksBulk}
-                panelOpen={panelOpen}
-                onClosePanel={onClosePanel}
-              />
-            </div>
-          </div>
-        </div>
+      {/* Pull strip — always visible, combines inbox + this week */}
+      {isToday && onUpdateTask && (
+        <PullStrip
+          inboxTasks={inboxTasks}
+          weekTasks={weekTasks}
+          onPullToToday={(taskId) => {
+            const today = new Date()
+            today.setHours(0, 0, 0, 0)
+            onUpdateTask(taskId, { bucket: 'timed' as const, scheduledFor: today, isAllDay: true })
+          }}
+          onSelectTask={(taskId) => handleSelectItem(`task-${taskId}`)}
+        />
       )}
 
-      {/* This Week pool — pull tasks into today */}
-      {isToday && showWeekPool && weekTasks.length > 0 && onUpdateTask && (
-        <div className="mb-4 md:mb-8 animate-fade-in-up">
-          <div className="rounded-xl md:rounded-2xl border border-blue-200 bg-blue-50/30">
-            <div className="flex items-center justify-between px-3 py-2 md:px-4 md:py-3 border-b border-blue-200/60">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-blue-400" />
-                <span className="text-sm font-medium text-blue-700">This Week</span>
-                <span className="text-xs text-blue-400">{weekTasks.length}</span>
-              </div>
-              <button
-                onClick={() => setShowWeekPool(false)}
-                className="p-1.5 rounded-lg text-blue-400 hover:text-blue-600 hover:bg-blue-100/50 transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </div>
-            <div className="p-2 md:p-3 space-y-1">
-              {weekTasks.map((task) => (
-                <div
-                  key={task.id}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/80 hover:bg-white transition-colors group cursor-pointer"
-                  onClick={() => handleSelectItem(`task-${task.id}`)}
-                >
-                  <span className="text-sm text-neutral-700 flex-1">{task.title}</span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      const today = new Date()
-                      today.setHours(0, 0, 0, 0)
-                      onUpdateTask(task.id, { bucket: 'timed', scheduledFor: today, isAllDay: true })
-                    }}
-                    className="opacity-0 group-hover:opacity-100 px-2 py-1 rounded-md bg-primary-50 text-primary-600 text-xs font-medium
-                               hover:bg-primary-100 transition-all"
-                  >
-                    Pull to Today
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
+      {/* Inline add to today */}
+      {isToday && onCreateTask && (
+        <div className="mb-4 md:mb-6">
+          <TodayAddInput onAdd={onCreateTask} />
         </div>
       )}
 

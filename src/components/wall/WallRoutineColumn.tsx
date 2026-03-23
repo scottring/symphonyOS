@@ -13,6 +13,9 @@ const CARD_COLORS = [
   '#F26E63',
 ]
 
+// Accent color for non-daily "special" routines (deeper teal with more contrast)
+const SPECIAL_COLOR = '#2A7D6B'
+
 function getEmojiIcon(title: string) {
   const lower = title.toLowerCase()
   if (lower.includes('walk') && lower.includes('jax')) return '🐕'
@@ -48,8 +51,19 @@ function formatItemTime(item: TimelineItem): string | null {
 }
 
 export function WallRoutineColumn({ choreItems, onComplete }: WallRoutineColumnProps) {
-  const incomplete = choreItems.filter(i => !i.completed)
-  const completed = choreItems.filter(i => i.completed)
+  // Split into specials (non-daily) vs daily chores
+  const specials = choreItems.filter(i => i.recurrencePattern?.type && i.recurrencePattern.type !== 'daily')
+  const dailies = choreItems.filter(i => !i.recurrencePattern?.type || i.recurrencePattern.type === 'daily')
+
+  const incompleteSpecials = specials.filter(i => !i.completed)
+  const completedSpecials = specials.filter(i => i.completed)
+  const allSpecials = [...incompleteSpecials, ...completedSpecials]
+
+  const incompleteDailies = dailies.filter(i => !i.completed)
+  const completedDailies = dailies.filter(i => i.completed)
+  const allDailies = [...incompleteDailies, ...completedDailies]
+
+  const allItems = [...allSpecials, ...allDailies]
 
   const [pressingId, setPressingId] = useState<string | null>(null)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -78,8 +92,6 @@ export function WallRoutineColumn({ choreItems, onComplete }: WallRoutineColumnP
     setPressingId(null)
   }, [])
 
-  const allItems = [...incomplete, ...completed]
-
   return (
     <div className="flex flex-col h-full">
       <div className="text-[1.1rem] font-black uppercase tracking-[0.25em] text-white/50 mb-4">
@@ -95,10 +107,65 @@ export function WallRoutineColumn({ choreItems, onComplete }: WallRoutineColumnP
         </div>
       ) : (
         <div
-          className="flex-1 flex flex-col gap-3 overflow-y-auto pr-1"
+          className="flex-1 flex flex-col gap-2 overflow-y-auto pr-1"
           style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
         >
-          {allItems.map((item, index) => {
+          {/* ─── Specials: non-daily routines (prominent) ─── */}
+          {allSpecials.map((item) => {
+            const icon = getEmojiIcon(item.title)
+            const timeStr = formatItemTime(item)
+            const isPressing = pressingId === item.id
+            const isDone = item.completed
+
+            return (
+              <button
+                key={item.id}
+                onPointerDown={(e) => handlePointerDown(e, item)}
+                onPointerUp={handlePointerCancel}
+                onPointerLeave={handlePointerCancel}
+                onPointerCancel={handlePointerCancel}
+                className={`relative rounded-[1.2rem] flex items-center gap-3 px-4 py-3.5 shadow-lg overflow-hidden transition-all duration-300 select-none ${isPressing ? 'scale-95' : 'active:scale-95'} ${isDone ? 'opacity-40' : ''}`}
+                style={{
+                  backgroundColor: isDone ? 'rgba(255,255,255,0.06)' : SPECIAL_COLOR,
+                  borderLeft: isDone ? 'none' : '4px solid rgba(255,255,255,0.5)',
+                  touchAction: 'none',
+                  minHeight: 76,
+                }}
+              >
+                {!isDone && (
+                  <div
+                    className={`absolute inset-0 bg-white/20 origin-bottom pointer-events-none z-10 ${isPressing ? 'scale-y-100 duration-700 ease-linear' : 'scale-y-0 duration-150 ease-out'}`}
+                    style={{ transition: 'transform' }}
+                  />
+                )}
+                {isDone && <div className="absolute top-2 right-2 text-[0.9rem] z-20">✅</div>}
+                {timeStr && !isDone && (
+                  <div className="absolute top-1.5 right-2 text-[0.65rem] font-black text-white/70 uppercase z-20">
+                    {timeStr}
+                  </div>
+                )}
+                <div className="text-[2.2rem] drop-shadow-md flex-shrink-0">{icon}</div>
+                <span
+                  className={`font-black text-[0.85rem] uppercase tracking-wider leading-tight flex-1 text-left ${isDone ? 'text-white/50 line-through' : 'text-white'}`}
+                  style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+                >
+                  {item.title}
+                </span>
+              </button>
+            )
+          })}
+
+          {/* Divider between specials and dailies */}
+          {allSpecials.length > 0 && allDailies.length > 0 && (
+            <div className="flex items-center gap-2 my-1 px-1">
+              <div className="flex-1 h-px bg-white/10" />
+              <span className="text-[0.55rem] font-black text-white/25 uppercase tracking-widest">Daily</span>
+              <div className="flex-1 h-px bg-white/10" />
+            </div>
+          )}
+
+          {/* ─── Daily chores (compact) ─── */}
+          {allDailies.map((item, index) => {
             const color = CARD_COLORS[index % CARD_COLORS.length]
             const icon = getEmojiIcon(item.title)
             const timeStr = formatItemTime(item)
@@ -112,37 +179,24 @@ export function WallRoutineColumn({ choreItems, onComplete }: WallRoutineColumnP
                 onPointerUp={handlePointerCancel}
                 onPointerLeave={handlePointerCancel}
                 onPointerCancel={handlePointerCancel}
-                className={`relative rounded-[1.2rem] flex items-center gap-3 px-4 py-3 shadow-lg overflow-hidden transition-all duration-300 select-none ${isPressing ? 'scale-95' : 'active:scale-95'} ${isDone ? 'opacity-40' : ''}`}
-                style={{ backgroundColor: isDone ? 'rgba(255,255,255,0.06)' : color, touchAction: 'none', minHeight: 72 }}
+                className={`relative rounded-[1.2rem] flex items-center gap-3 px-4 py-2.5 shadow-lg overflow-hidden transition-all duration-300 select-none ${isPressing ? 'scale-95' : 'active:scale-95'} ${isDone ? 'opacity-40' : ''}`}
+                style={{ backgroundColor: isDone ? 'rgba(255,255,255,0.06)' : color, touchAction: 'none', minHeight: 56 }}
               >
-                {/* Hold fill */}
                 {!isDone && (
                   <div
                     className={`absolute inset-0 bg-white/20 origin-bottom pointer-events-none z-10 ${isPressing ? 'scale-y-100 duration-700 ease-linear' : 'scale-y-0 duration-150 ease-out'}`}
                     style={{ transition: 'transform' }}
                   />
                 )}
-
-                {/* Completed checkmark */}
-                {isDone && (
-                  <div className="absolute top-2 right-2 text-[0.9rem] z-20">✅</div>
-                )}
-
-                {/* Time badge */}
+                {isDone && <div className="absolute top-2 right-2 text-[0.9rem] z-20">✅</div>}
                 {timeStr && !isDone && (
                   <div className="absolute top-1.5 right-2 text-[0.65rem] font-black text-white/70 uppercase z-20">
                     {timeStr}
                   </div>
                 )}
-
-                {/* Icon */}
-                <div className="text-[2rem] drop-shadow-md flex-shrink-0">
-                  {icon}
-                </div>
-
-                {/* Title */}
+                <div className="text-[1.6rem] drop-shadow-md flex-shrink-0">{icon}</div>
                 <span
-                  className={`font-black text-[0.75rem] uppercase tracking-wider leading-tight flex-1 text-left ${isDone ? 'text-white/50 line-through' : 'text-white'}`}
+                  className={`font-black text-[0.7rem] uppercase tracking-wider leading-tight flex-1 text-left ${isDone ? 'text-white/50 line-through' : 'text-white'}`}
                   style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
                 >
                   {item.title}

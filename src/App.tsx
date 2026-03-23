@@ -1259,6 +1259,14 @@ function App() {
     onUpdateTask: handleUpdateTaskWithToast,
     onPushTask: pushTask,
     onDeleteTask: deleteTask,
+    onCreateTask: async (title: string) => {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      await addTask(title, undefined, undefined, today, {
+        assignedTo: getCurrentUserMember()?.id,
+        context: currentDomain !== 'universal' ? currentDomain : undefined,
+      })
+    },
     onCreateFollowUp: handleCreateFollowUp,
 
     // Assignment actions
@@ -1329,7 +1337,7 @@ function App() {
     onOpenWeeklyReview: handleOpenWeeklyReview,
     onRefreshInstances: refreshDateInstances,
   }), [
-    handleToggleTask, toggleWaiting, handleUpdateTaskWithToast, pushTask, deleteTask, handleCreateFollowUp,
+    handleToggleTask, toggleWaiting, handleUpdateTaskWithToast, pushTask, deleteTask, addTask, getCurrentUserMember, currentDomain, handleCreateFollowUp,
     scheduleActions, updateRoutine, updateEventContext, hideEvent,
     playbook.instances, playbook.toggleItem, playbook.markBlockDone, playbook.reactToBlock,
     playbook.tagBlock, playbook.noteBlock, playbook.deleteBlock, playbook.suppressBlock,
