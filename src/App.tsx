@@ -40,6 +40,7 @@ import {
   RoutineInput,
   TaskView,
   ContactView,
+  ContactsList,
   RecipeViewer,
   CalendarConnect,
   OnboardingWizard,
@@ -323,7 +324,8 @@ function App() {
     if (path.startsWith('/goals')) return 'goals'
     if (path.startsWith('/projects')) return 'projects'
     if (path.startsWith('/routines')) return 'routines'
-    if (path.startsWith('/contacts')) return 'contact-detail'
+    if (path === '/contacts') return 'contacts'
+    if (path.startsWith('/contacts/')) return 'contact-detail'
     return 'today'
   }, [location.pathname, stateView])
 
@@ -396,8 +398,8 @@ function App() {
         e.preventDefault()
         setQuickAddOpen(true)
       }
-      // Cmd+J for search
-      if ((e.metaKey || e.ctrlKey) && e.key === 'j') {
+      // Cmd+/ for search (Cmd+J conflicts with Chrome Downloads)
+      if ((e.metaKey || e.ctrlKey) && e.key === '/') {
         e.preventDefault()
         setSearchOpen(true)
       }
@@ -855,7 +857,7 @@ function App() {
     } else if (view === 'routines') {
       setStateView(null)
       navigate('/routines')
-    } else if (view === 'contact-detail') {
+    } else if (view === 'contacts' || view === 'contact-detail') {
       setStateView(null)
       navigate('/contacts')
     }
@@ -1683,6 +1685,18 @@ function App() {
                 entityNotes={selectedTaskNotes}
                 entityNotesLoading={selectedTaskNotesLoading}
                 onAddEntityNote={handleAddTaskNote}
+              />
+            </Suspense>
+          )}
+
+          {activeView === 'contacts' && (
+            <Suspense fallback={<LoadingFallback />}>
+              <ContactsList
+                contacts={contacts}
+                onSelectContact={(contactId) => navigate(`/contacts/${contactId}`)}
+                onBack={() => navigate('/')}
+                onAddContact={addContact}
+                onDeleteContact={deleteContact}
               />
             </Suspense>
           )}

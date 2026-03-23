@@ -234,7 +234,7 @@ export function SearchModal({
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-neutral-800">Search</h2>
           <kbd className="px-2 py-1 text-xs font-mono bg-neutral-100 text-neutral-500 rounded">
-            ⌘J
+            ⌘/
           </kbd>
         </div>
 

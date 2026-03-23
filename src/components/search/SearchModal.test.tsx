@@ -519,7 +519,7 @@ describe('SearchModal', () => {
   describe('keyboard hints', () => {
     it('shows keyboard shortcut hint in header', () => {
       render(<SearchModal {...defaultProps} />)
-      expect(screen.getByText('⌘J')).toBeInTheDocument()
+      expect(screen.getByText('⌘/')).toBeInTheDocument()
     })
 
     it('shows navigation hints when there are results', () => {

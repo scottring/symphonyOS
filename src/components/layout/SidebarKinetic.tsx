@@ -111,7 +111,7 @@ export function SidebarKinetic({
                   Search
                 </span>
                 <kbd className="hidden lg:inline px-2 py-1 text-xs font-mono text-slate-400 bg-slate-800/50 rounded border border-slate-700/50">
-                  ⌘J
+                  ⌘/
                 </kbd>
               </>
             )}

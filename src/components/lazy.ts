@@ -28,6 +28,9 @@ export const TaskView = lazy(() =>
 export const ContactView = lazy(() =>
   import('./contact/ContactViewRedesign').then(m => ({ default: m.ContactViewRedesign }))
 )
+export const ContactsList = lazy(() =>
+  import('./contact/ContactsList').then(m => ({ default: m.ContactsList }))
+)
 
 // Recipe viewer
 export const RecipeViewer = lazy(() =>

@@ -37,7 +37,7 @@ const DOMAIN_THEME = {
   },
 } as const
 
-export type ViewType = 'home' | 'today' | 'goals' | 'projects' | 'routines' | 'rules' | 'coaching' | 'lists' | 'notes' | 'history' | 'task-detail' | 'contact-detail' | 'settings'
+export type ViewType = 'home' | 'today' | 'goals' | 'projects' | 'routines' | 'rules' | 'coaching' | 'lists' | 'notes' | 'contacts' | 'history' | 'task-detail' | 'contact-detail' | 'settings'
 
 interface EntityData {
   tasks: Task[]
@@ -143,7 +143,7 @@ export function Sidebar({
             {!collapsed && (
               <>
                 <span className="flex-1 text-left text-[15px]">Search</span>
-                <kbd className="hidden lg:inline text-[11px] text-neutral-400 font-medium">⌘J</kbd>
+                <kbd className="hidden lg:inline text-[11px] text-neutral-400 font-medium">⌘/</kbd>
               </>
             )}
           </button>
@@ -293,6 +293,23 @@ export function Sidebar({
             {!collapsed && <span className="text-[15px]">Lists</span>}
           </button>
         )}
+
+        <button
+          onClick={() => onViewChange('contacts')}
+          className={`
+            w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
+            ${activeView === 'contacts' || activeView === 'contact-detail'
+              ? 'text-primary-700 bg-primary-50/80 font-medium'
+              : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
+            }
+            ${collapsed ? 'justify-center' : ''}
+          `}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+          </svg>
+          {!collapsed && <span className="text-[15px]">Contacts</span>}
+        </button>
 
         <button
           onClick={() => onViewChange('history')}
