@@ -74,6 +74,17 @@ export function WallCalendar() {
     markDone: emailMarkDone,
   } = useEmailActionItems()
   const [showEmailActions, setShowEmailActions] = useState(false)
+  const [cameraEnabled, setCameraEnabled] = useState(() =>
+    localStorage.getItem('wall-camera-enabled') !== 'false'
+  )
+
+  const toggleCamera = useCallback((enabled?: boolean) => {
+    setCameraEnabled(prev => {
+      const next = enabled !== undefined ? enabled : !prev
+      localStorage.setItem('wall-camera-enabled', String(next))
+      return next
+    })
+  }, [])
 
   // ═══ COMPLETION ═══
   const handleComplete = useCallback(async (item: TimelineItem) => {
@@ -106,16 +117,23 @@ export function WallCalendar() {
     return () => clearInterval(interval)
   }, [])
 
-  // ═══ REMOTE REFRESH via Supabase Realtime ═══
+  // ═══ REMOTE COMMANDS via Supabase Realtime ═══
   useEffect(() => {
     const channel = supabase.channel('wall-refresh')
       .on('broadcast', { event: 'refresh' }, () => {
         console.log('[wall] remote refresh received')
         window.location.reload()
       })
+      .on('broadcast', { event: 'camera' }, (payload) => {
+        const action = payload?.payload?.action
+        console.log('[wall] remote camera command:', action)
+        if (action === 'on') toggleCamera(true)
+        else if (action === 'off') toggleCamera(false)
+        else toggleCamera()
+      })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [])
+  }, [toggleCamera])
 
   // ═══ ITEMS ═══
   const { choreItems, taskItems } = useMemo(() => {
@@ -555,9 +573,22 @@ export function WallCalendar() {
       </main>
 
       {/* ═══ CAMERA PiP ═══ */}
-      <WallCameraView />
+      {cameraEnabled && <WallCameraView />}
 
       {/* ═══ UTILITIES ═══ */}
+
+      {/* Camera toggle */}
+      <button
+        onClick={() => toggleCamera()}
+        className="fixed bottom-2 right-24 flex items-center gap-1.5 px-2.5 py-1 rounded-lg
+                   bg-white/5 hover:bg-white/10 border border-white/10
+                   text-white/20 hover:text-white/50 transition-all z-10 text-[0.7rem]"
+      >
+        <span>{cameraEnabled ? '📷' : '📷'}</span>
+        <span className="font-bold uppercase tracking-wider">
+          {cameraEnabled ? 'Cam On' : 'Cam Off'}
+        </span>
+      </button>
 
       <button
         onClick={() => window.location.reload()}
