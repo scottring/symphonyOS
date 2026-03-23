@@ -1,11 +1,11 @@
 import { useState, useMemo } from 'react'
-import type { Contact } from '@/types/contact'
+import type { Contact, ContactCategory } from '@/types/contact'
 
 interface ContactsListProps {
   contacts: Contact[]
   onSelectContact: (contactId: string) => void
   onBack: () => void
-  onAddContact: (data: { name: string; category?: string }) => Promise<Contact | null>
+  onAddContact: (data: { name: string; category?: ContactCategory }) => Promise<Contact | null>
   onDeleteContact: (id: string) => Promise<void>
 }
 
