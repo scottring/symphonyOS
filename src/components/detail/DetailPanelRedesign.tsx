@@ -1753,7 +1753,7 @@ export function DetailPanelRedesign({
                       onUpdateRoutine(item.originalRoutine!.id, { recurrence_pattern: newPattern })
                     }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                      item.originalRoutine.recurrence_pattern.type === type
+                      item.originalRoutine!.recurrence_pattern.type === type
                         ? 'bg-amber-100 text-amber-700'
                         : 'bg-white text-neutral-600 hover:bg-neutral-100 border border-neutral-200'
                     }`}
