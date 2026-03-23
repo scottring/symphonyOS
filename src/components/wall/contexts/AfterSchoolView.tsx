@@ -3,6 +3,7 @@ import confetti from 'canvas-confetti'
 import type { ContextViewProps } from './types'
 import type { TimelineItem } from '@/types/timeline'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
+import { EmailActionStrip } from './EmailActionStrip'
 
 // ============================================================================
 // HELPERS
@@ -250,6 +251,16 @@ export function AfterSchoolView({ data }: ContextViewProps) {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Social/playdate email action items */}
+        {data.emailActionItems && (
+          <EmailActionStrip
+            items={data.emailActionItems}
+            categories={['social']}
+            title="Invitations & RSVPs"
+            maxItems={3}
+          />
         )}
 
         {/* Snack ideas */}

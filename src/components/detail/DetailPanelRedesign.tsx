@@ -5,7 +5,7 @@ import type { Task, TaskLink, LinkedActivity, LinkType, LinkedActivityType } fro
 import type { Contact } from '@/types/contact'
 import { useGooglePlaces } from '@/hooks/useGooglePlaces'
 import type { Project } from '@/types/project'
-import type { ActionableInstance, Routine, PrepFollowupTemplate } from '@/types/actionable'
+import type { ActionableInstance, Routine, PrepFollowupTemplate, RecurrencePattern } from '@/types/actionable'
 import type { Attachment, AttachmentEntityType } from '@/types/attachment'
 import { formatTimeWithDate, formatTimeRangeWithDate } from '@/lib/timeUtils'
 import { detectActions, type DetectedAction } from '@/lib/actionDetection'
@@ -140,9 +140,19 @@ interface DetailPanelRedesignProps {
   ) => Promise<void>
   onToggleLinkedTask?: (taskId: string) => void
   onDeleteLinkedTask?: (taskId: string) => void
-  // Routine for template management
+  // Routine for template management + editing
   routine?: Routine | null
-  onUpdateRoutine?: (routineId: string, updates: { description?: string | null, prep_task_templates?: PrepFollowupTemplate[], followup_task_templates?: PrepFollowupTemplate[] }) => Promise<boolean>
+  onUpdateRoutine?: (routineId: string, updates: {
+    name?: string
+    description?: string | null
+    recurrence_pattern?: RecurrencePattern
+    time_of_day?: string | null
+    visibility?: 'active' | 'reference'
+    assigned_to_all?: string[] | null
+    context?: 'work' | 'family' | 'personal' | null
+    prep_task_templates?: PrepFollowupTemplate[]
+    followup_task_templates?: PrepFollowupTemplate[]
+  }) => Promise<boolean>
   // Family member assignment (for shared events)
   familyMembers?: FamilyMember[]
   eventAssignedToAll?: string[]
@@ -1094,8 +1104,12 @@ export function DetailPanelRedesign({
 
   const handleTitleSave = () => {
     const trimmed = editedTitle.trim()
-    if (trimmed && isTask && item.originalTask && onUpdate && trimmed !== item.title) {
-      onUpdate(item.originalTask.id, { title: trimmed })
+    if (trimmed && trimmed !== item.title) {
+      if (isTask && item.originalTask && onUpdate) {
+        onUpdate(item.originalTask.id, { title: trimmed })
+      } else if (isRoutine && item.originalRoutine && onUpdateRoutine) {
+        onUpdateRoutine(item.originalRoutine.id, { name: trimmed })
+      }
     }
     setIsEditingTitle(false)
   }
@@ -1293,8 +1307,8 @@ export function DetailPanelRedesign({
               <h2
                 className={`text-xl font-semibold leading-tight ${
                   item.completed ? 'text-neutral-400 line-through' : 'text-neutral-900'
-                } ${isTask ? 'cursor-pointer hover:text-primary-600 transition-colors' : ''}`}
-                onClick={() => isTask && setIsEditingTitle(true)}
+                } ${(isTask || isRoutine) ? 'cursor-pointer hover:text-primary-600 transition-colors' : ''}`}
+                onClick={() => (isTask || isRoutine) && setIsEditingTitle(true)}
               >
                 {item.title}
               </h2>
@@ -1677,6 +1691,170 @@ export function DetailPanelRedesign({
               onAddNote={handleRoutineAddNote}
               isLoading={actionable.isLoading}
             />
+          </div>
+        )}
+
+        {/* Routine Settings (editable) */}
+        {isRoutine && item.originalRoutine && onUpdateRoutine && (
+          <div className="mx-4 mt-4 space-y-3">
+            {/* Time of day */}
+            <div className="p-3 bg-neutral-50 rounded-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-sm font-medium text-neutral-700">Time</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="time"
+                    value={item.originalRoutine.time_of_day?.slice(0, 5) || ''}
+                    onChange={(e) => {
+                      onUpdateRoutine(item.originalRoutine!.id, {
+                        time_of_day: e.target.value || null
+                      })
+                    }}
+                    className="px-2 py-1 text-sm rounded-lg border border-neutral-200 bg-white
+                               focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  />
+                  {item.originalRoutine.time_of_day && (
+                    <button
+                      onClick={() => onUpdateRoutine(item.originalRoutine!.id, { time_of_day: null })}
+                      className="text-neutral-400 hover:text-neutral-600 p-1"
+                      title="Clear time"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Recurrence */}
+            <div className="p-3 bg-neutral-50 rounded-xl">
+              <div className="flex items-center gap-2 mb-2">
+                <svg className="w-4 h-4 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span className="text-sm font-medium text-neutral-700">Repeats</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {(['daily', 'weekly', 'monthly', 'quarterly'] as const).map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => {
+                      const newPattern: RecurrencePattern = { type }
+                      if (type === 'weekly') {
+                        newPattern.days = item.originalRoutine!.recurrence_pattern.days || ['mon', 'wed', 'fri']
+                      }
+                      onUpdateRoutine(item.originalRoutine!.id, { recurrence_pattern: newPattern })
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      item.originalRoutine.recurrence_pattern.type === type
+                        ? 'bg-amber-100 text-amber-700'
+                        : 'bg-white text-neutral-600 hover:bg-neutral-100 border border-neutral-200'
+                    }`}
+                  >
+                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                  </button>
+                ))}
+              </div>
+              {/* Day selector for weekly */}
+              {item.originalRoutine.recurrence_pattern.type === 'weekly' && (
+                <div className="flex gap-1 mt-2">
+                  {[
+                    { key: 'sun', label: 'S' },
+                    { key: 'mon', label: 'M' },
+                    { key: 'tue', label: 'T' },
+                    { key: 'wed', label: 'W' },
+                    { key: 'thu', label: 'T' },
+                    { key: 'fri', label: 'F' },
+                    { key: 'sat', label: 'S' },
+                  ].map(({ key, label }) => {
+                    const isSelected = item.originalRoutine!.recurrence_pattern.days?.includes(key)
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => {
+                          const currentDays = item.originalRoutine!.recurrence_pattern.days || []
+                          const newDays = isSelected
+                            ? currentDays.filter(d => d !== key)
+                            : [...currentDays, key]
+                          if (newDays.length === 0) return // Don't allow empty
+                          onUpdateRoutine(item.originalRoutine!.id, {
+                            recurrence_pattern: { ...item.originalRoutine!.recurrence_pattern, days: newDays }
+                          })
+                        }}
+                        className={`w-8 h-8 rounded-full text-xs font-medium transition-colors ${
+                          isSelected
+                            ? 'bg-amber-500 text-white'
+                            : 'bg-white text-neutral-500 hover:bg-neutral-100 border border-neutral-200'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Assignment (if family members available) */}
+            {familyMembers.length > 1 && (
+              <div className="p-3 bg-neutral-50 rounded-xl">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-neutral-500" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
+                    </svg>
+                    <span className="text-sm font-medium text-neutral-700">Assigned to</span>
+                  </div>
+                  <MultiAssigneeDropdown
+                    members={familyMembers}
+                    selectedIds={item.originalRoutine.assigned_to_all || (item.originalRoutine.assigned_to ? [item.originalRoutine.assigned_to] : [])}
+                    onSelect={(memberIds) => {
+                      onUpdateRoutine(item.originalRoutine!.id, {
+                        assigned_to_all: memberIds.length > 0 ? memberIds : null
+                      })
+                    }}
+                    size="sm"
+                    label="Assign routine"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Active/Paused toggle */}
+            <div className="p-3 bg-neutral-50 rounded-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 text-neutral-500" viewBox="0 0 20 20" fill="currentColor">
+                    {item.originalRoutine.visibility === 'active' ? (
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    ) : (
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                    )}
+                  </svg>
+                  <span className="text-sm font-medium text-neutral-700">Status</span>
+                </div>
+                <button
+                  onClick={() => {
+                    const newVisibility = item.originalRoutine!.visibility === 'active' ? 'reference' : 'active'
+                    onUpdateRoutine(item.originalRoutine!.id, { visibility: newVisibility })
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    item.originalRoutine.visibility === 'active'
+                      ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                      : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300'
+                  }`}
+                >
+                  {item.originalRoutine.visibility === 'active' ? 'Active' : 'Paused'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

@@ -2,6 +2,7 @@ import type { WallDayData } from '@/hooks/useWallData'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { FamilyMember } from '@/types/family'
 import type { TimelineItem } from '@/types/timeline'
+import type { EmailActionItem } from '@/types/emailAction'
 
 // ============================================================================
 // CONTEXT RULE DEFINITIONS
@@ -63,6 +64,7 @@ export interface ContextEvalData {
   overdueTasks: TimelineItem[]
   todayChores: TimelineItem[]
   todayTasks: TimelineItem[]
+  emailActionItems?: EmailActionItem[]
 }
 
 export interface ContextViewProps {

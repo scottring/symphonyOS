@@ -3,6 +3,7 @@ import confetti from 'canvas-confetti'
 import type { ContextViewProps } from './types'
 import type { TimelineItem } from '@/types/timeline'
 import { useWeather } from '@/hooks/useWeather'
+import { EmailActionStrip } from './EmailActionStrip'
 
 // ============================================================================
 // HELPERS
@@ -410,6 +411,16 @@ export function MorningLaunchView({ data }: ContextViewProps) {
         )}
 
         <DepartureCountdown />
+
+        {/* School-related email action items */}
+        {data.emailActionItems && (
+          <EmailActionStrip
+            items={data.emailActionItems}
+            categories={['school']}
+            title="Don't Forget"
+            maxItems={3}
+          />
+        )}
       </div>
 
       {/* Divider */}

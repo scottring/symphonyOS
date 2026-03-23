@@ -117,13 +117,13 @@ export function useWallData(): UseWallDataReturn {
         // 1. Family members
         supabase.from('family_members').select('*').order('display_order'),
 
-        // 2. Tasks in date range (family context only for kiosk)
+        // 2. Tasks in date range (family + untagged for kiosk, excludes work/personal)
         supabase
           .from('tasks')
           .select('*')
           .gte('scheduled_for', startDate.toISOString())
           .lte('scheduled_for', endDate.toISOString())
-          .eq('context', 'family'),
+          .or('context.eq.family,context.is.null'),
 
         // 3. Active routines
         supabase
@@ -162,13 +162,13 @@ export function useWallData(): UseWallDataReturn {
         supabase.from('screen_time_entries').select('*').eq('date', todayStr),
         supabase.from('screen_time_adjustments').select('*').eq('date', todayStr),
 
-        // 11. Overdue tasks (scheduled before today, not completed, family only)
+        // 11. Overdue tasks (scheduled before today, not completed, family + untagged)
         supabase
           .from('tasks')
           .select('*')
           .lt('scheduled_for', startDate.toISOString())
           .eq('completed', false)
-          .eq('context', 'family'),
+          .or('context.eq.family,context.is.null'),
 
         // 12. Inbox count (unscheduled, not completed, not someday, family only)
         supabase

@@ -25,6 +25,10 @@ import { getDailyRunningTip, getRunningCategoryLabel, getRunningCategoryColor } 
 import { WallRunningTipOverlay } from './WallRunningTipOverlay'
 import { useKioskCards } from '@/hooks/useKioskCards'
 import { WallAgentCards } from './WallAgentCards'
+import { useEmailActionItems } from '@/hooks/useEmailActionItems'
+import { WallEmailActions } from './WallEmailActions'
+import { WallEmailActionsOverlay } from './WallEmailActionsOverlay'
+import { WallCameraView } from './WallCameraView'
 
 // ============================================================================
 // HELPERS
@@ -61,6 +65,15 @@ export function WallCalendar() {
   const [showRunningTip, setShowRunningTip] = useState(false)
   const [detailItem, setDetailItem] = useState<TimelineItem | null>(null)
   const { cards: agentCards, dismissCard } = useKioskCards()
+  const {
+    items: emailItems,
+    urgentItems: emailUrgentItems,
+    acknowledge: emailAcknowledge,
+    snooze: emailSnooze,
+    dismiss: emailDismiss,
+    markDone: emailMarkDone,
+  } = useEmailActionItems()
+  const [showEmailActions, setShowEmailActions] = useState(false)
 
   // ═══ COMPLETION ═══
   const handleComplete = useCallback(async (item: TimelineItem) => {
@@ -194,6 +207,7 @@ export function WallCalendar() {
       overdueTasks: wallData.overdueTasks,
       todayChores: choreItems,
       todayTasks: taskItems,
+      emailActionItems: emailItems,
     }
   }, [currentTime, wallData, choreItems, taskItems])
 
@@ -487,6 +501,17 @@ export function WallCalendar() {
             )
           })()}
 
+          {/* Email Action Items Widget */}
+          {emailItems.length > 0 && (
+            <div className={`${glass} px-5 py-4 flex-1 flex items-center`}>
+              <WallEmailActions
+                items={emailItems}
+                urgentItems={emailUrgentItems}
+                onClick={() => setShowEmailActions(true)}
+              />
+            </div>
+          )}
+
           {/* Agent Cards Widget */}
           {agentCards.length > 0 && (
             <div className={`${glass} px-5 py-4 flex-1 flex flex-col justify-center`}>
@@ -528,6 +553,9 @@ export function WallCalendar() {
           </div>
         </div>
       </main>
+
+      {/* ═══ CAMERA PiP ═══ */}
+      <WallCameraView />
 
       {/* ═══ UTILITIES ═══ */}
 
@@ -579,6 +607,18 @@ export function WallCalendar() {
           mealName={dinnerMealName}
           mealIcon={dinnerEvent ? getMealIcon(dinnerEvent.title) : '🍽️'}
           onClose={handleCloseRecipe}
+        />
+      )}
+
+      {showEmailActions && (
+        <WallEmailActionsOverlay
+          items={emailItems}
+          familyMembers={wallData.familyMembers}
+          onAcknowledge={emailAcknowledge}
+          onSnooze={emailSnooze}
+          onDismiss={emailDismiss}
+          onDone={emailMarkDone}
+          onClose={() => setShowEmailActions(false)}
         />
       )}
 

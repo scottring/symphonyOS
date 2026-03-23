@@ -2,6 +2,7 @@ import { useMemo, useState, useCallback, useRef } from 'react'
 import confetti from 'canvas-confetti'
 import type { ContextViewProps } from './types'
 import type { TimelineItem } from '@/types/timeline'
+import { EmailActionStrip } from './EmailActionStrip'
 
 // ============================================================================
 // HELPERS
@@ -248,6 +249,24 @@ function CenterColumn({ data }: { data: ContextViewProps['data'] }) {
           </div>
         )}
       </div>
+
+      {/* Prep for tomorrow — email items due soon */}
+      {data.emailActionItems && data.emailActionItems.length > 0 && (
+        <div className="w-full mt-4">
+          <EmailActionStrip
+            items={data.emailActionItems.filter(i => {
+              if (!i.due_date) return false
+              const due = new Date(i.due_date + 'T00:00:00')
+              const tomorrow = new Date()
+              tomorrow.setDate(tomorrow.getDate() + 1)
+              tomorrow.setHours(23, 59, 59)
+              return due <= tomorrow
+            })}
+            title="Prep for Tomorrow"
+            maxItems={3}
+          />
+        </div>
+      )}
 
       <style>{`
         @keyframes bedtimeFloat {
