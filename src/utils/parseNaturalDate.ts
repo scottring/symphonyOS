@@ -14,22 +14,59 @@ export interface ParseResult {
   scheduledFor: Date
 }
 
-// Time patterns: 3pm, 3p, 3:00pm, 3:00, at 3, at 3pm, at 3p
-const TIME_PATTERN = /\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(a|am|p|pm)?\b/i
+// Time patterns: 3pm, 3p, 3:00pm, 3:00, at 3, at 3pm, at 3p, 400pm, 1030am
+// Group 1: compact form like 400pm, 1030am (3-4 digits run together with meridiem)
+// Group 2: standard form like 3pm, 3:00pm, at 3pm, 3:00
+const TIME_PATTERN = /\b(?:at\s+)?(\d{3,4})\s*(a|am|p|pm)\b|\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(a|am|p|pm)?\b/i
 
 // Day names for matching
 const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
 const DAYS_SHORT = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 
 /**
- * Parse a time string and return hours/minutes in 24h format
+ * Parse a time string and return hours/minutes in 24h format.
+ * Handles both compact (400pm, 1030am) and standard (4pm, 4:00pm, 4:00) forms.
  */
 function parseTime(match: RegExpMatchArray): { hours: number; minutes: number } | null {
-  const [, hourStr, minuteStr, meridiem] = match
+  // Compact form: groups 1,2 (e.g. "400pm" → digits="400", meridiem="pm")
+  if (match[1]) {
+    const digits = match[1]
+    const meridiem = match[2]
+    let hours: number
+    let minutes: number
+
+    if (digits.length === 3) {
+      // "400" → 4:00
+      hours = parseInt(digits[0], 10)
+      minutes = parseInt(digits.slice(1), 10)
+    } else {
+      // "1030" → 10:30
+      hours = parseInt(digits.slice(0, 2), 10)
+      minutes = parseInt(digits.slice(2), 10)
+    }
+
+    if (hours < 1 || hours > 12) return null
+    if (minutes > 59) return null
+
+    const lower = meridiem.toLowerCase()
+    const isPM = lower === 'pm' || lower === 'p'
+    if (isPM && hours !== 12) hours += 12
+    if (!isPM && hours === 12) hours = 0
+
+    return { hours, minutes }
+  }
+
+  // Standard form: groups 3,4,5 (e.g. "4pm", "4:00pm", "4:00")
+  const hourStr = match[3]
+  const minuteStr = match[4]
+  const meridiem = match[5]
+
+  if (!hourStr) return null
+
   let hours = parseInt(hourStr, 10)
   const minutes = minuteStr ? parseInt(minuteStr, 10) : 0
 
-  if (hours < 1 || hours > 12 && meridiem) return null
+  if (hours < 1 || (hours > 12 && meridiem)) return null
   if (hours > 23) return null
   if (minutes > 59) return null
 

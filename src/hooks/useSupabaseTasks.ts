@@ -248,6 +248,7 @@ export function useSupabaseTasks() {
     location?: string  // Address or place name
     locationPlaceId?: string  // Google Place ID for precise directions
     defaultAssigneeId?: string  // Default assignee if assignedTo is undefined
+    isAllDay?: boolean  // Whether the task is all-day (no specific time)
   }
 
   const addTask = useCallback(async (
@@ -288,6 +289,7 @@ export function useSupabaseTasks() {
       context: options?.context ?? null,
       location: options?.location,
       locationPlaceId: options?.locationPlaceId,
+      isAllDay: options?.isAllDay,
     }
     setTasks((prev) => [optimisticTask, ...prev])
 
@@ -310,6 +312,7 @@ export function useSupabaseTasks() {
         context: options?.context ?? null,
         location: options?.location ?? null,
         location_place_id: options?.locationPlaceId ?? null,
+        is_all_day: options?.isAllDay ?? null,
       })
       .select()
       .single()
@@ -773,12 +776,21 @@ export function useSupabaseTasks() {
       // Reschedule to a specific date
       const task = tasks.find((t) => t.id === id)
       const newScheduledFor = new Date(target)
-      if (task?.isAllDay === false && task?.scheduledFor) {
+
+      // Check if task is overdue (scheduled before today)
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const isOverdue = task?.scheduledFor && new Date(task.scheduledFor) < today
+
+      if (!isOverdue && task?.isAllDay === false && task?.scheduledFor) {
+        // Preserve original time for non-overdue tasks
         newScheduledFor.setHours(task.scheduledFor.getHours(), task.scheduledFor.getMinutes(), 0, 0)
       }
+
       await updateTask(id, {
         bucket: 'timed',
         scheduledFor: newScheduledFor,
+        ...(isOverdue ? { isAllDay: true } : {}),
       })
     }
   }, [tasks, updateTask])

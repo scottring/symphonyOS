@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Task } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
 import { formatTime } from '@/lib/timeUtils'
+import { parseNaturalDate } from '@/utils/parseNaturalDate'
 import { TaskQuickActions, type ScheduleContextItem } from '@/components/triage'
 
 interface PrepTasksListProps {
@@ -45,7 +46,13 @@ export function PrepTasksList({
     if (!newTaskTitle.trim() || isSubmitting) return
 
     setIsSubmitting(true)
-    await onAddPrepTask(newTaskTitle.trim(), newTaskTime)
+
+    // Parse natural language time from title (e.g. "cook sweet potatoes 400pm")
+    const parsed = parseNaturalDate(newTaskTitle.trim())
+    const title = parsed ? parsed.cleanedTitle : newTaskTitle.trim()
+    const scheduledFor = parsed ? parsed.scheduledFor : newTaskTime
+
+    await onAddPrepTask(title, scheduledFor)
     setNewTaskTitle('')
     setIsAdding(false)
     setIsSubmitting(false)

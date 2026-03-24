@@ -19,7 +19,7 @@ import { SwipeableCard } from './SwipeableCard'
 import { FollowUpInput } from './FollowUpInput'
 import { DateNavigator } from './DateNavigator'
 import { InboxTaskCard } from './InboxTaskCard'
-import { PullStrip } from './PullStrip'
+import { StagingFloat } from './StagingFloat'
 import { TodayAddInput } from './TodayAddInput'
 import { OverdueSection } from './OverdueSection'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
@@ -351,61 +351,14 @@ interface ProgressIndicatorProps {
   percent: number
 }
 
-function ProgressIndicator({ completed, total, percent }: ProgressIndicatorProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
-
+function ProgressIndicator({ completed, total }: ProgressIndicatorProps) {
   return (
-    <div className="relative flex-1 flex justify-center">
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-neutral-100/60 transition-colors"
-      >
-        <div className="w-24 sm:w-32">
-          <div className="progress-bar">
-            <div
-              className="absolute inset-0 bg-primary-500 rounded-full transition-all duration-500"
-              style={{ width: `${percent}%` }}
-            />
-          </div>
-        </div>
-        <span className="text-sm text-neutral-500 tabular-nums whitespace-nowrap">
-          {completed}/{total} tasks
-        </span>
-      </button>
-
-      {/* Expanded explanation popover */}
-      {isExpanded && (
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setIsExpanded(false)}
-          />
-          <div className="absolute top-full left-0 mt-2 z-50 w-64 p-4 rounded-xl bg-neutral-50 border border-neutral-200/60 shadow-lg animate-fade-in-scale">
-            <div className="flex items-start justify-between mb-3">
-              <h4 className="font-medium text-neutral-800">Today's Progress</h4>
-              <span className="text-lg font-semibold text-primary-600">{Math.round(percent)}%</span>
-            </div>
-            <p className="text-sm text-neutral-600 mb-3">
-              Track your progress through today's tasks and routines. Complete items to fill the bar.
-            </p>
-            <div className="space-y-1.5 text-xs text-neutral-500">
-              <div className="flex justify-between">
-                <span>Completed</span>
-                <span className="font-medium text-primary-600">{completed}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Remaining</span>
-                <span className="font-medium text-neutral-700">{total - completed}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Total for today</span>
-                <span className="font-medium text-neutral-700">{total}</span>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
+    <span className="text-sm text-neutral-500 tabular-nums whitespace-nowrap px-2 py-1.5">
+      <span className="font-semibold text-primary-600">{completed}</span>
+      <span className="text-neutral-300">/</span>
+      <span className="font-medium">{total}</span>
+      <span className="text-neutral-400 ml-1 text-xs">tasks</span>
+    </span>
   )
 }
 
@@ -954,6 +907,7 @@ export function TodaySchedule({
       weekday: 'long',
       month: 'long',
       day: 'numeric',
+      year: 'numeric',
     })
   }
 
@@ -1111,20 +1065,13 @@ export function TodaySchedule({
           /* Desktop: Full editorial header */
           <>
             <div className="flex items-end gap-3 mb-6">
-              <h1 className="font-display text-4xl md:text-5xl text-neutral-900 tracking-tight leading-none">
-                {isToday ? (
-                  <>
-                    <span className="text-neutral-400 font-normal text-2xl md:text-3xl block mb-1">Today is</span>
-                    {viewedDate.toLocaleDateString('en-US', { weekday: 'long' })}
-                  </>
-                ) : (
-                  formatDate()
-                )}
+              <h1 className="font-display text-3xl md:text-4xl text-neutral-900 tracking-tight leading-none">
+                {formatDate()}
               </h1>
               <DateNavigator date={viewedDate} onDateChange={onDateChange} showTodayButton={!isToday} />
             </div>
 
-            {/* Stats row: Progress, Assignee, Toggles, Clarity */}
+            {/* Stats row: Progress, Staging, Assignee, Toggles, Clarity */}
             <div className="flex items-center gap-4 pt-5 border-t border-neutral-200/60">
               {/* Progress */}
               {actionableCount > 0 && (
@@ -1132,6 +1079,21 @@ export function TodaySchedule({
                   completed={completedCount}
                   total={actionableCount}
                   percent={progressPercent}
+                />
+              )}
+
+              {/* This week — inline in stats row */}
+              {isToday && onUpdateTask && (inboxTasks.length + weekTasks.length) > 0 && (
+                <StagingFloat
+                  inboxTasks={inboxTasks}
+                  weekTasks={weekTasks}
+                  onPullToToday={(taskId) => {
+                    const today = new Date()
+                    today.setHours(0, 0, 0, 0)
+                    onUpdateTask(taskId, { bucket: 'timed' as const, scheduledFor: today, isAllDay: true })
+                  }}
+                  onSelectTask={(taskId) => handleSelectItem(`task-${taskId}`)}
+                  inline
                 />
               )}
 
@@ -1234,9 +1196,9 @@ export function TodaySchedule({
         <SundayNudgeBanner onOpenWeeklyReview={onOpenWeeklyReview} />
       )}
 
-      {/* Pull strip — always visible, combines inbox + this week */}
-      {isToday && onUpdateTask && (
-        <PullStrip
+      {/* This week float — mobile only (desktop is inline in stats row) */}
+      {isMobile && isToday && onUpdateTask && (
+        <StagingFloat
           inboxTasks={inboxTasks}
           weekTasks={weekTasks}
           onPullToToday={(taskId) => {
@@ -1250,7 +1212,7 @@ export function TodaySchedule({
 
       {/* Inline add to today */}
       {isToday && onCreateTask && (
-        <div className="mb-4 md:mb-6">
+        <div className="mb-3 md:mb-4">
           <TodayAddInput onAdd={onCreateTask} />
         </div>
       )}

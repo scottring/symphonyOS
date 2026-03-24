@@ -29,7 +29,7 @@ export function TodayAddInput({ onAdd }: TodayAddInputProps) {
 
   return (
     <div
-      className={`flex items-center gap-2 px-3 py-2.5 md:px-4 md:py-3 rounded-xl border transition-all duration-200 ${
+      className={`flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-lg border transition-all duration-200 ${
         focused
           ? 'border-primary-300 bg-white shadow-sm'
           : 'border-neutral-200/60 bg-neutral-50/50 hover:border-neutral-300'

@@ -296,6 +296,20 @@ function App() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [viewedDate, setViewedDate] = useState(() => new Date())
+
+  // Reset to today at midnight
+  useEffect(() => {
+    const now = new Date()
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+    const msUntilMidnight = tomorrow.getTime() - now.getTime()
+
+    const timeout = setTimeout(() => {
+      setViewedDate(new Date())
+    }, msUntilMidnight)
+
+    return () => clearTimeout(timeout)
+  }, [viewedDate])
+
   const [recipeUrl, setRecipeUrl] = useState<string | null>(null)
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   // Calendar reconnect prompt state
@@ -1265,6 +1279,7 @@ function App() {
       await addTask(title, undefined, undefined, today, {
         assignedTo: getCurrentUserMember()?.id,
         context: currentDomain !== 'universal' ? currentDomain : undefined,
+        isAllDay: true,
       })
     },
     onCreateFollowUp: handleCreateFollowUp,
