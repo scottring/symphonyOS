@@ -50,6 +50,8 @@ export interface CalendarEvent {
   calendarName?: string | null
   calendarColor?: string | null
   location?: string | null
+  // Attendees (from Google Calendar API)
+  attendees?: { email: string; displayName?: string; responseStatus?: string; self?: boolean }[]
 }
 
 export interface UpdateEventParams {

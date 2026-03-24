@@ -8,6 +8,7 @@ import type { Routine } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
 import type { PlaybookInstance, QuickReact, FamilyRule, DayType } from '@/types/playbook'
 import type { EveningReflectionData } from '@/types/coaching'
+import type { MeetingAttendee } from '@/hooks/useMeetingNotes'
 
 export interface ScheduleActionsValue {
   // Task actions
@@ -89,6 +90,9 @@ export interface ScheduleActionsValue {
   onOpenWeeklyReview?: () => void
   onRefreshInstances?: () => void
   onOpenChat?: () => void
+
+  // Meeting
+  onStartMeeting?: (eventId: string, title: string, attendees: MeetingAttendee[], startTime?: Date, endTime?: Date) => void
 }
 
 const ScheduleActionsContext = createContext<ScheduleActionsValue | null>(null)

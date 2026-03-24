@@ -21,6 +21,61 @@ interface ChatRequest {
   entityContext?: EntityContext
 }
 
+/**
+ * Get today's date boundaries in UTC, adjusted for US Eastern time.
+ * The user is in America/New_York (ET). Tasks scheduled for "today" in ET
+ * are stored as timestamps like "2026-03-24 04:00:00+00" (midnight ET = 4am UTC during EDT)
+ * or "2026-03-24 05:00:00+00" (midnight ET = 5am UTC during EST).
+ *
+ * We compute "today" in ET, then return UTC boundaries for that ET day.
+ * ET day start = midnight ET = 4am or 5am UTC
+ * ET day end   = next midnight ET = next day 4am or 5am UTC
+ */
+function getTodayBoundsUTC(): { todayStart: string; todayEnd: string; todayLabel: string } {
+  const now = new Date()
+
+  // Format in America/New_York to get the actual local date
+  const etDateStr = now.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) // yields YYYY-MM-DD
+  const etParts = etDateStr.split('-')
+  const year = parseInt(etParts[0])
+  const month = parseInt(etParts[1]) - 1 // 0-indexed
+  const day = parseInt(etParts[2])
+
+  // Build midnight ET for today and tomorrow using a trick:
+  // Create date at noon UTC on that day, then adjust.
+  // Instead, we use the ET offset. During EDT (Mar-Nov): UTC-4, during EST (Nov-Mar): UTC-5.
+  // We can determine this by checking the offset for the current moment.
+  const etNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }))
+  const utcNow = now.getTime()
+  const etNowTime = etNow.getTime()
+  // This gives approximate offset; let's just use a reliable method.
+  // Use Intl to get the timezone offset
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    timeZoneName: 'shortOffset',
+  })
+  const parts = formatter.formatToParts(now)
+  const tzPart = parts.find(p => p.type === 'timeZoneName')?.value || 'GMT-5'
+  // tzPart is like "GMT-4" or "GMT-5"
+  const offsetMatch = tzPart.match(/GMT([+-]\d+)/)
+  const etOffsetHours = offsetMatch ? parseInt(offsetMatch[1]) : -5
+
+  // Midnight ET today in UTC = today's date at 00:00 ET = today's date at (-etOffsetHours):00 UTC
+  // e.g., EDT (offset -4): midnight ET = 04:00 UTC
+  //       EST (offset -5): midnight ET = 05:00 UTC
+  const midnightETasUTCHour = -etOffsetHours // 4 for EDT, 5 for EST
+
+  // Build the UTC timestamps for start/end of today in ET
+  const todayStartUTC = new Date(Date.UTC(year, month, day, midnightETasUTCHour, 0, 0))
+  const todayEndUTC = new Date(Date.UTC(year, month, day + 1, midnightETasUTCHour, 0, 0))
+
+  return {
+    todayStart: todayStartUTC.toISOString(),
+    todayEnd: todayEndUTC.toISOString(),
+    todayLabel: etDateStr,
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -84,74 +139,150 @@ Deno.serve(async (req) => {
     }
 
     // ================================================================
-    // 1. Gather context
+    // 1. Gather context — run independent queries in parallel
     // ================================================================
     const contextParts: string[] = []
     const sourceNotes: { id: string; title: string; vaultPath?: string }[] = []
 
-    // Always include today's tasks as baseline context
-    {
-      // Use date string to avoid timezone issues (tasks store dates as YYYY-MM-DD or timestamps)
-      const now = new Date()
-      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-      const tomorrowDate = new Date(now)
-      tomorrowDate.setDate(tomorrowDate.getDate() + 1)
-      const tomorrowStr = `${tomorrowDate.getFullYear()}-${String(tomorrowDate.getMonth() + 1).padStart(2, '0')}-${String(tomorrowDate.getDate()).padStart(2, '0')}`
+    const { todayStart, todayEnd, todayLabel } = getTodayBoundsUTC()
 
-      const { data: todayTasks, error: tasksErr } = await serviceSupabase
+    // Fire off all independent data fetches in parallel
+    const [
+      todayTasksResult,
+      contactsResult,
+      projectsResult,
+      entityDetailsResult,
+      linkedNotesResult,
+    ] = await Promise.all([
+      // Today's tasks (using proper UTC bounds for ET timezone)
+      serviceSupabase
         .from('tasks')
-        .select('id, title, completed, scheduled_for, context, notes, phone_number, location')
+        .select('id, title, completed, scheduled_for, context, notes, phone_number, location, project_id, contact_id')
         .eq('user_id', user.id)
-        .gte('scheduled_for', todayStr)
-        .lt('scheduled_for', tomorrowStr)
+        .gte('scheduled_for', todayStart)
+        .lt('scheduled_for', todayEnd)
         .order('scheduled_for', { ascending: true })
-        .limit(30)
+        .limit(50),
 
-      console.log(`Tasks query for ${todayStr}: found ${todayTasks?.length ?? 0}, error: ${tasksErr?.message ?? 'none'}`)
+      // All contacts (summary)
+      serviceSupabase
+        .from('contacts')
+        .select('id, name, category, relationship, phone, email')
+        .eq('user_id', user.id)
+        .order('name', { ascending: true })
+        .limit(100),
 
-      if (todayTasks?.length) {
-        contextParts.push("## Today's Tasks\n" + todayTasks.map(t => {
-          const status = t.completed ? '[done]' : '[todo]'
-          const time = t.scheduled_for ? new Date(t.scheduled_for).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'All day'
+      // Active projects (summary)
+      serviceSupabase
+        .from('projects')
+        .select('id, name, status, context, notes')
+        .eq('user_id', user.id)
+        .in('status', ['not_started', 'in_progress', 'on_hold'])
+        .order('name', { ascending: true })
+        .limit(50),
+
+      // Entity details if viewing something specific
+      entityContext
+        ? fetchEntityDetails(serviceSupabase, user.id, entityContext)
+        : Promise.resolve(null),
+
+      // Linked notes if viewing an entity
+      entityContext
+        ? userSupabase
+            .from('note_entity_links')
+            .select('note_id')
+            .eq('entity_type', entityContext.type)
+            .eq('entity_id', entityContext.id)
+        : Promise.resolve({ data: null }),
+    ])
+
+    // Process today's tasks
+    const todayTasks = todayTasksResult.data
+    console.log(`Tasks query for ${todayLabel} (${todayStart} to ${todayEnd}): found ${todayTasks?.length ?? 0}, error: ${todayTasksResult.error?.message ?? 'none'}`)
+
+    if (todayTasks?.length) {
+      contextParts.push("## Today's Tasks (" + todayLabel + ")\n" + todayTasks.map(t => {
+        const status = t.completed ? '[done]' : '[todo]'
+        const extra = [
+          t.context && `(${t.context})`,
+          t.notes && `Notes: ${t.notes.slice(0, 200)}`,
+          t.phone_number && `Phone: ${t.phone_number}`,
+          t.location && `Location: ${t.location}`,
+        ].filter(Boolean).join(' | ')
+        return `- ${status} ${t.title}${extra ? ' -- ' + extra : ''}`
+      }).join('\n'))
+    }
+
+    // Fallback: if no tasks found for today, fetch recent incomplete tasks
+    if (!todayTasks?.length) {
+      const { data: incompleteTasks } = await serviceSupabase
+        .from('tasks')
+        .select('id, title, completed, scheduled_for, context, notes, phone_number, location, project_id, contact_id')
+        .eq('user_id', user.id)
+        .eq('completed', false)
+        .order('scheduled_for', { ascending: false, nullsFirst: false })
+        .limit(20)
+
+      if (incompleteTasks?.length) {
+        contextParts.push("## Incomplete Tasks (no tasks found for today, showing recent incomplete)\n" + incompleteTasks.map(t => {
+          const when = t.scheduled_for ? `[${new Date(t.scheduled_for).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric' })}]` : '[inbox]'
           const extra = [
             t.context && `(${t.context})`,
-            t.notes && `Notes: ${t.notes.slice(0, 200)}`,
+            t.notes && `Notes: ${t.notes.slice(0, 150)}`,
             t.phone_number && `Phone: ${t.phone_number}`,
-            t.location && `Location: ${t.location}`,
           ].filter(Boolean).join(' | ')
-          return `- ${status} ${time}: ${t.title}${extra ? ' — ' + extra : ''}`
+          return `- ${when} ${t.title}${extra ? ' -- ' + extra : ''}`
         }).join('\n'))
       }
     }
 
-    // Fetch entity details if viewing something specific
-    if (entityContext) {
-      const entityDetails = await fetchEntityDetails(serviceSupabase, user.id, entityContext)
-      if (entityDetails) {
-        contextParts.push(`## Currently Viewing: ${entityContext.type}\n${entityDetails}`)
-      }
+    // Process contacts summary
+    const contacts = contactsResult.data
+    if (contacts?.length) {
+      contextParts.push("## Contacts\n" + contacts.map(c => {
+        const details = [
+          c.category && `(${c.category})`,
+          c.relationship && c.relationship,
+          c.phone && `Phone: ${c.phone}`,
+          c.email && `Email: ${c.email}`,
+        ].filter(Boolean).join(' | ')
+        return `- **${c.name}**${details ? ' -- ' + details : ''}`
+      }).join('\n'))
+    }
 
-      // Fetch notes already linked to this entity (via note_entity_links)
-      const { data: linkedLinks } = await userSupabase
-        .from('note_entity_links')
-        .select('note_id')
-        .eq('entity_type', entityContext.type)
-        .eq('entity_id', entityContext.id)
+    // Process projects summary
+    const projects = projectsResult.data
+    if (projects?.length) {
+      contextParts.push("## Active Projects\n" + projects.map(p => {
+        const details = [
+          p.status && `Status: ${p.status}`,
+          p.context && `(${p.context})`,
+          p.notes && `Notes: ${p.notes.slice(0, 150)}`,
+        ].filter(Boolean).join(' | ')
+        return `- **${p.name}**${details ? ' -- ' + details : ''}`
+      }).join('\n'))
+    }
 
-      if (linkedLinks?.length) {
-        const noteIds = linkedLinks.map(l => l.note_id)
-        const { data: linkedNotes } = await userSupabase
-          .from('notes')
-          .select('id, title, content, vault_path, vault_domain')
-          .in('id', noteIds)
-          .limit(10)
+    // Process entity context
+    if (entityContext && entityDetailsResult) {
+      contextParts.push(`## Currently Viewing: ${entityContext.type}\n${entityDetailsResult}`)
+    }
 
-        if (linkedNotes?.length) {
-          contextParts.push('## Linked Notes\n' + linkedNotes.map(n => {
-            sourceNotes.push({ id: n.id, title: n.title || 'Untitled', vaultPath: n.vault_path })
-            return `### ${n.title || 'Untitled'}${n.vault_domain ? ` [${n.vault_domain}]` : ''}\n${n.content?.slice(0, 1500) || '(empty)'}`
-          }).join('\n\n'))
-        }
+    // Process linked notes
+    const linkedLinks = linkedNotesResult?.data as { note_id: string }[] | null
+    if (linkedLinks?.length) {
+      const noteIds = linkedLinks.map(l => l.note_id)
+      const { data: linkedNotes } = await userSupabase
+        .from('notes')
+        .select('id, title, content, vault_path, vault_domain')
+        .in('id', noteIds)
+        .limit(10)
+
+      if (linkedNotes?.length) {
+        contextParts.push('## Linked Notes\n' + linkedNotes.map(n => {
+          sourceNotes.push({ id: n.id, title: n.title || 'Untitled', vaultPath: n.vault_path })
+          return `### ${n.title || 'Untitled'}${n.vault_domain ? ` [${n.vault_domain}]` : ''}\n${n.content?.slice(0, 1500) || '(empty)'}`
+        }).join('\n\n'))
       }
     }
 
@@ -176,13 +307,14 @@ Deno.serve(async (req) => {
         const queryEmbedding = embResult.data?.[0]?.embedding
 
         if (queryEmbedding) {
+          // Use lower threshold (0.25) for better recall
           const { data: semanticResults, error: searchErr } = await userSupabase.rpc('search_notes_semantic', {
             query_embedding: JSON.stringify(queryEmbedding),
-            match_threshold: 0.3,
+            match_threshold: 0.25,
             match_count: 8,
             filter_vault_domain: null,
           })
-          console.log(`Semantic search for "${lastUserMessage}": ${semanticResults?.length ?? 0} results, error: ${searchErr?.message ?? 'none'}`)
+          console.log(`Semantic search for "${lastUserMessage.slice(0, 80)}": ${semanticResults?.length ?? 0} results, error: ${searchErr?.message ?? 'none'}`)
 
           if (semanticResults?.length) {
             // Deduplicate against already-linked notes
@@ -213,6 +345,7 @@ You have access to the user's vault notes (personal knowledge base) and Symphony
 - If you don't have enough context to answer, say so plainly.
 - Never make up information that isn't in the provided context.
 - The user has Parkinson's disease. Keep responses focused and easy to act on.
+- Today's date is ${todayLabel} (US Eastern time).
 
 ${contextParts.length > 0 ? '---\n\n# Available Context\n\n' + contextParts.join('\n\n---\n\n') : 'No additional context available for this query.'}`
 

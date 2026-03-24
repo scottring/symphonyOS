@@ -90,6 +90,9 @@ import type { LinkedActivityType } from '@/types/task'
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
 import { useHiddenCalendarEvents } from '@/hooks/useHiddenCalendarEvents'
 import { useChat, type EntityContext as ChatEntityContext } from '@/hooks/useChat'
+import { useMeetingNotes } from '@/hooks/useMeetingNotes'
+import { MeetingNotesView } from '@/components/meeting/MeetingNotesView'
+import { ActionQueueBar } from '@/components/actions/ActionQueueBar'
 
 function App() {
   const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask } = useSupabaseTasks()
@@ -111,6 +114,7 @@ function App() {
   const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, updateEventAssignmentAll, updateRecipeUrl, updateEventProject, getNote, getEventNotesForProject, updateEventContext, notes: eventNotesMap } = useEventNotes()
   const { contacts, contactsMap, addContact, updateContact, deleteContact, searchContacts } = useContacts()
   const { projects, projectsMap, addProject, updateProject, deleteProject, searchProjects, recalculateProjectStatus } = useProjects()
+  const meetingNotes = useMeetingNotes(contacts, tasks)
   const {
     areas: goalAreas,
     goals,
@@ -1372,6 +1376,7 @@ function App() {
     onOpenWeeklyReview: handleOpenWeeklyReview,
     onRefreshInstances: refreshDateInstances,
     onOpenChat: () => setChatOpen(true),
+    onStartMeeting: meetingNotes.startMeeting,
   }), [
     handleToggleTask, toggleWaiting, handleUpdateTaskWithToast, pushTask, deleteTask, addTask, getCurrentUserMember, currentDomain, handleCreateFollowUp,
     scheduleActions, updateRoutine, updateEventContext, hideEvent,
@@ -1382,7 +1387,7 @@ function App() {
     handleSendToList, handleCreateListInTriage, addProject, searchContacts, addContact,
     handleOpenProject, getDomainForCalendar, effectiveDayType, handleDayTypeChange,
     eveningReflections.saveReflection, eveningReflections.todayReflection,
-    handleOpenWeeklyReview, refreshDateInstances,
+    handleOpenWeeklyReview, refreshDateInstances, meetingNotes.startMeeting,
   ])
 
   if (authLoading || onboardingLoading) {
@@ -1642,31 +1647,45 @@ function App() {
         <SectionErrorBoundary sectionName="Content" onReset={() => handleViewChange('today')}>
           {activeView === 'today' && (
             <div className="h-full flex flex-col overflow-hidden">
-              {/* Calendar connect banner if needed */}
-              {!isConnected && (
-                <div className="p-4 border-b border-neutral-100 shrink-0">
-                  <Suspense fallback={<LoadingFallback />}>
-                    <CalendarConnect />
-                  </Suspense>
-                </div>
-              )}
-
-              {/* Zone 3: Today's schedule */}
-              <ScheduleActionsProvider value={scheduleActionsValue}>
-                <HomeView
-                  tasks={tasks}
-                  events={filteredEvents}
-                  routines={filteredRoutines}
-                  projects={projects}
-                  dateInstances={dateInstances}
-                  selectedItemId={selectedItemId}
-                  onSelectItem={handleSelectItem}
-                  loading={tasksLoading || eventsFetching || routinesLoading}
-                  viewedDate={viewedDate}
-                  onDateChange={setViewedDate}
-                  currentUserMemberId={getCurrentUserMember()?.id}
+              {/* Meeting mode — replaces normal view when active */}
+              {meetingNotes.isInMeeting && meetingNotes.meeting ? (
+                <MeetingNotesView
+                  meeting={meetingNotes.meeting}
+                  onSaveNote={meetingNotes.saveMeetingNote}
+                  onEndMeeting={meetingNotes.endMeeting}
                 />
-              </ScheduleActionsProvider>
+              ) : (
+                <>
+                  {/* Calendar connect banner if needed */}
+                  {!isConnected && (
+                    <div className="p-4 border-b border-neutral-100 shrink-0">
+                      <Suspense fallback={<LoadingFallback />}>
+                        <CalendarConnect />
+                      </Suspense>
+                    </div>
+                  )}
+
+                  {/* Action queue bar */}
+                  <ScheduleActionsProvider value={scheduleActionsValue}>
+                    <div className="px-4 pt-2 shrink-0">
+                      <ActionQueueBar />
+                    </div>
+                    <HomeView
+                      tasks={tasks}
+                      events={filteredEvents}
+                      routines={filteredRoutines}
+                      projects={projects}
+                      dateInstances={dateInstances}
+                      selectedItemId={selectedItemId}
+                      onSelectItem={handleSelectItem}
+                      loading={tasksLoading || eventsFetching || routinesLoading}
+                      viewedDate={viewedDate}
+                      onDateChange={setViewedDate}
+                      currentUserMemberId={getCurrentUserMember()?.id}
+                    />
+                  </ScheduleActionsProvider>
+                </>
+              )}
             </div>
           )}
 

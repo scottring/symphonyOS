@@ -6,7 +6,8 @@ import { formatTime, formatTimeRange, inferMealTime } from '@/lib/timeUtils'
 import { getProjectColor } from '@/lib/projectUtils'
 import { PushDropdown, SchedulePopover, ContextPicker, type ScheduleContextItem } from '@/components/triage'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
-import { Redo2 } from 'lucide-react'
+import { Redo2, Video } from 'lucide-react'
+import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useMobile } from '@/hooks/useMobile'
 import { TaskCheckbox } from './TaskCheckbox'
 import { DOMAIN_COLORS } from '@/lib/domainColors'
@@ -134,6 +135,37 @@ const overdueColors = {
 
 // Domain context colors - shared utility
 const contextColors: Record<string, { dot: string; bg: string }> = DOMAIN_COLORS
+
+// Start Meeting button - uses context to avoid prop drilling
+function StartMeetingButton({ item }: { item: TimelineItem }) {
+  const ctx = useScheduleActionsContext()
+  const onStartMeeting = ctx.onStartMeeting
+
+  if (!onStartMeeting) return null
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const eventId = item.id.replace('event-', '')
+    onStartMeeting(
+      eventId,
+      item.title,
+      item.attendees || [],
+      item.startTime ?? undefined,
+      item.endTime ?? undefined
+    )
+  }
+
+  return (
+    <button
+      onClick={handleClick}
+      className="shrink-0 p-1.5 rounded-lg text-neutral-400 hover:text-primary-600 hover:bg-primary-50 transition-all opacity-0 group-hover:opacity-100"
+      title="Start meeting"
+      aria-label="Start meeting"
+    >
+      <Video className="w-4 h-4" />
+    </button>
+  )
+}
 
 export const ScheduleItem = memo(function ScheduleItem({
   item,
@@ -440,6 +472,11 @@ export const ScheduleItem = memo(function ScheduleItem({
             )}
           </div>
         </div>
+
+        {/* Start Meeting button - for timed events only, shows on hover */}
+        {isEvent && !item.allDay && !item.completed && !item.skipped && (
+          <StartMeetingButton item={item} />
+        )}
 
         {/* Skip button - for routines and events, hidden by default, shows on hover */}
         {(isRoutine || item.type === 'event') && onSkip && !item.completed && !item.skipped && (

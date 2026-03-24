@@ -54,10 +54,13 @@ Deno.serve(async (req) => {
 
     const state = btoa(JSON.stringify({ userId: user.id }))
 
+    // Gmail scopes are used by gmail-check and gmail-send edge functions.
+    // If you change these, users must disconnect + reconnect Google to re-consent.
     const scopes = [
       'https://www.googleapis.com/auth/calendar',
       'https://www.googleapis.com/auth/calendar.events',
       'https://www.googleapis.com/auth/gmail.readonly',
+      'https://www.googleapis.com/auth/gmail.send',
     ]
 
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth')

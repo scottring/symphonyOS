@@ -124,3 +124,8 @@ export const NotesPage = lazy(() =>
 export const CompletedTasksView = lazy(() =>
   import('./history/CompletedTasksView').then(m => ({ default: m.CompletedTasksView }))
 )
+
+// Meeting notes
+export const MeetingNotesView = lazy(() =>
+  import('./meeting/MeetingNotesView').then(m => ({ default: m.MeetingNotesView }))
+)

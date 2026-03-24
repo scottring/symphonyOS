@@ -151,6 +151,12 @@ serve(async (req) => {
       selected?: boolean
       backgroundColor?: string // Google Calendar color (hex)
     }
+    interface GoogleCalendarAttendee {
+      email: string
+      displayName?: string
+      responseStatus?: string
+      self?: boolean
+    }
     interface GoogleCalendarEvent {
       id: string
       summary?: string
@@ -158,6 +164,7 @@ serve(async (req) => {
       location?: string
       start: { dateTime?: string; date?: string }
       end: { dateTime?: string; date?: string }
+      attendees?: GoogleCalendarAttendee[]
     }
 
     let calendars: GoogleCalendar[] = calendarListData.items || []
@@ -265,6 +272,12 @@ serve(async (req) => {
             calendar_id: calendar.id,
             calendar_name: calendar.summary || null,
             calendar_color: calendar.backgroundColor || null, // Google Calendar color
+            attendees: (event.attendees || []).map((a: GoogleCalendarAttendee) => ({
+              email: a.email,
+              displayName: a.displayName || undefined,
+              responseStatus: a.responseStatus || undefined,
+              self: a.self || false,
+            })),
             updated_at: new Date().toISOString(),
           }
         })
