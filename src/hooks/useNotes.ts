@@ -32,6 +32,11 @@ function dbNoteToNote(dbNote: DbNote): Note {
     audioUrl: dbNote.audio_url ?? undefined,
     externalId: dbNote.external_id ?? undefined,
     externalUrl: dbNote.external_url ?? undefined,
+    vaultPath: dbNote.vault_path ?? undefined,
+    vaultDomain: dbNote.vault_domain ?? undefined,
+    vaultFrontmatter: dbNote.vault_frontmatter ?? undefined,
+    context: dbNote.context as Note['context'] ?? undefined,
+    readonly: dbNote.source === 'vault',
     createdAt: new Date(dbNote.created_at),
     updatedAt: new Date(dbNote.updated_at),
   }

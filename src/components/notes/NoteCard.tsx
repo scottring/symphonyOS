@@ -1,5 +1,5 @@
 import type { DisplayNote, NoteTopic } from '@/types/note'
-import { noteTypeColors } from '@/types/note'
+import { noteTypeColors, vaultDomainLabels } from '@/types/note'
 import { formatRelativeTime } from '@/lib/timeUtils'
 import { htmlToPlainText } from '@/lib/htmlUtils'
 
@@ -65,6 +65,16 @@ export function NoteCard({ note, topic, isSelected, onClick }: NoteCardProps) {
         {/* Metadata row */}
         <div className="flex items-center gap-2 text-xs text-neutral-400">
           <time>{formatRelativeTime(note.createdAt)}</time>
+
+          {/* Vault domain pill */}
+          {'vaultDomain' in note && note.vaultDomain && (
+            <>
+              <span>·</span>
+              <span className="px-1.5 py-0.5 rounded-full bg-teal-50 text-teal-700 text-[10px] font-medium">
+                {vaultDomainLabels[note.vaultDomain] ?? note.vaultDomain}
+              </span>
+            </>
+          )}
 
           {/* Topic pill - only if assigned */}
           {topic && (

@@ -1,0 +1,110 @@
+import { useState, useCallback } from 'react'
+import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/hooks/useAuth'
+
+export interface ChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  sources?: { id: string; title: string; vaultPath?: string }[]
+  timestamp: Date
+}
+
+export interface EntityContext {
+  type: 'task' | 'contact' | 'project' | 'event' | 'routine'
+  id: string
+  name: string
+}
+
+export function useChat() {
+  const { user } = useAuth()
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [entityContext, setEntityContext] = useState<EntityContext | null>(null)
+
+  const sendMessage = useCallback(
+    async (content: string) => {
+      if (!user || !content.trim()) return
+
+      // Add user message
+      const userMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'user',
+        content: content.trim(),
+        timestamp: new Date(),
+      }
+      setMessages((prev) => [...prev, userMessage])
+      setLoading(true)
+      setError(null)
+
+      try {
+        // Get current session for auth
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('No active session')
+
+        // Build messages array for the API (exclude ids/timestamps)
+        const apiMessages = [...messages, userMessage].map((m) => ({
+          role: m.role,
+          content: m.content,
+        }))
+
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/symphony-chat`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              messages: apiMessages,
+              entityContext: entityContext ?? undefined,
+            }),
+          }
+        )
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({ error: 'Request failed' }))
+          const detail = errData.details ? `: ${errData.details}` : ''
+          throw new Error((errData.error || `HTTP ${response.status}`) + detail)
+        }
+
+        const data = await response.json()
+
+        const assistantMessage: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: data.message,
+          sources: data.sources,
+          timestamp: new Date(),
+        }
+        setMessages((prev) => [...prev, assistantMessage])
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to send message')
+      } finally {
+        setLoading(false)
+      }
+    },
+    [user, messages, entityContext]
+  )
+
+  const clearChat = useCallback(() => {
+    setMessages([])
+    setError(null)
+  }, [])
+
+  const updateEntityContext = useCallback((ctx: EntityContext | null) => {
+    setEntityContext(ctx)
+  }, [])
+
+  return {
+    messages,
+    loading,
+    error,
+    entityContext,
+    sendMessage,
+    clearChat,
+    updateEntityContext,
+  }
+}

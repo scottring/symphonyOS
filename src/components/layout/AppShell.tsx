@@ -3,6 +3,7 @@ import { Sidebar, type ViewType } from './Sidebar'
 import { SidebarKinetic } from './SidebarKinetic'
 import { MoreSheet } from './MoreSheet'
 import { QuickCapture } from './QuickCapture'
+import { ChatPanel } from '@/components/chat/ChatPanel'
 import { useMobile } from '@/hooks/useMobile'
 import { useTheme } from '@/hooks/useTheme'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
@@ -12,6 +13,7 @@ import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { Routine } from '@/types/routine'
+import type { ChatMessage, EntityContext } from '@/hooks/useChat'
 
 interface EntityData {
   tasks: Task[]
@@ -63,6 +65,16 @@ interface AppShellProps {
   onPinNavigate?: (entityType: PinnableEntityType, entityId: string) => void
   onPinMarkAccessed?: (entityType: PinnableEntityType, entityId: string) => void
   onPinRefreshStale?: (id: string) => void
+  // Chat props
+  chatOpen?: boolean
+  onChatOpenChange?: (open: boolean) => void
+  chatMessages?: ChatMessage[]
+  chatLoading?: boolean
+  chatError?: string | null
+  chatEntityContext?: EntityContext | null
+  onChatSend?: (message: string) => void
+  onChatClear?: () => void
+  onChatSourceClick?: (noteId: string) => void
 }
 
 export function AppShell({
@@ -92,10 +104,20 @@ export function AppShell({
   onPinNavigate,
   onPinMarkAccessed,
   onPinRefreshStale,
+  chatOpen = false,
+  onChatOpenChange,
+  chatMessages = [],
+  chatLoading = false,
+  chatError = null,
+  chatEntityContext = null,
+  onChatSend,
+  onChatClear,
+  onChatSourceClick,
 }: AppShellProps) {
   const isMobile = useMobile()
   const { theme } = useTheme()
   const [moreSheetOpen, setMoreSheetOpen] = useState(false)
+  const setChatOpen = (open: boolean) => onChatOpenChange?.(open)
 
   return (
     <div className="h-screen flex overflow-hidden overflow-x-hidden bg-bg-base w-full max-w-[100vw]">
@@ -306,6 +328,51 @@ export function AppShell({
           onNavigate={onViewChange}
           activeView={activeView}
         />
+      )}
+
+      {/* Chat panel — slide-in from right */}
+      {onChatSend && (
+        isMobile ? (
+          <div
+            className={`
+              fixed inset-0 z-50 bg-white
+              transform transition-transform duration-300 ease-out
+              ${chatOpen ? 'translate-x-0' : 'translate-x-full'}
+            `}
+            style={{ paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+          >
+            <ChatPanel
+              messages={chatMessages}
+              loading={chatLoading}
+              error={chatError}
+              entityContext={chatEntityContext}
+              onSend={onChatSend}
+              onClear={onChatClear ?? (() => {})}
+              onClose={() => setChatOpen(false)}
+              onSourceClick={onChatSourceClick}
+            />
+          </div>
+        ) : (
+          <aside
+            className={`
+              fixed top-0 right-0 h-full w-[380px]
+              transform transition-all duration-300 ease-out
+              shadow-xl z-30
+              ${chatOpen ? 'translate-x-0' : 'translate-x-full'}
+            `}
+          >
+            <ChatPanel
+              messages={chatMessages}
+              loading={chatLoading}
+              error={chatError}
+              entityContext={chatEntityContext}
+              onSend={onChatSend}
+              onClear={onChatClear ?? (() => {})}
+              onClose={() => setChatOpen(false)}
+              onSourceClick={onChatSourceClick}
+            />
+          </aside>
+        )
       )}
     </div>
   )

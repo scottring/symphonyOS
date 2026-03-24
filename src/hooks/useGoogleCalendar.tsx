@@ -122,39 +122,50 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
           return
         }
 
-        // Connection exists - now validate it by making a test API call
-        // This will trigger token refresh if needed and catch invalid refresh tokens
-        const { data, error: validateError } = await supabase.functions.invoke('google-calendar-events', {
-          body: {
-            startDate: new Date().toISOString(),
-            endDate: new Date().toISOString(),
-          },
-        })
+        // Connection exists - validate by making a test API call
+        // Retry once before declaring connection broken (handles transient failures)
+        let validated = false
+        let lastErrorMsg = ''
 
-        if (validateError || data?.error) {
-          const errorMsg = data?.error || validateError?.message || ''
-          // Check for auth-related errors indicating the connection is broken
-          if (
-            errorMsg.includes('invalid_grant') ||
-            errorMsg.includes('Token has been expired or revoked') ||
-            errorMsg.includes('Unauthorized') ||
-            errorMsg.includes('No calendar connection found')
-          ) {
-            console.warn('Calendar connection invalid, needs reconnect:', errorMsg)
-            setIsConnected(false)
-            setNeedsReconnect(true)
-            setError('Calendar connection expired. Please reconnect.')
-          } else {
-            // Other errors - connection might still be valid
-            console.warn('Calendar validation failed but connection may be valid:', errorMsg)
-            setIsConnected(true)
-            setNeedsReconnect(false)
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const { data, error: validateError } = await supabase.functions.invoke('google-calendar-events', {
+            body: {
+              startDate: new Date().toISOString(),
+              endDate: new Date().toISOString(),
+            },
+          })
+
+          if (!validateError && !data?.error) {
+            validated = true
+            break
           }
-        } else {
-          // Connection is valid
+
+          lastErrorMsg = data?.error || validateError?.message || ''
+          if (attempt === 0) {
+            // Wait briefly before retry
+            await new Promise(r => setTimeout(r, 1000))
+          }
+        }
+
+        if (validated) {
           setIsConnected(true)
           setNeedsReconnect(false)
           setError(null)
+        } else if (
+          lastErrorMsg.includes('invalid_grant') ||
+          lastErrorMsg.includes('Token has been expired or revoked') ||
+          lastErrorMsg.includes('Unauthorized') ||
+          lastErrorMsg.includes('No calendar connection found')
+        ) {
+          console.warn('Calendar connection invalid after retry, needs reconnect:', lastErrorMsg)
+          setIsConnected(false)
+          setNeedsReconnect(true)
+          setError('Calendar connection expired. Please reconnect.')
+        } else {
+          // Other errors - connection might still be valid
+          console.warn('Calendar validation failed but connection may be valid:', lastErrorMsg)
+          setIsConnected(true)
+          setNeedsReconnect(false)
         }
       } catch (err) {
         console.error('Error checking calendar connection:', err)

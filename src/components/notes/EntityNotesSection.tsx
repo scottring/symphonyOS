@@ -85,6 +85,12 @@ export function EntityNotesSection({
                       onClick={() => handleNoteClick(note.id)}
                       className="w-full px-3 py-2 text-left hover:bg-neutral-100/50 transition-colors"
                     >
+                      {note.source === 'vault' && note.title && (
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-teal-50 text-teal-700">Vault</span>
+                          <span className="text-xs font-medium text-neutral-600">{note.title}</span>
+                        </div>
+                      )}
                       <p className="text-sm text-neutral-700 line-clamp-2">
                         {isNoteExpanded ? note.content : getPreviewText(note.content)}
                       </p>

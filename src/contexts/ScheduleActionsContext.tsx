@@ -88,6 +88,7 @@ export interface ScheduleActionsValue {
   // Navigation
   onOpenWeeklyReview?: () => void
   onRefreshInstances?: () => void
+  onOpenChat?: () => void
 }
 
 const ScheduleActionsContext = createContext<ScheduleActionsValue | null>(null)

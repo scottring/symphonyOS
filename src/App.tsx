@@ -89,6 +89,7 @@ import type { ActionableInstance, Routine } from '@/types/actionable'
 import type { LinkedActivityType } from '@/types/task'
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
 import { useHiddenCalendarEvents } from '@/hooks/useHiddenCalendarEvents'
+import { useChat, type EntityContext as ChatEntityContext } from '@/hooks/useChat'
 
 function App() {
   const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask } = useSupabaseTasks()
@@ -100,6 +101,8 @@ function App() {
   const undo = useUndo({ duration: 5000 })
   const { toast, showToast, dismissToast } = useToast()
   const { isHidden: isEventHidden, hideEvent } = useHiddenCalendarEvents()
+  const chat = useChat()
+  const [chatOpen, setChatOpen] = useState(false)
   const [confirmationToast, setConfirmationToast] = useState<ConfirmationToastMessage | null>(null)
 
   // Onboarding state
@@ -936,6 +939,22 @@ function App() {
     [addNote, addEntityLink, getNotesForEntity]
   )
 
+  // Update chat entity context when viewing different entities
+  useEffect(() => {
+    let ctx: ChatEntityContext | null = null
+    if (selectedTaskId) {
+      const task = tasks.find(t => t.id === selectedTaskId)
+      if (task) ctx = { type: 'task', id: task.id, name: task.title }
+    } else if (selectedContactId) {
+      const contact = contactsMap.get(selectedContactId)
+      if (contact) ctx = { type: 'contact', id: contact.id, name: contact.name }
+    } else if (selectedProjectId) {
+      const project = projects.find(p => p.id === selectedProjectId)
+      if (project) ctx = { type: 'project', id: project.id, name: project.name }
+    }
+    chat.updateEntityContext(ctx)
+  }, [selectedTaskId, selectedContactId, selectedProjectId, tasks, contactsMap, projects, chat.updateEntityContext])
+
   // Handle selecting an item - all types open DetailPanel (unified UX)
   const handleSelectItem = useCallback((itemId: string | null) => {
     if (!itemId) {
@@ -1065,8 +1084,9 @@ function App() {
     const sourceTask = tasks.find(t => t.id === sourceTaskId)
     if (!sourceTask) return
 
+    const fullTitle = `${sourceTask.title}: ${title}`
     await addTask(
-      title,
+      fullTitle,
       sourceTask.contactId, // Inherit contact
       sourceTask.projectId, // Inherit project
       viewedDate, // Schedule for today
@@ -1351,6 +1371,7 @@ function App() {
     // Navigation
     onOpenWeeklyReview: handleOpenWeeklyReview,
     onRefreshInstances: refreshDateInstances,
+    onOpenChat: () => setChatOpen(true),
   }), [
     handleToggleTask, toggleWaiting, handleUpdateTaskWithToast, pushTask, deleteTask, addTask, getCurrentUserMember, currentDomain, handleCreateFollowUp,
     scheduleActions, updateRoutine, updateEventContext, hideEvent,
@@ -1506,6 +1527,14 @@ function App() {
       onPinNavigate={handlePinNavigate}
       onPinMarkAccessed={pinnedItems.markAccessed}
       onPinRefreshStale={pinnedItems.refreshStale}
+      chatOpen={chatOpen}
+      onChatOpenChange={setChatOpen}
+      chatMessages={chat.messages}
+      chatLoading={chat.loading}
+      chatError={chat.error}
+      chatEntityContext={chat.entityContext}
+      onChatSend={chat.sendMessage}
+      onChatClear={chat.clearChat}
       panel={
         recipeUrl ? (
           <Suspense fallback={<LoadingFallback />}>

@@ -1,6 +1,6 @@
 // Note type constants
-export type NoteType = 'quick_capture' | 'meeting_note' | 'transcript' | 'voice_memo' | 'general' | 'task_note'
-export type NoteSource = 'manual' | 'fathom' | 'voice' | 'import' | 'task'
+export type NoteType = 'quick_capture' | 'meeting_note' | 'transcript' | 'voice_memo' | 'general' | 'task_note' | 'vault_note'
+export type NoteSource = 'manual' | 'fathom' | 'voice' | 'import' | 'task' | 'vault'
 export type NoteLinkType = 'related' | 'primary' | 'mentioned'
 export type NoteEntityType = 'event' | 'project' | 'contact' | 'task' | 'routine'
 
@@ -47,6 +47,12 @@ export interface Note {
   audioUrl?: string
   externalId?: string
   externalUrl?: string
+  // Vault-specific fields
+  vaultPath?: string
+  vaultDomain?: string
+  vaultFrontmatter?: Record<string, unknown>
+  context?: 'work' | 'family' | 'personal'
+  readonly?: boolean  // true for vault notes (source of truth is the vault)
   createdAt: Date
   updatedAt: Date
   // Populated from joins
@@ -65,6 +71,12 @@ export interface DbNote {
   audio_url: string | null
   external_id: string | null
   external_url: string | null
+  // Vault-specific fields
+  vault_path: string | null
+  vault_domain: string | null
+  vault_frontmatter: Record<string, unknown> | null
+  vault_last_commit_sha: string | null
+  context: string | null
   created_at: string
   updated_at: string
 }
@@ -137,6 +149,7 @@ export const noteTypeColors: Record<NoteType, string> = {
   voice_memo: 'border-l-amber-300',
   general: 'border-l-neutral-300',
   task_note: 'border-l-green-300',
+  vault_note: 'border-l-teal-300',
 }
 
 export const noteTypeDotColors: Record<NoteType, string> = {
@@ -146,6 +159,7 @@ export const noteTypeDotColors: Record<NoteType, string> = {
   voice_memo: 'bg-amber-400',
   general: 'bg-neutral-400',
   task_note: 'bg-green-400',
+  vault_note: 'bg-teal-400',
 }
 
 export const noteTypeLabels: Record<NoteType, string> = {
@@ -155,4 +169,26 @@ export const noteTypeLabels: Record<NoteType, string> = {
   voice_memo: 'Voice',
   general: '',
   task_note: 'Task',
+  vault_note: 'Vault',
+}
+
+// Map vault domains to Symphony context
+export const vaultDomainToContext: Record<string, 'work' | 'family' | 'personal'> = {
+  'family': 'family',
+  'stacks-data': 'work',
+  'symphony-os': 'work',
+  'ppvis': 'work',
+  'job-search': 'personal',
+  'health': 'personal',
+  'personal': 'personal',
+}
+
+export const vaultDomainLabels: Record<string, string> = {
+  'family': 'Family',
+  'stacks-data': 'Stacks Data',
+  'symphony-os': 'Symphony',
+  'ppvis': 'PPVIS',
+  'job-search': 'Job Search',
+  'health': 'Health',
+  'personal': 'Personal',
 }
