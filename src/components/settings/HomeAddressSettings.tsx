@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -9,13 +9,6 @@ interface SavedLocation {
   name: string
   address: string
   placeId?: string
-}
-
-interface PlaceAutocompleteResult {
-  placeId: string
-  mainText: string
-  secondaryText: string
-  description: string
 }
 
 function getSavedHomeLocation(): SavedLocation | null {
@@ -50,75 +43,20 @@ export function HomeAddressSettings() {
   const { user } = useAuth()
   const [homeLocation, setHomeLocation] = useState<SavedLocation | null>(null)
   const [isEditing, setIsEditing] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<PlaceAutocompleteResult[]>([])
-  const [isSearching, setIsSearching] = useState(false)
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [addressInput, setAddressInput] = useState('')
 
   // Load saved home location on mount
   useEffect(() => {
     setHomeLocation(getSavedHomeLocation())
   }, [])
 
-  // Debounced search
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setSearchResults([])
-      return
-    }
-
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current)
-    }
-
-    debounceRef.current = setTimeout(async () => {
-      setIsSearching(true)
-      try {
-        const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-        const response = await fetch(
-          `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(searchQuery)}&types=address&key=${apiKey}`
-        )
-        const data = await response.json()
-
-        if (data.predictions) {
-          const results: PlaceAutocompleteResult[] = data.predictions.map((p: {
-            place_id: string
-            structured_formatting: { main_text: string; secondary_text: string }
-            description: string
-          }) => ({
-            placeId: p.place_id,
-            mainText: p.structured_formatting.main_text,
-            secondaryText: p.structured_formatting.secondary_text,
-            description: p.description,
-          }))
-          setSearchResults(results)
-        }
-      } catch {
-        // Silently fail
-      }
-      setIsSearching(false)
-    }, 300)
-
-    return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current)
-      }
-    }
-  }, [searchQuery])
-
-  const saveToSupabase = async (address: string, placeId: string, lat?: number, lng?: number) => {
+  const saveToSupabase = async (address: string) => {
     if (!user) return
-    const updates: Record<string, unknown> = {
+    await supabase.from('user_profiles').upsert({
       user_id: user.id,
       home_location: address,
-      home_place_id: placeId,
       updated_at: new Date().toISOString(),
-    }
-    if (lat != null && lng != null) {
-      updates.home_lat = lat
-      updates.home_lng = lng
-    }
-    await supabase.from('user_profiles').upsert(updates, { onConflict: 'user_id' })
+    }, { onConflict: 'user_id' })
   }
 
   const clearFromSupabase = async () => {
@@ -132,45 +70,20 @@ export function HomeAddressSettings() {
     }).eq('user_id', user.id)
   }
 
-  const handleSelectPlace = async (result: PlaceAutocompleteResult) => {
-    try {
-      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${result.placeId}&fields=formatted_address,geometry&key=${apiKey}`
-      )
-      const data = await response.json()
+  const handleSave = () => {
+    const address = addressInput.trim()
+    if (!address) return
 
-      const address = data.result?.formatted_address || result.description
-      const lat = data.result?.geometry?.location?.lat
-      const lng = data.result?.geometry?.location?.lng
-
-      const newLocation: SavedLocation = {
-        name: 'Home',
-        address,
-        placeId: result.placeId,
-      }
-
-      saveHomeLocation(newLocation)
-      setHomeLocation(newLocation)
-      saveToSupabase(address, result.placeId, lat, lng)
-      setIsEditing(false)
-      setSearchQuery('')
-      setSearchResults([])
-    } catch {
-      // Fallback if details fail
-      const newLocation: SavedLocation = {
-        name: 'Home',
-        address: result.description,
-        placeId: result.placeId,
-      }
-
-      saveHomeLocation(newLocation)
-      setHomeLocation(newLocation)
-      saveToSupabase(result.description, result.placeId)
-      setIsEditing(false)
-      setSearchQuery('')
-      setSearchResults([])
+    const newLocation: SavedLocation = {
+      name: 'Home',
+      address,
     }
+
+    saveHomeLocation(newLocation)
+    setHomeLocation(newLocation)
+    saveToSupabase(address)
+    setIsEditing(false)
+    setAddressInput('')
   }
 
   const handleClear = () => {
@@ -188,52 +101,29 @@ export function HomeAddressSettings() {
 
       {isEditing ? (
         <div className="p-4 bg-neutral-50 rounded-lg border border-neutral-200">
-          <div className="relative">
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search for your home address..."
-              className="w-full pl-10 pr-3 py-2.5 text-sm rounded-lg border border-neutral-200 bg-white
-                         focus:outline-none focus:ring-2 focus:ring-primary-500"
-              autoFocus
-            />
-          </div>
-
-          {isSearching && (
-            <p className="text-xs text-neutral-400 mt-2 flex items-center gap-2">
-              <span className="w-3 h-3 border-2 border-neutral-300 border-t-primary-500 rounded-full animate-spin" />
-              Searching...
-            </p>
-          )}
-
-          {searchResults.length > 0 && (
-            <ul className="mt-2 divide-y divide-neutral-100 rounded-lg border border-neutral-200 bg-white overflow-hidden max-h-48 overflow-auto">
-              {searchResults.map((result) => (
-                <li key={result.placeId}>
-                  <button
-                    onClick={() => handleSelectPlace(result)}
-                    className="w-full px-3 py-2 text-left hover:bg-neutral-50 transition-colors"
-                  >
-                    <p className="text-sm font-medium text-neutral-800">{result.mainText}</p>
-                    <p className="text-xs text-neutral-500">{result.secondaryText}</p>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+          <input
+            type="text"
+            value={addressInput}
+            onChange={(e) => setAddressInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSave() }}
+            placeholder="Enter your home address..."
+            className="w-full px-3 py-2.5 text-sm rounded-lg border border-neutral-200 bg-white
+                       focus:outline-none focus:ring-2 focus:ring-primary-500"
+            autoFocus
+          />
 
           <div className="flex gap-2 mt-3">
             <button
+              onClick={handleSave}
+              disabled={!addressInput.trim()}
+              className="btn-primary flex-1 disabled:opacity-50"
+            >
+              Save
+            </button>
+            <button
               onClick={() => {
                 setIsEditing(false)
-                setSearchQuery('')
-                setSearchResults([])
+                setAddressInput('')
               }}
               className="btn-secondary flex-1"
             >
