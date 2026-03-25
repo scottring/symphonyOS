@@ -10,6 +10,7 @@ import { Redo2, Video } from 'lucide-react'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useMobile } from '@/hooks/useMobile'
 import { TaskCheckbox } from './TaskCheckbox'
+import { PromoteToProjectButton } from './PromoteToProjectButton'
 import { DOMAIN_COLORS } from '@/lib/domainColors'
 
 // Nordic Journal calendar icon - minimal, elegant design
@@ -124,6 +125,8 @@ interface ScheduleItemProps {
   onClosePanel?: () => void
   // Coaching indicator
   hasCoaching?: boolean
+  // Event → Project promotion suggestion
+  isSuggestedPromotion?: boolean
 }
 
 // Warm amber color tokens for overdue styling
@@ -194,6 +197,7 @@ export const ScheduleItem = memo(function ScheduleItem({
   panelOpen,
   onClosePanel,
   hasCoaching,
+  isSuggestedPromotion,
 }: ScheduleItemProps) {
   const isMobile = useMobile()
   const isTask = item.type === 'task'
@@ -476,6 +480,11 @@ export const ScheduleItem = memo(function ScheduleItem({
         {/* Start Meeting button - for timed events only, shows on hover */}
         {isEvent && !item.allDay && !item.completed && !item.skipped && (
           <StartMeetingButton item={item} />
+        )}
+
+        {/* Promote to Project button - for events */}
+        {isEvent && !item.completed && !item.skipped && (
+          <PromoteToProjectButton item={item} isSuggestedPromotion={isSuggestedPromotion} />
         )}
 
         {/* Skip button - for routines and events, hidden by default, shows on hover */}

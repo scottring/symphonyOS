@@ -3,6 +3,8 @@ import type { Project, ProjectStatus } from '@/types/project'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import { PinButton } from '@/components/pins'
+import { ProjectSyncButton } from '@/components/project/ProjectSyncButton'
+import { useProjectSync } from '@/hooks/useProjectSync'
 import { formatTimeWithDate } from '@/lib/timeUtils'
 
 interface ProjectViewProps {
@@ -42,6 +44,7 @@ export function ProjectView({
   onUnpin,
 }: ProjectViewProps) {
   void _onDeleteTask // Available for future use
+  const { available: vaultAvailable, syncing: vaultSyncing, isSynced, pushToVault } = useProjectSync()
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState('')
   const [editStatus, setEditStatus] = useState<ProjectStatus>('not_started')
@@ -289,6 +292,13 @@ export function ProjectView({
                 </div>
               </div>
               <div className="flex items-center gap-1">
+                <ProjectSyncButton
+                  project={project}
+                  available={vaultAvailable}
+                  syncing={vaultSyncing}
+                  isSynced={isSynced(project.id)}
+                  onSync={pushToVault}
+                />
                 {onPin && onUnpin && (
                   <PinButton
                     entityType="project"

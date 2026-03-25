@@ -28,6 +28,7 @@ import { getCoachingForItem } from '@/lib/coachingMatcher'
 import { CoachingTipsSection } from './CoachingTipsSection'
 import { CoachingActionsSection } from './CoachingActionsSection'
 import { AgentInsightsSection } from './AgentInsightsSection'
+import { EventEmailsSection } from '@/components/schedule/EventEmailsSection'
 
 // Component to render text with clickable links (handles HTML links and plain URLs)
 function RichText({ text }: { text: string }) {
@@ -2266,6 +2267,15 @@ export function DetailPanelRedesign({
               }
             } : undefined}
             onTogglePrepTask={onTogglePrepTask}
+          />
+        )}
+
+        {/* Email Threads - for events with attendees */}
+        {isEvent && item.attendees && item.attendees.length > 0 && (
+          <EventEmailsSection
+            attendeeEmails={item.attendees
+              .filter(a => !a.self && a.email)
+              .map(a => a.email)}
           />
         )}
 

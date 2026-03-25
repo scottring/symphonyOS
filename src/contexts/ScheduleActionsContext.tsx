@@ -93,6 +93,9 @@ export interface ScheduleActionsValue {
 
   // Meeting
   onStartMeeting?: (eventId: string, title: string, attendees: MeetingAttendee[], startTime?: Date, endTime?: Date) => void
+
+  // Event → Project promotion
+  onUpdateEventProject?: (googleEventId: string, projectId: string | null, eventTitle?: string | null, eventStartTime?: Date | null) => void
 }
 
 const ScheduleActionsContext = createContext<ScheduleActionsValue | null>(null)

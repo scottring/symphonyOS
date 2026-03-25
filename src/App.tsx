@@ -1377,6 +1377,7 @@ function App() {
     onRefreshInstances: refreshDateInstances,
     onOpenChat: () => setChatOpen(true),
     onStartMeeting: meetingNotes.startMeeting,
+    onUpdateEventProject: updateEventProject,
   }), [
     handleToggleTask, toggleWaiting, handleUpdateTaskWithToast, pushTask, deleteTask, addTask, getCurrentUserMember, currentDomain, handleCreateFollowUp,
     scheduleActions, updateRoutine, updateEventContext, hideEvent,
@@ -1387,7 +1388,7 @@ function App() {
     handleSendToList, handleCreateListInTriage, addProject, searchContacts, addContact,
     handleOpenProject, getDomainForCalendar, effectiveDayType, handleDayTypeChange,
     eveningReflections.saveReflection, eveningReflections.todayReflection,
-    handleOpenWeeklyReview, refreshDateInstances, meetingNotes.startMeeting,
+    handleOpenWeeklyReview, refreshDateInstances, meetingNotes.startMeeting, updateEventProject,
   ])
 
   if (authLoading || onboardingLoading) {

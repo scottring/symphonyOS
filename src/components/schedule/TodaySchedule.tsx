@@ -26,6 +26,7 @@ import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { hasCoachingForItem } from '@/lib/coachingMatcher'
 import { SundayNudgeBanner } from './SundayNudgeBanner'
 import { useSystemHealth } from '@/hooks/useSystemHealth'
+import { useRecurringEventDetection } from '@/hooks/useRecurringEventDetection'
 import { MultiAssigneeDropdown } from '@/components/family/MultiAssigneeDropdown'
 // import { CalendarClock } from 'lucide-react' // Hidden - Plan button removed
 
@@ -464,6 +465,9 @@ export function TodaySchedule({
   } = useScheduleActionsContext()
 
   const isMobile = useMobile()
+
+  // Detect recurring events without linked projects for promotion suggestions
+  const { isPromotionSuggested } = useRecurringEventDetection(events, eventNotesMap)
 
   // Follow-up task state: tracks which task just got completed and should show the follow-up input
   const [followUpTaskId, setFollowUpTaskId] = useState<string | null>(null)
@@ -1463,6 +1467,7 @@ export function TodaySchedule({
                       panelOpen={panelOpen}
                       onClosePanel={onClosePanel}
                       hasCoaching={coachingItemIds.has(item.id)}
+                      isSuggestedPromotion={item.type === 'event' ? isPromotionSuggested(item.id.replace('event-', '')) : undefined}
                     />
                     {followUpTaskId === taskId && taskId && sourceTaskForFollowUp && (
                       <FollowUpInput
