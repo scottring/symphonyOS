@@ -709,7 +709,14 @@ function App() {
     // Check if it's a task
     if (selectedItemId.startsWith('task-')) {
       const taskId = selectedItemId.replace('task-', '')
-      const task = tasks.find((t) => t.id === taskId)
+      // Search top-level tasks and nested subtasks
+      let task = tasks.find((t) => t.id === taskId)
+      if (!task) {
+        for (const t of tasks) {
+          const sub = t.subtasks?.find((s) => s.id === taskId)
+          if (sub) { task = sub; break }
+        }
+      }
       return task ? taskToTimelineItem(task) : null
     }
 
@@ -1118,6 +1125,15 @@ function App() {
       { linkedTo, linkType, assignedTo: getCurrentUserMember()?.id }
     )
   }, [addTask, viewedDate, getCurrentUserMember])
+
+  // Handler for linking an existing task as prep/follow-up
+  const handleLinkExistingTask = useCallback(async (
+    taskId: string,
+    linkedTo: { type: LinkedActivityType; id: string },
+    linkType: 'prep' | 'followup',
+  ) => {
+    await updateTask(taskId, { linkedTo, linkType })
+  }, [updateTask])
 
   // Handler for toggling a linked task's completion
   const handleToggleLinkedTask = useCallback(async (taskId: string) => {
@@ -1583,6 +1599,7 @@ function App() {
               onUpdateProject={handleUpdateProject}
               onOpenProject={handleOpenProject}
               onAddProject={addProject}
+              allTasks={tasks}
               onAddSubtask={addSubtask}
               onActionComplete={refreshDateInstances}
               onHideEvent={hideEvent}
@@ -1609,6 +1626,7 @@ function App() {
               onOpenParentTask={(taskId) => setSelectedItemId(`task-${taskId}`)}
               linkedTasks={selectedItemLinkedTasks}
               onAddLinkedTask={handleAddLinkedTask}
+              onLinkExistingTask={handleLinkExistingTask}
               onToggleLinkedTask={handleToggleLinkedTask}
               onDeleteLinkedTask={handleDeleteLinkedTask}
               routine={selectedItemRoutine}

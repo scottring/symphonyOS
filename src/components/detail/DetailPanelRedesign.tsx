@@ -111,6 +111,8 @@ interface DetailPanelRedesignProps {
   onActionComplete?: () => void
   // Hide recurring event permanently
   onHideEvent?: (googleEventId: string, title?: string, calendarId?: string) => Promise<boolean>
+  // All tasks (for parent task picker)
+  allTasks?: Task[]
   // Prep task support (for meal events)
   prepTasks?: Task[]
   onAddPrepTask?: (title: string, linkedEventId: string, scheduledFor: Date) => Promise<string | undefined>
@@ -141,6 +143,11 @@ interface DetailPanelRedesignProps {
     linkedTo: LinkedActivity,
     linkType: LinkType,
     scheduledFor?: Date
+  ) => Promise<void>
+  onLinkExistingTask?: (
+    taskId: string,
+    linkedTo: LinkedActivity,
+    linkType: LinkType,
   ) => Promise<void>
   onToggleLinkedTask?: (taskId: string) => void
   onDeleteLinkedTask?: (taskId: string) => void
@@ -225,6 +232,10 @@ interface AddLinkedTaskInputProps {
   showTemplateOption?: boolean
   onAddAsTemplate?: (title: string) => void
   eventDate?: Date // Event date for default scheduling
+  // Link existing task support
+  allTasks?: Task[]
+  onLinkExisting?: (taskId: string) => void
+  currentItemId?: string // Exclude this task from search results
 }
 
 function AddLinkedTaskInput({
@@ -233,16 +244,30 @@ function AddLinkedTaskInput({
   showTemplateOption,
   onAddAsTemplate,
   eventDate,
+  allTasks = [],
+  onLinkExisting,
+  currentItemId,
 }: AddLinkedTaskInputProps) {
   const [value, setValue] = useState('')
   const [addToAll, setAddToAll] = useState(false)
   const [showSchedule, setShowSchedule] = useState(false)
   const [scheduledDate, setScheduledDate] = useState<string>('')
   const [scheduledTime, setScheduledTime] = useState<string>('')
+  const [mode, setMode] = useState<'create' | 'search'>('create')
+
+  // Search results for linking existing tasks
+  const searchResults = useMemo(() => {
+    if (mode !== 'search' || !value.trim()) return []
+    const query = value.toLowerCase()
+    return allTasks
+      .filter(t => t.id !== currentItemId && !t.completed)
+      .filter(t => t.title.toLowerCase().includes(query))
+      .slice(0, 8)
+  }, [allTasks, value, mode, currentItemId])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!value.trim()) return
+    if (!value.trim() || mode === 'search') return
 
     if (addToAll && onAddAsTemplate) {
       onAddAsTemplate(value.trim())
@@ -267,86 +292,148 @@ function AddLinkedTaskInput({
     setScheduledTime('')
   }
 
+  const handleLinkExisting = (taskId: string) => {
+    onLinkExisting?.(taskId)
+    setValue('')
+    setMode('create')
+  }
+
   // Calculate default date for the date input (event date or today)
   const defaultDate = eventDate
     ? eventDate.toISOString().split('T')[0]
     : new Date().toISOString().split('T')[0]
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-2">
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder={placeholder}
-          className="flex-1 px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-        />
-        {value.trim() && (
+    <div className="space-y-2">
+      {/* Mode toggle — only show if linking existing is available */}
+      {onLinkExisting && allTasks.length > 0 && (
+        <div className="flex gap-1 text-xs">
           <button
             type="button"
-            onClick={() => setShowSchedule(!showSchedule)}
-            className={`p-2 rounded-lg transition-colors ${showSchedule ? 'bg-primary-100 text-primary-600' : 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100'}`}
-            title="Set date/time"
+            onClick={() => { setMode('create'); setValue('') }}
+            className={`px-2 py-1 rounded-md transition-colors ${mode === 'create' ? 'bg-primary-100 text-primary-700 font-medium' : 'text-neutral-400 hover:text-neutral-600'}`}
           >
-            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-            </svg>
+            Create new
           </button>
-        )}
-        <button
-          type="submit"
-          disabled={!value.trim()}
-          className="px-3 py-2 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          Add
-        </button>
-      </div>
-
-      {/* Date/time picker row */}
-      {showSchedule && value.trim() && (
-        <div className="flex gap-2 items-center pl-1">
-          <input
-            type="date"
-            value={scheduledDate || defaultDate}
-            onChange={(e) => setScheduledDate(e.target.value)}
-            className="px-2 py-1.5 text-xs rounded border border-neutral-200 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-          />
-          <input
-            type="time"
-            step="300"
-            value={scheduledTime}
-            onChange={(e) => setScheduledTime(e.target.value)}
-            placeholder="Time"
-            className="px-2 py-1.5 text-xs rounded border border-neutral-200 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-          />
-          {(scheduledDate || scheduledTime) && (
-            <button
-              type="button"
-              onClick={() => {
-                setScheduledDate('')
-                setScheduledTime('')
-              }}
-              className="text-xs text-neutral-400 hover:text-neutral-600"
-            >
-              Clear
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => { setMode('search'); setValue('') }}
+            className={`px-2 py-1 rounded-md transition-colors ${mode === 'search' ? 'bg-primary-100 text-primary-700 font-medium' : 'text-neutral-400 hover:text-neutral-600'}`}
+          >
+            Link existing
+          </button>
         </div>
       )}
 
-      {showTemplateOption && value.trim() && (
-        <label className="flex items-center gap-2 text-xs text-neutral-500 cursor-pointer">
+      {mode === 'create' ? (
+        <form onSubmit={handleSubmit} className="space-y-2">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder={placeholder}
+              className="flex-1 px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+            {value.trim() && (
+              <button
+                type="button"
+                onClick={() => setShowSchedule(!showSchedule)}
+                className={`p-2 rounded-lg transition-colors ${showSchedule ? 'bg-primary-100 text-primary-600' : 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100'}`}
+                title="Set date/time"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                </svg>
+              </button>
+            )}
+            <button
+              type="submit"
+              disabled={!value.trim()}
+              className="px-3 py-2 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Add
+            </button>
+          </div>
+
+          {/* Date/time picker row */}
+          {showSchedule && value.trim() && (
+            <div className="flex gap-2 items-center pl-1">
+              <input
+                type="date"
+                value={scheduledDate || defaultDate}
+                onChange={(e) => setScheduledDate(e.target.value)}
+                className="px-2 py-1.5 text-xs rounded border border-neutral-200 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+              <input
+                type="time"
+                step="300"
+                value={scheduledTime}
+                onChange={(e) => setScheduledTime(e.target.value)}
+                placeholder="Time"
+                className="px-2 py-1.5 text-xs rounded border border-neutral-200 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+              {(scheduledDate || scheduledTime) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScheduledDate('')
+                    setScheduledTime('')
+                  }}
+                  className="text-xs text-neutral-400 hover:text-neutral-600"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          )}
+
+          {showTemplateOption && value.trim() && (
+            <label className="flex items-center gap-2 text-xs text-neutral-500 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={addToAll}
+                onChange={(e) => setAddToAll(e.target.checked)}
+                className="rounded border-neutral-300 text-primary-500 focus:ring-primary-500"
+              />
+              Add to all future instances
+            </label>
+          )}
+        </form>
+      ) : (
+        /* Search mode — find and link existing tasks */
+        <div className="space-y-1">
           <input
-            type="checkbox"
-            checked={addToAll}
-            onChange={(e) => setAddToAll(e.target.checked)}
-            className="rounded border-neutral-300 text-primary-500 focus:ring-primary-500"
+            type="text"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="Search existing tasks..."
+            className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            autoFocus
           />
-          Add to all future instances
-        </label>
+          {value.trim() && (
+            <div className="max-h-48 overflow-auto rounded-lg border border-neutral-200 bg-white">
+              {searchResults.length > 0 ? (
+                searchResults.map((task) => (
+                  <button
+                    key={task.id}
+                    onClick={() => handleLinkExisting(task.id)}
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 border-b border-neutral-100 last:border-b-0 flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4 text-neutral-300 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className="truncate text-neutral-800">{task.title}</span>
+                  </button>
+                ))
+              ) : (
+                <div className="px-3 py-3 text-sm text-neutral-400 text-center">No matching tasks</div>
+              )}
+            </div>
+          )}
+        </div>
       )}
-    </form>
+    </div>
   )
 }
 
@@ -520,6 +607,7 @@ export function DetailPanelRedesign({
   onAddSubtask,
   onActionComplete,
   onHideEvent,
+  allTasks = [],
   prepTasks,
   onAddPrepTask,
   onTogglePrepTask,
@@ -538,6 +626,7 @@ export function DetailPanelRedesign({
   onOpenParentTask,
   linkedTasks,
   onAddLinkedTask,
+  onLinkExistingTask,
   onToggleLinkedTask,
   onDeleteLinkedTask,
   routine,
@@ -927,6 +1016,13 @@ export function DetailPanelRedesign({
     if (!activity || !onAddLinkedTask) return
     await onAddLinkedTask(title, activity, linkType, scheduledFor)
   }, [getActivityIdentifier, onAddLinkedTask])
+
+  // Handle linking an existing task as prep/follow-up
+  const handleLinkExistingTask = useCallback(async (taskId: string, linkType: LinkType) => {
+    const activity = getActivityIdentifier()
+    if (!activity || !onLinkExistingTask) return
+    await onLinkExistingTask(taskId, activity, linkType)
+  }, [getActivityIdentifier, onLinkExistingTask])
 
   // Handle adding as template (routines only)
   const handleAddAsTemplate = useCallback(async (title: string, linkType: LinkType) => {
@@ -1429,9 +1525,12 @@ export function DetailPanelRedesign({
                           </svg>
                         )}
                       </button>
-                      <span className={`flex-1 min-w-0 text-sm ${subtask.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>
+                      <button
+                        onClick={() => onOpenParentTask?.(subtask.id)}
+                        className={`flex-1 min-w-0 text-sm text-left hover:underline cursor-pointer ${subtask.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}
+                      >
                         {subtask.title}
-                      </span>
+                      </button>
                       {/* Quick Actions - hidden on mobile */}
                       {onUpdate && (
                         <TaskQuickActions
@@ -1471,6 +1570,45 @@ export function DetailPanelRedesign({
                       />
                     </div>
                   </div>
+                  {/* Aggregated subtask context — surface notes, links, phones from children */}
+                  {subtasks.some(s => s.notes || s.phoneNumber || (s.links && s.links.length > 0)) && (
+                    <div className="mt-3 pt-3 border-t border-neutral-100 space-y-2">
+                      {subtasks.filter(s => s.notes || s.phoneNumber || (s.links && s.links.length > 0)).map((subtask) => (
+                        <button
+                          key={subtask.id}
+                          onClick={() => onOpenParentTask?.(subtask.id)}
+                          className="w-full text-left p-2 rounded-lg bg-neutral-50 hover:bg-neutral-100 transition-colors cursor-pointer"
+                        >
+                          <div className="text-xs font-medium text-neutral-500 mb-1">{subtask.title}</div>
+                          {subtask.phoneNumber && (
+                            <div className="flex items-center gap-1.5 text-xs text-primary-600 mb-1">
+                              <svg className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                              </svg>
+                              {subtask.phoneNumber}
+                            </div>
+                          )}
+                          {subtask.links && subtask.links.length > 0 && (
+                            <div className="space-y-0.5">
+                              {subtask.links.map((link, i) => (
+                                <div key={i} className="flex items-center gap-1.5 text-xs text-primary-600 truncate">
+                                  <svg className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd" />
+                                  </svg>
+                                  <span className="truncate">{link.title || link.url}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {subtask.notes && (
+                            <div className="text-xs text-neutral-400 line-clamp-2 whitespace-pre-wrap">
+                              {subtask.notes.replace(/<[^>]*>/g, '')}
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ) : null}
 
@@ -2376,6 +2514,9 @@ export function DetailPanelRedesign({
                   onAdd={(title, scheduledFor) => handleAddLinkedTask(title, 'prep', scheduledFor)}
                   showTemplateOption={isRoutine && !!routine && !!onUpdateRoutine}
                   onAddAsTemplate={(title) => handleAddAsTemplate(title, 'prep')}
+                  allTasks={allTasks}
+                  onLinkExisting={onLinkExistingTask ? (taskId) => handleLinkExistingTask(taskId, 'prep') : undefined}
+                  currentItemId={item.originalTask?.id ?? item.originalRoutine?.id}
                   eventDate={item.startTime ?? undefined}
                 />
               </div>
@@ -2413,6 +2554,9 @@ export function DetailPanelRedesign({
                   showTemplateOption={isRoutine && !!routine && !!onUpdateRoutine}
                   onAddAsTemplate={(title) => handleAddAsTemplate(title, 'followup')}
                   eventDate={item.startTime ?? undefined}
+                  allTasks={allTasks}
+                  onLinkExisting={onLinkExistingTask ? (taskId) => handleLinkExistingTask(taskId, 'followup') : undefined}
+                  currentItemId={item.originalTask?.id ?? item.originalRoutine?.id}
                 />
               </div>
             </div>
