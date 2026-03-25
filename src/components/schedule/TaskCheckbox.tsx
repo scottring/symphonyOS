@@ -40,7 +40,7 @@ export const TaskCheckbox = memo(function TaskCheckbox({
     >
       <span
         className={`
-          w-5 h-5 border-2 flex items-center justify-center transition-colors relative
+          w-5 h-5 border-2 flex items-center justify-center transition-colors relative bg-bg-base
           ${isRoutine ? 'rounded-full' : 'rounded-md'}
           ${pressing ? 'long-press-ring' : ''}
           ${completed

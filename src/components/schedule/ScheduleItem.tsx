@@ -127,6 +127,10 @@ interface ScheduleItemProps {
   hasCoaching?: boolean
   // Event → Project promotion suggestion
   isSuggestedPromotion?: boolean
+  // Visual weight variant
+  variant?: 'full' | 'minimal'
+  // Hide time label (for same-time grouping) — preserves column space
+  hideTime?: boolean
 }
 
 // Warm amber color tokens for overdue styling
@@ -198,6 +202,8 @@ export const ScheduleItem = memo(function ScheduleItem({
   onClosePanel,
   hasCoaching,
   isSuggestedPromotion,
+  variant = 'full',
+  hideTime,
 }: ScheduleItemProps) {
   const isMobile = useMobile()
   const isTask = item.type === 'task'
@@ -278,20 +284,22 @@ export const ScheduleItem = memo(function ScheduleItem({
       role="button"
       aria-pressed={selected}
       className={`
-        group relative px-3 py-2.5 rounded-xl cursor-pointer
-        transition-all duration-200 border
-        ${selected
-          ? 'bg-primary-50 border-primary-200 shadow-md ring-1 ring-primary-200'
-          : 'bg-bg-elevated border-transparent hover:border-neutral-200 hover:shadow-md'
+        group relative cursor-pointer transition-all duration-200 rounded-xl border
+        ${variant === 'minimal'
+          ? `px-3 py-1 border-transparent hover:bg-neutral-50/60 ${selected ? 'bg-neutral-50 ring-1 ring-neutral-200' : ''}`
+          : `px-3 py-2 ${selected
+              ? 'bg-primary-50 border-primary-200 shadow-md ring-1 ring-primary-200'
+              : 'border-transparent hover:bg-primary-50/50 hover:border-primary-100'
+            }`
         }
         ${item.completed || item.skipped ? 'opacity-60' : ''}
       `}
     >
-      {/* Left edge indicator - amber for overdue, project color otherwise */}
-      {(isOverdue || projectColor) && (
+      {/* Left edge indicator - project color only (not overdue) */}
+      {projectColor && !isOverdue && (
         <div
           className="absolute left-0 top-[20%] w-[3px] h-[60%] rounded-none"
-          style={{ backgroundColor: isOverdue ? overdueColors.warning500 : projectColor! }}
+          style={{ backgroundColor: projectColor }}
         />
       )}
 
@@ -312,14 +320,14 @@ export const ScheduleItem = memo(function ScheduleItem({
       )}
       {/* Main row: time | checkbox/circle | title */}
       <div className="relative flex items-center gap-3">
-        {/* Time column - fixed width for alignment, clickable to reschedule */}
-        {/* Tasks use onSchedule, routines/events use onPush for one-off rescheduling */}
-        {(isTask && onSchedule) || ((isRoutine || item.type === 'event') && onPush) ? (
+        {/* Time column - fixed width for alignment */}
+        {hideTime ? (
+          <div className="w-12 shrink-0" />
+        ) : (isTask && onSchedule) || ((isRoutine || item.type === 'event') && onPush) ? (
           <div
             className="w-12 shrink-0 relative"
             onClick={(e) => {
               e.stopPropagation()
-              // Close panel when opening schedule popover
               if (panelOpen && onClosePanel) {
                 onClosePanel()
               }
@@ -332,12 +340,10 @@ export const ScheduleItem = memo(function ScheduleItem({
                 if (isTask && onSchedule) {
                   onSchedule(date, isAllDay)
                 } else if (onPush) {
-                  // For routines/events, use push/reschedule as one-off
                   onPush(date)
                 }
               }}
               onClear={isTask && onSchedule ? () => {
-                // Clear schedule - set to unscheduled (inbox) - only for tasks
                 onSchedule(undefined as unknown as Date, false)
               } : undefined}
               getItemsForDate={getScheduleItemsForDate}
@@ -398,12 +404,12 @@ export const ScheduleItem = memo(function ScheduleItem({
 
         {/* Checkbox/circle/calendar - fixed width for alignment, hidden on mobile when overdue */}
         {!(isMobile && isOverdue) && (
-          <div className="w-5 shrink-0 flex items-center justify-center">
+          <div className="w-5 shrink-0 flex items-center justify-center relative z-[1]">
             {isEvent ? (
               // Calendar events show a calendar icon with the context color
               <button
                 onClick={handleCheckboxClick}
-                className="touch-target flex items-center justify-center -m-2 p-2"
+                className="touch-target flex items-center justify-center -m-2 p-2 bg-bg-base rounded-full"
                 aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
               >
                 <CalendarIcon
@@ -433,11 +439,13 @@ export const ScheduleItem = memo(function ScheduleItem({
           <div className="flex items-center gap-2">
             <span
               className={`
-                text-base font-medium line-clamp-2 transition-colors
+                ${variant === 'minimal' ? 'text-sm' : 'text-base'} font-medium line-clamp-2 transition-colors
                 ${item.completed || item.skipped
                   ? 'line-through text-neutral-400'
                   : item.isWaiting
                     ? 'text-amber-600/70 italic'
+                    : variant === 'minimal'
+                    ? 'text-neutral-500 group-hover:text-neutral-700'
                     : 'text-neutral-800 group-hover:text-neutral-900'
                 }
               `}
@@ -488,7 +496,7 @@ export const ScheduleItem = memo(function ScheduleItem({
         )}
 
         {/* Skip button - for routines and events, hidden by default, shows on hover */}
-        {(isRoutine || item.type === 'event') && onSkip && !item.completed && !item.skipped && (
+        {variant !== 'minimal' && (isRoutine || item.type === 'event') && onSkip && !item.completed && !item.skipped && (
           <button
             onClick={(e) => {
               e.stopPropagation()
@@ -503,7 +511,7 @@ export const ScheduleItem = memo(function ScheduleItem({
         )}
 
         {/* Push button - for tasks and routines, hover on desktop */}
-        {(isTask || isRoutine) && onPush && (
+        {variant !== 'minimal' && (isTask || isRoutine) && onPush && (
           <div
             className={`shrink-0 ${isMobile && isOverdue ? '' : 'hidden md:block opacity-0 group-hover:opacity-100'} transition-opacity`}
             onClick={(e) => {
@@ -519,7 +527,7 @@ export const ScheduleItem = memo(function ScheduleItem({
         )}
 
         {/* Context picker - hidden by default, shown on hover */}
-        {(isTask || isRoutine || isEvent) && onContextChange && (
+        {variant !== 'minimal' && (isTask || isRoutine || isEvent) && onContextChange && (
           <div
             className="shrink-0"
             onClick={(e) => {
@@ -537,7 +545,7 @@ export const ScheduleItem = memo(function ScheduleItem({
         )}
 
         {/* Assignee avatar - use multi-select when onAssignAll is provided */}
-        {familyMembers.length > 0 && onAssignAll ? (
+        {variant !== 'minimal' && familyMembers.length > 0 && onAssignAll ? (
           <div
             className="shrink-0"
             onClick={(e) => {
@@ -556,7 +564,7 @@ export const ScheduleItem = memo(function ScheduleItem({
               label={item.type === 'event' ? "Who's attending?" : "Who's responsible?"}
             />
           </div>
-        ) : familyMembers.length > 0 && onAssign && (
+        ) : variant !== 'minimal' && familyMembers.length > 0 && onAssign && (
           <div
             className="shrink-0"
             onClick={(e) => {

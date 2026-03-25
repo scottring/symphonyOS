@@ -1282,6 +1282,8 @@ export function TodaySchedule({
               onToggleWithFollowUp={handleToggleTaskWithFollowUp}
               onFollowUpSubmit={onCreateFollowUp ? handleFollowUpSubmit : undefined}
               onFollowUpDismiss={handleFollowUpDismiss}
+              panelOpen={panelOpen}
+              onClosePanel={onClosePanel}
             />
           )}
 
@@ -1289,7 +1291,12 @@ export function TodaySchedule({
             const items = grouped[section]
             return (
               <TimeGroup key={section} section={section} isEmpty={items.length === 0}>
-                {items.map((item) => {
+                {items.map((item, itemIndex) => {
+                  // Time deduplication: hide time if same as previous item
+                  const timeKey = item.startTime ? `${item.startTime.getHours()}:${item.startTime.getMinutes()}` : item.allDay ? 'allday' : ''
+                  const prevItem = itemIndex > 0 ? items[itemIndex - 1] : null
+                  const prevTimeKey = prevItem?.startTime ? `${prevItem.startTime.getHours()}:${prevItem.startTime.getMinutes()}` : prevItem?.allDay ? 'allday' : ''
+                  const shouldHideTime = itemIndex > 0 && timeKey !== '' && timeKey === prevTimeKey
                   const contactName = item.contactId && contactsMap?.get(item.contactId)?.name
                   const projectName = item.projectId && projectsMap?.get(item.projectId)?.name
                   const parentTaskId = item.parentTaskId
@@ -1299,8 +1306,8 @@ export function TodaySchedule({
                   // Render PlaybookBlockCard for playbook items
                   if (item.type === 'playbook' && item.originalPlaybookInstance) {
                     return (
+                      <div key={item.id}>
                       <PlaybookBlockCard
-                        key={item.id}
                         instance={item.originalPlaybookInstance}
                         currentMinute={isToday ? currentMinute : undefined}
                         onToggleItem={onPlaybookToggleItem ?? (() => {})}
@@ -1312,6 +1319,7 @@ export function TodaySchedule({
                         onDelete={onPlaybookDelete}
                         onSuppress={onPlaybookSuppress}
                       />
+                      </div>
                     )
                   }
 
@@ -1319,7 +1327,7 @@ export function TodaySchedule({
                   if (isMobile) {
                     const sourceTask = taskId ? tasksMap.get(taskId) : undefined
                     return (
-                      <div key={item.id}>
+                      <div key={item.id} >
                         <SwipeableCard
                           item={item}
                           selected={selectedItemId === item.id}
@@ -1378,7 +1386,7 @@ export function TodaySchedule({
 
                   const sourceTaskForFollowUp = taskId ? tasksMap.get(taskId) : undefined
                   return (
-                    <div key={item.id}>
+                    <div key={item.id} >
                     <ScheduleItem
                       item={item}
                       selected={selectedItemId === item.id}
@@ -1468,6 +1476,8 @@ export function TodaySchedule({
                       onClosePanel={onClosePanel}
                       hasCoaching={coachingItemIds.has(item.id)}
                       isSuggestedPromotion={item.type === 'event' ? isPromotionSuggested(item.id.replace('event-', '')) : undefined}
+                      variant={item.type === 'routine' ? 'minimal' : 'full'}
+                      hideTime={shouldHideTime}
                     />
                     {followUpTaskId === taskId && taskId && sourceTaskForFollowUp && (
                       <FollowUpInput

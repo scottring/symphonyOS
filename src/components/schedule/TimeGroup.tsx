@@ -20,7 +20,7 @@ export function TimeGroup({ section, children, isEmpty }: TimeGroupProps) {
       <h3 className="time-group-header mb-4">
         {label}
       </h3>
-      <div className="space-y-3 stagger-in">
+      <div className="timeline-group stagger-in">
         {children}
       </div>
     </div>

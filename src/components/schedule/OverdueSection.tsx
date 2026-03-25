@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
@@ -21,16 +22,12 @@ interface OverdueSectionProps {
   projectsMap?: Map<string, Project>
   familyMembers?: FamilyMember[]
   onAssignTask?: (taskId: string, memberId: string | null) => void
-  // Follow-up support
   followUpTaskId?: string | null
   onToggleWithFollowUp?: (taskId: string, wasCompleted: boolean) => void
   onFollowUpSubmit?: (title: string, sourceTaskId: string) => void
   onFollowUpDismiss?: () => void
-}
-
-// Warm amber color for overdue header
-const colors = {
-  warning600: 'hsl(32 80% 44%)',
+  panelOpen?: boolean
+  onClosePanel?: () => void
 }
 
 export function OverdueSection({
@@ -49,22 +46,21 @@ export function OverdueSection({
   onToggleWithFollowUp,
   onFollowUpSubmit,
   onFollowUpDismiss,
+  panelOpen,
+  onClosePanel,
 }: OverdueSectionProps) {
   const isMobile = useMobile()
 
   if (tasks.length === 0) return null
 
-  const incompleteCount = tasks.filter(t => !t.completed).length
-
   // Sort: incomplete first (oldest at top), then completed at bottom
-  const sortedTasks = [...tasks].sort((a, b) => {
+  const sortedTasks = useMemo(() => [...tasks].sort((a, b) => {
     if (a.completed !== b.completed) return a.completed ? 1 : -1
     const dateA = a.scheduledFor ? new Date(a.scheduledFor).getTime() : 0
     const dateB = b.scheduledFor ? new Date(b.scheduledFor).getTime() : 0
     return dateA - dateB
-  })
+  }), [tasks])
 
-  // Use the follow-up aware handler if available, otherwise fall back
   const handleToggle = (taskId: string, wasCompleted: boolean) => {
     if (onToggleWithFollowUp) {
       onToggleWithFollowUp(taskId, wasCompleted)
@@ -77,26 +73,15 @@ export function OverdueSection({
     <div
       role="region"
       aria-label="Overdue tasks"
-      className="mb-8 animate-fade-in-up"
+      className="mb-10 animate-fade-in-up"
     >
-      {/* Section header - matches TimeGroup styling */}
-      <h3
-        className="font-display text-sm tracking-wide uppercase mb-4 flex items-center gap-2"
-        style={{ color: colors.warning600 }}
-      >
-        <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-          <path
-            fillRule="evenodd"
-            d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
-            clipRule="evenodd"
-          />
-        </svg>
-        Overdue{incompleteCount > 0 ? ` (${incompleteCount})` : ''}
+      {/* Section header — "Overdue" in amber, same style as MORNING etc. */}
+      <h3 className="time-group-header mb-4" style={{ color: 'hsl(32 80% 44%)' }}>
+        Overdue
       </h3>
 
-      {/* Overdue task items */}
-      <div className="space-y-3">
-        {sortedTasks.map((task) => {
+      <div className="timeline-group timeline-group--tight stagger-in">
+        {sortedTasks.map((task, index) => {
           const item = taskToTimelineItem(task)
           const taskId = task.id
           const contactName = task.contactId && contactsMap?.get(task.contactId)?.name
@@ -105,7 +90,13 @@ export function OverdueSection({
             ? formatOverdueDate(new Date(task.scheduledFor))
             : undefined
 
-          // Use SwipeableCard on mobile for better touch interactions
+          // Deduplicate: only show date label on first item of each date group
+          const prevTask = index > 0 ? sortedTasks[index - 1] : null
+          const prevLabel = prevTask?.scheduledFor
+            ? formatOverdueDate(new Date(prevTask.scheduledFor))
+            : undefined
+          const shouldHideTime = index > 0 && overdueLabel === prevLabel
+
           if (isMobile) {
             return (
               <div key={task.id}>
@@ -137,7 +128,6 @@ export function OverdueSection({
             )
           }
 
-          // Desktop view - use ScheduleItem
           return (
             <div key={task.id}>
               <ScheduleItem
@@ -160,6 +150,9 @@ export function OverdueSection({
                 onContextChange={onUpdateTask ? (context) => onUpdateTask(taskId, { context }) : undefined}
                 isOverdue={!task.completed}
                 overdueLabel={task.completed ? undefined : overdueLabel}
+                hideTime={shouldHideTime}
+                panelOpen={panelOpen}
+                onClosePanel={onClosePanel}
               />
               {followUpTaskId === taskId && onFollowUpSubmit && onFollowUpDismiss && (
                 <FollowUpInput

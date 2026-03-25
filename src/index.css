@@ -743,6 +743,36 @@ body {
 }
 
 /* =============================================================================
+   TIMELINE - Vertical spine through checkbox column
+   Times sit LEFT of the spine, checkboxes ON the spine, content to the RIGHT
+   ============================================================================= */
+
+.timeline-group {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+/* Tighter variant for overdue groups */
+.timeline-group--tight {
+  gap: 0;
+}
+
+/* Spine — runs through center of checkbox column
+   px-3(12) + w-12(48) + gap-3(12) + w-5/2(10) = 82px from left edge */
+.timeline-group::before {
+  content: '';
+  position: absolute;
+  left: 82px;
+  top: 0;
+  bottom: 0;
+  width: 1.5px;
+  background: var(--color-neutral-200);
+  z-index: 0;
+}
+
+/* =============================================================================
    INPUT STYLES
    ============================================================================= */
 
