@@ -1504,59 +1504,94 @@ export function DetailPanelRedesign({
               </div>
 
               {subtasks.length > 0 ? (
-                <div className="space-y-2">
-                  {subtasks.map((subtask) => (
-                    <div
-                      key={subtask.id}
-                      className="flex items-center gap-2 p-2 -mx-2 rounded-lg hover:bg-neutral-50 group transition-colors"
-                    >
-                      <button
-                        onClick={() => onToggleComplete?.(subtask.id)}
-                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${
-                          subtask.completed
-                            ? 'bg-primary-500 border-primary-500'
-                            : 'border-neutral-300 hover:border-primary-400'
-                        }`}
-                        aria-label={subtask.completed ? 'Mark incomplete' : 'Mark complete'}
+                <div className="space-y-1">
+                  {subtasks.map((subtask) => {
+                    const hasContext = !!(subtask.notes || subtask.phoneNumber || (subtask.links && subtask.links.length > 0))
+                    return (
+                      <div
+                        key={subtask.id}
+                        className="p-2 -mx-2 rounded-lg hover:bg-neutral-50 group transition-colors"
                       >
-                        {subtask.completed && (
-                          <svg className="w-3 h-3 text-white" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
+                        {/* Main row: checkbox + title + actions */}
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => onToggleComplete?.(subtask.id)}
+                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${
+                              subtask.completed
+                                ? 'bg-primary-500 border-primary-500'
+                                : 'border-neutral-300 hover:border-primary-400'
+                            }`}
+                            aria-label={subtask.completed ? 'Mark incomplete' : 'Mark complete'}
+                          >
+                            {subtask.completed && (
+                              <svg className="w-3 h-3 text-white" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => onOpenParentTask?.(subtask.id)}
+                            className={`flex-1 min-w-0 text-sm text-left hover:underline cursor-pointer ${subtask.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}
+                          >
+                            {subtask.title}
+                          </button>
+                          {/* Quick Actions - hidden on mobile */}
+                          {onUpdate && (
+                            <TaskQuickActions
+                              task={subtask}
+                              onSchedule={(date, isAllDay) => {
+                                onUpdate(subtask.id, { scheduledFor: date, isAllDay })
+                              }}
+                              getScheduleItemsForDate={getScheduleItemsForDate}
+                              onContextChange={(context) => {
+                                onUpdate(subtask.id, { context })
+                              }}
+                              familyMembers={familyMembers}
+                              onAssign={(memberId) => {
+                                onUpdate(subtask.id, { assignedTo: memberId ?? undefined })
+                              }}
+                              size="sm"
+                              className="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity"
+                            />
+                          )}
+                          <button className="hidden md:block opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-red-500 transition-all p-1 flex-shrink-0">
+                            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                        </div>
+                        {/* Inline context preview — links, phone, notes snippet */}
+                        {hasContext && (
+                          <div
+                            className="ml-7 mt-1 space-y-0.5 cursor-pointer"
+                            onClick={() => onOpenParentTask?.(subtask.id)}
+                          >
+                            {subtask.phoneNumber && (
+                              <div className="flex items-center gap-1.5 text-xs text-primary-600">
+                                <svg className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                                  <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                                </svg>
+                                <span className="truncate">{subtask.phoneNumber}</span>
+                              </div>
+                            )}
+                            {subtask.links && subtask.links.length > 0 && subtask.links.map((link, i) => (
+                              <div key={i} className="flex items-center gap-1.5 text-xs text-primary-600 truncate">
+                                <svg className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd" />
+                                </svg>
+                                <span className="truncate">{link.title || new URL(link.url).hostname}</span>
+                              </div>
+                            ))}
+                            {subtask.notes && (
+                              <div className="text-xs text-neutral-400 line-clamp-1 truncate">
+                                {subtask.notes.replace(/<[^>]*>/g, '').trim()}
+                              </div>
+                            )}
+                          </div>
                         )}
-                      </button>
-                      <button
-                        onClick={() => onOpenParentTask?.(subtask.id)}
-                        className={`flex-1 min-w-0 text-sm text-left hover:underline cursor-pointer ${subtask.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}
-                      >
-                        {subtask.title}
-                      </button>
-                      {/* Quick Actions - hidden on mobile */}
-                      {onUpdate && (
-                        <TaskQuickActions
-                          task={subtask}
-                          onSchedule={(date, isAllDay) => {
-                            onUpdate(subtask.id, { scheduledFor: date, isAllDay })
-                          }}
-                          getScheduleItemsForDate={getScheduleItemsForDate}
-                          onContextChange={(context) => {
-                            onUpdate(subtask.id, { context })
-                          }}
-                          familyMembers={familyMembers}
-                          onAssign={(memberId) => {
-                            onUpdate(subtask.id, { assignedTo: memberId ?? undefined })
-                          }}
-                          size="sm"
-                          className="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity"
-                        />
-                      )}
-                      <button className="hidden md:block opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-red-500 transition-all p-1 flex-shrink-0">
-                        <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                      </button>
-                    </div>
-                  ))}
+                      </div>
+                    )
+                  })}
                   {/* Progress bar */}
                   <div className="mt-3 pt-3 border-t border-neutral-100">
                     <div className="flex items-center justify-between text-xs text-neutral-500 mb-1.5">
@@ -1570,45 +1605,6 @@ export function DetailPanelRedesign({
                       />
                     </div>
                   </div>
-                  {/* Aggregated subtask context — surface notes, links, phones from children */}
-                  {subtasks.some(s => s.notes || s.phoneNumber || (s.links && s.links.length > 0)) && (
-                    <div className="mt-3 pt-3 border-t border-neutral-100 space-y-2">
-                      {subtasks.filter(s => s.notes || s.phoneNumber || (s.links && s.links.length > 0)).map((subtask) => (
-                        <button
-                          key={subtask.id}
-                          onClick={() => onOpenParentTask?.(subtask.id)}
-                          className="w-full text-left p-2 rounded-lg bg-neutral-50 hover:bg-neutral-100 transition-colors cursor-pointer"
-                        >
-                          <div className="text-xs font-medium text-neutral-500 mb-1">{subtask.title}</div>
-                          {subtask.phoneNumber && (
-                            <div className="flex items-center gap-1.5 text-xs text-primary-600 mb-1">
-                              <svg className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
-                              </svg>
-                              {subtask.phoneNumber}
-                            </div>
-                          )}
-                          {subtask.links && subtask.links.length > 0 && (
-                            <div className="space-y-0.5">
-                              {subtask.links.map((link, i) => (
-                                <div key={i} className="flex items-center gap-1.5 text-xs text-primary-600 truncate">
-                                  <svg className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd" />
-                                  </svg>
-                                  <span className="truncate">{link.title || link.url}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          {subtask.notes && (
-                            <div className="text-xs text-neutral-400 line-clamp-2 whitespace-pre-wrap">
-                              {subtask.notes.replace(/<[^>]*>/g, '')}
-                            </div>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  )}
                 </div>
               ) : null}
 
