@@ -735,10 +735,10 @@ body {
 
 .time-group-header {
   font-family: var(--font-family-sans);
-  font-weight: 500;
-  font-size: 0.6875rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: none;
   color: var(--color-neutral-400);
 }
 

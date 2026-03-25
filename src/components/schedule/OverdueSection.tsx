@@ -75,8 +75,8 @@ export function OverdueSection({
       aria-label="Overdue tasks"
       className="mb-10 animate-fade-in-up"
     >
-      {/* Section header — "Overdue" in amber, same style as MORNING etc. */}
-      <h3 className="time-group-header mb-4" style={{ color: 'hsl(32 80% 44%)' }}>
+      {/* Section header — warm but subtle */}
+      <h3 className="time-group-header mb-4" style={{ color: 'hsl(32 60% 50%)' }}>
         Overdue
       </h3>
 

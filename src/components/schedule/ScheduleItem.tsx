@@ -133,11 +133,11 @@ interface ScheduleItemProps {
   hideTime?: boolean
 }
 
-// Warm amber color tokens for overdue styling
+// Warm muted color tokens for overdue styling
 const overdueColors = {
-  warning50: 'hsl(38 75% 96%)',
-  warning500: 'hsl(35 80% 50%)',
-  warning600: 'hsl(32 80% 44%)',
+  warning50: 'hsl(38 50% 96%)',
+  warning500: 'hsl(35 45% 55%)',
+  warning600: 'hsl(32 40% 52%)',
 }
 
 // Domain context colors - shared utility
@@ -303,21 +303,6 @@ export const ScheduleItem = memo(function ScheduleItem({
         />
       )}
 
-      {/* Project name tooltip - appears on hover, positioned above card */}
-      {projectName && (
-        <div className="
-          absolute left-0 -top-8
-          opacity-0 group-hover:opacity-100
-          pointer-events-none
-          px-2 py-1 text-xs font-medium
-          bg-neutral-800 text-white rounded
-          whitespace-nowrap
-          transition-opacity duration-150
-          z-20
-        ">
-          {projectName}
-        </div>
-      )}
       {/* Main row: time | checkbox/circle | title */}
       <div className="relative flex items-center gap-3">
         {/* Time column - fixed width for alignment */}
@@ -351,7 +336,7 @@ export const ScheduleItem = memo(function ScheduleItem({
               itemTitle={item.title}
               trigger={
                 <button
-                  className="w-full text-left text-xs font-medium rounded-md px-1 py-0.5 -mx-1 hover:bg-neutral-100 transition-colors cursor-pointer"
+                  className="w-full text-left text-xs font-medium tabular-nums rounded-md px-1 py-0.5 -mx-1 hover:bg-neutral-100 transition-colors cursor-pointer"
                   title="Change time"
                 >
                   {isOverdue && overdueLabel ? (
@@ -367,7 +352,7 @@ export const ScheduleItem = memo(function ScheduleItem({
                         <div className="text-neutral-300">{timeDisplay.end}</div>
                       </div>
                     ) : (
-                      <span className="text-sm text-neutral-500 tabular-nums">{timeDisplay.time}</span>
+                      <span className="text-neutral-500">{timeDisplay.time}</span>
                     )
                   ) : (
                     <span className="text-neutral-300">—</span>
@@ -377,12 +362,9 @@ export const ScheduleItem = memo(function ScheduleItem({
             />
           </div>
         ) : (
-          <div className="w-12 shrink-0 text-xs font-medium">
+          <div className="w-12 shrink-0 text-xs font-medium tabular-nums">
             {isOverdue && overdueLabel ? (
-              <span
-                className="text-xs font-medium"
-                style={{ color: overdueColors.warning600 }}
-              >
+              <span style={{ color: overdueColors.warning600 }}>
                 {overdueLabel}
               </span>
             ) : timeDisplay ? (
@@ -394,7 +376,7 @@ export const ScheduleItem = memo(function ScheduleItem({
                   <div className="text-neutral-300">{timeDisplay.end}</div>
                 </div>
               ) : (
-                <span className="text-sm text-neutral-500 tabular-nums">{timeDisplay.time}</span>
+                <span className="text-neutral-500">{timeDisplay.time}</span>
               )
             ) : (
               <span className="text-neutral-300">—</span>
@@ -526,119 +508,119 @@ export const ScheduleItem = memo(function ScheduleItem({
           </div>
         )}
 
-        {/* Context picker - hidden by default, shown on hover */}
-        {variant !== 'minimal' && (isTask || isRoutine || isEvent) && onContextChange && (
-          <div
-            className="shrink-0"
-            onClick={(e) => {
-              e.stopPropagation()
-              if (panelOpen && onClosePanel) {
-                onClosePanel()
-              }
-            }}
-          >
-            <ContextPicker
-              value={item.context ?? undefined}
-              onChange={onContextChange}
-            />
-          </div>
-        )}
+        {/* Right indicators — compact group: context (hover-only) + assignee */}
+        <div className="shrink-0 flex items-center gap-0.5">
+          {/* Context picker — hover-only to reduce visual noise */}
+          {(isTask || isRoutine || isEvent) && onContextChange && (
+            <div
+              className="opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={(e) => {
+                e.stopPropagation()
+                if (panelOpen && onClosePanel) {
+                  onClosePanel()
+                }
+              }}
+            >
+              <ContextPicker
+                value={item.context ?? undefined}
+                onChange={onContextChange}
+              />
+            </div>
+          )}
 
-        {/* Assignee avatar - use multi-select when onAssignAll is provided */}
-        {variant !== 'minimal' && familyMembers.length > 0 && onAssignAll ? (
-          <div
-            className="shrink-0"
-            onClick={(e) => {
-              e.stopPropagation()
-              // Close panel when opening assignee picker
-              if (panelOpen && onClosePanel) {
-                onClosePanel()
-              }
-            }}
-          >
-            <MultiAssigneeDropdown
-              members={familyMembers}
-              selectedIds={assignedToAll}
-              onSelect={onAssignAll}
-              size="sm"
-              label={item.type === 'event' ? "Who's attending?" : "Who's responsible?"}
-            />
-          </div>
-        ) : variant !== 'minimal' && familyMembers.length > 0 && onAssign && (
-          <div
-            className="shrink-0"
-            onClick={(e) => {
-              e.stopPropagation()
-              // Close panel when opening assignee picker
-              if (panelOpen && onClosePanel) {
-                onClosePanel()
-              }
-            }}
-          >
-            <AssigneeDropdown
-              members={familyMembers}
-              selectedId={assignedTo}
-              onSelect={onAssign}
-              size="sm"
-            />
-          </div>
-        )}
+          {/* Assignee avatar — always visible, with context color ring */}
+          {familyMembers.length > 0 && onAssignAll ? (
+            <div
+              className={contextColor ? 'ring-2 ring-offset-1 rounded-full' : ''}
+              style={contextColor ? { ['--tw-ring-color' as string]: contextColor } : undefined}
+              onClick={(e) => {
+                e.stopPropagation()
+                if (panelOpen && onClosePanel) {
+                  onClosePanel()
+                }
+              }}
+            >
+              <MultiAssigneeDropdown
+                members={familyMembers}
+                selectedIds={assignedToAll}
+                onSelect={onAssignAll}
+                size="sm"
+                label={item.type === 'event' ? "Who's attending?" : "Who's responsible?"}
+              />
+            </div>
+          ) : familyMembers.length > 0 && onAssign && (
+            <div
+              className={contextColor ? 'ring-2 ring-offset-1 rounded-full' : ''}
+              style={contextColor ? { ['--tw-ring-color' as string]: contextColor } : undefined}
+              onClick={(e) => {
+                e.stopPropagation()
+                if (panelOpen && onClosePanel) {
+                  onClosePanel()
+                }
+              }}
+            >
+              <AssigneeDropdown
+                members={familyMembers}
+                selectedId={assignedTo}
+                onSelect={onAssign}
+                size="sm"
+              />
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Location row - shows destination/location with directions link */}
-      {item.location && (
-        <div className="flex items-center gap-2 mt-1.5 ml-[5.75rem]">
-          <a
-            href={`https://www.google.com/maps/dir/?api=1&destination=${
-              item.locationPlaceId
-                ? `place_id:${item.locationPlaceId}`
-                : encodeURIComponent(item.location)
-            }`}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center gap-1.5 px-2 py-1 bg-primary-50 hover:bg-primary-100 text-primary-700 rounded-lg text-xs font-medium border border-primary-100 transition-colors group max-w-full"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-            </svg>
-            <span className="truncate">{item.location}</span>
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
-              <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
-            </svg>
-          </a>
-        </div>
-      )}
+      {/* Metadata row — location on hover, contact/project always compact */}
+      {(item.location || hasContactChip || parentTaskName || projectName) && (
+        <div className={`flex items-center gap-2 ml-[5.75rem] flex-wrap ${
+          /* If only location (no other metadata), collapse row until hover */
+          !hasContactChip && !parentTaskName && !projectName
+            ? 'h-0 group-hover:h-auto group-hover:mt-1 overflow-hidden transition-all'
+            : 'mt-1'
+        }`}>
+          {/* Location chip — hover-only for cleaner default view */}
+          {item.location && (
+            <a
+              href={`https://www.google.com/maps/dir/?api=1&destination=${
+                item.locationPlaceId
+                  ? `place_id:${item.locationPlaceId}`
+                  : encodeURIComponent(item.location)
+              }`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 text-primary-600 hover:text-primary-700 rounded text-[11px] font-medium transition-all opacity-0 group-hover:opacity-100 max-w-[220px]"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+              </svg>
+              <span className="truncate">{item.location}</span>
+            </a>
+          )}
 
-      {/* Contact chip row - desktop only, aligned with title */}
-      {hasContactChip && (
-        <div className="hidden md:flex items-center gap-2 mt-1.5 ml-[5.75rem]">
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-xs font-medium border border-primary-100 max-w-[100px]">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-            </svg>
-            <span className="truncate">{contactName}</span>
-          </span>
-        </div>
-      )}
+          {/* Contact chip - desktop only */}
+          {hasContactChip && (
+            <span className="hidden md:inline-flex items-center gap-1 text-[11px] text-neutral-500">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+              </svg>
+              <span className="truncate max-w-[80px]">{contactName}</span>
+            </span>
+          )}
 
-      {/* Parent task or project context - shows relationship below title */}
-      {(parentTaskName || projectName) && (
-        <div className="flex items-center gap-1 mt-1 ml-[5.75rem] text-xs text-neutral-400">
-          <span className="font-mono">└</span>
+          {/* Parent task or project context */}
           {parentTaskName && parentTaskId ? (
             <button
               onClick={(e) => {
                 e.stopPropagation()
                 onOpenParentTask?.(parentTaskId)
               }}
-              className="hover:text-neutral-600 hover:underline truncate max-w-[200px]"
+              className="text-[11px] text-neutral-400 hover:text-neutral-600 hover:underline truncate max-w-[180px]"
             >
               {parentTaskName}
             </button>
           ) : projectName ? (
-            <span className="truncate max-w-[200px]">{projectName}</span>
+            <span className="text-[11px] text-neutral-400 truncate max-w-[180px]">{projectName}</span>
           ) : null}
         </div>
       )}

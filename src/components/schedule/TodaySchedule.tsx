@@ -1068,8 +1068,8 @@ export function TodaySchedule({
         ) : (
           /* Desktop: Full editorial header */
           <>
-            <div className="flex items-end gap-3 mb-6">
-              <h1 className="font-display text-3xl md:text-4xl text-neutral-900 tracking-tight leading-none">
+            <div className="flex items-end gap-3 mb-6 pr-48">
+              <h1 className="font-display text-3xl md:text-4xl text-neutral-900 tracking-tight leading-none truncate">
                 {formatDate()}
               </h1>
               <DateNavigator date={viewedDate} onDateChange={onDateChange} showTodayButton={!isToday} />

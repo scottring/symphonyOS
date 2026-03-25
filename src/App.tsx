@@ -1098,6 +1098,7 @@ function App() {
         assignedTo: sourceTask.assignedTo ?? getCurrentUserMember()?.id,
         context: sourceTask.context,
         category: sourceTask.category,
+        parentTaskId: sourceTask.id, // Link back to source for context lineage
       }
     )
   }, [tasks, addTask, viewedDate, getCurrentUserMember])
@@ -1601,6 +1602,11 @@ function App() {
               canPin={pinnedItems.canPin()}
               onPin={pinnedItems.pin}
               onUnpin={pinnedItems.unpin}
+              parentTask={selectedItem?.originalTask?.parentTaskId
+                ? tasks.find(t => t.id === selectedItem.originalTask?.parentTaskId) ?? null
+                : null
+              }
+              onOpenParentTask={(taskId) => setSelectedItemId(`task-${taskId}`)}
               linkedTasks={selectedItemLinkedTasks}
               onAddLinkedTask={handleAddLinkedTask}
               onToggleLinkedTask={handleToggleLinkedTask}
