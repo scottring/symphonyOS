@@ -24,38 +24,19 @@ import { useToast } from '@/hooks/useToast'
 import type { PinnableEntityType } from '@/types/pin'
 import { supabase } from '@/lib/supabase'
 import { DomainPageOutline } from '@/components/domain/DomainPageOutline'
+import { ViewRouter } from '@/components/layout/ViewRouter'
 import { AppShell } from '@/components/layout/AppShell'
-import { HomeView } from '@/components/home'
 import { useFocusMode } from '@/hooks/useFocusMode'
 import { SearchModal } from '@/components/search/SearchModal'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
-import { SectionErrorBoundary } from '@/components/SectionErrorBoundary'
 import { Toast, ConfirmationToast, type ConfirmationToastMessage } from '@/components/toast'
 import { UndoToast } from '@/components/undo/UndoToast'
 import {
-  ProjectsList,
-  ProjectView,
-  RoutinesList,
-  RoutineForm,
-  RoutineInput,
-  TaskView,
-  ContactView,
-  ContactsList,
   RecipeViewer,
-  CalendarConnect,
   OnboardingWizard,
-  SettingsPage,
   AuthForm,
-  GoalsList,
-  GoalView,
-  GoalPlanningChat,
   FocusMode,
-  PlanningSession,
   DetailPanelRedesign as DetailPanel,
-  ListsList,
-  ListView,
-  NotesPage,
-  CompletedTasksView,
 } from '@/components/lazy'
 import { useGoals } from '@/hooks/useGoals'
 import { useGoalMilestones } from '@/hooks/useGoalMilestones'
@@ -63,16 +44,14 @@ import { useGoalPlanning } from '@/hooks/useGoalPlanning'
 import { useScheduleActions } from '@/hooks/useScheduleActions'
 import { useDomain } from '@/hooks/useDomain'
 import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings'
-import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
+import { useDetailPanelState } from '@/hooks/useDetailPanelState'
+import { useScheduleFiltering } from '@/hooks/useScheduleFiltering'
 import type { ViewType } from '@/components/layout/Sidebar'
-import type { ActionableInstance, Routine } from '@/types/actionable'
 import type { LinkedActivityType } from '@/types/task'
-import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
+import { type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
 import { useHiddenCalendarEvents } from '@/hooks/useHiddenCalendarEvents'
 import { useChat, type EntityContext as ChatEntityContext } from '@/hooks/useChat'
 import { useMeetingNotes } from '@/hooks/useMeetingNotes'
-import { MeetingNotesView } from '@/components/meeting/MeetingNotesView'
-import { ActionQueueBar } from '@/components/actions/ActionQueueBar'
 
 function App() {
   const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask } = useSupabaseTasks()
@@ -210,9 +189,6 @@ function App() {
     lists,
     notes,
   })
-
-  // Actionable instances for the viewed date (to filter skipped/completed events)
-  const [dateInstances, setDateInstances] = useState<ActionableInstance[]>([])
 
   // UI state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -397,15 +373,19 @@ function App() {
     }
   }, [isConnected, viewedDate, fetchEvents])
 
-  // Fetch actionable instances for the viewed date
-  const refreshDateInstances = useCallback(async () => {
-    const instances = await getInstancesForDate(viewedDate)
-    setDateInstances(instances)
-  }, [viewedDate, getInstancesForDate])
-
-  useEffect(() => {
-    refreshDateInstances()
-  }, [refreshDateInstances])
+  const { filteredEvents, filteredRoutines, dateInstances, refreshDateInstances } = useScheduleFiltering({
+    viewedDate,
+    events,
+    allRoutines,
+    getRoutinesForDate,
+    getInstancesForDate,
+    isEventHidden,
+    tasksLoading,
+    routinesLoading,
+    getLinkedTasks,
+    addTask,
+    getCurrentUserMember,
+  })
 
   // Schedule action handlers (assign, complete, skip, push for tasks/events/routines)
   const scheduleActions = useScheduleActions({
@@ -426,147 +406,33 @@ function App() {
     pushAction: undo.pushAction,
   })
 
-  // Filter events to exclude skipped/completed items
-  const filteredEvents = useMemo(() => {
-    // Build a map of entity_id -> status for quick lookup
-    const statusMap = new Map<string, string>()
-    for (const instance of dateInstances) {
-      if (instance.entity_type === 'calendar_event') {
-        statusMap.set(instance.entity_id, instance.status)
-      }
-    }
-
-    // Filter out events that are skipped, deferred, or permanently hidden
-    return events.filter((event) => {
-      const eventId = event.google_event_id || event.id
-      // Remove permanently hidden recurring events
-      if (isEventHidden(eventId)) return false
-      const status = statusMap.get(eventId)
-      // Remove if skipped or deferred
-      return status !== 'skipped' && status !== 'deferred'
-    })
-  }, [events, dateInstances, isEventHidden])
-
-  // Get routines for the viewed date:
-  // 1. Routines that normally occur on this date (by recurrence pattern)
-  // 2. Routines that were deferred TO this date (even if not normally scheduled)
-  // 3. Filter out routines that are skipped or deferred away from this date
-  const filteredRoutines = useMemo(() => {
-    const routinesForDate = getRoutinesForDate(viewedDate)
-
-    // Build a map of routine_id -> instance for quick lookup
-    const instanceMap = new Map<string, ActionableInstance>()
-    for (const instance of dateInstances) {
-      if (instance.entity_type === 'routine') {
-        instanceMap.set(instance.entity_id, instance)
-      }
-    }
-
-    // Find routines that were deferred TO this date (any status — includes completed/skipped)
-    const deferredToThisDate = new Set<string>()
-    const viewedDateStr = viewedDate.toISOString().split('T')[0]
-    for (const instance of dateInstances) {
-      if (
-        instance.entity_type === 'routine' &&
-        instance.deferred_to &&
-        (instance.date as string) !== viewedDateStr // Only cross-day deferrals
-      ) {
-        const deferredToDateStr = new Date(instance.deferred_to).toISOString().split('T')[0]
-        if (deferredToDateStr === viewedDateStr) {
-          deferredToThisDate.add(instance.entity_id)
-        }
-      }
-    }
-
-    // Get additional routines that were deferred to this date but don't normally occur today
-    const additionalRoutines: Routine[] = []
-    for (const routineId of deferredToThisDate) {
-      // If this routine isn't already in routinesForDate, add it
-      if (!routinesForDate.some(r => r.id === routineId)) {
-        const routine = allRoutines.find(r => r.id === routineId)
-        if (routine) {
-          additionalRoutines.push(routine)
-        }
-      }
-    }
-
-    // Filter out skipped routines and routines deferred AWAY (but not TO this date)
-    const filteredNormalRoutines = routinesForDate.filter((routine) => {
-      const instance = instanceMap.get(routine.id)
-      if (!instance) return true // No instance = pending
-      if (instance.status === 'skipped') return false
-      // If deferred, only hide if NOT deferred to this specific date
-      if (instance.status === 'deferred') {
-        return deferredToThisDate.has(routine.id)
-      }
-      return true
-    })
-
-    // Combine normal routines with deferred-to routines
-    return [...filteredNormalRoutines, ...additionalRoutines]
-  }, [getRoutinesForDate, viewedDate, dateInstances, allRoutines])
-
-  // Generate prep tasks from routine templates when routines surface for the day
-  // This runs once when filteredRoutines changes for a given date
-  useEffect(() => {
-    if (tasksLoading || routinesLoading) return
-    if (filteredRoutines.length === 0) return
-
-    // Format date string for instance ID
-    const dateStr = viewedDate.toISOString().split('T')[0]
-
-    const generateTemplatedTasks = async () => {
-      for (const routine of filteredRoutines) {
-        // Skip if no prep templates
-        if (!routine.prep_task_templates || routine.prep_task_templates.length === 0) {
-          continue
-        }
-
-        const instanceId = `${routine.id}_${dateStr}`
-        const existingLinked = getLinkedTasks('routine_instance' as LinkedActivityType, instanceId)
-
-        for (const template of routine.prep_task_templates) {
-          // Check if a task with this title already exists for this instance
-          const exists = existingLinked.prep.some(t => t.title === template.title)
-          if (!exists) {
-            // Create prep task scheduled for today
-            await addTask(
-              template.title,
-              undefined, // contactId
-              undefined, // projectId
-              viewedDate, // scheduledFor - same day as routine
-              {
-                linkedTo: { type: 'routine_instance' as LinkedActivityType, id: instanceId },
-                linkType: 'prep',
-                assignedTo: getCurrentUserMember()?.id,
-              }
-            )
-          }
-        }
-      }
-    }
-
-    generateTemplatedTasks()
-  }, [filteredRoutines, viewedDate, tasksLoading, routinesLoading, getLinkedTasks, addTask, getCurrentUserMember])
-
-  // Fetch event notes when an event is selected
-  useEffect(() => {
-    if (selectedItemId?.startsWith('event-')) {
-      const eventId = selectedItemId.replace('event-', '')
-      fetchNote(eventId)
-    }
-  }, [selectedItemId, fetchNote])
-
-  // Fetch attachments when an item is selected
-  useEffect(() => {
-    if (selectedItemId?.startsWith('task-')) {
-      const taskId = selectedItemId.replace('task-', '')
-      fetchAttachments('task', taskId)
-    } else if (selectedItemId?.startsWith('event-')) {
-      const eventId = selectedItemId.replace('event-', '')
-      fetchAttachments('event_note', eventId)
-    }
-  }, [selectedItemId, fetchAttachments])
+  const {
+    selectedItem,
+    selectedContact,
+    selectedItemProject,
+    selectedEventRecipeUrl,
+    selectedEventAssignedToAll,
+    selectedEventProjectId,
+    selectedItemAttachments,
+    selectedItemLinkedTasks,
+    selectedItemRoutine,
+  } = useDetailPanelState({
+    selectedItemId,
+    tasks,
+    events,
+    activeRoutines,
+    allRoutines,
+    viewedDate,
+    dateInstances,
+    getNote,
+    eventNotesMap,
+    contactsMap,
+    projectsMap,
+    getLinkedTasks,
+    fetchNote,
+    fetchAttachments,
+    getAttachments: attachments.getAttachments,
+  })
 
   // Batch fetch event notes for all visible events (for info icon display)
   useEffect(() => {
@@ -575,141 +441,6 @@ function App() {
       fetchNotesForEvents(eventIds)
     }
   }, [filteredEvents, fetchNotesForEvents])
-
-  // Find selected item from tasks, events, or routines
-  const selectedItem = useMemo(() => {
-    if (!selectedItemId) return null
-
-    // Check if it's a task
-    if (selectedItemId.startsWith('task-')) {
-      const taskId = selectedItemId.replace('task-', '')
-      // Search top-level tasks and nested subtasks
-      let task = tasks.find((t) => t.id === taskId)
-      if (!task) {
-        for (const t of tasks) {
-          const sub = t.subtasks?.find((s) => s.id === taskId)
-          if (sub) { task = sub; break }
-        }
-      }
-      return task ? taskToTimelineItem(task) : null
-    }
-
-    // Check if it's an event
-    if (selectedItemId.startsWith('event-')) {
-      const eventId = selectedItemId.replace('event-', '')
-      const event = events.find((e) => (e.google_event_id || e.id) === eventId)
-      if (!event) return null
-
-      const timelineItem = eventToTimelineItem(event)
-      // Add user's notes from event_notes table
-      const eventNote = getNote(eventId)
-      if (eventNote?.notes) {
-        timelineItem.notes = eventNote.notes
-      }
-      return timelineItem
-    }
-
-    // Check if it's a routine
-    if (selectedItemId.startsWith('routine-')) {
-      const routineId = selectedItemId.replace('routine-', '')
-      const routine = activeRoutines.find((r) => r.id === routineId)
-      if (!routine) return null
-
-      // Create timeline item with the viewed date for time context
-      const timelineItem = routineToTimelineItem(routine, viewedDate)
-
-      // Check if there's an instance to update completion status
-      const instance = dateInstances.find(
-        (i) => i.entity_type === 'routine' && i.entity_id === routineId
-      )
-      if (instance?.status === 'completed') {
-        timelineItem.completed = true
-      }
-
-      return timelineItem
-    }
-
-    return null
-  }, [selectedItemId, tasks, events, activeRoutines, viewedDate, dateInstances, getNote])
-
-  // Get contact for selected item (must be before early returns to follow Rules of Hooks)
-  const selectedContact = useMemo(() => {
-    if (!selectedItem?.contactId) return null
-    return contactsMap.get(selectedItem.contactId) ?? null
-  }, [selectedItem, contactsMap])
-
-  // Get project for selected item
-  const selectedItemProject = useMemo(() => {
-    if (!selectedItem?.projectId) return null
-    return projectsMap.get(selectedItem.projectId) ?? null
-  }, [selectedItem, projectsMap])
-
-  // Get recipe URL for selected event
-  const selectedEventRecipeUrl = useMemo(() => {
-    if (!selectedItem?.originalEvent) return null
-    const eventId = selectedItem.originalEvent.google_event_id || selectedItem.originalEvent.id
-    const eventNote = eventNotesMap.get(eventId)
-    return eventNote?.recipeUrl ?? null
-  }, [selectedItem, eventNotesMap])
-
-  // Get assigned family members for selected event
-  const selectedEventAssignedToAll = useMemo(() => {
-    if (!selectedItem?.originalEvent) return []
-    const eventId = selectedItem.originalEvent.google_event_id || selectedItem.originalEvent.id
-    const eventNote = eventNotesMap.get(eventId)
-    return eventNote?.assignedToAll ?? []
-  }, [selectedItem, eventNotesMap])
-
-  // Get linked project for selected event
-  const selectedEventProjectId = useMemo(() => {
-    if (!selectedItem?.originalEvent) return null
-    const eventId = selectedItem.originalEvent.google_event_id || selectedItem.originalEvent.id
-    const eventNote = eventNotesMap.get(eventId)
-    return eventNote?.projectId ?? null
-  }, [selectedItem, eventNotesMap])
-
-  // Get attachments for selected item
-  const selectedItemAttachments = useMemo(() => {
-    if (!selectedItemId) return []
-    if (selectedItemId.startsWith('task-')) {
-      const taskId = selectedItemId.replace('task-', '')
-      return attachments.getAttachments('task', taskId)
-    }
-    if (selectedItemId.startsWith('event-')) {
-      const eventId = selectedItemId.replace('event-', '')
-      return attachments.getAttachments('event_note', eventId)
-    }
-    return []
-  }, [selectedItemId, attachments])
-
-  // Get linked tasks (prep/followup) for selected item
-  const selectedItemLinkedTasks = useMemo(() => {
-    if (!selectedItemId) return { prep: [], followup: [] }
-
-    const dateStr = viewedDate.toISOString().split('T')[0]
-
-    if (selectedItemId.startsWith('task-')) {
-      const taskId = selectedItemId.replace('task-', '')
-      return getLinkedTasks('task' as LinkedActivityType, taskId)
-    }
-    if (selectedItemId.startsWith('routine-')) {
-      const routineId = selectedItemId.replace('routine-', '')
-      const instanceId = `${routineId}_${dateStr}`
-      return getLinkedTasks('routine_instance' as LinkedActivityType, instanceId)
-    }
-    if (selectedItemId.startsWith('event-')) {
-      const eventId = selectedItemId.replace('event-', '')
-      return getLinkedTasks('calendar_event' as LinkedActivityType, eventId)
-    }
-    return { prep: [], followup: [] }
-  }, [selectedItemId, viewedDate, getLinkedTasks])
-
-  // Get routine for selected routine item (for templates)
-  const selectedItemRoutine = useMemo((): Routine | null => {
-    if (!selectedItemId?.startsWith('routine-')) return null
-    const routineId = selectedItemId.replace('routine-', '')
-    return allRoutines.find(r => r.id === routineId) ?? null
-  }, [selectedItemId, allRoutines])
 
   // Get project for project view
   const selectedProject = useMemo(() => {
@@ -1491,400 +1222,126 @@ function App() {
       }
     >
       <DomainPageOutline>
-        <SectionErrorBoundary sectionName="Content" onReset={() => handleViewChange('today')}>
-          {activeView === 'today' && (
-            <div className="h-full flex flex-col overflow-hidden">
-              {/* Meeting mode — replaces normal view when active */}
-              {meetingNotes.isInMeeting && meetingNotes.meeting ? (
-                <MeetingNotesView
-                  meeting={meetingNotes.meeting}
-                  onSaveNote={meetingNotes.saveMeetingNote}
-                  onEndMeeting={meetingNotes.endMeeting}
-                />
-              ) : (
-                <>
-                  {/* Calendar connect banner if needed */}
-                  {!isConnected && (
-                    <div className="p-4 border-b border-neutral-100 shrink-0">
-                      <Suspense fallback={<LoadingFallback />}>
-                        <CalendarConnect />
-                      </Suspense>
-                    </div>
-                  )}
-
-                  {/* Action queue bar */}
-                  <ScheduleActionsProvider value={scheduleActionsValue}>
-                    <div className="px-4 pt-2 shrink-0">
-                      <ActionQueueBar />
-                    </div>
-                    <HomeView
-                      tasks={tasks}
-                      events={filteredEvents}
-                      routines={filteredRoutines}
-                      projects={projects}
-                      dateInstances={dateInstances}
-                      selectedItemId={selectedItemId}
-                      onSelectItem={handleSelectItem}
-                      loading={tasksLoading || eventsFetching || routinesLoading}
-                      viewedDate={viewedDate}
-                      onDateChange={setViewedDate}
-                      currentUserMemberId={getCurrentUserMember()?.id}
-                    />
-                  </ScheduleActionsProvider>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Planning Session - fullscreen overlay */}
-          {planningOpen && (
-            <Suspense fallback={<LoadingFallback />}>
-              <PlanningSession
-                tasks={tasks}
-                events={events}
-                routines={filteredRoutines}
-                initialDate={viewedDate}
-                onClose={() => setPlanningOpen(false)}
-                onUpdateTask={updateTask}
-                onPushTask={pushTask}
-                familyMembers={familyMembers}
-                eventNotesMap={eventNotesMap}
-              />
-            </Suspense>
-          )}
-
-          {activeView === 'task-detail' && selectedTask && (
-            <Suspense fallback={<LoadingFallback />}>
-              <TaskView
-                task={selectedTask}
-                onBack={() => {
-                  setSelectedTaskId(null)
-                  setStateView(null)
-                }}
-                onUpdate={updateTask}
-                onDelete={(id) => {
-                  deleteTask(id)
-                  setSelectedTaskId(null)
-                  setStateView(null)
-                }}
-                onToggleComplete={handleToggleTask}
-                onPush={pushTask}
-                contact={selectedTaskContact}
-                contacts={contacts}
-                onSearchContacts={searchContacts}
-                onAddContact={addContact}
-                onOpenContact={handleOpenContact}
-                project={selectedTaskProject}
-                projects={projects}
-                onSearchProjects={searchProjects}
-                onOpenProject={handleOpenProject}
-                onAddProject={addProject}
-                onAddSubtask={addSubtask}
-                entityNotes={selectedTaskNotes}
-                entityNotesLoading={selectedTaskNotesLoading}
-                onAddEntityNote={handleAddTaskNote}
-              />
-            </Suspense>
-          )}
-
-          {activeView === 'contacts' && (
-            <Suspense fallback={<LoadingFallback />}>
-              <ContactsList
-                contacts={contacts}
-                onSelectContact={(contactId) => navigate(`/contacts/${contactId}`)}
-                onBack={() => navigate('/')}
-                onAddContact={addContact}
-                onDeleteContact={deleteContact}
-              />
-            </Suspense>
-          )}
-
-          {activeView === 'contact-detail' && selectedContactForView && (
-            <Suspense fallback={<LoadingFallback />}>
-              <ContactView
-                contact={selectedContactForView}
-                onBack={() => {
-                  navigate('/contacts')
-                }}
-                onUpdate={updateContact}
-                onDelete={async (id) => {
-                  await deleteContact(id)
-                  navigate('/contacts')
-                }}
-                tasks={tasks}
-                onSelectTask={(taskId) => {
-                  setSelectedTaskId(taskId)
-                  setStateView('task-detail')
-                }}
-                isPinned={pinnedItems.isPinned('contact', selectedContactForView.id)}
-                canPin={pinnedItems.canPin()}
-                onPin={() => pinnedItems.pin('contact', selectedContactForView.id)}
-                onUnpin={() => pinnedItems.unpin('contact', selectedContactForView.id)}
-                entityNotes={selectedContactNotes}
-                entityNotesLoading={selectedContactNotesLoading}
-                onAddEntityNote={handleAddContactNote}
-              />
-            </Suspense>
-          )}
-
-          {activeView === 'projects' && !selectedProjectId && (
-            <Suspense fallback={<LoadingFallback />}>
-              <ProjectsList
-                projects={currentDomain === 'universal' ? projects : projects.filter(p => p.context === currentDomain)}
-                tasks={tasks}
-                onSelectProject={(id) => navigate(`/projects/${id}`)}
-                onAddProject={(project) => addProject({ ...project, context: currentDomain !== 'universal' ? currentDomain : undefined })}
-              />
-            </Suspense>
-          )}
-
-          {activeView === 'projects' && selectedProject && (
-            <Suspense fallback={<LoadingFallback />}>
-              <ProjectView
-                project={selectedProject}
-                tasks={tasks}
-                contactsMap={contactsMap}
-                onBack={() => navigate('/projects')}
-                onUpdateProject={handleUpdateProject}
-                onDeleteProject={deleteProject}
-                onAddTask={(title, projectId) => addTask(title, undefined, projectId, undefined, { assignedTo: getCurrentUserMember()?.id })}
-                onDeleteTask={deleteTask}
-                onSelectTask={handleSelectItem}
-                onToggleTask={handleToggleTask}
-                onUpdateTask={handleUpdateTaskWithToast}
-                familyMembers={familyMembers}
-                selectedTaskId={selectedItemId}
-                linkedEvents={linkedEventsForProject}
-                isPinned={pinnedItems.isPinned('project', selectedProject.id)}
-                canPin={pinnedItems.canPin()}
-                onPin={() => pinnedItems.pin('project', selectedProject.id)}
-                onUnpin={() => pinnedItems.unpin('project', selectedProject.id)}
-              />
-            </Suspense>
-          )}
-
-          {activeView === 'goals' && !selectedGoalId && (
-            <Suspense fallback={<LoadingFallback />}>
-              <GoalsList
-                areas={goalAreas}
-                goals={currentDomain === 'universal' ? goals : goals.filter(g => g.context === currentDomain)}
-                currentQuarter={getCurrentQuarter()}
-                year={new Date().getFullYear()}
-                onSelectGoal={(id) => navigate(`/goals/${id}`)}
-                onAddArea={addGoalArea}
-                onAddGoal={(areaId, name) => addGoal(areaId, name, currentDomain !== 'universal' ? currentDomain : undefined)}
-                onToggleAction={toggleGoalAction}
-                onDeleteArea={deleteGoalArea}
-              />
-            </Suspense>
-          )}
-
-          {activeView === 'goals' && selectedGoalId && getGoalById(selectedGoalId) && !planningGoalId && (
-            <Suspense fallback={<LoadingFallback />}>
-              <GoalView
-                goal={getGoalById(selectedGoalId)!}
-                area={goalAreas.find(a => a.id === getGoalById(selectedGoalId)!.areaId)}
-                currentQuarter={getCurrentQuarter()}
-                onBack={() => navigate('/goals')}
-                onUpdateGoal={updateGoal}
-                onDeleteGoal={deleteGoal}
-                onAddAction={addGoalAction}
-                onUpdateAction={updateGoalAction}
-                onToggleAction={toggleGoalAction}
-                onDeleteAction={deleteGoalAction}
-                onStartPlanning={() => {
-                  setPlanningGoalId(selectedGoalId)
-                  const g = getGoalById(selectedGoalId)
-                  if (g) {
-                    const areaName = goalAreas.find(a => a.id === g.areaId)?.name
-                    goalPlanning.startPlanning(g.id, g.name, g.notes, areaName)
-                  }
-                }}
-                onAddMilestone={addGoalMilestone}
-                onUpdateMilestone={updateGoalMilestone}
-                onUpdateMilestoneProgress={updateMilestoneProgress}
-                onDeleteMilestone={deleteGoalMilestone}
-              />
-            </Suspense>
-          )}
-
-          {activeView === 'goals' && planningGoalId && (
-            <Suspense fallback={<LoadingFallback />}>
-              <GoalPlanningChat
-                goalName={getGoalById(planningGoalId)?.name ?? 'Goal'}
-                messages={goalPlanning.messages}
-                loading={goalPlanning.loading}
-                readyToFinish={goalPlanning.readyToFinish}
-                planningResult={goalPlanning.planningResult}
-                error={goalPlanning.error}
-                onStart={() => {
-                  const g = getGoalById(planningGoalId)
-                  if (g) {
-                    const areaName = goalAreas.find(a => a.id === g.areaId)?.name
-                    goalPlanning.startPlanning(g.id, g.name, g.notes, areaName)
-                  }
-                }}
-                onSend={goalPlanning.sendMessage}
-                onFinish={goalPlanning.finishPlanning}
-                onBack={() => {
-                  setPlanningGoalId(null)
-                  goalPlanning.reset()
-                }}
-                onDone={() => {
-                  setPlanningGoalId(null)
-                  goalPlanning.reset()
-                }}
-              />
-            </Suspense>
-          )}
-
-          {activeView === 'routines' && !selectedRoutineId && !creatingRoutine && (
-            <Suspense fallback={<LoadingFallback />}>
-              <RoutinesList
-                routines={currentDomain === 'universal' ? allRoutines : allRoutines.filter(r => r.context === currentDomain)}
-                contacts={contacts}
-                familyMembers={familyMembers}
-                onSelectRoutine={(routine) => navigate(`/routines/${routine.id}`)}
-                onCreateRoutine={() => navigate('/routines/new')}
-                onUpdateRoutine={updateRoutine}
-              />
-            </Suspense>
-          )}
-
-          {activeView === 'routines' && creatingRoutine && (
-            <div className="h-full overflow-auto">
-              <div className="max-w-2xl mx-auto">
-                {/* Header */}
-                <div className="flex items-center gap-3 p-6 pb-0">
-                  <button
-                    onClick={() => navigate('/routines')}
-                    className="p-2 -ml-2 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                  <h1 className="text-xl font-semibold text-neutral-800">New Routine</h1>
-                </div>
-                <Suspense fallback={<LoadingFallback />}>
-                  <RoutineInput
-                    contacts={contacts}
-                    onSave={async (input) => {
-                      await addRoutine({ ...input, context: currentDomain !== 'universal' ? currentDomain : undefined })
-                      navigate('/routines')
-                    }}
-                    onCancel={() => navigate('/routines')}
-                  />
-                </Suspense>
-              </div>
-            </div>
-          )}
-
-          {activeView === 'routines' && selectedRoutine && (
-            <Suspense fallback={<LoadingFallback />}>
-              <RoutineForm
-                key={selectedRoutine.id}
-                routine={selectedRoutine}
-                contacts={contacts}
-                familyMembers={familyMembers}
-                onBack={() => navigate('/routines')}
-                onUpdate={updateRoutine}
-                onDelete={deleteRoutine}
-                onToggleVisibility={toggleRoutineVisibility}
-                isPinned={pinnedItems.isPinned('routine', selectedRoutine.id)}
-                canPin={pinnedItems.canPin()}
-                onPin={() => pinnedItems.pin('routine', selectedRoutine.id)}
-                onUnpin={() => pinnedItems.unpin('routine', selectedRoutine.id)}
-              />
-            </Suspense>
-          )}
-
-          {activeView === 'lists' && !selectedListId && (
-            <Suspense fallback={<LoadingFallback />}>
-              <ListsList
-                lists={lists}
-                listsByCategory={listsByCategory}
-                onSelectList={setSelectedListId}
-                onAddList={addList}
-              />
-            </Suspense>
-          )}
-
-          {activeView === 'lists' && selectedList && (
-            <Suspense fallback={<LoadingFallback />}>
-              <ListView
-                list={selectedList}
-                items={listItems}
-                onBack={() => setSelectedListId(null)}
-                onUpdateList={updateList}
-                onDeleteList={deleteList}
-                onAddItem={addListItem}
-                onUpdateItem={updateListItem}
-                onDeleteItem={deleteListItem}
-                onReorderItems={reorderListItems}
-                isPinned={pinnedItems.isPinned('list', selectedList.id)}
-                canPin={pinnedItems.canPin()}
-                onPin={() => pinnedItems.pin('list', selectedList.id)}
-                onUnpin={() => pinnedItems.unpin('list', selectedList.id)}
-              />
-            </Suspense>
-          )}
-
-          {activeView === 'history' && (
-            <Suspense fallback={<LoadingFallback />}>
-              <CompletedTasksView
-                tasks={tasks}
-                contactsMap={contactsMap}
-                projectsMap={projectsMap}
-                onSelectTask={(taskId) => handleSelectItem(`task-${taskId}`)}
-                onBack={() => handleViewChange('today')}
-              />
-            </Suspense>
-          )}
-
-          {activeView === 'notes' && (
-            <Suspense fallback={<LoadingFallback />}>
-              <NotesPage
-                notes={notes}
-                notesByDate={notesByDate}
-                topics={activeTopics}
-                topicsMap={topicsMap}
-                loading={notesLoading}
-                tasks={tasks}
-                projects={projects}
-                contacts={contacts}
-                onAddNote={async (content, topicId) => {
-                  return addNote({ content, topicId })
-                }}
-                onUpdateNote={async (id, updates) => {
-                  await updateNoteContent(id, updates)
-                }}
-                onDeleteNote={deleteNote}
-                onAddTopic={async (name) => {
-                  return addTopic({ name })
-                }}
-                getEntityLinks={getEntityLinks}
-                onAddEntityLink={async (noteId, entityType, entityId) => {
-                  await addEntityLink(noteId, { entityType, entityId })
-                }}
-                onRemoveEntityLink={removeEntityLink}
-                onNavigateToTask={(taskId) => handleSelectItem(`task-${taskId}`)}
-              />
-            </Suspense>
-          )}
-
-          {activeView === 'settings' && (
-            <Suspense fallback={<LoadingFallback />}>
-              <SettingsPage
-                onBack={() => {
-                  refetchFamilyMembers() // Refresh family members in case they were edited
-                  handleViewChange('today')
-                }}
-                onFamilyMembersChanged={refetchFamilyMembers}
-              />
-            </Suspense>
-          )}
-        </SectionErrorBoundary>
+        <ViewRouter
+          activeView={activeView}
+          onViewChange={handleViewChange}
+          tasks={tasks}
+          events={events}
+          filteredEvents={filteredEvents}
+          filteredRoutines={filteredRoutines}
+          projects={projects}
+          dateInstances={dateInstances}
+          selectedItemId={selectedItemId}
+          onSelectItem={handleSelectItem}
+          tasksLoading={tasksLoading}
+          eventsFetching={eventsFetching}
+          routinesLoading={routinesLoading}
+          viewedDate={viewedDate}
+          onDateChange={setViewedDate}
+          currentUserMemberId={getCurrentUserMember()?.id}
+          isConnected={isConnected}
+          scheduleActionsValue={scheduleActionsValue}
+          meetingNotes={meetingNotes}
+          planningOpen={planningOpen}
+          onClosePlanning={() => setPlanningOpen(false)}
+          onUpdateTask={updateTask}
+          pushTask={pushTask}
+          familyMembers={familyMembers}
+          eventNotesMap={eventNotesMap}
+          selectedTask={selectedTask}
+          onBackFromTask={() => { setSelectedTaskId(null); setStateView(null) }}
+          onDeleteTaskAndBack={(id) => { deleteTask(id); setSelectedTaskId(null); setStateView(null) }}
+          onToggleTask={handleToggleTask}
+          selectedTaskContact={selectedTaskContact}
+          contacts={contacts}
+          onSearchContacts={searchContacts}
+          onAddContact={addContact}
+          onOpenContact={handleOpenContact}
+          selectedTaskProject={selectedTaskProject}
+          onSearchProjects={searchProjects}
+          onOpenProject={handleOpenProject}
+          onAddProject={addProject}
+          onAddSubtask={addSubtask}
+          selectedTaskNotes={selectedTaskNotes}
+          selectedTaskNotesLoading={selectedTaskNotesLoading}
+          onAddTaskNote={handleAddTaskNote}
+          onDeleteContact={deleteContact}
+          onUpdateContact={updateContact}
+          selectedContactForView={selectedContactForView}
+          selectedContactId={selectedContactId}
+          onSelectTaskFromContact={(taskId) => { setSelectedTaskId(taskId); setStateView('task-detail') }}
+          pinnedItems={pinnedItems}
+          selectedContactNotes={selectedContactNotes}
+          selectedContactNotesLoading={selectedContactNotesLoading}
+          onAddContactNote={handleAddContactNote}
+          selectedProjectId={selectedProjectId}
+          selectedProject={selectedProject}
+          currentDomain={currentDomain}
+          contactsMap={contactsMap}
+          onUpdateProject={handleUpdateProject}
+          onDeleteProject={deleteProject}
+          onAddTaskToProject={(title, projectId) => addTask(title, undefined, projectId, undefined, { assignedTo: getCurrentUserMember()?.id })}
+          onDeleteTask={deleteTask}
+          onToggleTaskForProject={handleToggleTask}
+          onUpdateTaskWithToast={handleUpdateTaskWithToast}
+          linkedEventsForProject={linkedEventsForProject}
+          goalAreas={goalAreas}
+          goals={goals}
+          getCurrentQuarter={getCurrentQuarter}
+          selectedGoalId={selectedGoalId}
+          getGoalById={getGoalById}
+          planningGoalId={planningGoalId}
+          onSetPlanningGoalId={setPlanningGoalId}
+          onAddGoalArea={addGoalArea}
+          onDeleteGoalArea={deleteGoalArea}
+          onAddGoal={addGoal}
+          onUpdateGoal={updateGoal}
+          onDeleteGoal={deleteGoal}
+          onAddGoalAction={addGoalAction}
+          onUpdateGoalAction={updateGoalAction}
+          onToggleGoalAction={toggleGoalAction}
+          onDeleteGoalAction={deleteGoalAction}
+          onAddGoalMilestone={addGoalMilestone}
+          onUpdateGoalMilestone={updateGoalMilestone}
+          onUpdateMilestoneProgress={updateMilestoneProgress}
+          onDeleteGoalMilestone={deleteGoalMilestone}
+          goalPlanning={goalPlanning}
+          allRoutines={allRoutines}
+          selectedRoutineId={selectedRoutineId}
+          selectedRoutine={selectedRoutine}
+          creatingRoutine={creatingRoutine}
+          onAddRoutine={addRoutine}
+          onUpdateRoutine={updateRoutine}
+          onDeleteRoutine={deleteRoutine}
+          onToggleRoutineVisibility={toggleRoutineVisibility}
+          lists={lists}
+          listsByCategory={listsByCategory}
+          selectedListId={selectedListId}
+          onSelectList={setSelectedListId}
+          selectedList={selectedList}
+          listItems={listItems}
+          onAddList={addList}
+          onUpdateList={updateList}
+          onDeleteList={deleteList}
+          onAddListItem={addListItem}
+          onUpdateListItem={updateListItem}
+          onDeleteListItem={deleteListItem}
+          onReorderListItems={reorderListItems}
+          projectsMap={projectsMap}
+          notes={notes}
+          notesByDate={notesByDate}
+          activeTopics={activeTopics}
+          topicsMap={topicsMap}
+          notesLoading={notesLoading}
+          onAddNote={addNote}
+          onUpdateNoteContent={updateNoteContent}
+          onDeleteNote={deleteNote}
+          onAddTopic={addTopic}
+          getEntityLinks={getEntityLinks}
+          onAddEntityLink={addEntityLink}
+          onRemoveEntityLink={removeEntityLink}
+          refetchFamilyMembers={refetchFamilyMembers}
+        />
 
         {/* Search Modal */}
         <SearchModal

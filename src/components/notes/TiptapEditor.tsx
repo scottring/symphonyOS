@@ -493,6 +493,25 @@ export function TiptapEditor({
           margin-top: 1rem;
           margin-bottom: 0.5rem;
         }
+        .ProseMirror ul:not([data-type="taskList"]) {
+          list-style-type: disc;
+          padding-left: 1.5rem;
+          margin: 0.5rem 0;
+        }
+        .ProseMirror ul:not([data-type="taskList"]) ul {
+          list-style-type: circle;
+        }
+        .ProseMirror ul:not([data-type="taskList"]) ul ul {
+          list-style-type: square;
+        }
+        .ProseMirror ol {
+          list-style-type: decimal;
+          padding-left: 1.5rem;
+          margin: 0.5rem 0;
+        }
+        .ProseMirror li {
+          margin: 0.25rem 0;
+        }
       `}</style>
     </div>
   )
