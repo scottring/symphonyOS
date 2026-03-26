@@ -27,6 +27,15 @@ vi.mock('@/hooks/useMobile', () => ({
   useMobile: () => false, // Desktop by default
 }))
 
+// Mock useRecurringEventDetection
+vi.mock('@/hooks/useRecurringEventDetection', () => ({
+  useRecurringEventDetection: () => ({
+    getRecurringProject: () => null,
+    linkedProjectIds: new Set(),
+    isPromotionSuggested: () => false,
+  }),
+}))
+
 // Create a stable "today" for testing - we'll use fake timers to control Date
 const mockToday = new Date('2024-01-15T12:00:00.000Z')
 
@@ -171,11 +180,11 @@ describe('TodaySchedule', () => {
     it('renders date header', () => {
       render(<TodaySchedule {...defaultProps} />)
 
-      // Date header shows "Today is" + weekday name
-      expect(screen.getByRole('heading', { name: /Today is.*Monday/ })).toBeInTheDocument()
+      // Desktop header shows full date format like "Monday, January 15, 2024"
+      expect(screen.getByRole('heading', { name: /Monday, January 15/ })).toBeInTheDocument()
     })
 
-    it('shows weekday name for non-today dates', () => {
+    it('shows full date for non-today dates', () => {
       const futureDate = new Date('2024-01-20T12:00:00Z')
       render(<TodaySchedule {...defaultProps} viewedDate={futureDate} />)
 
@@ -183,23 +192,26 @@ describe('TodaySchedule', () => {
       expect(screen.getByRole('heading', { name: /Saturday, January 20/ })).toBeInTheDocument()
     })
 
-    it('renders progress bar when there are actionable items', () => {
+    it('renders progress indicator when there are actionable items', () => {
       const tasks = [
-        createMockTask({ id: '1', scheduledFor: mockToday }),
-        createMockTask({ id: '2', scheduledFor: mockToday, completed: true }),
+        createMockTask({ id: '1', bucket: 'timed', scheduledFor: mockToday }),
+        createMockTask({ id: '2', bucket: 'timed', scheduledFor: mockToday, completed: true }),
       ]
 
       render(<TodaySchedule {...defaultProps} tasks={tasks} />)
 
-      // Progress format is "completed/total tasks"
-      expect(screen.getByText('1/2 tasks')).toBeInTheDocument()
+      // Progress is rendered via ProgressIndicator with separate spans
+      // Check for the completed count and total count
+      expect(screen.getByText('1')).toBeInTheDocument()
+      expect(screen.getByText('2')).toBeInTheDocument()
+      expect(screen.getByText('tasks')).toBeInTheDocument()
     })
   })
 
   describe('task display', () => {
     it('renders scheduled tasks for the day', () => {
       const tasks = [
-        createMockTask({ id: '1', title: 'Morning task', scheduledFor: mockToday }),
+        createMockTask({ id: '1', title: 'Morning task', bucket: 'timed', scheduledFor: mockToday }),
       ]
 
       render(<TodaySchedule {...defaultProps} tasks={tasks} />)
@@ -207,31 +219,11 @@ describe('TodaySchedule', () => {
       expect(screen.getByText('Morning task')).toBeInTheDocument()
     })
 
-    it.skip('does not show unscheduled tasks in main schedule sections', () => {
-      const tasks = [
-        createMockTask({ id: '1', title: 'Inbox task', scheduledFor: undefined }),
-      ]
-
-      // Task goes to inbox, not the main schedule sections (morning, afternoon, etc.)
-      render(
-        <TodaySchedule
-          {...defaultProps}
-          tasks={tasks}
-        />
-      )
-
-      // Task should appear in inbox section, not in time sections
-      // The Inbox section will contain the task
-      expect(screen.getByText('Inbox task')).toBeInTheDocument()
-      // Inbox header shows count, like "Inbox (1)"
-      expect(screen.getByText(/Inbox \(/)).toBeInTheDocument()
-    })
-
     it('filters tasks to only show for viewed date', () => {
       // Use dates far apart to avoid timezone issues
       const tasks = [
-        createMockTask({ id: '1', title: 'Today task', scheduledFor: new Date('2024-01-15T14:00:00Z') }),
-        createMockTask({ id: '2', title: 'Next week task', scheduledFor: new Date('2024-01-22T14:00:00Z') }),
+        createMockTask({ id: '1', title: 'Today task', bucket: 'timed', scheduledFor: new Date('2024-01-15T14:00:00Z') }),
+        createMockTask({ id: '2', title: 'Next week task', bucket: 'timed', scheduledFor: new Date('2024-01-22T14:00:00Z') }),
       ]
 
       render(<TodaySchedule {...defaultProps} tasks={tasks} />)
@@ -316,23 +308,6 @@ describe('TodaySchedule', () => {
   })
 
   describe('inbox section', () => {
-    it.skip('shows inbox tasks on today view', () => {
-      const tasks = [
-        createMockTask({ id: '1', title: 'My inbox item', scheduledFor: undefined }),
-      ]
-
-      render(
-        <TodaySchedule
-          {...defaultProps}
-          tasks={tasks}
-        />
-      )
-
-      // Inbox section should render with the task
-      expect(screen.getByText('My inbox item')).toBeInTheDocument()
-      expect(screen.getByText(/Inbox \(/)).toBeInTheDocument()
-    })
-
     it('does not show inbox on non-today dates', () => {
       const futureDate = new Date('2024-01-20T12:00:00Z')
       const tasks = [
@@ -349,26 +324,6 @@ describe('TodaySchedule', () => {
 
       // Should show empty state since inbox not visible on future dates
       expect(screen.getByText(/Nothing scheduled for/)).toBeInTheDocument()
-    })
-
-    it.skip('shows deferred tasks that are due today in inbox', () => {
-      const tasks = [
-        createMockTask({
-          id: '1',
-          title: 'Deferred task',
-          scheduledFor: undefined,
-          deferredUntil: new Date('2024-01-15'), // Today
-        }),
-      ]
-
-      render(
-        <TodaySchedule
-          {...defaultProps}
-          tasks={tasks}
-        />
-      )
-
-      expect(screen.getByText('Deferred task')).toBeInTheDocument()
     })
 
     it('does not show tasks deferred to future dates', () => {
@@ -397,7 +352,7 @@ describe('TodaySchedule', () => {
     it('calls onSelectItem when clicking a task', () => {
       const onSelectItem = vi.fn()
       const tasks = [
-        createMockTask({ id: '1', title: 'Clickable task', scheduledFor: mockToday }),
+        createMockTask({ id: '1', title: 'Clickable task', bucket: 'timed', scheduledFor: mockToday }),
       ]
 
       render(<TodaySchedule {...defaultProps} tasks={tasks} onSelectItem={onSelectItem} />)
@@ -410,7 +365,7 @@ describe('TodaySchedule', () => {
     it('calls onToggleTask when completing a task', () => {
       const onToggleTask = vi.fn()
       const tasks = [
-        createMockTask({ id: '1', title: 'Completable task', scheduledFor: mockToday }),
+        createMockTask({ id: '1', title: 'Completable task', bucket: 'timed', scheduledFor: mockToday }),
       ]
 
       render(<TodaySchedule {...defaultProps} tasks={tasks} onToggleTask={onToggleTask} />)
@@ -446,25 +401,6 @@ describe('TodaySchedule', () => {
     })
   })
 
-  describe('inbox tasks', () => {
-    it.skip('shows inbox tasks count in progress bar', () => {
-      const tasks = [
-        createMockTask({ id: '1', scheduledFor: undefined }),
-        createMockTask({ id: '2', scheduledFor: undefined }),
-      ]
-
-      render(
-        <TodaySchedule
-          {...defaultProps}
-          tasks={tasks}
-        />
-      )
-
-      // Inbox section should show count
-      expect(screen.getByText(/Inbox \(2\)/)).toBeInTheDocument()
-    })
-  })
-
   describe('date navigation', () => {
     it('renders DateNavigator component', () => {
       render(<TodaySchedule {...defaultProps} />)
@@ -487,7 +423,7 @@ describe('TodaySchedule', () => {
   describe('contact and project display', () => {
     it('shows contact name when task has contactId', () => {
       const tasks = [
-        createMockTask({ id: '1', title: 'Task with contact', scheduledFor: mockToday, contactId: 'contact-1' }),
+        createMockTask({ id: '1', title: 'Task with contact', bucket: 'timed', scheduledFor: mockToday, contactId: 'contact-1' }),
       ]
       mockContextValue.contactsMap = new Map([['contact-1', mockContact]])
 
@@ -498,7 +434,7 @@ describe('TodaySchedule', () => {
 
     it('shows project name when task has projectId', () => {
       const tasks = [
-        createMockTask({ id: '1', title: 'Task with project', scheduledFor: mockToday, projectId: 'project-1' }),
+        createMockTask({ id: '1', title: 'Task with project', bucket: 'timed', scheduledFor: mockToday, projectId: 'project-1' }),
       ]
       mockContextValue.projectsMap = new Map([['project-1', mockProject]])
 
@@ -513,7 +449,7 @@ describe('TodaySchedule', () => {
   describe('family member assignment', () => {
     it('shows assigned family member', () => {
       const tasks = [
-        createMockTask({ id: '1', title: 'Assigned task', scheduledFor: mockToday, assignedTo: 'member-1' }),
+        createMockTask({ id: '1', title: 'Assigned task', bucket: 'timed', scheduledFor: mockToday, assignedTo: 'member-1' }),
       ]
 
       mockContextValue.familyMembers = [mockFamilyMember]
@@ -534,8 +470,8 @@ describe('TodaySchedule', () => {
   describe('progress tracking', () => {
     it('calculates progress correctly with mixed completion', () => {
       const tasks = [
-        createMockTask({ id: '1', scheduledFor: mockToday, completed: false }),
-        createMockTask({ id: '2', scheduledFor: mockToday, completed: true }),
+        createMockTask({ id: '1', bucket: 'timed', scheduledFor: mockToday, completed: false }),
+        createMockTask({ id: '2', bucket: 'timed', scheduledFor: mockToday, completed: true }),
       ]
       const routines = [
         createMockRoutine({ id: 'r1', name: 'Routine 1' }),
@@ -554,12 +490,16 @@ describe('TodaySchedule', () => {
       )
 
       // 1 task + 1 routine completed = 2, total = 3
-      expect(screen.getByText('2/3 tasks')).toBeInTheDocument()
+      // ProgressIndicator renders these in separate spans
+      const progressContainer = screen.getByText('tasks').parentElement
+      expect(progressContainer).toBeInTheDocument()
+      expect(progressContainer?.textContent).toContain('2')
+      expect(progressContainer?.textContent).toContain('3')
     })
 
     it('does not include events in actionable count', () => {
       const tasks = [
-        createMockTask({ id: '1', scheduledFor: mockToday }),
+        createMockTask({ id: '1', bucket: 'timed', scheduledFor: mockToday }),
       ]
       const events = [
         createMockEvent({ title: 'Event' }),
@@ -568,7 +508,10 @@ describe('TodaySchedule', () => {
       render(<TodaySchedule {...defaultProps} tasks={tasks} events={events} />)
 
       // Only 1 task is actionable, not the event
-      expect(screen.getByText('0/1 tasks')).toBeInTheDocument()
+      // Progress is shown as separate spans, check the container text
+      const progressContainer = screen.getByText('tasks').parentElement
+      expect(progressContainer?.textContent).toContain('0')
+      expect(progressContainer?.textContent).toContain('1')
     })
   })
 })

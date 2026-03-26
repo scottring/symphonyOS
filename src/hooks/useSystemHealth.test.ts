@@ -83,8 +83,8 @@ describe('useSystemHealth', () => {
 
     it('counts deferred tasks as having a home', () => {
       const tasks = [
-        createTask({ deferredUntil: new Date('2024-06-20') }),
-        createTask({ deferredUntil: new Date('2024-06-21') }),
+        createTask({ bucket: 'week' as const }),
+        createTask({ bucket: 'month' as const }),
       ]
 
       const { result } = renderHook(() => useSystemHealth(tasks))

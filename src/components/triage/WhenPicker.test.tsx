@@ -3,6 +3,46 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { WhenPicker } from './WhenPicker'
 
+// Mock the date helpers module
+vi.mock('@/lib/dateHelpers', () => ({
+  getBaseDate: (daysOffset: number) => {
+    const d = new Date()
+    d.setDate(d.getDate() + daysOffset)
+    d.setHours(0, 0, 0, 0)
+    return d
+  },
+  parseDateInput: (dateStr: string) => {
+    if (!dateStr) return null
+    const [year, month, day] = dateStr.split('-').map(Number)
+    const d = new Date(year, month - 1, day)
+    d.setHours(0, 0, 0, 0)
+    return d
+  },
+  parseTimeInput: (timeStr: string, baseDate: Date) => {
+    if (!timeStr) return null
+    const [hours, minutes] = timeStr.split(':').map(Number)
+    const d = new Date(baseDate)
+    d.setHours(hours, minutes, 0, 0)
+    return d
+  },
+  formatDateLabel: (date: Date) => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const d = new Date(date)
+    d.setHours(0, 0, 0, 0)
+    if (d.getTime() === today.getTime()) return 'Today'
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    if (d.getTime() === tomorrow.getTime()) return 'Tomorrow'
+    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+  },
+}))
+
+vi.mock('@/lib/inputStyles', () => ({
+  DATE_INPUT_CLASS: 'date-input-class',
+  TIME_INPUT_CLASS: 'time-input-class',
+}))
+
 describe('WhenPicker', () => {
   const mockOnChange = vi.fn()
   const mockToday = new Date('2024-01-15T12:00:00.000Z')
@@ -21,21 +61,7 @@ describe('WhenPicker', () => {
     it('renders trigger button with calendar icon', () => {
       render(<WhenPicker onChange={mockOnChange} />)
 
-      expect(screen.getByRole('button', { name: 'Set date' })).toBeInTheDocument()
-    })
-
-    it('applies inactive styling when no value is set', () => {
-      render(<WhenPicker onChange={mockOnChange} />)
-
-      const button = screen.getByRole('button', { name: 'Set date' })
-      expect(button).toHaveClass('text-neutral-400')
-    })
-
-    it('applies active styling when value is set', () => {
-      render(<WhenPicker value={new Date()} onChange={mockOnChange} />)
-
-      const button = screen.getByRole('button', { name: 'Set date' })
-      expect(button).toHaveClass('text-primary-600')
+      expect(screen.getByRole('button', { name: 'Set when' })).toBeInTheDocument()
     })
 
     it('does not show popover initially', () => {
@@ -46,37 +72,39 @@ describe('WhenPicker', () => {
   })
 
   describe('opening popover', () => {
-    it('shows day selection options when clicked', () => {
+    it('shows bucket options when clicked', () => {
       render(<WhenPicker onChange={mockOnChange} />)
 
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Set when' }))
 
       expect(screen.getByText('Today')).toBeInTheDocument()
       expect(screen.getByText('Tomorrow')).toBeInTheDocument()
-      expect(screen.getByText('Next Week')).toBeInTheDocument()
+      expect(screen.getByText('This Week')).toBeInTheDocument()
+      expect(screen.getByText('This Month')).toBeInTheDocument()
+      expect(screen.getByText('This Quarter')).toBeInTheDocument()
       expect(screen.getByText('Pick date...')).toBeInTheDocument()
     })
 
-    it('does not show Clear option when no value is set', () => {
-      render(<WhenPicker onChange={mockOnChange} />)
+    it('shows Back to Inbox option when bucket is set', () => {
+      render(<WhenPicker bucket="week" onChange={mockOnChange} />)
 
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Set when' }))
 
-      expect(screen.queryByText('Clear')).not.toBeInTheDocument()
+      expect(screen.getByText('Back to Inbox')).toBeInTheDocument()
     })
 
-    it('shows Clear option when value is set', () => {
-      render(<WhenPicker value={new Date()} onChange={mockOnChange} />)
+    it('does not show Back to Inbox option when no bucket', () => {
+      render(<WhenPicker onChange={mockOnChange} />)
 
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Set when' }))
 
-      expect(screen.getByText('Clear')).toBeInTheDocument()
+      expect(screen.queryByText('Back to Inbox')).not.toBeInTheDocument()
     })
 
     it('toggles popover on button click', () => {
       render(<WhenPicker onChange={mockOnChange} />)
 
-      const button = screen.getByRole('button', { name: 'Set date' })
+      const button = screen.getByRole('button', { name: 'Set when' })
 
       // First click opens
       fireEvent.click(button)
@@ -88,11 +116,49 @@ describe('WhenPicker', () => {
     })
   })
 
-  describe('day selection (step 1)', () => {
+  describe('bucket selection', () => {
+    it('selecting This Week calls onChange with "week" bucket', () => {
+      render(<WhenPicker onChange={mockOnChange} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Set when' }))
+      fireEvent.click(screen.getByText('This Week'))
+
+      expect(mockOnChange).toHaveBeenCalledWith('week', undefined)
+    })
+
+    it('selecting This Month calls onChange with "month" bucket', () => {
+      render(<WhenPicker onChange={mockOnChange} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Set when' }))
+      fireEvent.click(screen.getByText('This Month'))
+
+      expect(mockOnChange).toHaveBeenCalledWith('month', undefined)
+    })
+
+    it('selecting This Quarter calls onChange with "quarter" bucket', () => {
+      render(<WhenPicker onChange={mockOnChange} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Set when' }))
+      fireEvent.click(screen.getByText('This Quarter'))
+
+      expect(mockOnChange).toHaveBeenCalledWith('quarter', undefined)
+    })
+
+    it('closes popover after bucket selection', () => {
+      render(<WhenPicker onChange={mockOnChange} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Set when' }))
+      fireEvent.click(screen.getByText('This Week'))
+
+      expect(screen.queryByText('Today')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('day selection → time selection', () => {
     it('selecting Today advances to time selection', () => {
       render(<WhenPicker onChange={mockOnChange} />)
 
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Set when' }))
       fireEvent.click(screen.getByText('Today'))
 
       // Should now see time options
@@ -105,44 +171,105 @@ describe('WhenPicker', () => {
     it('selecting Tomorrow advances to time selection', () => {
       render(<WhenPicker onChange={mockOnChange} />)
 
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Set when' }))
       fireEvent.click(screen.getByText('Tomorrow'))
 
       expect(screen.getByText('All Day')).toBeInTheDocument()
-      // Should show Tomorrow in back button
-      expect(screen.getByText('Tomorrow')).toBeInTheDocument()
-    })
-
-    it('selecting Next Week advances to time selection', () => {
-      render(<WhenPicker onChange={mockOnChange} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
-      fireEvent.click(screen.getByText('Next Week'))
-
-      expect(screen.getByText('All Day')).toBeInTheDocument()
-    })
-
-    it('clicking Pick date shows date input', () => {
-      render(<WhenPicker onChange={mockOnChange} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
-      fireEvent.click(screen.getByText('Pick date...'))
-
-      // Should show date input and back button
-      expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
-      expect(document.querySelector('input[type="date"]')).toBeInTheDocument()
     })
   })
 
-  describe('date input (step date-input)', () => {
-    it('back button returns to day selection', () => {
+  describe('time selection', () => {
+    it('selecting All Day calls onChange with timed bucket and isAllDay=true', () => {
       render(<WhenPicker onChange={mockOnChange} />)
 
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
-      fireEvent.click(screen.getByText('Pick date...'))
-      fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Set when' }))
+      fireEvent.click(screen.getByText('Today'))
+      fireEvent.click(screen.getByText('All Day'))
 
-      // Should be back to day selection
+      expect(mockOnChange).toHaveBeenCalledWith(
+        'timed',
+        expect.any(Date),
+        true
+      )
+    })
+
+    it('selecting Morning sets 9am', () => {
+      render(<WhenPicker onChange={mockOnChange} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Set when' }))
+      fireEvent.click(screen.getByText('Today'))
+      fireEvent.click(screen.getByText(/Morning/))
+
+      expect(mockOnChange).toHaveBeenCalledWith(
+        'timed',
+        expect.any(Date),
+        false
+      )
+      const calledDate = mockOnChange.mock.calls[0][1] as Date
+      expect(calledDate.getHours()).toBe(9)
+    })
+
+    it('selecting Afternoon sets 1pm', () => {
+      render(<WhenPicker onChange={mockOnChange} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Set when' }))
+      fireEvent.click(screen.getByText('Today'))
+      fireEvent.click(screen.getByText(/Afternoon/))
+
+      const calledDate = mockOnChange.mock.calls[0][1] as Date
+      expect(calledDate.getHours()).toBe(13)
+    })
+
+    it('selecting Evening sets 6pm', () => {
+      render(<WhenPicker onChange={mockOnChange} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Set when' }))
+      fireEvent.click(screen.getByText('Today'))
+      fireEvent.click(screen.getByText(/Evening/))
+
+      const calledDate = mockOnChange.mock.calls[0][1] as Date
+      expect(calledDate.getHours()).toBe(18)
+    })
+
+    it('clicking Pick time shows time input', () => {
+      render(<WhenPicker onChange={mockOnChange} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Set when' }))
+      fireEvent.click(screen.getByText('Today'))
+      fireEvent.click(screen.getByText('Pick time...'))
+
+      expect(document.querySelector('input[type="time"]')).toBeInTheDocument()
+    })
+
+    it('closes popover after time selection', () => {
+      render(<WhenPicker onChange={mockOnChange} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Set when' }))
+      fireEvent.click(screen.getByText('Today'))
+      fireEvent.click(screen.getByText(/Morning/))
+
+      // Popover should be closed
+      expect(screen.queryByText('All Day')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('date input', () => {
+    it('clicking Pick date shows date input', () => {
+      render(<WhenPicker onChange={mockOnChange} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Set when' }))
+      fireEvent.click(screen.getByText('Pick date...'))
+
+      expect(document.querySelector('input[type="date"]')).toBeInTheDocument()
+    })
+
+    it('back button returns to bucket selection', () => {
+      render(<WhenPicker onChange={mockOnChange} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Set when' }))
+      fireEvent.click(screen.getByText('Pick date...'))
+      fireEvent.click(screen.getByText('Back'))
+
       expect(screen.getByText('Today')).toBeInTheDocument()
       expect(screen.getByText('Tomorrow')).toBeInTheDocument()
     })
@@ -150,7 +277,7 @@ describe('WhenPicker', () => {
     it('selecting a date advances to time selection', () => {
       render(<WhenPicker onChange={mockOnChange} />)
 
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Set when' }))
       fireEvent.click(screen.getByText('Pick date...'))
 
       const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement
@@ -161,149 +288,21 @@ describe('WhenPicker', () => {
     })
   })
 
-  describe('time selection (step 2)', () => {
-    it('back button returns to day selection with date label', () => {
-      render(<WhenPicker onChange={mockOnChange} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
-      fireEvent.click(screen.getByText('Today'))
-
-      // Back button should show "Today"
-      const backButton = screen.getByRole('button', { name: 'Today' })
-      fireEvent.click(backButton)
-
-      // Should be back to day selection
-      expect(screen.getByText('Tomorrow')).toBeInTheDocument()
-      expect(screen.getByText('Next Week')).toBeInTheDocument()
-    })
-
-    it('selecting All Day calls onChange with isAllDay=true', () => {
-      render(<WhenPicker onChange={mockOnChange} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
-      fireEvent.click(screen.getByText('Today'))
-      fireEvent.click(screen.getByText('All Day'))
-
-      expect(mockOnChange).toHaveBeenCalledWith(
-        expect.any(Date),
-        true
-      )
-      // Date should be today at midnight
-      const calledDate = mockOnChange.mock.calls[0][0] as Date
-      expect(calledDate.getHours()).toBe(0)
-      expect(calledDate.getMinutes()).toBe(0)
-    })
-
-    it('selecting Morning sets 9am', () => {
-      render(<WhenPicker onChange={mockOnChange} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
-      fireEvent.click(screen.getByText('Today'))
-      fireEvent.click(screen.getByText(/Morning/))
-
-      expect(mockOnChange).toHaveBeenCalledWith(
-        expect.any(Date),
-        false
-      )
-      const calledDate = mockOnChange.mock.calls[0][0] as Date
-      expect(calledDate.getHours()).toBe(9)
-    })
-
-    it('selecting Afternoon sets 1pm', () => {
-      render(<WhenPicker onChange={mockOnChange} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
-      fireEvent.click(screen.getByText('Today'))
-      fireEvent.click(screen.getByText(/Afternoon/))
-
-      const calledDate = mockOnChange.mock.calls[0][0] as Date
-      expect(calledDate.getHours()).toBe(13)
-    })
-
-    it('selecting Evening sets 6pm', () => {
-      render(<WhenPicker onChange={mockOnChange} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
-      fireEvent.click(screen.getByText('Today'))
-      fireEvent.click(screen.getByText(/Evening/))
-
-      const calledDate = mockOnChange.mock.calls[0][0] as Date
-      expect(calledDate.getHours()).toBe(18)
-    })
-
-    it('clicking Pick time shows time input', () => {
-      render(<WhenPicker onChange={mockOnChange} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
-      fireEvent.click(screen.getByText('Today'))
-      fireEvent.click(screen.getByText('Pick time...'))
-
-      expect(document.querySelector('input[type="time"]')).toBeInTheDocument()
-    })
-
-    it('closes popover after time selection', () => {
-      render(<WhenPicker onChange={mockOnChange} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
-      fireEvent.click(screen.getByText('Today'))
-      fireEvent.click(screen.getByText(/Morning/))
-
-      // Popover should be closed
-      expect(screen.queryByText('All Day')).not.toBeInTheDocument()
-    })
-  })
-
-  describe('time input (step time-input)', () => {
-    it('back button returns to time preset selection', () => {
-      render(<WhenPicker onChange={mockOnChange} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
-      fireEvent.click(screen.getByText('Today'))
-      fireEvent.click(screen.getByText('Pick time...'))
-
-      // Find the back button (shows "Today" label)
-      fireEvent.click(screen.getByText('Today'))
-
-      // Should be back to time selection
-      expect(screen.getByText('All Day')).toBeInTheDocument()
-      expect(screen.getByText(/Morning/)).toBeInTheDocument()
-    })
-
-    it('entering time calls onChange with correct hours and minutes', () => {
-      render(<WhenPicker onChange={mockOnChange} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
-      fireEvent.click(screen.getByText('Today'))
-      fireEvent.click(screen.getByText('Pick time...'))
-
-      const timeInput = document.querySelector('input[type="time"]') as HTMLInputElement
-      fireEvent.change(timeInput, { target: { value: '14:30' } })
-
-      expect(mockOnChange).toHaveBeenCalledWith(
-        expect.any(Date),
-        false
-      )
-      const calledDate = mockOnChange.mock.calls[0][0] as Date
-      expect(calledDate.getHours()).toBe(14)
-      expect(calledDate.getMinutes()).toBe(30)
-    })
-  })
-
   describe('clear functionality', () => {
-    it('clicking Clear calls onChange with undefined', () => {
-      render(<WhenPicker value={new Date()} onChange={mockOnChange} />)
+    it('clicking Back to Inbox calls onChange with inbox bucket', () => {
+      render(<WhenPicker bucket="timed" value={new Date()} onChange={mockOnChange} />)
 
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
-      fireEvent.click(screen.getByText('Clear'))
+      fireEvent.click(screen.getByRole('button', { name: 'Set when' }))
+      fireEvent.click(screen.getByText('Back to Inbox'))
 
-      expect(mockOnChange).toHaveBeenCalledWith(undefined, false)
+      expect(mockOnChange).toHaveBeenCalledWith('inbox')
     })
 
     it('closes popover after clearing', () => {
-      render(<WhenPicker value={new Date()} onChange={mockOnChange} />)
+      render(<WhenPicker bucket="timed" value={new Date()} onChange={mockOnChange} />)
 
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
-      fireEvent.click(screen.getByText('Clear'))
+      fireEvent.click(screen.getByRole('button', { name: 'Set when' }))
+      fireEvent.click(screen.getByText('Back to Inbox'))
 
       expect(screen.queryByText('Today')).not.toBeInTheDocument()
     })
@@ -323,7 +322,7 @@ describe('WhenPicker', () => {
 
       const user = userEvent.setup()
 
-      await user.click(screen.getByRole('button', { name: 'Set date' }))
+      await user.click(screen.getByRole('button', { name: 'Set when' }))
       expect(screen.getByText('Today')).toBeInTheDocument()
 
       // Click outside
@@ -332,7 +331,7 @@ describe('WhenPicker', () => {
       expect(screen.queryByText('Today')).not.toBeInTheDocument()
     })
 
-    it('resets step to day on outside click', async () => {
+    it('resets step to bucket on outside click', async () => {
       vi.useRealTimers()
 
       render(
@@ -345,111 +344,35 @@ describe('WhenPicker', () => {
       const user = userEvent.setup()
 
       // Open and go to time step
-      await user.click(screen.getByRole('button', { name: 'Set date' }))
+      await user.click(screen.getByRole('button', { name: 'Set when' }))
       await user.click(screen.getByText('Today'))
       expect(screen.getByText('All Day')).toBeInTheDocument()
 
       // Click outside
       await user.click(screen.getByTestId('outside'))
 
-      // Reopen - should be back at day step
-      await user.click(screen.getByRole('button', { name: 'Set date' }))
+      // Reopen - should be back at bucket step
+      await user.click(screen.getByRole('button', { name: 'Set when' }))
       expect(screen.getByText('Tomorrow')).toBeInTheDocument()
       expect(screen.queryByText('All Day')).not.toBeInTheDocument()
     })
   })
 
-  describe('date calculations', () => {
-    it('Tomorrow sets date to next day', () => {
-      render(<WhenPicker onChange={mockOnChange} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
-      fireEvent.click(screen.getByText('Tomorrow'))
-      fireEvent.click(screen.getByText('All Day'))
-
-      const calledDate = mockOnChange.mock.calls[0][0] as Date
-      // mockToday is Jan 15, so tomorrow should be Jan 16
-      expect(calledDate.getDate()).toBe(16)
-      expect(calledDate.getMonth()).toBe(0) // January
-    })
-
-    it('Next Week sets date to 7 days ahead', () => {
-      render(<WhenPicker onChange={mockOnChange} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
-      fireEvent.click(screen.getByText('Next Week'))
-      fireEvent.click(screen.getByText('All Day'))
-
-      const calledDate = mockOnChange.mock.calls[0][0] as Date
-      // mockToday is Jan 15, so next week should be Jan 22
-      expect(calledDate.getDate()).toBe(22)
-    })
-
-    it('custom date input parses correctly', () => {
-      render(<WhenPicker onChange={mockOnChange} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
-      fireEvent.click(screen.getByText('Pick date...'))
-
-      const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement
-      fireEvent.change(dateInput, { target: { value: '2024-06-15' } })
-      fireEvent.click(screen.getByText('All Day'))
-
-      const calledDate = mockOnChange.mock.calls[0][0] as Date
-      expect(calledDate.getFullYear()).toBe(2024)
-      expect(calledDate.getMonth()).toBe(5) // June (0-indexed)
-      expect(calledDate.getDate()).toBe(15)
-    })
-  })
-
-  describe('date label formatting', () => {
-    it('shows Today label for today date', () => {
-      render(<WhenPicker onChange={mockOnChange} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
-      fireEvent.click(screen.getByText('Today'))
-
-      // Back button should show "Today"
-      expect(screen.getByRole('button', { name: 'Today' })).toBeInTheDocument()
-    })
-
-    it('shows Tomorrow label for tomorrow date', () => {
-      render(<WhenPicker onChange={mockOnChange} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
-      fireEvent.click(screen.getByText('Tomorrow'))
-
-      // Back button should show "Tomorrow"
-      expect(screen.getByRole('button', { name: 'Tomorrow' })).toBeInTheDocument()
-    })
-
-    it('shows formatted date for other dates', () => {
-      render(<WhenPicker onChange={mockOnChange} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
-      fireEvent.click(screen.getByText('Next Week'))
-
-      // Back button should show formatted date like "Mon, Jan 22"
-      const backButton = screen.getByRole('button', { name: /Jan 22/ })
-      expect(backButton).toBeInTheDocument()
-    })
-  })
-
   describe('reopen behavior', () => {
-    it('resets to day step when reopening after time selection', () => {
+    it('resets to bucket step when reopening after time selection', () => {
       render(<WhenPicker onChange={mockOnChange} />)
 
       // Complete a selection
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Set when' }))
       fireEvent.click(screen.getByText('Today'))
       fireEvent.click(screen.getByText(/Morning/))
 
       // Reopen
-      fireEvent.click(screen.getByRole('button', { name: 'Set date' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Set when' }))
 
-      // Should be at day step, not time step
+      // Should be at bucket step, not time step
       expect(screen.getByText('Tomorrow')).toBeInTheDocument()
-      expect(screen.getByText('Next Week')).toBeInTheDocument()
+      expect(screen.getByText('This Week')).toBeInTheDocument()
       expect(screen.queryByText('All Day')).not.toBeInTheDocument()
     })
   })

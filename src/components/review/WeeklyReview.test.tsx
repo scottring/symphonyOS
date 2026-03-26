@@ -3,6 +3,17 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { WeeklyReview } from './WeeklyReview'
 import { createMockTask, createMockProject, createMockContact } from '@/test/mocks/factories'
 
+// Mock the Google Places hook (used by AssignPicker)
+vi.mock('@/hooks/useGooglePlaces', () => ({
+  useGooglePlaces: () => ({
+    results: [],
+    loading: false,
+    searchPlaces: vi.fn(),
+    getPlaceDetails: vi.fn(),
+    clearResults: vi.fn(),
+  }),
+}))
+
 describe('WeeklyReview', () => {
   const mockOnUpdateTask = vi.fn()
   const mockOnPushTask = vi.fn()
@@ -227,14 +238,14 @@ describe('WeeklyReview', () => {
       render(<WeeklyReview {...defaultProps} />)
       const pushButtons = screen.getAllByRole('button', { name: 'Push task' })
       fireEvent.click(pushButtons[0])
-      expect(screen.getByText('Push until')).toBeInTheDocument()
+      expect(screen.getByText('Defer to')).toBeInTheDocument()
     })
 
     it('opens AssignPicker when clicking assign button', () => {
       render(<WeeklyReview {...defaultProps} />)
       const assignButtons = screen.getAllByRole('button', { name: 'Assign to' })
       fireEvent.click(assignButtons[0])
-      expect(screen.getByPlaceholderText('Search contacts...')).toBeInTheDocument()
+      expect(screen.getByPlaceholderText('Search contacts or businesses...')).toBeInTheDocument()
     })
   })
 

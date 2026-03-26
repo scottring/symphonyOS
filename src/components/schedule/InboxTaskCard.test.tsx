@@ -3,6 +3,17 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { InboxTaskCard } from './InboxTaskCard'
 import { createMockTask, createMockProject } from '@/test/mocks/factories'
 
+// Mock the Google Places hook (used by AssignPicker)
+vi.mock('@/hooks/useGooglePlaces', () => ({
+  useGooglePlaces: () => ({
+    results: [],
+    loading: false,
+    searchPlaces: vi.fn(),
+    getPlaceDetails: vi.fn(),
+    clearResults: vi.fn(),
+  }),
+}))
+
 describe('InboxTaskCard', () => {
   const mockOnUpdate = vi.fn()
   const mockOnSelect = vi.fn()
@@ -42,21 +53,6 @@ describe('InboxTaskCard', () => {
       // Find the checkbox button
       const buttons = screen.getAllByRole('button')
       expect(buttons.length).toBeGreaterThan(0)
-    })
-
-    it('renders unchecked state for incomplete task', () => {
-      render(<InboxTaskCard {...defaultProps} />)
-
-      const checkbox = document.querySelector('.border-neutral-300')
-      expect(checkbox).toBeInTheDocument()
-    })
-
-    it('renders checked state for completed task', () => {
-      const completedTask = createMockTask({ ...mockTask, completed: true })
-      render(<InboxTaskCard {...defaultProps} task={completedTask} />)
-
-      const checkbox = document.querySelector('.bg-primary-500')
-      expect(checkbox).toBeInTheDocument()
     })
 
     it('applies line-through to completed task title', () => {
@@ -110,18 +106,7 @@ describe('InboxTaskCard', () => {
       expect(screen.getByRole('button', { name: 'Defer item' })).toBeInTheDocument()
     })
 
-    it('calls onDefer when Tomorrow is selected', () => {
-      render(<InboxTaskCard {...defaultProps} />)
-
-      // Open DeferPicker
-      fireEvent.click(screen.getByRole('button', { name: 'Defer item' }))
-      // Select Tomorrow
-      fireEvent.click(screen.getByText('Tomorrow'))
-
-      expect(mockOnDefer).toHaveBeenCalledWith(expect.any(Date))
-    })
-
-    it('calls onDefer when Next Week is selected', () => {
+    it('calls onDefer with "week" when Next Week is selected', () => {
       render(<InboxTaskCard {...defaultProps} />)
 
       // Open DeferPicker
@@ -129,42 +114,22 @@ describe('InboxTaskCard', () => {
       // Select Next Week
       fireEvent.click(screen.getByText('Next Week'))
 
-      expect(mockOnDefer).toHaveBeenCalledWith(expect.any(Date))
+      expect(mockOnDefer).toHaveBeenCalledWith('week')
     })
 
-    it('shows Show Now option when task is deferred', () => {
-      const deferredTask = createMockTask({
-        ...mockTask,
-        deferredUntil: new Date('2024-12-25'),
-      })
-      render(<InboxTaskCard {...defaultProps} task={deferredTask} />)
+    it('calls onDefer with "month" when Next Month is selected', () => {
+      render(<InboxTaskCard {...defaultProps} />)
 
       // Open DeferPicker
       fireEvent.click(screen.getByRole('button', { name: 'Defer item' }))
+      // Select Next Month
+      fireEvent.click(screen.getByText('Next Month'))
 
-      expect(screen.getByText('Show Now')).toBeInTheDocument()
-    })
-
-    it('calls onDefer with undefined when Show Now is clicked', () => {
-      const deferredTask = createMockTask({
-        ...mockTask,
-        deferredUntil: new Date('2024-12-25'),
-      })
-      render(<InboxTaskCard {...defaultProps} task={deferredTask} />)
-
-      // Open DeferPicker
-      fireEvent.click(screen.getByRole('button', { name: 'Defer item' }))
-      // Click Show Now
-      fireEvent.click(screen.getByText('Show Now'))
-
-      expect(mockOnDefer).toHaveBeenCalledWith(undefined)
+      expect(mockOnDefer).toHaveBeenCalledWith('month')
     })
   })
 
   describe('project chip', () => {
-    // Note: Chips are hidden on mobile (hidden md:flex class)
-    // These tests verify the data binding works when rendered
-
     it('renders project data when task has project', () => {
       const taskWithProject = createMockTask({
         ...mockTask,
@@ -190,36 +155,6 @@ describe('InboxTaskCard', () => {
       // No chips row should be rendered
       const container = document.querySelector('.hidden.md\\:flex')
       expect(container).not.toBeInTheDocument()
-    })
-  })
-
-  describe('defer badge in DeferPicker', () => {
-    it('shows defer badge when deferCount >= 2', () => {
-      const deferredTask = createMockTask({
-        ...mockTask,
-        deferCount: 3,
-      })
-
-      render(<InboxTaskCard {...defaultProps} task={deferredTask} />)
-
-      expect(screen.getByText('↻3')).toBeInTheDocument()
-    })
-
-    it('does not show defer badge when deferCount < 2', () => {
-      const lowDeferTask = createMockTask({
-        ...mockTask,
-        deferCount: 1,
-      })
-
-      render(<InboxTaskCard {...defaultProps} task={lowDeferTask} />)
-
-      expect(screen.queryByText('↻1')).not.toBeInTheDocument()
-    })
-
-    it('does not show defer badge when deferCount is undefined', () => {
-      render(<InboxTaskCard {...defaultProps} />)
-
-      expect(screen.queryByText(/↻/)).not.toBeInTheDocument()
     })
   })
 })

@@ -4,6 +4,17 @@ import userEvent from '@testing-library/user-event'
 import { AssignPicker } from './AssignPicker'
 import { createMockContact } from '@/test/mocks/factories'
 
+// Mock the Google Places hook
+vi.mock('@/hooks/useGooglePlaces', () => ({
+  useGooglePlaces: () => ({
+    results: [],
+    loading: false,
+    searchPlaces: vi.fn(),
+    getPlaceDetails: vi.fn(),
+    clearResults: vi.fn(),
+  }),
+}))
+
 describe('AssignPicker', () => {
   const mockOnChange = vi.fn()
   const mockOnSearchContacts = vi.fn()
@@ -55,7 +66,7 @@ describe('AssignPicker', () => {
     it('does not show dropdown initially', () => {
       render(<AssignPicker contacts={mockContacts} onChange={mockOnChange} />)
 
-      expect(screen.queryByPlaceholderText('Search contacts...')).not.toBeInTheDocument()
+      expect(screen.queryByPlaceholderText('Search contacts or businesses...')).not.toBeInTheDocument()
     })
   })
 
@@ -65,7 +76,7 @@ describe('AssignPicker', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Assign to' }))
 
-      expect(screen.getByPlaceholderText('Search contacts...')).toBeInTheDocument()
+      expect(screen.getByPlaceholderText('Search contacts or businesses...')).toBeInTheDocument()
     })
 
     it('shows first 5 contacts by default', () => {
@@ -92,7 +103,7 @@ describe('AssignPicker', () => {
       await user.click(screen.getByRole('button', { name: 'Assign to' }))
 
       await waitFor(() => {
-        expect(screen.getByPlaceholderText('Search contacts...')).toHaveFocus()
+        expect(screen.getByPlaceholderText('Search contacts or businesses...')).toHaveFocus()
       })
     })
 
@@ -103,11 +114,11 @@ describe('AssignPicker', () => {
 
       // First click opens
       fireEvent.click(button)
-      expect(screen.getByPlaceholderText('Search contacts...')).toBeInTheDocument()
+      expect(screen.getByPlaceholderText('Search contacts or businesses...')).toBeInTheDocument()
 
       // Second click closes
       fireEvent.click(button)
-      expect(screen.queryByPlaceholderText('Search contacts...')).not.toBeInTheDocument()
+      expect(screen.queryByPlaceholderText('Search contacts or businesses...')).not.toBeInTheDocument()
     })
 
     it('does not show Clear option when no value is set', () => {
@@ -158,7 +169,7 @@ describe('AssignPicker', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Assign to' }))
       fireEvent.click(screen.getByText('Alice Johnson'))
 
-      expect(screen.queryByPlaceholderText('Search contacts...')).not.toBeInTheDocument()
+      expect(screen.queryByPlaceholderText('Search contacts or businesses...')).not.toBeInTheDocument()
     })
 
     it('highlights currently selected contact', () => {
@@ -188,7 +199,7 @@ describe('AssignPicker', () => {
       )
 
       fireEvent.click(screen.getByRole('button', { name: 'Assign to' }))
-      fireEvent.change(screen.getByPlaceholderText('Search contacts...'), {
+      fireEvent.change(screen.getByPlaceholderText('Search contacts or businesses...'), {
         target: { value: 'alice' },
       })
 
@@ -197,7 +208,7 @@ describe('AssignPicker', () => {
       expect(screen.queryByText('Bob Smith')).not.toBeInTheDocument()
     })
 
-    it('shows "No contacts found" when search has no results', () => {
+    it('shows no results when search has no matching contacts', () => {
       mockOnSearchContacts.mockReturnValue([])
 
       render(
@@ -209,11 +220,13 @@ describe('AssignPicker', () => {
       )
 
       fireEvent.click(screen.getByRole('button', { name: 'Assign to' }))
-      fireEvent.change(screen.getByPlaceholderText('Search contacts...'), {
+      fireEvent.change(screen.getByPlaceholderText('Search contacts or businesses...'), {
         target: { value: 'xyz' },
       })
 
-      expect(screen.getByText('No contacts found')).toBeInTheDocument()
+      // With no contacts and no add handler, no contact items should be shown
+      expect(screen.queryByText('Alice Johnson')).not.toBeInTheDocument()
+      expect(screen.queryByText('Bob Smith')).not.toBeInTheDocument()
     })
 
     it('shows "No contacts yet" when contacts list is empty and no search', () => {
@@ -234,7 +247,7 @@ describe('AssignPicker', () => {
       )
 
       fireEvent.click(screen.getByRole('button', { name: 'Assign to' }))
-      fireEvent.change(screen.getByPlaceholderText('Search contacts...'), {
+      fireEvent.change(screen.getByPlaceholderText('Search contacts or businesses...'), {
         target: { value: 'alice' },
       })
       fireEvent.click(screen.getByText('Alice Johnson'))
@@ -242,7 +255,7 @@ describe('AssignPicker', () => {
       // Reopen
       fireEvent.click(screen.getByRole('button', { name: 'Assign to' }))
 
-      expect(screen.getByPlaceholderText('Search contacts...')).toHaveValue('')
+      expect(screen.getByPlaceholderText('Search contacts or businesses...')).toHaveValue('')
     })
   })
 
@@ -260,7 +273,7 @@ describe('AssignPicker', () => {
       )
 
       fireEvent.click(screen.getByRole('button', { name: 'Assign to' }))
-      fireEvent.change(screen.getByPlaceholderText('Search contacts...'), {
+      fireEvent.change(screen.getByPlaceholderText('Search contacts or businesses...'), {
         target: { value: 'New Person' },
       })
 
@@ -283,7 +296,7 @@ describe('AssignPicker', () => {
       )
 
       fireEvent.click(screen.getByRole('button', { name: 'Assign to' }))
-      fireEvent.change(screen.getByPlaceholderText('Search contacts...'), {
+      fireEvent.change(screen.getByPlaceholderText('Search contacts or businesses...'), {
         target: { value: 'New Person' },
       })
       fireEvent.click(screen.getByText('Add "New Person"'))
@@ -308,7 +321,7 @@ describe('AssignPicker', () => {
       )
 
       fireEvent.click(screen.getByRole('button', { name: 'Assign to' }))
-      fireEvent.change(screen.getByPlaceholderText('Search contacts...'), {
+      fireEvent.change(screen.getByPlaceholderText('Search contacts or businesses...'), {
         target: { value: 'New Person' },
       })
       fireEvent.click(screen.getByText('Add "New Person"'))
@@ -335,7 +348,7 @@ describe('AssignPicker', () => {
       )
 
       fireEvent.click(screen.getByRole('button', { name: 'Assign to' }))
-      fireEvent.change(screen.getByPlaceholderText('Search contacts...'), {
+      fireEvent.change(screen.getByPlaceholderText('Search contacts or businesses...'), {
         target: { value: 'New Person' },
       })
       fireEvent.click(screen.getByText('Add "New Person"'))
@@ -361,12 +374,11 @@ describe('AssignPicker', () => {
       )
 
       fireEvent.click(screen.getByRole('button', { name: 'Assign to' }))
-      fireEvent.change(screen.getByPlaceholderText('Search contacts...'), {
+      fireEvent.change(screen.getByPlaceholderText('Search contacts or businesses...'), {
         target: { value: 'New Person' },
       })
 
       expect(screen.queryByText(/Add "/)).not.toBeInTheDocument()
-      expect(screen.getByText('No contacts found')).toBeInTheDocument()
     })
 
     it('does not call onAddContact with empty search query', () => {
@@ -382,7 +394,7 @@ describe('AssignPicker', () => {
       )
 
       fireEvent.click(screen.getByRole('button', { name: 'Assign to' }))
-      fireEvent.change(screen.getByPlaceholderText('Search contacts...'), {
+      fireEvent.change(screen.getByPlaceholderText('Search contacts or businesses...'), {
         target: { value: '   ' }, // Whitespace only
       })
 
@@ -419,7 +431,7 @@ describe('AssignPicker', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Assign to' }))
       fireEvent.click(screen.getByText('Clear'))
 
-      expect(screen.queryByPlaceholderText('Search contacts...')).not.toBeInTheDocument()
+      expect(screen.queryByPlaceholderText('Search contacts or businesses...')).not.toBeInTheDocument()
     })
   })
 
@@ -435,11 +447,11 @@ describe('AssignPicker', () => {
       )
 
       await user.click(screen.getByRole('button', { name: 'Assign to' }))
-      expect(screen.getByPlaceholderText('Search contacts...')).toBeInTheDocument()
+      expect(screen.getByPlaceholderText('Search contacts or businesses...')).toBeInTheDocument()
 
       await user.click(screen.getByTestId('outside'))
 
-      expect(screen.queryByPlaceholderText('Search contacts...')).not.toBeInTheDocument()
+      expect(screen.queryByPlaceholderText('Search contacts or businesses...')).not.toBeInTheDocument()
     })
 
     it('clears search query on outside click', async () => {
@@ -457,12 +469,12 @@ describe('AssignPicker', () => {
       )
 
       await user.click(screen.getByRole('button', { name: 'Assign to' }))
-      await user.type(screen.getByPlaceholderText('Search contacts...'), 'alice')
+      await user.type(screen.getByPlaceholderText('Search contacts or businesses...'), 'alice')
       await user.click(screen.getByTestId('outside'))
 
       // Reopen and verify search is cleared
       await user.click(screen.getByRole('button', { name: 'Assign to' }))
-      expect(screen.getByPlaceholderText('Search contacts...')).toHaveValue('')
+      expect(screen.getByPlaceholderText('Search contacts or businesses...')).toHaveValue('')
     })
   })
 

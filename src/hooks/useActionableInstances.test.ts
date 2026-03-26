@@ -40,16 +40,33 @@ const createEqChain = (depth: number = 0, isDeferred: boolean = false): unknown 
         mockSingle()
         return Promise.resolve({ data: mockFetchResult, error: mockError })
       },
+      gte: (gteField: string, gteValue: string) => {
+        mockGte(gteField, gteValue)
+        return createEqChain(depth + 1, nextIsDeferred)
+      },
     }
   },
   gte: (field: string, value: string) => {
     mockGte(field, value)
-    return createEqChain(depth + 1, isDeferred)
+    // If gte is on deferred_to, this is a deferred query
+    const nextIsDeferred = isDeferred || field === 'deferred_to'
+    return createEqChain(depth + 1, nextIsDeferred)
   },
   lte: (field: string, value: string) => {
     mockLte(field, value)
-    // After lte, we're at the end of the deferred query chain
-    return Promise.resolve({ data: isDeferred ? mockDeferredFetchResult : mockFetchResult, error: mockError })
+    // After lte, provide both direct resolution and chaining methods
+    const result = Promise.resolve({ data: isDeferred ? mockDeferredFetchResult : mockFetchResult, error: mockError })
+    // Attach maybeSingle/single methods for queries that chain after lte
+    const chainable = result as unknown as Record<string, unknown>
+    chainable.maybeSingle = () => {
+      mockSingle()
+      return Promise.resolve({ data: isDeferred ? mockDeferredFetchResult : mockFetchResult, error: mockError })
+    }
+    chainable.single = () => {
+      mockSingle()
+      return Promise.resolve({ data: isDeferred ? mockDeferredFetchResult : mockFetchResult, error: mockError })
+    }
+    return chainable
   },
   single: () => {
     mockSingle()

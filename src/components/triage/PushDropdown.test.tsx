@@ -5,16 +5,9 @@ import { PushDropdown } from './PushDropdown'
 
 describe('PushDropdown', () => {
   const mockOnPush = vi.fn()
-  const mockToday = new Date('2024-01-15T12:00:00.000Z')
 
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.useFakeTimers()
-    vi.setSystemTime(mockToday)
-  })
-
-  afterEach(() => {
-    vi.useRealTimers()
   })
 
   describe('initial render', () => {
@@ -27,7 +20,7 @@ describe('PushDropdown', () => {
     it('does not show dropdown initially', () => {
       render(<PushDropdown onPush={mockOnPush} />)
 
-      expect(screen.queryByText('Push until')).not.toBeInTheDocument()
+      expect(screen.queryByText('Defer to')).not.toBeInTheDocument()
     })
 
     it('uses medium size styling by default', () => {
@@ -53,10 +46,10 @@ describe('PushDropdown', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
 
-      expect(screen.getByText('Push until')).toBeInTheDocument()
-      expect(screen.getByText('Tomorrow')).toBeInTheDocument()
-      expect(screen.getByText('Next Week')).toBeInTheDocument()
-      expect(screen.getByText('Pick date...')).toBeInTheDocument()
+      expect(screen.getByText('Defer to')).toBeInTheDocument()
+      expect(screen.getByText('This Week')).toBeInTheDocument()
+      expect(screen.getByText('This Month')).toBeInTheDocument()
+      expect(screen.getByText('This Quarter')).toBeInTheDocument()
     })
 
     it('toggles dropdown on button click', () => {
@@ -66,148 +59,82 @@ describe('PushDropdown', () => {
 
       // First click opens
       fireEvent.click(button)
-      expect(screen.getByText('Push until')).toBeInTheDocument()
+      expect(screen.getByText('Defer to')).toBeInTheDocument()
 
       // Second click closes
       fireEvent.click(button)
-      expect(screen.queryByText('Push until')).not.toBeInTheDocument()
+      expect(screen.queryByText('Defer to')).not.toBeInTheDocument()
     })
   })
 
-  describe('quick push options', () => {
-    it('clicking Tomorrow calls onPush with tomorrow date', () => {
+  describe('push options', () => {
+    it('clicking This Week calls onPush with "week"', () => {
       render(<PushDropdown onPush={mockOnPush} />)
 
       fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
-      fireEvent.click(screen.getByText('Tomorrow'))
+      fireEvent.click(screen.getByText('This Week'))
 
-      expect(mockOnPush).toHaveBeenCalledWith(expect.any(Date))
-      const pushedDate = mockOnPush.mock.calls[0][0] as Date
-      expect(pushedDate.getDate()).toBe(16) // Jan 16 (tomorrow from Jan 15)
-      expect(pushedDate.getMonth()).toBe(0) // January
-      expect(pushedDate.getHours()).toBe(0) // Midnight
+      expect(mockOnPush).toHaveBeenCalledWith('week')
     })
 
-    it('clicking Next Week calls onPush with date 7 days ahead', () => {
+    it('clicking This Month calls onPush with "month"', () => {
       render(<PushDropdown onPush={mockOnPush} />)
 
       fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
-      fireEvent.click(screen.getByText('Next Week'))
+      fireEvent.click(screen.getByText('This Month'))
 
-      expect(mockOnPush).toHaveBeenCalledWith(expect.any(Date))
-      const pushedDate = mockOnPush.mock.calls[0][0] as Date
-      expect(pushedDate.getDate()).toBe(22) // Jan 22 (7 days from Jan 15)
-      expect(pushedDate.getMonth()).toBe(0) // January
+      expect(mockOnPush).toHaveBeenCalledWith('month')
     })
 
-    it('closes dropdown after selecting Tomorrow', () => {
+    it('clicking This Quarter calls onPush with "quarter"', () => {
       render(<PushDropdown onPush={mockOnPush} />)
 
       fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
-      fireEvent.click(screen.getByText('Tomorrow'))
+      fireEvent.click(screen.getByText('This Quarter'))
 
-      expect(screen.queryByText('Push until')).not.toBeInTheDocument()
+      expect(mockOnPush).toHaveBeenCalledWith('quarter')
     })
 
-    it('closes dropdown after selecting Next Week', () => {
+    it('closes dropdown after selecting This Week', () => {
       render(<PushDropdown onPush={mockOnPush} />)
 
       fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
-      fireEvent.click(screen.getByText('Next Week'))
+      fireEvent.click(screen.getByText('This Week'))
 
-      expect(screen.queryByText('Push until')).not.toBeInTheDocument()
+      expect(screen.queryByText('Defer to')).not.toBeInTheDocument()
+    })
+
+    it('closes dropdown after selecting This Month', () => {
+      render(<PushDropdown onPush={mockOnPush} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
+      fireEvent.click(screen.getByText('This Month'))
+
+      expect(screen.queryByText('Defer to')).not.toBeInTheDocument()
     })
   })
 
-  describe('date picker mode', () => {
-    it('clicking Pick date shows date input', () => {
-      render(<PushDropdown onPush={mockOnPush} />)
+  describe('Today option', () => {
+    it('shows Today option when showTodayOption is true', () => {
+      render(<PushDropdown onPush={mockOnPush} showTodayOption />)
 
       fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
-      fireEvent.click(screen.getByText('Pick date...'))
 
-      expect(document.querySelector('input[type="date"]')).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
+      expect(screen.getByText('Move to')).toBeInTheDocument()
+      expect(screen.getByText('Today')).toBeInTheDocument()
     })
 
-    it('hides push options when showing date picker', () => {
+    it('does not show Today option by default', () => {
       render(<PushDropdown onPush={mockOnPush} />)
 
       fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
-      fireEvent.click(screen.getByText('Pick date...'))
 
-      expect(screen.queryByText('Push until')).not.toBeInTheDocument()
-      expect(screen.queryByText('Tomorrow')).not.toBeInTheDocument()
-    })
-
-    it('back button returns to push options', () => {
-      render(<PushDropdown onPush={mockOnPush} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
-      fireEvent.click(screen.getByText('Pick date...'))
-      fireEvent.click(screen.getByRole('button', { name: 'Back' }))
-
-      expect(screen.getByText('Push until')).toBeInTheDocument()
-      expect(screen.getByText('Tomorrow')).toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
-    })
-
-    it('selecting a date calls onPush with correct date', () => {
-      render(<PushDropdown onPush={mockOnPush} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
-      fireEvent.click(screen.getByText('Pick date...'))
-
-      const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement
-      fireEvent.change(dateInput, { target: { value: '2024-02-20' } })
-
-      expect(mockOnPush).toHaveBeenCalledWith(expect.any(Date))
-      const pushedDate = mockOnPush.mock.calls[0][0] as Date
-      expect(pushedDate.getFullYear()).toBe(2024)
-      expect(pushedDate.getMonth()).toBe(1) // February (0-indexed)
-      expect(pushedDate.getDate()).toBe(20)
-      expect(pushedDate.getHours()).toBe(0)
-    })
-
-    it('closes dropdown after selecting custom date', () => {
-      render(<PushDropdown onPush={mockOnPush} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
-      fireEvent.click(screen.getByText('Pick date...'))
-
-      const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement
-      fireEvent.change(dateInput, { target: { value: '2024-02-20' } })
-
-      expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
-    })
-
-    it('date input has min value set to today', () => {
-      render(<PushDropdown onPush={mockOnPush} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
-      fireEvent.click(screen.getByText('Pick date...'))
-
-      const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement
-      expect(dateInput.min).toBe('2024-01-15')
-    })
-
-    it('does not call onPush if date input is empty', () => {
-      render(<PushDropdown onPush={mockOnPush} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
-      fireEvent.click(screen.getByText('Pick date...'))
-
-      const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement
-      fireEvent.change(dateInput, { target: { value: '' } })
-
-      expect(mockOnPush).not.toHaveBeenCalled()
+      expect(screen.queryByText('Today')).not.toBeInTheDocument()
     })
   })
 
   describe('outside click behavior', () => {
     it('closes dropdown on outside click', async () => {
-      vi.useRealTimers()
-
       render(
         <div>
           <div data-testid="outside">Outside</div>
@@ -218,88 +145,11 @@ describe('PushDropdown', () => {
       const user = userEvent.setup()
 
       await user.click(screen.getByRole('button', { name: 'Push task' }))
-      expect(screen.getByText('Push until')).toBeInTheDocument()
+      expect(screen.getByText('Defer to')).toBeInTheDocument()
 
       await user.click(screen.getByTestId('outside'))
 
-      expect(screen.queryByText('Push until')).not.toBeInTheDocument()
-    })
-
-    it('closes date picker on outside click', async () => {
-      vi.useRealTimers()
-
-      render(
-        <div>
-          <div data-testid="outside">Outside</div>
-          <PushDropdown onPush={mockOnPush} />
-        </div>
-      )
-
-      const user = userEvent.setup()
-
-      await user.click(screen.getByRole('button', { name: 'Push task' }))
-      await user.click(screen.getByText('Pick date...'))
-      expect(document.querySelector('input[type="date"]')).toBeInTheDocument()
-
-      await user.click(screen.getByTestId('outside'))
-
-      expect(document.querySelector('input[type="date"]')).not.toBeInTheDocument()
-    })
-
-    it('resets to main view on reopen after outside click from date picker', async () => {
-      vi.useRealTimers()
-
-      render(
-        <div>
-          <div data-testid="outside">Outside</div>
-          <PushDropdown onPush={mockOnPush} />
-        </div>
-      )
-
-      const user = userEvent.setup()
-
-      // Open and go to date picker
-      await user.click(screen.getByRole('button', { name: 'Push task' }))
-      await user.click(screen.getByText('Pick date...'))
-
-      // Close with outside click
-      await user.click(screen.getByTestId('outside'))
-
-      // Reopen - should be at main view
-      await user.click(screen.getByRole('button', { name: 'Push task' }))
-      expect(screen.getByText('Push until')).toBeInTheDocument()
-      expect(screen.getByText('Tomorrow')).toBeInTheDocument()
-    })
-  })
-
-  describe('date calculations', () => {
-    it('Tomorrow correctly handles month boundary', () => {
-      // Set system time to Jan 31
-      vi.setSystemTime(new Date('2024-01-31T12:00:00.000Z'))
-
-      render(<PushDropdown onPush={mockOnPush} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
-      fireEvent.click(screen.getByText('Tomorrow'))
-
-      const pushedDate = mockOnPush.mock.calls[0][0] as Date
-      expect(pushedDate.getDate()).toBe(1)
-      expect(pushedDate.getMonth()).toBe(1) // February
-    })
-
-    it('Next Week correctly handles year boundary', () => {
-      // Set system time to Dec 28
-      vi.setSystemTime(new Date('2024-12-28T12:00:00.000Z'))
-
-      render(<PushDropdown onPush={mockOnPush} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
-      fireEvent.click(screen.getByText('Next Week'))
-
-      const pushedDate = mockOnPush.mock.calls[0][0] as Date
-      expect(pushedDate.getDate()).toBe(4)
-      expect(pushedDate.getMonth()).toBe(0) // January
-      expect(pushedDate.getFullYear()).toBe(2025)
+      expect(screen.queryByText('Defer to')).not.toBeInTheDocument()
     })
   })
 
@@ -325,15 +175,6 @@ describe('PushDropdown', () => {
       render(<PushDropdown onPush={mockOnPush} />)
 
       expect(screen.getByRole('button', { name: 'Push task' })).toBeInTheDocument()
-    })
-
-    it('back button has accessible label', () => {
-      render(<PushDropdown onPush={mockOnPush} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
-      fireEvent.click(screen.getByText('Pick date...'))
-
-      expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
     })
   })
 })
