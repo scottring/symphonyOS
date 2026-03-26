@@ -550,15 +550,26 @@ export function useSupabaseTasks() {
 
     const newIsWaiting = !task.isWaiting
     const now = new Date()
+    const isSubtask = !!task.parentTaskId
+    const waitingUpdates = { isWaiting: newIsWaiting, waitingSince: newIsWaiting ? now : undefined }
 
-    // Optimistic update
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === id
-          ? { ...t, isWaiting: newIsWaiting, waitingSince: newIsWaiting ? now : undefined }
-          : t
+    // Optimistic update — handle subtasks
+    if (isSubtask) {
+      const parent = findParentOfSubtask(id)
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === parent?.id
+            ? { ...t, subtasks: (t.subtasks || []).map((s) => s.id === id ? { ...s, ...waitingUpdates } : s) }
+            : t
+        )
       )
-    )
+    } else {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === id ? { ...t, ...waitingUpdates } : t
+        )
+      )
+    }
 
     const { error: updateError } = await supabase
       .from('tasks')
@@ -570,20 +581,44 @@ export function useSupabaseTasks() {
 
     if (updateError) {
       // Rollback
-      setTasks((prev) =>
-        prev.map((t) => (t.id === id ? task : t))
-      )
+      if (isSubtask) {
+        const parent = findParentOfSubtask(id)
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === parent?.id
+              ? { ...t, subtasks: (t.subtasks || []).map((s) => s.id === id ? task : s) }
+              : t
+          )
+        )
+      } else {
+        setTasks((prev) =>
+          prev.map((t) => (t.id === id ? task : t))
+        )
+      }
       setError(updateError.message)
     }
-  }, [findTaskById])
+  }, [findTaskById, findParentOfSubtask])
 
   const deleteTask = useCallback(async (id: string) => {
     // Save for rollback
-    const taskToDelete = tasks.find((t) => t.id === id)
+    const taskToDelete = findTaskById(id)
     if (!taskToDelete) return
 
-    // Optimistic update
-    setTasks((prev) => prev.filter((t) => t.id !== id))
+    const isSubtask = !!taskToDelete.parentTaskId
+
+    // Optimistic update — handle subtasks
+    if (isSubtask) {
+      const parent = findParentOfSubtask(id)
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === parent?.id
+            ? { ...t, subtasks: (t.subtasks || []).filter((s) => s.id !== id) }
+            : t
+        )
+      )
+    } else {
+      setTasks((prev) => prev.filter((t) => t.id !== id))
+    }
 
     const { error: deleteError } = await supabase
       .from('tasks')
@@ -592,14 +627,25 @@ export function useSupabaseTasks() {
 
     if (deleteError) {
       // Rollback on error
-      setTasks((prev) => [...prev, taskToDelete])
+      if (isSubtask) {
+        const parent = findParentOfSubtask(id)
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === parent?.id
+              ? { ...t, subtasks: [...(t.subtasks || []), taskToDelete] }
+              : t
+          )
+        )
+      } else {
+        setTasks((prev) => [...prev, taskToDelete])
+      }
       setError(deleteError.message)
     }
-  }, [tasks])
+  }, [findTaskById, findParentOfSubtask])
 
   const updateTask = useCallback(async (id: string, updates: Partial<Task>) => {
     logger.debug('[updateTask] Called with:', { id, updates })
-    const task = tasks.find((t) => t.id === id)
+    const task = findTaskById(id)
     if (!task) {
       logger.debug('[updateTask] Task not found!')
       return
@@ -617,10 +663,22 @@ export function useSupabaseTasks() {
       }
     }
 
-    // Optimistic update
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, ...updates } : t))
-    )
+    // Optimistic update — handle both top-level tasks and nested subtasks
+    const isSubtask = !!task.parentTaskId
+    if (isSubtask) {
+      const parent = findParentOfSubtask(id)
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === parent?.id
+            ? { ...t, subtasks: (t.subtasks || []).map((s) => s.id === id ? { ...s, ...updates } : s) }
+            : t
+        )
+      )
+    } else {
+      setTasks((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, ...updates } : t))
+      )
+    }
 
     // Convert Task updates to DB format
     // Use 'key in updates' to detect when a field is explicitly set (even to undefined)
@@ -672,17 +730,29 @@ export function useSupabaseTasks() {
 
     if (updateError) {
       console.error('[updateTask] DB error:', updateError.message)
-      // Rollback on error
-      setTasks((prev) =>
-        prev.map((t) => (t.id === id ? task : t))
-      )
+      showToast('Failed to update task', 'error', 3000)
+      // Rollback on error — handle subtasks correctly
+      if (isSubtask) {
+        const parent = findParentOfSubtask(id)
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === parent?.id
+              ? { ...t, subtasks: (t.subtasks || []).map((s) => s.id === id ? task : s) }
+              : t
+          )
+        )
+      } else {
+        setTasks((prev) =>
+          prev.map((t) => (t.id === id ? task : t))
+        )
+      }
       setError(updateError.message)
     } else if (data && data.length > 0) {
       logger.debug('[updateTask] DB update successful, returned notes:', (data[0] as DbTask).notes)
     } else {
       console.warn('[updateTask] DB update returned no data!')
     }
-  }, [tasks, familyMembers, showToast])
+  }, [tasks, familyMembers, showToast, findTaskById, findParentOfSubtask])
 
   // Bulk update multiple tasks at once
   const updateTasksBulk = useCallback(async (taskIds: string[], updates: Partial<Task>) => {
@@ -777,7 +847,7 @@ export function useSupabaseTasks() {
       })
     } else {
       // Reschedule to a specific date
-      const task = tasks.find((t) => t.id === id)
+      const task = findTaskById(id)
       const newScheduledFor = new Date(target)
 
       // Check if task is overdue (scheduled before today)
@@ -790,13 +860,15 @@ export function useSupabaseTasks() {
         newScheduledFor.setHours(task.scheduledFor.getHours(), task.scheduledFor.getMinutes(), 0, 0)
       }
 
+      // If the target date has a specific time set (not midnight), respect it
+      const hasSpecificTime = newScheduledFor.getHours() !== 0 || newScheduledFor.getMinutes() !== 0
       await updateTask(id, {
         bucket: 'timed',
         scheduledFor: newScheduledFor,
-        ...(isOverdue ? { isAllDay: true } : {}),
+        ...(isOverdue && !hasSpecificTime ? { isAllDay: true } : {}),
       })
     }
-  }, [tasks, updateTask])
+  }, [findTaskById, updateTask])
 
   // Set a task's bucket directly (for triage: inbox → week, month, etc.)
   const setBucket = useCallback(async (id: string, bucket: TaskBucket, scheduledFor?: Date, isAllDay?: boolean) => {

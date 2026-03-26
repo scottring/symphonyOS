@@ -25,6 +25,7 @@ export interface TimelineItem {
   context?: 'work' | 'family' | 'personal' | null // Life domain for filtering
   category?: TaskCategory // Type of task: task, chore, errand, event, activity
   // Subtask support
+  isSubtask?: boolean // True if this item is a subtask appearing on the timeline
   subtaskCount?: number // Total subtasks
   subtaskCompletedCount?: number // Completed subtasks
   // Event-specific
@@ -65,6 +66,7 @@ export function taskToTimelineItem(task: Task): TimelineItem {
     contactId: task.contactId,
     projectId: task.projectId,
     parentTaskId: task.parentTaskId,
+    isSubtask: !!task.parentTaskId,
     assignedTo: task.assignedTo,
     context: task.context,
     category: task.category,

@@ -161,6 +161,7 @@ interface DetailPanelRedesignProps {
     visibility?: 'active' | 'reference'
     assigned_to_all?: string[] | null
     context?: 'work' | 'family' | 'personal' | null
+    show_on_timeline?: boolean
     prep_task_templates?: PrepFollowupTemplate[]
     followup_task_templates?: PrepFollowupTemplate[]
   }) => Promise<boolean>
@@ -2032,6 +2033,24 @@ export function DetailPanelRedesign({
                   {item.originalRoutine.visibility === 'active' ? 'Active' : 'Paused'}
                 </button>
               </div>
+            </div>
+
+            {/* Show on timeline toggle */}
+            <div className="p-3 bg-neutral-50 rounded-xl">
+              <label className="flex items-center justify-between cursor-pointer">
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                  <span className="text-sm font-medium text-neutral-700">Show on timeline</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={item.originalRoutine!.show_on_timeline !== false}
+                  onChange={(e) => onUpdateRoutine(item.originalRoutine!.id, { show_on_timeline: e.target.checked })}
+                  className="w-4 h-4 rounded border-neutral-300 text-amber-500 focus:ring-amber-500"
+                />
+              </label>
             </div>
           </div>
         )}

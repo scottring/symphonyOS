@@ -322,13 +322,13 @@ export const ScheduleItem = memo(function ScheduleItem({
               value={item.startTime ?? undefined}
               isAllDay={item.allDay}
               onSchedule={(date, isAllDay) => {
-                if (isTask && onSchedule) {
+                if (onSchedule) {
                   onSchedule(date, isAllDay)
                 } else if (onPush) {
                   onPush(date)
                 }
               }}
-              onClear={isTask && onSchedule ? () => {
+              onClear={onSchedule ? () => {
                 onSchedule(undefined as unknown as Date, false)
               } : undefined}
               getItemsForDate={getScheduleItemsForDate}

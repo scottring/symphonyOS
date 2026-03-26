@@ -97,9 +97,12 @@ export function OverdueSection({
             : undefined
           const shouldHideTime = index > 0 && overdueLabel === prevLabel
 
+          // Only show as indented subtask if parent is also visible in this list
+          const parentVisible = task.parentTaskId ? sortedTasks.some(t => t.id === task.parentTaskId) : false
+
           if (isMobile) {
             return (
-              <div key={task.id}>
+              <div key={task.id} className={parentVisible ? 'ml-6 border-l-2 border-neutral-200 pl-2' : ''}>
                 <SwipeableCard
                   item={item}
                   selected={selectedItemId === `task-${task.id}`}
@@ -129,7 +132,7 @@ export function OverdueSection({
           }
 
           return (
-            <div key={task.id}>
+            <div key={task.id} className={parentVisible ? 'ml-6 border-l-2 border-neutral-200 pl-2' : ''}>
               <ScheduleItem
                 item={item}
                 selected={selectedItemId === `task-${task.id}`}
@@ -137,6 +140,7 @@ export function OverdueSection({
                 onToggleWaiting={onToggleWaiting ? () => onToggleWaiting(taskId) : undefined}
                 onToggleComplete={() => handleToggle(taskId, !!task.completed)}
                 onPush={onPushTask ? (target: Date | 'week' | 'month' | 'quarter') => onPushTask(taskId, target) : undefined}
+                onSchedule={onUpdateTask ? (date: Date, isAllDay: boolean) => onUpdateTask(taskId, { bucket: 'timed', scheduledFor: date, isAllDay }) : undefined}
                 contactName={contactName || undefined}
                 projectName={projectName || undefined}
                 projectId={task.projectId || undefined}

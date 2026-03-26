@@ -192,10 +192,12 @@ export function SchedulePopover({
   }, [itemsForSelectedDate])
 
   const [customTimeSearch, setCustomTimeSearch] = useState('')
+  const [highlightedIndex, setHighlightedIndex] = useState<number>(-1)
   const containerRef = useRef<HTMLDivElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const customTimeInputRef = useRef<HTMLInputElement>(null)
   const triggerRef = useRef<HTMLButtonElement | HTMLDivElement>(null)
+  const suggestionRefs = useRef<(HTMLButtonElement | null)[]>([])
   const [dropdownPosition, setDropdownPosition] = useState<{ top?: number; bottom?: number; left: number }>({ top: 0, left: 0 })
 
   // Close on outside click - check both container and dropdown refs
@@ -266,6 +268,7 @@ export function SchedulePopover({
     setStep('date')
     setSelectedDate(null)
     setCustomTimeSearch('')
+    setHighlightedIndex(-1)
   }, [])
 
   const handleDateSelect = (date: Date) => {
@@ -562,7 +565,29 @@ export function SchedulePopover({
                   ref={customTimeInputRef}
                   type="text"
                   value={customTimeSearch}
-                  onChange={(e) => setCustomTimeSearch(e.target.value)}
+                  onChange={(e) => {
+                    setCustomTimeSearch(e.target.value)
+                    setHighlightedIndex(-1)
+                  }}
+                  onKeyDown={(e) => {
+                    const options = customTimeSearch ? filteredTimeOptions.slice(0, 20) : []
+                    if (options.length === 0) return
+
+                    if (e.key === 'Tab' || e.key === 'ArrowDown') {
+                      e.preventDefault()
+                      const next = highlightedIndex < options.length - 1 ? highlightedIndex + 1 : 0
+                      setHighlightedIndex(next)
+                      suggestionRefs.current[next]?.scrollIntoView({ block: 'nearest' })
+                    } else if (e.key === 'ArrowUp') {
+                      e.preventDefault()
+                      const prev = highlightedIndex > 0 ? highlightedIndex - 1 : options.length - 1
+                      setHighlightedIndex(prev)
+                      suggestionRefs.current[prev]?.scrollIntoView({ block: 'nearest' })
+                    } else if (e.key === 'Enter' && highlightedIndex >= 0) {
+                      e.preventDefault()
+                      handleCustomTimeSelect(options[highlightedIndex].value)
+                    }
+                  }}
                   onClick={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
                   placeholder="Type time (e.g., 2:15pm)"
@@ -572,6 +597,9 @@ export function SchedulePopover({
                     focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400
                     transition-all duration-150
                   "
+                  role="combobox"
+                  aria-expanded={customTimeSearch.length > 0 && filteredTimeOptions.length > 0}
+                  aria-activedescendant={highlightedIndex >= 0 ? `time-option-${highlightedIndex}` : undefined}
                 />
               </div>
 
@@ -579,18 +607,27 @@ export function SchedulePopover({
               {customTimeSearch && filteredTimeOptions.length > 0 && (
                 <div
                   className="mb-3 max-h-48 overflow-y-auto rounded-lg border border-neutral-100"
+                  role="listbox"
                   onClick={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
                 >
-                  {filteredTimeOptions.slice(0, 20).map((option) => (
+                  {filteredTimeOptions.slice(0, 20).map((option, idx) => (
                     <button
                       key={option.value}
+                      id={`time-option-${idx}`}
+                      ref={(el) => { suggestionRefs.current[idx] = el }}
+                      role="option"
+                      aria-selected={idx === highlightedIndex}
                       onClick={() => handleCustomTimeSelect(option.value)}
-                      className="
+                      onMouseEnter={() => setHighlightedIndex(idx)}
+                      className={`
                         w-full px-3 py-2 text-sm text-left
-                        text-neutral-700 hover:bg-primary-50 hover:text-primary-700
                         transition-colors first:rounded-t-lg last:rounded-b-lg
-                      "
+                        ${idx === highlightedIndex
+                          ? 'bg-primary-50 text-primary-700'
+                          : 'text-neutral-700 hover:bg-primary-50 hover:text-primary-700'
+                        }
+                      `}
                     >
                       {option.label}
                     </button>

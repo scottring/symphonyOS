@@ -7,6 +7,7 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { ScheduleContextItem } from '@/components/triage'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
+import type { TimelineItem } from '@/types/timeline'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem, playbookInstanceToTimelineItem } from '@/types/timeline'
 import { PlaybookBlockCard } from '@/components/playbook/PlaybookBlockCard'
 import { EveningReflection } from '@/components/playbook/EveningReflection'
@@ -580,6 +581,12 @@ export function TodaySchedule({
     const map = new Map<string, Task>()
     for (const task of tasks) {
       map.set(task.id, task)
+      // Also index subtasks so they can be looked up by ID
+      if (task.subtasks) {
+        for (const subtask of task.subtasks) {
+          map.set(subtask.id, subtask)
+        }
+      }
     }
     return map
   }, [tasks])
@@ -646,7 +653,7 @@ export function TodaySchedule({
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
-    return tasks.filter((task) => {
+    const isOverdue = (task: Task): boolean => {
       if (!task.scheduledFor) return false
       if (!matchesAssigneeFilter(task.assignedTo)) return false
 
@@ -663,7 +670,19 @@ export function TodaySchedule({
       }
 
       return taskDate < today
-    })
+    }
+
+    const result: Task[] = []
+    for (const task of tasks) {
+      if (isOverdue(task)) result.push(task)
+      // Also check subtasks for overdue
+      if (task.subtasks) {
+        for (const subtask of task.subtasks) {
+          if (isOverdue(subtask)) result.push(subtask)
+        }
+      }
+    }
+    return result
   }, [tasks, isToday, selectedAssignee, projectsMap])
 
   // Inbox tasks: needs triage - only shown on today's view
@@ -722,23 +741,40 @@ export function TodaySchedule({
     })
   }, [tasks, viewedDate, selectedAssignee])
 
-  // Filter timed tasks for the viewed date (bucket='timed')
+  // Filter timed tasks for the viewed date (bucket='timed'), including scheduled subtasks
   const filteredTasks = useMemo(() => {
     const startOfDay = new Date(viewedDate)
     startOfDay.setHours(0, 0, 0, 0)
     const endOfDay = new Date(viewedDate)
     endOfDay.setHours(23, 59, 59, 999)
 
-    return tasks.filter((task) => {
-      if (!matchesAssigneeFilter(task.assignedTo)) return false
-      if (task.bucket !== 'timed') return false
+    const isOnViewedDate = (date: Date | undefined | null) => {
+      if (!date) return false
+      const d = new Date(date)
+      return d >= startOfDay && d <= endOfDay
+    }
 
-      if (task.scheduledFor) {
-        const taskDate = new Date(task.scheduledFor)
-        return taskDate >= startOfDay && taskDate <= endOfDay
+    const result: Task[] = []
+
+    for (const task of tasks) {
+      // Include parent tasks scheduled for today
+      if (!matchesAssigneeFilter(task.assignedTo)) continue
+      if (task.bucket === 'timed' && isOnViewedDate(task.scheduledFor)) {
+        result.push(task)
       }
-      return false
-    })
+
+      // Also include any subtasks that are scheduled for today
+      if (task.subtasks) {
+        for (const subtask of task.subtasks) {
+          if (!matchesAssigneeFilter(subtask.assignedTo)) continue
+          if (subtask.bucket === 'timed' && isOnViewedDate(subtask.scheduledFor)) {
+            result.push(subtask)
+          }
+        }
+      }
+    }
+
+    return result
   }, [tasks, viewedDate, selectedAssignee, projectsMap])
 
   // Filter events for the viewed date and deduplicate by title + start time
@@ -847,6 +883,11 @@ export function TodaySchedule({
         if (instance?.deferred_to && instance.status === 'pending') {
           const deferredTime = new Date(instance.deferred_to)
           item.startTime = deferredTime
+          // If deferred to a specific time, it's no longer all-day
+          if (deferredTime.getHours() !== 0 || deferredTime.getMinutes() !== 0) {
+            item.allDay = false
+            item.endTime = null // Clear stale endTime from original event
+          }
         }
         return item
       })
@@ -887,7 +928,53 @@ export function TodaySchedule({
       .map(instance => playbookInstanceToTimelineItem(instance, viewedDate))
 
     const allItems = [...taskItems, ...eventItems, ...routineItems, ...playbookItems]
-    return groupByDaySection(allItems)
+    const sections = groupByDaySection(allItems)
+
+    // Post-process: move subtasks right after their parent task within each section
+    for (const key of Object.keys(sections) as DaySection[]) {
+      const items = sections[key]
+      const subtasks: TimelineItem[] = []
+      const nonSubtasks: TimelineItem[] = []
+
+      for (const item of items) {
+        if (item.isSubtask) {
+          subtasks.push(item)
+        } else {
+          nonSubtasks.push(item)
+        }
+      }
+
+      if (subtasks.length === 0) continue
+
+      // Rebuild the section: insert subtasks after their parent
+      const result: TimelineItem[] = []
+      const placed = new Set<string>()
+
+      for (const item of nonSubtasks) {
+        result.push(item)
+        // Find subtasks belonging to this parent and insert them right after
+        const taskId = item.id.startsWith('task-') ? item.id.replace('task-', '') : null
+        if (taskId) {
+          for (const sub of subtasks) {
+            if (sub.parentTaskId === taskId) {
+              result.push(sub)
+              placed.add(sub.id)
+            }
+          }
+        }
+      }
+
+      // Any subtasks whose parent isn't in this section — append at end
+      for (const sub of subtasks) {
+        if (!placed.has(sub.id)) {
+          result.push(sub)
+        }
+      }
+
+      sections[key] = result
+    }
+
+    return sections
   }, [allFilteredTasks, filteredEvents, visibleRoutines, viewedDate, routineStatusMap, eventStatusMap, eventNotesMap, selectedAssignee, hideCoaching, playbookInstances, getDomainForCalendar, eventContextOverrides])
 
   // Compute which items have coaching available (for sparkle indicator)
@@ -1323,11 +1410,16 @@ export function TodaySchedule({
                     )
                   }
 
+                  // Only indent subtask if its parent is also visible in this section
+                  const parentVisibleInSection = item.isSubtask && item.parentTaskId
+                    ? items.some(i => i.id === `task-${item.parentTaskId}`)
+                    : false
+
                   // Use SwipeableCard on mobile for better touch interactions
                   if (isMobile) {
                     const sourceTask = taskId ? tasksMap.get(taskId) : undefined
                     return (
-                      <div key={item.id} >
+                      <div key={item.id} className={parentVisibleInSection ? 'ml-6 border-l-2 border-neutral-200 pl-2' : ''}>
                         <SwipeableCard
                           item={item}
                           selected={selectedItemId === item.id}
@@ -1386,7 +1478,7 @@ export function TodaySchedule({
 
                   const sourceTaskForFollowUp = taskId ? tasksMap.get(taskId) : undefined
                   return (
-                    <div key={item.id} >
+                    <div key={item.id} className={parentVisibleInSection ? 'ml-6 border-l-2 border-neutral-200 pl-2' : ''}>
                     <ScheduleItem
                       item={item}
                       selected={selectedItemId === item.id}
