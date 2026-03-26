@@ -29,7 +29,6 @@ function getTypeLabel(item: TimelineItem): string {
     case 'task': return item.category || 'Task'
     case 'event': return 'Event'
     case 'routine': return 'Routine'
-    case 'playbook': return 'Playbook'
     default: return 'Item'
   }
 }
@@ -39,7 +38,6 @@ function getTypeColor(item: TimelineItem): string {
     case 'task': return '#F9C35C'
     case 'event': return '#6DC4A7'
     case 'routine': return '#F26E63'
-    case 'playbook': return '#A78BFA'
     default: return '#9CA3AF'
   }
 }

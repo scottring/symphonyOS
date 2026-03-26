@@ -68,33 +68,6 @@ export const SettingsPage = lazy(() =>
   import('./settings/SettingsPage').then(m => ({ default: m.SettingsPage }))
 )
 
-// Planning Workspace
-export const PlanningWorkspace = lazy(() =>
-  import('./planning-workspace/PlanningWorkspace').then(m => ({ default: m.PlanningWorkspace }))
-)
-
-// Coaching / Intelligence Layer views
-export const CoachingHub = lazy(() =>
-  import('./coaching/CoachingHub').then(m => ({ default: m.CoachingHub }))
-)
-export const QuickAssessment = lazy(() =>
-  import('./layer/QuickAssessment').then(m => ({ default: m.QuickAssessment }))
-)
-export const DomainDetail = lazy(() =>
-  import('./layer/DomainDetail').then(m => ({ default: m.DomainDetail }))
-)
-export const DeepAssessmentChat = lazy(() =>
-  import('./layer/DeepAssessmentChat').then(m => ({ default: m.DeepAssessmentChat }))
-)
-export const RulesView = lazy(() =>
-  import('./rules/RulesView').then(m => ({ default: m.RulesView }))
-)
-export const BlockEditor = lazy(() =>
-  import('./playbook/BlockEditor').then(m => ({ default: m.BlockEditor }))
-)
-export const WeeklyPlannerGrid = lazy(() =>
-  import('./playbook/WeeklyPlannerGrid').then(m => ({ default: m.WeeklyPlannerGrid }))
-)
 export const FocusMode = lazy(() =>
   import('./focus/FocusMode').then(m => ({ default: m.FocusMode }))
 )

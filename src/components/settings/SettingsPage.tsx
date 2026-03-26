@@ -1,25 +1,20 @@
 import { useState } from 'react'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
-import { useIntelligenceLayers } from '@/hooks/useIntelligenceLayers'
 import { useHouseholdInvitations } from '@/hooks/useHouseholdInvitations'
-import { LAYER_CONFIG } from '@/types/intelligence-layer'
 import { CalendarSettings } from './CalendarSettings'
 import { WaitlistAdmin } from './WaitlistAdmin'
 import { ThemeSelector } from './ThemeSelector'
 import { useTextSize } from '@/hooks/useTextSize'
 import { HomeAddressSettings } from './HomeAddressSettings'
 import { DemoControls } from './DemoControls'
-import { ImportPlaybook } from './ImportPlaybook'
 import type { FamilyMember } from '@/types/family'
-import type { CreateBlockInput } from '@/types/playbook'
 
 interface SettingsPageProps {
   onBack: () => void
   onFamilyMembersChanged?: () => void
-  onImportBlocks?: (blocks: CreateBlockInput[]) => Promise<void>
 }
 
-type Tab = 'general' | 'calendar' | 'layers' | 'admin'
+type Tab = 'general' | 'calendar' | 'admin'
 
 interface DeleteConfirmationProps {
   memberName: string
@@ -96,10 +91,8 @@ function generateInitials(name: string): string {
 export function SettingsPage({
   onBack,
   onFamilyMembersChanged,
-  onImportBlocks,
 }: SettingsPageProps) {
   const { members, addMember, updateMember, deleteMember } = useFamilyMembers()
-  const { layersWithAssessments, activateLayer, deactivateLayer } = useIntelligenceLayers()
   const { invitations, createInvitation, deleteInvitation } = useHouseholdInvitations()
   const [activeTab, setActiveTab] = useState<Tab>('general')
 
@@ -258,15 +251,6 @@ export function SettingsPage({
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
           <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-        </svg>
-      ),
-    },
-    {
-      id: 'layers',
-      label: 'Layers',
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-          <path d="M10.75 16.82A7.462 7.462 0 0115 15.5c.71 0 1.396.098 2.046.282A.75.75 0 0018 15.06v-11a.75.75 0 00-.546-.721A9.006 9.006 0 0015 3a8.963 8.963 0 00-4.25 1.065V16.82zM9.25 4.065A8.963 8.963 0 005 3c-.85 0-1.673.118-2.454.339A.75.75 0 002 4.06v11a.75.75 0 00.954.721A7.506 7.506 0 015 15.5c1.579 0 3.042.487 4.25 1.32V4.065z" />
         </svg>
       ),
     },
@@ -649,86 +633,11 @@ export function SettingsPage({
               </div>
             </section>
 
-            {/* Import Playbook */}
-            {onImportBlocks && (
-              <ImportPlaybook onImport={onImportBlocks} />
-            )}
           </div>
         )}
 
         {activeTab === 'calendar' && (
           <CalendarSettings />
-        )}
-
-        {activeTab === 'layers' && (
-          <div className="space-y-6">
-            <section>
-              <h2 className="text-lg font-semibold text-neutral-700 mb-2">Intelligence Layers</h2>
-              <p className="text-sm text-neutral-500 mb-6">
-                Layers add coached intelligence to your timeline — personalized guidance that blends into your day.
-              </p>
-
-              <div className="space-y-3">
-                {layersWithAssessments.length > 0 ? (
-                  layersWithAssessments.map(({ layer, assessment }) => {
-                    const config = LAYER_CONFIG[layer.slug] || { label: layer.name, color: 'text-neutral-700', bgColor: 'bg-neutral-100', borderColor: 'border-neutral-200' }
-                    const isActive = assessment?.status === 'active'
-                    return (
-                      <div
-                        key={layer.id}
-                        className="w-full text-left p-5 bg-white rounded-xl border border-neutral-150 transition-all"
-                      >
-                        <div className="flex items-start gap-4">
-                          <div className={`w-10 h-10 rounded-lg ${config.bgColor} flex items-center justify-center shrink-0`}>
-                            <svg xmlns="http://www.w3.org/2000/svg" className={`w-5 h-5 ${config.color}`} viewBox="0 0 20 20" fill="currentColor">
-                              <path d="M10.75 16.82A7.462 7.462 0 0115 15.5c.71 0 1.396.098 2.046.282A.75.75 0 0018 15.06v-11a.75.75 0 00-.546-.721A9.006 9.006 0 0015 3a8.963 8.963 0 00-4.25 1.065V16.82zM9.25 4.065A8.963 8.963 0 005 3c-.85 0-1.673.118-2.454.339A.75.75 0 002 4.06v11a.75.75 0 00.954.721A7.506 7.506 0 015 15.5c1.579 0 3.042.487 4.25 1.32V4.065z" />
-                            </svg>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h3 className="font-semibold text-neutral-800">{layer.name}</h3>
-                              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                                isActive ? 'text-green-700 bg-green-100' : 'text-neutral-500 bg-neutral-100'
-                              }`}>
-                                {isActive ? 'Active' : assessment ? 'Inactive' : 'Setup'}
-                              </span>
-                            </div>
-                            <p className="text-sm text-neutral-500 leading-relaxed">
-                              {layer.description || `${layer.name} intelligence layer`}
-                            </p>
-                          </div>
-                          {/* Activate/Deactivate toggle */}
-                          <button
-                            onClick={() => {
-                              if (isActive) {
-                                deactivateLayer(layer.id)
-                              } else {
-                                activateLayer(layer.id)
-                              }
-                            }}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full shrink-0 mt-1 transition-colors duration-200 ${
-                              isActive ? 'bg-primary-500' : 'bg-neutral-200'
-                            }`}
-                            title={isActive ? 'Deactivate layer' : 'Activate layer'}
-                          >
-                            <span
-                              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
-                                isActive ? 'translate-x-6' : 'translate-x-1'
-                              }`}
-                            />
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  })
-                ) : (
-                  <div className="text-center py-8">
-                    <p className="text-sm text-neutral-400">No intelligence layers configured yet.</p>
-                  </div>
-                )}
-              </div>
-            </section>
-          </div>
         )}
 
         {activeTab === 'admin' && (

@@ -6,8 +6,6 @@ import type { FamilyMember } from '@/types/family'
 import type { List, ListCategory } from '@/types/list'
 import type { Routine } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
-import type { PlaybookInstance, QuickReact, FamilyRule, DayType } from '@/types/playbook'
-import type { EveningReflectionData } from '@/types/coaching'
 import type { MeetingAttendee } from '@/hooks/useMeetingNotes'
 
 export interface ScheduleActionsValue {
@@ -43,17 +41,6 @@ export interface ScheduleActionsValue {
   onUpdateEventContext?: (eventId: string, context: TaskContext | null) => void
   onHideEvent?: (googleEventId: string, title?: string, calendarId?: string) => Promise<boolean>
 
-  // Playbook actions
-  playbookInstances?: PlaybookInstance[]
-  onPlaybookToggleItem?: (instanceId: string, itemId: string) => void
-  onPlaybookMarkDone?: (instanceId: string, completed?: boolean) => void
-  onPlaybookReact?: (instanceId: string, react: QuickReact | null) => void
-  onPlaybookTag?: (instanceId: string, tags: string[]) => void
-  onPlaybookNote?: (instanceId: string, notes: string | null) => void
-  onPlaybookEdit?: (block: PlaybookInstance['block']) => void
-  onPlaybookDelete?: (blockId: string) => void
-  onPlaybookSuppress?: (blockId: string, date: string) => void
-
   // Reference data
   contactsMap?: Map<string, Contact>
   projectsMap?: Map<string, Project>
@@ -63,7 +50,6 @@ export interface ScheduleActionsValue {
   lists: List[]
   listsByCategory?: Record<ListCategory, List[]>
   eventNotesMap?: Map<string, EventNote>
-  activeRules?: FamilyRule[]
   eventContextOverrides?: Map<string, TaskContext>
 
   // List actions
@@ -78,16 +64,7 @@ export interface ScheduleActionsValue {
   // Calendar domain mapping
   getDomainForCalendar?: (calendarId?: string | null, calendarName?: string | null) => TaskContext | null
 
-  // Day type
-  dayType?: DayType
-  onDayTypeChange?: (dayType: DayType) => void
-
-  // Evening reflections
-  onSaveReflection?: (reflection: { highlight: string; notes: string }) => void
-  todayReflection?: EveningReflectionData | null
-
   // Navigation
-  onOpenWeeklyReview?: () => void
   onRefreshInstances?: () => void
   onOpenChat?: () => void
 

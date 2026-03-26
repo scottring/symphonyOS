@@ -49,14 +49,6 @@ import {
   GoalsList,
   GoalView,
   GoalPlanningChat,
-  PlanningWorkspace,
-  CoachingHub,
-  QuickAssessment,
-  DomainDetail,
-  DeepAssessmentChat,
-  RulesView,
-  BlockEditor,
-  WeeklyPlannerGrid,
   FocusMode,
   PlanningSession,
   DetailPanelRedesign as DetailPanel,
@@ -68,21 +60,9 @@ import {
 import { useGoals } from '@/hooks/useGoals'
 import { useGoalMilestones } from '@/hooks/useGoalMilestones'
 import { useGoalPlanning } from '@/hooks/useGoalPlanning'
-import { usePlaybook } from '@/hooks/usePlaybook'
-import { useIntelligenceLayers } from '@/hooks/useIntelligenceLayers'
-import { useFamilyRules } from '@/hooks/useFamilyRules'
-import { useResponsibilities } from '@/hooks/useResponsibilities'
-import { usePlanningResources } from '@/hooks/usePlanningResources'
-import { useResearchWorkspaces } from '@/hooks/useResearchWorkspaces'
-import { useWeeklyFeedback } from '@/hooks/useWeeklyFeedback'
-import { useAIPlaybookSuggestions } from '@/hooks/useAIPlaybookSuggestions'
 import { useScheduleActions } from '@/hooks/useScheduleActions'
-import { useDomainAssessments } from '@/hooks/useDomainAssessments'
 import { useDomain } from '@/hooks/useDomain'
 import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings'
-import { getLayerConfig } from '@/config/layers'
-import { useDeepAssessment } from '@/hooks/useDeepAssessment'
-import { useEveningReflections } from '@/hooks/useEveningReflections'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import type { ViewType } from '@/components/layout/Sidebar'
 import type { ActionableInstance, Routine } from '@/types/actionable'
@@ -155,13 +135,7 @@ function App() {
   const isOnline = useOnlineStatus()
   const focusMode = useFocusMode()
 
-  // Intelligence Layers + Playbook
-  const { layersWithAssessments: layersList } = useIntelligenceLayers()
-  const playbook = usePlaybook()
   const { getDomainForCalendar } = useCalendarDomainMappings()
-
-  // Evening Reflections
-  const eveningReflections = useEveningReflections()
 
   // Event context overrides: extract from event notes map
   const eventContextOverrides = useMemo(() => {
@@ -174,61 +148,6 @@ function App() {
     return overrides
   }, [eventNotesMap])
 
-  // Weekly Review — track which week is being reviewed
-  const [reviewWeekOf, setReviewWeekOf] = useState(() => {
-    const now = new Date()
-    const day = now.getDay()
-    const diff = now.getDate() - day + (day === 0 ? -6 : 1) // Monday
-    const monday = new Date(now)
-    monday.setDate(diff)
-    return monday.toISOString().split('T')[0]
-  })
-  const weeklyFeedback = useWeeklyFeedback(reviewWeekOf)
-  const aiSuggestions = useAIPlaybookSuggestions()
-
-  // Family Rules
-  const familyRules = useFamilyRules()
-  const responsibilities = useResponsibilities()
-
-  // Deep Assessment (AI chat per domain)
-  const deepAssessment = useDeepAssessment()
-
-  // Planning Resources + Research Workspaces
-  const planningResources = usePlanningResources()
-  const researchWorkspaces = useResearchWorkspaces()
-
-  // Coaching state
-  const [activeLayerSlug, setActiveLayerSlug] = useState<string | null>(null)
-  const [coachingNavStack, setCoachingNavStack] = useState<('hub' | 'rules' | 'assessment' | 'domain' | 'deep-assessment' | 'research' | 'review' | 'playbook')[]>(['hub'])
-  const coachingSubView = coachingNavStack[coachingNavStack.length - 1]
-  const [activeDomainSlug, setActiveDomainSlug] = useState<string | null>(null)
-
-  // Block editing from timeline
-  const [timelineEditingBlock, setTimelineEditingBlock] = useState<import('@/types/playbook').PlaybookBlock | null>(null)
-
-  // Get the DB ID for the active layer (needed for assessment/deep-assessment sub-views)
-  const activeLayerDbId = useMemo(() => {
-    if (!activeLayerSlug) return null
-    const match = layersList.find(l => l.layer.slug === activeLayerSlug)
-    return match?.layer.id ?? null
-  }, [activeLayerSlug, layersList])
-
-  const activeLayerConfig = useMemo(() => {
-    if (!activeLayerSlug) return null
-    return getLayerConfig(activeLayerSlug)
-  }, [activeLayerSlug])
-
-  // Coaching navigation helpers (stack-based for proper back behavior)
-  const pushCoachingView = useCallback((view: typeof coachingSubView) => {
-    setCoachingNavStack(prev => [...prev, view])
-  }, [])
-
-  const popCoachingView = useCallback(() => {
-    setCoachingNavStack(prev => prev.length > 1 ? prev.slice(0, -1) : prev)
-  }, [])
-
-  // Fetch ALL assessments across all layers for the coaching hub
-  const domainAssessments = useDomainAssessments()
   const { currentDomain } = useDomain()
 
   // Lists state
@@ -333,7 +252,7 @@ function App() {
   const params = useParams<{ projectId?: string; routineId?: string; contactId?: string; goalId?: string }>()
 
   // State for non-URL-routed views
-  const [stateView, setStateView] = useState<'today' | 'lists' | 'notes' | 'history' | 'rules' | 'coaching' | 'settings' | 'task-detail' | null>(null)
+  const [stateView, setStateView] = useState<'today' | 'lists' | 'notes' | 'history' | 'settings' | 'task-detail' | null>(null)
 
   // Derive view from URL path or state
   const activeView: ViewType = useMemo(() => {
@@ -506,51 +425,6 @@ function App() {
     refreshDateInstances,
     pushAction: undo.pushAction,
   })
-
-  // Open weekly review from Sunday nudge banner
-  const handleOpenWeeklyReview = useCallback(() => {
-    setStateView('coaching')
-    setCoachingNavStack(['hub', 'review'])
-    navigate('/')
-  }, [navigate])
-
-  // Day type override state (localStorage-persisted, keyed by date)
-  const [dayTypeOverrides, setDayTypeOverrides] = useState<Record<string, import('@/types/playbook').DayType>>(() => {
-    try {
-      const stored = localStorage.getItem('symphony-daytype-overrides')
-      return stored ? JSON.parse(stored) : {}
-    } catch {
-      return {}
-    }
-  })
-
-  // Compute effective day type for the viewed date
-  const effectiveDayType = useMemo((): import('@/types/playbook').DayType => {
-    const dateStr = viewedDate.toISOString().split('T')[0]
-    if (dayTypeOverrides[dateStr]) return dayTypeOverrides[dateStr]
-    const dayOfWeek = viewedDate.getDay()
-    return (dayOfWeek === 0 || dayOfWeek === 6) ? 'weekend' : 'school-day'
-  }, [viewedDate, dayTypeOverrides])
-
-  const handleDayTypeChange = useCallback((newDayType: import('@/types/playbook').DayType) => {
-    const dateStr = viewedDate.toISOString().split('T')[0]
-    setDayTypeOverrides((prev) => {
-      const updated = { ...prev, [dateStr]: newDayType }
-      localStorage.setItem('symphony-daytype-overrides', JSON.stringify(updated))
-      return updated
-    })
-    // Re-instantiate playbook with new day type
-    playbook.instantiateDay(dateStr, newDayType)
-  }, [viewedDate, playbook])
-
-  // Fetch playbook instances when viewed date changes + instantiate day
-  useEffect(() => {
-    if (playbook.loading) return
-    const dateStr = viewedDate.toISOString().split('T')[0]
-    playbook.fetchInstancesForDate(dateStr).then(() => {
-      playbook.instantiateDay(dateStr, effectiveDayType)
-    })
-  }, [viewedDate, playbook.loading, playbook.blocks.length, effectiveDayType])
 
   // Filter events to exclude skipped/completed items
   const filteredEvents = useMemo(() => {
@@ -890,8 +764,7 @@ function App() {
       navigate('/contacts')
     }
     // Handle state-based views
-    else if (view === 'lists' || view === 'notes' || view === 'history' || view === 'rules' || view === 'coaching' || view === 'settings' || view === 'task-detail') {
-      if (view === 'coaching') setCoachingNavStack(['hub'])
+    else if (view === 'lists' || view === 'notes' || view === 'history' || view === 'settings' || view === 'task-detail') {
       setStateView(view)
       navigate('/') // Navigate to home URL but show state view
     } else {
@@ -1346,17 +1219,6 @@ function App() {
     onUpdateEventContext: updateEventContext,
     onHideEvent: hideEvent,
 
-    // Playbook
-    playbookInstances: playbook.instances,
-    onPlaybookToggleItem: playbook.toggleItem,
-    onPlaybookMarkDone: playbook.markBlockDone,
-    onPlaybookReact: playbook.reactToBlock,
-    onPlaybookTag: playbook.tagBlock,
-    onPlaybookNote: playbook.noteBlock,
-    onPlaybookEdit: (block: import('@/types/playbook').PlaybookBlock | undefined) => block && setTimelineEditingBlock(block),
-    onPlaybookDelete: playbook.deleteBlock,
-    onPlaybookSuppress: playbook.suppressBlock,
-
     // Reference data
     contactsMap,
     projectsMap,
@@ -1366,7 +1228,6 @@ function App() {
     lists,
     listsByCategory,
     eventNotesMap,
-    activeRules: familyRules.rules.filter(r => r.status === 'active'),
     eventContextOverrides,
 
     // List/contact actions
@@ -1381,16 +1242,7 @@ function App() {
     // Calendar domain mapping
     getDomainForCalendar,
 
-    // Day type
-    dayType: effectiveDayType,
-    onDayTypeChange: handleDayTypeChange,
-
-    // Evening reflections
-    onSaveReflection: eveningReflections.saveReflection,
-    todayReflection: eveningReflections.todayReflection,
-
     // Navigation
-    onOpenWeeklyReview: handleOpenWeeklyReview,
     onRefreshInstances: refreshDateInstances,
     onOpenChat: () => setChatOpen(true),
     onStartMeeting: meetingNotes.startMeeting,
@@ -1398,14 +1250,11 @@ function App() {
   }), [
     handleToggleTask, toggleWaiting, handleUpdateTaskWithToast, pushTask, deleteTask, addTask, getCurrentUserMember, currentDomain, handleCreateFollowUp,
     scheduleActions, updateRoutine, updateEventContext, hideEvent,
-    playbook.instances, playbook.toggleItem, playbook.markBlockDone, playbook.reactToBlock,
-    playbook.tagBlock, playbook.noteBlock, playbook.deleteBlock, playbook.suppressBlock,
     contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
-    eventNotesMap, familyRules.rules, eventContextOverrides,
+    eventNotesMap, eventContextOverrides,
     handleSendToList, handleCreateListInTriage, addProject, searchContacts, addContact,
-    handleOpenProject, getDomainForCalendar, effectiveDayType, handleDayTypeChange,
-    eveningReflections.saveReflection, eveningReflections.todayReflection,
-    handleOpenWeeklyReview, refreshDateInstances, meetingNotes.startMeeting, updateEventProject,
+    handleOpenProject, getDomainForCalendar,
+    refreshDateInstances, meetingNotes.startMeeting, updateEventProject,
   ])
 
   if (authLoading || onboardingLoading) {
@@ -1636,33 +1485,6 @@ function App() {
               onUpdateEventAssignment={updateEventAssignmentAll}
               eventProjectId={selectedEventProjectId}
               onUpdateEventProject={updateEventProject}
-              activeRules={familyRules.rules.filter(r => r.status === 'active')}
-              blocks={playbook.blocks}
-              onAddBlock={async (input) => {
-                const block = await playbook.addBlock(input)
-                if (block) {
-                  const dateStr = new Date().toISOString().split('T')[0]
-                  await playbook.instantiateDay(dateStr, effectiveDayType)
-                  // Ensure coaching is visible on the timeline
-                  localStorage.setItem('symphony-hide-coaching', 'false')
-                  window.dispatchEvent(new CustomEvent('symphony-show-coaching'))
-                  showToast('Coaching block added to timeline')
-                } else {
-                  showToast('Failed to create coaching block — check console', 'warning')
-                }
-                return block
-              }}
-              onUpdateBlock={async (id, updates) => {
-                await playbook.updateBlock(id, updates)
-                const dateStr = new Date().toISOString().split('T')[0]
-                // Refresh instances + create any missing ones
-                await playbook.fetchInstancesForDate(dateStr)
-                await playbook.instantiateDay(dateStr, effectiveDayType)
-                // Ensure coaching is visible on the timeline
-                localStorage.setItem('symphony-hide-coaching', 'false')
-                window.dispatchEvent(new CustomEvent('symphony-show-coaching'))
-              }}
-              onOpenBlockEditor={(prefill) => setTimelineEditingBlock(prefill as import('@/types/playbook').PlaybookBlock)}
             />
           </Suspense>
         )
@@ -1712,26 +1534,6 @@ function App() {
                 </>
               )}
             </div>
-          )}
-
-          {/* Block Editor modal (from timeline overflow menu) */}
-          {timelineEditingBlock && (
-            <Suspense fallback={<LoadingFallback />}>
-              <BlockEditor
-                block={timelineEditingBlock}
-                onSave={async (input) => {
-                  if ('id' in input) {
-                    await playbook.updateBlock(input.id, input.updates)
-                  }
-                  setTimelineEditingBlock(null)
-                }}
-                onDelete={async (id) => {
-                  await playbook.deleteBlock(id)
-                  setTimelineEditingBlock(null)
-                }}
-                onClose={() => setTimelineEditingBlock(null)}
-              />
-            </Suspense>
           )}
 
           {/* Planning Session - fullscreen overlay */}
@@ -1928,23 +1730,6 @@ function App() {
                   setPlanningGoalId(null)
                   goalPlanning.reset()
                 }}
-                onAcceptBlock={async (block) => {
-                  await playbook.addBlock({
-                    label: block.label,
-                    blockType: block.blockType as 'solo' | 'routine' | 'connection' | 'together',
-                    timeSlot: block.timeSlot,
-                    narrative: block.narrative,
-                    coachingNote: block.coachingNote ?? null,
-                    items: (block.items ?? []).map(item => ({
-                      who: item.who,
-                      action: item.action,
-                      context: item.context,
-                      coaching: item.coaching,
-                    })),
-                    dayTypes: block.dayTypes as ('school-day' | 'weekend' | 'holiday' | 'half-day')[],
-                    goalId: planningGoalId,
-                  })
-                }}
                 onDone={() => {
                   setPlanningGoalId(null)
                   goalPlanning.reset()
@@ -2088,245 +1873,6 @@ function App() {
             </Suspense>
           )}
 
-          {activeView === 'rules' && (
-            <Suspense fallback={<LoadingFallback />}>
-              <RulesView
-                rules={familyRules.rules}
-                responsibilities={responsibilities.responsibilities}
-                onAddRule={familyRules.addRule}
-                onUpdateRule={familyRules.updateRule}
-                onDeleteRule={familyRules.deleteRule}
-                onAddResponsibility={responsibilities.addResponsibility}
-                getResponsibilitiesForRule={responsibilities.getForRule}
-                loading={familyRules.loading}
-                onBack={() => handleViewChange('settings')}
-              />
-            </Suspense>
-          )}
-
-          {activeView === 'coaching' && (
-            <SectionErrorBoundary sectionName="Coaching" onReset={() => setCoachingNavStack(['hub'])}>
-              <Suspense fallback={<LoadingFallback />}>
-                {coachingSubView === 'hub' && (
-                  <CoachingHub
-                    assessments={domainAssessments.assessments}
-                    assessmentsLoading={domainAssessments.loading}
-                    rules={familyRules.rules.filter(r => r.status === 'active')}
-                    workspaces={researchWorkspaces.workspaces}
-                    blocks={playbook.blocks}
-                    onOpenRules={() => pushCoachingView('rules')}
-                    onOpenResearch={() => pushCoachingView('research')}
-                    onOpenWeeklyReview={() => pushCoachingView('review')}
-                    onOpenPlaybook={() => pushCoachingView('playbook')}
-                    onOpenAssessment={(layerSlug) => {
-                      setActiveLayerSlug(layerSlug)
-                      pushCoachingView('assessment')
-                    }}
-                    onOpenDomain={(layerSlug, domainSlug) => {
-                      setActiveLayerSlug(layerSlug)
-                      setActiveDomainSlug(domainSlug)
-                      pushCoachingView('domain')
-                    }}
-                  />
-                )}
-
-                {coachingSubView === 'assessment' && activeLayerConfig && (
-                  <QuickAssessment
-                    config={activeLayerConfig}
-                    existingAssessments={domainAssessments.assessments}
-                    onSave={(ratings) => domainAssessments.saveQuickAssessment(ratings, activeLayerDbId || undefined)}
-                    onBack={popCoachingView}
-                  />
-                )}
-
-                {coachingSubView === 'domain' && activeDomainSlug && activeLayerConfig && (() => {
-                  const domainConfig = activeLayerConfig.domains.find(d => d.slug === activeDomainSlug)
-                  const assessment = domainAssessments.getAssessment(activeDomainSlug)
-                  if (!domainConfig || !assessment) {
-                    return (
-                      <QuickAssessment
-                        config={activeLayerConfig}
-                        existingAssessments={domainAssessments.assessments}
-                        onSave={(ratings) => domainAssessments.saveQuickAssessment(ratings, activeLayerDbId || undefined)}
-                        onBack={popCoachingView}
-                      />
-                    )
-                  }
-                  return (
-                    <DomainDetail
-                      domain={domainConfig}
-                      assessment={assessment}
-                      accentColor={activeLayerConfig.accentColor}
-                      onBack={popCoachingView}
-                      onReassess={() => pushCoachingView('assessment')}
-                      onGoDeeper={() => {
-                        pushCoachingView('deep-assessment')
-                      }}
-                    />
-                  )
-                })()}
-
-                {coachingSubView === 'deep-assessment' && activeDomainSlug && activeLayerConfig && (() => {
-                  const domainConfig = activeLayerConfig.domains.find(d => d.slug === activeDomainSlug)
-                  const quickAssessment = domainAssessments.getAssessment(activeDomainSlug)
-                  if (!domainConfig) return null
-                  return (
-                    <DeepAssessmentChat
-                      config={activeLayerConfig}
-                      domain={domainConfig}
-                      quickAssessment={quickAssessment ?? undefined}
-                      messages={deepAssessment.messages}
-                      loading={deepAssessment.loading}
-                      readyToFinish={deepAssessment.readyToFinish}
-                      result={deepAssessment.result}
-                      error={deepAssessment.error}
-                      onStart={() => {
-                        deepAssessment.start({
-                          layerId: activeLayerDbId || '',
-                          layerName: activeLayerConfig.name,
-                          domainSlug: activeDomainSlug,
-                          domainName: domainConfig.name,
-                          domainSubtitle: domainConfig.subtitle,
-                          quickAssessment: quickAssessment ?? undefined,
-                        })
-                      }}
-                      onSend={deepAssessment.respond}
-                      onFinish={deepAssessment.finish}
-                      onBack={() => {
-                        deepAssessment.reset()
-                        popCoachingView()
-                      }}
-                      onDone={() => {
-                        domainAssessments.refetch()
-                        deepAssessment.reset()
-                        popCoachingView()
-                      }}
-                    />
-                  )
-                })()}
-
-                {coachingSubView === 'rules' && (
-                  <RulesView
-                    rules={familyRules.rules}
-                    responsibilities={responsibilities.responsibilities}
-                    onAddRule={familyRules.addRule}
-                    onUpdateRule={familyRules.updateRule}
-                    onDeleteRule={familyRules.deleteRule}
-                    onAddResponsibility={responsibilities.addResponsibility}
-                    getResponsibilitiesForRule={responsibilities.getForRule}
-                    loading={familyRules.loading}
-                    onBack={popCoachingView}
-                    title="Rules"
-                    description="Coaching guidance across all domains"
-                    crossLayerMode
-                  />
-                )}
-
-                {coachingSubView === 'research' && (
-                  <Suspense fallback={<LoadingFallback />}>
-                    <PlanningWorkspace
-                      resources={planningResources.resources}
-                      loading={planningResources.loading}
-                      onAddResource={planningResources.addResource}
-                      onUpdateResource={planningResources.updateResource}
-                      onDeleteResource={planningResources.deleteResource}
-                      onUploadFile={planningResources.uploadFile}
-                      onGetSignedUrl={planningResources.getSignedUrl}
-                      workspaces={researchWorkspaces.workspaces}
-                      workspacesLoading={researchWorkspaces.loading}
-                      onCreateWorkspace={researchWorkspaces.addWorkspace}
-                      onUpdateWorkspace={researchWorkspaces.updateWorkspace}
-                      onDeleteWorkspace={researchWorkspaces.deleteWorkspace}
-                      onMarkWorkspaceSynthesized={researchWorkspaces.markSynthesized}
-                      rules={familyRules.rules}
-                      onAddRule={familyRules.addRule}
-                      onUpdateRule={familyRules.updateRule}
-                      onDeleteRule={familyRules.deleteRule}
-                      onViewPublishedRules={() => pushCoachingView('rules')}
-                      weeklyReview={{
-                        blockSummaries: weeklyFeedback.blockSummaries,
-                        overallStats: weeklyFeedback.overallStats,
-                        flaggedBlocks: weeklyFeedback.flaggedBlocks,
-                        feedbackLoading: weeklyFeedback.loading,
-                        weekOf: reviewWeekOf,
-                        onWeekChange: setReviewWeekOf,
-                        blocks: playbook.blocks,
-                        onAddBlock: playbook.addBlock,
-                        onUpdateBlock: playbook.updateBlock,
-                        onDeleteBlock: playbook.deleteBlock,
-                        onReorderBlocks: playbook.reorderBlocks,
-                        aiResult: aiSuggestions.result,
-                        aiLoading: aiSuggestions.loading,
-                        aiError: aiSuggestions.error,
-                        onGenerateAI: aiSuggestions.generateSuggestions,
-                        onAcceptSuggestion: aiSuggestions.acceptSuggestion,
-                        onRejectSuggestion: aiSuggestions.rejectSuggestion,
-                      }}
-                      onBack={popCoachingView}
-                      initialTab="research"
-                    />
-                  </Suspense>
-                )}
-
-                {coachingSubView === 'review' && (
-                  <Suspense fallback={<LoadingFallback />}>
-                    <PlanningWorkspace
-                      resources={planningResources.resources}
-                      loading={planningResources.loading}
-                      onAddResource={planningResources.addResource}
-                      onUpdateResource={planningResources.updateResource}
-                      onDeleteResource={planningResources.deleteResource}
-                      onUploadFile={planningResources.uploadFile}
-                      onGetSignedUrl={planningResources.getSignedUrl}
-                      workspaces={researchWorkspaces.workspaces}
-                      workspacesLoading={researchWorkspaces.loading}
-                      onCreateWorkspace={researchWorkspaces.addWorkspace}
-                      onUpdateWorkspace={researchWorkspaces.updateWorkspace}
-                      onDeleteWorkspace={researchWorkspaces.deleteWorkspace}
-                      onMarkWorkspaceSynthesized={researchWorkspaces.markSynthesized}
-                      rules={familyRules.rules}
-                      onAddRule={familyRules.addRule}
-                      onUpdateRule={familyRules.updateRule}
-                      onDeleteRule={familyRules.deleteRule}
-                      onViewPublishedRules={() => pushCoachingView('rules')}
-                      weeklyReview={{
-                        blockSummaries: weeklyFeedback.blockSummaries,
-                        overallStats: weeklyFeedback.overallStats,
-                        flaggedBlocks: weeklyFeedback.flaggedBlocks,
-                        feedbackLoading: weeklyFeedback.loading,
-                        weekOf: reviewWeekOf,
-                        onWeekChange: setReviewWeekOf,
-                        blocks: playbook.blocks,
-                        onAddBlock: playbook.addBlock,
-                        onUpdateBlock: playbook.updateBlock,
-                        onDeleteBlock: playbook.deleteBlock,
-                        onReorderBlocks: playbook.reorderBlocks,
-                        aiResult: aiSuggestions.result,
-                        aiLoading: aiSuggestions.loading,
-                        aiError: aiSuggestions.error,
-                        onGenerateAI: aiSuggestions.generateSuggestions,
-                        onAcceptSuggestion: aiSuggestions.acceptSuggestion,
-                        onRejectSuggestion: aiSuggestions.rejectSuggestion,
-                      }}
-                      onBack={popCoachingView}
-                      initialTab="weekly-review"
-                    />
-                  </Suspense>
-                )}
-
-                {coachingSubView === 'playbook' && (
-                  <WeeklyPlannerGrid
-                    blocks={playbook.blocks}
-                    onAddBlock={playbook.addBlock}
-                    onUpdateBlock={playbook.updateBlock}
-                    onDeleteBlock={playbook.deleteBlock}
-                    onBack={popCoachingView}
-                  />
-                )}
-              </Suspense>
-            </SectionErrorBoundary>
-          )}
-
           {activeView === 'settings' && (
             <Suspense fallback={<LoadingFallback />}>
               <SettingsPage
@@ -2335,11 +1881,6 @@ function App() {
                   handleViewChange('today')
                 }}
                 onFamilyMembersChanged={refetchFamilyMembers}
-                onImportBlocks={async (blocks) => {
-                  for (const block of blocks) {
-                    await playbook.addBlock(block)
-                  }
-                }}
               />
             </Suspense>
           )}

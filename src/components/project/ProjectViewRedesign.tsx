@@ -8,8 +8,6 @@ import { formatTimeWithDate } from '@/lib/timeUtils'
 import { TaskQuickActions, type ScheduleContextItem } from '@/components/triage'
 import { calculateProjectStatus } from '@/hooks/useProjects'
 import { UnifiedNotesEditor } from '@/components/notes/UnifiedNotesEditor'
-import { analyzeLanguage, getCoachingMessage, getExamples } from '@/lib/outcomeLanguage'
-import { CoachingTip } from '@/components/coaching/CoachingTip'
 
 interface ProjectViewProps {
   project: Project
@@ -60,25 +58,6 @@ export function ProjectViewRedesign({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [showStatusDropdown, setShowStatusDropdown] = useState(false)
-  const [coachingMessage, setCoachingMessage] = useState<string | null>(null)
-  const [coachingExamples, setCoachingExamples] = useState<string[]>([])
-
-  // Analyze project name for vague language patterns
-  useEffect(() => {
-    if (!isEditing || !editName.trim()) {
-      setCoachingMessage(null)
-      setCoachingExamples([])
-      return
-    }
-
-    const analysis = analyzeLanguage(editName)
-    const message = getCoachingMessage(analysis)
-    const examples = getExamples(analysis)
-
-    setCoachingMessage(message)
-    setCoachingExamples(examples)
-  }, [editName, isEditing])
-
   const projectTasks = useMemo(() => {
     return tasks.filter((t) => t.projectId === project.id)
   }, [tasks, project.id])
@@ -301,19 +280,6 @@ export function ProjectViewRedesign({
                                    focus:outline-none focus:ring-2 focus:ring-primary-500"
                         autoFocus
                       />
-                      {/* Coaching Tip - appears when vague language detected */}
-                      {coachingMessage && (
-                        <div className="mt-3">
-                          <CoachingTip
-                            message={coachingMessage}
-                            examples={coachingExamples}
-                            onDismiss={() => {
-                              setCoachingMessage(null)
-                              setCoachingExamples([])
-                            }}
-                          />
-                        </div>
-                      )}
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-neutral-600 mb-1.5">Status</label>

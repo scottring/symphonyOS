@@ -95,8 +95,6 @@ function getBuildingColors(item: TimelineItem): { wall: string; roof: string; ac
       return { wall: '#F26E63', roof: '#C0504D', accent: '#FFD4D0' }
     case 'event':
       return { wall: '#6DC4A7', roof: '#4A9B82', accent: '#D0F0E4' }
-    case 'playbook':
-      return { wall: '#A78BFA', roof: '#7C5FD3', accent: '#E4D8FF' }
     case 'task':
     default:
       return { wall: '#F9C35C', roof: '#D4A033', accent: '#FFF3D0' }
@@ -189,7 +187,6 @@ function BuildingSVG({ item }: { item: TimelineItem }) {
   switch (item.type) {
     case 'routine': return <HouseBuilding colors={colors} />
     case 'event': return <PublicBuilding colors={colors} />
-    case 'playbook': return <CastleBuilding colors={colors} />
     case 'task':
     default: return <ShopBuilding colors={colors} />
   }

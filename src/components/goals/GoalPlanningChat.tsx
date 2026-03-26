@@ -12,7 +12,7 @@ interface GoalPlanningChatProps {
   onSend: (message: string) => void
   onFinish: () => void
   onBack: () => void
-  onAcceptBlock: (block: GoalPlanningResult['suggestedBlocks'][0]) => void
+  onAcceptBlock?: (block: GoalPlanningResult['suggestedBlocks'][0]) => void
   onDone: () => void
 }
 
@@ -62,7 +62,7 @@ export function GoalPlanningChat({
 
   const handleAcceptBlock = (block: GoalPlanningResult['suggestedBlocks'][0], index: number) => {
     setAcceptedBlocks(prev => new Set(prev).add(index))
-    onAcceptBlock(block)
+    onAcceptBlock?.(block)
   }
 
   // Results view

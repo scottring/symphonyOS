@@ -1,5 +1,4 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
-import { logger } from '@/lib/logger'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
@@ -8,9 +7,7 @@ import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { ScheduleContextItem } from '@/components/triage'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import type { TimelineItem } from '@/types/timeline'
-import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem, playbookInstanceToTimelineItem } from '@/types/timeline'
-import { PlaybookBlockCard } from '@/components/playbook/PlaybookBlockCard'
-import { EveningReflection } from '@/components/playbook/EveningReflection'
+import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import { ScanMyDay } from './ScanMyDay'
 import { groupByDaySection, type DaySection } from '@/lib/timeUtils'
 import { useMobile } from '@/hooks/useMobile'
@@ -24,8 +21,6 @@ import { StagingFloat } from './StagingFloat'
 import { TodayAddInput } from './TodayAddInput'
 import { OverdueSection } from './OverdueSection'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
-import { hasCoachingForItem } from '@/lib/coachingMatcher'
-import { SundayNudgeBanner } from './SundayNudgeBanner'
 import { useSystemHealth } from '@/hooks/useSystemHealth'
 import { useRecurringEventDetection } from '@/hooks/useRecurringEventDetection'
 import { MultiAssigneeDropdown } from '@/components/family/MultiAssigneeDropdown'
@@ -456,13 +451,8 @@ export function TodaySchedule({
     contactsMap, projectsMap, familyMembers = [], eventNotesMap,
     lists = [], listsByCategory, onSendToList, onCreateList,
     onOpenProject,
-    playbookInstances, onPlaybookToggleItem, onPlaybookMarkDone,
-    onPlaybookReact, onPlaybookTag, onPlaybookNote,
-    onPlaybookEdit, onPlaybookDelete, onPlaybookSuppress,
-    getDomainForCalendar, activeRules = [], eventContextOverrides,
-    dayType, onDayTypeChange,
-    onSaveReflection, todayReflection,
-    onOpenWeeklyReview, onOpenChat,
+    getDomainForCalendar, eventContextOverrides,
+    onOpenChat,
   } = useScheduleActionsContext()
 
   const isMobile = useMobile()
@@ -512,41 +502,6 @@ export function TodaySchedule({
       localStorage.setItem('symphony-hide-routines', String(newValue))
       return newValue
     })
-  }, [])
-
-  // Current minute for coaching block auto-expand (updates every 60s)
-  const [currentMinute, setCurrentMinute] = useState(() => {
-    const now = new Date()
-    return now.getHours() * 60 + now.getMinutes()
-  })
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date()
-      setCurrentMinute(now.getHours() * 60 + now.getMinutes())
-    }, 60_000)
-    return () => clearInterval(interval)
-  }, [])
-
-  // Hide coaching toggle with localStorage persistence (hidden by default)
-  const [hideCoaching, setHideCoaching] = useState(() => {
-    const stored = localStorage.getItem('symphony-hide-coaching')
-    return stored === null ? true : stored === 'true'
-  })
-
-  const toggleHideCoaching = useCallback(() => {
-    setHideCoaching(prev => {
-      const newValue = !prev
-      localStorage.setItem('symphony-hide-coaching', String(newValue))
-      return newValue
-    })
-  }, [])
-
-  // Auto-show coaching when a block is created from the coaching section
-  useEffect(() => {
-    const handler = () => setHideCoaching(false)
-    window.addEventListener('symphony-show-coaching', handler)
-    return () => window.removeEventListener('symphony-show-coaching', handler)
   }, [])
 
   // Completed inbox items - collapsed by default
@@ -923,11 +878,7 @@ export function TodaySchedule({
         return item
       })
 
-    // Map playbook instances (if coaching is visible)
-    const playbookItems = hideCoaching ? [] : (playbookInstances ?? [])
-      .map(instance => playbookInstanceToTimelineItem(instance, viewedDate))
-
-    const allItems = [...taskItems, ...eventItems, ...routineItems, ...playbookItems]
+    const allItems = [...taskItems, ...eventItems, ...routineItems]
     const sections = groupByDaySection(allItems)
 
     // Post-process: move subtasks right after their parent task within each section
@@ -975,21 +926,7 @@ export function TodaySchedule({
     }
 
     return sections
-  }, [allFilteredTasks, filteredEvents, visibleRoutines, viewedDate, routineStatusMap, eventStatusMap, eventNotesMap, selectedAssignee, hideCoaching, playbookInstances, getDomainForCalendar, eventContextOverrides])
-
-  // Compute which items have coaching available (for sparkle indicator)
-  const coachingItemIds = useMemo(() => {
-    if (hideCoaching || activeRules.length === 0) return new Set<string>()
-    const ids = new Set<string>()
-    for (const section of Object.values(grouped)) {
-      for (const item of section) {
-        if (item.type !== 'playbook' && hasCoachingForItem(item, activeRules)) {
-          ids.add(item.id)
-        }
-      }
-    }
-    return ids
-  }, [grouped, activeRules, hideCoaching])
+  }, [allFilteredTasks, filteredEvents, visibleRoutines, viewedDate, routineStatusMap, eventStatusMap, eventNotesMap, selectedAssignee, getDomainForCalendar, eventContextOverrides])
 
   const sections: DaySection[] = ['allday', 'morning', 'afternoon', 'evening', 'unscheduled']
 
@@ -1127,25 +1064,6 @@ export function TodaySchedule({
                   )}
                 </button>
               )}
-              {/* Coaching toggle */}
-              {(playbookInstances ?? []).length > 0 && (
-                <button
-                  onClick={toggleHideCoaching}
-                  className={`relative flex items-center mr-2 transition-all ${
-                    hideCoaching ? 'text-neutral-300' : 'text-amber-500'
-                  }`}
-                  title={hideCoaching ? 'Show coaching' : 'Hide coaching'}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
-                  </svg>
-                  {hideCoaching && (
-                    <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <span className="w-3 h-0.5 bg-neutral-300 rotate-45" />
-                    </span>
-                  )}
-                </button>
-              )}
               {/* Progress */}
               {actionableCount > 0 && (
                 <span className="text-[11px] text-neutral-400 tabular-nums">{completedCount}/{actionableCount}</span>
@@ -1231,28 +1149,6 @@ export function TodaySchedule({
                 </button>
               )}
 
-              {/* Coaching toggle - only show if there are playbook instances */}
-              {(playbookInstances ?? []).length > 0 && (
-                <button
-                  onClick={toggleHideCoaching}
-                  className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm transition-all duration-200 ${
-                    hideCoaching
-                      ? 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100'
-                      : 'text-amber-500 hover:text-amber-600 hover:bg-amber-50'
-                  }`}
-                  title={hideCoaching ? 'Show coaching' : 'Hide coaching'}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className={`w-4 h-4 ${hideCoaching ? 'opacity-50' : ''}`} viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
-                  </svg>
-                  {hideCoaching && (
-                    <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <span className="w-5 h-0.5 bg-neutral-400 rotate-45" />
-                    </span>
-                  )}
-                </button>
-              )}
-
               {/* Clarity score - right side */}
               {isToday && !loading && tasks.length > 0 && (
                 <ClarityIndicator
@@ -1286,19 +1182,11 @@ export function TodaySchedule({
       </header>
 
       {/* Scan My Day - morning briefing card */}
-      {isToday && !loading && !hideCoaching && (
+      {isToday && !loading && (
         <ScanMyDay
           tasks={allFilteredTasks}
           events={filteredEvents}
-          playbookInstances={playbookInstances ?? []}
-          dayType={dayType}
-          onDayTypeChange={onDayTypeChange}
         />
-      )}
-
-      {/* Sunday nudge banner - shown on Sundays when coaching is visible */}
-      {isToday && !hideCoaching && viewedDate.getDay() === 0 && onOpenWeeklyReview && (
-        <SundayNudgeBanner onOpenWeeklyReview={onOpenWeeklyReview} />
       )}
 
       {/* This week float — mobile only (desktop is inline in stats row) */}
@@ -1389,26 +1277,6 @@ export function TodaySchedule({
                   const parentTaskId = item.parentTaskId
                   const parentTaskName = parentTaskId ? tasksMap.get(parentTaskId)?.title : undefined
                   const taskId = item.id.startsWith('task-') ? item.id.replace('task-', '') : null
-
-                  // Render PlaybookBlockCard for playbook items
-                  if (item.type === 'playbook' && item.originalPlaybookInstance) {
-                    return (
-                      <div key={item.id}>
-                      <PlaybookBlockCard
-                        instance={item.originalPlaybookInstance}
-                        currentMinute={isToday ? currentMinute : undefined}
-                        onToggleItem={onPlaybookToggleItem ?? (() => {})}
-                        onMarkDone={onPlaybookMarkDone ?? (() => {})}
-                        onReact={onPlaybookReact ?? (() => {})}
-                        onTag={onPlaybookTag ?? (() => {})}
-                        onNote={onPlaybookNote ?? (() => {})}
-                        onEdit={onPlaybookEdit}
-                        onDelete={onPlaybookDelete}
-                        onSuppress={onPlaybookSuppress}
-                      />
-                      </div>
-                    )
-                  }
 
                   // Only indent subtask if its parent is also visible in this section
                   const parentVisibleInSection = item.isSubtask && item.parentTaskId
@@ -1566,7 +1434,6 @@ export function TodaySchedule({
                       getScheduleItemsForDate={getScheduleItemsForDate}
                       panelOpen={panelOpen}
                       onClosePanel={onClosePanel}
-                      hasCoaching={coachingItemIds.has(item.id)}
                       isSuggestedPromotion={item.type === 'event' ? isPromotionSuggested(item.id.replace('event-', '')) : undefined}
                       variant={item.type === 'routine' ? 'minimal' : 'full'}
                       hideTime={shouldHideTime}
@@ -1585,21 +1452,6 @@ export function TodaySchedule({
               </TimeGroup>
             )
           })}
-
-          {/* Evening Reflection - shown on today's view, after 7pm, when coaching is visible and there are playbook instances */}
-          {isToday && !hideCoaching && (playbookInstances ?? []).length > 0 && new Date().getHours() >= 19 && (
-            <EveningReflection
-              onSave={(reflection) => {
-                if (onSaveReflection) {
-                  onSaveReflection(reflection)
-                } else {
-                  logger.debug('Evening reflection saved (no handler):', reflection)
-                }
-              }}
-              initialHighlight={todayReflection?.highlight ?? ''}
-              initialNotes={todayReflection?.notes ?? ''}
-            />
-          )}
 
         </div>
       )}

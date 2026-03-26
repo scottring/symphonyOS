@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import type { ConversationMessage } from '@/types/coaching'
+import type { ConversationMessage } from '@/types/goal'
 
 interface InlineChatThreadProps {
   messages: ConversationMessage[]

@@ -23,10 +23,6 @@ import type { FamilyMember } from '@/types/family'
 import { TaskQuickActions, ContextPicker, type ScheduleContextItem } from '@/components/triage'
 import { TiptapEditor } from '@/components/notes/TiptapEditor'
 import { NotesEditorModal } from '@/components/notes/NotesEditorModal'
-import type { FamilyRule, PlaybookBlock, CreateBlockInput, UpdateBlockInput } from '@/types/playbook'
-import { getCoachingForItem } from '@/lib/coachingMatcher'
-import { CoachingTipsSection } from './CoachingTipsSection'
-import { CoachingActionsSection } from './CoachingActionsSection'
 import { AgentInsightsSection } from './AgentInsightsSection'
 import { EventEmailsSection } from '@/components/schedule/EventEmailsSection'
 
@@ -174,14 +170,6 @@ interface DetailPanelRedesignProps {
   onUpdateEventProject?: (googleEventId: string, projectId: string | null, eventTitle?: string | null, eventStartTime?: Date | null) => void
   // Quick action support for linked tasks
   getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
-  // Coaching tips
-  activeRules?: FamilyRule[]
-  hideCoaching?: boolean
-  // Coaching injection
-  blocks?: PlaybookBlock[]
-  onAddBlock?: (input: CreateBlockInput) => Promise<PlaybookBlock | null>
-  onUpdateBlock?: (id: string, updates: UpdateBlockInput) => Promise<void>
-  onOpenBlockEditor?: (prefill: Partial<PlaybookBlock>) => void
 }
 
 function ActionIcon({ type }: { type: DetectedAction['icon'] }) {
@@ -638,19 +626,7 @@ export function DetailPanelRedesign({
   eventProjectId,
   onUpdateEventProject,
   getScheduleItemsForDate,
-  activeRules = [],
-  hideCoaching = false,
-  blocks,
-  onAddBlock,
-  onUpdateBlock,
-  onOpenBlockEditor,
 }: DetailPanelRedesignProps) {
-  // Coaching matches for the current item
-  const coachingMatches = useMemo(() => {
-    if (!item) return []
-    return getCoachingForItem(item, activeRules, hideCoaching)
-  }, [item, activeRules, hideCoaching])
-
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [editedTitle, setEditedTitle] = useState(item?.title || '')
@@ -2472,22 +2448,6 @@ export function DetailPanelRedesign({
             attendeeEmails={item.attendees
               .filter(a => !a.self && a.email)
               .map(a => a.email)}
-          />
-        )}
-
-        {/* Coaching Tips - contextual coaching rules for this item */}
-        <CoachingTipsSection matches={coachingMatches} />
-
-        {/* Coaching Actions - AI-powered coaching injection */}
-        {!hideCoaching && item && onAddBlock && onUpdateBlock && onOpenBlockEditor && (
-          <CoachingActionsSection
-            item={item}
-            matches={coachingMatches}
-            blocks={blocks ?? []}
-            onAddBlock={onAddBlock}
-            onUpdateBlock={onUpdateBlock}
-            onOpenBlockEditor={onOpenBlockEditor}
-            hideCoaching={hideCoaching}
           />
         )}
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { X, Calendar, Check } from 'lucide-react'
 
-export type ToastType = 'success' | 'info' | 'warning'
+export type ToastType = 'success' | 'info' | 'warning' | 'error'
 
 export interface ToastMessage {
   id: string

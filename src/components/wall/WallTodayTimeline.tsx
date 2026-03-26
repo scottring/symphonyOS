@@ -15,7 +15,7 @@ interface TimelineNode {
   sortKey: number
   title: string
   completed: boolean
-  type: 'event' | 'task' | 'routine' | 'playbook'
+  type: 'event' | 'task' | 'routine'
   colorClass: string
   isPast: boolean
 }
