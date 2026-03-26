@@ -234,6 +234,28 @@ export function Sidebar({
 
         {/* Coaching nav removed — feature deleted */}
 
+        <button
+          onClick={() => window.open('/wall', '_blank')}
+          className={`
+            w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
+            text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800
+            ${collapsed ? 'justify-center' : ''}
+          `}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clipRule="evenodd" />
+          </svg>
+          {!collapsed && (
+            <>
+              <span className="text-[15px]">Wall</span>
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 ml-auto text-neutral-400" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+                <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+              </svg>
+            </>
+          )}
+        </button>
+
         {/* ── REFERENCE ── */}
         {!collapsed && (
           <p className="px-3.5 pt-4 pb-1 text-[11px] font-medium text-neutral-400 uppercase tracking-wider">Reference</p>
