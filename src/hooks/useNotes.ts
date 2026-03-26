@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { logger } from '@/lib/logger'
+import { fetchVaultNotes, fetchVaultNote, captureToVault, type VaultNoteMeta } from '@/lib/openBrain'
+import { vaultDomainToContext } from '@/types/note'
 import type {
   Note,
   DisplayNote,
@@ -50,6 +52,25 @@ function dbEntityLinkToEntityLink(dbLink: DbNoteEntityLink): NoteEntityLink {
     entityId: dbLink.entity_id,
     linkType: dbLink.link_type as NoteLinkType,
     createdAt: new Date(dbLink.created_at),
+  }
+}
+
+function vaultNoteMetaToNote(meta: VaultNoteMeta): Note {
+  // Use path prefix (e.g. "tasks/slug.md") for endpoint type — meta.type is singular but API needs plural
+  const endpointType = meta.path.split('/')[0]
+  return {
+    id: `vault-${endpointType}-${meta.slug}`,
+    title: meta.title,
+    content: meta.content || '',
+    type: 'vault_note' as NoteType,
+    source: 'vault' as NoteSource,
+    vaultPath: meta.path,
+    vaultDomain: meta.domain,
+    vaultFrontmatter: { status: meta.status, due: meta.due, tags: meta.tags, linked: meta.linked },
+    context: vaultDomainToContext[meta.domain || ''] || undefined,
+    readonly: true,
+    createdAt: meta.created ? new Date(meta.created) : new Date(),
+    updatedAt: meta.created ? new Date(meta.created) : new Date(),
   }
 }
 
@@ -121,7 +142,11 @@ export function useNotes() {
         // Don't fail completely, just log the error
       }
 
-      const secondBrainNotes = (notesData as DbNote[]).map(dbNoteToNote)
+      // Filter out Supabase vault notes — Open Brain is now the source of truth
+      const supabaseNotes = (notesData as DbNote[])
+        .map(dbNoteToNote)
+        .filter(n => n.source !== 'vault')
+
       const taskNotesConverted = (tasksData || []).map((task: any) =>
         taskToDisplayNote({
           id: task.id,
@@ -132,8 +157,18 @@ export function useNotes() {
         } as Task)
       )
 
-      logger.debug('[useNotes] Successfully fetched', secondBrainNotes.length, 'notes and', taskNotesConverted.length, 'task notes')
-      setNotes(secondBrainNotes)
+      // Fetch vault notes from Open Brain (non-blocking — merge when available)
+      const vaultTypes = ['ideas', 'tasks', 'projects', 'people'] as const
+      const vaultResults = await Promise.all(
+        vaultTypes.map(type => fetchVaultNotes(type).catch(() => null))
+      )
+      const vaultNotes: Note[] = vaultResults
+        .filter((r): r is VaultNoteMeta[] => r !== null)
+        .flat()
+        .map(vaultNoteMetaToNote)
+
+      logger.debug('[useNotes] Fetched', supabaseNotes.length, 'notes,', vaultNotes.length, 'vault notes,', taskNotesConverted.length, 'task notes')
+      setNotes([...supabaseNotes, ...vaultNotes])
       setTaskNotes(taskNotesConverted)
       setLoading(false)
     }
@@ -186,6 +221,11 @@ export function useNotes() {
       // Replace optimistic note with real one
       const realNote = dbNoteToNote(data as DbNote)
       setNotes((prev) => prev.map((n) => (n.id === tempId ? realNote : n)))
+
+      // Dual-write: also capture to vault via Open Brain (fire-and-forget)
+      if (realNote.type === 'quick_capture') {
+        captureToVault(realNote.content).catch(() => {})
+      }
 
       return realNote
     },
@@ -463,6 +503,23 @@ export function useNotes() {
     return groups
   }, [allNotes])
 
+  // Lazy-load full content for vault notes (list view only has metadata)
+  const getVaultNoteContent = useCallback(
+    async (noteId: string): Promise<string | null> => {
+      const match = noteId.match(/^vault-(\w+)-(.+)$/)
+      if (!match) return null
+      const [, type, slug] = match
+      const full = await fetchVaultNote(type, slug)
+      if (!full?.content) return null
+      // Update the note in state with the full content
+      setNotes(prev => prev.map(n =>
+        n.id === noteId ? { ...n, content: full.content! } : n
+      ))
+      return full.content
+    },
+    [],
+  )
+
   return {
     notes: allNotes, // Return merged notes
     notesMap,
@@ -483,5 +540,6 @@ export function useNotes() {
     searchNotes,
     getNotesByTopic,
     getNotesByType,
+    getVaultNoteContent,
   }
 }

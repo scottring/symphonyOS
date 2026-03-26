@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import type { Note, DisplayNote, NoteTopic, NoteEntityLink, NoteEntityType } from '@/types/note'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
@@ -27,6 +27,8 @@ interface NotesPageProps {
   getEntityLinks?: (noteId: string) => Promise<NoteEntityLink[]>
   onAddEntityLink?: (noteId: string, entityType: NoteEntityType, entityId: string) => Promise<void>
   onRemoveEntityLink?: (linkId: string) => Promise<void>
+  // Vault
+  getVaultNoteContent?: (noteId: string) => Promise<string | null>
   // Navigation
   onNavigateToTask?: (taskId: string) => void
 }
@@ -47,11 +49,36 @@ export function NotesPage({
   getEntityLinks,
   onAddEntityLink,
   onRemoveEntityLink,
+  getVaultNoteContent,
   onNavigateToTask,
 }: NotesPageProps) {
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(
+    () => sessionStorage.getItem('symphony:selectedNoteId')
+  )
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null)
   const [entityLinks, setEntityLinks] = useState<NoteEntityLink[]>([])
+
+  // Persist selected note across reloads
+  useEffect(() => {
+    if (selectedNoteId) {
+      sessionStorage.setItem('symphony:selectedNoteId', selectedNoteId)
+    } else {
+      sessionStorage.removeItem('symphony:selectedNoteId')
+    }
+  }, [selectedNoteId])
+
+  // Restore vault note content on mount if we have a persisted selection
+  useEffect(() => {
+    if (selectedNoteId && !loading) {
+      const note = notes.find((n) => n.id === selectedNoteId)
+      if (note?.source === 'vault' && !note.content && getVaultNoteContent) {
+        getVaultNoteContent(selectedNoteId)
+      }
+      if (getEntityLinks) {
+        getEntityLinks(selectedNoteId).then(setEntityLinks)
+      }
+    }
+  }, [selectedNoteId, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Filter notes by selected topic
   const filteredNotesByDate = useMemo(() => {
@@ -82,12 +109,18 @@ export function NotesPage({
       }
 
       setSelectedNoteId(noteId)
+
+      // Fetch vault note content if needed
+      if (note?.source === 'vault' && !note.content && getVaultNoteContent) {
+        getVaultNoteContent(noteId)
+      }
+
       if (getEntityLinks) {
         const links = await getEntityLinks(noteId)
         setEntityLinks(links)
       }
     },
-    [notes, getEntityLinks, onNavigateToTask]
+    [notes, getEntityLinks, getVaultNoteContent, onNavigateToTask]
   )
 
   const handleQuickCapture = useCallback(

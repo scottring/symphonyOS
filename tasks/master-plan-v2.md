@@ -30,8 +30,8 @@
 - [ ] Break remaining 60+ hooks into focused context providers (scheduling, notes, calendar, etc.)
 - [ ] Reduce re-render blast radius
 
-### Phase 3: Wall System Access
-- [ ] Wire the wall into sidebar navigation so it's reachable from the UI
+### Phase 3: Wall System Access ✅
+- [x] Wire the wall into sidebar navigation so it's reachable from the UI (opens /wall in new tab)
 
 ### Phase 4: Build the New Vision (in order)
 1. **Unified notes viewer/editor** — one stream, vault as source of truth, Open Brain API powers search/retrieval, Symphony writes back to vault

@@ -203,6 +203,7 @@ export interface ViewRouterProps {
   getEntityLinks: (noteId: string) => Promise<NoteEntityLink[]>
   onAddEntityLink: (noteId: string, input: CreateEntityLinkInput) => Promise<NoteEntityLink | null>
   onRemoveEntityLink: (linkId: string) => Promise<void>
+  getVaultNoteContent: (noteId: string) => Promise<string | null>
 
   // Settings
   refetchFamilyMembers: () => void
@@ -574,6 +575,7 @@ export function ViewRouter(props: ViewRouterProps) {
               await props.onAddEntityLink(noteId, { entityType, entityId })
             }}
             onRemoveEntityLink={props.onRemoveEntityLink}
+            getVaultNoteContent={props.getVaultNoteContent}
             onNavigateToTask={(taskId) => props.onSelectItem(`task-${taskId}`)}
           />
         </Suspense>

@@ -159,6 +159,7 @@ function App() {
     addEntityLink,
     removeEntityLink,
     getNotesForEntity,
+    getVaultNoteContent,
   } = useNotes()
   const {
     topicsMap,
@@ -1340,6 +1341,7 @@ function App() {
           getEntityLinks={getEntityLinks}
           onAddEntityLink={addEntityLink}
           onRemoveEntityLink={removeEntityLink}
+          getVaultNoteContent={getVaultNoteContent}
           refetchFamilyMembers={refetchFamilyMembers}
         />
 
