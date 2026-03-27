@@ -148,6 +148,7 @@ export function AppShell({
           activeView={activeView}
           onViewChange={onViewChange}
           onOpenSearch={onOpenSearch}
+          onOpenChat={onChatOpenChange ? () => onChatOpenChange(true) : undefined}
           pins={pins}
           entities={entities}
           onPinNavigate={onPinNavigate}

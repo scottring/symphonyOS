@@ -10,12 +10,11 @@ import { useRoutines } from '@/hooks/useRoutines'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
-import { useLists } from '@/hooks/useLists'
-import { useListItems } from '@/hooks/useListItems'
 import type { ListCategory } from '@/types/list'
-import { useNotes } from '@/hooks/useNotes'
-import { useNoteTopics } from '@/hooks/useNoteTopics'
 import type { Note, NoteEntityType } from '@/types/note'
+import { GoalsProvider } from '@/contexts/GoalsContext'
+import { ListsProvider, useListsContext } from '@/contexts/ListsContext'
+import { NotesProvider, useNotesContext } from '@/contexts/NotesContext'
 import { useSearch, type SearchResult } from '@/hooks/useSearch'
 import { useAttachments } from '@/hooks/useAttachments'
 import { usePinnedItems } from '@/hooks/usePinnedItems'
@@ -38,9 +37,7 @@ import {
   FocusMode,
   DetailPanelRedesign as DetailPanel,
 } from '@/components/lazy'
-import { useGoals } from '@/hooks/useGoals'
-import { useGoalMilestones } from '@/hooks/useGoalMilestones'
-import { useGoalPlanning } from '@/hooks/useGoalPlanning'
+import type { User } from '@supabase/supabase-js'
 import { useScheduleActions } from '@/hooks/useScheduleActions'
 import { useDomain } from '@/hooks/useDomain'
 import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings'
@@ -54,8 +51,92 @@ import { useChat, type EntityContext as ChatEntityContext } from '@/hooks/useCha
 import { useMeetingNotes } from '@/hooks/useMeetingNotes'
 
 function App() {
-  const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask } = useSupabaseTasks()
   const { user, loading: authLoading, signOut } = useAuth()
+
+  // Onboarding state
+  const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null)
+  const [onboardingLoading, setOnboardingLoading] = useState(true)
+  const onboardingChecked = useRef(false)
+
+  // Check onboarding status — only on initial load, not on auth token refreshes.
+  useEffect(() => {
+    if (onboardingChecked.current) return // Only check once
+    async function checkOnboarding() {
+      if (!user) {
+        setOnboardingLoading(false)
+        return
+      }
+
+      onboardingChecked.current = true
+
+      try {
+        const { data: profile, error } = await supabase
+          .from('user_profiles')
+          .select('onboarding_completed_at')
+          .eq('user_id', user.id)
+          .maybeSingle()
+
+        if (error) {
+          console.error('Error checking onboarding:', error)
+          // Assume complete on error to not block the app
+          setOnboardingComplete(true)
+        } else if (profile?.onboarding_completed_at) {
+          setOnboardingComplete(true)
+        } else {
+          setOnboardingComplete(false)
+        }
+      } catch (err) {
+        console.error('Error in checkOnboarding:', err)
+        setOnboardingComplete(true) // Fail open
+      } finally {
+        setOnboardingLoading(false)
+      }
+    }
+
+    if (!authLoading) {
+      checkOnboarding()
+    }
+  }, [user, authLoading])
+
+  if (authLoading || onboardingLoading) {
+    return (
+      <div className="min-h-screen bg-bg-base flex items-center justify-center">
+        <p className="text-neutral-500">Loading...</p>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <AuthForm />
+      </Suspense>
+    )
+  }
+
+  if (onboardingComplete === false) {
+    return (
+      <div className="min-h-screen bg-bg-base">
+        <Suspense fallback={<LoadingFallback />}>
+          <OnboardingWizard onComplete={() => setOnboardingComplete(true)} />
+        </Suspense>
+      </div>
+    )
+  }
+
+  return (
+    <GoalsProvider>
+      <ListsProvider>
+        <NotesProvider>
+          <AppContent user={user} signOut={signOut} />
+        </NotesProvider>
+      </ListsProvider>
+    </GoalsProvider>
+  )
+}
+
+function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
+  const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask } = useSupabaseTasks()
   const { isConnected, events, fetchEvents, isFetching: eventsFetching, createEvent, updateEvent, connect: connectCalendar } = useGoogleCalendar()
   const attachments = useAttachments()
   const { fetchAttachments } = attachments
@@ -67,38 +148,11 @@ function App() {
   const [chatOpen, setChatOpen] = useState(false)
   const [confirmationToast, setConfirmationToast] = useState<ConfirmationToastMessage | null>(null)
 
-  // Onboarding state
-  const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null)
-  const [onboardingLoading, setOnboardingLoading] = useState(true)
   const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, updateEventAssignmentAll, updateRecipeUrl, updateEventProject, getNote, getEventNotesForProject, updateEventContext, notes: eventNotesMap } = useEventNotes()
   const { contacts, contactsMap, addContact, updateContact, deleteContact, searchContacts } = useContacts()
   const { projects, projectsMap, addProject, updateProject, deleteProject, searchProjects, recalculateProjectStatus } = useProjects()
   const meetingNotes = useMeetingNotes(contacts, tasks)
-  const {
-    areas: goalAreas,
-    goals,
-    addArea: addGoalArea,
-    deleteArea: deleteGoalArea,
-    addGoal,
-    updateGoal,
-    deleteGoal,
-    addAction: addGoalAction,
-    updateAction: updateGoalAction,
-    toggleAction: toggleGoalAction,
-    deleteAction: deleteGoalAction,
-    getGoalById,
-    getCurrentQuarter,
-    addMilestoneLocal,
-    updateMilestoneLocal,
-    removeMilestoneLocal,
-  } = useGoals()
-  const { addMilestone: addGoalMilestone, updateMilestone: updateGoalMilestone, updateProgress: updateMilestoneProgress, deleteMilestone: deleteGoalMilestone } = useGoalMilestones({
-    addMilestoneLocal,
-    updateMilestoneLocal,
-    removeMilestoneLocal,
-  })
-  const goalPlanning = useGoalPlanning()
-  const [planningGoalId, setPlanningGoalId] = useState<string | null>(null)
+
   const {
     routines: allRoutines,
     activeRoutines,
@@ -116,6 +170,10 @@ function App() {
 
   const { getDomainForCalendar } = useCalendarDomainMappings()
 
+  // From contexts
+  const { lists, listsByCategory, setSelectedListId, addList } = useListsContext()
+  const { notes, addNote, updateNote: updateNoteContent, addEntityLink, getNotesForEntity, activeTopics, addTopic } = useNotesContext()
+
   // Event context overrides: extract from event notes map
   const eventContextOverrides = useMemo(() => {
     const overrides = new Map<string, import('@/types/task').TaskContext>()
@@ -128,50 +186,6 @@ function App() {
   }, [eventNotesMap])
 
   const { currentDomain } = useDomain()
-
-  // Lists state
-  const [selectedListId, setSelectedListId] = useState<string | null>(null)
-  const {
-    lists,
-    listsByCategory,
-    addList,
-    updateList,
-    deleteList,
-    getListById,
-  } = useLists()
-  const {
-    items: listItems,
-    addItem: addListItem,
-    updateItem: updateListItem,
-    deleteItem: deleteListItem,
-    reorderItems: reorderListItems,
-  } = useListItems(selectedListId)
-
-  // Notes state
-  const {
-    notes,
-    notesByDate,
-    loading: notesLoading,
-    addNote,
-    updateNote: updateNoteContent,
-    deleteNote,
-    getEntityLinks,
-    addEntityLink,
-    removeEntityLink,
-    getNotesForEntity,
-    getVaultNoteContent,
-  } = useNotes()
-  const {
-    topicsMap,
-    activeTopics,
-    addTopic,
-  } = useNoteTopics()
-
-  // Get selected list for ListView
-  const selectedList = useMemo(() => {
-    if (!selectedListId) return null
-    return getListById(selectedListId) ?? null
-  }, [selectedListId, getListById])
 
   // Search state
   const [searchOpen, setSearchOpen] = useState(false)
@@ -226,7 +240,7 @@ function App() {
   // URL-based navigation
   const navigate = useNavigate()
   const location = useLocation()
-  const params = useParams<{ projectId?: string; routineId?: string; contactId?: string; goalId?: string }>()
+  const params = useParams<{ projectId?: string; routineId?: string; contactId?: string }>()
 
   // State for non-URL-routed views
   const [stateView, setStateView] = useState<'today' | 'lists' | 'notes' | 'history' | 'settings' | 'task-detail' | null>(null)
@@ -250,7 +264,6 @@ function App() {
   const selectedProjectId = params.projectId || null
   const selectedRoutineId = params.routineId || null
   const selectedContactId = params.contactId || null
-  const selectedGoalId = params.goalId || null
   const creatingRoutine = location.pathname === '/routines/new'
   const [, setRecentlyCreatedTaskId] = useState<string | null>(null)
   const [planningOpen, setPlanningOpen] = useState(false)
@@ -263,49 +276,6 @@ function App() {
   useEffect(() => {
     localStorage.setItem('symphony-sidebar-collapsed', String(sidebarCollapsed))
   }, [sidebarCollapsed])
-
-  // Check onboarding status — only on initial load, not on auth token refreshes.
-  // This prevents the wizard from unmounting mid-conversation when Supabase
-  // refreshes the auth token and a transient error would flip onboardingComplete.
-  const onboardingChecked = useRef(false)
-  useEffect(() => {
-    if (onboardingChecked.current) return // Only check once
-    async function checkOnboarding() {
-      if (!user) {
-        setOnboardingLoading(false)
-        return
-      }
-
-      onboardingChecked.current = true
-
-      try {
-        const { data: profile, error } = await supabase
-          .from('user_profiles')
-          .select('onboarding_completed_at')
-          .eq('user_id', user.id)
-          .maybeSingle()
-
-        if (error) {
-          console.error('Error checking onboarding:', error)
-          // Assume complete on error to not block the app
-          setOnboardingComplete(true)
-        } else if (profile?.onboarding_completed_at) {
-          setOnboardingComplete(true)
-        } else {
-          setOnboardingComplete(false)
-        }
-      } catch (err) {
-        console.error('Error in checkOnboarding:', err)
-        setOnboardingComplete(true) // Fail open
-      } finally {
-        setOnboardingLoading(false)
-      }
-    }
-
-    if (!authLoading) {
-      checkOnboarding()
-    }
-  }, [user, authLoading])
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -341,16 +311,15 @@ function App() {
   }, [])
 
   // Open QuickCapture when app is ready (after auth/onboarding)
+  // AppContent only renders when user is authenticated and onboarding is complete
   useEffect(() => {
-    if (user && onboardingComplete === true) {
-      const shouldOpenQuickAdd = sessionStorage.getItem('symphony:quickadd')
-      if (shouldOpenQuickAdd === 'true') {
-        sessionStorage.removeItem('symphony:quickadd')
-        // Small delay to ensure app is fully rendered
-        setTimeout(() => setQuickAddOpen(true), 100)
-      }
+    const shouldOpenQuickAdd = sessionStorage.getItem('symphony:quickadd')
+    if (shouldOpenQuickAdd === 'true') {
+      sessionStorage.removeItem('symphony:quickadd')
+      // Small delay to ensure app is fully rendered
+      setTimeout(() => setQuickAddOpen(true), 100)
     }
-  }, [user, onboardingComplete])
+  }, [])
 
   // Redirect to join page if user just authenticated and has a pending join token
   useEffect(() => {
@@ -989,34 +958,6 @@ function App() {
     refreshDateInstances, meetingNotes.startMeeting, updateEventProject,
   ])
 
-  if (authLoading || onboardingLoading) {
-    return (
-      <div className="min-h-screen bg-bg-base flex items-center justify-center">
-        <p className="text-neutral-500">Loading...</p>
-      </div>
-    )
-  }
-
-  if (!user) {
-    // Show login form for unauthenticated users
-    return (
-      <Suspense fallback={<LoadingFallback />}>
-        <AuthForm />
-      </Suspense>
-    )
-  }
-
-  // Show onboarding for new users
-  if (onboardingComplete === false) {
-    return (
-      <div className="min-h-screen bg-bg-base">
-        <Suspense fallback={<LoadingFallback />}>
-          <OnboardingWizard onComplete={() => setOnboardingComplete(true)} />
-        </Suspense>
-      </div>
-    )
-  }
-
   return (
     <AppShell
       sidebarCollapsed={sidebarCollapsed}
@@ -1286,27 +1227,6 @@ function App() {
           onToggleTaskForProject={handleToggleTask}
           onUpdateTaskWithToast={handleUpdateTaskWithToast}
           linkedEventsForProject={linkedEventsForProject}
-          goalAreas={goalAreas}
-          goals={goals}
-          getCurrentQuarter={getCurrentQuarter}
-          selectedGoalId={selectedGoalId}
-          getGoalById={getGoalById}
-          planningGoalId={planningGoalId}
-          onSetPlanningGoalId={setPlanningGoalId}
-          onAddGoalArea={addGoalArea}
-          onDeleteGoalArea={deleteGoalArea}
-          onAddGoal={addGoal}
-          onUpdateGoal={updateGoal}
-          onDeleteGoal={deleteGoal}
-          onAddGoalAction={addGoalAction}
-          onUpdateGoalAction={updateGoalAction}
-          onToggleGoalAction={toggleGoalAction}
-          onDeleteGoalAction={deleteGoalAction}
-          onAddGoalMilestone={addGoalMilestone}
-          onUpdateGoalMilestone={updateGoalMilestone}
-          onUpdateMilestoneProgress={updateMilestoneProgress}
-          onDeleteGoalMilestone={deleteGoalMilestone}
-          goalPlanning={goalPlanning}
           allRoutines={allRoutines}
           selectedRoutineId={selectedRoutineId}
           selectedRoutine={selectedRoutine}
@@ -1315,33 +1235,7 @@ function App() {
           onUpdateRoutine={updateRoutine}
           onDeleteRoutine={deleteRoutine}
           onToggleRoutineVisibility={toggleRoutineVisibility}
-          lists={lists}
-          listsByCategory={listsByCategory}
-          selectedListId={selectedListId}
-          onSelectList={setSelectedListId}
-          selectedList={selectedList}
-          listItems={listItems}
-          onAddList={addList}
-          onUpdateList={updateList}
-          onDeleteList={deleteList}
-          onAddListItem={addListItem}
-          onUpdateListItem={updateListItem}
-          onDeleteListItem={deleteListItem}
-          onReorderListItems={reorderListItems}
           projectsMap={projectsMap}
-          notes={notes}
-          notesByDate={notesByDate}
-          activeTopics={activeTopics}
-          topicsMap={topicsMap}
-          notesLoading={notesLoading}
-          onAddNote={addNote}
-          onUpdateNoteContent={updateNoteContent}
-          onDeleteNote={deleteNote}
-          onAddTopic={addTopic}
-          getEntityLinks={getEntityLinks}
-          onAddEntityLink={addEntityLink}
-          onRemoveEntityLink={removeEntityLink}
-          getVaultNoteContent={getVaultNoteContent}
           refetchFamilyMembers={refetchFamilyMembers}
         />
 

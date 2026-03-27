@@ -1,11 +1,14 @@
 import { Suspense } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { SectionErrorBoundary } from '@/components/SectionErrorBoundary'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 import { HomeView } from '@/components/home'
 import { MeetingNotesView } from '@/components/meeting/MeetingNotesView'
 import { ActionQueueBar } from '@/components/actions/ActionQueueBar'
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
+import { useGoalsContext } from '@/contexts/GoalsContext'
+import { useListsContext } from '@/contexts/ListsContext'
+import { useNotesContext } from '@/contexts/NotesContext'
 import {
   ProjectsList,
   ProjectView,
@@ -35,10 +38,8 @@ import type { CreateRoutineInput, UpdateRoutineInput } from '@/hooks/useRoutines
 import type { EventNote } from '@/hooks/useEventNotes'
 import type { Contact, ContactCategory } from '@/types/contact'
 import type { Project } from '@/types/project'
-import type { GoalArea, Goal, GoalAction, GoalMilestone, Quarter, ConversationMessage, GoalPlanningResult } from '@/types/goal'
 import type { FamilyMember } from '@/types/family'
-import type { List, ListItem, ListCategory, ListVisibility } from '@/types/list'
-import type { Note, DisplayNote, NoteEntityType, NoteTopic, NoteEntityLink, CreateNoteInput, UpdateNoteInput, CreateNoteTopicInput, CreateEntityLinkInput } from '@/types/note'
+import type { Note, NoteEntityType } from '@/types/note'
 import type { MeetingState } from '@/hooks/useMeetingNotes'
 import type { TaskLink } from '@/types/task'
 import type { PinnableEntityType } from '@/types/pin'
@@ -129,39 +130,6 @@ export interface ViewRouterProps {
   onUpdateTaskWithToast: (id: string, updates: Partial<Task>) => Promise<void>
   linkedEventsForProject: EventNote[]
 
-  // Goals view
-  goalAreas: GoalArea[]
-  goals: Goal[]
-  getCurrentQuarter: () => Quarter
-  selectedGoalId: string | null
-  getGoalById: (id: string) => Goal | undefined
-  planningGoalId: string | null
-  onSetPlanningGoalId: (id: string | null) => void
-  onAddGoalArea: (name: string) => Promise<GoalArea | null>
-  onDeleteGoalArea: (id: string) => Promise<void>
-  onAddGoal: (areaId: string, name: string, context?: 'work' | 'family' | 'personal') => Promise<Goal | null>
-  onUpdateGoal: (id: string, updates: Partial<Pick<Goal, 'name' | 'notes' | 'status' | 'areaId' | 'sortOrder' | 'strategy' | 'domainSlug' | 'layerId' | 'context'>>) => Promise<void>
-  onDeleteGoal: (id: string) => Promise<void>
-  onAddGoalAction: (goalId: string, description: string, quarter: Quarter) => Promise<GoalAction | null>
-  onUpdateGoalAction: (id: string, updates: Partial<Pick<GoalAction, 'description' | 'completed' | 'notes' | 'sortOrder'>>) => Promise<void>
-  onToggleGoalAction: (id: string) => Promise<void>
-  onDeleteGoalAction: (id: string) => Promise<void>
-  onAddGoalMilestone: (goalId: string, title: string, opts?: { description?: string; targetDate?: string; targetValue?: number; unit?: string; sortOrder?: number }) => Promise<GoalMilestone | null>
-  onUpdateGoalMilestone: (id: string, updates: Partial<Pick<GoalMilestone, 'title' | 'description' | 'targetDate' | 'targetValue' | 'currentValue' | 'unit' | 'status' | 'sortOrder'>>) => Promise<void>
-  onUpdateMilestoneProgress: (id: string, currentValue: number, milestoneTargetValue?: number) => Promise<void>
-  onDeleteGoalMilestone: (id: string) => Promise<void>
-  goalPlanning: {
-    messages: ConversationMessage[]
-    loading: boolean
-    readyToFinish: boolean
-    planningResult: GoalPlanningResult | null
-    error: string | null
-    startPlanning: (goalId: string, goalName: string, goalNotes?: string, areaName?: string) => Promise<void>
-    sendMessage: (message: string) => Promise<void>
-    finishPlanning: () => Promise<void>
-    reset: () => void
-  }
-
   // Routines view
   allRoutines: Routine[]
   selectedRoutineId: string | null
@@ -172,38 +140,8 @@ export interface ViewRouterProps {
   onDeleteRoutine: (id: string) => Promise<boolean>
   onToggleRoutineVisibility: (id: string) => Promise<boolean>
 
-  // Lists view
-  lists: List[]
-  listsByCategory: Record<ListCategory, List[]>
-  selectedListId: string | null
-  onSelectList: (id: string | null) => void
-  selectedList: List | null
-  listItems: ListItem[]
-  onAddList: (list: { title: string; icon?: string; category?: ListCategory; visibility?: ListVisibility; hiddenFrom?: string[] }) => Promise<List | null>
-  onUpdateList: (id: string, updates: Partial<List>) => Promise<void>
-  onDeleteList: (id: string) => Promise<void>
-  onAddListItem: (item: { text: string; note?: string }) => Promise<ListItem | null>
-  onUpdateListItem: (id: string, updates: Partial<ListItem>) => Promise<void>
-  onDeleteListItem: (id: string) => Promise<void>
-  onReorderListItems: (itemIds: string[]) => Promise<void>
-
   // History view
   projectsMap: Map<string, Project>
-
-  // Notes view
-  notes: Note[]
-  notesByDate: { date: string; label: string; notes: DisplayNote[] }[]
-  activeTopics: NoteTopic[]
-  topicsMap: Map<string, NoteTopic>
-  notesLoading: boolean
-  onAddNote: (input: CreateNoteInput) => Promise<Note | null>
-  onUpdateNoteContent: (id: string, updates: UpdateNoteInput) => Promise<void>
-  onDeleteNote: (id: string) => Promise<void>
-  onAddTopic: (input: CreateNoteTopicInput) => Promise<NoteTopic | null>
-  getEntityLinks: (noteId: string) => Promise<NoteEntityLink[]>
-  onAddEntityLink: (noteId: string, input: CreateEntityLinkInput) => Promise<NoteEntityLink | null>
-  onRemoveEntityLink: (linkId: string) => Promise<void>
-  getVaultNoteContent: (noteId: string) => Promise<string | null>
 
   // Settings
   refetchFamilyMembers: () => void
@@ -371,80 +309,7 @@ export function ViewRouter(props: ViewRouterProps) {
         </Suspense>
       )}
 
-      {props.activeView === 'goals' && !props.selectedGoalId && (
-        <Suspense fallback={<LoadingFallback />}>
-          <GoalsList
-            areas={props.goalAreas}
-            goals={props.currentDomain === 'universal' ? props.goals : props.goals.filter(g => g.context === props.currentDomain)}
-            currentQuarter={props.getCurrentQuarter()}
-            year={new Date().getFullYear()}
-            onSelectGoal={(id) => navigate(`/goals/${id}`)}
-            onAddArea={props.onAddGoalArea}
-            onAddGoal={(areaId, name) => props.onAddGoal(areaId, name, props.currentDomain !== 'universal' ? props.currentDomain : undefined)}
-            onToggleAction={props.onToggleGoalAction}
-            onDeleteArea={props.onDeleteGoalArea}
-          />
-        </Suspense>
-      )}
-
-      {props.activeView === 'goals' && props.selectedGoalId && props.getGoalById(props.selectedGoalId) && !props.planningGoalId && (
-        <Suspense fallback={<LoadingFallback />}>
-          <GoalView
-            goal={props.getGoalById(props.selectedGoalId)!}
-            area={props.goalAreas.find(a => a.id === props.getGoalById(props.selectedGoalId!)!.areaId)}
-            currentQuarter={props.getCurrentQuarter()}
-            onBack={() => navigate('/goals')}
-            onUpdateGoal={props.onUpdateGoal}
-            onDeleteGoal={props.onDeleteGoal}
-            onAddAction={props.onAddGoalAction}
-            onUpdateAction={props.onUpdateGoalAction}
-            onToggleAction={props.onToggleGoalAction}
-            onDeleteAction={props.onDeleteGoalAction}
-            onStartPlanning={() => {
-              props.onSetPlanningGoalId(props.selectedGoalId)
-              const g = props.getGoalById(props.selectedGoalId!)
-              if (g) {
-                const areaName = props.goalAreas.find(a => a.id === g.areaId)?.name
-                props.goalPlanning.startPlanning(g.id, g.name, g.notes, areaName)
-              }
-            }}
-            onAddMilestone={props.onAddGoalMilestone}
-            onUpdateMilestone={props.onUpdateGoalMilestone}
-            onUpdateMilestoneProgress={props.onUpdateMilestoneProgress}
-            onDeleteMilestone={props.onDeleteGoalMilestone}
-          />
-        </Suspense>
-      )}
-
-      {props.activeView === 'goals' && props.planningGoalId && (
-        <Suspense fallback={<LoadingFallback />}>
-          <GoalPlanningChat
-            goalName={props.getGoalById(props.planningGoalId)?.name ?? 'Goal'}
-            messages={props.goalPlanning.messages}
-            loading={props.goalPlanning.loading}
-            readyToFinish={props.goalPlanning.readyToFinish}
-            planningResult={props.goalPlanning.planningResult}
-            error={props.goalPlanning.error}
-            onStart={() => {
-              const g = props.getGoalById(props.planningGoalId!)
-              if (g) {
-                const areaName = props.goalAreas.find(a => a.id === g.areaId)?.name
-                props.goalPlanning.startPlanning(g.id, g.name, g.notes, areaName)
-              }
-            }}
-            onSend={props.goalPlanning.sendMessage}
-            onFinish={props.goalPlanning.finishPlanning}
-            onBack={() => {
-              props.onSetPlanningGoalId(null)
-              props.goalPlanning.reset()
-            }}
-            onDone={() => {
-              props.onSetPlanningGoalId(null)
-              props.goalPlanning.reset()
-            }}
-          />
-        </Suspense>
-      )}
+      {props.activeView === 'goals' && <GoalsSection currentDomain={props.currentDomain} />}
 
       {props.activeView === 'routines' && !props.selectedRoutineId && !props.creatingRoutine && (
         <Suspense fallback={<LoadingFallback />}>
@@ -506,36 +371,7 @@ export function ViewRouter(props: ViewRouterProps) {
         </Suspense>
       )}
 
-      {props.activeView === 'lists' && !props.selectedListId && (
-        <Suspense fallback={<LoadingFallback />}>
-          <ListsList
-            lists={props.lists}
-            listsByCategory={props.listsByCategory}
-            onSelectList={props.onSelectList}
-            onAddList={props.onAddList}
-          />
-        </Suspense>
-      )}
-
-      {props.activeView === 'lists' && props.selectedList && (
-        <Suspense fallback={<LoadingFallback />}>
-          <ListView
-            list={props.selectedList}
-            items={props.listItems}
-            onBack={() => props.onSelectList(null)}
-            onUpdateList={props.onUpdateList}
-            onDeleteList={props.onDeleteList}
-            onAddItem={props.onAddListItem}
-            onUpdateItem={props.onUpdateListItem}
-            onDeleteItem={props.onDeleteListItem}
-            onReorderItems={props.onReorderListItems}
-            isPinned={props.pinnedItems.isPinned('list', props.selectedList.id)}
-            canPin={props.pinnedItems.canPin()}
-            onPin={() => props.pinnedItems.pin('list', props.selectedList!.id)}
-            onUnpin={() => props.pinnedItems.unpin('list', props.selectedList!.id)}
-          />
-        </Suspense>
-      )}
+      {props.activeView === 'lists' && <ListsSection pinnedItems={props.pinnedItems} />}
 
       {props.activeView === 'history' && (
         <Suspense fallback={<LoadingFallback />}>
@@ -549,37 +385,7 @@ export function ViewRouter(props: ViewRouterProps) {
         </Suspense>
       )}
 
-      {props.activeView === 'notes' && (
-        <Suspense fallback={<LoadingFallback />}>
-          <NotesPage
-            notes={props.notes}
-            notesByDate={props.notesByDate}
-            topics={props.activeTopics}
-            topicsMap={props.topicsMap}
-            loading={props.notesLoading}
-            tasks={props.tasks}
-            projects={props.projects}
-            contacts={props.contacts}
-            onAddNote={async (content, topicId) => {
-              return props.onAddNote({ content, topicId })
-            }}
-            onUpdateNote={async (id, updates) => {
-              await props.onUpdateNoteContent(id, updates)
-            }}
-            onDeleteNote={props.onDeleteNote}
-            onAddTopic={async (name) => {
-              return props.onAddTopic({ name })
-            }}
-            getEntityLinks={props.getEntityLinks}
-            onAddEntityLink={async (noteId, entityType, entityId) => {
-              await props.onAddEntityLink(noteId, { entityType, entityId })
-            }}
-            onRemoveEntityLink={props.onRemoveEntityLink}
-            getVaultNoteContent={props.getVaultNoteContent}
-            onNavigateToTask={(taskId) => props.onSelectItem(`task-${taskId}`)}
-          />
-        </Suspense>
-      )}
+      {props.activeView === 'notes' && <NotesSection tasks={props.tasks} projects={props.projects} contacts={props.contacts} onSelectItem={props.onSelectItem} />}
 
       {props.activeView === 'settings' && (
         <Suspense fallback={<LoadingFallback />}>
@@ -593,5 +399,162 @@ export function ViewRouter(props: ViewRouterProps) {
         </Suspense>
       )}
     </SectionErrorBoundary>
+  )
+}
+
+function GoalsSection({ currentDomain }: { currentDomain: TaskContext | 'universal' }) {
+  const navigate = useNavigate()
+  const params = useParams<{ goalId?: string }>()
+  const selectedGoalId = params.goalId || null
+  const {
+    areas, goals, getCurrentQuarter, getGoalById,
+    addArea, deleteArea, addGoal, updateGoal, deleteGoal,
+    addAction, updateAction, toggleAction, deleteAction,
+    addMilestone, updateMilestone, updateMilestoneProgress, deleteMilestone,
+    planningGoalId, setPlanningGoalId, goalPlanning,
+  } = useGoalsContext()
+
+  const filteredGoals = currentDomain === 'universal' ? goals : goals.filter(g => g.context === currentDomain)
+
+  return (
+    <>
+      {!selectedGoalId && (
+        <Suspense fallback={<LoadingFallback />}>
+          <GoalsList
+            areas={areas}
+            goals={filteredGoals}
+            currentQuarter={getCurrentQuarter()}
+            year={new Date().getFullYear()}
+            onSelectGoal={(id) => navigate(`/goals/${id}`)}
+            onAddArea={addArea}
+            onAddGoal={(areaId, name) => addGoal(areaId, name, currentDomain !== 'universal' ? currentDomain : undefined)}
+            onToggleAction={toggleAction}
+            onDeleteArea={deleteArea}
+          />
+        </Suspense>
+      )}
+
+      {selectedGoalId && getGoalById(selectedGoalId) && !planningGoalId && (
+        <Suspense fallback={<LoadingFallback />}>
+          <GoalView
+            goal={getGoalById(selectedGoalId)!}
+            area={areas.find(a => a.id === getGoalById(selectedGoalId!)!.areaId)}
+            currentQuarter={getCurrentQuarter()}
+            onBack={() => navigate('/goals')}
+            onUpdateGoal={updateGoal}
+            onDeleteGoal={deleteGoal}
+            onAddAction={addAction}
+            onUpdateAction={updateAction}
+            onToggleAction={toggleAction}
+            onDeleteAction={deleteAction}
+            onStartPlanning={() => {
+              setPlanningGoalId(selectedGoalId)
+              const g = getGoalById(selectedGoalId!)
+              if (g) {
+                const areaName = areas.find(a => a.id === g.areaId)?.name
+                goalPlanning.startPlanning(g.id, g.name, g.notes, areaName)
+              }
+            }}
+            onAddMilestone={addMilestone}
+            onUpdateMilestone={updateMilestone}
+            onUpdateMilestoneProgress={updateMilestoneProgress}
+            onDeleteMilestone={deleteMilestone}
+          />
+        </Suspense>
+      )}
+
+      {planningGoalId && (
+        <Suspense fallback={<LoadingFallback />}>
+          <GoalPlanningChat
+            goalName={getGoalById(planningGoalId)?.name ?? 'Goal'}
+            messages={goalPlanning.messages}
+            loading={goalPlanning.loading}
+            readyToFinish={goalPlanning.readyToFinish}
+            planningResult={goalPlanning.planningResult}
+            error={goalPlanning.error}
+            onStart={() => {
+              const g = getGoalById(planningGoalId!)
+              if (g) {
+                const areaName = areas.find(a => a.id === g.areaId)?.name
+                goalPlanning.startPlanning(g.id, g.name, g.notes, areaName)
+              }
+            }}
+            onSend={goalPlanning.sendMessage}
+            onFinish={goalPlanning.finishPlanning}
+            onBack={() => { setPlanningGoalId(null); goalPlanning.reset() }}
+            onDone={() => { setPlanningGoalId(null); goalPlanning.reset() }}
+          />
+        </Suspense>
+      )}
+    </>
+  )
+}
+
+function ListsSection({ pinnedItems }: { pinnedItems: ViewRouterProps['pinnedItems'] }) {
+  const { lists, listsByCategory, selectedListId, setSelectedListId, selectedList, listItems, addList, updateList, deleteList, addItem, updateItem, deleteItem, reorderItems } = useListsContext()
+
+  return (
+    <>
+      {!selectedListId && (
+        <Suspense fallback={<LoadingFallback />}>
+          <ListsList
+            lists={lists}
+            listsByCategory={listsByCategory}
+            onSelectList={setSelectedListId}
+            onAddList={addList}
+          />
+        </Suspense>
+      )}
+
+      {selectedList && (
+        <Suspense fallback={<LoadingFallback />}>
+          <ListView
+            list={selectedList}
+            items={listItems}
+            onBack={() => setSelectedListId(null)}
+            onUpdateList={updateList}
+            onDeleteList={deleteList}
+            onAddItem={addItem}
+            onUpdateItem={updateItem}
+            onDeleteItem={deleteItem}
+            onReorderItems={reorderItems}
+            isPinned={pinnedItems.isPinned('list', selectedList.id)}
+            canPin={pinnedItems.canPin()}
+            onPin={() => pinnedItems.pin('list', selectedList!.id)}
+            onUnpin={() => pinnedItems.unpin('list', selectedList!.id)}
+          />
+        </Suspense>
+      )}
+    </>
+  )
+}
+
+function NotesSection({ tasks, projects, contacts, onSelectItem }: { tasks: Task[]; projects: Project[]; contacts: Contact[]; onSelectItem: (id: string | null) => void }) {
+  const { notes, notesByDate, loading, addNote, updateNote, deleteNote, activeTopics, topicsMap, addTopic, getEntityLinks, addEntityLink, removeEntityLink, getVaultNoteContent } = useNotesContext()
+
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <NotesPage
+        notes={notes}
+        notesByDate={notesByDate}
+        topics={activeTopics}
+        topicsMap={topicsMap}
+        loading={loading}
+        tasks={tasks}
+        projects={projects}
+        contacts={contacts}
+        onAddNote={async (content, topicId) => addNote({ content, topicId })}
+        onUpdateNote={async (id, updates) => { await updateNote(id, updates) }}
+        onDeleteNote={deleteNote}
+        onAddTopic={async (name) => addTopic({ name })}
+        getEntityLinks={getEntityLinks}
+        onAddEntityLink={async (noteId, entityType, entityId) => {
+          await addEntityLink(noteId, { entityType, entityId })
+        }}
+        onRemoveEntityLink={removeEntityLink}
+        getVaultNoteContent={getVaultNoteContent}
+        onNavigateToTask={(taskId) => onSelectItem(`task-${taskId}`)}
+      />
+    </Suspense>
   )
 }

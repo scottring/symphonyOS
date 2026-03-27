@@ -17,6 +17,13 @@ vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ user: mockUserState }),
 }))
 
+// Mock Open Brain (vault notes)
+vi.mock('@/lib/openBrain', () => ({
+  fetchVaultNotes: () => Promise.resolve(null),
+  fetchVaultNote: () => Promise.resolve(null),
+  captureToVault: () => Promise.resolve(false),
+}))
+
 // Mock Supabase
 vi.mock('@/lib/supabase', () => ({
   supabase: {

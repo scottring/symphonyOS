@@ -20,9 +20,12 @@ import { InboxTaskCard } from './InboxTaskCard'
 import { StagingFloat } from './StagingFloat'
 import { TodayAddInput } from './TodayAddInput'
 import { OverdueSection } from './OverdueSection'
+import { EmailActionsBanner } from './EmailActionsBanner'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { useSystemHealth } from '@/hooks/useSystemHealth'
+import { useEmailActionItems } from '@/hooks/useEmailActionItems'
 import { useRecurringEventDetection } from '@/hooks/useRecurringEventDetection'
+import { useRoutineStats } from '@/hooks/useRoutineStats'
 import { MultiAssigneeDropdown } from '@/components/family/MultiAssigneeDropdown'
 // import { CalendarClock } from 'lucide-react' // Hidden - Plan button removed
 
@@ -455,6 +458,8 @@ export function TodaySchedule({
     onOpenChat,
   } = useScheduleActionsContext()
 
+  const emailActions = useEmailActionItems()
+  const { getStats: getRoutineStats } = useRoutineStats()
   const isMobile = useMobile()
 
   // Detect recurring events without linked projects for promotion suggestions
@@ -1262,6 +1267,16 @@ export function TodaySchedule({
             />
           )}
 
+          {/* Email action items - from Gmail scanner */}
+          {isToday && (
+            <EmailActionsBanner
+              items={emailActions.items}
+              onAcknowledge={emailActions.acknowledge}
+              onDismiss={emailActions.dismiss}
+              onSnooze={emailActions.snooze}
+            />
+          )}
+
           {sections.map((section) => {
             const items = grouped[section]
             return (
@@ -1437,6 +1452,7 @@ export function TodaySchedule({
                       isSuggestedPromotion={item.type === 'event' ? isPromotionSuggested(item.id.replace('event-', '')) : undefined}
                       variant={item.type === 'routine' ? 'minimal' : 'full'}
                       hideTime={shouldHideTime}
+                      routineStreak={item.type === 'routine' ? getRoutineStats(item.id.replace('routine-', ''))?.currentStreak : undefined}
                     />
                     {followUpTaskId === taskId && taskId && sourceTaskForFollowUp && (
                       <FollowUpInput

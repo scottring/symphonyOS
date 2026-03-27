@@ -36,6 +36,27 @@ vi.mock('@/hooks/useRecurringEventDetection', () => ({
   }),
 }))
 
+// Mock useRoutineStats
+vi.mock('@/hooks/useRoutineStats', () => ({
+  useRoutineStats: () => ({
+    stats: new Map(),
+    loading: false,
+    getStats: () => undefined,
+    refetch: () => {},
+  }),
+}))
+
+// Mock useEmailActionItems
+vi.mock('@/hooks/useEmailActionItems', () => ({
+  useEmailActionItems: () => ({
+    items: [],
+    loading: false,
+    acknowledge: () => {},
+    dismiss: () => {},
+    snooze: () => {},
+  }),
+}))
+
 // Create a stable "today" for testing - we'll use fake timers to control Date
 const mockToday = new Date('2024-01-15T12:00:00.000Z')
 

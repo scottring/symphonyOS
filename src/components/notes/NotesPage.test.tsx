@@ -77,6 +77,7 @@ const defaultProps = {
 describe('NotesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    sessionStorage.clear()
   })
 
   it('shows loading state', () => {

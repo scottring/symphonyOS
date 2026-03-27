@@ -9,6 +9,7 @@ import { FollowUpInput } from './FollowUpInput'
 import { taskToTimelineItem } from '@/types/timeline'
 import { formatOverdueDate } from '@/lib/timeUtils'
 import { useMobile } from '@/hooks/useMobile'
+import { getOverdueSuggestions, type OverdueSuggestion } from '@/lib/overdueSuggestions'
 
 interface OverdueSectionProps {
   tasks: Task[]
@@ -28,6 +29,7 @@ interface OverdueSectionProps {
   onFollowUpDismiss?: () => void
   panelOpen?: boolean
   onClosePanel?: () => void
+  onDeleteTask?: (taskId: string) => void
 }
 
 export function OverdueSection({
@@ -48,6 +50,7 @@ export function OverdueSection({
   onFollowUpDismiss,
   panelOpen,
   onClosePanel,
+  onDeleteTask,
 }: OverdueSectionProps) {
   const isMobile = useMobile()
 
@@ -131,6 +134,8 @@ export function OverdueSection({
             )
           }
 
+          const suggestions = getOverdueSuggestions(task, contactName || undefined)
+
           return (
             <div key={task.id} className={parentVisible ? 'ml-6 border-l-2 border-neutral-200 pl-2' : ''}>
               <ScheduleItem
@@ -158,6 +163,14 @@ export function OverdueSection({
                 panelOpen={panelOpen}
                 onClosePanel={onClosePanel}
               />
+              {suggestions.length > 0 && (
+                <SuggestionChips
+                  suggestions={suggestions}
+                  taskId={taskId}
+                  onPush={onPushTask}
+                  onDelete={onDeleteTask}
+                />
+              )}
               {followUpTaskId === taskId && onFollowUpSubmit && onFollowUpDismiss && (
                 <FollowUpInput
                   sourceTask={task}
@@ -170,6 +183,48 @@ export function OverdueSection({
           )
         })}
       </div>
+    </div>
+  )
+}
+
+function SuggestionChips({
+  suggestions,
+  taskId,
+  onPush,
+  onDelete,
+}: {
+  suggestions: OverdueSuggestion[]
+  taskId: string
+  onPush?: (taskId: string, target: Date | 'week' | 'month' | 'quarter') => void
+  onDelete?: (taskId: string) => void
+}) {
+  return (
+    <div className="flex gap-2 ml-8 mt-0.5 mb-2">
+      {suggestions.map((s) => (
+        <button
+          key={s.type}
+          onClick={() => {
+            if (s.type === 'call' && s.phoneNumber) {
+              window.open(`tel:${s.phoneNumber}`, '_self')
+            } else if (s.type === 'open_link' && s.url) {
+              window.open(s.url, '_blank')
+            } else if (s.type === 'someday' && onPush) {
+              onPush(taskId, 'quarter')
+            } else if (s.type === 'stale' && onDelete) {
+              onDelete(taskId)
+            }
+          }}
+          className="text-xs px-2.5 py-1 rounded-full border transition-colors bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
+        >
+          {s.type === 'call' && (
+            <span className="mr-1">&#9743;</span>
+          )}
+          {s.type === 'open_link' && (
+            <span className="mr-1">&rarr;</span>
+          )}
+          {s.label}
+        </button>
+      ))}
     </div>
   )
 }

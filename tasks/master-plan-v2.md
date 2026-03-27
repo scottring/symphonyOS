@@ -33,21 +33,31 @@
 ### Phase 3: Wall System Access ✅
 - [x] Wire the wall into sidebar navigation so it's reachable from the UI (opens /wall in new tab)
 
+### Infrastructure ✅
+- [x] Open Brain running on Mac Mini with Cloudflare Tunnel (brain.symphony-os.com)
+- [x] Open Brain API hardened (API key auth, CORS locked to symphony-os.com + localhost)
+- [x] Symphony → Open Brain API connection (`src/lib/openBrain.ts`)
+- [x] Symphony → vault write-back for captures (dual-write pattern)
+- [x] pm2 process management + launchd for cloudflared
+
 ### Phase 4: Build the New Vision (in order)
-1. **Unified notes viewer/editor** — one stream, vault as source of truth, Open Brain API powers search/retrieval, Symphony writes back to vault
-2. **Smart overdue suggestions** — AI reads task context (links, phone numbers, notes, staleness) and suggests contextual actions
-3. **Email intelligence** — Gmail triage agent, surface email cards in day view, suggested actions (like the Kelly/UPM example)
-4. **Agent pane** — persistent right-side overlay, conversational fallback, context-aware, action-capable
+1. **Unified notes viewer/editor** ✅ — vault notes fetched via Open Brain, merged into notes stream, lazy content loading, dual-write captures
+2. **Smart overdue suggestions** ✅ — rule-based contextual chips on overdue tasks (call, open link, move to someday, stale check, follow up)
+3. **Email intelligence** ✅ — Email action items surfaced in Today schedule (EmailActionsBanner), ActionQueueBar for gmail-check approvals already wired, edge functions deployed
+4. **Agent pane** ✅ — persistent right-side overlay accessible from sidebar + schedule, context-aware with entity context + semantic search, uses symphony-chat edge function (Claude Haiku). Action-capable via action queue integration (future: add tool use to edge function)
 5. **Routine intelligence** — behavior tracking embedded in routines (like the Kjellum bedtime example), pattern recognition, contextual reminders
 
 ---
 
 ## Infrastructure Needed
 
-- [ ] Open Brain running on Mac Mini with stable network endpoint (Cloudflare Tunnel or Tailscale)
-- [ ] Open Brain API hardened (auth, CORS)
-- [ ] Symphony → Open Brain API connection for knowledge/search
-- [ ] Symphony → vault write-back for captures and notes
+- [x] Open Brain running on Mac Mini with stable network endpoint (Cloudflare Tunnel)
+- [x] Open Brain API hardened (auth, CORS)
+- [x] Symphony → Open Brain API connection for knowledge/search
+- [x] Symphony → vault write-back for captures and notes
+- [ ] SQLite vector database populated on Mac Mini (embeddings)
+- [ ] Vault git sync cron job on Mac Mini (auto pull/push every 5 min)
+- [ ] Uptime monitoring for brain.symphony-os.com
 
 ---
 

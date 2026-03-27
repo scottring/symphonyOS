@@ -131,6 +131,8 @@ interface ScheduleItemProps {
   variant?: 'full' | 'minimal'
   // Hide time label (for same-time grouping) — preserves column space
   hideTime?: boolean
+  // Routine streak count (shown as badge for routines)
+  routineStreak?: number
 }
 
 // Warm muted color tokens for overdue styling
@@ -204,6 +206,7 @@ export const ScheduleItem = memo(function ScheduleItem({
   isSuggestedPromotion,
   variant = 'full',
   hideTime,
+  routineStreak,
 }: ScheduleItemProps) {
   const isMobile = useMobile()
   const isTask = item.type === 'task'
@@ -437,6 +440,12 @@ export const ScheduleItem = memo(function ScheduleItem({
                 <span className="ml-1.5 text-xs text-amber-500 not-italic font-normal">waiting</span>
               )}
             </span>
+            {/* Routine streak badge */}
+            {isRoutine && routineStreak != null && routineStreak > 0 && !item.completed && !item.skipped && (
+              <span className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded text-xs font-medium" title={`${routineStreak}-day streak`}>
+                🔥 {routineStreak}
+              </span>
+            )}
             {/* Category chip - only show for non-task categories */}
             {item.category && item.category !== 'task' && (
               <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded text-xs font-medium">
