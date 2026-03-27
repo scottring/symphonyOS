@@ -65,7 +65,7 @@ export function ChatPanel({
           </div>
           <div>
             <h3 className="text-sm font-medium text-neutral-800">
-              {mode === 'guided_reflection' ? 'Guided Reflection' : 'Symphony AI'}
+              {mode === 'guided_reflection' ? 'Think It Through' : 'Symphony AI'}
             </h3>
             {entityContext && (
               <p className="text-[10px] text-neutral-400">
@@ -109,7 +109,7 @@ export function ChatPanel({
             </div>
             <p className="text-sm text-neutral-500 mb-1">
               {mode === 'guided_reflection' && entityContext
-                ? `Let's reflect on ${entityContext.name}`
+                ? `Let's think through ${entityContext.name}`
                 : entityContext
                 ? `Ask about ${entityContext.name}`
                 : 'Ask me anything'
@@ -117,7 +117,7 @@ export function ChatPanel({
             </p>
             <p className="text-xs text-neutral-400">
               {mode === 'guided_reflection'
-                ? "I'll guide you through a reflection — your thinking, your words"
+                ? "I'll ask questions to help you explore this — save the result if it's worth keeping"
                 : "I'll search your vault and Symphony data for context"
               }
             </p>

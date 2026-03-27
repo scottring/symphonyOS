@@ -1266,6 +1266,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
               onUpdateEventAssignment={updateEventAssignmentAll}
               eventProjectId={selectedEventProjectId}
               onUpdateEventProject={updateEventProject}
+              onOpenGuidedChat={handleOpenGuidedChat}
             />
           </Suspense>
         )

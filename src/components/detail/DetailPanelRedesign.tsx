@@ -170,6 +170,8 @@ interface DetailPanelRedesignProps {
   onUpdateEventProject?: (googleEventId: string, projectId: string | null, eventTitle?: string | null, eventStartTime?: Date | null) => void
   // Quick action support for linked tasks
   getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
+  // Guided reflection
+  onOpenGuidedChat?: (entityType: 'task' | 'contact' | 'project' | 'event', entityId: string, entityName: string, prompt?: string) => void
 }
 
 function ActionIcon({ type }: { type: DetectedAction['icon'] }) {
@@ -626,6 +628,7 @@ export function DetailPanelRedesign({
   eventProjectId,
   onUpdateEventProject,
   getScheduleItemsForDate,
+  onOpenGuidedChat,
 }: DetailPanelRedesignProps) {
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -2119,6 +2122,26 @@ export function DetailPanelRedesign({
         {/* Agent Insights - proactive data fetched for this task */}
         {isTask && item.id && (
           <AgentInsightsSection taskId={item.id.replace('task-', '')} />
+        )}
+
+        {/* Think Through — AI-guided exploration that can become a vault note */}
+        {isTask && item.id && onOpenGuidedChat && (
+          <div className="mx-4 mt-3">
+            <button
+              onClick={() => {
+                const taskId = item.id.replace('task-', '')
+                onOpenGuidedChat('task', taskId, item.title, `Help me think through: ${item.title}`)
+              }}
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl
+                         bg-violet-50 hover:bg-violet-100 text-violet-700 text-sm font-medium
+                         transition-colors border border-violet-200/50"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M18 13V5a2 2 0 00-2-2H4a2 2 0 00-2 2v8a2 2 0 002 2h3l3 3 3-3h3a2 2 0 002-2zM5 7a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm1 3a1 1 0 100 2h3a1 1 0 100-2H6z" />
+              </svg>
+              Think Through This
+            </button>
+          </div>
         )}
 
         {/* ========================================
