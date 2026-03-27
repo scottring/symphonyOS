@@ -22,6 +22,7 @@ const ACTION_TYPE_CONFIG: Record<
   schedule_meeting: { icon: Calendar, label: 'Meeting', color: 'text-purple-600' },
   update_contact: { icon: UserCog, label: 'Contact', color: 'text-amber-600' },
   write_vault_note: { icon: FileText, label: 'Note', color: 'text-sage-600' },
+  send_text: { icon: Mail, label: 'Text', color: 'text-green-600' },
 }
 
 const SOURCE_LABELS: Record<ActionQueueItem['source'], string> = {
