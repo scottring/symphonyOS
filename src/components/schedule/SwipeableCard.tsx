@@ -238,6 +238,7 @@ export const SwipeableCard = memo(function SwipeableCard({
 
       {/* Main card content */}
       <div
+        data-selectable
         ref={cardRef}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}

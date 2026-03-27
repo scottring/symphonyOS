@@ -24,7 +24,7 @@ interface DayHighlight {
 }
 
 const MAX_DAYS = 4
-const MAX_ITEMS_PER_DAY = 3
+const MAX_ITEMS_PER_DAY = 5
 
 // Custom colors for nodes
 const COLORS = ['bg-[#6DC4A7]', 'bg-[#F26E63]', 'bg-[#F9C35C]', 'bg-[#6DC4A7]']
@@ -43,9 +43,16 @@ function getDayHighlights(days: WallDayData[], _familyMembers: FamilyMember[]): 
     for (const section of ['allday', 'morning', 'afternoon', 'evening'] as const) {
       const sectionItems = day.items[section] || []
       for (const item of sectionItems) {
-        // Show tasks, events, and non-daily routines (weekly pickups, etc.)
-        const isNonDailyRoutine = item.type === 'routine' && item.recurrencePattern?.type && item.recurrencePattern.type !== 'daily'
-        if ((item.type !== 'routine' || isNonDailyRoutine) && !item.completed && items.length < MAX_ITEMS_PER_DAY) {
+        // Show tasks and events. Only show routines that are truly infrequent
+        // (weekly with 1-2 days, like soccer practice) — skip daily routines and
+        // routines that run most days (specific_days with 3+ days, weekday routines, etc.)
+        if (item.type === 'routine') {
+          const rp = item.recurrencePattern
+          if (!rp) continue
+          const isInfrequent = rp.type === 'weekly' && rp.days && rp.days.length <= 2
+          if (!isInfrequent) continue
+        }
+        if (!item.completed && items.length < MAX_ITEMS_PER_DAY) {
           items.push({
             title: item.title.toUpperCase(),
             time: item.startTime && !item.allDay ? formatTime(item.startTime) : null,

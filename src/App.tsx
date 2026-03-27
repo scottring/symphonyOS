@@ -24,7 +24,7 @@ import type { PinnableEntityType } from '@/types/pin'
 import { supabase } from '@/lib/supabase'
 import { DomainPageOutline } from '@/components/domain/DomainPageOutline'
 import { ViewRouter } from '@/components/layout/ViewRouter'
-import { AppShell } from '@/components/layout/AppShell'
+import { AppShell, type PanelTab } from '@/components/layout/AppShell'
 import { useFocusMode } from '@/hooks/useFocusMode'
 import { SearchModal } from '@/components/search/SearchModal'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
@@ -146,6 +146,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   const { isHidden: isEventHidden, hideEvent } = useHiddenCalendarEvents()
   const chat = useChat()
   const [chatOpen, setChatOpen] = useState(false)
+  const [activePanelTab, setActivePanelTab] = useState<PanelTab>('details')
   const [confirmationToast, setConfirmationToast] = useState<ConfirmationToastMessage | null>(null)
 
   const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, updateEventAssignmentAll, updateRecipeUrl, updateEventProject, getNote, getEventNotesForProject, updateEventContext, notes: eventNotesMap } = useEventNotes()
@@ -291,13 +292,14 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
         setSearchOpen(true)
       }
       // Escape to close panel (search modal handles its own escape)
-      if (e.key === 'Escape' && selectedItemId && !searchOpen) {
-        setSelectedItemId(null)
+      if (e.key === 'Escape' && !searchOpen) {
+        if (selectedItemId) setSelectedItemId(null)
+        if (chatOpen) setChatOpen(false)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedItemId, searchOpen])
+  }, [selectedItemId, chatOpen, searchOpen])
 
   // Auto-open QuickCapture from URL parameter (for Action Button shortcut)
   // Store intent in sessionStorage to preserve through auth flow
@@ -552,6 +554,20 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     setSelectedItemId(itemId)
     setSelectedTaskId(null)
     setRecipeUrl(null)
+    // When selecting an item, switch to details tab
+    setActivePanelTab('details')
+  }, [])
+
+  // Dismiss panel — called when clicking empty space in main content
+  const handleDismissPanel = useCallback(() => {
+    setSelectedItemId(null)
+    setChatOpen(false)
+  }, [])
+
+  // Handle chat open — auto-switch to AI tab
+  const handleChatOpenChange = useCallback((open: boolean) => {
+    setChatOpen(open)
+    if (open) setActivePanelTab('ai')
   }, [])
 
   // Get selected task for TaskView (desktop)
@@ -945,7 +961,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
 
     // Navigation
     onRefreshInstances: refreshDateInstances,
-    onOpenChat: () => setChatOpen(true),
+    onOpenChat: () => handleChatOpenChange(true),
     onStartMeeting: meetingNotes.startMeeting,
     onUpdateEventProject: updateEventProject,
   }), [
@@ -955,7 +971,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     eventNotesMap, eventContextOverrides,
     handleSendToList, handleCreateListInTriage, addProject, searchContacts, addContact,
     handleOpenProject, getDomainForCalendar,
-    refreshDateInstances, meetingNotes.startMeeting, updateEventProject,
+    refreshDateInstances, meetingNotes.startMeeting, updateEventProject, handleChatOpenChange,
   ])
 
   return (
@@ -963,6 +979,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       sidebarCollapsed={sidebarCollapsed}
       onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
       panelOpen={selectedItemId !== null || recipeUrl !== null}
+      onDismissPanel={handleDismissPanel}
       focusModeOpen={focusMode.isOpen}
       userEmail={user.email ?? undefined}
       userName={getCurrentUserMember()?.name}
@@ -1073,7 +1090,9 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       onPinMarkAccessed={pinnedItems.markAccessed}
       onPinRefreshStale={pinnedItems.refreshStale}
       chatOpen={chatOpen}
-      onChatOpenChange={setChatOpen}
+      onChatOpenChange={handleChatOpenChange}
+      activePanelTab={activePanelTab}
+      onPanelTabChange={setActivePanelTab}
       chatMessages={chat.messages}
       chatLoading={chat.loading}
       chatError={chat.error}

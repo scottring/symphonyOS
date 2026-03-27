@@ -60,6 +60,7 @@ export const InboxTaskCard = memo(function InboxTaskCard({
 
   return (
     <div
+      data-selectable
       onClick={() => {
         // In selection mode, clicking the card toggles selection
         if (selectionMode && onToggleSelection) {
@@ -67,12 +68,8 @@ export const InboxTaskCard = memo(function InboxTaskCard({
           return
         }
 
-        // Normal mode: toggle panel
-        if (panelOpen && onClosePanel) {
-          onClosePanel()
-        } else {
-          onSelect()
-        }
+        // Normal mode: always select this item (switches panel to show details)
+        onSelect()
       }}
       className={`bg-white rounded-xl border pl-0.5 pr-3 py-2.5 shadow-sm cursor-pointer transition-all group ${
         isSelected

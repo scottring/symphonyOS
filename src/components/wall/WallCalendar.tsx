@@ -29,6 +29,7 @@ import { useEmailActionItems } from '@/hooks/useEmailActionItems'
 import { WallEmailActions } from './WallEmailActions'
 import { WallEmailActionsOverlay } from './WallEmailActionsOverlay'
 import { WallCameraView } from './WallCameraView'
+import { WallTodayTimeline } from './WallTodayTimeline'
 
 // ============================================================================
 // HELPERS
@@ -189,6 +190,8 @@ export function WallCalendar() {
   }, [taskItems, wallData.familyMembers, wallData.overdueTasks])
 
   // ═══ DETAIL OVERLAY ═══
+  const todayData = useMemo(() => wallData.days.find(d => d.isToday), [wallData.days])
+
   const handleItemTap = useCallback((item: TimelineItem) => {
     setDetailItem(item)
   }, [])
@@ -402,6 +405,11 @@ export function WallCalendar() {
           <span className="text-[1.1rem] font-bold text-white/30 tracking-wider ml-3">{dateStr}</span>
         </div>
       </header>
+
+      {/* ═══ TODAY'S SCHEDULE — Calendar Events ═══ */}
+      <div className="relative z-10 px-10" style={{ height: 140 }}>
+        <WallTodayTimeline todayData={todayData} />
+      </div>
 
       {/* ═══ MAIN CONTENT — CSS Grid ═══ */}
       <main className="flex-1 grid min-h-0 relative z-10 px-10 pb-6 gap-4"

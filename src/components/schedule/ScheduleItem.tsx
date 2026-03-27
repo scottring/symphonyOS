@@ -273,14 +273,10 @@ export const ScheduleItem = memo(function ScheduleItem({
 
   return (
     <div
+      data-selectable
       onClick={() => {
-        // If panel is open, close it
-        if (panelOpen && onClosePanel) {
-          onClosePanel()
-        } else {
-          // If panel is closed, open for this item
-          onSelect()
-        }
+        // Always select this item (switches panel to show this item's details)
+        onSelect()
       }}
       onKeyDown={handleKeyDown}
       tabIndex={0}

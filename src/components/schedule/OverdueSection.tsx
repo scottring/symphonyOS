@@ -3,9 +3,11 @@ import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
+import type { ProactiveSuggestion, SuggestionEntityType } from '@/types/proactiveSuggestion'
 import { ScheduleItem } from './ScheduleItem'
 import { SwipeableCard } from './SwipeableCard'
 import { FollowUpInput } from './FollowUpInput'
+import { ProactiveSuggestionChips } from './ProactiveSuggestionChips'
 import { taskToTimelineItem } from '@/types/timeline'
 import { formatOverdueDate } from '@/lib/timeUtils'
 import { useMobile } from '@/hooks/useMobile'
@@ -30,6 +32,10 @@ interface OverdueSectionProps {
   panelOpen?: boolean
   onClosePanel?: () => void
   onDeleteTask?: (taskId: string) => void
+  // Proactive suggestions
+  suggestionsForTask?: (entityType: SuggestionEntityType, entityId: string) => ProactiveSuggestion[]
+  onActSuggestion?: (suggestionId: string, detail?: string, outcome?: string) => void
+  onDismissSuggestion?: (suggestionId: string) => void
 }
 
 export function OverdueSection({
@@ -51,6 +57,9 @@ export function OverdueSection({
   panelOpen,
   onClosePanel,
   onDeleteTask,
+  suggestionsForTask,
+  onActSuggestion,
+  onDismissSuggestion,
 }: OverdueSectionProps) {
   const isMobile = useMobile()
 
@@ -134,7 +143,9 @@ export function OverdueSection({
             )
           }
 
-          const suggestions = getOverdueSuggestions(task, contactName || undefined)
+          // Prefer proactive suggestions from engine, fall back to rule-based
+          const proactiveSuggs = suggestionsForTask?.('task', taskId) || []
+          const fallbackSuggs = getOverdueSuggestions(task, contactName || undefined)
 
           return (
             <div key={task.id} className={parentVisible ? 'ml-6 border-l-2 border-neutral-200 pl-2' : ''}>
@@ -163,14 +174,22 @@ export function OverdueSection({
                 panelOpen={panelOpen}
                 onClosePanel={onClosePanel}
               />
-              {suggestions.length > 0 && (
+              {proactiveSuggs.length > 0 && onActSuggestion && onDismissSuggestion ? (
+                <ProactiveSuggestionChips
+                  suggestions={proactiveSuggs}
+                  onAct={onActSuggestion}
+                  onDismiss={onDismissSuggestion}
+                  onPush={onPushTask ? (id: string, target: 'quarter') => onPushTask(id, target) : undefined}
+                  onDelete={onDeleteTask}
+                />
+              ) : fallbackSuggs.length > 0 ? (
                 <SuggestionChips
-                  suggestions={suggestions}
+                  suggestions={fallbackSuggs}
                   taskId={taskId}
                   onPush={onPushTask}
                   onDelete={onDeleteTask}
                 />
-              )}
+              ) : null}
               {followUpTaskId === taskId && onFollowUpSubmit && onFollowUpDismiss && (
                 <FollowUpInput
                   sourceTask={task}
@@ -199,7 +218,7 @@ function SuggestionChips({
   onDelete?: (taskId: string) => void
 }) {
   return (
-    <div className="flex gap-2 ml-8 mt-0.5 mb-2">
+    <div className="flex gap-2 ml-[6.5rem] mt-0.5 mb-2">
       {suggestions.map((s) => (
         <button
           key={s.type}

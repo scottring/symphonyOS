@@ -8,6 +8,7 @@ interface WallCameraViewProps {
 export function WallCameraView({ startExpanded = false }: WallCameraViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [expanded, setExpanded] = useState(startExpanded)
+  const [collapsed, setCollapsed] = useState(false)
   const [streamActive, setStreamActive] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -52,6 +53,21 @@ export function WallCameraView({ startExpanded = false }: WallCameraViewProps) {
     setExpanded(prev => !prev)
   }, [])
 
+  // Collapsed: show just a small icon button
+  if (collapsed) {
+    return (
+      <button
+        className="fixed z-40 bottom-16 right-16 w-14 h-14 rounded-2xl bg-black/60 backdrop-blur-md
+                   border border-white/15 flex items-center justify-center
+                   text-white/50 hover:text-white hover:bg-black/70 transition-all shadow-2xl"
+        onClick={() => setCollapsed(false)}
+        style={{ touchAction: 'manipulation' }}
+      >
+        <span className="text-[1.4rem]">📷</span>
+      </button>
+    )
+  }
+
   if (error) {
     return (
       <div
@@ -91,13 +107,23 @@ export function WallCameraView({ startExpanded = false }: WallCameraViewProps) {
           style={{ transform: 'scaleX(-1)' }}
         />
 
-        {/* PiP label */}
+        {/* PiP: collapse and live label */}
         {!expanded && streamActive && (
-          <div className="absolute bottom-2 left-2 px-2 py-1 rounded-lg bg-black/60 backdrop-blur-sm">
-            <span className="text-white/60 font-black text-[0.55rem] uppercase tracking-widest">
-              Live
-            </span>
-          </div>
+          <>
+            <button
+              onClick={(e) => { e.stopPropagation(); setCollapsed(true) }}
+              className="absolute top-2 right-2 w-8 h-8 rounded-lg bg-black/60 backdrop-blur-sm
+                         flex items-center justify-center text-white/50 hover:text-white
+                         hover:bg-black/80 transition-all text-[0.8rem]"
+            >
+              ✕
+            </button>
+            <div className="absolute bottom-2 left-2 px-2 py-1 rounded-lg bg-black/60 backdrop-blur-sm">
+              <span className="text-white/60 font-black text-[0.55rem] uppercase tracking-widest">
+                Live
+              </span>
+            </div>
+          </>
         )}
 
         {/* Expanded: close button */}

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useState, useCallback, useRef, useEffect, type ReactNode } from 'react'
 import { Sidebar, type ViewType } from './Sidebar'
 import { SidebarKinetic } from './SidebarKinetic'
 import { MoreSheet } from './MoreSheet'
@@ -14,6 +14,8 @@ import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { Routine } from '@/types/routine'
 import type { ChatMessage, EntityContext } from '@/hooks/useChat'
+
+export type PanelTab = 'details' | 'ai'
 
 interface EntityData {
   tasks: Task[]
@@ -65,6 +67,8 @@ interface AppShellProps {
   onPinNavigate?: (entityType: PinnableEntityType, entityId: string) => void
   onPinMarkAccessed?: (entityType: PinnableEntityType, entityId: string) => void
   onPinRefreshStale?: (id: string) => void
+  // Panel dismiss (click-outside-to-close)
+  onDismissPanel?: () => void
   // Chat props
   chatOpen?: boolean
   onChatOpenChange?: (open: boolean) => void
@@ -75,6 +79,9 @@ interface AppShellProps {
   onChatSend?: (message: string) => void
   onChatClear?: () => void
   onChatSourceClick?: (noteId: string) => void
+  // Tabbed panel state
+  activePanelTab?: PanelTab
+  onPanelTabChange?: (tab: PanelTab) => void
 }
 
 export function AppShell({
@@ -104,6 +111,7 @@ export function AppShell({
   onPinNavigate,
   onPinMarkAccessed,
   onPinRefreshStale,
+  onDismissPanel,
   chatOpen = false,
   onChatOpenChange,
   chatMessages = [],
@@ -113,11 +121,44 @@ export function AppShell({
   onChatSend,
   onChatClear,
   onChatSourceClick,
+  activePanelTab = 'details',
+  onPanelTabChange,
 }: AppShellProps) {
   const isMobile = useMobile()
   const { theme } = useTheme()
   const [moreSheetOpen, setMoreSheetOpen] = useState(false)
   const setChatOpen = (open: boolean) => onChatOpenChange?.(open)
+  const mainRef = useRef<HTMLElement>(null)
+
+  // Track window width for three-panel mode
+  // Breakpoint: sidebar(240) + min content(360) + detail(420) + chat(380) ≈ 1400px
+  const [isWideScreen, setIsWideScreen] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth >= 1400 : false
+  )
+  useEffect(() => {
+    const handleResize = () => setIsWideScreen(window.innerWidth >= 1400)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  // Whether the right panel column is visible (detail or chat or both active)
+  const rightPanelVisible = panelOpen || chatOpen
+  const bothPanelsActive = panelOpen && chatOpen
+  // Wide screen: show both panels side-by-side. Narrow: tabbed in single column.
+  const useThreePanelLayout = isWideScreen && bothPanelsActive
+  // Show tabs only when both are active AND screen is too narrow for side-by-side
+  const showPanelTabs = bothPanelsActive && !useThreePanelLayout
+
+  // Click-outside handler: clicking on main content dismisses the panel
+  const handleMainClick = useCallback((e: React.MouseEvent) => {
+    // Only dismiss if click is directly on main or its non-interactive children
+    // Don't dismiss if user clicked on a button, link, input, or data-selectable item
+    const target = e.target as HTMLElement
+    if (target.closest('[data-selectable]') || target.closest('button') || target.closest('a') || target.closest('input') || target.closest('textarea') || target.closest('[role="button"]')) {
+      return
+    }
+    onDismissPanel?.()
+  }, [onDismissPanel])
 
   return (
     <div className="h-screen flex overflow-hidden overflow-x-hidden bg-bg-base w-full max-w-[100vw]">
@@ -159,6 +200,7 @@ export function AppShell({
 
       {/* Main content area */}
       <main
+        ref={mainRef}
         className={`
           relative flex-1 overflow-auto overflow-x-hidden
           transition-all duration-300 ease-in-out
@@ -167,12 +209,15 @@ export function AppShell({
         style={isMobile
           ? { paddingBottom: 'calc(2.75rem + env(safe-area-inset-bottom, 0px))' }
           : {
-              marginRight: panelOpen && focusModeOpen ? '840px'
+              marginRight: useThreePanelLayout && focusModeOpen ? '1220px'  // 420 + 380 + 420
+                : useThreePanelLayout ? '800px'                             // 420 + 380
+                : rightPanelVisible && focusModeOpen ? '840px'
                 : focusModeOpen ? '420px'
-                : panelOpen ? '420px'
+                : rightPanelVisible ? '420px'
                 : '0'
             }
         }
+        onClick={!isMobile ? handleMainClick : undefined}
       >
         {/* Mobile header */}
         {isMobile && (
@@ -235,30 +280,160 @@ export function AppShell({
         />
       )}
 
-      {/* Detail panel - full screen overlay on mobile */}
+      {/* Right panel column — tabbed: Details + AI share one 420px column */}
       {isMobile ? (
-        <div
-          className={`
-            fixed inset-0 z-50 bg-bg-elevated
-            transform transition-transform duration-300 ease-out
-            ${panelOpen ? 'translate-x-0' : 'translate-x-full'}
-            safe-top safe-bottom
-          `}
-        >
-          {panel}
-        </div>
+        <>
+          {/* Mobile: detail panel as full-screen overlay */}
+          <div
+            className={`
+              fixed inset-0 z-50 bg-bg-elevated
+              transform transition-transform duration-300 ease-out
+              ${panelOpen ? 'translate-x-0' : 'translate-x-full'}
+              safe-top safe-bottom
+            `}
+          >
+            {panel}
+          </div>
+          {/* Mobile: chat panel as full-screen overlay */}
+          {onChatSend && (
+            <div
+              className={`
+                fixed inset-0 z-50 bg-white
+                transform transition-transform duration-300 ease-out
+                ${chatOpen ? 'translate-x-0' : 'translate-x-full'}
+              `}
+              style={{ paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+            >
+              <ChatPanel
+                messages={chatMessages}
+                loading={chatLoading}
+                error={chatError}
+                entityContext={chatEntityContext}
+                onSend={onChatSend}
+                onClear={onChatClear ?? (() => {})}
+                onClose={() => setChatOpen(false)}
+                onSourceClick={onChatSourceClick}
+              />
+            </div>
+          )}
+        </>
+      ) : useThreePanelLayout ? (
+        /* Wide screen: detail and chat as separate side-by-side panels */
+        <>
+          {/* Detail panel — left of pair */}
+          <aside
+            className={`
+              fixed top-0 h-full w-[420px]
+              bg-bg-elevated border-l border-neutral-200/80
+              transform transition-all duration-300 ease-out
+              ${panelOpen ? 'translate-x-0' : 'translate-x-full'}
+              shadow-xl z-20
+            `}
+            style={{ right: (focusModeOpen ? 420 : 0) + 380 }}
+          >
+            {panel}
+          </aside>
+
+          {/* Chat panel — rightmost */}
+          {onChatSend && (
+            <aside
+              className={`
+                fixed top-0 right-0 h-full w-[380px]
+                bg-bg-elevated border-l border-neutral-200/80
+                transform transition-all duration-300 ease-out
+                ${chatOpen ? 'translate-x-0' : 'translate-x-full'}
+                shadow-xl z-20
+              `}
+              style={{ right: focusModeOpen ? 420 : 0 }}
+            >
+              <ChatPanel
+                messages={chatMessages}
+                loading={chatLoading}
+                error={chatError}
+                entityContext={chatEntityContext}
+                onSend={onChatSend}
+                onClear={onChatClear ?? (() => {})}
+                onClose={() => setChatOpen(false)}
+                onSourceClick={onChatSourceClick}
+              />
+            </aside>
+          )}
+        </>
       ) : (
+        /* Narrow screen or single panel: tabbed single column */
         <aside
           className={`
             fixed top-0 h-full w-[420px]
             bg-bg-elevated border-l border-neutral-200/80
             transform transition-all duration-300 ease-out
-            ${panelOpen ? 'translate-x-0' : 'translate-x-full'}
-            shadow-xl z-20
+            ${rightPanelVisible ? 'translate-x-0' : 'translate-x-full'}
+            shadow-xl z-20 flex flex-col
           `}
           style={{ right: focusModeOpen ? '420px' : '0' }}
         >
-          {panel}
+          {/* Tabs — shown when both detail and chat are active on narrow screens */}
+          {showPanelTabs && (
+            <div className="flex border-b border-neutral-200/80 bg-bg-elevated shrink-0">
+              <button
+                onClick={() => onPanelTabChange?.('details')}
+                className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors relative ${
+                  activePanelTab === 'details'
+                    ? 'text-neutral-900'
+                    : 'text-neutral-400 hover:text-neutral-600'
+                }`}
+              >
+                Details
+                {activePanelTab === 'details' && (
+                  <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-primary-500 rounded-full" />
+                )}
+              </button>
+              <button
+                onClick={() => onPanelTabChange?.('ai')}
+                className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors relative ${
+                  activePanelTab === 'ai'
+                    ? 'text-neutral-900'
+                    : 'text-neutral-400 hover:text-neutral-600'
+                }`}
+              >
+                AI
+                {activePanelTab === 'ai' && (
+                  <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-primary-500 rounded-full" />
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Panel content — switch between detail and chat */}
+          <div className="flex-1 overflow-hidden relative">
+            {/* Detail panel */}
+            <div className={`absolute inset-0 ${
+              (!showPanelTabs && panelOpen) || activePanelTab === 'details'
+                ? 'opacity-100 pointer-events-auto z-10'
+                : 'opacity-0 pointer-events-none z-0'
+            } ${!panelOpen ? 'hidden' : ''}`}>
+              {panel}
+            </div>
+
+            {/* Chat panel */}
+            {onChatSend && (
+              <div className={`absolute inset-0 ${
+                (!showPanelTabs && chatOpen && !panelOpen) || (showPanelTabs && activePanelTab === 'ai')
+                  ? 'opacity-100 pointer-events-auto z-10'
+                  : 'opacity-0 pointer-events-none z-0'
+              } ${!chatOpen ? 'hidden' : ''}`}>
+                <ChatPanel
+                  messages={chatMessages}
+                  loading={chatLoading}
+                  error={chatError}
+                  entityContext={chatEntityContext}
+                  onSend={onChatSend}
+                  onClear={onChatClear ?? (() => {})}
+                  onClose={() => setChatOpen(false)}
+                  onSourceClick={onChatSourceClick}
+                />
+              </div>
+            )}
+          </div>
         </aside>
       )}
 
@@ -331,50 +506,6 @@ export function AppShell({
         />
       )}
 
-      {/* Chat panel — slide-in from right */}
-      {onChatSend && (
-        isMobile ? (
-          <div
-            className={`
-              fixed inset-0 z-50 bg-white
-              transform transition-transform duration-300 ease-out
-              ${chatOpen ? 'translate-x-0' : 'translate-x-full'}
-            `}
-            style={{ paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
-          >
-            <ChatPanel
-              messages={chatMessages}
-              loading={chatLoading}
-              error={chatError}
-              entityContext={chatEntityContext}
-              onSend={onChatSend}
-              onClear={onChatClear ?? (() => {})}
-              onClose={() => setChatOpen(false)}
-              onSourceClick={onChatSourceClick}
-            />
-          </div>
-        ) : (
-          <aside
-            className={`
-              fixed top-0 right-0 h-full w-[380px]
-              transform transition-all duration-300 ease-out
-              shadow-xl z-30
-              ${chatOpen ? 'translate-x-0' : 'translate-x-full'}
-            `}
-          >
-            <ChatPanel
-              messages={chatMessages}
-              loading={chatLoading}
-              error={chatError}
-              entityContext={chatEntityContext}
-              onSend={onChatSend}
-              onClear={onChatClear ?? (() => {})}
-              onClose={() => setChatOpen(false)}
-              onSourceClick={onChatSourceClick}
-            />
-          </aside>
-        )
-      )}
     </div>
   )
 }
