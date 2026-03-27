@@ -6,6 +6,7 @@ import { HomeView } from '@/components/home'
 import { MeetingNotesView } from '@/components/meeting/MeetingNotesView'
 import { ActionQueueBar } from '@/components/actions/ActionQueueBar'
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
+import { InboxView } from '@/components/schedule/InboxView'
 import { useGoalsContext } from '@/contexts/GoalsContext'
 import { useListsContext } from '@/contexts/ListsContext'
 import { useNotesContext } from '@/contexts/NotesContext'
@@ -193,6 +194,19 @@ export function ViewRouter(props: ViewRouterProps) {
             </>
           )}
         </div>
+      )}
+
+      {props.activeView === 'inbox' && (
+        <ScheduleActionsProvider value={props.scheduleActionsValue}>
+          <InboxView
+            tasks={props.tasks}
+            projects={props.projects}
+            selectedItemId={props.selectedItemId}
+            onSelectItem={props.onSelectItem}
+            panelOpen={props.selectedItemId !== null}
+            onClosePanel={() => props.onSelectItem(null)}
+          />
+        </ScheduleActionsProvider>
       )}
 
       {props.planningOpen && (

@@ -128,6 +128,99 @@ export async function semanticSearch(
 }
 
 // ============================================================================
+// iMessage
+// ============================================================================
+
+export interface IMessage {
+  id: number
+  text: string | null
+  date: string         // ISO date string
+  isFromMe: boolean
+  service: string      // 'iMessage' | 'SMS'
+  hasAttachments: boolean
+}
+
+export interface IMessageConversation {
+  chatId: number
+  identifier: string   // phone or email
+  displayName: string | null
+  service: string
+  isGroup: boolean
+  lastMessage: {
+    text: string
+    date: string
+    isFromMe: boolean
+  } | null
+  messageCount: number
+}
+
+export interface IMessageStatus {
+  available: boolean
+  messageCount?: number
+  contactCount?: number
+  error?: string
+}
+
+/** Check if iMessage integration is available */
+export async function checkMessagesStatus(): Promise<IMessageStatus> {
+  const result = await callOpenBrain<IMessageStatus>('/api/messages/status', { timeout: 3000 })
+  return result ?? { available: false }
+}
+
+/** Fetch recent conversations */
+export async function fetchConversations(limit = 20): Promise<IMessageConversation[] | null> {
+  const result = await callOpenBrain<{ conversations: IMessageConversation[] }>(
+    `/api/messages/conversations?limit=${limit}`,
+  )
+  return result?.conversations ?? null
+}
+
+/** Fetch messages for a specific contact (phone number or email) */
+export async function fetchContactMessages(
+  identifier: string,
+  options: { limit?: number; before?: string } = {},
+): Promise<{ messages: IMessage[]; found: boolean } | null> {
+  const params = new URLSearchParams()
+  if (options.limit) params.set('limit', String(options.limit))
+  if (options.before) params.set('before', options.before)
+  const qs = params.toString() ? `?${params.toString()}` : ''
+
+  return callOpenBrain<{ messages: IMessage[]; found: boolean }>(
+    `/api/messages/contact/${encodeURIComponent(identifier)}${qs}`,
+    { timeout: 8000 },
+  )
+}
+
+/** Search messages by text */
+export async function searchMessages(
+  query: string,
+  options: { limit?: number; contact?: string } = {},
+): Promise<IMessage[] | null> {
+  const params = new URLSearchParams({ q: query })
+  if (options.limit) params.set('limit', String(options.limit))
+  if (options.contact) params.set('contact', options.contact)
+
+  const result = await callOpenBrain<{ messages: IMessage[] }>(
+    `/api/messages/search?${params.toString()}`,
+    { timeout: 8000 },
+  )
+  return result?.messages ?? null
+}
+
+/** Send an iMessage/SMS via Open Brain */
+export async function sendMessage(
+  to: string,
+  message: string,
+  service?: 'iMessage' | 'SMS',
+): Promise<{ sent: boolean; service: string } | null> {
+  return callOpenBrain<{ sent: boolean; service: string }>('/api/messages/send', {
+    method: 'POST',
+    body: JSON.stringify({ to, message, service }),
+    timeout: 15000,
+  })
+}
+
+// ============================================================================
 // Health
 // ============================================================================
 

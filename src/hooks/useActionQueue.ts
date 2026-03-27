@@ -6,7 +6,7 @@ import { logger } from '@/lib/logger'
 export interface ActionQueueItem {
   id: string
   user_id: string
-  action_type: 'send_email' | 'create_task' | 'schedule_meeting' | 'update_contact' | 'write_vault_note'
+  action_type: 'send_email' | 'create_task' | 'schedule_meeting' | 'update_contact' | 'write_vault_note' | 'send_text'
   summary: string
   payload: Record<string, unknown>
   source: 'email' | 'meeting' | 'transcript' | 'ai_chat' | 'system'

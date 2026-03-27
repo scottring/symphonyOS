@@ -23,8 +23,10 @@ import type { FamilyMember } from '@/types/family'
 import { TaskQuickActions, ContextPicker, type ScheduleContextItem } from '@/components/triage'
 import { TiptapEditor } from '@/components/notes/TiptapEditor'
 import { NotesEditorModal } from '@/components/notes/NotesEditorModal'
-import { AgentInsightsSection } from './AgentInsightsSection'
+// AgentInsightsSection removed — replaced by "Think Through This" guided notes
 import { EventEmailsSection } from '@/components/schedule/EventEmailsSection'
+import { MessageThread } from '@/components/messages/MessageThread'
+import { useMessages } from '@/hooks/useMessages'
 
 // Component to render text with clickable links (handles HTML links and plain URLs)
 function RichText({ text }: { text: string }) {
@@ -1028,6 +1030,11 @@ export function DetailPanelRedesign({
     await handleAddLinkedTask(title, linkType)
   }, [item, routine, onUpdateRoutine, handleAddLinkedTask])
 
+  // iMessage integration — must be above early return to maintain hook order
+  const phoneNumber = contact?.phone || item?.phoneNumber
+  const { messages: iMessages, loading: iMessagesLoading, available: iMessagesAvailable, sending: iMessageSending, send: sendIMessage, refresh: refreshIMessages } = useMessages(phoneNumber)
+  const [showMessages, setShowMessages] = useState(false)
+
   if (!item) return null
 
   const isTask = item.type === 'task'
@@ -1317,8 +1324,6 @@ export function DetailPanelRedesign({
         ? formatTimeWithDate(item.startTime)
         : 'All day'
     : 'Unscheduled'
-
-  const phoneNumber = contact?.phone || item.phoneNumber
 
   return (
     <div className="h-full flex flex-col bg-bg-base">
@@ -2119,11 +2124,6 @@ export function DetailPanelRedesign({
           </div>
         )}
 
-        {/* Agent Insights - proactive data fetched for this task */}
-        {isTask && item.id && (
-          <AgentInsightsSection taskId={item.id.replace('task-', '')} />
-        )}
-
         {/* Think Through — AI-guided exploration that can become a vault note */}
         {isTask && item.id && onOpenGuidedChat && (
           <div className="mx-4 mt-3">
@@ -2249,6 +2249,37 @@ export function DetailPanelRedesign({
                     </div>
                   )}
                 />
+
+                {/* iMessage Thread (expandable, shown when contact has phone) */}
+                {contact && phoneNumber && iMessagesAvailable && (
+                  <div className="mt-1">
+                    <button
+                      onClick={() => setShowMessages(!showMessages)}
+                      className="flex items-center gap-2 w-full px-2 py-1.5 text-xs text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50 rounded-lg transition-colors"
+                    >
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+                      </svg>
+                      <span>{showMessages ? 'Hide' : 'Show'} messages{iMessages.length > 0 ? ` (${iMessages.length})` : ''}</span>
+                      <svg className={`w-3 h-3 ml-auto transition-transform ${showMessages ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                    {showMessages && (
+                      <div className="mt-1 border border-neutral-100 rounded-xl overflow-hidden bg-white">
+                        <MessageThread
+                          messages={iMessages}
+                          loading={iMessagesLoading}
+                          available={iMessagesAvailable}
+                          sending={iMessageSending}
+                          contactName={contact.name}
+                          onSend={sendIMessage}
+                          onRefresh={refreshIMessages}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Location Row */}
                 <DetailRow

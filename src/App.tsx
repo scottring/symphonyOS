@@ -302,7 +302,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   const params = useParams<{ projectId?: string; routineId?: string; contactId?: string }>()
 
   // State for non-URL-routed views
-  const [stateView, setStateView] = useState<'today' | 'lists' | 'notes' | 'history' | 'settings' | 'task-detail' | null>(null)
+  const [stateView, setStateView] = useState<'today' | 'inbox' | 'lists' | 'notes' | 'history' | 'settings' | 'task-detail' | null>(null)
 
   // Derive view from URL path or state
   const activeView: ViewType = useMemo(() => {
@@ -525,7 +525,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       navigate('/contacts')
     }
     // Handle state-based views
-    else if (view === 'lists' || view === 'notes' || view === 'history' || view === 'settings' || view === 'task-detail') {
+    else if (view === 'inbox' || view === 'lists' || view === 'notes' || view === 'history' || view === 'settings' || view === 'task-detail') {
       setStateView(view)
       navigate('/') // Navigate to home URL but show state view
     } else {

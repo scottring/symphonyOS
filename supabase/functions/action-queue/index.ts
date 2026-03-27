@@ -211,6 +211,9 @@ async function executeAction(
     case 'write_vault_note':
       return executeWriteVaultNote(userSupabase, userId, payload)
 
+    case 'send_text':
+      return executeSendText(payload)
+
     default:
       throw new Error(`Unknown action type: ${actionType}`)
   }
@@ -334,4 +337,46 @@ async function executeWriteVaultNote(
   if (error) throw new Error(`Failed to write vault note: ${error.message}`)
 
   return { note_id: data.id, title: data.title }
+}
+
+// Send a text message via Open Brain's iMessage integration
+async function executeSendText(
+  payload: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const to = payload.to as string
+  const message = payload.message as string
+  const service = (payload.service as string) || 'iMessage'
+
+  if (!to || !message) {
+    throw new Error('Both "to" and "message" are required in payload')
+  }
+
+  const openBrainUrl = Deno.env.get('OPEN_BRAIN_URL')
+  const openBrainApiKey = Deno.env.get('OPEN_BRAIN_API_KEY')
+
+  if (!openBrainUrl) {
+    throw new Error('OPEN_BRAIN_URL not configured — cannot send text messages')
+  }
+
+  const response = await fetch(`${openBrainUrl}/api/messages/send`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(openBrainApiKey ? { 'X-Api-Key': openBrainApiKey } : {}),
+    },
+    body: JSON.stringify({ to, message, service }),
+  })
+
+  if (!response.ok) {
+    const errorBody = await response.text()
+    throw new Error(`Failed to send text: ${response.status} ${errorBody}`)
+  }
+
+  const result = await response.json()
+  return {
+    sent: result.sent,
+    to,
+    service: result.service,
+    message_preview: message.slice(0, 100),
+  }
 }

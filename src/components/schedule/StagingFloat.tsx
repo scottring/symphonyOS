@@ -81,6 +81,7 @@ export function StagingFloat({ inboxTasks, weekTasks, onPullToToday, onSelectTas
               return (
                 <div
                   key={task.id}
+                  data-selectable
                   className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl hover:bg-neutral-100/60 transition-colors cursor-pointer group"
                   onClick={() => {
                     onSelectTask(task.id)
