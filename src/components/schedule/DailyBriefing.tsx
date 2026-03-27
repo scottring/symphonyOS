@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import type { ProactiveSuggestion } from '@/types/proactiveSuggestion'
+import { OutcomePicker, type ActionOutcome } from './OutcomePicker'
 
 interface DailyBriefingProps {
   suggestions: ProactiveSuggestion[]
   onAct: (suggestionId: string, detail?: string, outcome?: string) => void
   onDismiss: (suggestionId: string) => void
   onSelectTask: (taskId: string) => void
+  onOpenGuidedChat?: (entityType: 'task' | 'contact' | 'project' | 'event', entityId: string, entityName: string, prompt?: string) => void
   lastUpdated: Date | null
 }
 
@@ -28,34 +30,45 @@ export function DailyBriefing({
   onAct,
   onDismiss,
   onSelectTask,
+  onOpenGuidedChat,
   lastUpdated,
 }: DailyBriefingProps) {
   const [collapsed, setCollapsed] = useState(false)
+  const [pendingOutcome, setPendingOutcome] = useState<{
+    suggestionId: string
+    actionType: string
+    detail: string
+  } | null>(null)
 
   if (suggestions.length === 0) return null
 
   const handleAction = (s: ProactiveSuggestion) => {
     const payload = s.actionPayload
+    const actionType = s.actionType || s.suggestionType
 
-    switch (s.actionType || s.suggestionType) {
+    switch (actionType) {
       case 'call':
         if (payload.phoneNumber) {
           window.open(`tel:${payload.phoneNumber}`, '_self')
-          onAct(s.id, `Called ${payload.phoneNumber}`)
+          setPendingOutcome({
+            suggestionId: s.id,
+            actionType: 'call',
+            detail: `Called ${payload.phoneNumber}`,
+          })
         }
         break
       case 'email':
         if (payload.email) {
           const subject = payload.subject ? `?subject=${encodeURIComponent(String(payload.subject))}` : ''
           window.open(`mailto:${payload.email}${subject}`, '_blank')
-          onAct(s.id, `Emailed ${payload.email}`)
+          onAct(s.id, `Emailed ${payload.email}`, 'sent')
         }
         break
       case 'text':
         if (payload.phoneNumber) {
           const body = payload.messageTemplate ? `&body=${encodeURIComponent(String(payload.messageTemplate))}` : ''
           window.open(`sms:${payload.phoneNumber}${body}`, '_self')
-          onAct(s.id, `Texted ${payload.phoneNumber}`)
+          onAct(s.id, `Texted ${payload.phoneNumber}`, 'sent')
         }
         break
       case 'open_link':
@@ -73,14 +86,35 @@ export function DailyBriefing({
           onAct(s.id, `Navigated to ${payload.location}`)
         }
         break
+      case 'guided_chat':
+        if (onOpenGuidedChat) {
+          const entityType = s.entityType === 'calendar_event' ? 'event' as const : s.entityType === 'task' ? 'task' as const : 'task' as const
+          const guidedPrompt = payload.prompt ? String(payload.prompt) : s.detail || `Help me think through: ${s.title}`
+          onOpenGuidedChat(entityType, s.entityId, s.title, guidedPrompt)
+          onAct(s.id, 'Opened guided chat')
+        }
+        break
       default:
-        // Navigate to the entity for non-direct actions
         if (s.entityType === 'task') {
           onSelectTask(`task-${s.entityId}`)
         } else if (s.entityType === 'calendar_event') {
           onSelectTask(`event-${s.entityId}`)
         }
         break
+    }
+  }
+
+  const handleOutcomeSelect = (outcome: ActionOutcome) => {
+    if (pendingOutcome) {
+      onAct(pendingOutcome.suggestionId, pendingOutcome.detail, outcome)
+      setPendingOutcome(null)
+    }
+  }
+
+  const handleOutcomeCancel = () => {
+    if (pendingOutcome) {
+      onAct(pendingOutcome.suggestionId, pendingOutcome.detail)
+      setPendingOutcome(null)
     }
   }
 
@@ -110,7 +144,18 @@ export function DailyBriefing({
         </svg>
       </button>
 
-      {!collapsed && (
+      {/* Outcome picker overlay */}
+      {pendingOutcome && (
+        <div className="mb-3 px-3 py-2 rounded-xl bg-bg-elevated border border-primary-200">
+          <OutcomePicker
+            actionType={pendingOutcome.actionType}
+            onSelect={handleOutcomeSelect}
+            onCancel={handleOutcomeCancel}
+          />
+        </div>
+      )}
+
+      {!collapsed && !pendingOutcome && (
         <div className="space-y-1.5">
           {suggestions.map((s) => (
             <div

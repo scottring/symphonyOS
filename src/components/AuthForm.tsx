@@ -5,14 +5,26 @@ export function AuthForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
+  const [isForgotPassword, setIsForgotPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const { signInWithEmail, signUpWithEmail } = useAuth()
+  const { signInWithEmail, signUpWithEmail, resetPassword } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setLoading(true)
+
+    if (isForgotPassword) {
+      const { error } = await resetPassword(email)
+      if (error) {
+        setError(error.message)
+      } else {
+        setError('Check your email for a password reset link!')
+      }
+      setLoading(false)
+      return
+    }
 
     const { error } = isSignUp
       ? await signUpWithEmail(email, password)
@@ -47,7 +59,7 @@ export function AuthForm() {
         {/* Form card */}
         <div className="card p-8">
           <h2 className="font-display text-xl font-medium text-neutral-800 mb-6 text-center">
-            {isSignUp ? 'Create Account' : 'Sign In'}
+            {isForgotPassword ? 'Reset Password' : isSignUp ? 'Create Account' : 'Sign In'}
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -66,21 +78,23 @@ export function AuthForm() {
               />
             </div>
 
-            <div className="space-y-2">
-              <label htmlFor="password" className="block text-sm font-medium text-neutral-600">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="input-base"
-                placeholder="At least 6 characters"
-                required
-                minLength={6}
-              />
-            </div>
+            {!isForgotPassword && (
+              <div className="space-y-2">
+                <label htmlFor="password" className="block text-sm font-medium text-neutral-600">
+                  Password
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="input-base"
+                  placeholder="At least 6 characters"
+                  required
+                  minLength={6}
+                />
+              </div>
+            )}
 
             {error && (
               <div className={`p-3 rounded-lg text-sm ${
@@ -104,24 +118,52 @@ export function AuthForm() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
-                  <span>Signing in...</span>
+                  <span>{isForgotPassword ? 'Sending...' : 'Signing in...'}</span>
                 </span>
               ) : (
-                isSignUp ? 'Create Account' : 'Sign In'
+                isForgotPassword ? 'Send Reset Link' : isSignUp ? 'Create Account' : 'Sign In'
               )}
             </button>
           </form>
 
-          <div className="mt-6 pt-5 border-t border-neutral-100">
-            <p className="text-center text-sm text-neutral-500">
-              {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
+          {/* Forgot password link (only on sign in) */}
+          {!isSignUp && !isForgotPassword && (
+            <div className="mt-4 text-center">
               <button
                 type="button"
-                onClick={() => setIsSignUp(!isSignUp)}
-                className="text-primary-600 font-medium hover:text-primary-700"
+                onClick={() => { setIsForgotPassword(true); setError(null) }}
+                className="text-sm text-neutral-500 hover:text-primary-600"
               >
-                {isSignUp ? 'Sign In' : 'Sign Up'}
+                Forgot your password?
               </button>
+            </div>
+          )}
+
+          <div className="mt-6 pt-5 border-t border-neutral-100">
+            <p className="text-center text-sm text-neutral-500">
+              {isForgotPassword ? (
+                <>
+                  Remember your password?{' '}
+                  <button
+                    type="button"
+                    onClick={() => { setIsForgotPassword(false); setError(null) }}
+                    className="text-primary-600 font-medium hover:text-primary-700"
+                  >
+                    Sign In
+                  </button>
+                </>
+              ) : (
+                <>
+                  {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
+                  <button
+                    type="button"
+                    onClick={() => { setIsSignUp(!isSignUp); setError(null) }}
+                    className="text-primary-600 font-medium hover:text-primary-700"
+                  >
+                    {isSignUp ? 'Sign In' : 'Sign Up'}
+                  </button>
+                </>
+              )}
             </p>
           </div>
         </div>

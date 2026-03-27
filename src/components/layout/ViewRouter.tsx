@@ -63,6 +63,7 @@ export interface ViewRouterProps {
   viewedDate: Date
   onDateChange: (date: Date) => void
   currentUserMemberId: string | undefined
+  bothPanelsOpen?: boolean
   isConnected: boolean
   scheduleActionsValue: ScheduleActionsValue
   meetingNotes: {
@@ -186,6 +187,7 @@ export function ViewRouter(props: ViewRouterProps) {
                   viewedDate={props.viewedDate}
                   onDateChange={props.onDateChange}
                   currentUserMemberId={props.currentUserMemberId}
+                  bothPanelsOpen={props.bothPanelsOpen}
                 />
               </ScheduleActionsProvider>
             </>

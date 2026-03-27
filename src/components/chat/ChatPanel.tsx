@@ -1,7 +1,8 @@
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect, useCallback, useState } from 'react'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
-import type { ChatMessage as ChatMessageType, EntityContext } from '@/hooks/useChat'
+import { VaultDraftCard } from './VaultDraftCard'
+import type { ChatMessage as ChatMessageType, EntityContext, ChatMode } from '@/hooks/useChat'
 
 interface ChatPanelProps {
   messages: ChatMessageType[]
@@ -12,6 +13,8 @@ interface ChatPanelProps {
   onClear: () => void
   onClose: () => void
   onSourceClick?: (noteId: string) => void
+  onSaveToVault?: (title: string, content: string) => Promise<boolean>
+  mode?: ChatMode
 }
 
 export function ChatPanel({
@@ -23,8 +26,11 @@ export function ChatPanel({
   onClear,
   onClose,
   onSourceClick,
+  onSaveToVault,
+  mode = 'chat',
 }: ChatPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [dismissedDrafts, setDismissedDrafts] = useState<Set<string>>(new Set())
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -58,10 +64,12 @@ export function ChatPanel({
             </svg>
           </div>
           <div>
-            <h3 className="text-sm font-medium text-neutral-800">Symphony AI</h3>
+            <h3 className="text-sm font-medium text-neutral-800">
+              {mode === 'guided_reflection' ? 'Guided Reflection' : 'Symphony AI'}
+            </h3>
             {entityContext && (
               <p className="text-[10px] text-neutral-400">
-                Context: {entityContext.name}
+                {entityContext.name}
               </p>
             )}
           </div>
@@ -100,22 +108,36 @@ export function ChatPanel({
               </svg>
             </div>
             <p className="text-sm text-neutral-500 mb-1">
-              {entityContext
+              {mode === 'guided_reflection' && entityContext
+                ? `Let's reflect on ${entityContext.name}`
+                : entityContext
                 ? `Ask about ${entityContext.name}`
                 : 'Ask me anything'
               }
             </p>
             <p className="text-xs text-neutral-400">
-              I'll search your vault and Symphony data for context
+              {mode === 'guided_reflection'
+                ? "I'll guide you through a reflection — your thinking, your words"
+                : "I'll search your vault and Symphony data for context"
+              }
             </p>
           </div>
         ) : (
           messages.map((msg) => (
-            <ChatMessage
-              key={msg.id}
-              message={msg}
-              onSourceClick={onSourceClick}
-            />
+            <div key={msg.id}>
+              <ChatMessage
+                message={msg}
+                onSourceClick={onSourceClick}
+              />
+              {msg.vaultDraft && onSaveToVault && !dismissedDrafts.has(msg.id) && (
+                <VaultDraftCard
+                  title={msg.vaultDraft.title}
+                  content={msg.vaultDraft.content}
+                  onSave={(title, content) => onSaveToVault(title, content)}
+                  onDismiss={() => setDismissedDrafts(prev => new Set([...prev, msg.id]))}
+                />
+              )}
+            </div>
           ))
         )}
 

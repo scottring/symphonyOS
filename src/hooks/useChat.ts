@@ -2,12 +2,29 @@ import { useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 
+export interface VaultDraft {
+  title: string
+  content: string
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
   sources?: { id: string; title: string; vaultPath?: string }[]
+  vaultDraft?: VaultDraft
   timestamp: Date
+}
+
+/** Parse :::vault-draft fenced blocks from AI response */
+function parseVaultDraft(text: string): { content: string; draft: VaultDraft | undefined } {
+  const match = text.match(/:::vault-draft\s*\n##\s*(.+?)\n([\s\S]*?):::/)
+  if (!match) return { content: text, draft: undefined }
+  const title = match[1].trim()
+  const draftContent = match[2].trim()
+  // Remove the vault-draft block from the visible message
+  const cleanContent = text.replace(/:::vault-draft\s*\n[\s\S]*?:::/, '').trim()
+  return { content: cleanContent, draft: { title, content: draftContent } }
 }
 
 export interface EntityContext {
@@ -16,12 +33,15 @@ export interface EntityContext {
   name: string
 }
 
+export type ChatMode = 'chat' | 'guided_reflection'
+
 export function useChat() {
   const { user } = useAuth()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [entityContext, setEntityContext] = useState<EntityContext | null>(null)
+  const [mode, setMode] = useState<ChatMode>('chat')
 
   const sendMessage = useCallback(
     async (content: string) => {
@@ -60,6 +80,7 @@ export function useChat() {
             body: JSON.stringify({
               messages: apiMessages,
               entityContext: entityContext ?? undefined,
+              mode,
             }),
           }
         )
@@ -72,11 +93,13 @@ export function useChat() {
 
         const data = await response.json()
 
+        const { content: parsedContent, draft } = parseVaultDraft(data.message)
         const assistantMessage: ChatMessage = {
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: data.message,
+          content: parsedContent,
           sources: data.sources,
+          vaultDraft: draft,
           timestamp: new Date(),
         }
         setMessages((prev) => [...prev, assistantMessage])
@@ -86,16 +109,21 @@ export function useChat() {
         setLoading(false)
       }
     },
-    [user, messages, entityContext]
+    [user, messages, entityContext, mode]
   )
 
   const clearChat = useCallback(() => {
     setMessages([])
     setError(null)
+    setMode('chat')
   }, [])
 
   const updateEntityContext = useCallback((ctx: EntityContext | null) => {
     setEntityContext(ctx)
+  }, [])
+
+  const setGuidedReflection = useCallback(() => {
+    setMode('guided_reflection')
   }, [])
 
   return {
@@ -103,8 +131,10 @@ export function useChat() {
     loading,
     error,
     entityContext,
+    mode,
     sendMessage,
     clearChat,
     updateEntityContext,
+    setGuidedReflection,
   }
 }

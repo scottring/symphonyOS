@@ -48,10 +48,63 @@ import type { LinkedActivityType } from '@/types/task'
 import { type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
 import { useHiddenCalendarEvents } from '@/hooks/useHiddenCalendarEvents'
 import { useChat, type EntityContext as ChatEntityContext } from '@/hooks/useChat'
+import { useVaultWrite } from '@/hooks/useVaultWrite'
 import { useMeetingNotes } from '@/hooks/useMeetingNotes'
 
+function PasswordResetForm({ onSubmit }: { onSubmit: (password: string) => Promise<{ error: { message: string } | null }> }) {
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (password !== confirm) {
+      setError('Passwords do not match.')
+      return
+    }
+    setError(null)
+    setLoading(true)
+    const { error } = await onSubmit(password)
+    if (error) {
+      setError(error.message)
+    }
+    setLoading(false)
+  }
+
+  return (
+    <div className="min-h-screen bg-bg-base flex flex-col items-center justify-center px-6 py-12">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <img src="/symphony-logo.jpg" alt="Symphony Logo" className="w-12 h-12 rounded-full object-cover" />
+            <h1 className="font-display text-3xl text-neutral-900">Symphony</h1>
+          </div>
+        </div>
+        <div className="card p-8">
+          <h2 className="font-display text-xl font-medium text-neutral-800 mb-6 text-center">Set New Password</h2>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-2">
+              <label htmlFor="new-password" className="block text-sm font-medium text-neutral-600">New Password</label>
+              <input id="new-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="input-base" placeholder="At least 6 characters" required minLength={6} />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="confirm-password" className="block text-sm font-medium text-neutral-600">Confirm Password</label>
+              <input id="confirm-password" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className="input-base" placeholder="Re-enter your password" required minLength={6} />
+            </div>
+            {error && <div className="p-3 rounded-lg text-sm bg-danger-50 text-danger-700">{error}</div>}
+            <button type="submit" disabled={loading} className="w-full btn-primary py-3 text-base font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed">
+              {loading ? 'Updating...' : 'Update Password'}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function App() {
-  const { user, loading: authLoading, signOut } = useAuth()
+  const { user, loading: authLoading, signOut, isPasswordRecovery, updatePassword } = useAuth()
 
   // Onboarding state
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null)
@@ -114,6 +167,10 @@ function App() {
     )
   }
 
+  if (isPasswordRecovery) {
+    return <PasswordResetForm onSubmit={updatePassword} />
+  }
+
   if (onboardingComplete === false) {
     return (
       <div className="min-h-screen bg-bg-base">
@@ -145,6 +202,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   const { toast, showToast, dismissToast } = useToast()
   const { isHidden: isEventHidden, hideEvent } = useHiddenCalendarEvents()
   const chat = useChat()
+  const vaultWrite = useVaultWrite()
   const [chatOpen, setChatOpen] = useState(false)
   const [activePanelTab, setActivePanelTab] = useState<PanelTab>('details')
   const [confirmationToast, setConfirmationToast] = useState<ConfirmationToastMessage | null>(null)
@@ -570,6 +628,34 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     if (open) setActivePanelTab('ai')
   }, [])
 
+  // Handle guided chat — set entity context, enable reflection mode, open chat panel
+  const handleOpenGuidedChat = useCallback((
+    entityType: 'task' | 'contact' | 'project' | 'event',
+    entityId: string,
+    entityName: string,
+    prompt?: string,
+  ) => {
+    chat.updateEntityContext({ type: entityType, id: entityId, name: entityName })
+    chat.setGuidedReflection()
+    setChatOpen(true)
+    setActivePanelTab('ai')
+    // Pre-send the guided prompt so the AI starts the reflection
+    if (prompt) {
+      setTimeout(() => chat.sendMessage(prompt), 100)
+    }
+  }, [chat])
+
+  // Save vault draft from guided reflection — user explicitly approved this note
+  const handleChatSaveToVault = useCallback(async (title: string, content: string): Promise<boolean> => {
+    const result = await vaultWrite.createVaultNote({
+      title,
+      content,
+      domain: 'personal',
+      path: 'Reflections',
+    }, `Save reflection: ${title}`)
+    return result !== null
+  }, [vaultWrite])
+
   // Get selected task for TaskView (desktop)
   const selectedTask = useMemo(() => {
     if (!selectedTaskId) return null
@@ -962,6 +1048,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     // Navigation
     onRefreshInstances: refreshDateInstances,
     onOpenChat: () => handleChatOpenChange(true),
+    onOpenGuidedChat: handleOpenGuidedChat,
     onStartMeeting: meetingNotes.startMeeting,
     onUpdateEventProject: updateEventProject,
   }), [
@@ -971,7 +1058,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     eventNotesMap, eventContextOverrides,
     handleSendToList, handleCreateListInTriage, addProject, searchContacts, addContact,
     handleOpenProject, getDomainForCalendar,
-    refreshDateInstances, meetingNotes.startMeeting, updateEventProject, handleChatOpenChange,
+    refreshDateInstances, meetingNotes.startMeeting, updateEventProject, handleChatOpenChange, handleOpenGuidedChat,
   ])
 
   return (
@@ -1097,8 +1184,10 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       chatLoading={chat.loading}
       chatError={chat.error}
       chatEntityContext={chat.entityContext}
+      chatMode={chat.mode}
       onChatSend={chat.sendMessage}
       onChatClear={chat.clearChat}
+      onChatSaveToVault={handleChatSaveToVault}
       panel={
         recipeUrl ? (
           <Suspense fallback={<LoadingFallback />}>
@@ -1200,6 +1289,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
           viewedDate={viewedDate}
           onDateChange={setViewedDate}
           currentUserMemberId={getCurrentUserMember()?.id}
+          bothPanelsOpen={(selectedItemId !== null || recipeUrl !== null) && chatOpen}
           isConnected={isConnected}
           scheduleActionsValue={scheduleActionsValue}
           meetingNotes={meetingNotes}

@@ -67,6 +67,7 @@ export interface ScheduleActionsValue {
   // Navigation
   onRefreshInstances?: () => void
   onOpenChat?: () => void
+  onOpenGuidedChat?: (entityType: 'task' | 'contact' | 'project' | 'event', entityId: string, entityName: string, prompt?: string) => void
 
   // Meeting
   onStartMeeting?: (eventId: string, title: string, attendees: MeetingAttendee[], startTime?: Date, endTime?: Date) => void

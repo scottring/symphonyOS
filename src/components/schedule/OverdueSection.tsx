@@ -7,7 +7,6 @@ import type { ProactiveSuggestion, SuggestionEntityType } from '@/types/proactiv
 import { ScheduleItem } from './ScheduleItem'
 import { SwipeableCard } from './SwipeableCard'
 import { FollowUpInput } from './FollowUpInput'
-import { ProactiveSuggestionChips } from './ProactiveSuggestionChips'
 import { taskToTimelineItem } from '@/types/timeline'
 import { formatOverdueDate } from '@/lib/timeUtils'
 import { useMobile } from '@/hooks/useMobile'
@@ -36,6 +35,7 @@ interface OverdueSectionProps {
   suggestionsForTask?: (entityType: SuggestionEntityType, entityId: string) => ProactiveSuggestion[]
   onActSuggestion?: (suggestionId: string, detail?: string, outcome?: string) => void
   onDismissSuggestion?: (suggestionId: string) => void
+  onOpenGuidedChat?: (entityType: 'task' | 'contact' | 'project' | 'event', entityId: string, entityName: string, prompt?: string) => void
 }
 
 export function OverdueSection({
@@ -60,6 +60,7 @@ export function OverdueSection({
   suggestionsForTask,
   onActSuggestion,
   onDismissSuggestion,
+  onOpenGuidedChat,
 }: OverdueSectionProps) {
   const isMobile = useMobile()
 
@@ -148,7 +149,7 @@ export function OverdueSection({
           const fallbackSuggs = getOverdueSuggestions(task, contactName || undefined)
 
           return (
-            <div key={task.id} className={parentVisible ? 'ml-6 border-l-2 border-neutral-200 pl-2' : ''}>
+            <div key={task.id} className={`group/card ${parentVisible ? 'ml-6 border-l-2 border-neutral-200 pl-2' : ''}`}>
               <ScheduleItem
                 item={item}
                 selected={selectedItemId === `task-${task.id}`}
@@ -173,23 +174,22 @@ export function OverdueSection({
                 hideTime={shouldHideTime}
                 panelOpen={panelOpen}
                 onClosePanel={onClosePanel}
+                suggestions={proactiveSuggs.length > 0 ? proactiveSuggs : undefined}
+                onActSuggestion={onActSuggestion}
+                onDismissSuggestion={onDismissSuggestion}
+                onOpenGuidedChat={onOpenGuidedChat}
               />
-              {proactiveSuggs.length > 0 && onActSuggestion && onDismissSuggestion ? (
-                <ProactiveSuggestionChips
-                  suggestions={proactiveSuggs}
-                  onAct={onActSuggestion}
-                  onDismiss={onDismissSuggestion}
-                  onPush={onPushTask ? (id: string, target: 'quarter') => onPushTask(id, target) : undefined}
-                  onDelete={onDeleteTask}
-                />
-              ) : fallbackSuggs.length > 0 ? (
-                <SuggestionChips
-                  suggestions={fallbackSuggs}
-                  taskId={taskId}
-                  onPush={onPushTask}
-                  onDelete={onDeleteTask}
-                />
-              ) : null}
+              {/* Fallback rule-based suggestions (proactive ones show inline via ScheduleItem) */}
+              {proactiveSuggs.length === 0 && fallbackSuggs.length > 0 && (
+                <div className="h-0 group-hover/card:h-auto overflow-hidden transition-all">
+                  <SuggestionChips
+                    suggestions={fallbackSuggs}
+                    taskId={taskId}
+                    onPush={onPushTask}
+                    onDelete={onDeleteTask}
+                  />
+                </div>
+              )}
               {followUpTaskId === taskId && onFollowUpSubmit && onFollowUpDismiss && (
                 <FollowUpInput
                   sourceTask={task}

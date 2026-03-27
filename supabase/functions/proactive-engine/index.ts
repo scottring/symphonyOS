@@ -121,27 +121,33 @@ function generateTaskSuggestions(
   const contactEmail = contact?.email
 
   // Check if action was taken recently (last 3 days)
+  // Accept both past-tense ('called') and present-tense ('call') action_type values
   const recentlyCalled = taskActions.some(
-    a => a.action_type === 'called' && (now - new Date(a.created_at).getTime()) < 3 * 86400000
+    a => (a.action_type === 'called' || a.action_type === 'call') && (now - new Date(a.created_at).getTime()) < 3 * 86400000
   )
   const recentlyEmailed = taskActions.some(
-    a => a.action_type === 'emailed' && (now - new Date(a.created_at).getTime()) < 3 * 86400000
+    a => (a.action_type === 'emailed' || a.action_type === 'email') && (now - new Date(a.created_at).getTime()) < 3 * 86400000
   )
   const recentlyOpenedLink = taskActions.some(
-    a => a.action_type === 'opened_link' && (now - new Date(a.created_at).getTime()) < 1 * 86400000
+    a => (a.action_type === 'opened_link' || a.action_type === 'open_link') && (now - new Date(a.created_at).getTime()) < 1 * 86400000
   )
 
-  // ── Rule 1: Has phone number → suggest calling ──
+  // ── Rule 1: Has phone number → suggest calling (with outcome-aware follow-ups) ──
   if (phoneNumber && !recentlyCalled) {
     const label = contactName ? `Call ${contactName}` : 'Make the call'
     const waitingDetail = task.is_waiting && task.waiting_since
       ? `Waiting since ${new Date(task.waiting_since).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
       : undefined
 
-    // If they called recently and left voicemail, suggest follow-up
-    const leftVoicemail = taskActions.find(
-      a => a.action_type === 'called' && a.outcome === 'voicemail'
-    )
+    // Check recent call outcomes for smarter follow-ups
+    const recentCallActions = taskActions
+      .filter(a => (a.action_type === 'called' || a.action_type === 'call'))
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+    const lastCall = recentCallActions[0]
+    const noAnswerCount = recentCallActions.filter(a => a.outcome === 'no_answer').length
+    const leftVoicemail = recentCallActions.find(a => a.outcome === 'voicemail')
+
     if (leftVoicemail) {
       const daysAgo = Math.floor((now - new Date(leftVoicemail.created_at).getTime()) / 86400000)
       if (daysAgo >= 2) {
@@ -152,6 +158,48 @@ function generateTaskSuggestions(
           title: contactName ? `Follow up with ${contactName}` : 'Follow up — no response yet',
           detail: `Left voicemail ${daysAgo} days ago`,
           confidence: 0.9,
+          action_type: 'call',
+          action_payload: { phoneNumber },
+          suggestion_key: `task:${task.id}:followup_call`,
+        })
+      }
+    } else if (noAnswerCount >= 2) {
+      // Multiple no-answers → suggest trying a different channel
+      if (contactEmail) {
+        suggestions.push({
+          entity_type: 'task',
+          entity_id: task.id,
+          suggestion_type: 'followup',
+          title: contactName ? `Email ${contactName} instead` : 'Try email — calls not connecting',
+          detail: `Called ${noAnswerCount}× with no answer`,
+          confidence: 0.9,
+          action_type: 'email',
+          action_payload: { email: contactEmail, subject: task.title },
+          suggestion_key: `task:${task.id}:followup_email`,
+        })
+      } else {
+        suggestions.push({
+          entity_type: 'task',
+          entity_id: task.id,
+          suggestion_type: 'followup',
+          title: contactName ? `Try ${contactName} again` : 'Try calling again',
+          detail: `${noAnswerCount} previous attempts — no answer`,
+          confidence: 0.75,
+          action_type: 'call',
+          action_payload: { phoneNumber },
+          suggestion_key: `task:${task.id}:followup_call`,
+        })
+      }
+    } else if (lastCall && lastCall.outcome === 'no_answer') {
+      const daysAgo = Math.floor((now - new Date(lastCall.created_at).getTime()) / 86400000)
+      if (daysAgo >= 1) {
+        suggestions.push({
+          entity_type: 'task',
+          entity_id: task.id,
+          suggestion_type: 'followup',
+          title: contactName ? `Try ${contactName} again` : 'Try calling again',
+          detail: `No answer ${daysAgo === 1 ? 'yesterday' : `${daysAgo} days ago`}`,
+          confidence: 0.85,
           action_type: 'call',
           action_payload: { phoneNumber },
           suggestion_key: `task:${task.id}:followup_call`,
@@ -172,18 +220,41 @@ function generateTaskSuggestions(
     }
   }
 
-  // ── Rule 2: Has email contact, no phone → suggest emailing ──
+  // ── Rule 2: Has email contact, no phone → suggest emailing (with follow-up awareness) ──
   if (contactEmail && !phoneNumber && !recentlyEmailed) {
-    suggestions.push({
-      entity_type: 'task',
-      entity_id: task.id,
-      suggestion_type: 'email',
-      title: contactName ? `Email ${contactName}` : 'Send an email',
-      confidence: isOverdue ? 0.85 : 0.7,
-      action_type: 'email',
-      action_payload: { email: contactEmail, subject: task.title },
-      suggestion_key: `task:${task.id}:email`,
-    })
+    // Check if we emailed before and are waiting for a reply
+    const recentEmailActions = taskActions
+      .filter(a => (a.action_type === 'emailed' || a.action_type === 'email'))
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    const lastEmail = recentEmailActions[0]
+
+    if (lastEmail && lastEmail.outcome === 'sent') {
+      const daysAgo = Math.floor((now - new Date(lastEmail.created_at).getTime()) / 86400000)
+      if (daysAgo >= 3) {
+        suggestions.push({
+          entity_type: 'task',
+          entity_id: task.id,
+          suggestion_type: 'followup',
+          title: contactName ? `Follow up with ${contactName}` : 'Follow up on email',
+          detail: `Emailed ${daysAgo} days ago — no reply yet`,
+          confidence: 0.85,
+          action_type: 'email',
+          action_payload: { email: contactEmail, subject: `Re: ${task.title}` },
+          suggestion_key: `task:${task.id}:followup_email`,
+        })
+      }
+    } else {
+      suggestions.push({
+        entity_type: 'task',
+        entity_id: task.id,
+        suggestion_type: 'email',
+        title: contactName ? `Email ${contactName}` : 'Send an email',
+        confidence: isOverdue ? 0.85 : 0.7,
+        action_type: 'email',
+        action_payload: { email: contactEmail, subject: task.title },
+        suggestion_key: `task:${task.id}:email`,
+      })
+    }
   }
 
   // ── Rule 3: Has links → suggest opening ──
@@ -410,6 +481,51 @@ async function fetchCalendarEvents(
   }))
 }
 
+// ── Open Brain vault enrichment ──
+async function fetchVaultContext(queries: string[]): Promise<string> {
+  const openBrainUrl = Deno.env.get('OPEN_BRAIN_URL')
+  const openBrainApiKey = Deno.env.get('OPEN_BRAIN_API_KEY')
+  if (!openBrainUrl || queries.length === 0) return ''
+
+  // Deduplicate and limit queries
+  const uniqueQueries = [...new Set(queries)].slice(0, 5)
+  const results: string[] = []
+
+  for (const query of uniqueQueries) {
+    try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 3000)
+      const res = await fetch(
+        `${openBrainUrl}/api/search?q=${encodeURIComponent(query)}&k=3`,
+        {
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(openBrainApiKey ? { 'X-Api-Key': openBrainApiKey } : {}),
+          },
+        },
+      )
+      clearTimeout(timeout)
+
+      if (res.ok) {
+        const data = await res.json()
+        const hits = data.results || []
+        for (const hit of hits.slice(0, 2)) {
+          if (hit.snippet && hit.title) {
+            results.push(`[${hit.title}] ${hit.snippet.substring(0, 150)}`)
+          }
+        }
+      }
+    } catch {
+      // Open Brain unreachable — continue without vault context
+      console.log(`Open Brain search failed for "${query}", continuing without vault`)
+      break // If one fails, likely all will — skip remaining
+    }
+  }
+
+  return results.length > 0 ? results.join('\n') : ''
+}
+
 // ── LLM reasoning pass ──
 async function runLLMPass(
   tasks: TaskRow[],
@@ -444,6 +560,13 @@ async function runLLMPass(
     return []
   }
 
+  // Fetch vault context for tasks and events (best-effort, non-blocking)
+  const vaultQueries = [
+    ...aiTasks.slice(0, 3).map(t => t.title),
+    ...aiEvents.slice(0, 2).map(e => e.title),
+  ]
+  const vaultContext = await fetchVaultContext(vaultQueries)
+
   // Build contacts lookup string
   const contactsList = Array.from(contactsMap.values())
     .map(c => `${c.name} (${c.relationship || c.category || 'contact'})${c.phone ? ` phone:${c.phone}` : ''}${c.email ? ` email:${c.email}` : ''}`)
@@ -462,6 +585,9 @@ TODAY: ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeri
 CONTACTS:
 ${contactsList || 'None'}
 
+VAULT CONTEXT (relevant notes from the user's personal knowledge base):
+${vaultContext || 'None available'}
+
 RECENT ACTIONS (what the user already did — do NOT suggest these again):
 ${actionsSummary || 'None'}
 
@@ -479,6 +605,7 @@ For each item where you find a useful insight, return a suggestion. Focus on:
 2. Cross-entity connections (an email mentions something related to a task or event)
 3. Tasks that are complex/reflective and would benefit from guided thinking
 4. Stale tasks that need a personalized nudge based on their notes
+5. Vault context that adds useful background to tasks or events (e.g., related notes, prior decisions, contact history)
 
 Rules:
 - Be SPECIFIC with actions. Include phone numbers, email addresses from contacts.
@@ -661,6 +788,41 @@ Deno.serve(async (req) => {
       allSuggestions.push(...llmSuggestions)
     } catch (err) {
       console.error('LLM pass error:', err)
+    }
+
+    // ── SMART RANKING — adjust confidence based on dismiss/act history ──
+    try {
+      // Get historical suggestion outcomes (last 30 days)
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString()
+      const { data: historicalSuggestions } = await supabase
+        .from('proactive_suggestions')
+        .select('suggestion_type, status')
+        .eq('user_id', userId)
+        .in('status', ['acted', 'dismissed'])
+        .gte('updated_at', thirtyDaysAgo)
+
+      if (historicalSuggestions && historicalSuggestions.length >= 5) {
+        // Calculate act rate per suggestion type
+        const typeStats = new Map<string, { acted: number; dismissed: number }>()
+        for (const s of historicalSuggestions) {
+          const stats = typeStats.get(s.suggestion_type) || { acted: 0, dismissed: 0 }
+          if (s.status === 'acted') stats.acted++
+          else if (s.status === 'dismissed') stats.dismissed++
+          typeStats.set(s.suggestion_type, stats)
+        }
+
+        // Apply multiplier: types with high dismiss rates get dampened
+        for (const suggestion of allSuggestions) {
+          const stats = typeStats.get(suggestion.suggestion_type)
+          if (!stats || (stats.acted + stats.dismissed) < 3) continue
+          const actRate = stats.acted / (stats.acted + stats.dismissed)
+          // Scale: 0% act rate → 0.5x, 50% → 1.0x, 100% → 1.2x
+          const multiplier = 0.5 + actRate * 0.7
+          suggestion.confidence = Math.min(Math.max(suggestion.confidence * multiplier, 0.1), 1.0)
+        }
+      }
+    } catch (err) {
+      console.error('Smart ranking error (continuing):', err)
     }
 
     // ── WRITE TO DB ──

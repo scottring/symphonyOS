@@ -29,6 +29,7 @@ interface HomeViewProps {
   viewedDate: Date
   onDateChange: (date: Date) => void
   currentUserMemberId?: string
+  bothPanelsOpen?: boolean
 }
 
 export function HomeView({
@@ -43,6 +44,7 @@ export function HomeView({
   viewedDate,
   onDateChange,
   currentUserMemberId,
+  bothPanelsOpen,
 }: HomeViewProps) {
   const ctx = useScheduleActionsContext()
   const { currentView, setCurrentView } = useHomeView()
@@ -299,6 +301,7 @@ export function HomeView({
         assigneesWithTasks={ctx.familyMembers}
         hasUnassignedTasks={hasUnassignedTasks}
         panelOpen={selectedItemId !== null}
+        bothPanelsOpen={bothPanelsOpen}
         onClosePanel={() => onSelectItem(null)}
         onUpdateTasksBulk={handleUpdateTasksBulk}
       />

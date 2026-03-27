@@ -2,6 +2,7 @@ import { memo } from 'react'
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
 import type { TaskContext } from '@/types/task'
+import type { ProactiveSuggestion } from '@/types/proactiveSuggestion'
 import { formatTime, formatTimeRange, inferMealTime } from '@/lib/timeUtils'
 import { getProjectColor } from '@/lib/projectUtils'
 import { PushDropdown, SchedulePopover, ContextPicker, type ScheduleContextItem } from '@/components/triage'
@@ -133,6 +134,11 @@ interface ScheduleItemProps {
   hideTime?: boolean
   // Routine streak count (shown as badge for routines)
   routineStreak?: number
+  // Proactive suggestions — shown on hover
+  suggestions?: ProactiveSuggestion[]
+  onActSuggestion?: (suggestionId: string, detail?: string, outcome?: string) => void
+  onDismissSuggestion?: (suggestionId: string) => void
+  onOpenGuidedChat?: (entityType: 'task' | 'contact' | 'project' | 'event', entityId: string, entityName: string, prompt?: string) => void
 }
 
 // Warm muted color tokens for overdue styling
@@ -207,6 +213,10 @@ export const ScheduleItem = memo(function ScheduleItem({
   variant = 'full',
   hideTime,
   routineStreak,
+  suggestions,
+  onActSuggestion,
+  onDismissSuggestion,
+  onOpenGuidedChat,
 }: ScheduleItemProps) {
   const isMobile = useMobile()
   const isTask = item.type === 'task'
@@ -390,7 +400,7 @@ export const ScheduleItem = memo(function ScheduleItem({
               // Calendar events show a calendar icon with the context color
               <button
                 onClick={handleCheckboxClick}
-                className="touch-target flex items-center justify-center -m-2 p-2 bg-bg-base rounded-full"
+                className="touch-target flex items-center justify-center -m-2 p-2 rounded-full"
                 aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
               >
                 <CalendarIcon
@@ -627,6 +637,84 @@ export const ScheduleItem = memo(function ScheduleItem({
           ) : projectName ? (
             <span className="text-[11px] text-neutral-400 truncate max-w-[180px]">{projectName}</span>
           ) : null}
+        </div>
+      )}
+
+      {/* Proactive suggestions — hover-only, ambient */}
+      {suggestions && suggestions.length > 0 && !item.completed && !item.skipped && onActSuggestion && (
+        <div className="h-0 group-hover:h-auto overflow-hidden transition-all ml-[5.75rem]">
+          <div className="flex gap-1.5 pt-1 pb-0.5 flex-wrap">
+            {suggestions.map((s) => {
+              const icons: Record<string, string> = {
+                call: '\u260F', text: '\u{1F4AC}', email: '\u2709', open_link: '\u2192',
+                navigate: '\u{1F4CD}', followup: '\u21BB', guided_chat: '\u{1F4AD}',
+                create_task: '\u2795', someday: '\u23F3', stale: '?', do_today: '\u2714',
+              }
+              const actionType = s.actionType || s.suggestionType
+              return (
+                <button
+                  key={s.id}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    const payload = s.actionPayload
+                    switch (actionType) {
+                      case 'call':
+                        if (payload.phoneNumber) {
+                          window.open(`tel:${payload.phoneNumber}`, '_self')
+                          onActSuggestion(s.id, `Called ${payload.phoneNumber}`)
+                        }
+                        break
+                      case 'text':
+                        if (payload.phoneNumber) {
+                          const body = payload.messageTemplate ? `&body=${encodeURIComponent(String(payload.messageTemplate))}` : ''
+                          window.open(`sms:${payload.phoneNumber}${body}`, '_self')
+                          onActSuggestion(s.id, `Texted ${payload.phoneNumber}`, 'sent')
+                        }
+                        break
+                      case 'email':
+                        if (payload.email) {
+                          const subject = payload.subject ? `?subject=${encodeURIComponent(String(payload.subject))}` : ''
+                          window.open(`mailto:${payload.email}${subject}`, '_blank')
+                          onActSuggestion(s.id, `Emailed ${payload.email}`, 'sent')
+                        }
+                        break
+                      case 'open_link':
+                        if (payload.url) {
+                          window.open(String(payload.url), '_blank')
+                          onActSuggestion(s.id, `Opened ${payload.url}`, 'success')
+                        }
+                        break
+                      case 'navigate':
+                        if (payload.location) {
+                          const q = payload.placeId
+                            ? `https://www.google.com/maps/place/?q=place_id:${payload.placeId}`
+                            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(String(payload.location))}`
+                          window.open(q, '_blank')
+                          onActSuggestion(s.id, `Navigated to ${payload.location}`)
+                        }
+                        break
+                      case 'guided_chat':
+                        if (onOpenGuidedChat) {
+                          const entType = item.type === 'event' ? 'event' as const : 'task' as const
+                          const entId = item.type === 'event' ? item.id.replace('event-', '') : item.id.replace('task-', '')
+                          const prompt = payload.prompt ? String(payload.prompt) : s.detail || `Help me think through: ${s.title}`
+                          onOpenGuidedChat(entType, entId, item.title, prompt)
+                          onActSuggestion(s.id, 'Opened guided chat')
+                        }
+                        break
+                      default:
+                        onActSuggestion(s.id)
+                    }
+                  }}
+                  title={s.detail || s.title}
+                  className="text-[10px] px-2 py-0.5 rounded-full border transition-colors bg-amber-50/80 border-amber-200/60 text-amber-700 hover:bg-amber-100 hover:border-amber-300"
+                >
+                  <span className="mr-0.5">{icons[actionType] || '\u2728'}</span>
+                  {s.title}
+                </button>
+              )
+            })}
+          </div>
         </div>
       )}
     </div>

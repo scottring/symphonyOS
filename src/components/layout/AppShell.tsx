@@ -76,9 +76,11 @@ interface AppShellProps {
   chatLoading?: boolean
   chatError?: string | null
   chatEntityContext?: EntityContext | null
+  chatMode?: import('@/hooks/useChat').ChatMode
   onChatSend?: (message: string) => void
   onChatClear?: () => void
   onChatSourceClick?: (noteId: string) => void
+  onChatSaveToVault?: (title: string, content: string) => Promise<boolean>
   // Tabbed panel state
   activePanelTab?: PanelTab
   onPanelTabChange?: (tab: PanelTab) => void
@@ -118,9 +120,11 @@ export function AppShell({
   chatLoading = false,
   chatError = null,
   chatEntityContext = null,
+  chatMode,
   onChatSend,
   onChatClear,
   onChatSourceClick,
+  onChatSaveToVault,
   activePanelTab = 'details',
   onPanelTabChange,
 }: AppShellProps) {
@@ -309,10 +313,12 @@ export function AppShell({
                 loading={chatLoading}
                 error={chatError}
                 entityContext={chatEntityContext}
+                mode={chatMode}
                 onSend={onChatSend}
                 onClear={onChatClear ?? (() => {})}
                 onClose={() => setChatOpen(false)}
                 onSourceClick={onChatSourceClick}
+                onSaveToVault={onChatSaveToVault}
               />
             </div>
           )}
@@ -351,10 +357,12 @@ export function AppShell({
                 loading={chatLoading}
                 error={chatError}
                 entityContext={chatEntityContext}
+                mode={chatMode}
                 onSend={onChatSend}
                 onClear={onChatClear ?? (() => {})}
                 onClose={() => setChatOpen(false)}
                 onSourceClick={onChatSourceClick}
+                onSaveToVault={onChatSaveToVault}
               />
             </aside>
           )}
@@ -426,10 +434,12 @@ export function AppShell({
                   loading={chatLoading}
                   error={chatError}
                   entityContext={chatEntityContext}
+                  mode={chatMode}
                   onSend={onChatSend}
                   onClear={onChatClear ?? (() => {})}
                   onClose={() => setChatOpen(false)}
                   onSourceClick={onChatSourceClick}
+                  onSaveToVault={onChatSaveToVault}
                 />
               </div>
             )}

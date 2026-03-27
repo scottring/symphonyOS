@@ -19,6 +19,7 @@ interface EntityContext {
 interface ChatRequest {
   messages: ChatMessage[]
   entityContext?: EntityContext
+  mode?: 'chat' | 'guided_reflection'
 }
 
 /**
@@ -129,7 +130,8 @@ Deno.serve(async (req) => {
       })
     }
 
-    const { messages, entityContext }: ChatRequest = await req.json()
+    const { messages, entityContext, mode }: ChatRequest = await req.json()
+    const isGuidedReflection = mode === 'guided_reflection'
 
     if (!messages?.length) {
       return new Response(JSON.stringify({ error: 'messages array is required' }), {
@@ -335,7 +337,44 @@ Deno.serve(async (req) => {
     // ================================================================
     // 2. Build prompt and call Haiku
     // ================================================================
-    const systemPrompt = `You are Symphony's contextual AI assistant. You help the user manage work, life, and family by surfacing the right information at the right moment.
+    const contextBlock = contextParts.length > 0
+      ? '---\n\n# Available Context\n\n' + contextParts.join('\n\n---\n\n')
+      : 'No additional context available for this query.'
+
+    const systemPrompt = isGuidedReflection
+      ? `You are a thoughtful reflection guide inside Symphony, a personal OS for work, life, and family.
+
+Your role is to help the user think deeply about a topic through conversation. You are the interviewer — the user is the author. Your job is to draw out THEIR thinking, not generate ideas for them.
+
+## How to guide the reflection:
+
+1. START by asking one clear, open-ended question related to the topic. Keep it warm and specific.
+2. LISTEN to their response, then ask a follow-up that goes deeper. Ask about feelings, motivations, or tensions — not just logistics.
+3. After 3-4 exchanges (when you feel you have enough substance), SYNTHESIZE their thinking into a clean note draft.
+4. The draft should read like THEY wrote it — distilling their own words and insights, not AI-generated advice or platitudes.
+
+## When you synthesize, format the draft inside a special fence:
+
+\`\`\`
+:::vault-draft
+## [Title that captures the essence]
+[Their reflection, organized and distilled. Use first person. Keep their voice. No AI slop — no "journey", no "tapestry", no "in conclusion". Just their honest thinking, structured clearly.]
+:::
+\`\`\`
+
+Include a brief message before the fence like "Here's what I heard you say — take a look and save it if it feels right."
+
+## Rules:
+- Ask ONE question at a time. Never rapid-fire multiple questions.
+- Keep your questions short (1-2 sentences).
+- Do not offer advice unless asked. You are a mirror, not a coach.
+- The vault draft is a PROPOSAL. The user will review, edit, and choose whether to save it. Make it worth saving.
+- Reference context from their tasks/notes/projects if it adds depth, but don't force it.
+- The user has Parkinson's disease. Keep interactions focused and easy to engage with.
+- Today's date is ${todayLabel} (US Eastern time).
+
+${contextBlock}`
+      : `You are Symphony's contextual AI assistant. You help the user manage work, life, and family by surfacing the right information at the right moment.
 
 You have access to the user's vault notes (personal knowledge base) and Symphony data (tasks, contacts, projects, calendar events). When answering:
 
@@ -347,7 +386,7 @@ You have access to the user's vault notes (personal knowledge base) and Symphony
 - The user has Parkinson's disease. Keep responses focused and easy to act on.
 - Today's date is ${todayLabel} (US Eastern time).
 
-${contextParts.length > 0 ? '---\n\n# Available Context\n\n' + contextParts.join('\n\n---\n\n') : 'No additional context available for this query.'}`
+${contextBlock}`
 
     const anthropicMessages = messages.map(m => ({
       role: m.role,

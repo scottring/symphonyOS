@@ -8,7 +8,7 @@ import type { ScheduleContextItem } from '@/components/triage'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import type { TimelineItem } from '@/types/timeline'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
-import { ScanMyDay } from './ScanMyDay'
+// import { ScanMyDay } from './ScanMyDay'
 import { groupByDaySection, type DaySection } from '@/lib/timeUtils'
 import { useMobile } from '@/hooks/useMobile'
 import { TimeGroup } from './TimeGroup'
@@ -21,8 +21,8 @@ import { StagingFloat } from './StagingFloat'
 import { TodayAddInput } from './TodayAddInput'
 import { OverdueSection } from './OverdueSection'
 import { EmailActionsBanner } from './EmailActionsBanner'
-import { DailyBriefing } from './DailyBriefing'
-import { ProactiveSuggestionChips } from './ProactiveSuggestionChips'
+// import { DailyBriefing } from './DailyBriefing'
+// import { ProactiveSuggestionChips } from './ProactiveSuggestionChips'
 import { useProactiveSuggestions } from '@/hooks/useProactiveSuggestions'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { useSystemHealth } from '@/hooks/useSystemHealth'
@@ -388,6 +388,7 @@ interface TodayScheduleProps {
   hasUnassignedTasks?: boolean
   // Panel state
   panelOpen?: boolean
+  bothPanelsOpen?: boolean
   onClosePanel?: () => void
   // Bulk actions (managed by HomeView)
   onUpdateTasksBulk?: (taskIds: string[], updates: Partial<Task>) => Promise<void>
@@ -443,6 +444,7 @@ export function TodaySchedule({
   assigneesWithTasks = [],
   hasUnassignedTasks = false,
   panelOpen,
+  bothPanelsOpen,
   onClosePanel,
   onUpdateTasksBulk,
 }: TodayScheduleProps) {
@@ -459,6 +461,7 @@ export function TodaySchedule({
     onOpenProject,
     getDomainForCalendar, eventContextOverrides,
     onOpenChat,
+    onOpenGuidedChat,
   } = useScheduleActionsContext()
 
   const emailActions = useEmailActionItems()
@@ -1028,7 +1031,7 @@ export function TodaySchedule({
   }, [tasks, events, visibleRoutines, routineStatusMap])
 
   return (
-    <div className={`px-2 py-3 md:px-10 md:py-10 max-w-[680px] ${panelOpen ? 'ml-0 mr-auto' : 'mx-auto'}`}>
+    <div className={`px-2 py-3 md:px-10 md:py-10 max-w-[680px] ${bothPanelsOpen ? 'ml-0 mr-auto' : 'mx-auto'}`}>
       {/* Header - Compact on mobile, editorial on desktop */}
       <header className="mb-4 md:mb-10 animate-fade-in-up">
         {/* Mobile: Compact single-line header */}
@@ -1190,14 +1193,6 @@ export function TodaySchedule({
         )}
       </header>
 
-      {/* Scan My Day - morning briefing card */}
-      {isToday && !loading && (
-        <ScanMyDay
-          tasks={allFilteredTasks}
-          events={filteredEvents}
-        />
-      )}
-
       {/* This week float — mobile only (desktop is inline in stats row) */}
       {isMobile && isToday && onUpdateTask && (
         <StagingFloat
@@ -1271,6 +1266,7 @@ export function TodaySchedule({
               suggestionsForTask={proactive.suggestionsForEntity}
               onActSuggestion={proactive.actOnSuggestion}
               onDismissSuggestion={proactive.dismissSuggestion}
+              onOpenGuidedChat={onOpenGuidedChat}
             />
           )}
 
@@ -1281,17 +1277,6 @@ export function TodaySchedule({
               onAcknowledge={emailActions.acknowledge}
               onDismiss={emailActions.dismiss}
               onSnooze={emailActions.snooze}
-            />
-          )}
-
-          {/* Proactive suggestions — daily briefing */}
-          {isToday && proactive.topSuggestions.length > 0 && (
-            <DailyBriefing
-              suggestions={proactive.topSuggestions}
-              onAct={proactive.actOnSuggestion}
-              onDismiss={proactive.dismissSuggestion}
-              onSelectTask={onSelectItem}
-              lastUpdated={proactive.lastUpdated}
             />
           )}
 
@@ -1365,19 +1350,6 @@ export function TodaySchedule({
                               : undefined
                           }
                         />
-                        {/* Proactive suggestion chips — for events in mobile timeline */}
-                        {item.type === 'event' && !item.completed && (() => {
-                          const eventId = item.id.replace('event-', '')
-                          const eventSuggestions = proactive.suggestionsForEntity('calendar_event', eventId)
-                          if (eventSuggestions.length === 0) return null
-                          return (
-                            <ProactiveSuggestionChips
-                              suggestions={eventSuggestions}
-                              onAct={proactive.actOnSuggestion}
-                              onDismiss={proactive.dismissSuggestion}
-                            />
-                          )
-                        })()}
                         {followUpTaskId === taskId && taskId && sourceTask && (
                           <FollowUpInput
                             sourceTask={sourceTask}
@@ -1484,20 +1456,17 @@ export function TodaySchedule({
                       variant={item.type === 'routine' ? 'minimal' : 'full'}
                       hideTime={shouldHideTime}
                       routineStreak={item.type === 'routine' ? getRoutineStats(item.id.replace('routine-', ''))?.currentStreak : undefined}
+                      suggestions={(() => {
+                        const entityType = item.type === 'event' ? 'calendar_event' : item.type === 'task' ? 'task' : null
+                        const entityId = item.type === 'event' ? item.id.replace('event-', '') : taskId
+                        if (!entityType || !entityId) return undefined
+                        const s = proactive.suggestionsForEntity(entityType, entityId)
+                        return s.length > 0 ? s : undefined
+                      })()}
+                      onActSuggestion={proactive.actOnSuggestion}
+                      onDismissSuggestion={proactive.dismissSuggestion}
+                      onOpenGuidedChat={onOpenGuidedChat}
                     />
-                    {/* Proactive suggestion chips — for events and tasks in timeline */}
-                    {item.type === 'event' && !item.completed && (() => {
-                      const eventId = item.id.replace('event-', '')
-                      const eventSuggestions = proactive.suggestionsForEntity('calendar_event', eventId)
-                      if (eventSuggestions.length === 0) return null
-                      return (
-                        <ProactiveSuggestionChips
-                          suggestions={eventSuggestions}
-                          onAct={proactive.actOnSuggestion}
-                          onDismiss={proactive.dismissSuggestion}
-                        />
-                      )
-                    })()}
                     {followUpTaskId === taskId && taskId && sourceTaskForFollowUp && (
                       <FollowUpInput
                         sourceTask={sourceTaskForFollowUp}
