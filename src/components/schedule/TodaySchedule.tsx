@@ -1031,9 +1031,9 @@ export function TodaySchedule({
   }, [tasks, events, visibleRoutines, routineStatusMap])
 
   return (
-    <div className={`px-2 py-3 md:px-10 md:py-10 max-w-[680px] ${bothPanelsOpen ? 'ml-0 mr-auto' : 'mx-auto'}`}>
+    <div className={`px-2 py-1 md:px-10 md:py-10 max-w-[680px] ${bothPanelsOpen ? 'ml-0 mr-auto' : 'mx-auto'}`}>
       {/* Header - Compact on mobile, editorial on desktop */}
-      <header className="mb-4 md:mb-10 animate-fade-in-up">
+      <header className="mb-2 md:mb-10 animate-fade-in-up">
         {/* Mobile: Compact single-line header */}
         {isMobile ? (
           <div className="flex items-center">
@@ -1045,12 +1045,26 @@ export function TodaySchedule({
             {/* Spacer */}
             <div className="flex-1" />
             {/* Right side controls - unified group */}
-            <div className="flex items-center pr-3">
+            <div className="flex items-center gap-1 pr-3">
+              {/* This week / inbox — compact in header */}
+              {isToday && onUpdateTask && (inboxTasks.length + weekTasks.length) > 0 && (
+                <StagingFloat
+                  inboxTasks={inboxTasks}
+                  weekTasks={weekTasks}
+                  onPullToToday={(taskId) => {
+                    const today = new Date()
+                    today.setHours(0, 0, 0, 0)
+                    onUpdateTask(taskId, { bucket: 'timed' as const, scheduledFor: today, isAllDay: true })
+                  }}
+                  onSelectTask={(taskId) => handleSelectItem(`task-${taskId}`)}
+                  inline
+                />
+              )}
               {/* Routines toggle */}
               {routines.length > 0 && (
                 <button
                   onClick={toggleHideRoutines}
-                  className={`relative flex items-center mr-2 transition-all ${
+                  className={`relative flex items-center transition-all ${
                     hideRoutines ? 'text-neutral-300' : 'text-neutral-400'
                   }`}
                   title={hideRoutines ? 'Show routines' : 'Hide routines'}
@@ -1193,23 +1207,12 @@ export function TodaySchedule({
         )}
       </header>
 
-      {/* This week float — mobile only (desktop is inline in stats row) */}
-      {isMobile && isToday && onUpdateTask && (
-        <StagingFloat
-          inboxTasks={inboxTasks}
-          weekTasks={weekTasks}
-          onPullToToday={(taskId) => {
-            const today = new Date()
-            today.setHours(0, 0, 0, 0)
-            onUpdateTask(taskId, { bucket: 'timed' as const, scheduledFor: today, isAllDay: true })
-          }}
-          onSelectTask={(taskId) => handleSelectItem(`task-${taskId}`)}
-        />
-      )}
+      {/* This week float — mobile: compact in header; desktop: inline in stats row */}
+      {/* StagingFloat block removed from mobile — now lives in the header row */}
 
-      {/* Inline add to today */}
-      {isToday && onCreateTask && (
-        <div className="mb-3 md:mb-4">
+      {/* Inline add to today — desktop only (mobile uses QuickCapture FAB) */}
+      {!isMobile && isToday && onCreateTask && (
+        <div className="mb-4">
           <TodayAddInput onAdd={onCreateTask} />
         </div>
       )}

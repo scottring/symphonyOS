@@ -45,8 +45,8 @@ export function StagingFloat({ inboxTasks, weekTasks, onPullToToday, onSelectTas
       />
 
       {/* Panel */}
-      <div className={`absolute z-50 bg-bg-elevated rounded-2xl border border-neutral-200/80 shadow-xl animate-fade-in-scale overflow-hidden ${
-        inline ? 'top-full mt-2 right-0 w-[380px]' : 'left-0 right-0 top-full mt-2'
+      <div className={`z-50 bg-bg-elevated rounded-2xl border border-neutral-200/80 shadow-xl animate-fade-in-scale overflow-hidden ${
+        inline ? 'fixed top-14 left-3 right-3 md:absolute md:top-full md:mt-2 md:right-0 md:left-auto md:w-[380px]' : 'absolute left-0 right-0 top-full mt-2'
       }`}>
         {/* Panel header */}
         <div className="flex items-center justify-between px-5 pt-4 pb-3">
@@ -127,19 +127,19 @@ export function StagingFloat({ inboxTasks, weekTasks, onPullToToday, onSelectTas
         <button
           onClick={() => setOpen(prev => !prev)}
           className={`
-            flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors
+            flex items-center gap-1.5 px-1.5 py-1 md:gap-2 md:px-2 md:py-1.5 rounded-lg transition-colors
             ${open
               ? 'bg-primary-50 text-primary-700'
               : 'hover:bg-neutral-100/60 text-neutral-500'
             }
           `}
         >
-          <InboxIcon className={`w-4 h-4 ${open ? 'text-primary-500' : 'text-neutral-400'}`} />
-          <span className="text-sm font-medium whitespace-nowrap">
+          <InboxIcon className={`w-3.5 h-3.5 md:w-4 md:h-4 ${open ? 'text-primary-500' : 'text-neutral-400'}`} />
+          <span className="hidden md:inline text-sm font-medium whitespace-nowrap">
             This week
           </span>
           <span className={`
-            flex items-center justify-center min-w-[20px] h-5 px-1 rounded-full text-[11px] font-semibold tabular-nums
+            flex items-center justify-center min-w-[18px] h-[18px] md:min-w-[20px] md:h-5 px-1 rounded-full text-[10px] md:text-[11px] font-semibold tabular-nums
             ${open ? 'bg-primary-100 text-primary-700' : 'bg-neutral-100 text-neutral-500'}
           `}>
             {totalCount}
