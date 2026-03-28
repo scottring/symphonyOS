@@ -7,19 +7,17 @@ import { AgentChatInput } from './AgentChatInput'
 export function AgentHomeView() {
   const { messages, loading: chatLoading, error: chatError, sendMessage, resetSession } = useAgentChat()
   const { briefing, loading: briefingLoading, error: briefingError, refresh } = useAgentBriefing()
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const bottomRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
   return (
-    <div className="flex flex-col bg-bg-base" style={{ height: 'calc(100dvh - 7rem)' }}>
-      {/* Scrollable content area */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+    <div className="bg-bg-base pb-16">
+      {/* Content area — pb-16 reserves space for fixed chat input */}
+      <div>
         {/* Briefing section */}
         {briefingLoading && !briefing && (
           <div className="px-4 pt-4 pb-2">
@@ -99,9 +97,12 @@ export function AgentHomeView() {
             <p className="text-sm text-neutral-400">Ask Michael anything about your tasks, projects, or vault.</p>
           </div>
         )}
+
+        {/* Scroll anchor */}
+        <div ref={bottomRef} />
       </div>
 
-      {/* Fixed input at bottom */}
+      {/* Fixed input above bottom nav */}
       <AgentChatInput onSend={sendMessage} disabled={chatLoading} />
     </div>
   )
