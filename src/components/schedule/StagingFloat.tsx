@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import type { Task } from '@/types/task'
 
 interface StagingFloatProps {
@@ -36,7 +37,7 @@ export function StagingFloat({ inboxTasks, weekTasks, onPullToToday, onSelectTas
   )
   const combined = [...sortedInbox, ...weekTasks]
 
-  const panel = open && (
+  const panelContent = open && (
     <>
       {/* Backdrop */}
       <div
@@ -107,7 +108,7 @@ export function StagingFloat({ inboxTasks, weekTasks, onPullToToday, onSelectTas
                     onClick={(e) => handlePull(e, task.id)}
                     className="flex-shrink-0 mt-0.5 px-2.5 py-1 rounded-lg bg-primary-50 text-primary-600 text-xs font-semibold
                                hover:bg-primary-100 active:bg-primary-200 transition-colors
-                               opacity-0 group-hover:opacity-100"
+                               md:opacity-0 md:group-hover:opacity-100"
                   >
                     Today
                   </button>
@@ -119,6 +120,12 @@ export function StagingFloat({ inboxTasks, weekTasks, onPullToToday, onSelectTas
       </div>
     </>
   )
+
+  // Portal the panel to document.body so it escapes ancestor transforms
+  // (CSS transforms create a new containing block, breaking position:fixed)
+  const panel = inline
+    ? panelContent && createPortal(panelContent, document.body)
+    : panelContent
 
   // Inline mode: compact trigger that sits in the stats row
   if (inline) {
