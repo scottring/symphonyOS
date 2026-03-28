@@ -221,6 +221,118 @@ export async function sendMessage(
 }
 
 // ============================================================================
+// Agent Chat (Michael)
+// ============================================================================
+
+export interface AgentChatResponse {
+  reply: string
+  sessionId: string | null
+  channelId: string
+}
+
+export interface AgentChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: number
+}
+
+/** Send a message to the Michael agent */
+export async function agentChat(
+  message: string,
+  channelId = 'web:default',
+): Promise<AgentChatResponse | null> {
+  return callOpenBrain<AgentChatResponse>('/api/agent-chat', {
+    method: 'POST',
+    body: JSON.stringify({ message, channelId }),
+    timeout: 120000, // Agent can take a while
+  })
+}
+
+/** Get chat history for a channel */
+export async function getAgentChatHistory(
+  channelId = 'web:default',
+  limit = 50,
+): Promise<AgentChatMessage[] | null> {
+  const result = await callOpenBrain<{ messages: AgentChatMessage[] }>(
+    `/api/agent-chat/history?channelId=${encodeURIComponent(channelId)}&limit=${limit}`,
+  )
+  return result?.messages ?? null
+}
+
+/** Reset agent session (start fresh) */
+export async function resetAgentSession(channelId = 'web:default'): Promise<boolean> {
+  const result = await callOpenBrain('/api/agent-chat/reset', {
+    method: 'POST',
+    body: JSON.stringify({ channelId }),
+  })
+  return result !== null
+}
+
+// ============================================================================
+// Briefing
+// ============================================================================
+
+export interface BriefingTask {
+  slug: string
+  title: string
+  status: string
+  due?: string
+  domain?: string
+  daysOverdue?: number
+}
+
+export interface BriefingData {
+  greeting: string
+  timeContext: 'morning' | 'midday' | 'evening' | 'night'
+  timestamp: string
+  overdueTasks: BriefingTask[]
+  dueTodayTasks: BriefingTask[]
+  upcomingTasks: BriefingTask[]
+  activeProjects: { slug: string; title: string; status: string; domain?: string }[]
+  recentCaptures: { text: string; timestamp: string }[]
+}
+
+/** Fetch structured briefing from Open Brain */
+export async function fetchBriefing(): Promise<BriefingData | null> {
+  return callOpenBrain<BriefingData>('/api/briefing', { timeout: 10000 })
+}
+
+// ============================================================================
+// Voice Transcription
+// ============================================================================
+
+/** Transcribe audio via Groq Whisper on Open Brain */
+export async function transcribeVoice(audioBlob: Blob): Promise<string | null> {
+  if (!OPEN_BRAIN_URL) return null
+
+  const formData = new FormData()
+  formData.append('audio', audioBlob, 'recording.webm')
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 30000)
+
+  try {
+    const res = await fetch(`${OPEN_BRAIN_URL}/api/voice/transcribe`, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'X-Api-Key': OPEN_BRAIN_API_KEY,
+      },
+      body: formData,
+    })
+
+    clearTimeout(timeoutId)
+    if (!res.ok) return null
+
+    const data = await res.json() as { text: string }
+    return data.text
+  } catch {
+    clearTimeout(timeoutId)
+    return null
+  }
+}
+
+// ============================================================================
 // Health
 // ============================================================================
 

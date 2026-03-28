@@ -1,6 +1,7 @@
 import { Suspense } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { SectionErrorBoundary } from '@/components/SectionErrorBoundary'
+import { AgentHomeView } from '@/components/agent/AgentHomeView'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 import { HomeView } from '@/components/home'
 import { MeetingNotesView } from '@/components/meeting/MeetingNotesView'
@@ -402,6 +403,10 @@ export function ViewRouter(props: ViewRouterProps) {
       )}
 
       {props.activeView === 'notes' && <NotesSection tasks={props.tasks} projects={props.projects} contacts={props.contacts} onSelectItem={props.onSelectItem} />}
+
+      {props.activeView === 'agent' && (
+        <AgentHomeView />
+      )}
 
       {props.activeView === 'settings' && (
         <Suspense fallback={<LoadingFallback />}>
