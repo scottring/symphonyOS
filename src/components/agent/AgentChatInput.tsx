@@ -47,8 +47,8 @@ export function AgentChatInput({ onSend, disabled }: AgentChatInputProps) {
   }, [])
 
   return (
-    <div className="fixed left-0 right-0 border-t border-neutral-200/60 bg-bg-elevated/95 backdrop-blur-lg z-20"
-         style={{ bottom: 'calc(2.75rem + env(safe-area-inset-bottom, 0px))' }}>
+    <div className="fixed left-0 right-0 border-t border-neutral-200/60 bg-bg-elevated/95 backdrop-blur-lg z-50"
+         style={{ bottom: 'calc(2.5rem + max(0px, calc(env(safe-area-inset-bottom, 0px) - 8px)))' }}>
       <div className="flex items-end gap-2 px-3 pt-2 pb-1">
         {/* Voice button */}
         <button

@@ -268,8 +268,8 @@ export function AppShell({
         {children}
       </main>
 
-      {/* Quick Capture - FAB shown on all pages when panel is closed */}
-      {onQuickAdd && (
+      {/* Quick Capture - FAB shown on all pages when panel is closed (except agent view which has its own input) */}
+      {onQuickAdd && activeView !== 'agent' && (
         <QuickCapture
           onAdd={onQuickAdd}
           onAddRich={onQuickAddRich}
