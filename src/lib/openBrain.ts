@@ -293,8 +293,28 @@ export interface BriefingData {
 }
 
 /** Fetch structured briefing from Open Brain */
-export async function fetchBriefing(): Promise<BriefingData | null> {
-  return callOpenBrain<BriefingData>('/api/briefing', { timeout: 10000 })
+export async function fetchBriefing(): Promise<BriefingData> {
+  if (!OPEN_BRAIN_URL) throw new Error('OPEN_BRAIN_URL not configured')
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 10000)
+
+  const res = await fetch(`${OPEN_BRAIN_URL}/api/briefing`, {
+    signal: controller.signal,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Api-Key': OPEN_BRAIN_API_KEY,
+    },
+  })
+
+  clearTimeout(timeoutId)
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`HTTP ${res.status}: ${body.slice(0, 200)}`)
+  }
+
+  return await res.json() as BriefingData
 }
 
 // ============================================================================
