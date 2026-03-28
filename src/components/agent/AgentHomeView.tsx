@@ -37,6 +37,11 @@ export function AgentHomeView() {
               {briefingError}
               <button onClick={() => refresh(true)} className="ml-2 underline">Retry</button>
             </div>
+            <div className="mt-2 rounded-xl bg-neutral-100 p-3 text-xs text-neutral-500 font-mono break-all">
+              URL: {import.meta.env.VITE_OPEN_BRAIN_URL || '(empty)'}
+              <br />
+              Key: {import.meta.env.VITE_OPEN_BRAIN_API_KEY ? `${import.meta.env.VITE_OPEN_BRAIN_API_KEY.slice(0, 8)}...` : '(empty)'}
+            </div>
           </div>
         )}
 

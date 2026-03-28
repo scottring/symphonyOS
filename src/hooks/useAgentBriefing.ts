@@ -49,10 +49,10 @@ export function useAgentBriefing() {
         setBriefing(data)
         setCache(data)
       } else {
-        setError('Could not reach Open Brain')
+        setError('Could not reach Open Brain — check console')
       }
-    } catch {
-      setError('Failed to fetch briefing')
+    } catch (e) {
+      setError(`Briefing error: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
       setLoading(false)
       fetchingRef.current = false
