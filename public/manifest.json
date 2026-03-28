@@ -1,7 +1,7 @@
 {
-  "name": "Relish",
-  "short_name": "Relish",
-  "description": "Your family's coherence operating system",
+  "name": "Symphony OS",
+  "short_name": "Symphony",
+  "description": "Your personal operating system for work, life, and family",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FAF8F5",
