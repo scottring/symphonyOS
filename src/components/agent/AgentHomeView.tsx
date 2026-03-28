@@ -17,7 +17,7 @@ export function AgentHomeView() {
   }, [messages])
 
   return (
-    <div className="flex flex-col h-full bg-bg-base">
+    <div className="flex flex-col bg-bg-base" style={{ height: 'calc(100dvh - 7rem)' }}>
       {/* Scrollable content area */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         {/* Briefing section */}
@@ -36,11 +36,6 @@ export function AgentHomeView() {
             <div className="rounded-xl bg-red-50 border border-red-100 p-3 text-sm text-red-600">
               {briefingError}
               <button onClick={() => refresh(true)} className="ml-2 underline">Retry</button>
-            </div>
-            <div className="mt-2 rounded-xl bg-neutral-100 p-3 text-xs text-neutral-500 font-mono break-all">
-              URL: {import.meta.env.VITE_OPEN_BRAIN_URL || '(empty)'}
-              <br />
-              Key: {import.meta.env.VITE_OPEN_BRAIN_API_KEY ? `${import.meta.env.VITE_OPEN_BRAIN_API_KEY.slice(0, 8)}...` : '(empty)'}
             </div>
           </div>
         )}
