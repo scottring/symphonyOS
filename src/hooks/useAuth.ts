@@ -19,22 +19,7 @@ export function useAuth() {
       }
     }, 5000)
 
-    // Get initial session
-    supabase.auth.getSession()
-      .then(({ data: { session } }) => {
-        setUser(session?.user ?? null)
-        loadingRef.current = false
-        setLoading(false)
-        clearTimeout(timeout)
-      })
-      .catch((error) => {
-        console.error('Auth session check failed:', error)
-        loadingRef.current = false
-        setLoading(false)
-        clearTimeout(timeout)
-      })
-
-    // Listen for auth changes
+    // Listen for auth changes — must be set up BEFORE exchangeCodeForSession
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setUser(session?.user ?? null)
@@ -43,6 +28,41 @@ export function useAuth() {
         }
       }
     )
+
+    // Handle PKCE code exchange (password recovery, email confirm, etc.)
+    const params = new URLSearchParams(window.location.search)
+    const code = params.get('code')
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code)
+        .then(() => {
+          // Clean up the URL
+          window.history.replaceState({}, '', window.location.pathname)
+          loadingRef.current = false
+          setLoading(false)
+          clearTimeout(timeout)
+        })
+        .catch((error) => {
+          console.error('Code exchange failed:', error)
+          loadingRef.current = false
+          setLoading(false)
+          clearTimeout(timeout)
+        })
+    } else {
+      // No code param — just get existing session
+      supabase.auth.getSession()
+        .then(({ data: { session } }) => {
+          setUser(session?.user ?? null)
+          loadingRef.current = false
+          setLoading(false)
+          clearTimeout(timeout)
+        })
+        .catch((error) => {
+          console.error('Auth session check failed:', error)
+          loadingRef.current = false
+          setLoading(false)
+          clearTimeout(timeout)
+        })
+    }
 
     return () => {
       clearTimeout(timeout)
