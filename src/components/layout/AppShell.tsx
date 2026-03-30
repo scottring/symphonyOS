@@ -441,46 +441,36 @@ export function AppShell({
             </div>
           )}
 
-          {/* Panel content — switch between detail and chat */}
-          <div className="flex-1 overflow-hidden relative min-h-0">
-            {/* Detail panel */}
-            <div className={`absolute inset-0 ${
-              (!showPanelTabs && panelOpen) || activePanelTab === 'details'
-                ? 'opacity-100 pointer-events-auto z-10'
-                : 'opacity-0 pointer-events-none z-0'
-            } ${!panelOpen ? 'hidden' : ''}`}>
+          {/* Panel content — detail or chat, flex child fills remaining aside height */}
+          {((!showPanelTabs && panelOpen) || (showPanelTabs && activePanelTab === 'details')) && panelOpen && (
+            <div className="flex-1 min-h-0 overflow-hidden">
               {panel}
             </div>
+          )}
 
-            {/* Chat panel */}
-            {onChatSend && (
-              <div className={`absolute inset-0 flex flex-col ${
-                (!showPanelTabs && chatOpen && !panelOpen) || (showPanelTabs && activePanelTab === 'ai')
-                  ? 'opacity-100 pointer-events-auto z-10'
-                  : 'opacity-0 pointer-events-none z-0'
-              } ${!chatOpen ? 'hidden' : ''}`}>
-                <ChatPanel
-                  messages={chatMessages}
-                  loading={chatLoading}
-                  error={chatError}
-                  entityContext={chatEntityContext}
-                  mode={chatMode}
-                  onSend={onChatSend}
-                  onClear={onChatClear ?? (() => {})}
-                  onClose={() => setChatOpen(false)}
-                  onSourceClick={onChatSourceClick}
-                  onSaveToVault={onChatSaveToVault}
-                  onAddTask={onChatAddTask}
-                  sessions={chatSessions}
-                  sessionsLoading={chatSessionsLoading}
-                  onLoadSession={onChatLoadSession}
-                  onDeleteSession={onChatDeleteSession}
-                  onNewChat={onChatNewChat}
-                  activeSessionId={activeChatSessionId}
-                />
-              </div>
-            )}
-          </div>
+          {onChatSend && ((!showPanelTabs && chatOpen && !panelOpen) || (showPanelTabs && activePanelTab === 'ai')) && chatOpen && (
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <ChatPanel
+                messages={chatMessages}
+                loading={chatLoading}
+                error={chatError}
+                entityContext={chatEntityContext}
+                mode={chatMode}
+                onSend={onChatSend}
+                onClear={onChatClear ?? (() => {})}
+                onClose={() => setChatOpen(false)}
+                onSourceClick={onChatSourceClick}
+                onSaveToVault={onChatSaveToVault}
+                onAddTask={onChatAddTask}
+                sessions={chatSessions}
+                sessionsLoading={chatSessionsLoading}
+                onLoadSession={onChatLoadSession}
+                onDeleteSession={onChatDeleteSession}
+                onNewChat={onChatNewChat}
+                activeSessionId={activeChatSessionId}
+              />
+            </div>
+          )}
         </aside>
       )}
 

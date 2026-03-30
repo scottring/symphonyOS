@@ -101,7 +101,7 @@ export function ChatPanel({
 
   return (
     <div
-      className="flex flex-col h-full bg-white border-l border-neutral-200"
+      className="flex flex-col h-full min-h-0 bg-white border-l border-neutral-200"
       onKeyDown={handleKeyDown}
     >
       {/* Header */}
