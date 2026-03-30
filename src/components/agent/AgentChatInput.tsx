@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useVoiceInput } from '@/hooks/useVoiceInput'
 
 interface AgentChatInputProps {
@@ -46,7 +47,7 @@ export function AgentChatInput({ onSend, disabled }: AgentChatInputProps) {
     el.style.height = Math.min(el.scrollHeight, 120) + 'px'
   }, [])
 
-  return (
+  return createPortal(
     <div className="fixed left-0 right-0 border-t border-neutral-200/60 bg-bg-elevated/95 backdrop-blur-lg z-50"
          style={{ bottom: 'calc(3.25rem + env(safe-area-inset-bottom, 0px))' }}>
       <div className="flex items-end gap-2 px-3 pt-2 pb-1">
@@ -114,6 +115,7 @@ export function AgentChatInput({ onSend, disabled }: AgentChatInputProps) {
           </button>
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   )
 }
