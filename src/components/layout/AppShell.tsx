@@ -352,9 +352,9 @@ export function AppShell({
           {/* Detail panel — left of pair */}
           <aside
             className={`
-              fixed top-0 h-full w-[420px]
+              fixed top-0 bottom-0 w-[420px]
               bg-bg-elevated border-l border-neutral-200/80
-              transform transition-all duration-300 ease-out
+              transition-transform duration-300 ease-out
               ${panelOpen ? 'translate-x-0' : 'translate-x-full'}
               shadow-xl z-20
             `}
@@ -367,9 +367,9 @@ export function AppShell({
           {onChatSend && (
             <aside
               className={`
-                fixed top-0 right-0 h-full w-[380px]
+                fixed top-0 bottom-0 w-[380px]
                 bg-bg-elevated border-l border-neutral-200/80
-                transform transition-all duration-300 ease-out
+                transition-transform duration-300 ease-out
                 ${chatOpen ? 'translate-x-0' : 'translate-x-full'}
                 shadow-xl z-20
               `}
@@ -401,9 +401,9 @@ export function AppShell({
         /* Narrow screen or single panel: tabbed single column */
         <aside
           className={`
-            fixed top-0 h-full w-[420px]
+            fixed top-0 bottom-0 w-[420px]
             bg-bg-elevated border-l border-neutral-200/80
-            transform transition-all duration-300 ease-out
+            transition-transform duration-300 ease-out
             ${rightPanelVisible ? 'translate-x-0' : 'translate-x-full'}
             shadow-xl z-20 flex flex-col
           `}
@@ -442,7 +442,7 @@ export function AppShell({
           )}
 
           {/* Panel content — switch between detail and chat */}
-          <div className="flex-1 overflow-hidden relative">
+          <div className="flex-1 overflow-hidden relative min-h-0">
             {/* Detail panel */}
             <div className={`absolute inset-0 ${
               (!showPanelTabs && panelOpen) || activePanelTab === 'details'
@@ -458,7 +458,7 @@ export function AppShell({
                 (!showPanelTabs && chatOpen && !panelOpen) || (showPanelTabs && activePanelTab === 'ai')
                   ? 'opacity-100 pointer-events-auto z-10'
                   : 'opacity-0 pointer-events-none z-0'
-              } ${!chatOpen ? 'hidden' : ''}`}>
+              } ${!chatOpen ? 'hidden' : ''}`>
                 <ChatPanel
                   messages={chatMessages}
                   loading={chatLoading}
