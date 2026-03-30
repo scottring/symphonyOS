@@ -454,7 +454,7 @@ export function AppShell({
 
             {/* Chat panel */}
             {onChatSend && (
-              <div className={`absolute inset-0 ${
+              <div className={`absolute inset-0 flex flex-col ${
                 (!showPanelTabs && chatOpen && !panelOpen) || (showPanelTabs && activePanelTab === 'ai')
                   ? 'opacity-100 pointer-events-auto z-10'
                   : 'opacity-0 pointer-events-none z-0'

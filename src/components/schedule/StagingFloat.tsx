@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { useMobile } from '@/hooks/useMobile'
 import type { Task } from '@/types/task'
 
 interface StagingFloatProps {
@@ -21,6 +22,7 @@ function InboxIcon({ className }: { className?: string }) {
 
 export function StagingFloat({ inboxTasks, weekTasks, onPullToToday, onSelectTask, inline }: StagingFloatProps) {
   const [open, setOpen] = useState(false)
+  const isMobile = useMobile()
 
   const totalCount = inboxTasks.length + weekTasks.length
 
@@ -121,9 +123,10 @@ export function StagingFloat({ inboxTasks, weekTasks, onPullToToday, onSelectTas
     </>
   )
 
-  // Portal the panel to document.body so it escapes ancestor transforms
+  // Portal the panel to document.body on mobile so it escapes ancestor transforms
   // (CSS transforms create a new containing block, breaking position:fixed)
-  const panel = inline
+  // On desktop, keep it in-place so md:absolute positioning works relative to parent
+  const panel = inline && isMobile
     ? panelContent && createPortal(panelContent, document.body)
     : panelContent
 
