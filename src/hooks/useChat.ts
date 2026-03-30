@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -42,6 +42,10 @@ export function useChat() {
   const [error, setError] = useState<string | null>(null)
   const [entityContext, setEntityContext] = useState<EntityContext | null>(null)
   const [mode, setMode] = useState<ChatMode>('chat')
+  const [sessionId, setSessionId] = useState<string | null>(null)
+
+  // Track whether session needs saving (new messages since last save)
+  const dirtyRef = useRef(false)
 
   const sendMessage = useCallback(
     async (content: string) => {
@@ -57,6 +61,7 @@ export function useChat() {
       setMessages((prev) => [...prev, userMessage])
       setLoading(true)
       setError(null)
+      dirtyRef.current = true
 
       try {
         // Get current session for auth
@@ -116,6 +121,8 @@ export function useChat() {
     setMessages([])
     setError(null)
     setMode('chat')
+    setSessionId(null)
+    dirtyRef.current = false
   }, [])
 
   const updateEntityContext = useCallback((ctx: EntityContext | null) => {
@@ -126,15 +133,45 @@ export function useChat() {
     setMode('guided_reflection')
   }, [])
 
+  // Load a previous session's messages into the active chat
+  const loadSession = useCallback((
+    id: string,
+    savedMessages: ChatMessage[],
+    savedEntityContext: EntityContext | null,
+    savedMode: ChatMode
+  ) => {
+    setSessionId(id)
+    setMessages(savedMessages)
+    setEntityContext(savedEntityContext)
+    setMode(savedMode)
+    setError(null)
+    dirtyRef.current = false
+  }, [])
+
+  // Start a fresh chat (used when clicking "New chat" from history)
+  const startNewChat = useCallback(() => {
+    setSessionId(null)
+    setMessages([])
+    setEntityContext(null)
+    setMode('chat')
+    setError(null)
+    dirtyRef.current = false
+  }, [])
+
   return {
     messages,
     loading,
     error,
     entityContext,
     mode,
+    sessionId,
+    isDirty: dirtyRef,
     sendMessage,
     clearChat,
     updateEntityContext,
     setGuidedReflection,
+    loadSession,
+    startNewChat,
+    setSessionId,
   }
 }

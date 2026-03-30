@@ -14,6 +14,7 @@ import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { Routine } from '@/types/routine'
 import type { ChatMessage, EntityContext } from '@/hooks/useChat'
+import type { ChatSession } from '@/hooks/useChatSessions'
 
 export type PanelTab = 'details' | 'ai'
 
@@ -81,6 +82,14 @@ interface AppShellProps {
   onChatClear?: () => void
   onChatSourceClick?: (noteId: string) => void
   onChatSaveToVault?: (title: string, content: string) => Promise<boolean>
+  onChatAddTask?: (title: string, destination: 'inbox' | 'today') => void
+  // Chat history
+  chatSessions?: ChatSession[]
+  chatSessionsLoading?: boolean
+  onChatLoadSession?: (session: ChatSession) => void
+  onChatDeleteSession?: (sessionId: string) => void
+  onChatNewChat?: () => void
+  activeChatSessionId?: string | null
   // Tabbed panel state
   activePanelTab?: PanelTab
   onPanelTabChange?: (tab: PanelTab) => void
@@ -125,6 +134,13 @@ export function AppShell({
   onChatClear,
   onChatSourceClick,
   onChatSaveToVault,
+  onChatAddTask,
+  chatSessions = [],
+  chatSessionsLoading = false,
+  onChatLoadSession,
+  onChatDeleteSession,
+  onChatNewChat,
+  activeChatSessionId,
   activePanelTab = 'details',
   onPanelTabChange,
 }: AppShellProps) {
@@ -319,6 +335,13 @@ export function AppShell({
                 onClose={() => setChatOpen(false)}
                 onSourceClick={onChatSourceClick}
                 onSaveToVault={onChatSaveToVault}
+                onAddTask={onChatAddTask}
+                sessions={chatSessions}
+                sessionsLoading={chatSessionsLoading}
+                onLoadSession={onChatLoadSession}
+                onDeleteSession={onChatDeleteSession}
+                onNewChat={onChatNewChat}
+                activeSessionId={activeChatSessionId}
               />
             </div>
           )}
@@ -363,6 +386,13 @@ export function AppShell({
                 onClose={() => setChatOpen(false)}
                 onSourceClick={onChatSourceClick}
                 onSaveToVault={onChatSaveToVault}
+                onAddTask={onChatAddTask}
+                sessions={chatSessions}
+                sessionsLoading={chatSessionsLoading}
+                onLoadSession={onChatLoadSession}
+                onDeleteSession={onChatDeleteSession}
+                onNewChat={onChatNewChat}
+                activeSessionId={activeChatSessionId}
               />
             </aside>
           )}
@@ -440,6 +470,13 @@ export function AppShell({
                   onClose={() => setChatOpen(false)}
                   onSourceClick={onChatSourceClick}
                   onSaveToVault={onChatSaveToVault}
+                  onAddTask={onChatAddTask}
+                  sessions={chatSessions}
+                  sessionsLoading={chatSessionsLoading}
+                  onLoadSession={onChatLoadSession}
+                  onDeleteSession={onChatDeleteSession}
+                  onNewChat={onChatNewChat}
+                  activeSessionId={activeChatSessionId}
                 />
               </div>
             )}

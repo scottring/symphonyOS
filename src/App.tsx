@@ -48,6 +48,7 @@ import type { LinkedActivityType } from '@/types/task'
 import { type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
 import { useHiddenCalendarEvents } from '@/hooks/useHiddenCalendarEvents'
 import { useChat, type EntityContext as ChatEntityContext } from '@/hooks/useChat'
+import { useChatSessions } from '@/hooks/useChatSessions'
 import { useVaultWrite } from '@/hooks/useVaultWrite'
 import { useMeetingNotes } from '@/hooks/useMeetingNotes'
 
@@ -202,6 +203,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   const { toast, showToast, dismissToast } = useToast()
   const { isHidden: isEventHidden, hideEvent } = useHiddenCalendarEvents()
   const chat = useChat()
+  const chatSessions = useChatSessions()
   const vaultWrite = useVaultWrite()
   const [chatOpen, setChatOpen] = useState(false)
   const [activePanelTab, setActivePanelTab] = useState<PanelTab>('details')
@@ -655,6 +657,57 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     }, `Save reflection: ${title}`)
     return result !== null
   }, [vaultWrite])
+
+  // Add task from AI chat panel
+  const handleChatAddTask = useCallback(async (title: string, destination: 'inbox' | 'today') => {
+    const scheduledFor = destination === 'today' ? new Date() : undefined
+    await addTask(title, undefined, undefined, scheduledFor, {
+      assignedTo: getCurrentUserMember()?.id,
+    })
+  }, [addTask, getCurrentUserMember])
+
+  // Auto-save chat session after each assistant response
+  const prevMessageCountRef = useRef(0)
+  useEffect(() => {
+    const msgCount = chat.messages.length
+    // Only save when a new assistant message arrives (count increased and last msg is from assistant)
+    if (msgCount > prevMessageCountRef.current && msgCount >= 2) {
+      const lastMsg = chat.messages[msgCount - 1]
+      if (lastMsg.role === 'assistant') {
+        chatSessions.saveSession(
+          chat.sessionId,
+          chat.messages,
+          chat.entityContext,
+          chat.mode
+        ).then((id) => {
+          if (id && !chat.sessionId) {
+            chat.setSessionId(id)
+          }
+        })
+      }
+    }
+    prevMessageCountRef.current = msgCount
+  }, [chat.messages]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load a saved chat session
+  const handleChatLoadSession = useCallback((session: import('@/hooks/useChatSessions').ChatSession) => {
+    // Auto-save current conversation before switching (if it has messages)
+    if (chat.messages.length >= 2) {
+      chatSessions.saveSession(chat.sessionId, chat.messages, chat.entityContext, chat.mode)
+    }
+    const entityCtx = session.entityType && session.entityId
+      ? { type: session.entityType as ChatEntityContext['type'], id: session.entityId, name: '' }
+      : null
+    chat.loadSession(session.id, session.messages, entityCtx, session.mode)
+  }, [chat, chatSessions])
+
+  // Start a new chat (save current first)
+  const handleChatNewChat = useCallback(() => {
+    if (chat.messages.length >= 2) {
+      chatSessions.saveSession(chat.sessionId, chat.messages, chat.entityContext, chat.mode)
+    }
+    chat.startNewChat()
+  }, [chat, chatSessions])
 
   // Get selected task for TaskView (desktop)
   const selectedTask = useMemo(() => {
@@ -1188,6 +1241,13 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       onChatSend={chat.sendMessage}
       onChatClear={chat.clearChat}
       onChatSaveToVault={handleChatSaveToVault}
+      onChatAddTask={handleChatAddTask}
+      chatSessions={chatSessions.sessions}
+      chatSessionsLoading={chatSessions.loading}
+      onChatLoadSession={handleChatLoadSession}
+      onChatDeleteSession={chatSessions.deleteSession}
+      onChatNewChat={handleChatNewChat}
+      activeChatSessionId={chat.sessionId}
       panel={
         recipeUrl ? (
           <Suspense fallback={<LoadingFallback />}>
