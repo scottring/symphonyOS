@@ -458,7 +458,7 @@ export function AppShell({
                 (!showPanelTabs && chatOpen && !panelOpen) || (showPanelTabs && activePanelTab === 'ai')
                   ? 'opacity-100 pointer-events-auto z-10'
                   : 'opacity-0 pointer-events-none z-0'
-              } ${!chatOpen ? 'hidden' : ''}`>
+              } ${!chatOpen ? 'hidden' : ''}`}>
                 <ChatPanel
                   messages={chatMessages}
                   loading={chatLoading}
