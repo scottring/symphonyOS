@@ -30,6 +30,7 @@ import { WallEmailActions } from './WallEmailActions'
 import { WallEmailActionsOverlay } from './WallEmailActionsOverlay'
 import { WallCameraView } from './WallCameraView'
 import { WallTodayTimeline } from './WallTodayTimeline'
+import { WallTravelDay, detectTravelDay } from './WallTravelDay'
 
 // ============================================================================
 // HELPERS
@@ -75,6 +76,7 @@ export function WallCalendar() {
     markDone: emailMarkDone,
   } = useEmailActionItems()
   const [showEmailActions, setShowEmailActions] = useState(false)
+  const [travelDayDismissed, setTravelDayDismissed] = useState(false)
   const [cameraEnabled, setCameraEnabled] = useState(() =>
     localStorage.getItem('wall-camera-enabled') !== 'false'
   )
@@ -328,6 +330,26 @@ export function WallCalendar() {
           <div className="text-[1.25rem] text-white/40">Loading your day...</div>
         </div>
       </div>
+    )
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // RENDER: Travel Day takeover
+  // ════════════════════════════════════════════════════════════════
+
+  const isTravelDay = useMemo(
+    () => detectTravelDay(wallData.calendarEvents),
+    [wallData.calendarEvents]
+  )
+
+  if (isTravelDay && !travelDayDismissed) {
+    return (
+      <WallTravelDay
+        calendarEvents={wallData.calendarEvents}
+        weather={weather}
+        currentTime={currentTime}
+        onBack={() => setTravelDayDismissed(true)}
+      />
     )
   }
 
