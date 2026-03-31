@@ -69,15 +69,25 @@ const PRE_DEPARTURE_CHECKLIST = [
 // ============================================================================
 
 function getEventStart(event: CalendarEvent): Date | null {
-  const raw = event.start_time || event.startTime
-  if (!raw) return null
-  return new Date(raw)
+  try {
+    const raw = event.start_time || event.startTime
+    if (!raw) return null
+    const d = new Date(raw)
+    return isNaN(d.getTime()) ? null : d
+  } catch {
+    return null
+  }
 }
 
 function getEventEnd(event: CalendarEvent): Date | null {
-  const raw = event.end_time || event.endTime
-  if (!raw) return null
-  return new Date(raw)
+  try {
+    const raw = event.end_time || event.endTime
+    if (!raw) return null
+    const d = new Date(raw)
+    return isNaN(d.getTime()) ? null : d
+  } catch {
+    return null
+  }
 }
 
 function formatTimeShort(date: Date): string {
@@ -110,8 +120,11 @@ function guessEmoji(title: string): string {
 }
 
 function stripEmoji(text: string): string {
-  // Remove leading emojis and common Unicode emoji ranges
-  return text.replace(/^[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]+\s*/u, '').trim()
+  // Remove leading emoji characters (safe approach — trim known prefixes)
+  return text
+    .replace(/^[^\w\s(]+\s*/i, '')
+    .replace(/^(✈️|🍳|🎯|🏋️|💅|🧳|🐕|🚗|🛃|🚿|👕|🍽️|📌)\s*/g, '')
+    .trim() || text
 }
 
 function parseFlightDetails(event: CalendarEvent): FlightDetails | null {

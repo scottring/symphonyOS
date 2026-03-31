@@ -77,6 +77,11 @@ export function WallCalendar() {
   } = useEmailActionItems()
   const [showEmailActions, setShowEmailActions] = useState(false)
   const [travelDayDismissed, setTravelDayDismissed] = useState(false)
+
+  const isTravelDay = useMemo(
+    () => detectTravelDay(wallData.calendarEvents),
+    [wallData.calendarEvents]
+  )
   const [cameraEnabled, setCameraEnabled] = useState(() =>
     localStorage.getItem('wall-camera-enabled') !== 'false'
   )
@@ -336,11 +341,6 @@ export function WallCalendar() {
   // ════════════════════════════════════════════════════════════════
   // RENDER: Travel Day takeover
   // ════════════════════════════════════════════════════════════════
-
-  const isTravelDay = useMemo(
-    () => detectTravelDay(wallData.calendarEvents),
-    [wallData.calendarEvents]
-  )
 
   if (isTravelDay && !travelDayDismissed) {
     return (
