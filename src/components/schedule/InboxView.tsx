@@ -1,7 +1,9 @@
-import { useMemo, useCallback } from 'react'
+import { useMemo, useCallback, useState } from 'react'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
+import { useDomain } from '@/hooks/useDomain'
+import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { InboxTaskCard } from './InboxTaskCard'
 
 interface InboxViewProps {
@@ -11,6 +13,7 @@ interface InboxViewProps {
   onSelectItem: (id: string | null) => void
   panelOpen: boolean
   onClosePanel: () => void
+  currentUserMemberId?: string
 }
 
 export function InboxView({
@@ -20,6 +23,7 @@ export function InboxView({
   onSelectItem,
   panelOpen,
   onClosePanel,
+  currentUserMemberId,
 }: InboxViewProps) {
   const {
     onToggleWaiting, onUpdateTask, onPushTask,
@@ -29,26 +33,68 @@ export function InboxView({
     onOpenProject,
   } = useScheduleActionsContext()
 
+  const { currentDomain } = useDomain()
+
+  // Domain + privacy filtering (matches HomeView logic)
+  const filteredByDomain = useMemo(() => {
+    return tasks.filter(task => {
+      // Hide other members' work/personal tasks (private domains)
+      if (currentUserMemberId && (task.context === 'work' || task.context === 'personal')) {
+        const assignee = task.assignedTo || (task.assignedToAll?.[0])
+        if (assignee && assignee !== currentUserMemberId) return false
+      }
+      // Universal shows everything passing privacy filter
+      if (currentDomain === 'universal') return true
+      // Always show inbox tasks regardless of domain — they need triage
+      if (task.bucket === 'inbox' && !task.completed) return true
+      // Specific domain match
+      return task.context === currentDomain
+    })
+  }, [tasks, currentDomain, currentUserMemberId])
+
+  // Assignee filter state
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
+
+  // Assignee filtering
+  const filteredTasks = useMemo(() => {
+    if (selectedAssignees.length === 0) return filteredByDomain
+    return filteredByDomain.filter(task => {
+      if (selectedAssignees.includes('unassigned')) {
+        return !task.assignedTo && (!task.assignedToAll || task.assignedToAll.length === 0)
+      }
+      return selectedAssignees.some(id =>
+        task.assignedTo === id || task.assignedToAll?.includes(id)
+      )
+    })
+  }, [filteredByDomain, selectedAssignees])
+
+  // For AssigneeFilter component
+  const hasUnassignedTasks = useMemo(() => {
+    return filteredByDomain.some(t =>
+      !t.completed && !t.assignedTo && (!t.assignedToAll || t.assignedToAll.length === 0)
+    )
+  }, [filteredByDomain])
+
   // Inbox tasks: bucket='inbox', not completed
   const inboxTasks = useMemo(() => {
-    return tasks
+    return filteredTasks
       .filter(t => !t.completed && t.bucket === 'inbox')
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  }, [tasks])
+  }, [filteredTasks])
 
   // Week tasks: bucket='week', not completed
   const weekTasks = useMemo(() => {
-    return tasks
+    return filteredTasks
       .filter(t => !t.completed && t.bucket === 'week')
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  }, [tasks])
+  }, [filteredTasks])
 
   // Month tasks: bucket='month', not completed
   const monthTasks = useMemo(() => {
-    return tasks
+    return filteredTasks
       .filter(t => !t.completed && t.bucket === 'month')
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  }, [tasks])
+  }, [filteredTasks])
 
   const handleSelectTask = useCallback((taskId: string) => {
     onSelectItem(`task-${taskId}`)
@@ -59,7 +105,17 @@ export function InboxView({
   return (
     <div className="h-full overflow-y-auto px-4 md:px-6 py-6">
       <header className="mb-6">
-        <h1 className="font-display text-2xl font-semibold text-neutral-800">Inbox</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="font-display text-2xl font-semibold text-neutral-800">Inbox</h1>
+          {familyMembers.length > 0 && (
+            <AssigneeFilter
+              selectedAssignees={selectedAssignees}
+              onSelectAssignees={setSelectedAssignees}
+              assigneesWithTasks={familyMembers}
+              hasUnassignedTasks={hasUnassignedTasks}
+            />
+          )}
+        </div>
         <p className="text-sm text-neutral-500 mt-1">
           {totalCount === 0
             ? 'All clear — nothing to triage'

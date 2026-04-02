@@ -206,6 +206,7 @@ export function ViewRouter(props: ViewRouterProps) {
             onSelectItem={props.onSelectItem}
             panelOpen={props.selectedItemId !== null}
             onClosePanel={() => props.onSelectItem(null)}
+            currentUserMemberId={props.currentUserMemberId}
           />
         </ScheduleActionsProvider>
       )}
