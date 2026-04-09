@@ -4,8 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useWallData } from '@/hooks/useWallData'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import type { TimelineItem } from '@/types/timeline'
-import { assignRoom } from './roomConfig'
-import { WallRoomsView } from './WallRoomsView'
+import { WallScratchpad } from './WallScratchpad'
 import { WallRoutineColumn } from './WallRoutineColumn'
 import { WallTaskColumn } from './WallTaskColumn'
 import { WallJaxCareWidget } from './WallJaxCareWidget'
@@ -165,36 +164,11 @@ export function WallCalendar() {
     return { choreItems: nonJaxChores, taskItems: tasks }
   }, [wallData.days])
 
-  // ═══ SPLIT TASKS: room vs general vs adult ═══
-  const { roomTasks, generalTasks, adultTasks } = useMemo(() => {
-    const parentMemberIds = new Set(
-      wallData.familyMembers
-        .filter(m => m.role_label?.toLowerCase() === 'parent')
-        .map(m => m.id)
-    )
-    const room: TimelineItem[] = []
-    const general: TimelineItem[] = []
-    const adult: TimelineItem[] = []
-
-    const classify = (task: TimelineItem) => {
-      if (task.assignedTo && parentMemberIds.has(task.assignedTo)) {
-        adult.push(task)
-      } else {
-        // Only put in rooms if it matches a real room keyword (not "general" catch-all)
-        const matched = assignRoom(task.title)
-        if (matched.id !== 'general') {
-          room.push(task)
-        } else {
-          general.push(task)
-        }
-      }
-    }
-
-    for (const task of taskItems) classify(task)
-    for (const task of wallData.overdueTasks) classify(task)
-
-    return { roomTasks: room, generalTasks: general, adultTasks: adult }
-  }, [taskItems, wallData.familyMembers, wallData.overdueTasks])
+  // ═══ ALL TASKS: today's scheduled + overdue, in one list ═══
+  const allTasks = useMemo(
+    () => [...taskItems, ...wallData.overdueTasks],
+    [taskItems, wallData.overdueTasks],
+  )
 
   // ═══ DETAIL OVERLAY ═══
   const todayData = useMemo(() => wallData.days.find(d => d.isToday), [wallData.days])
@@ -438,14 +412,9 @@ export function WallCalendar() {
         style={{ gridTemplateColumns: '1fr 260px 260px 380px', gridTemplateRows: '1fr auto' }}
       >
 
-        {/* ─── PANEL: Rooms ─── */}
+        {/* ─── PANEL: Scratchpad (voice capture) ─── */}
         <div className={`${glass} p-5 min-h-0 flex flex-col overflow-hidden`}>
-          <WallRoomsView
-            roomTasks={roomTasks}
-            adultTasks={adultTasks}
-            onComplete={handleComplete}
-            onItemTap={handleItemTap}
-          />
+          <WallScratchpad />
         </div>
 
         {/* ─── PANEL: Routines ─── */}
@@ -459,7 +428,7 @@ export function WallCalendar() {
         {/* ─── PANEL: Tasks ─── */}
         <div className={`${glass} p-5 min-h-0 overflow-hidden flex flex-col`}>
           <WallTaskColumn
-            taskItems={generalTasks}
+            taskItems={allTasks}
             onComplete={handleComplete}
             onItemTap={handleItemTap}
           />
@@ -599,11 +568,18 @@ export function WallCalendar() {
               {getDailyJoke()}
             </p>
           </div>
+
+          {/* Camera — inline live thumbnail (tap to expand) */}
+          {cameraEnabled && (
+            <div
+              className={`${glass} flex-shrink-0 overflow-hidden`}
+              style={{ width: 150, padding: 4 }}
+            >
+              <WallCameraView />
+            </div>
+          )}
         </div>
       </main>
-
-      {/* ═══ CAMERA PiP ═══ */}
-      {cameraEnabled && <WallCameraView />}
 
       {/* ═══ UTILITIES ═══ */}
 

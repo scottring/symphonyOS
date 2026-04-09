@@ -1,17 +1,18 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
-interface WallCameraViewProps {
-  /** Start expanded instead of PiP */
-  startExpanded?: boolean
-}
+// ============================================================================
+// WallCameraView — inline camera thumbnail with tap-to-expand
+// Lives in the bottom widget strip as a small live feed; tapping opens a
+// fullscreen overlay. No floating PiP.
+// ============================================================================
 
-export function WallCameraView({ startExpanded = false }: WallCameraViewProps) {
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const [expanded, setExpanded] = useState(startExpanded)
-  const [collapsed, setCollapsed] = useState(false)
+export function WallCameraView() {
+  const inlineVideoRef = useRef<HTMLVideoElement>(null)
+  const expandedVideoRef = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const [expanded, setExpanded] = useState(false)
   const [streamActive, setStreamActive] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const streamRef = useRef<MediaStream | null>(null)
 
   const startCamera = useCallback(async () => {
     try {
@@ -24,8 +25,8 @@ export function WallCameraView({ startExpanded = false }: WallCameraViewProps) {
         audio: false,
       })
       streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
+      if (inlineVideoRef.current) {
+        inlineVideoRef.current.srcObject = stream
       }
       setStreamActive(true)
       setError(null)
@@ -49,102 +50,79 @@ export function WallCameraView({ startExpanded = false }: WallCameraViewProps) {
     return () => stopCamera()
   }, [startCamera, stopCamera])
 
-  const toggleExpand = useCallback(() => {
-    setExpanded(prev => !prev)
-  }, [])
+  // Attach the shared stream to the expanded video element whenever it mounts
+  useEffect(() => {
+    if (expanded && expandedVideoRef.current && streamRef.current) {
+      expandedVideoRef.current.srcObject = streamRef.current
+    }
+  }, [expanded, streamActive])
 
-  // Collapsed: show just a small icon button
-  if (collapsed) {
-    return (
-      <button
-        className="fixed z-40 bottom-16 right-16 w-14 h-14 rounded-2xl bg-black/60 backdrop-blur-md
-                   border border-white/15 flex items-center justify-center
-                   text-white/50 hover:text-white hover:bg-black/70 transition-all shadow-2xl"
-        onClick={() => setCollapsed(false)}
-        style={{ touchAction: 'manipulation' }}
-      >
-        <span className="text-[1.4rem]">📷</span>
-      </button>
-    )
-  }
-
+  // Error state — inline label
   if (error) {
     return (
-      <div
-        className={`fixed z-40 rounded-2xl bg-black/80 border border-white/10 flex items-center justify-center
-          ${expanded
-            ? 'inset-10'
-            : 'bottom-16 right-16 w-[240px] h-[180px]'
-          }`}
-      >
-        <div className="text-center">
-          <span className="text-[2rem]">📷</span>
-          <p className="text-white/30 font-bold text-[0.8rem] mt-2">{error}</p>
-        </div>
+      <div className="h-full w-full flex items-center justify-center gap-2 px-2">
+        <span className="text-[1.25rem] opacity-60">📷</span>
+        <span className="text-white/30 font-black text-[0.55rem] uppercase tracking-wider leading-tight">
+          {error}
+        </span>
       </div>
     )
   }
 
   return (
     <>
-      {/* Camera feed */}
-      <div
-        className={`fixed z-40 overflow-hidden cursor-pointer transition-all duration-300 ease-out
-          ${expanded
-            ? 'inset-10 rounded-3xl'
-            : 'bottom-16 right-16 w-[240px] h-[180px] rounded-2xl hover:scale-105'
-          }
-          border border-white/15 shadow-2xl`}
-        onClick={toggleExpand}
+      {/* Inline thumbnail — lives in parent flow */}
+      <button
+        type="button"
+        onClick={() => setExpanded(true)}
+        className="relative h-full w-full rounded-xl overflow-hidden bg-black/40 cursor-pointer border border-white/10 hover:border-white/20 transition-all"
         style={{ touchAction: 'manipulation' }}
+        aria-label="Expand camera"
       >
         <video
-          ref={videoRef}
+          ref={inlineVideoRef}
           autoPlay
           playsInline
           muted
           className="w-full h-full object-cover"
           style={{ transform: 'scaleX(-1)' }}
         />
-
-        {/* PiP: collapse and live label */}
-        {!expanded && streamActive && (
-          <>
-            <button
-              onClick={(e) => { e.stopPropagation(); setCollapsed(true) }}
-              className="absolute top-2 right-2 w-8 h-8 rounded-lg bg-black/60 backdrop-blur-sm
-                         flex items-center justify-center text-white/50 hover:text-white
-                         hover:bg-black/80 transition-all text-[0.8rem]"
-            >
-              ✕
-            </button>
-            <div className="absolute bottom-2 left-2 px-2 py-1 rounded-lg bg-black/60 backdrop-blur-sm">
-              <span className="text-white/60 font-black text-[0.55rem] uppercase tracking-widest">
-                Live
-              </span>
-            </div>
-          </>
+        {streamActive && (
+          <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-sm flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+            <span className="text-white/70 font-black text-[0.5rem] uppercase tracking-widest">
+              Live
+            </span>
+          </div>
         )}
+      </button>
 
-        {/* Expanded: close button */}
-        {expanded && (
+      {/* Fullscreen expansion */}
+      {expanded && (
+        <div
+          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+          onClick={() => setExpanded(false)}
+        >
+          <video
+            ref={expandedVideoRef}
+            autoPlay
+            playsInline
+            muted
+            className="max-w-full max-h-full object-contain"
+            style={{ transform: 'scaleX(-1)' }}
+          />
           <button
-            onClick={(e) => { e.stopPropagation(); setExpanded(false) }}
-            className="absolute top-6 right-6 w-14 h-14 rounded-2xl bg-black/50 backdrop-blur-md
-                       border border-white/15 flex items-center justify-center
-                       text-white/50 hover:text-white hover:bg-black/70 transition-all text-[1.5rem] z-50"
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              setExpanded(false)
+            }}
+            className="absolute top-8 right-8 w-14 h-14 rounded-2xl bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white/70 hover:text-white hover:bg-black/70 transition-all text-[1.5rem]"
+            aria-label="Close camera"
           >
             ✕
           </button>
-        )}
-      </div>
-
-      {/* Expanded backdrop */}
-      {expanded && (
-        <div
-          className="fixed inset-0 bg-black/60 z-30"
-          onClick={() => setExpanded(false)}
-        />
+        </div>
       )}
     </>
   )
