@@ -1,11 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { useTranscription } from '@/hooks/useTranscription'
 import { supabase } from '@/lib/supabase'
+import { transcribeVoice, isOpenBrainConfigured } from '@/lib/openBrain'
 
 // ============================================================================
 // WallScratchpad — voice-first family inbox capture
-// Tap the mic to dictate; what you say becomes a family inbox task.
+//
+// Uses MediaRecorder (universal browser support, including Pi Chromium) to
+// capture audio, then ships it to Open Brain's Groq Whisper endpoint for
+// transcription. The result is saved as a family inbox task.
+//
+// Web Speech API is intentionally NOT used: Raspberry Pi Chromium doesn't
+// ship with the Google speech backend that webkitSpeechRecognition requires.
 // ============================================================================
 
 interface RecentCapture {
@@ -14,34 +20,60 @@ interface RecentCapture {
   created_at: string
 }
 
-type SaveState = 'idle' | 'saving' | 'saved' | 'error'
+type Phase = 'idle' | 'recording' | 'transcribing' | 'saving' | 'saved' | 'error'
 
 const RECENT_POLL_INTERVAL_MS = 3 * 60 * 1000
+const MAX_RECORDING_SECONDS = 60
 
 export function WallScratchpad() {
   const { user } = useAuth()
-  const {
-    isSupported,
-    isTranscribing,
-    transcript,
-    interimText,
-    error,
-    startTranscription,
-    stopTranscription,
-    clearTranscript,
-  } = useTranscription()
 
-  const [saveState, setSaveState] = useState<SaveState>('idle')
+  const [phase, setPhase] = useState<Phase>('idle')
+  const [recordingSeconds, setRecordingSeconds] = useState(0)
+  const [transcribedText, setTranscribedText] = useState('')
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [recentCaptures, setRecentCaptures] = useState<RecentCapture[]>([])
 
-  // Mirror the latest transcript text in a ref so the save handler can read
-  // it after async delays without stale closures.
-  const transcriptTextRef = useRef('')
-  useEffect(() => {
-    transcriptTextRef.current = transcript.map(t => t.text).join(' ')
-  }, [transcript])
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const autoStopRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const phaseResetRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Fetch today's family inbox tasks (the recent dictations)
+  const isMediaRecorderSupported =
+    typeof window !== 'undefined' &&
+    typeof window.MediaRecorder !== 'undefined' &&
+    typeof navigator.mediaDevices?.getUserMedia === 'function'
+
+  const isSupported = isMediaRecorderSupported && isOpenBrainConfigured
+
+  const cleanupStream = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop())
+      streamRef.current = null
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+    if (autoStopRef.current) {
+      clearTimeout(autoStopRef.current)
+      autoStopRef.current = null
+    }
+  }, [])
+
+  const scheduleReset = useCallback((ms: number) => {
+    if (phaseResetRef.current) clearTimeout(phaseResetRef.current)
+    phaseResetRef.current = setTimeout(() => {
+      setPhase('idle')
+      setErrorMessage(null)
+      setTranscribedText('')
+      setRecordingSeconds(0)
+    }, ms)
+  }, [])
+
+  // Fetch today's family inbox tasks for the "Today" list
   const fetchRecent = useCallback(async () => {
     if (!user) return
     const today = new Date()
@@ -65,78 +97,188 @@ export function WallScratchpad() {
     return () => clearInterval(interval)
   }, [fetchRecent])
 
-  const handleMicTap = useCallback(async () => {
-    if (!user || !isSupported) return
-    if (saveState === 'saving') return
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        try { mediaRecorderRef.current.stop() } catch { /* noop */ }
+      }
+      cleanupStream()
+      if (phaseResetRef.current) clearTimeout(phaseResetRef.current)
+    }
+  }, [cleanupStream])
 
-    if (isTranscribing) {
-      // Stop and save whatever was captured
-      stopTranscription()
-      // Let the final onresult callbacks land before reading the transcript
-      await new Promise(resolve => setTimeout(resolve, 300))
-      const text = transcriptTextRef.current.trim()
-      clearTranscript()
-      transcriptTextRef.current = ''
+  const handleTranscribedText = useCallback(
+    async (text: string) => {
+      if (!user) return
+      const trimmed = text.trim()
+      if (!trimmed) {
+        setErrorMessage('Nothing heard — try again')
+        setPhase('error')
+        scheduleReset(3000)
+        return
+      }
 
-      if (!text) return
+      setTranscribedText(trimmed)
+      setPhase('saving')
 
-      setSaveState('saving')
-      const { error: insertError } = await supabase.from('tasks').insert({
+      const { error } = await supabase.from('tasks').insert({
         user_id: user.id,
-        title: text,
+        title: trimmed,
         context: 'family',
         scheduled_for: null,
         completed: false,
       })
 
-      if (insertError) {
-        console.error('[scratchpad] save failed:', insertError)
-        setSaveState('error')
-        setTimeout(() => setSaveState('idle'), 3000)
+      if (error) {
+        console.error('[scratchpad] save failed:', error)
+        setErrorMessage('Save failed')
+        setPhase('error')
+        scheduleReset(3000)
       } else {
-        setSaveState('saved')
+        setPhase('saved')
         await fetchRecent()
-        setTimeout(() => setSaveState('idle'), 2000)
+        scheduleReset(2500)
       }
-    } else {
-      // Start a new recording
-      clearTranscript()
-      transcriptTextRef.current = ''
-      setSaveState('idle')
-      startTranscription()
-    }
-  }, [
-    user,
-    isSupported,
-    isTranscribing,
-    saveState,
-    startTranscription,
-    stopTranscription,
-    clearTranscript,
-    fetchRecent,
-  ])
+    },
+    [user, fetchRecent, scheduleReset],
+  )
 
-  // ═══ Render: unsupported browser ═══
+  const startRecording = useCallback(async () => {
+    if (phaseResetRef.current) {
+      clearTimeout(phaseResetRef.current)
+      phaseResetRef.current = null
+    }
+    setErrorMessage(null)
+    setTranscribedText('')
+    setRecordingSeconds(0)
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
+      chunksRef.current = []
+
+      const mr = new MediaRecorder(stream)
+
+      mr.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data)
+      }
+
+      mr.onstop = async () => {
+        const blob = new Blob(chunksRef.current, {
+          type: mr.mimeType || 'audio/webm',
+        })
+        chunksRef.current = []
+        cleanupStream()
+
+        if (blob.size === 0) {
+          setPhase('idle')
+          return
+        }
+
+        setPhase('transcribing')
+        const text = await transcribeVoice(blob)
+
+        if (!text) {
+          setErrorMessage('Transcription failed')
+          setPhase('error')
+          scheduleReset(3000)
+          return
+        }
+
+        await handleTranscribedText(text)
+      }
+
+      mr.onerror = (e) => {
+        console.error('[scratchpad] MediaRecorder error:', e)
+        setErrorMessage('Recording failed')
+        setPhase('error')
+        cleanupStream()
+        scheduleReset(3000)
+      }
+
+      mediaRecorderRef.current = mr
+      mr.start()
+      setPhase('recording')
+
+      // Live timer
+      timerRef.current = setInterval(() => {
+        setRecordingSeconds(prev => prev + 1)
+      }, 1000)
+
+      // Hard safety cap
+      autoStopRef.current = setTimeout(() => {
+        if (mr.state === 'recording') mr.stop()
+      }, MAX_RECORDING_SECONDS * 1000)
+    } catch (err) {
+      console.error('[scratchpad] getUserMedia failed:', err)
+      cleanupStream()
+      if (err instanceof DOMException && err.name === 'NotAllowedError') {
+        setErrorMessage('Microphone blocked')
+      } else if (err instanceof DOMException && err.name === 'NotFoundError') {
+        setErrorMessage('No microphone found')
+      } else {
+        setErrorMessage('Microphone unavailable')
+      }
+      setPhase('error')
+      scheduleReset(3000)
+    }
+  }, [cleanupStream, handleTranscribedText, scheduleReset])
+
+  const stopRecording = useCallback(() => {
+    const mr = mediaRecorderRef.current
+    if (mr && mr.state === 'recording') {
+      mr.stop()
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+    if (autoStopRef.current) {
+      clearTimeout(autoStopRef.current)
+      autoStopRef.current = null
+    }
+  }, [])
+
+  const handleMicTap = useCallback(() => {
+    if (!isSupported) return
+    if (phase === 'idle' || phase === 'error') {
+      startRecording()
+    } else if (phase === 'recording') {
+      stopRecording()
+    }
+    // Ignore taps during transcribing/saving/saved
+  }, [isSupported, phase, startRecording, stopRecording])
+
+  // ═══ Render: unsupported ═══
   if (!isSupported) {
+    const reason = !isMediaRecorderSupported
+      ? "This browser doesn't support audio recording"
+      : 'Open Brain not configured — transcription unavailable'
     return (
       <div className="h-full flex flex-col items-center justify-center text-center px-6">
         <div className="text-[4rem] mb-4 opacity-50">🎙️</div>
         <div className="font-display text-white/70 text-[1.3rem] mb-1">Voice capture unavailable</div>
         <div className="text-[0.8rem] text-white/30 font-bold uppercase tracking-wider">
-          This browser doesn't support speech recognition
+          {reason}
         </div>
       </div>
     )
   }
 
-  const finalText = transcript.map(t => t.text).join(' ')
-  const hasText = Boolean(finalText || interimText)
-  const errorLabel =
-    error === 'not-allowed' || error === 'service-not-allowed'
-      ? 'Microphone blocked'
-      : error === 'audio-capture'
-        ? 'No microphone found'
-        : error
+  const isBusy = phase === 'transcribing' || phase === 'saving'
+  const minutes = Math.floor(recordingSeconds / 60)
+  const seconds = recordingSeconds % 60
+  const timerLabel = `${minutes}:${seconds.toString().padStart(2, '0')}`
+
+  const statusLabel: Record<Phase, string> = {
+    idle: 'Tap to speak',
+    recording: 'Listening…',
+    transcribing: 'Transcribing…',
+    saving: 'Saving…',
+    saved: 'Saved',
+    error: 'Error',
+  }
 
   return (
     <div className="h-full flex flex-col min-h-0">
@@ -146,72 +288,83 @@ export function WallScratchpad() {
           Brain Dump
         </h2>
         <span className="text-white/30 text-[0.65rem] font-black uppercase tracking-widest">
-          {isTranscribing ? 'Listening…' : 'Tap to speak'}
+          {statusLabel[phase]}
         </span>
       </div>
 
-      {/* Big mic zone — flex-1 fills available space */}
+      {/* Big mic zone */}
       <button
         type="button"
         onClick={handleMicTap}
+        disabled={isBusy}
         className={`
           flex-1 min-h-0 flex flex-col items-center justify-center gap-5
           rounded-2xl border-2 transition-all select-none
-          ${isTranscribing
+          ${phase === 'recording'
             ? 'bg-red-500/15 border-red-400/60 shadow-[0_0_60px_rgba(248,113,113,0.15)]'
-            : 'bg-white/[0.04] border-white/10 hover:bg-white/[0.08] hover:border-white/20 active:scale-[0.99]'}
+            : phase === 'saved'
+              ? 'bg-emerald-500/15 border-emerald-400/50'
+              : phase === 'error'
+                ? 'bg-red-900/20 border-red-700/40'
+                : 'bg-white/[0.04] border-white/10 hover:bg-white/[0.08] hover:border-white/20 active:scale-[0.99]'}
+          ${isBusy ? 'cursor-wait' : 'cursor-pointer'}
         `}
         style={{ touchAction: 'manipulation' }}
       >
         <div
           className={`
             text-[5.5rem] leading-none transition-transform
-            ${isTranscribing ? 'animate-pulse' : ''}
+            ${phase === 'recording' ? 'animate-pulse' : ''}
           `}
         >
-          {isTranscribing ? '🔴' : '🎙️'}
+          {phase === 'recording' && '🔴'}
+          {phase === 'transcribing' && '💭'}
+          {phase === 'saving' && '💭'}
+          {phase === 'saved' && '✅'}
+          {phase === 'error' && '⚠️'}
+          {phase === 'idle' && '🎙️'}
         </div>
 
-        {hasText ? (
-          <div
-            className="text-white font-medium text-[1.35rem] text-center px-10 leading-snug max-h-[8rem] overflow-y-auto"
-            style={{ scrollbarWidth: 'none' }}
-          >
-            {finalText}
-            {interimText && (
-              <span className="text-white/40">{finalText ? ' ' : ''}{interimText}</span>
-            )}
-          </div>
-        ) : (
-          <div className="text-white/40 font-black text-[0.9rem] uppercase tracking-[0.2em]">
-            {isTranscribing ? 'Speak freely' : 'Drop a thought'}
+        {phase === 'recording' && (
+          <>
+            <div className="text-red-300 font-black text-[2rem] tabular-nums tracking-wide">
+              {timerLabel}
+            </div>
+            <div className="text-white/40 font-black text-[0.75rem] uppercase tracking-[0.2em]">
+              Tap to stop
+            </div>
+          </>
+        )}
+
+        {(phase === 'transcribing' || phase === 'saving') && (
+          <div className="text-white/60 font-black text-[0.9rem] uppercase tracking-[0.2em]">
+            {phase === 'transcribing' ? 'Hearing you out…' : 'Saving…'}
           </div>
         )}
 
-        {errorLabel && !isTranscribing && (
-          <div className="mt-2 px-4 py-1.5 rounded-lg bg-red-500/15 border border-red-500/25">
-            <span className="text-red-300/80 text-[0.7rem] font-black uppercase tracking-widest">
-              {errorLabel}
-            </span>
+        {phase === 'saved' && transcribedText && (
+          <>
+            <div className="text-white font-medium text-[1.2rem] text-center px-10 leading-snug max-h-[6rem] overflow-hidden">
+              "{transcribedText}"
+            </div>
+            <div className="text-emerald-300/80 font-black text-[0.75rem] uppercase tracking-[0.2em]">
+              Added to family inbox
+            </div>
+          </>
+        )}
+
+        {phase === 'error' && errorMessage && (
+          <div className="text-red-300/80 font-black text-[0.8rem] uppercase tracking-widest px-6 text-center">
+            {errorMessage}
+          </div>
+        )}
+
+        {phase === 'idle' && (
+          <div className="text-white/40 font-black text-[0.9rem] uppercase tracking-[0.2em]">
+            Drop a thought
           </div>
         )}
       </button>
-
-      {/* Save status */}
-      {saveState !== 'idle' && (
-        <div
-          className={`
-            mt-3 py-2.5 px-4 rounded-xl text-center text-[0.8rem] font-black uppercase tracking-widest flex-shrink-0
-            ${saveState === 'saving' ? 'bg-white/5 text-white/50' : ''}
-            ${saveState === 'saved' ? 'bg-emerald-500/20 text-emerald-300' : ''}
-            ${saveState === 'error' ? 'bg-red-500/20 text-red-300' : ''}
-          `}
-        >
-          {saveState === 'saving' && 'Saving…'}
-          {saveState === 'saved' && '✓ Added to family inbox'}
-          {saveState === 'error' && 'Save failed — try again'}
-        </div>
-      )}
 
       {/* Recent captures from today */}
       {recentCaptures.length > 0 && (
