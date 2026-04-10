@@ -4,7 +4,8 @@ import { supabase } from '@/lib/supabase'
 import { useWallData } from '@/hooks/useWallData'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import type { TimelineItem } from '@/types/timeline'
-import { WallScratchpad } from './WallScratchpad'
+// Voice capture disabled — import paused to prevent accidental data corruption
+// import { WallScratchpad } from './WallScratchpad'
 import { WallRoutineColumn } from './WallRoutineColumn'
 import { WallTaskColumn } from './WallTaskColumn'
 import { WallJaxCareWidget } from './WallJaxCareWidget'
@@ -412,9 +413,13 @@ export function WallCalendar() {
         style={{ gridTemplateColumns: '1fr 260px 260px 380px', gridTemplateRows: '1fr auto' }}
       >
 
-        {/* ─── PANEL: Scratchpad (voice capture) ─── */}
-        <div className={`${glass} p-5 min-h-0 flex flex-col overflow-hidden`}>
-          <WallScratchpad />
+        {/* ─── PANEL: Scratchpad (voice capture DISABLED — under repair) ─── */}
+        <div className={`${glass} p-5 min-h-0 flex flex-col overflow-hidden items-center justify-center text-center`}>
+          <div className="text-[3.5rem] mb-4 opacity-30">🛠️</div>
+          <div className="font-display text-white/50 text-[1.4rem] mb-1">Brain Dump</div>
+          <div className="text-white/25 font-black uppercase tracking-[0.2em] text-[0.65rem]">
+            Paused for repairs
+          </div>
         </div>
 
         {/* ─── PANEL: Routines ─── */}
