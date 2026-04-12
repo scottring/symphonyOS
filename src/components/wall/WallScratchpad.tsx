@@ -33,6 +33,7 @@ export function WallScratchpad() {
   const [transcribedText, setTranscribedText] = useState('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [recentCaptures, setRecentCaptures] = useState<RecentCapture[]>([])
+  const [pressingDeleteId, setPressingDeleteId] = useState<string | null>(null)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -40,6 +41,7 @@ export function WallScratchpad() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const autoStopRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const phaseResetRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const deleteHoldRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const isMediaRecorderSupported =
     typeof window !== 'undefined' &&
@@ -250,6 +252,41 @@ export function WallScratchpad() {
     // Ignore taps during transcribing/saving/saved
   }, [isSupported, phase, startRecording, stopRecording])
 
+  // ═══ Long-press to delete a recent capture ═══
+  const clearDeleteHold = useCallback(() => {
+    if (deleteHoldRef.current) {
+      clearTimeout(deleteHoldRef.current)
+      deleteHoldRef.current = null
+    }
+    setPressingDeleteId(null)
+  }, [])
+
+  const handleDeletePointerDown = useCallback(
+    (id: string) => {
+      clearDeleteHold()
+      setPressingDeleteId(id)
+      deleteHoldRef.current = setTimeout(async () => {
+        setPressingDeleteId(null)
+        deleteHoldRef.current = null
+        // Optimistic removal
+        setRecentCaptures(prev => prev.filter(c => c.id !== id))
+        const { error } = await supabase.from('tasks').delete().eq('id', id)
+        if (error) {
+          console.error('[scratchpad] delete failed:', error)
+          // Rollback on failure
+          await fetchRecent()
+        }
+      }, 700)
+    },
+    [clearDeleteHold, fetchRecent],
+  )
+
+  useEffect(() => {
+    return () => {
+      if (deleteHoldRef.current) clearTimeout(deleteHoldRef.current)
+    }
+  }, [])
+
   // ═══ Render: unsupported ═══
   if (!isSupported) {
     const reason = !isMediaRecorderSupported
@@ -366,24 +403,49 @@ export function WallScratchpad() {
         )}
       </button>
 
-      {/* Recent captures from today */}
+      {/* Recent captures from today — long-press to delete */}
       {recentCaptures.length > 0 && (
         <div className="mt-4 flex-shrink-0">
-          <div className="text-white/30 font-black uppercase tracking-[0.2em] text-[0.6rem] mb-2">
-            Today
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-white/30 font-black uppercase tracking-[0.2em] text-[0.6rem]">
+              Today
+            </div>
+            <div className="text-white/20 font-bold uppercase tracking-wider text-[0.55rem]">
+              Hold to delete
+            </div>
           </div>
           <div
             className="space-y-1.5 max-h-[8rem] overflow-y-auto pr-1"
             style={{ scrollbarWidth: 'none' }}
           >
-            {recentCaptures.map(c => (
-              <div
-                key={c.id}
-                className="bg-white/[0.05] rounded-lg px-3 py-2 text-white/75 text-[0.85rem] leading-snug truncate"
-              >
-                {c.title}
-              </div>
-            ))}
+            {recentCaptures.map(c => {
+              const isPressing = pressingDeleteId === c.id
+              return (
+                <div
+                  key={c.id}
+                  onPointerDown={() => handleDeletePointerDown(c.id)}
+                  onPointerUp={clearDeleteHold}
+                  onPointerLeave={clearDeleteHold}
+                  onPointerCancel={clearDeleteHold}
+                  className={`
+                    relative overflow-hidden rounded-lg px-3 py-2 text-[0.85rem] leading-snug truncate
+                    select-none cursor-pointer transition-colors
+                    ${isPressing ? 'bg-red-500/15 text-red-100' : 'bg-white/[0.05] text-white/75 hover:bg-white/[0.08]'}
+                  `}
+                  style={{ touchAction: 'none' }}
+                >
+                  {/* Hold fill */}
+                  <div
+                    className={`
+                      absolute inset-0 bg-red-500/25 origin-left pointer-events-none
+                      ${isPressing ? 'scale-x-100 duration-700 ease-linear' : 'scale-x-0 duration-150 ease-out'}
+                    `}
+                    style={{ transition: 'transform' }}
+                  />
+                  <span className="relative z-10">{c.title}</span>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}

@@ -8,7 +8,6 @@ import { useHomeView } from '@/hooks/useHomeView'
 import { useMobile } from '@/hooks/useMobile'
 import { useUndo } from '@/hooks/useUndo'
 import { useDomain, type Domain } from '@/hooks/useDomain'
-import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings'
 import { HomeViewSwitcher } from './HomeViewSwitcher'
 import { WeekView } from './WeekView'
 import { MonthView } from './MonthView'
@@ -51,7 +50,6 @@ export function HomeView({
   const isMobile = useMobile()
   const { currentAction, pushAction, executeUndo, dismiss } = useUndo({ duration: 5000 })
   const { currentDomain } = useDomain()
-  const { getDomainForCalendar } = useCalendarDomainMappings()
 
   // Filter tasks, routines, projects, and events by current domain
   // Specific domains show ONLY matching items — untagged items stay in universal
@@ -94,16 +92,9 @@ export function HomeView({
     return projects.filter(project => project.context === currentDomain)
   }, [projects, currentDomain])
 
-  const filteredEvents = useMemo(() => {
-    if (currentDomain === 'universal') return events
-    return events.filter(event => {
-      const calId = event.calendar_id || event.calendarId
-      const calName = event.calendar_name || event.calendarName
-      const eventDomain = getDomainForCalendar(calId, calName)
-      // Show events whose calendar maps to this domain, or events with no mapping
-      return eventDomain === currentDomain || eventDomain === null
-    })
-  }, [events, currentDomain, getDomainForCalendar])
+  // Calendar events always show regardless of domain filter —
+  // domain filtering applies to tasks, routines, and projects only
+  const filteredEvents = events
 
   // Assignee filter state
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
