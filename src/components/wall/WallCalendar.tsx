@@ -4,10 +4,9 @@ import { supabase } from '@/lib/supabase'
 import { useWallData } from '@/hooks/useWallData'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import type { TimelineItem } from '@/types/timeline'
-// Voice capture disabled — import paused to prevent accidental data corruption
-// import { WallScratchpad } from './WallScratchpad'
 import { WallRoutineColumn } from './WallRoutineColumn'
-import { WallTaskColumn } from './WallTaskColumn'
+import { WallSwimlane } from './WallSwimlane'
+import { WallMicButton } from './WallMicButton'
 import { WallJaxCareWidget } from './WallJaxCareWidget'
 import { WallLookAhead } from './WallLookAhead'
 import { WallItemDetail } from './WallItemDetail'
@@ -144,25 +143,46 @@ export function WallCalendar() {
   }, [toggleCamera])
 
   // ═══ ITEMS ═══
-  const { choreItems, taskItems } = useMemo(() => {
+  const { dailyChoreItems, nonDailyRoutineItems, taskItems, todayEventItems } = useMemo(() => {
     const today = wallData.days.find(d => d.isToday)
-    if (!today) return { choreItems: [] as TimelineItem[], taskItems: [] as TimelineItem[] }
-    const chores: TimelineItem[] = []
-    const tasks: TimelineItem[] = []
-    for (const section of ['morning', 'afternoon', 'evening', 'allday'] as const) {
-      for (const item of (today.items[section] || [])) {
-        if (item.type === 'event' || item.skipped) continue
-        if (item.type === 'routine') chores.push(item)
-        else if (item.type === 'task') tasks.push(item)
+    if (!today) {
+      return {
+        dailyChoreItems: [] as TimelineItem[],
+        nonDailyRoutineItems: [] as TimelineItem[],
+        taskItems: [] as TimelineItem[],
+        todayEventItems: [] as TimelineItem[],
       }
     }
-    // Filter Jax-related routines — handled by the Jax care widget
+    const dailyChores: TimelineItem[] = []
+    const nonDailyRoutines: TimelineItem[] = []
+    const tasks: TimelineItem[] = []
+    const events: TimelineItem[] = []
+    for (const section of ['morning', 'afternoon', 'evening', 'allday'] as const) {
+      for (const item of (today.items[section] || [])) {
+        if (item.skipped) continue
+        if (item.type === 'event') {
+          events.push(item)
+        } else if (item.type === 'routine') {
+          const isDaily = item.recurrencePattern?.type === 'daily'
+          if (isDaily) dailyChores.push(item)
+          else nonDailyRoutines.push(item)
+        } else if (item.type === 'task') {
+          tasks.push(item)
+        }
+      }
+    }
+    // Filter Jax-related daily chores — handled by the Jax care widget
     const JAX_KEYWORDS = ['jax', 'walk jax', 'feed jax', 'jax dinner', 'jax med']
-    const nonJaxChores = chores.filter(item => {
+    const nonJaxDailyChores = dailyChores.filter(item => {
       const lower = item.title.toLowerCase()
       return !JAX_KEYWORDS.some(kw => lower.includes(kw))
     })
-    return { choreItems: nonJaxChores, taskItems: tasks }
+    return {
+      dailyChoreItems: nonJaxDailyChores,
+      nonDailyRoutineItems: nonDailyRoutines,
+      taskItems: tasks,
+      todayEventItems: events,
+    }
   }, [wallData.days])
 
   // ═══ ALL TASKS: today's scheduled + overdue, in one list ═══
@@ -208,11 +228,11 @@ export function WallCalendar() {
       calendarEvents: wallData.calendarEvents,
       familyMembers: wallData.familyMembers,
       overdueTasks: wallData.overdueTasks,
-      todayChores: choreItems,
+      todayChores: dailyChoreItems,
       todayTasks: taskItems,
       emailActionItems: emailItems,
     }
-  }, [currentTime, wallData, choreItems, taskItems])
+  }, [currentTime, wallData, dailyChoreItems, taskItems])
 
   const {
     surfacedRules,
@@ -410,32 +430,26 @@ export function WallCalendar() {
 
       {/* ═══ MAIN CONTENT — CSS Grid ═══ */}
       <main className="flex-1 grid min-h-0 relative z-10 px-10 pb-6 gap-4"
-        style={{ gridTemplateColumns: '1fr 260px 260px 380px', gridTemplateRows: '1fr auto' }}
+        style={{ gridTemplateColumns: '1fr 260px 380px', gridTemplateRows: '1fr auto' }}
       >
 
-        {/* ─── PANEL: Scratchpad (voice capture DISABLED — under repair) ─── */}
-        <div className={`${glass} p-5 min-h-0 flex flex-col overflow-hidden items-center justify-center text-center`}>
-          <div className="text-[3.5rem] mb-4 opacity-30">🛠️</div>
-          <div className="font-display text-white/50 text-[1.4rem] mb-1">Brain Dump</div>
-          <div className="text-white/25 font-black uppercase tracking-[0.2em] text-[0.65rem]">
-            Paused for repairs
-          </div>
-        </div>
-
-        {/* ─── PANEL: Routines ─── */}
-        <div className={`${glass} p-5 min-h-0 overflow-hidden flex flex-col`}>
-          <WallRoutineColumn
-            choreItems={choreItems}
+        {/* ─── PANEL: Swimlane (per-person Today view) ─── */}
+        <div className={`${glass} p-5 min-h-0 flex flex-col overflow-hidden`}>
+          <WallSwimlane
+            familyMembers={wallData.familyMembers}
+            taskItems={allTasks}
+            routineItems={nonDailyRoutineItems}
+            calendarEvents={todayEventItems}
             onComplete={handleComplete}
+            onItemTap={handleItemTap}
           />
         </div>
 
-        {/* ─── PANEL: Tasks ─── */}
+        {/* ─── PANEL: Daily Routines ─── */}
         <div className={`${glass} p-5 min-h-0 overflow-hidden flex flex-col`}>
-          <WallTaskColumn
-            taskItems={allTasks}
+          <WallRoutineColumn
+            choreItems={dailyChoreItems}
             onComplete={handleComplete}
-            onItemTap={handleItemTap}
           />
         </div>
 
@@ -449,7 +463,7 @@ export function WallCalendar() {
         </div>
 
         {/* ─── BOTTOM ROW: Widget Strip ─── */}
-        <div className="flex gap-4 col-span-4">
+        <div className="flex gap-4 col-span-3">
           {/* Jax Care Widget (meds + fed + bone + treat + sleep tracker) */}
           <div className={`${glass} px-5 py-4`} style={{ flex: '2 1 0%' }}>
             <WallJaxCareWidget />
@@ -587,6 +601,9 @@ export function WallCalendar() {
       </main>
 
       {/* ═══ UTILITIES ═══ */}
+
+      {/* Floating mic — voice → family inbox */}
+      <WallMicButton />
 
       {/* Camera toggle */}
       <button

@@ -48,6 +48,8 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
   const [recurrenceType, setRecurrenceType] = useState<RecurrencePattern['type']>(routine.recurrence_pattern.type)
   const [selectedDays, setSelectedDays] = useState<string[]>(routine.recurrence_pattern.days || [])
   const [dayOfMonth, setDayOfMonth] = useState<number>(routine.recurrence_pattern.day_of_month || 1)
+  const [weeklyInterval, setWeeklyInterval] = useState<number>(routine.recurrence_pattern.interval || 1)
+  const [startDate, setStartDate] = useState<string>(routine.recurrence_pattern.start_date || '')
   const [timeOfDay, setTimeOfDay] = useState(routine.time_of_day || '')
 
   const [isSaving, setIsSaving] = useState(false)
@@ -76,6 +78,8 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
       const originalDays = routine.recurrence_pattern.days || []
       if (selectedDays.length !== originalDays.length) return true
       if (!selectedDays.every(d => originalDays.includes(d))) return true
+      if (weeklyInterval !== (routine.recurrence_pattern.interval || 1)) return true
+      if (weeklyInterval > 1 && startDate !== (routine.recurrence_pattern.start_date || '')) return true
     }
     if (recurrenceType === 'monthly') {
       if (dayOfMonth !== (routine.recurrence_pattern.day_of_month || 1)) return true
@@ -104,6 +108,11 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
       const recurrence_pattern: RecurrencePattern = { type: recurrenceType }
       if (recurrenceType === 'weekly') {
         recurrence_pattern.days = selectedDays
+        if (weeklyInterval > 1) {
+          recurrence_pattern.interval = weeklyInterval
+          // Default start_date to today if user didn't pick one
+          recurrence_pattern.start_date = startDate || new Date().toISOString().slice(0, 10)
+        }
       }
       if (recurrenceType === 'monthly') {
         recurrence_pattern.day_of_month = dayOfMonth
@@ -299,6 +308,38 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
                   </div>
                   {recurrenceType === 'weekly' && selectedDays.length === 0 && (
                     <p className="text-sm text-red-500 mt-2">Select at least one day</p>
+                  )}
+
+                  {/* Interval — every N weeks */}
+                  <div className="mt-4 flex items-center gap-3">
+                    <label className="text-sm font-medium text-neutral-700">Every</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={52}
+                      value={weeklyInterval}
+                      onChange={(e) => setWeeklyInterval(Math.max(1, Number(e.target.value) || 1))}
+                      className="w-20 px-3 py-2 rounded-lg border border-neutral-200 bg-white text-neutral-800 text-center
+                                 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    />
+                    <span className="text-sm text-neutral-600">{weeklyInterval === 1 ? 'week' : 'weeks'}</span>
+                  </div>
+                  {weeklyInterval > 1 && (
+                    <div className="mt-3">
+                      <label className="block text-sm font-medium text-neutral-700 mb-2">
+                        Anchor date <span className="text-neutral-400 font-normal">(a day this routine should occur)</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="px-3 py-2 rounded-lg border border-neutral-200 bg-white text-neutral-800
+                                   focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                      />
+                      <p className="text-xs text-neutral-500 mt-1">
+                        Pick any past or upcoming date when this should occur — future occurrences are spaced from here.
+                      </p>
+                    </div>
                   )}
                 </div>
               )}
