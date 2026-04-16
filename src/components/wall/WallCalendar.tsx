@@ -8,6 +8,7 @@ import { WallRoutineColumn } from './WallRoutineColumn'
 import { WallSwimlane } from './WallSwimlane'
 import { WallMicButton } from './WallMicButton'
 import { WallJaxCareWidget } from './WallJaxCareWidget'
+import { WallDinnerPromptWidget } from './WallDinnerPromptWidget'
 import { WallLookAhead } from './WallLookAhead'
 import { WallItemDetail } from './WallItemDetail'
 import { findDinnerEvent, getMealIcon } from './WallDinnerWidget'
@@ -491,6 +492,11 @@ export function WallCalendar() {
             {recipeUrl && (
               <span className="text-white/30 text-[1rem]">📖</span>
             )}
+          </div>
+
+          {/* Dinner conversation prompt from Relish */}
+          <div className={`${glass} px-5 py-4 flex-1`}>
+            <WallDinnerPromptWidget />
           </div>
 
           {/* Soccer Tip Widget */}
