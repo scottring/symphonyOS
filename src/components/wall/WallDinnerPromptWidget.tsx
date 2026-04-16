@@ -92,11 +92,11 @@ export function WallDinnerPromptWidget() {
     if (!isRelishConfigured) return null
     if (loading) {
         return (
-            <div className="flex flex-col flex-1 pl-4 pr-12 border-r border-white/10 opacity-50">
-                <div className="text-[1.2rem] font-black uppercase tracking-widest text-white mb-4 font-display">
+            <div className="flex flex-col flex-1 opacity-50">
+                <div className="text-[0.7rem] font-black uppercase tracking-widest text-white mb-1 font-display">
                     Tonight at dinner
                 </div>
-                <div className="text-white/40 text-sm">loading…</div>
+                <div className="text-white/40 text-xs">loading…</div>
             </div>
         )
     }
@@ -105,18 +105,18 @@ export function WallDinnerPromptWidget() {
     const isAdult = prompt.audience === 'adult'
 
     return (
-        <div className="flex flex-col flex-1 pl-4 pr-12 border-r border-white/10 relative">
+        <div className="flex flex-col flex-1 relative">
             <div
-                className="text-[1.2rem] font-black uppercase tracking-widest mb-3 font-display"
+                className="text-[0.7rem] font-black uppercase tracking-widest mb-1 font-display"
                 style={{ color: isAdult ? '#F4C27A' : 'white' }}
             >
                 {isAdult ? 'Tonight — just the two of you' : 'Tonight at dinner'}
             </div>
 
-            <div className="flex items-start gap-4">
+            <div className="flex items-center gap-3">
                 <p
                     className="flex-1 font-display text-white/95 leading-snug"
-                    style={{ fontSize: '1.55rem', fontStyle: 'italic' }}
+                    style={{ fontSize: '1.1rem', fontStyle: 'italic' }}
                 >
                     {prompt.text}
                 </p>
@@ -126,7 +126,7 @@ export function WallDinnerPromptWidget() {
                     onPointerUp={handlePointerUp}
                     onPointerLeave={clearLongPress}
                     onPointerCancel={clearLongPress}
-                    className="shrink-0 w-10 h-10 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 flex items-center justify-center text-white/70 text-xl select-none"
+                    className="shrink-0 w-8 h-8 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 flex items-center justify-center text-white/70 text-base select-none"
                     style={{ touchAction: 'none' }}
                     aria-label="Swap prompt (long-press to report)"
                 >
@@ -134,8 +134,8 @@ export function WallDinnerPromptWidget() {
                 </button>
             </div>
 
-            <div className="mt-2 text-[0.7rem] uppercase tracking-wider text-white/30">
-                {prompt.theme.replace(/-/g, ' ')} · {prompt.source === 'synthesized' ? 'personal' : ''}
+            <div className="mt-1 text-[0.55rem] uppercase tracking-wider text-white/30">
+                {prompt.theme.replace(/-/g, ' ')}{prompt.source === 'synthesized' ? ' · personal' : ''}
             </div>
 
             {showReportConfirm && (

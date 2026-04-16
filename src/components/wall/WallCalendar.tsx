@@ -19,10 +19,6 @@ import type { ContextEvalData } from './contexts'
 import { useWeather } from '@/hooks/useWeather'
 import { getWeatherMessage, getWeatherEmoji } from './weatherMessages'
 import { getDailyJoke } from './alienJokes'
-import { getDailySoccerTip, getCategoryLabel, getCategoryColor } from './soccerTips'
-import { WallSoccerTipOverlay } from './WallSoccerTipOverlay'
-import { getDailyRunningTip, getRunningCategoryLabel, getRunningCategoryColor } from './runningTips'
-import { WallRunningTipOverlay } from './WallRunningTipOverlay'
 import { useKioskCards } from '@/hooks/useKioskCards'
 import { WallAgentCards } from './WallAgentCards'
 import { useEmailActionItems } from '@/hooks/useEmailActionItems'
@@ -63,8 +59,6 @@ export function WallCalendar() {
   const [nightWake, setNightWake] = useState(false)
   const nightWakeTimerRef = useRef<NodeJS.Timeout | null>(null)
   const [showRecipeViewer, setShowRecipeViewer] = useState(false)
-  const [showSoccerTip, setShowSoccerTip] = useState(false)
-  const [showRunningTip, setShowRunningTip] = useState(false)
   const [detailItem, setDetailItem] = useState<TimelineItem | null>(null)
   const { cards: agentCards, dismissCard } = useKioskCards()
   const {
@@ -464,88 +458,44 @@ export function WallCalendar() {
         </div>
 
         {/* ─── BOTTOM ROW: Widget Strip ─── */}
-        <div className="flex gap-4 col-span-3">
+        <div className="flex gap-3 col-span-3 items-stretch">
           {/* Jax Care Widget (meds + fed + bone + treat + sleep tracker) */}
-          <div className={`${glass} px-5 py-4`} style={{ flex: '2 1 0%' }}>
+          <div className={`${glass} px-4 py-2`} style={{ flex: '2 1 0%' }}>
             <WallJaxCareWidget />
           </div>
 
           {/* Dinner Widget */}
-          <div className={`${glass} px-5 py-4 flex-1 flex items-center gap-4 ${recipeUrl ? 'cursor-pointer' : ''}`}
+          <div className={`${glass} px-4 py-2 flex-1 flex items-center gap-3 ${recipeUrl ? 'cursor-pointer' : ''}`}
             onClick={recipeUrl ? handleOpenRecipe : undefined}
           >
-            <div className="text-[2.2rem]">
+            <div className="text-[1.8rem]">
               {dinnerEvent ? getMealIcon(dinnerEvent.title) : '🍽️'}
             </div>
             <div className="flex flex-col min-w-0 flex-1">
-              <span className="text-white/40 font-black uppercase tracking-widest text-[0.7rem]">
+              <span className="text-white/40 font-black uppercase tracking-widest text-[0.6rem]">
                 Tonight
               </span>
               {dinnerEvent ? (
-                <span className="text-white font-bold text-[1.1rem] truncate leading-tight">
+                <span className="text-white font-bold text-[1rem] truncate leading-tight">
                   {dinnerMealName}
                 </span>
               ) : (
-                <span className="text-white/30 text-[1rem] italic">No dinner planned</span>
+                <span className="text-white/30 text-[0.9rem] italic">No dinner planned</span>
               )}
             </div>
             {recipeUrl && (
-              <span className="text-white/30 text-[1rem]">📖</span>
+              <span className="text-white/30 text-[0.9rem]">📖</span>
             )}
           </div>
 
           {/* Dinner conversation prompt from Relish */}
-          <div className={`${glass} px-5 py-4 flex-1`}>
+          <div className={`${glass} px-4 py-2`} style={{ flex: '2 1 0%' }}>
             <WallDinnerPromptWidget />
           </div>
 
-          {/* Soccer Tip Widget */}
-          {(() => {
-            const soccerTip = getDailySoccerTip()
-            const catColor = getCategoryColor(soccerTip.category)
-            return (
-              <div
-                className={`${glass} px-5 py-4 flex items-center gap-3 cursor-pointer hover:bg-white/[0.12] transition-colors`}
-                onClick={() => setShowSoccerTip(true)}
-              >
-                <div className="text-[2.2rem] flex-shrink-0">⚽</div>
-                <div className="flex flex-col min-w-0 flex-1">
-                  <span className="font-black uppercase tracking-widest text-[0.6rem] mb-0.5" style={{ color: catColor }}>
-                    {getCategoryLabel(soccerTip.category)}
-                  </span>
-                  <span className="text-white font-bold text-[1rem] truncate leading-tight">
-                    {soccerTip.title}
-                  </span>
-                </div>
-              </div>
-            )
-          })()}
-
-          {/* Running Tip Widget */}
-          {(() => {
-            const runTip = getDailyRunningTip()
-            const runColor = getRunningCategoryColor(runTip.category)
-            return (
-              <div
-                className={`${glass} px-5 py-4 flex items-center gap-3 cursor-pointer hover:bg-white/[0.12] transition-colors`}
-                onClick={() => setShowRunningTip(true)}
-              >
-                <div className="text-[2.2rem] flex-shrink-0">🏃</div>
-                <div className="flex flex-col min-w-0 flex-1">
-                  <span className="font-black uppercase tracking-widest text-[0.6rem] mb-0.5" style={{ color: runColor }}>
-                    {getRunningCategoryLabel(runTip.category)}
-                  </span>
-                  <span className="text-white font-bold text-[1rem] truncate leading-tight">
-                    {runTip.title}
-                  </span>
-                </div>
-              </div>
-            )
-          })()}
-
           {/* Email Action Items Widget */}
           {emailItems.length > 0 && (
-            <div className={`${glass} px-5 py-4 flex-1 flex items-center`}>
+            <div className={`${glass} px-4 py-2 flex-1 flex items-center`}>
               <WallEmailActions
                 items={emailItems}
                 urgentItems={emailUrgentItems}
@@ -556,7 +506,7 @@ export function WallCalendar() {
 
           {/* Agent Cards Widget */}
           {agentCards.length > 0 && (
-            <div className={`${glass} px-5 py-4 flex-1 flex flex-col justify-center`}>
+            <div className={`${glass} px-4 py-2 flex-1 flex flex-col justify-center`}>
               <WallAgentCards cards={agentCards} onDismiss={dismissCard} />
             </div>
           )}
@@ -687,13 +637,6 @@ export function WallCalendar() {
         />
       )}
 
-      {showSoccerTip && (
-        <WallSoccerTipOverlay onClose={() => setShowSoccerTip(false)} />
-      )}
-
-      {showRunningTip && (
-        <WallRunningTipOverlay onClose={() => setShowRunningTip(false)} />
-      )}
 
       {detailItem && (
         <WallItemDetail item={detailItem} onClose={handleCloseDetail} />
