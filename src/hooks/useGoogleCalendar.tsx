@@ -13,6 +13,14 @@ export interface CreateEventParams {
   timeZone?: string
   /** Optional idempotency key to prevent duplicate events on retry */
   requestId?: string
+  /** Optional target calendar ID. Defaults to 'primary' server-side. */
+  calendarId?: string
+}
+
+export interface MoveEventParams {
+  eventId: string
+  sourceCalendarId: string
+  destinationCalendarId: string
 }
 
 /** Error thrown when calendar needs reconnection due to expired/revoked permissions */
@@ -83,6 +91,7 @@ interface GoogleCalendarContextValue {
   fetchCalendarList: () => Promise<GoogleCalendarInfo[]>
   createEvent: (params: CreateEventParams) => Promise<CreateEventResult>
   updateEvent: (params: UpdateEventParams) => Promise<void>
+  moveEvent: (params: MoveEventParams) => Promise<void>
 }
 
 const GoogleCalendarContext = createContext<GoogleCalendarContextValue | null>(null)
@@ -367,6 +376,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
         allDay: params.allDay,
         timeZone,
         requestId: params.requestId,
+        calendarId: params.calendarId,
       },
     })
 
@@ -452,6 +462,39 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     await fetchTodayEvents()
   }, [isConnected, fetchTodayEvents])
 
+  // Move an event between calendars (Google events.move endpoint)
+  const moveEvent = useCallback(async (params: MoveEventParams): Promise<void> => {
+    if (!isConnected) {
+      throw new Error('Not connected to Google Calendar')
+    }
+
+    const { data, error } = await supabase.functions.invoke('google-calendar-move-event', {
+      body: {
+        eventId: params.eventId,
+        sourceCalendarId: params.sourceCalendarId,
+        destinationCalendarId: params.destinationCalendarId,
+      },
+    })
+
+    if (error) throw error
+
+    if (data?.error) {
+      const isAuthError =
+        data.error.includes('Unauthorized') ||
+        data.error.includes('invalid_grant') ||
+        data.error.includes('Token has been expired or revoked') ||
+        data.needsReconnect
+
+      if (isAuthError) {
+        setError('Calendar connection expired. Please reconnect.')
+        setIsConnected(false)
+        setNeedsReconnect(true)
+        throw new CalendarReconnectError()
+      }
+      throw new Error(data.error)
+    }
+  }, [isConnected])
+
   const value: GoogleCalendarContextValue = {
     isConnected,
     needsReconnect,
@@ -467,6 +510,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     fetchCalendarList,
     createEvent,
     updateEvent,
+    moveEvent,
   }
 
   return (

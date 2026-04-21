@@ -523,12 +523,17 @@ export const ScheduleItem = memo(function ScheduleItem({
           </div>
         )}
 
-        {/* Right indicators — compact group: context (hover-only) + assignee */}
+        {/* Right indicators — compact group: context + assignee */}
         <div className="shrink-0 flex items-center gap-0.5">
-          {/* Context picker — hover-only to reduce visual noise */}
+          {/* Context picker — always visible on events (no hover to reveal on touch);
+              hover-only for tasks/routines to reduce visual noise */}
           {(isTask || isRoutine || isEvent) && onContextChange && (
             <div
-              className="opacity-0 group-hover:opacity-100 transition-opacity"
+              className={
+                isEvent || item.context
+                  ? 'transition-opacity'
+                  : 'opacity-0 group-hover:opacity-100 transition-opacity'
+              }
               onClick={(e) => {
                 e.stopPropagation()
                 if (panelOpen && onClosePanel) {

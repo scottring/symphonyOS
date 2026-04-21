@@ -195,7 +195,7 @@ function App() {
 
 function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask } = useSupabaseTasks()
-  const { isConnected, events, fetchEvents, isFetching: eventsFetching, createEvent, updateEvent, connect: connectCalendar } = useGoogleCalendar()
+  const { isConnected, events, fetchEvents, isFetching: eventsFetching, createEvent, updateEvent, moveEvent, fetchCalendarList, connect: connectCalendar } = useGoogleCalendar()
   const attachments = useAttachments()
   const { fetchAttachments } = attachments
   const pinnedItems = usePinnedItems()
@@ -229,7 +229,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   const isOnline = useOnlineStatus()
   const focusMode = useFocusMode()
 
-  const { getDomainForCalendar } = useCalendarDomainMappings()
+  const { getDomainForCalendar, getCalendarForDomain } = useCalendarDomainMappings()
 
   // From contexts
   const { lists, listsByCategory, setSelectedListId, addList } = useListsContext()
@@ -1148,12 +1148,17 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
             const endTime = new Date(startTime)
             endTime.setHours(endTime.getHours() + 1)
 
+            // Pick target calendar from the current domain mapping (e.g., Family domain → Family calendar)
+            const explicitContext = data.context ?? (currentDomain !== 'universal' ? currentDomain : undefined)
+            const targetCalendar = getCalendarForDomain(explicitContext ?? null)
+
             await createEvent({
               title: data.title,
               startTime,
               endTime,
               // Use browser timezone
               timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              calendarId: targetCalendar?.calendarId,
             })
 
             // Refresh calendar events to show the new event
@@ -1272,6 +1277,22 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
                 } catch (error) {
                   console.error('Failed to update event location:', error)
                   showToast(error instanceof Error ? error.message : 'Failed to update location', 'warning')
+                }
+              }}
+              fetchCalendarList={fetchCalendarList}
+              onMoveEventToCalendar={async (eventId: string, sourceCalendarId: string, destinationCalendarId: string) => {
+                try {
+                  await moveEvent({ eventId, sourceCalendarId, destinationCalendarId })
+                  // Refresh events so the moved event reflects its new calendar
+                  const today = new Date()
+                  today.setHours(0, 0, 0, 0)
+                  const weekLater = new Date(today)
+                  weekLater.setDate(weekLater.getDate() + 7)
+                  await fetchEvents(today, weekLater)
+                  showToast('Event moved to new calendar', 'success')
+                } catch (error) {
+                  console.error('Failed to move event:', error)
+                  showToast(error instanceof Error ? error.message : 'Failed to move event', 'warning')
                 }
               }}
               eventRecipeUrl={selectedEventRecipeUrl}

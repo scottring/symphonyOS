@@ -89,6 +89,10 @@ interface DetailPanelRedesignProps {
   onToggleComplete?: (taskId: string) => void
   onUpdateEventNote?: (googleEventId: string, notes: string | null) => void
   onUpdateEventLocation?: (googleEventId: string, location: string | null, calendarId?: string) => void
+  // Calendar list + move for reassigning events between calendars
+  fetchCalendarList?: () => Promise<Array<{ id: string; summary: string; accessRole: 'owner' | 'writer' | 'reader'; primary: boolean; backgroundColor?: string }>>
+  onMoveEventToCalendar?: (googleEventId: string, sourceCalendarId: string, destinationCalendarId: string) => Promise<void>
+
   // Recipe support
   eventRecipeUrl?: string | null
   onUpdateRecipeUrl?: (googleEventId: string, recipeUrl: string | null) => void
@@ -584,6 +588,8 @@ export function DetailPanelRedesign({
   onToggleComplete,
   onUpdateEventNote,
   onUpdateEventLocation,
+  fetchCalendarList,
+  onMoveEventToCalendar,
   eventRecipeUrl,
   onUpdateRecipeUrl,
   onOpenRecipe,
@@ -667,6 +673,24 @@ export function DetailPanelRedesign({
   const [isCreatingProjectLoading, setIsCreatingProjectLoading] = useState(false)
   // Event project picker (for calendar events)
   const [showEventProjectPicker, setShowEventProjectPicker] = useState(false)
+
+  // Event calendar picker (move between Google calendars)
+  const [showCalendarPicker, setShowCalendarPicker] = useState(false)
+  const [availableCalendars, setAvailableCalendars] = useState<Array<{ id: string; summary: string; accessRole: 'owner' | 'writer' | 'reader'; primary: boolean; backgroundColor?: string }>>([])
+  const [loadingCalendars, setLoadingCalendars] = useState(false)
+  const [movingCalendar, setMovingCalendar] = useState(false)
+
+  const openCalendarPicker = useCallback(async () => {
+    setShowCalendarPicker(true)
+    if (!fetchCalendarList || availableCalendars.length > 0) return
+    setLoadingCalendars(true)
+    try {
+      const list = await fetchCalendarList()
+      setAvailableCalendars(list)
+    } finally {
+      setLoadingCalendars(false)
+    }
+  }, [fetchCalendarList, availableCalendars.length])
 
   // Links state
   const [showLinks, setShowLinks] = useState(false)
@@ -2112,6 +2136,83 @@ export function DetailPanelRedesign({
             </div>
           </div>
         )}
+
+        {/* Calendar picker — move event between Google calendars */}
+        {isEvent && item.originalEvent && onMoveEventToCalendar && fetchCalendarList && (() => {
+          const currentCalendarId = item.originalEvent.calendar_id || item.originalEvent.calendarId
+          const currentCalendarName = item.originalEvent.calendar_name || item.originalEvent.calendarName || 'Primary'
+          const googleEventId = item.originalEvent.google_event_id || item.originalEvent.id
+          if (!currentCalendarId || !googleEventId) return null
+          return (
+            <div className="mx-4 mt-4 p-3 bg-neutral-50 rounded-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 text-neutral-500" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-sm font-medium text-neutral-700">Calendar</span>
+                </div>
+                <button
+                  onClick={openCalendarPicker}
+                  disabled={movingCalendar}
+                  className="text-sm text-primary-600 hover:text-primary-700 font-medium disabled:opacity-50"
+                >
+                  {currentCalendarName}
+                </button>
+              </div>
+              {showCalendarPicker && (
+                <div className="mt-3 pt-3 border-t border-neutral-200">
+                  {loadingCalendars ? (
+                    <div className="text-sm text-neutral-400">Loading calendars...</div>
+                  ) : (
+                    <div className="space-y-1 max-h-56 overflow-y-auto">
+                      {availableCalendars
+                        .filter(cal => cal.accessRole === 'owner' || cal.accessRole === 'writer')
+                        .map(cal => {
+                          const isCurrent = cal.id === currentCalendarId
+                          return (
+                            <button
+                              key={cal.id}
+                              disabled={isCurrent || movingCalendar}
+                              onClick={async () => {
+                                setMovingCalendar(true)
+                                try {
+                                  await onMoveEventToCalendar(googleEventId, currentCalendarId, cal.id)
+                                  setShowCalendarPicker(false)
+                                } finally {
+                                  setMovingCalendar(false)
+                                }
+                              }}
+                              className={`w-full px-3 py-2 text-sm text-left rounded-lg flex items-center gap-2 ${
+                                isCurrent
+                                  ? 'bg-primary-50 text-primary-700 cursor-default'
+                                  : 'hover:bg-white text-neutral-700'
+                              }`}
+                            >
+                              {cal.backgroundColor && (
+                                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cal.backgroundColor }} />
+                              )}
+                              <span className="flex-1 truncate">{cal.summary}</span>
+                              {isCurrent && <span className="text-xs text-primary-600">current</span>}
+                            </button>
+                          )
+                        })}
+                      {availableCalendars.filter(c => c.accessRole === 'owner' || c.accessRole === 'writer').length === 0 && (
+                        <div className="text-sm text-neutral-400 px-3 py-2">No writable calendars found</div>
+                      )}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setShowCalendarPicker(false)}
+                    className="mt-2 text-xs text-neutral-400 hover:text-neutral-600"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+          )
+        })()}
 
         {/* Quick Actions - Detected actions prominently displayed */}
         {detectedActions.length > 0 && (

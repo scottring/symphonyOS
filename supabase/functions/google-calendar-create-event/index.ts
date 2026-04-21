@@ -69,6 +69,7 @@ interface CreateEventRequest {
   allDay?: boolean
   timeZone?: string  // IANA timezone (e.g., 'America/New_York')
   requestId?: string // Idempotency key to prevent duplicate events
+  calendarId?: string // Target calendar ID (defaults to 'primary')
 }
 
 interface UpdateEventRequest {
@@ -221,7 +222,8 @@ serve(async (req) => {
 
     // Handle create request
     const createBody: CreateEventRequest = body
-    const { title, description, startTime, endTime, location, allDay, timeZone, requestId } = createBody
+    const { title, description, startTime, endTime, location, allDay, timeZone, requestId, calendarId } = createBody
+    const targetCreateCalendarId = calendarId || 'primary'
 
     if (!title || !startTime || !endTime) {
       return new Response(JSON.stringify({ error: 'Missing required fields: title, startTime, endTime' }), {
@@ -321,7 +323,7 @@ serve(async (req) => {
     }
 
     // Build the URL with optional idempotency key
-    const createUrl = new URL('https://www.googleapis.com/calendar/v3/calendars/primary/events')
+    const createUrl = new URL(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(targetCreateCalendarId)}/events`)
 
     // Google Calendar uses conferenceDataVersion for some features, but for idempotency
     // we can use a custom approach: check if event with same requestId exists
@@ -372,7 +374,7 @@ serve(async (req) => {
 
         // Fetch the existing event
         const getResponse = await fetch(
-          `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventBodyWithId.id}`,
+          `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(targetCreateCalendarId)}/events/${eventBodyWithId.id}`,
           {
             headers: { Authorization: `Bearer ${accessToken}` },
           }

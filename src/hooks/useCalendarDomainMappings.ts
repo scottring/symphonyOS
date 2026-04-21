@@ -70,5 +70,16 @@ export function useCalendarDomainMappings() {
     [mappings]
   )
 
-  return { mappings, loading, getDomainForCalendar }
+  // Reverse lookup: find the calendar mapped to a given domain (for event creation defaults)
+  const getCalendarForDomain = useCallback(
+    (domain?: TaskContext | null): { calendarId: string; calendarName: string } | null => {
+      if (!domain) return null
+      const match = mappings.find((m) => m.domain === domain)
+      if (!match) return null
+      return { calendarId: match.calendarId, calendarName: match.calendarName }
+    },
+    [mappings]
+  )
+
+  return { mappings, loading, getDomainForCalendar, getCalendarForDomain }
 }
