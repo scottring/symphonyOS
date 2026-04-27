@@ -130,28 +130,31 @@ describe('InboxTaskCard', () => {
   })
 
   describe('family badge', () => {
+    // Note: badge intentionally has NO `hidden md:flex` so it shows on mobile too.
+    // jsdom can't exercise responsive classes — don't refactor this row to be
+    // desktop-only without first reading the Phase 2 design doc.
     it('renders FamilyBadge when task.context is family', () => {
       const task = createMockTask({ context: 'family' })
       render(<InboxTaskCard {...defaultProps} task={task} />)
-      expect(screen.getByText('Family')).toBeInTheDocument()
+      expect(screen.getByLabelText('Shared with family')).toBeInTheDocument()
     })
 
-    it('does NOT render FamilyBadge when task.context is null', () => {
+    it('does not render FamilyBadge when task.context is null', () => {
       const task = createMockTask({ context: null })
       render(<InboxTaskCard {...defaultProps} task={task} />)
-      expect(screen.queryByText('Family')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Shared with family')).not.toBeInTheDocument()
     })
 
-    it('does NOT render FamilyBadge when task.context is work', () => {
+    it('does not render FamilyBadge when task.context is work', () => {
       const task = createMockTask({ context: 'work' })
       render(<InboxTaskCard {...defaultProps} task={task} />)
-      expect(screen.queryByText('Family')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Shared with family')).not.toBeInTheDocument()
     })
 
-    it('does NOT render FamilyBadge when task.context is personal', () => {
+    it('does not render FamilyBadge when task.context is personal', () => {
       const task = createMockTask({ context: 'personal' })
       render(<InboxTaskCard {...defaultProps} task={task} />)
-      expect(screen.queryByText('Family')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Shared with family')).not.toBeInTheDocument()
     })
   })
 
