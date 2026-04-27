@@ -10,6 +10,10 @@ function dbListItemToListItem(dbItem: DbListItem): ListItem {
     text: dbItem.text,
     note: dbItem.note ?? undefined,
     sortOrder: dbItem.sort_order,
+    externalId: dbItem.external_id ?? undefined,
+    externalSource: dbItem.external_source ?? undefined,
+    completed: dbItem.completed,
+    completedAt: dbItem.completed_at ? new Date(dbItem.completed_at) : undefined,
     createdAt: new Date(dbItem.created_at),
     updatedAt: new Date(dbItem.updated_at),
   }
@@ -73,6 +77,7 @@ export function useListItems(listId: string | null) {
       text: item.text,
       note: item.note,
       sortOrder: maxSortOrder + 1,
+      completed: false,
       createdAt: new Date(),
       updatedAt: new Date(),
     }

@@ -24,8 +24,10 @@ export interface DbList {
   icon: string | null
   category: ListCategory
   visibility: ListVisibility
-  hidden_from: string[] | null  // User IDs - for gift lists
+  hidden_from: string[] | null
   sort_order: number
+  external_id: string | null
+  external_source: string | null
   created_at: string
   updated_at: string
 }
@@ -34,11 +36,13 @@ export interface DbList {
 export interface List {
   id: string
   title: string
-  icon?: string  // emoji
+  icon?: string
   category: ListCategory
   visibility: ListVisibility
-  hiddenFrom?: string[]  // User IDs - for gift lists
+  hiddenFrom?: string[]
   sortOrder: number
+  externalId?: string
+  externalSource?: string
   createdAt: Date
   updatedAt: Date
 }
@@ -51,6 +55,10 @@ export interface DbListItem {
   text: string
   note: string | null
   sort_order: number
+  external_id: string | null
+  external_source: string | null
+  completed: boolean
+  completed_at: string | null
   created_at: string
   updated_at: string
 }
@@ -62,6 +70,10 @@ export interface ListItem {
   text: string
   note?: string
   sortOrder: number
+  externalId?: string
+  externalSource?: string
+  completed: boolean
+  completedAt?: Date
   createdAt: Date
   updatedAt: Date
 }
