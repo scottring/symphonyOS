@@ -424,7 +424,7 @@ export function MorningLaunchView({ data }: ContextViewProps) {
         )}
 
         {/* Groceries — synced from Apple Reminders via the bridge */}
-        <div className="wall-section">
+        <div className="wall-section" style={{ flex: '0 1 auto', maxHeight: '40%' }}>
           <ShoppingListView appleListName="Groceries" title="Groceries" />
         </div>
       </div>
