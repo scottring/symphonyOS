@@ -1,7 +1,7 @@
 import Foundation
 
 /// Item as seen on the Apple Reminders side. Keyed by EventKit's calendarItemIdentifier.
-public struct AppleItem: Equatable {
+public struct AppleItem: Equatable, Hashable {
     public let externalId: String
     public let title: String
     public let isCompleted: Bool
@@ -16,7 +16,7 @@ public struct AppleItem: Equatable {
 }
 
 /// Item as seen on the Symphony side. May or may not have an externalId yet.
-public struct SymphonyItem: Equatable {
+public struct SymphonyItem: Equatable, Hashable {
     public let id: UUID
     public let listId: UUID
     public let text: String
@@ -35,7 +35,7 @@ public struct SymphonyItem: Equatable {
 }
 
 /// Operations the reconciler emits. The Applier executes them.
-public enum SyncOp: Equatable {
+public enum SyncOp: Equatable, Hashable {
     /// Apple has an item, Symphony doesn't — insert into Symphony.
     case insertSymphony(listId: UUID, apple: AppleItem)
     /// Both sides have it; Apple is newer — update Symphony.
