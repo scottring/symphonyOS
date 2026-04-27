@@ -22,6 +22,7 @@ import { useUndo } from '@/hooks/useUndo'
 import { useToast } from '@/hooks/useToast'
 import type { PinnableEntityType } from '@/types/pin'
 import { supabase } from '@/lib/supabase'
+import { detectContextSharingChange } from '@/lib/contextSharingToast'
 import { DomainPageOutline } from '@/components/domain/DomainPageOutline'
 import { ViewRouter } from '@/components/layout/ViewRouter'
 import { AppShell, type PanelTab } from '@/components/layout/AppShell'
@@ -956,6 +957,15 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     id: string,
     updates: Parameters<typeof updateTask>[1]
   ) => {
+    // Show toast when context changes to family (task becomes visible to household members)
+    const prevTask = tasks.find(t => t.id === id)
+    if (prevTask) {
+      const sharingMessage = detectContextSharingChange(prevTask, updates)
+      if (sharingMessage) {
+        showToast(sharingMessage, 'info', 3000)
+      }
+    }
+
     // Check if scheduling to a past date
     if (updates.scheduledFor) {
       const scheduleDate = updates.scheduledFor
@@ -1001,7 +1011,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       // No date change, proceed normally
       await updateTask(id, updates)
     }
-  }, [updateTask, showToast, formatDateForToast])
+  }, [tasks, updateTask, showToast, formatDateForToast])
 
   // Handle pin navigation
   const handlePinNavigate = useCallback((entityType: PinnableEntityType, entityId: string) => {
