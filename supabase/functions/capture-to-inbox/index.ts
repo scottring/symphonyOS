@@ -5,9 +5,10 @@
 // Auth: shared secret in `x-capture-secret` header.
 // The shared secret is set as CAPTURE_SHARED_SECRET in Supabase secrets.
 //
-// User targeting: uses CAPTURE_USER_ID secret (Scott's known Symphony user_id).
-// The user_email field in the request body is accepted but not used for lookup —
-// it exists only for caller-side clarity and future multi-user extension.
+// User targeting: uses CAPTURE_USERS secret — a JSON object mapping
+// email → user_id, e.g. {"smkaufman@gmail.com":"bace953e-..."}.
+// The caller must include user_email in the request body to identify
+// which user's inbox to write to. O(1) lookup, no network calls.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -18,7 +19,7 @@ const corsHeaders = {
 }
 
 interface CaptureBody {
-  user_email?: string
+  user_email: string
   title: string
 }
 
@@ -34,6 +35,9 @@ export function validateRequest(
   const provided = headers.get('x-capture-secret')
   if (!provided || provided !== expectedSecret) {
     return { ok: false, status: 401, error: 'invalid or missing capture secret' }
+  }
+  if (!body.user_email || typeof body.user_email !== 'string' || body.user_email.trim() === '') {
+    return { ok: false, status: 400, error: 'user_email required' }
   }
   if (!body.title || typeof body.title !== 'string' || body.title.trim() === '') {
     return { ok: false, status: 400, error: 'title required' }
@@ -54,9 +58,16 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: 'server misconfigured' }, 500)
   }
 
-  const captureUserId = Deno.env.get('CAPTURE_USER_ID') ?? ''
-  if (!captureUserId) {
-    return jsonResponse({ error: 'server misconfigured: missing user id' }, 500)
+  const captureUsersRaw = Deno.env.get('CAPTURE_USERS') ?? ''
+  if (!captureUsersRaw) {
+    return jsonResponse({ error: 'server misconfigured: missing CAPTURE_USERS' }, 500)
+  }
+
+  let captureUsers: Record<string, string>
+  try {
+    captureUsers = JSON.parse(captureUsersRaw)
+  } catch {
+    return jsonResponse({ error: 'server misconfigured: invalid CAPTURE_USERS' }, 500)
   }
 
   let parsed: Partial<CaptureBody>
@@ -69,6 +80,12 @@ Deno.serve(async (req: Request) => {
   const v = validateRequest(req.headers, parsed, expectedSecret)
   if (!v.ok) return jsonResponse({ error: v.error }, v.status)
 
+  const normalizedEmail = v.body.user_email.toLowerCase().trim()
+  const userId = captureUsers[normalizedEmail]
+  if (!userId) {
+    return jsonResponse({ error: 'user not found' }, 404)
+  }
+
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const admin = createClient(supabaseUrl, serviceRoleKey)
@@ -77,7 +94,7 @@ Deno.serve(async (req: Request) => {
     .from('tasks')
     .insert({
       title: v.body.title.trim(),
-      user_id: captureUserId,
+      user_id: userId,
       bucket: 'inbox',
       context: null,
       completed: false,
