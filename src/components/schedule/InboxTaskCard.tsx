@@ -3,7 +3,7 @@ import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
 import type { List, ListCategory } from '@/types/list'
-import { MultiAssigneeDropdown } from '@/components/family'
+import { FamilyBadge, MultiAssigneeDropdown } from '@/components/family'
 import { SchedulePopover, DeferPicker, ContextPicker } from '@/components/triage'
 import { ListPicker } from '@/components/triage/ListPicker'
 import type { ScheduleContextItem } from '@/components/triage'
@@ -197,6 +197,13 @@ export const InboxTaskCard = memo(function InboxTaskCard({
         </div>
         )}
       </div>
+
+      {/* Family badge - always visible (desktop + mobile) when task is family-shared */}
+      {task.context === 'family' && (
+        <div className="flex items-center gap-2 mt-1.5 ml-8">
+          <FamilyBadge size="sm" />
+        </div>
+      )}
 
       {/* Chips row - desktop only, only show if project exists */}
       {project && (

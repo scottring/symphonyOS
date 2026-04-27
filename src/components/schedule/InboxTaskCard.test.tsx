@@ -129,6 +129,32 @@ describe('InboxTaskCard', () => {
     })
   })
 
+  describe('family badge', () => {
+    it('renders FamilyBadge when task.context is family', () => {
+      const task = createMockTask({ context: 'family' })
+      render(<InboxTaskCard {...defaultProps} task={task} />)
+      expect(screen.getByText('Family')).toBeInTheDocument()
+    })
+
+    it('does NOT render FamilyBadge when task.context is null', () => {
+      const task = createMockTask({ context: null })
+      render(<InboxTaskCard {...defaultProps} task={task} />)
+      expect(screen.queryByText('Family')).not.toBeInTheDocument()
+    })
+
+    it('does NOT render FamilyBadge when task.context is work', () => {
+      const task = createMockTask({ context: 'work' })
+      render(<InboxTaskCard {...defaultProps} task={task} />)
+      expect(screen.queryByText('Family')).not.toBeInTheDocument()
+    })
+
+    it('does NOT render FamilyBadge when task.context is personal', () => {
+      const task = createMockTask({ context: 'personal' })
+      render(<InboxTaskCard {...defaultProps} task={task} />)
+      expect(screen.queryByText('Family')).not.toBeInTheDocument()
+    })
+  })
+
   describe('project chip', () => {
     it('renders project data when task has project', () => {
       const taskWithProject = createMockTask({
