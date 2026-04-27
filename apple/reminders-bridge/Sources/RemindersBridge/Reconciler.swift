@@ -10,6 +10,16 @@ public enum Reconciler {
     /// - Symphony-only with externalId: deleteSymphony (Apple deleted it).
     /// - Symphony-only without externalId: insertApple (kiosk created it).
     /// - Both: newer updatedAt wins; equal timestamps = no-op.
+    ///
+    /// Preconditions (caller responsibility):
+    /// - All `apple` items came from the Apple list named `mapping.appleListName`.
+    /// - All `symphony` items belong to `mapping.symphonyListId`.
+    /// - Symphony items with `externalId` set have distinct externalIds (DB unique
+    ///   index enforces this; if it ever drifts, the last-seen item wins silently).
+    /// - Apple items have distinct, non-empty `externalId` (EventKit guarantees this
+    ///   via `calendarItemIdentifier`).
+    ///
+    /// Complexity: O(N + M) time and space, where N = apple.count and M = symphony.count.
     public static func reconcile(
         apple: [AppleItem],
         symphony: [SymphonyItem],
