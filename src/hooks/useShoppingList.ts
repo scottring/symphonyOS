@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
-import { supabase } from '../lib/supabase'
-import type { ListItem, DbListItem } from '../types/list'
+import { supabase } from '@/lib/supabase'
+import type { ListItem } from '@/types/list'
+import { dbListItemToListItem } from './useListItems'
 
 interface UseShoppingListResult {
   items: ListItem[]
@@ -8,22 +9,6 @@ interface UseShoppingListResult {
   error: string | null
   toggleComplete: (id: string, completed: boolean) => Promise<void>
   refresh: () => Promise<void>
-}
-
-function rowToItem(row: DbListItem): ListItem {
-  return {
-    id: row.id,
-    listId: row.list_id,
-    text: row.text,
-    note: row.note ?? undefined,
-    sortOrder: row.sort_order,
-    externalId: row.external_id ?? undefined,
-    externalSource: row.external_source ?? undefined,
-    completed: row.completed,
-    completedAt: row.completed_at ? new Date(row.completed_at) : undefined,
-    createdAt: new Date(row.created_at),
-    updatedAt: new Date(row.updated_at),
-  }
 }
 
 export function useShoppingList(appleListName: string): UseShoppingListResult {
@@ -58,7 +43,7 @@ export function useShoppingList(appleListName: string): UseShoppingListResult {
       setLoading(false)
       return
     }
-    setItems((rows ?? []).map(rowToItem))
+    setItems((rows ?? []).map(dbListItemToListItem))
     setLoading(false)
   }, [appleListName])
 

@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import type { ListItem, DbListItem } from '@/types/list'
 
-function dbListItemToListItem(dbItem: DbListItem): ListItem {
+export function dbListItemToListItem(dbItem: DbListItem): ListItem {
   return {
     id: dbItem.id,
     listId: dbItem.list_id,

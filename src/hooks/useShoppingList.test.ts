@@ -14,7 +14,7 @@ function makeQueryMock(returnData: unknown) {
   return chain
 }
 
-vi.mock('../lib/supabase', () => {
+vi.mock('@/lib/supabase', () => {
   const mockFrom = vi.fn()
   return {
     supabase: { from: mockFrom },
@@ -22,7 +22,7 @@ vi.mock('../lib/supabase', () => {
   }
 })
 
-import { __mockFrom } from '../lib/supabase'
+import { __mockFrom } from '@/lib/supabase'
 
 describe('useShoppingList', () => {
   beforeEach(() => {
@@ -54,5 +54,16 @@ describe('useShoppingList', () => {
     // Verify .update() was called somewhere in the chain
     const calls = vi.mocked(__mockFrom as any).mock.calls
     expect(calls.some((c: any) => c[0] === 'list_items')).toBe(true)
+  })
+
+  it('sets an error when the list is not found', async () => {
+    // Lists query returns empty array
+    vi.mocked(__mockFrom as any).mockReturnValue(makeQueryMock([]))
+
+    const { result } = renderHook(() => useShoppingList('Nope'))
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.error).toMatch(/not found/i)
+    expect(result.current.items).toEqual([])
   })
 })
