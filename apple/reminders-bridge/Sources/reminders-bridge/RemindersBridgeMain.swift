@@ -16,7 +16,7 @@ struct RemindersBridgeMain {
                 symphony: SymphonyClient(supabaseUrl: config.supabaseUrl, serviceRoleKey: config.serviceRoleKey)
             )
             try await bridge.runOnce()
-            exit(0)
+            // Implicit return → exit 0 with proper teardown.
         } catch {
             FileHandle.standardError.write(Data("reminders-bridge: \(error)\n".utf8))
             exit(1)

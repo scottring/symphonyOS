@@ -1,54 +1,6 @@
 import XCTest
 @testable import RemindersBridge
 
-final class MockRemindersClient: RemindersClientProtocol {
-    var inserted: [(title: String, completed: Bool, list: String)] = []
-    var updated: [(externalId: String, title: String, completed: Bool)] = []
-    var deleted: [String] = []
-    var nextInsertedId = "new-apple-id"
-
-    func requestAccess() async throws {}
-    func fetchItems(fromListNamed name: String) async throws -> [AppleItem] { [] }
-
-    func insert(title: String, completed: Bool, intoListNamed name: String) async throws -> String {
-        inserted.append((title, completed, name))
-        return nextInsertedId
-    }
-    func update(externalId: String, title: String, completed: Bool) async throws {
-        updated.append((externalId, title, completed))
-    }
-    func delete(externalId: String) async throws {
-        deleted.append(externalId)
-    }
-}
-
-class MockSymphonyClient: SymphonyClientProtocol {
-    var inserted: [(listId: UUID, text: String, completed: Bool, externalId: String)] = []
-    var updated: [(id: UUID, text: String, completed: Bool)] = []
-    var externalIdSet: [(id: UUID, externalId: String)] = []
-    var deleted: [UUID] = []
-
-    func fetchItems(listId: UUID) async throws -> [SymphonyItem] { [] }
-    func insert(listId: UUID, userId: UUID, text: String, completed: Bool, externalId: String) async throws {
-        inserted.append((listId, text, completed, externalId))
-    }
-    func update(symphonyId: UUID, text: String, completed: Bool) async throws {
-        updated.append((symphonyId, text, completed))
-    }
-    func setExternalId(symphonyId: UUID, externalId: String) async throws {
-        externalIdSet.append((symphonyId, externalId))
-    }
-    func delete(symphonyId: UUID) async throws {
-        deleted.append(symphonyId)
-    }
-}
-
-final class FailingSetExternalIdSymphonyMock: MockSymphonyClient {
-    override func setExternalId(symphonyId: UUID, externalId: String) async throws {
-        throw NSError(domain: "test", code: 1)
-    }
-}
-
 final class ApplierTests: XCTestCase {
     let userId = UUID()
     let listId = UUID()

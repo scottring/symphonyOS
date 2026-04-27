@@ -1,5 +1,10 @@
 import Foundation
 
+public enum BridgeError: Error, Equatable {
+    /// All configured list mappings failed during a single sync pass.
+    case allMappingsFailed(count: Int)
+}
+
 public final class Bridge {
     private let config: Config
     private let reminders: RemindersClientProtocol
@@ -16,6 +21,7 @@ public final class Bridge {
         try await reminders.requestAccess()
         let applier = Applier(reminders: reminders, symphony: symphony, userId: config.userId)
 
+        var failures = 0
         for mapping in config.lists {
             do {
                 let appleItems = try await reminders.fetchItems(fromListNamed: mapping.appleListName)
@@ -26,9 +32,14 @@ public final class Bridge {
                 }
                 try await applier.apply(ops)
             } catch {
+                failures += 1
                 log("list \(mapping.appleListName): ERROR \(error)")
                 // Continue with other lists; individual list failure shouldn't block others.
             }
+        }
+
+        if !config.lists.isEmpty && failures == config.lists.count {
+            throw BridgeError.allMappingsFailed(count: failures)
         }
     }
 
