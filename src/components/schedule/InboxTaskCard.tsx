@@ -33,6 +33,11 @@ interface InboxTaskCardProps {
   selectionMode?: boolean
   isSelected?: boolean
   onToggleSelection?: () => void
+  // Compact mode (for narrow drop-zone columns): hides triage actions, context picker,
+  // and assignee avatars to give the title room to breathe. Editing happens via the
+  // detail panel after click. Family pill row is preserved so privacy state is still
+  // visible at a glance.
+  compact?: boolean
 }
 
 export const InboxTaskCard = memo(function InboxTaskCard({
@@ -55,6 +60,7 @@ export const InboxTaskCard = memo(function InboxTaskCard({
   selectionMode = false,
   isSelected = false,
   onToggleSelection,
+  compact = false,
 }: InboxTaskCardProps) {
   const project = projects.find(p => p.id === task.projectId)
 
@@ -134,8 +140,8 @@ export const InboxTaskCard = memo(function InboxTaskCard({
           )}
         </span>
 
-        {/* Triage actions - hidden in selection mode */}
-        {!selectionMode && (
+        {/* Triage actions - hidden in selection mode AND in compact mode */}
+        {!selectionMode && !compact && (
           <div
             className="shrink-0 flex items-center gap-0.5"
             onClick={(e) => {

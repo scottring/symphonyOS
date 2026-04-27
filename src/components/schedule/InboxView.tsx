@@ -374,8 +374,10 @@ export function InboxView({
   const totalCount = inboxTasks.length + weekTasks.length + monthTasks.length + quarterTasks.length
   const isDragging = activeId !== null
 
-  // Shared task card renderer
-  const renderTaskCard = (task: Task) => (
+  // Shared task card renderer.
+  // `compact` is true when rendering inside narrow bucket drop-zones (This Week,
+  // This Month, Someday) — hides triage actions and avatars so the title has room.
+  const renderTaskCard = (task: Task, compact = false) => (
     <InboxTaskCard
       key={task.id}
       task={task}
@@ -393,6 +395,7 @@ export function InboxView({
       onCreateList={onCreateList}
       panelOpen={panelOpen && selectedItemId === `task-${task.id}`}
       onClosePanel={onClosePanel}
+      compact={compact}
     />
   )
 
@@ -478,7 +481,7 @@ export function InboxView({
                     >
                       {(bucketTasksMap[zone.id] ?? []).map(task => (
                         <DraggableInboxCard key={task.id} task={task}>
-                          {renderTaskCard(task)}
+                          {renderTaskCard(task, true)}
                         </DraggableInboxCard>
                       ))}
                     </BucketDropZone>

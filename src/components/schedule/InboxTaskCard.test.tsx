@@ -129,6 +129,33 @@ describe('InboxTaskCard', () => {
     })
   })
 
+  describe('compact mode', () => {
+    // Compact is used in narrow drop-zone columns (This Week, This Month, Someday).
+    // Triage actions, ContextPicker, and assignee avatars are hidden so the title
+    // has room. Family pill row is preserved for at-a-glance privacy state.
+    it('does not render the triage actions cluster (defer button) when compact is true', () => {
+      const task = createMockTask({ context: 'family' })
+      render(<InboxTaskCard {...defaultProps} task={task} compact={true} />)
+      expect(screen.queryByRole('button', { name: 'Defer item' })).not.toBeInTheDocument()
+    })
+
+    it('still renders the Family pill in compact mode for family-context tasks', () => {
+      const task = createMockTask({ context: 'family' })
+      render(<InboxTaskCard {...defaultProps} task={task} compact={true} />)
+      expect(screen.getByLabelText('Shared with family')).toBeInTheDocument()
+    })
+
+    it('still renders the task title in compact mode', () => {
+      render(<InboxTaskCard {...defaultProps} compact={true} />)
+      expect(screen.getByText('Test task')).toBeInTheDocument()
+    })
+
+    it('renders the triage actions cluster when compact is false (default)', () => {
+      render(<InboxTaskCard {...defaultProps} />)
+      expect(screen.getByRole('button', { name: 'Defer item' })).toBeInTheDocument()
+    })
+  })
+
   describe('family badge', () => {
     // Note: badge intentionally has NO `hidden md:flex` so it shows on mobile too.
     // jsdom can't exercise responsive classes — don't refactor this row to be
