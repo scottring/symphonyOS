@@ -1135,3 +1135,42 @@ body {
 .wall-stagger > *:nth-child(4) { animation-delay: 180ms; }
 .wall-stagger > *:nth-child(5) { animation-delay: 240ms; }
 .wall-stagger > *:nth-child(6) { animation-delay: 300ms; }
+
+/* Wall shopping list (kiosk touch view) */
+.wall-shopping-list {
+  font-size: 1.75rem;
+  padding: 1rem;
+}
+.wall-shopping-title {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+}
+.wall-shopping-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.wall-shopping-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.5rem;
+  cursor: pointer;
+  border-radius: 0.5rem;
+}
+.wall-shopping-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.wall-shopping-item.completed {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+.wall-shopping-checkbox {
+  font-size: 2rem;
+  width: 2.5rem;
+  text-align: center;
+}
+.wall-shopping-empty {
+  opacity: 0.6;
+  font-style: italic;
+}
