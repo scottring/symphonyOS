@@ -1154,9 +1154,10 @@ body {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem 0.5rem;
+  padding: 1rem 0.75rem;
   cursor: pointer;
   border-radius: 0.5rem;
+  min-height: 4rem;
 }
 .wall-shopping-item:hover {
   background: rgba(255, 255, 255, 0.05);
@@ -1166,7 +1167,7 @@ body {
   text-decoration: line-through;
 }
 .wall-shopping-checkbox {
-  font-size: 2rem;
+  font-size: 1.75rem;
   width: 2.5rem;
   text-align: center;
 }

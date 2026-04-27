@@ -48,6 +48,13 @@ export function useShoppingList(appleListName: string): UseShoppingListResult {
   }, [appleListName])
 
   const toggleComplete = useCallback(async (id: string, completed: boolean) => {
+    // Capture previous state for rollback
+    const previous = items
+    // Optimistic local update FIRST so subsequent taps read the new state
+    setItems(prev => prev.map(i => i.id === id
+      ? { ...i, completed, completedAt: completed ? new Date() : undefined }
+      : i
+    ))
     const { error: uerr } = await supabase
       .from('list_items')
       .update({
@@ -56,15 +63,11 @@ export function useShoppingList(appleListName: string): UseShoppingListResult {
       })
       .eq('id', id)
     if (uerr) {
+      // Roll back to previous state
+      setItems(previous)
       setError(uerr.message)
-      return
     }
-    // Optimistic local update
-    setItems(prev => prev.map(i => i.id === id
-      ? { ...i, completed, completedAt: completed ? new Date() : undefined }
-      : i
-    ))
-  }, [])
+  }, [items])
 
   useEffect(() => { refresh() }, [refresh])
 
