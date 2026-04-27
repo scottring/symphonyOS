@@ -41,7 +41,16 @@ public final class Applier {
                 completed: s.completed,
                 intoListNamed: listName
             )
-            try await symphony.setExternalId(symphonyId: s.id, externalId: newId)
+            do {
+                try await symphony.setExternalId(symphonyId: s.id, externalId: newId)
+            } catch {
+                // Compensating delete: roll back the Apple insert so the orphan-pair
+                // failure mode doesn't multiply across subsequent sync ticks.
+                // Best-effort: if the compensating delete itself fails, swallow that
+                // and rethrow the original error.
+                try? await reminders.delete(externalId: newId)
+                throw error
+            }
         case .updateApple(let externalId, let s):
             try await reminders.update(
                 externalId: externalId,

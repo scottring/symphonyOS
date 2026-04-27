@@ -22,7 +22,7 @@ final class MockRemindersClient: RemindersClientProtocol {
     }
 }
 
-final class MockSymphonyClient: SymphonyClientProtocol {
+class MockSymphonyClient: SymphonyClientProtocol {
     var inserted: [(listId: UUID, text: String, completed: Bool, externalId: String)] = []
     var updated: [(id: UUID, text: String, completed: Bool)] = []
     var externalIdSet: [(id: UUID, externalId: String)] = []
@@ -40,6 +40,12 @@ final class MockSymphonyClient: SymphonyClientProtocol {
     }
     func delete(symphonyId: UUID) async throws {
         deleted.append(symphonyId)
+    }
+}
+
+final class FailingSetExternalIdSymphonyMock: MockSymphonyClient {
+    override func setExternalId(symphonyId: UUID, externalId: String) async throws {
+        throw NSError(domain: "test", code: 1)
     }
 }
 
@@ -98,5 +104,36 @@ final class ApplierTests: XCTestCase {
         XCTAssertEqual(r.updated[0].externalId, "a1")
         XCTAssertEqual(r.updated[0].title, "olive oil")
         XCTAssertEqual(r.updated[0].completed, true)
+    }
+
+    func testUpdateSymphonyPassesAppleValues() async throws {
+        let r = MockRemindersClient(); let s = MockSymphonyClient()
+        let applier = Applier(reminders: r, symphony: s, userId: userId)
+        let symId = UUID()
+        let apple = AppleItem(externalId: "a1", title: "milk 2%", isCompleted: true, lastModified: t0)
+
+        try await applier.apply([.updateSymphony(symphonyId: symId, fromApple: apple)])
+
+        XCTAssertEqual(s.updated.count, 1)
+        XCTAssertEqual(s.updated[0].id, symId)
+        XCTAssertEqual(s.updated[0].text, "milk 2%")
+        XCTAssertEqual(s.updated[0].completed, true)
+    }
+
+    func testInsertAppleCompensatesWhenSetExternalIdFails() async throws {
+        let r = MockRemindersClient(); let s = FailingSetExternalIdSymphonyMock()
+        r.nextInsertedId = "ghost-id"
+        let applier = Applier(reminders: r, symphony: s, userId: userId)
+        let sym = SymphonyItem(id: UUID(), listId: listId, text: "phantom", completed: false, updatedAt: t0, externalId: nil)
+
+        do {
+            try await applier.apply([.insertApple(symphony: sym, appleListName: "Groceries")])
+            XCTFail("expected throw")
+        } catch {
+            // expected
+        }
+
+        XCTAssertEqual(r.inserted.count, 1)
+        XCTAssertEqual(r.deleted, ["ghost-id"]) // compensating delete invoked
     }
 }
