@@ -12,6 +12,8 @@ function dbListToList(dbList: DbList): List {
     visibility: dbList.visibility,
     hiddenFrom: dbList.hidden_from ?? undefined,
     sortOrder: dbList.sort_order,
+    externalId: dbList.external_id ?? undefined,
+    externalSource: dbList.external_source ?? undefined,
     createdAt: new Date(dbList.created_at),
     updatedAt: new Date(dbList.updated_at),
   }

@@ -315,6 +315,8 @@ export function createMockDbList(overrides: Partial<DbList> = {}): DbList {
     visibility: 'self' as ListVisibility,
     hidden_from: null,
     sort_order: 0,
+    external_id: null,
+    external_source: null,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
     ...overrides,
