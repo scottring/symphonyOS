@@ -1,5 +1,7 @@
 import type { Task } from '@/types/task'
 
+export const FAMILY_SHARING_MESSAGE = 'Now visible to family members'
+
 /**
  * Returns a human-readable message to show as a toast when an update
  * changes a task's privacy/sharing state in a user-noticeable way.
@@ -17,5 +19,5 @@ export function detectContextSharingChange(
   if (!('context' in updates)) return null
   if (updates.context !== 'family') return null
   if (prev.context === 'family') return null
-  return 'Now visible to family members'
+  return FAMILY_SHARING_MESSAGE
 }

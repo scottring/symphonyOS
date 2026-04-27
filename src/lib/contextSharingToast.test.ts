@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { detectContextSharingChange } from './contextSharingToast'
+import { detectContextSharingChange, FAMILY_SHARING_MESSAGE } from './contextSharingToast'
 import type { Task } from '@/types/task'
 
 const baseTask: Partial<Task> = { id: 'x', title: 't', completed: false }
@@ -10,7 +10,7 @@ describe('detectContextSharingChange', () => {
       { ...baseTask, context: null } as Task,
       { context: 'family' },
     )
-    expect(result).toMatch(/visible to/i)
+    expect(result).toBe(FAMILY_SHARING_MESSAGE)
   })
 
   it('returns the family message when context becomes family from work', () => {
@@ -18,7 +18,7 @@ describe('detectContextSharingChange', () => {
       { ...baseTask, context: 'work' } as Task,
       { context: 'family' },
     )
-    expect(result).toMatch(/visible to/i)
+    expect(result).toBe(FAMILY_SHARING_MESSAGE)
   })
 
   it('returns the family message when context becomes family from personal', () => {
@@ -26,7 +26,7 @@ describe('detectContextSharingChange', () => {
       { ...baseTask, context: 'personal' } as Task,
       { context: 'family' },
     )
-    expect(result).toMatch(/visible to/i)
+    expect(result).toBe(FAMILY_SHARING_MESSAGE)
   })
 
   it('returns null when context is unchanged (was already family)', () => {
