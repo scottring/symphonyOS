@@ -24,20 +24,19 @@ Deno.test('validateRequest rejects wrong secret', () => {
   assertEquals((result as FailResult).status, 401)
 })
 
-Deno.test('validateRequest rejects missing user_email', () => {
+Deno.test('validateRequest accepts request without user_email (user_email now optional)', () => {
   const result = validateRequest(
     new Headers({ 'x-capture-secret': 'expected-secret' }),
-    { title: 'x' } as unknown as { user_email: string; title: string },
+    { title: 'x' },
     'expected-secret',
   )
-  assertEquals(result.ok, false)
-  assertEquals((result as FailResult).status, 400)
+  assertEquals(result.ok, true)
 })
 
 Deno.test('validateRequest rejects missing title', () => {
   const result = validateRequest(
     new Headers({ 'x-capture-secret': 'expected-secret' }),
-    { user_email: 'a@b.com' } as unknown as { user_email: string; title: string },
+    { user_email: 'a@b.com' } as unknown as { title: string },
     'expected-secret',
   )
   assertEquals(result.ok, false)
@@ -54,10 +53,19 @@ Deno.test('validateRequest rejects empty title', () => {
   assertEquals((result as FailResult).status, 400)
 })
 
-Deno.test('validateRequest accepts valid request', () => {
+Deno.test('validateRequest accepts valid request with user_email', () => {
   const result = validateRequest(
     new Headers({ 'x-capture-secret': 'expected-secret' }),
     { user_email: 'a@b.com', title: 'buy milk' },
+    'expected-secret',
+  )
+  assertEquals(result.ok, true)
+})
+
+Deno.test('validateRequest accepts valid request without user_email', () => {
+  const result = validateRequest(
+    new Headers({ 'x-capture-secret': 'expected-secret' }),
+    { title: 'buy milk' },
     'expected-secret',
   )
   assertEquals(result.ok, true)

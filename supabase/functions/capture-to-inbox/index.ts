@@ -2,11 +2,12 @@
 // (iOS Shortcut, etc.) and inserts it into the user's Symphony inbox
 // as a private task (bucket='inbox', context=NULL).
 //
-// Auth: shared secret in `x-capture-secret` header + user_email in body.
+// Auth: shared secret in `x-capture-secret` header.
 // The shared secret is set as CAPTURE_SHARED_SECRET in Supabase secrets.
 //
-// User lookup: email lives in auth.users; we resolve it via the admin auth
-// API (listUsers with filter) since user_profiles has no email column.
+// User targeting: uses CAPTURE_USER_ID secret (Scott's known Symphony user_id).
+// The user_email field in the request body is accepted but not used for lookup —
+// it exists only for caller-side clarity and future multi-user extension.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -17,7 +18,7 @@ const corsHeaders = {
 }
 
 interface CaptureBody {
-  user_email: string
+  user_email?: string
   title: string
 }
 
@@ -33,9 +34,6 @@ export function validateRequest(
   const provided = headers.get('x-capture-secret')
   if (!provided || provided !== expectedSecret) {
     return { ok: false, status: 401, error: 'invalid or missing capture secret' }
-  }
-  if (!body.user_email || typeof body.user_email !== 'string') {
-    return { ok: false, status: 400, error: 'user_email required' }
   }
   if (!body.title || typeof body.title !== 'string' || body.title.trim() === '') {
     return { ok: false, status: 400, error: 'title required' }
@@ -56,6 +54,11 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: 'server misconfigured' }, 500)
   }
 
+  const captureUserId = Deno.env.get('CAPTURE_USER_ID') ?? ''
+  if (!captureUserId) {
+    return jsonResponse({ error: 'server misconfigured: missing user id' }, 500)
+  }
+
   let parsed: Partial<CaptureBody>
   try {
     parsed = await req.json()
@@ -70,26 +73,11 @@ Deno.serve(async (req: Request) => {
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const admin = createClient(supabaseUrl, serviceRoleKey)
 
-  // Resolve email → user_id via admin auth API.
-  // auth.users is not directly queryable via .from(); use auth.admin.listUsers with filter.
-  const { data: listData, error: listErr } = await admin.auth.admin.listUsers({
-    perPage: 1000,
-  })
-
-  if (listErr) return jsonResponse({ error: listErr.message }, 500)
-
-  const normalizedEmail = v.body.user_email.toLowerCase().trim()
-  const authUser = listData?.users?.find(
-    (u) => u.email?.toLowerCase() === normalizedEmail,
-  )
-
-  if (!authUser) return jsonResponse({ error: 'user not found' }, 404)
-
   const { data: task, error: insertErr } = await admin
     .from('tasks')
     .insert({
       title: v.body.title.trim(),
-      user_id: authUser.id,
+      user_id: captureUserId,
       bucket: 'inbox',
       context: null,
       completed: false,
