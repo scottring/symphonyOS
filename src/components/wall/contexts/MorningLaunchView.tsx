@@ -4,6 +4,7 @@ import type { ContextViewProps } from './types'
 import type { TimelineItem } from '@/types/timeline'
 import { useWeather } from '@/hooks/useWeather'
 import { EmailActionStrip } from './EmailActionStrip'
+import { ShoppingListView } from '../views/ShoppingListView'
 
 // ============================================================================
 // HELPERS
@@ -421,6 +422,11 @@ export function MorningLaunchView({ data }: ContextViewProps) {
             maxItems={3}
           />
         )}
+
+        {/* Groceries — synced from Apple Reminders via the bridge */}
+        <div className="wall-section">
+          <ShoppingListView appleListName="Groceries" title="Groceries" />
+        </div>
       </div>
 
       {/* Divider */}
