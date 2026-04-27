@@ -23,6 +23,8 @@ public enum RemindersError: Error {
     case accessDenied
     case listNotFound(String)
     case itemNotFound(String)
+    case saveFailed(underlying: Error)
+    case removeFailed(underlying: Error)
 }
 
 public final class RemindersClient: RemindersClientProtocol {
@@ -49,10 +51,13 @@ public final class RemindersClient: RemindersClientProtocol {
                 continuation.resume(returning: result ?? [])
             }
         }
-        return reminders.map { r in
-            AppleItem(
+        return reminders.compactMap { r in
+            guard let title = r.title, !title.isEmpty else {
+                return nil
+            }
+            return AppleItem(
                 externalId: r.calendarItemIdentifier,
-                title: r.title ?? "",
+                title: title,
                 isCompleted: r.isCompleted,
                 lastModified: r.lastModifiedDate ?? r.creationDate ?? Date()
             )
@@ -67,7 +72,11 @@ public final class RemindersClient: RemindersClientProtocol {
         reminder.title = title
         reminder.isCompleted = completed
         reminder.calendar = calendar
-        try store.save(reminder, commit: true)
+        do {
+            try store.save(reminder, commit: true)
+        } catch {
+            throw RemindersError.saveFailed(underlying: error)
+        }
         return reminder.calendarItemIdentifier
     }
 
@@ -77,14 +86,22 @@ public final class RemindersClient: RemindersClientProtocol {
         }
         item.title = title
         item.isCompleted = completed
-        try store.save(item, commit: true)
+        do {
+            try store.save(item, commit: true)
+        } catch {
+            throw RemindersError.saveFailed(underlying: error)
+        }
     }
 
     public func delete(externalId: String) async throws {
         guard let item = store.calendarItem(withIdentifier: externalId) as? EKReminder else {
             throw RemindersError.itemNotFound(externalId)
         }
-        try store.remove(item, commit: true)
+        do {
+            try store.remove(item, commit: true)
+        } catch {
+            throw RemindersError.removeFailed(underlying: error)
+        }
     }
 
     private func findCalendar(named name: String) -> EKCalendar? {
