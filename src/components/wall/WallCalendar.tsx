@@ -5,6 +5,7 @@ import { useWallData } from '@/hooks/useWallData'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import type { TimelineItem } from '@/types/timeline'
 import { WallRoutineColumn } from './WallRoutineColumn'
+import { ShoppingListView } from './views/ShoppingListView'
 import { WallSwimlane } from './WallSwimlane'
 import { WallMicButton } from './WallMicButton'
 import { WallJaxCareWidget } from './WallJaxCareWidget'
@@ -419,7 +420,7 @@ export function WallCalendar() {
       </header>
 
       {/* ═══ TODAY'S SCHEDULE — Calendar Events ═══ */}
-      <div className="relative z-10 px-10" style={{ height: 140 }}>
+      <div className="relative z-10 px-10" style={{ height: 170 }}>
         <WallTodayTimeline todayData={todayData} />
       </div>
 
@@ -428,24 +429,21 @@ export function WallCalendar() {
         style={{ gridTemplateColumns: '1fr 260px 380px', gridTemplateRows: '1fr auto' }}
       >
 
-        {/* ─── PANEL: Swimlane (per-person Today view) ─── */}
+        {/* ─── PANEL: Swimlane (per-person Today view, includes routines/chores) ─── */}
         <div className={`${glass} p-5 min-h-0 flex flex-col overflow-hidden`}>
           <WallSwimlane
             familyMembers={wallData.familyMembers}
             taskItems={allTasks}
-            routineItems={nonDailyRoutineItems}
+            routineItems={[...nonDailyRoutineItems, ...dailyChoreItems]}
             calendarEvents={todayEventItems}
             onComplete={handleComplete}
             onItemTap={handleItemTap}
           />
         </div>
 
-        {/* ─── PANEL: Daily Routines ─── */}
+        {/* ─── PANEL: Groceries (synced from Apple Reminders via the bridge) ─── */}
         <div className={`${glass} p-5 min-h-0 overflow-hidden flex flex-col`}>
-          <WallRoutineColumn
-            choreItems={dailyChoreItems}
-            onComplete={handleComplete}
-          />
+          <ShoppingListView appleListName="Groceries" title="Groceries" />
         </div>
 
         {/* ─── PANEL: Look Ahead ─── */}
