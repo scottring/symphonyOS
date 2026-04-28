@@ -12,7 +12,10 @@ export interface KidAcceptanceEntry {
 /** Keyed by family_member_id (uuid string). */
 export type KidAcceptanceMap = Record<string, KidAcceptanceEntry>
 
-export type MealParameter = 'regular' | '800g' | 'low-carb' | 'custom' | string
+// `(string & {})` preserves literal-autocomplete while still allowing arbitrary
+// freeform strings (e.g., "high-protein week", "Whole 30"). Without that, the
+// `| string` would widen the union and IDEs would stop suggesting the literals.
+export type MealParameter = 'regular' | '800g' | 'low-carb' | 'custom' | (string & {})
 
 export type MealSlot =
   | 'dinner'
@@ -96,7 +99,7 @@ export interface MealPlan {
   id: string
   userId: string
   weekStart: Date
-  parameter: MealParameter
+  parameter?: MealParameter
   entries: MealPlanEntry[]
   createdAt: Date
   updatedAt: Date
@@ -108,6 +111,8 @@ export interface MealPlanEntry {
   dayOfWeek: number
   slot: MealSlot
   recipeId?: string
+  /** Populated by hooks (e.g. useMealPlan) via a join on recipes; the
+   *  row mapper does NOT set this field. */
   recipe?: Recipe
   adHocTitle?: string
   notes?: string
@@ -223,7 +228,7 @@ export function dbMealPlanToMealPlan(
     id: row.id,
     userId: row.user_id,
     weekStart: new Date(row.week_start),
-    parameter: (row.parameter ?? 'regular') as MealParameter,
+    parameter: row.parameter ?? undefined,
     entries: entries.map(dbMealPlanEntryToMealPlanEntry),
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
