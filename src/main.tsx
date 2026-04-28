@@ -79,7 +79,6 @@ import { CalendarCallback } from './pages/CalendarCallback'
 import { NotFound } from './components/NotFound'
 import { JoinHousehold } from './components/JoinHousehold'
 import { WallCalendar } from './components/wall/WallCalendar'
-import { MemoryShelfPage, PlannerPage } from './components/meals'
 import { GoogleCalendarProvider } from './hooks/useGoogleCalendar'
 import { DomainProvider } from './hooks/useDomain'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -102,8 +101,8 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/contacts" element={<App />} />
               <Route path="/contacts/:contactId" element={<App />} />
               <Route path="/wall" element={<WallCalendar />} />
-              <Route path="/meals/shelf" element={<MemoryShelfPage />} />
-              <Route path="/meals/plan" element={<PlannerPage />} />
+              <Route path="/meals/shelf" element={<App />} />
+              <Route path="/meals/plan" element={<App />} />
               <Route path="/join/:token" element={<JoinHousehold />} />
               <Route path="/calendar-callback" element={<CalendarCallback />} />
               <Route path="*" element={<NotFound />} />

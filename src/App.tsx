@@ -319,6 +319,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     if (path.startsWith('/routines')) return 'routines'
     if (path === '/contacts') return 'contacts'
     if (path.startsWith('/contacts/')) return 'contact-detail'
+    if (path.startsWith('/meals')) return 'meals'
     return 'today'
   }, [location.pathname, stateView])
 
@@ -526,6 +527,9 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     } else if (view === 'contacts' || view === 'contact-detail') {
       setStateView(null)
       navigate('/contacts')
+    } else if (view === 'meals') {
+      setStateView(null)
+      navigate('/meals/plan')
     }
     // Handle state-based views
     else if (view === 'agent' || view === 'inbox' || view === 'lists' || view === 'notes' || view === 'history' || view === 'settings' || view === 'task-detail') {

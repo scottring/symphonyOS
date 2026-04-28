@@ -1,7 +1,8 @@
 import { Suspense } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { SectionErrorBoundary } from '@/components/SectionErrorBoundary'
 import { AgentHomeView } from '@/components/agent/AgentHomeView'
+import { MemoryShelfPage, PlannerPage } from '@/components/meals'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 import { HomeView } from '@/components/home'
 import { MeetingNotesView } from '@/components/meeting/MeetingNotesView'
@@ -152,6 +153,7 @@ export interface ViewRouterProps {
 
 export function ViewRouter(props: ViewRouterProps) {
   const navigate = useNavigate()
+  const location = useLocation()
 
   return (
     <SectionErrorBoundary sectionName="Content" onReset={() => props.onViewChange('today')}>
@@ -419,6 +421,14 @@ export function ViewRouter(props: ViewRouterProps) {
             onFamilyMembersChanged={props.refetchFamilyMembers}
           />
         </Suspense>
+      )}
+
+      {props.activeView === 'meals' && location.pathname.startsWith('/meals/shelf') && (
+        <MemoryShelfPage />
+      )}
+
+      {props.activeView === 'meals' && !location.pathname.startsWith('/meals/shelf') && (
+        <PlannerPage />
       )}
     </SectionErrorBoundary>
   )
