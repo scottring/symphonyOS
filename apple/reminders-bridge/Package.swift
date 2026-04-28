@@ -22,7 +22,16 @@ let package = Package(
         ),
         .executableTarget(
             name: "reminders-bridge",
-            dependencies: ["RemindersBridge"]
+            dependencies: ["RemindersBridge"],
+            exclude: ["Info.plist"],
+            linkerSettings: [
+                .unsafeFlags([
+                    "-Xlinker", "-sectcreate",
+                    "-Xlinker", "__TEXT",
+                    "-Xlinker", "__info_plist",
+                    "-Xlinker", "Sources/reminders-bridge/Info.plist",
+                ])
+            ]
         ),
         .testTarget(
             name: "RemindersBridgeTests",
