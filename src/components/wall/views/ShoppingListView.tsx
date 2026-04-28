@@ -127,17 +127,17 @@ export function ShoppingListView({ appleListName, title }: Props) {
                 key={item.id}
                 data-completed={isDone}
                 onClick={() => toggleComplete(item.id, !isDone)}
-                className={`relative rounded-[1.2rem] flex items-center gap-3 px-4 py-3 shadow-lg overflow-hidden transition-all duration-300 select-none active:scale-95 ${isDone ? 'opacity-40' : ''}`}
+                className={`relative rounded-[1rem] flex items-center gap-3 px-3.5 py-2 shadow-lg overflow-hidden transition-all duration-300 select-none active:scale-95 ${isDone ? 'opacity-40' : ''}`}
                 style={{
                   backgroundColor: isDone ? 'rgba(255,255,255,0.06)' : color,
                   touchAction: 'manipulation',
-                  minHeight: 64,
+                  minHeight: 48,
                 }}
               >
-                {isDone && <div className="absolute top-2 right-2 text-[0.9rem] z-20">✅</div>}
-                <div className="text-[1.8rem] drop-shadow-md flex-shrink-0">{icon}</div>
+                {isDone && <div className="absolute top-1.5 right-2 text-[0.75rem] z-20">✅</div>}
+                <div className="text-[1.4rem] drop-shadow-md flex-shrink-0">{icon}</div>
                 <span
-                  className={`font-black text-[0.85rem] uppercase tracking-wider leading-tight flex-1 text-left ${isDone ? 'text-white/50 line-through' : 'text-white'}`}
+                  className={`font-black text-[0.8rem] uppercase tracking-wider leading-tight flex-1 text-left ${isDone ? 'text-white/50 line-through' : 'text-white'}`}
                   style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
                 >
                   {item.text}

@@ -441,9 +441,9 @@ export function WallCalendar() {
           />
         </div>
 
-        {/* ─── PANEL: Groceries (synced from Apple Reminders via the bridge) ─── */}
+        {/* ─── PANEL: Need now (synced from Apple Reminders via the bridge) ─── */}
         <div className={`${glass} p-5 min-h-0 overflow-hidden flex flex-col`}>
-          <ShoppingListView appleListName="Groceries" title="Groceries" />
+          <ShoppingListView appleListName="Need now" title="Need Now" />
         </div>
 
         {/* ─── PANEL: Look Ahead ─── */}
