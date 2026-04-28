@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.symphony.reminders-bridge</string>
+    <key>CFBundleName</key>
+    <string>reminders-bridge</string>
+    <key>CFBundleExecutable</key>
+    <string>reminders-bridge</string>
+    <key>NSRemindersUsageDescription</key>
+    <string>Sync your shared shopping lists with Symphony.</string>
+    <key>NSRemindersFullAccessUsageDescription</key>
+    <string>Sync your shared shopping lists with Symphony.</string>
+</dict>
+</plist>
