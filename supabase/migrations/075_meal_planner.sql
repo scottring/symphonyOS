@@ -22,7 +22,7 @@ create table recipes (
   ingredients jsonb not null default '[]'::jsonb,
   instructions jsonb not null default '[]'::jsonb,
   tags text[] not null default '{}',
-  kid_acceptance jsonb not null default '{}'::jsonb,
+  kid_acceptance jsonb not null default '{}'::jsonb,  -- shape: { "<family_member_id>": { "level": "loves|eats|rejects", "note": "..." } }
   acceptance_sentence text,
   is_prep_friendly boolean not null default false,
   times_cooked integer not null default 0,
@@ -139,7 +139,7 @@ create table cooking_history (
   recipe_id uuid references recipes(id) on delete cascade not null,
   entry_id uuid references meal_plan_entries(id) on delete set null,
   cooked_at timestamptz not null default now(),
-  outcome jsonb not null default '{}'::jsonb,
+  outcome jsonb not null default '{}'::jsonb,  -- shape: { "<family_member_id>": "loves|eats|rejects|skipped" }
   notes text
 );
 
