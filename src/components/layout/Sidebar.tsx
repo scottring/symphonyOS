@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { PinnedSection } from '@/components/pins'
 import { useDomain } from '@/hooks/useDomain'
 import type { PinnedItem } from '@/types/pin'
@@ -37,7 +38,7 @@ const DOMAIN_THEME = {
   },
 } as const
 
-export type ViewType = 'agent' | 'home' | 'today' | 'inbox' | 'goals' | 'projects' | 'routines' | 'lists' | 'notes' | 'contacts' | 'history' | 'task-detail' | 'contact-detail' | 'settings'
+export type ViewType = 'agent' | 'home' | 'today' | 'inbox' | 'goals' | 'projects' | 'routines' | 'lists' | 'notes' | 'contacts' | 'history' | 'task-detail' | 'contact-detail' | 'settings' | 'meals'
 
 interface EntityData {
   tasks: Task[]
@@ -81,6 +82,7 @@ export function Sidebar({
   onPinMarkAccessed,
   onPinRefreshStale,
 }: SidebarProps) {
+  const navigate = useNavigate()
   const { currentDomain } = useDomain()
   const theme = DOMAIN_THEME[currentDomain]
 
@@ -336,6 +338,23 @@ export function Sidebar({
             {!collapsed && <span className="text-[15px]">Lists</span>}
           </button>
         )}
+
+        <button
+          onClick={() => navigate('/meals/plan')}
+          className={`
+            w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
+            ${activeView === 'meals'
+              ? 'text-primary-700 bg-primary-50/80 font-medium'
+              : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
+            }
+            ${collapsed ? 'justify-center' : ''}
+          `}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M3 2a1 1 0 011 1v5a2 2 0 002 2h.5a.5.5 0 01.5.5V17a1 1 0 11-2 0v-6H5a4 4 0 01-4-4V3a1 1 0 011-1h1zm6 0a1 1 0 011 1v4a3 3 0 01-2 2.83V17a1 1 0 11-2 0V9.83A3 3 0 015 7V3a1 1 0 112 0v4a1 1 0 102 0V3a1 1 0 011-1zm6 0a3 3 0 013 3v6.5a.5.5 0 01-.5.5H16v5a1 1 0 11-2 0V3a1 1 0 011-1z" />
+          </svg>
+          {!collapsed && <span className="text-[15px]">Meals</span>}
+        </button>
 
         <button
           onClick={() => onViewChange('contacts')}
