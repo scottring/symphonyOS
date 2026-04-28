@@ -6,7 +6,7 @@ import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { Routine } from '@/types/routine'
 import type { ViewType } from './Sidebar'
-import { Home, Flag, FolderKanban, RefreshCw, Clock, FileText, Search, Settings, LogOut, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Home, Flag, FolderKanban, RefreshCw, Clock, FileText, Search, Settings, LogOut, ChevronLeft, ChevronRight, UtensilsCrossed } from 'lucide-react'
 
 // Feature flags for in-progress features
 const FEATURES = {
@@ -169,6 +169,15 @@ export function SidebarKinetic({
           collapsed={collapsed}
           onClick={() => onViewChange('routines')}
           gradient="from-magenta-500 to-electric-600"
+        />
+
+        <NavButton
+          icon={UtensilsCrossed}
+          label="Meals"
+          active={activeView === 'meals'}
+          collapsed={collapsed}
+          onClick={() => onViewChange('meals')}
+          gradient="from-amber-400 to-magenta-500"
         />
 
         <NavButton
