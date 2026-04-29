@@ -18,11 +18,28 @@ export type KidAcceptanceMap = Record<string, KidAcceptanceEntry>
 export type MealParameter = 'regular' | '800g' | 'low-carb' | 'custom' | (string & {})
 
 export type MealSlot =
+  | 'breakfast'
+  | 'lunch'
+  | 'snack'
   | 'dinner'
   | 'prep'
   | 'lunch_iris'
   | 'lunch_scott'
   | 'kid_alternate'
+
+/** The four canonical day-meal slots, in display order. */
+export const DAY_MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'snack', 'dinner']
+
+export const MEAL_SLOT_LABEL: Record<MealSlot, string> = {
+  breakfast: 'Breakfast',
+  lunch: 'Lunch',
+  snack: 'Snack',
+  dinner: 'Dinner',
+  prep: 'Prep',
+  lunch_iris: 'Lunch',
+  lunch_scott: 'Lunch',
+  kid_alternate: 'Kids',
+}
 
 // ─────────────────────────────────────────────────────────────────
 // recipes
@@ -83,6 +100,8 @@ export interface DbMealPlan {
   updated_at: string
 }
 
+export type TrackingState = 'as_planned' | 'swapped' | 'skipped' | 'added'
+
 export interface DbMealPlanEntry {
   id: string
   meal_plan_id: string
@@ -93,6 +112,14 @@ export interface DbMealPlanEntry {
   notes: string | null
   leftover_from: string | null
   created_at: string
+  // S12 today-tracking columns (migration 076)
+  tracking_state?: TrackingState | null
+  swap_title?: string | null
+  swap_grams?: string | null
+  actual_grams?: string | null
+  tracking_updated_at?: string | null
+  // Per-person variants (migration 079)
+  family_member_id?: string | null
 }
 
 export interface MealPlan {
@@ -117,6 +144,117 @@ export interface MealPlanEntry {
   adHocTitle?: string
   notes?: string
   leftoverFrom?: string
+  trackingState: TrackingState
+  swapTitle?: string
+  swapGrams?: string
+  actualGrams?: string
+  /** NULL = family-default. Otherwise a family_members.id. */
+  familyMemberId?: string
+}
+
+// ─────────────────────────────────────────────────────────────────
+// weekly_briefs · the free-form Sunday-morning brief
+// ─────────────────────────────────────────────────────────────────
+
+export type BriefStatus = 'draft' | 'generated'
+
+export interface DbWeeklyBrief {
+  id: string
+  user_id: string
+  week_start: string
+  body: string
+  status: BriefStatus
+  generated_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface WeeklyBrief {
+  id: string
+  userId: string
+  weekStart: Date
+  body: string
+  status: BriefStatus
+  generatedAt?: Date
+}
+
+export function dbWeeklyBriefToWeeklyBrief(row: DbWeeklyBrief): WeeklyBrief {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    weekStart: new Date(row.week_start + 'T00:00:00'),
+    body: row.body,
+    status: row.status,
+    generatedAt: row.generated_at ? new Date(row.generated_at) : undefined,
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// standing_habits · durable per-user habits applied to every plan
+// ─────────────────────────────────────────────────────────────────
+
+export interface DbStandingHabit {
+  id: string
+  user_id: string
+  name: string
+  slot: 'breakfast' | 'lunch' | 'snack' | 'dinner'
+  grams_hint: number | null
+  sort_order: number
+  paused: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface StandingHabit {
+  id: string
+  userId: string
+  name: string
+  slot: 'breakfast' | 'lunch' | 'snack' | 'dinner'
+  gramsHint?: number
+  sortOrder: number
+  paused: boolean
+}
+
+export function dbStandingHabitToStandingHabit(row: DbStandingHabit): StandingHabit {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    name: row.name,
+    slot: row.slot,
+    gramsHint: row.grams_hint ?? undefined,
+    sortOrder: row.sort_order,
+    paused: row.paused,
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// meal_day_logs · habits, notes, weight per calendar date
+// ─────────────────────────────────────────────────────────────────
+
+export type HabitMap = Record<string, boolean>
+
+export interface DbMealDayLog {
+  id: string
+  user_id: string
+  log_date: string  // YYYY-MM-DD
+  notes: string | null
+  weight_lb: number | null
+  weight_note: string | null
+  habits: HabitMap
+  total_grams_actual: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface MealDayLog {
+  id: string
+  userId: string
+  logDate: Date
+  notes?: string
+  weightLb?: number
+  weightNote?: string
+  habits: HabitMap
+  totalGramsActual?: number
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -217,6 +355,24 @@ export function dbMealPlanEntryToMealPlanEntry(row: DbMealPlanEntry): MealPlanEn
     adHocTitle: row.ad_hoc_title ?? undefined,
     notes: row.notes ?? undefined,
     leftoverFrom: row.leftover_from ?? undefined,
+    trackingState: (row.tracking_state ?? 'as_planned') as TrackingState,
+    swapTitle: row.swap_title ?? undefined,
+    swapGrams: row.swap_grams ?? undefined,
+    actualGrams: row.actual_grams ?? undefined,
+    familyMemberId: row.family_member_id ?? undefined,
+  }
+}
+
+export function dbMealDayLogToMealDayLog(row: DbMealDayLog): MealDayLog {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    logDate: new Date(row.log_date + 'T00:00:00'),
+    notes: row.notes ?? undefined,
+    weightLb: row.weight_lb ?? undefined,
+    weightNote: row.weight_note ?? undefined,
+    habits: row.habits ?? {},
+    totalGramsActual: row.total_grams_actual ?? undefined,
   }
 }
 

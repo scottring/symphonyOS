@@ -2,7 +2,10 @@ import { Suspense } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { SectionErrorBoundary } from '@/components/SectionErrorBoundary'
 import { AgentHomeView } from '@/components/agent/AgentHomeView'
-import { MemoryShelfPage, PlannerPage } from '@/components/meals'
+import {
+  MemoryShelfPage, PlannerPage, TodayPage, BriefComposerPage, StandingHabitsPage,
+  DayDetailPage, CookPage, GramTrackingPage, TonightPage,
+} from '@/components/meals'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 import { HomeView } from '@/components/home'
 import { MeetingNotesView } from '@/components/meeting/MeetingNotesView'
@@ -427,7 +430,43 @@ export function ViewRouter(props: ViewRouterProps) {
         <MemoryShelfPage />
       )}
 
-      {props.activeView === 'meals' && !location.pathname.startsWith('/meals/shelf') && (
+      {props.activeView === 'meals' && location.pathname.startsWith('/meals/today') && (
+        <TodayPage />
+      )}
+
+      {props.activeView === 'meals' && location.pathname.startsWith('/meals/brief') && (
+        <BriefComposerPage />
+      )}
+
+      {props.activeView === 'meals' && location.pathname.startsWith('/meals/habits') && (
+        <StandingHabitsPage />
+      )}
+
+      {props.activeView === 'meals' && location.pathname.startsWith('/meals/day/') && (
+        <DayDetailPage />
+      )}
+
+      {props.activeView === 'meals' && location.pathname.startsWith('/meals/cook/') && (
+        <CookPage />
+      )}
+
+      {props.activeView === 'meals' && location.pathname.startsWith('/meals/grams') && (
+        <GramTrackingPage />
+      )}
+
+      {props.activeView === 'meals' && location.pathname.startsWith('/meals/tonight') && (
+        <TonightPage />
+      )}
+
+      {props.activeView === 'meals'
+        && !location.pathname.startsWith('/meals/shelf')
+        && !location.pathname.startsWith('/meals/today')
+        && !location.pathname.startsWith('/meals/brief')
+        && !location.pathname.startsWith('/meals/habits')
+        && !location.pathname.startsWith('/meals/day/')
+        && !location.pathname.startsWith('/meals/cook/')
+        && !location.pathname.startsWith('/meals/grams')
+        && !location.pathname.startsWith('/meals/tonight') && (
         <PlannerPage />
       )}
     </SectionErrorBoundary>

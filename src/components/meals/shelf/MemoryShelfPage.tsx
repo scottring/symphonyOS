@@ -7,6 +7,7 @@ import { RecipeUrlPasteDialog } from './RecipeUrlPasteDialog'
 import { RecipeManualEditor } from './RecipeManualEditor'
 import { RecipeDetailModal } from './RecipeDetailModal'
 import { RationaleFooter } from './RationaleFooter'
+import { MealsTabs } from '../MealsTabs'
 
 export function MemoryShelfPage() {
   const { recipes, loading, error, filter, setFilter, addByUrl, addManual } = useRecipes()
@@ -24,6 +25,7 @@ export function MemoryShelfPage() {
 
   return (
     <div className="px-12 py-12 max-w-6xl mx-auto">
+      <MealsTabs />
       <div className="flex items-start justify-between mb-8">
         <div>
           <div className="text-[0.7rem] font-bold uppercase tracking-[0.25em] text-neutral-500 mb-2">

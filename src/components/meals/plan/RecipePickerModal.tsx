@@ -3,15 +3,18 @@ import { useRecipes } from '@/hooks/useRecipes'
 import { AddRecipeButton } from '../shelf/AddRecipeButton'
 import { RecipeUrlPasteDialog } from '../shelf/RecipeUrlPasteDialog'
 import { RecipeManualEditor } from '../shelf/RecipeManualEditor'
-import type { Recipe } from '@/types/meal-planner'
+import type { MealSlot, Recipe } from '@/types/meal-planner'
+import { MEAL_SLOT_LABEL } from '@/types/meal-planner'
 
 interface Props {
   isOpen: boolean
+  slot?: MealSlot
+  forLabel?: string
   onClose: () => void
   onPick: (recipeId: string) => void
 }
 
-export function RecipePickerModal({ isOpen, onClose, onPick }: Props) {
+export function RecipePickerModal({ isOpen, slot, forLabel, onClose, onPick }: Props) {
   const { recipes, loading, addByUrl, addManual } = useRecipes()
   const [q, setQ] = useState('')
   const [pasteOpen, setPasteOpen] = useState(false)
@@ -37,7 +40,9 @@ export function RecipePickerModal({ isOpen, onClose, onPick }: Props) {
         <div className="p-8 pb-4 border-b border-neutral-200">
           <div className="flex items-start justify-between gap-4 mb-3">
             <div className="text-[0.7rem] font-bold uppercase tracking-[0.25em] text-neutral-500 mt-1">
-              PICK A RECIPE
+              {slot
+                ? `PICK A RECIPE · ${MEAL_SLOT_LABEL[slot].toUpperCase()}${forLabel ? ` · FOR ${forLabel.toUpperCase()}` : ''}`
+                : 'PICK A RECIPE'}
             </div>
             <AddRecipeButton onPasteUrl={() => setPasteOpen(true)} onManualEntry={() => setManualOpen(true)} />
           </div>

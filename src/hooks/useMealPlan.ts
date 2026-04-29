@@ -11,6 +11,8 @@ interface AddMealInput {
   recipeId?: string
   adHocTitle?: string
   notes?: string
+  /** NULL/undefined = family-default. Otherwise a family_members.id. */
+  familyMemberId?: string | null
 }
 
 interface UseMealPlanResult {
@@ -43,12 +45,17 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
     const userId = userResult?.user?.id
     if (!userId) { setError('not authenticated'); setLoading(false); return }
 
-    const { data: planRow, error: planErr } = await supabase
-      .from('meal_plans').select('*').eq('user_id', userId).eq('week_start', weekStartIso).maybeSingle()
+    // RLS handles household visibility — query by week_start only. If multiple
+    // household members each created a plan, the oldest wins (deterministic).
+    const { data: planRows, error: planErr } = await supabase
+      .from('meal_plans').select('*')
+      .eq('week_start', weekStartIso)
+      .order('created_at', { ascending: true })
+      .limit(1)
 
     if (planErr) { setError(planErr.message); setLoading(false); return }
 
-    let row = planRow as DbMealPlan | null
+    let row = (planRows && planRows[0]) as DbMealPlan | null
     if (!row) {
       const { data: created, error: createErr } = await supabase
         .from('meal_plans').insert({ user_id: userId, week_start: weekStartIso }).select().single()
@@ -75,6 +82,7 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
         recipe_id: input.recipeId ?? null,
         ad_hoc_title: input.adHocTitle ?? null,
         notes: input.notes ?? null,
+        family_member_id: input.familyMemberId ?? null,
       }).select().single()
     if (insertErr) { setError(insertErr.message); return }
     if (data) {
@@ -85,6 +93,11 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
           slot: data.slot, recipeId: data.recipe_id ?? undefined,
           adHocTitle: data.ad_hoc_title ?? undefined, notes: data.notes ?? undefined,
           leftoverFrom: data.leftover_from ?? undefined,
+          trackingState: (data.tracking_state ?? 'as_planned'),
+          swapTitle: data.swap_title ?? undefined,
+          swapGrams: data.swap_grams ?? undefined,
+          actualGrams: data.actual_grams ?? undefined,
+          familyMemberId: data.family_member_id ?? undefined,
         }],
       } : prev)
     }
