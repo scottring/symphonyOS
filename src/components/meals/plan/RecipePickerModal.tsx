@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import { useRecipes } from '@/hooks/useRecipes'
+import { AddRecipeButton } from '../shelf/AddRecipeButton'
+import { RecipeUrlPasteDialog } from '../shelf/RecipeUrlPasteDialog'
+import { RecipeManualEditor } from '../shelf/RecipeManualEditor'
 import type { Recipe } from '@/types/meal-planner'
 
 interface Props {
@@ -9,20 +12,34 @@ interface Props {
 }
 
 export function RecipePickerModal({ isOpen, onClose, onPick }: Props) {
-  const { recipes, loading } = useRecipes()
+  const { recipes, loading, addByUrl, addManual } = useRecipes()
   const [q, setQ] = useState('')
+  const [pasteOpen, setPasteOpen] = useState(false)
+  const [manualOpen, setManualOpen] = useState(false)
+
   if (!isOpen) return null
 
   const filtered = q
     ? recipes.filter(r => r.title.toLowerCase().includes(q.toLowerCase()))
     : recipes
 
+  const handleAddByUrl = async (url: string) => {
+    await addByUrl(url)
+  }
+
+  const handleAddManual = async (input: Parameters<typeof addManual>[0]) => {
+    await addManual(input)
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/40 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-bg-elevated rounded-3xl shadow-elevated max-w-2xl w-full mx-6 max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="p-8 pb-4 border-b border-neutral-200">
-          <div className="text-[0.7rem] font-bold uppercase tracking-[0.25em] text-neutral-500 mb-2">
-            PICK A RECIPE
+          <div className="flex items-start justify-between gap-4 mb-3">
+            <div className="text-[0.7rem] font-bold uppercase tracking-[0.25em] text-neutral-500 mt-1">
+              PICK A RECIPE
+            </div>
+            <AddRecipeButton onPasteUrl={() => setPasteOpen(true)} onManualEntry={() => setManualOpen(true)} />
           </div>
           <input type="text" value={q} onChange={(e) => setQ(e.target.value)}
                  placeholder="Search your shelf…"
@@ -34,7 +51,7 @@ export function RecipePickerModal({ isOpen, onClose, onPick }: Props) {
           {!loading && filtered.length === 0 && (
             <div className="py-12 text-center text-neutral-500">
               {recipes.length === 0
-                ? <p>Your shelf is empty. Add a recipe first.</p>
+                ? <p>Your shelf is empty — add your first recipe above ↑</p>
                 : <p>No recipes match "{q}".</p>}
             </div>
           )}
@@ -52,6 +69,18 @@ export function RecipePickerModal({ isOpen, onClose, onPick }: Props) {
           <button onClick={onClose} className="px-5 py-2 rounded-2xl text-neutral-600 hover:bg-neutral-100">Cancel</button>
         </div>
       </div>
+
+      {/* Nested overlays — render with higher effective z by virtue of being later in DOM */}
+      <RecipeUrlPasteDialog
+        isOpen={pasteOpen}
+        onClose={() => setPasteOpen(false)}
+        onSave={handleAddByUrl}
+      />
+      <RecipeManualEditor
+        isOpen={manualOpen}
+        onClose={() => setManualOpen(false)}
+        onSave={handleAddManual}
+      />
     </div>
   )
 }
