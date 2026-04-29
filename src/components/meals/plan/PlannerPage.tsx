@@ -15,6 +15,7 @@ import { SendToGroceriesModal } from '../groceries/SendToGroceriesModal'
 import { MealsTabs } from '../MealsTabs'
 import { ParameterDropdown } from './ParameterDropdown'
 import { AskSymphonyRail } from '../chat/AskSymphonyRail'
+import { UndoToast } from './UndoToast'
 import { DAY_MEAL_SLOTS, MEAL_SLOT_LABEL } from '@/types/meal-planner'
 import type { MealPlanEntry, MealSlot, Recipe } from '@/types/meal-planner'
 
@@ -97,6 +98,7 @@ export function PlannerPage() {
 
   return (
     <div className="px-12 py-12 max-w-3xl mx-auto">
+      <UndoToast />
       <MealsTabs />
 
       {/* Doc title + kicker */}
