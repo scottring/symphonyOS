@@ -41,6 +41,23 @@ Deno.serve(async (req) => {
       return jsonError(410, 'token expired')
     }
 
+    // Optimistic-lock claim: only one caller can transition used_at: null → now().
+    // A racing second caller will receive zero rows back and treat it as noop.
+    const claimedAt = new Date().toISOString()
+    const { data: claimed, error: claimErr } = await supabase
+      .from('ai_undo_tokens')
+      .update({ used_at: claimedAt })
+      .eq('id', tokenId)
+      .is('used_at', null)
+      .select('id')
+    if (claimErr) return jsonError(500, `claim failed: ${claimErr.message}`)
+    if (!claimed || claimed.length === 0) {
+      // Another caller won the race — treat as idempotent success.
+      return new Response(JSON.stringify({ ok: true, noop: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     const actions = (token.inverse_actions ?? []) as InverseAction[]
     for (const action of actions) {
       if (action.type === 'delete_meal_plan_entries_by_ids') {
@@ -58,9 +75,6 @@ Deno.serve(async (req) => {
         }
       }
     }
-
-    await supabase.from('ai_undo_tokens')
-      .update({ used_at: new Date().toISOString() }).eq('id', tokenId)
 
     return new Response(JSON.stringify({ ok: true, noop: false }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
