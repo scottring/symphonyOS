@@ -70,9 +70,22 @@ Deno.serve(async (req) => {
       return jsonError(500, `context load failed: ${(planErr || briefErr || recErr || habErr || memErr)?.message}`)
     }
 
-    const plan  = planRows?.[0]
+    let plan = planRows?.[0]
     const brief = briefRows?.[0]
-    if (!plan)  return jsonError(404, 'no meal_plan exists for this week — create one first')
+    if (!plan) {
+      // Auto-create the plan row so first-time generation Just Works.
+      // (Mirrors the auto-create behavior in src/hooks/useMealPlan.ts.)
+      const { data: { user } } = await supabase.auth.getUser()
+      const userId = user?.id
+      if (!userId) return jsonError(401, 'no authenticated user')
+      const { data: created, error: createErr } = await supabase
+        .from('meal_plans')
+        .insert({ user_id: userId, week_start: body.weekStart })
+        .select('id,user_id')
+        .single()
+      if (createErr || !created) return jsonError(500, `failed to create meal_plan: ${createErr?.message}`)
+      plan = created
+    }
     if (!brief || !brief.body?.trim()) return jsonError(400, 'brief is empty')
 
     const promptContext = buildPromptContext({

@@ -196,3 +196,40 @@ describe('buildPromptContext', () => {
     expect(out).toContain('"Eat \\"well\\""')
   })
 })
+
+import * as denoMirror from '../../supabase/functions/_shared/mealPlanGenerate'
+
+describe('Node ↔ Deno mirror equivalence', () => {
+  const FIXTURE = {
+    weekStart: '2026-04-27',
+    mealPlanId: 'mp-1',
+    members: [
+      { name: 'Iris',  family_member_id: 'fm-iris',  auth_user_id: 'au-iris' },
+      { name: 'Scott "with quotes"', family_member_id: 'fm-scott', auth_user_id: null },
+    ],
+    shelf: [
+      { recipe_id: 'rec-1', title: 'Bittman Shrimp', tags: ['~80g', 'quick'], prep_minutes: 15, kid_acceptance: 'Both kids eat this.', is_prep_friendly: false },
+    ],
+    habits: [
+      { owner_auth_user_id: 'au-iris', name: 'Yogurt + tomatoes', slot: 'breakfast', grams_hint: 80 },
+    ],
+    brief: '800g challenge · No "stir fry" this week',
+  }
+
+  it('buildPromptContext produces identical output in src and Deno mirror', async () => {
+    const { buildPromptContext: srcFn } = await import('./mealPlanValidation')
+    expect(denoMirror.buildPromptContext(FIXTURE)).toBe(srcFn(FIXTURE))
+  })
+
+  it('validateGeneratedEntries produces identical output in src and Deno mirror', async () => {
+    const { validateGeneratedEntries: srcFn } = await import('./mealPlanValidation')
+    const ROSTER = new Set(['fm-iris'])
+    const SHELF = new Set(['rec-1'])
+    const ENTRIES = [
+      { day_of_week: 0, slot: 'breakfast', family_member_id: 'fm-iris', recipe_id: null, ad_hoc_title: 'Yogurt' },
+      { day_of_week: 7, slot: 'dinner', family_member_id: null, recipe_id: 'rec-1', ad_hoc_title: null },  // out of range
+    ]
+    expect(JSON.stringify(denoMirror.validateGeneratedEntries(ENTRIES, ROSTER, SHELF)))
+      .toBe(JSON.stringify(srcFn(ENTRIES, ROSTER, SHELF)))
+  })
+})
