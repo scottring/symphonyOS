@@ -15,6 +15,7 @@ import type { Note, NoteEntityType } from '@/types/note'
 import { GoalsProvider } from '@/contexts/GoalsContext'
 import { ListsProvider, useListsContext } from '@/contexts/ListsContext'
 import { NotesProvider, useNotesContext } from '@/contexts/NotesContext'
+import { GeneratePlanProvider } from '@/contexts/GeneratePlanContext'
 import { useSearch, type SearchResult } from '@/hooks/useSearch'
 import { useAttachments } from '@/hooks/useAttachments'
 import { usePinnedItems } from '@/hooks/usePinnedItems'
@@ -187,7 +188,9 @@ function App() {
     <GoalsProvider>
       <ListsProvider>
         <NotesProvider>
-          <AppContent user={user} signOut={signOut} />
+          <GeneratePlanProvider>
+            <AppContent user={user} signOut={signOut} />
+          </GeneratePlanProvider>
         </NotesProvider>
       </ListsProvider>
     </GoalsProvider>
