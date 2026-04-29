@@ -12,10 +12,7 @@ export function AddRecipeButton({ onPasteUrl, onManualEntry }: Props) {
       </button>
       <button onClick={onPasteUrl}
               className="px-5 py-2 rounded-full bg-neutral-800 text-white text-[14px] font-medium hover:bg-neutral-900">
-        <span className="inline-flex items-center gap-2">
-          <span className="px-1.5 py-0.5 rounded bg-white/20 text-[10px] font-bold tracking-wider">NY</span>
-          Paste NYT URL
-        </span>
+        Paste recipe URL
       </button>
     </div>
   )

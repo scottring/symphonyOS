@@ -61,7 +61,7 @@ export function RecipeUrlPasteDialog({ isOpen, onClose, onSave }: Props) {
               type="url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://cooking.nytimes.com/recipes/..."
+              placeholder="https://…  any recipe site (NYT, Smitten Kitchen, AllRecipes, etc.)"
               className="w-full px-5 py-3 rounded-2xl border border-neutral-200 bg-bg-base text-[16px] focus:outline-none focus:border-primary-500"
               autoFocus
             />
