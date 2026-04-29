@@ -7,6 +7,26 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+/** Extract the outermost balanced { ... } object from a string. Tolerates
+ *  trailing prose Haiku occasionally emits after the JSON. Returns the input
+ *  unchanged if no `{` is found. */
+function extractJson(s: string): string {
+  const start = s.indexOf('{')
+  if (start < 0) return s
+  let depth = 0, inStr = false, esc = false
+  for (let i = start; i < s.length; i++) {
+    const c = s[i]
+    if (inStr) {
+      if (esc) esc = false
+      else if (c === '\\') esc = true
+      else if (c === '"') inStr = false
+    } else if (c === '"') inStr = true
+    else if (c === '{') depth++
+    else if (c === '}' && --depth === 0) return s.slice(start, i + 1)
+  }
+  return s
+}
+
 const SYSTEM_PROMPT = `You draft a one-week meal plan for a household based on a planner's free-form brief. Output strict JSON matching the schema. Every recipe you reference must come from the supplied shelf — never invent a recipe_id. Foods named in the brief that aren't on the shelf become ad_hoc entries (no recipe_id, just a title). Apply each standing habit to the right person each day, unless the brief explicitly overrides it. The four canonical slots are breakfast, lunch, snack, dinner. day_of_week is 0..6 (Mon..Sun).`
 
 interface RequestBody {
@@ -74,18 +94,18 @@ Deno.serve(async (req) => {
     const aiResp = await callAnthropic(anthropicKey, promptContext, /*retried=*/ false)
     let parsed: { entries: unknown[]; notes_for_planner?: string }
     try {
-      parsed = JSON.parse(aiResp)
+      parsed = JSON.parse(extractJson(aiResp))
     } catch {
       // single retry with explicit error feedback
       const retryResp = await callAnthropic(anthropicKey, promptContext, /*retried=*/ true)
       try {
-        parsed = JSON.parse(retryResp)
+        parsed = JSON.parse(extractJson(retryResp))
       } catch (e) {
         return jsonError(502, `model returned non-JSON twice: ${e}`)
       }
     }
 
-    if (!parsed.entries || parsed.entries.length === 0) {
+    if (!Array.isArray(parsed.entries) || parsed.entries.length === 0) {
       return jsonError(422, 'model returned 0 entries — try a more specific brief')
     }
 
@@ -172,7 +192,12 @@ async function callAnthropic(apiKey: string, context: string, retried: boolean):
       ],
     }),
   })
-  if (!resp.ok) throw new Error(`anthropic ${resp.status}: ${await resp.text()}`)
+  if (!resp.ok) {
+    const bodyText = await resp.text()
+    const requestId = resp.headers.get('request-id') ?? resp.headers.get('x-request-id') ?? null
+    console.error('anthropic upstream error', { status: resp.status, requestId, body: bodyText })
+    throw new Error(`anthropic upstream ${resp.status}${requestId ? ` (request-id: ${requestId})` : ''}`)
+  }
   const data = await resp.json()
   const text = data.content?.[0]?.text ?? ''
   // Re-prefix the prefilled assistant content so the JSON is complete.
