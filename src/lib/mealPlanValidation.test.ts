@@ -181,4 +181,18 @@ describe('buildPromptContext', () => {
     expect(out).toContain('SHELF (household, 0 recipes)')
     expect(out).toContain('STANDING HABITS:\n  (none)')
   })
+
+  it('escapes user-controlled strings with quotes safely', () => {
+    const out = buildPromptContext({
+      weekStart: '2026-04-27',
+      mealPlanId: 'mp-1',
+      members: [{ name: 'Iris "The Great"', family_member_id: 'fm-iris', auth_user_id: null }],
+      shelf: [{ recipe_id: 'rec-1', title: 'A "fancy" dish', tags: [], prep_minutes: null, kid_acceptance: null, is_prep_friendly: false }],
+      habits: [{ owner_auth_user_id: 'au-1', name: 'Eat "well"', slot: 'breakfast', grams_hint: null }],
+      brief: 'with "quotes" inside',
+    })
+    expect(out).toContain('"Iris \\"The Great\\""')
+    expect(out).toContain('"A \\"fancy\\" dish"')
+    expect(out).toContain('"Eat \\"well\\""')
+  })
 })

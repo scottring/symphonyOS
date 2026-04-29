@@ -93,19 +93,19 @@ export function buildPromptContext(input: PromptContextInput): string {
   const members = input.members.length === 0
     ? '  (none)'
     : input.members.map(m =>
-        `  - {name: "${m.name}", family_member_id: "${m.family_member_id}", auth_user_id: ${m.auth_user_id ? `"${m.auth_user_id}"` : 'null'}}`
+        `  - {name: ${JSON.stringify(m.name)}, family_member_id: ${JSON.stringify(m.family_member_id)}, auth_user_id: ${m.auth_user_id ? JSON.stringify(m.auth_user_id) : 'null'}}`
       ).join('\n')
 
   const shelf = input.shelf.length === 0
     ? '  (none)'
     : input.shelf.map(r =>
-        `  - {recipe_id: "${r.recipe_id}", title: ${JSON.stringify(r.title)}, tags: ${JSON.stringify(r.tags)}, prep_minutes: ${r.prep_minutes ?? 'null'}, kid_acceptance: ${r.kid_acceptance ? JSON.stringify(r.kid_acceptance) : 'null'}, is_prep_friendly: ${r.is_prep_friendly}}`
+        `  - {recipe_id: ${JSON.stringify(r.recipe_id)}, title: ${JSON.stringify(r.title)}, tags: ${JSON.stringify(r.tags)}, prep_minutes: ${r.prep_minutes ?? 'null'}, kid_acceptance: ${r.kid_acceptance ? JSON.stringify(r.kid_acceptance) : 'null'}, is_prep_friendly: ${r.is_prep_friendly}}`
       ).join('\n')
 
   const habits = input.habits.length === 0
     ? '  (none)'
     : input.habits.map(h =>
-        `  - {owner_auth_user_id: "${h.owner_auth_user_id}", name: ${JSON.stringify(h.name)}, slot: "${h.slot}", grams_hint: ${h.grams_hint ?? 'null'}}`
+        `  - {owner_auth_user_id: ${JSON.stringify(h.owner_auth_user_id)}, name: ${JSON.stringify(h.name)}, slot: ${JSON.stringify(h.slot)}, grams_hint: ${h.grams_hint ?? 'null'}}`
       ).join('\n')
 
   return [
