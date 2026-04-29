@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWeeklyBrief } from '@/hooks/useWeeklyBrief'
+import { useGeneratePlan } from '@/hooks/useGeneratePlan'
+import { useGeneratePlanContext } from '@/contexts/GeneratePlanContext'
 import { mondayOfWeek, formatDateMonthDay } from '@/lib/weekHelpers'
 import { MealsTabs } from '../MealsTabs'
 
@@ -14,15 +16,16 @@ export function BriefComposerPage() {
   const navigate = useNavigate()
   const weekStart = useMemo(() => mondayOfWeek(new Date()), [])
   const weekIndex = useMemo(() => Math.ceil((Date.now() - new Date(weekStart.getFullYear(), 0, 1).getTime()) / (7 * 86400000)), [weekStart])
-  const { brief, loading, setBody, markGenerated } = useWeeklyBrief(weekStart)
+  const { brief, loading, setBody } = useWeeklyBrief(weekStart)
+  const { generate, generating, error: genError } = useGeneratePlan()
+  const { setLastUndoToken } = useGeneratePlanContext()
 
   const [draft, setDraft] = useState('')
-  const [generating, setGenerating] = useState(false)
+  const [errorToast, setErrorToast] = useState<string | null>(null)
 
   useEffect(() => { if (brief) setDraft(brief.body) }, [brief?.id])
 
   const charCount = draft.length
-  const canGenerate = draft.trim().length > 0 && !generating
 
   const onChange = (next: string) => {
     setDraft(next.slice(0, MAX))
@@ -33,10 +36,17 @@ export function BriefComposerPage() {
   }
 
   const onGenerate = async () => {
-    setGenerating(true)
+    if (!draft.trim()) {
+      setErrorToast('Write something in the brief first.')
+      return
+    }
     if (draft !== brief?.body) await setBody(draft)
-    await markGenerated()
-    setGenerating(false)
+    const r = await generate(weekStart)
+    if (!r.ok) {
+      setErrorToast(r.error ?? 'Generation failed.')
+      return
+    }
+    if (r.result?.undoToken) setLastUndoToken(r.result.undoToken)
     navigate('/meals/plan')
   }
 
@@ -92,14 +102,22 @@ export function BriefComposerPage() {
         </p>
         <button
           onClick={onGenerate}
-          disabled={!canGenerate}
+          disabled={!draft.trim() || generating}
           className="px-5 py-2.5 rounded-full bg-primary-500 text-white text-[13px] font-medium
                      shadow-primary hover:bg-primary-600 disabled:opacity-40 flex items-center gap-2"
         >
-          <span className="text-[15px]">✦</span>
-          <span className="text-[10px] uppercase tracking-[0.18em] mr-1 px-1.5 py-0.5 rounded
-                           bg-white/15 font-bold">Enter</span>
-          {generating ? 'Generating…' : 'Generate plan'}
+          {generating ? (
+            <>
+              <span className="font-display italic">Drafting your week…</span>
+            </>
+          ) : (
+            <>
+              <span className="text-[15px]">✦</span>
+              <span className="text-[10px] uppercase tracking-[0.18em] mr-1 px-1.5 py-0.5 rounded
+                               bg-white/15 font-bold">Enter</span>
+              Generate plan
+            </>
+          )}
         </button>
       </div>
       <p className="text-[11px] italic text-neutral-400 mt-2 text-right">
@@ -111,6 +129,19 @@ export function BriefComposerPage() {
         <p className="mt-6 text-[12px] italic text-neutral-400">
           Last generated {brief.generatedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.
         </p>
+      )}
+
+      {/* Toasts */}
+      {errorToast && (
+        <div className="mt-4 px-4 py-2 rounded-xl border border-accent-100 bg-accent-50 text-accent-600 text-[13px]">
+          {errorToast}
+          <button onClick={() => setErrorToast(null)} className="ml-3 italic underline">
+            dismiss
+          </button>
+        </div>
+      )}
+      {genError && !errorToast && (
+        <div className="mt-4 text-[13px] italic text-accent-500">{genError}</div>
       )}
     </div>
   )
