@@ -1,0 +1,187 @@
+// supabase/functions/meal-plan-generate/index.ts
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { buildPromptContext, validateGeneratedEntries, type GeneratedEntry } from '../_shared/mealPlanGenerate.ts'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+const SYSTEM_PROMPT = `You draft a one-week meal plan for a household based on a planner's free-form brief. Output strict JSON matching the schema. Every recipe you reference must come from the supplied shelf — never invent a recipe_id. Foods named in the brief that aren't on the shelf become ad_hoc entries (no recipe_id, just a title). Apply each standing habit to the right person each day, unless the brief explicitly overrides it. The four canonical slots are breakfast, lunch, snack, dinner. day_of_week is 0..6 (Mon..Sun).`
+
+interface RequestBody {
+  weekStart: string  // YYYY-MM-DD (Monday)
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+
+  try {
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) return jsonError(401, 'missing authorization')
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } },
+    )
+
+    const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
+    if (!anthropicKey) return jsonError(500, 'ANTHROPIC_API_KEY not set')
+
+    const body = (await req.json()) as RequestBody
+    if (!body.weekStart) return jsonError(400, 'weekStart required')
+
+    // ── Load context (RLS filters to household-visible rows) ───────────
+    const [
+      { data: planRows, error: planErr },
+      { data: briefRows, error: briefErr },
+      { data: recipes,   error: recErr   },
+      { data: habits,    error: habErr   },
+      { data: members,   error: memErr   },
+    ] = await Promise.all([
+      supabase.from('meal_plans').select('id,user_id').eq('week_start', body.weekStart).order('created_at', { ascending: true }).limit(1),
+      supabase.from('weekly_briefs').select('id,body').eq('week_start', body.weekStart).order('created_at', { ascending: true }).limit(1),
+      supabase.from('recipes').select('id,title,tags,prep_minutes,acceptance_sentence,is_prep_friendly'),
+      supabase.from('standing_habits').select('user_id,name,slot,grams_hint').eq('paused', false),
+      supabase.from('family_members').select('id,name,auth_user_id'),
+    ])
+    if (planErr || briefErr || recErr || habErr || memErr) {
+      return jsonError(500, `context load failed: ${(planErr || briefErr || recErr || habErr || memErr)?.message}`)
+    }
+
+    const plan  = planRows?.[0]
+    const brief = briefRows?.[0]
+    if (!plan)  return jsonError(404, 'no meal_plan exists for this week — create one first')
+    if (!brief || !brief.body?.trim()) return jsonError(400, 'brief is empty')
+
+    const promptContext = buildPromptContext({
+      weekStart: body.weekStart,
+      mealPlanId: plan.id,
+      members: (members ?? []).map(m => ({ name: m.name, family_member_id: m.id, auth_user_id: m.auth_user_id })),
+      shelf:   (recipes ?? []).map(r => ({
+        recipe_id: r.id, title: r.title, tags: r.tags ?? [],
+        prep_minutes: r.prep_minutes, kid_acceptance: r.acceptance_sentence,
+        is_prep_friendly: r.is_prep_friendly,
+      })),
+      habits: (habits ?? []).map(h => ({
+        owner_auth_user_id: h.user_id, name: h.name, slot: h.slot, grams_hint: h.grams_hint,
+      })),
+      brief: brief.body,
+    })
+
+    // ── Call Anthropic ──────────────────────────────────────────────────
+    const aiResp = await callAnthropic(anthropicKey, promptContext, /*retried=*/ false)
+    let parsed: { entries: unknown[]; notes_for_planner?: string }
+    try {
+      parsed = JSON.parse(aiResp)
+    } catch {
+      // single retry with explicit error feedback
+      const retryResp = await callAnthropic(anthropicKey, promptContext, /*retried=*/ true)
+      try {
+        parsed = JSON.parse(retryResp)
+      } catch (e) {
+        return jsonError(502, `model returned non-JSON twice: ${e}`)
+      }
+    }
+
+    if (!parsed.entries || parsed.entries.length === 0) {
+      return jsonError(422, 'model returned 0 entries — try a more specific brief')
+    }
+
+    // ── Validate ────────────────────────────────────────────────────────
+    const roster = new Set((members ?? []).map(m => m.id))
+    const shelf  = new Set((recipes ?? []).map(r => r.id))
+    const { kept, dropped } = validateGeneratedEntries(parsed.entries, roster, shelf)
+    const validationNotes = dropped.map(d => d.reason)
+
+    if (kept.length === 0) {
+      return jsonError(422, `all ${dropped.length} entries failed validation`)
+    }
+
+    // ── Snapshot prior entries for undo ─────────────────────────────────
+    const { data: prior } = await supabase
+      .from('meal_plan_entries').select('*').eq('meal_plan_id', plan.id)
+
+    // ── Atomic delete + insert via RPC ──────────────────────────────────
+    const { data: rpcResult, error: rpcErr } = await supabase.rpc('regenerate_meal_plan', {
+      p_meal_plan_id: plan.id,
+      p_entries: kept,
+    })
+    if (rpcErr) return jsonError(500, `regenerate_meal_plan failed: ${rpcErr.message}`)
+    const insertedIds = (rpcResult?.inserted_ids ?? []) as string[]
+
+    // ── Persist undo token ──────────────────────────────────────────────
+    const { data: { user } } = await supabase.auth.getUser()
+    const userId = user?.id
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString()
+    const { data: tokenRow, error: tokenErr } = await supabase
+      .from('ai_undo_tokens')
+      .insert({
+        user_id: userId,
+        description: `Drafted week of ${body.weekStart} from your brief`,
+        inverse_actions: [
+          { type: 'delete_meal_plan_entries_by_ids', payload: { ids: insertedIds } },
+          { type: 'restore_meal_plan_entries', payload: { rows: prior ?? [] } },
+        ],
+        expires_at: expiresAt,
+      })
+      .select('id')
+      .single()
+
+    if (tokenErr) {
+      // Plan was written; just no undo. Don't fail the whole request.
+      console.warn('undo token persist failed:', tokenErr.message)
+    }
+
+    // ── Mark brief generated ────────────────────────────────────────────
+    await supabase.from('weekly_briefs')
+      .update({ status: 'generated', generated_at: new Date().toISOString() })
+      .eq('id', brief.id)
+
+    return new Response(JSON.stringify({
+      insertedCount: insertedIds.length,
+      undoToken: tokenRow ? { id: tokenRow.id, expiresAt } : null,
+      notesForPlanner: parsed.notes_for_planner ?? '',
+      validationNotes,
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+  } catch (e) {
+    return jsonError(500, `unexpected: ${e instanceof Error ? e.message : String(e)}`)
+  }
+})
+
+async function callAnthropic(apiKey: string, context: string, retried: boolean): Promise<string> {
+  const userMessage = retried
+    ? `${context}\n\nERROR: previous response wasn't valid JSON. Output ONLY the JSON object, starting with { and ending with }.`
+    : context
+
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 4000,
+      system: SYSTEM_PROMPT,
+      messages: [
+        { role: 'user', content: userMessage },
+        { role: 'assistant', content: '{\n  "entries":' },
+      ],
+    }),
+  })
+  if (!resp.ok) throw new Error(`anthropic ${resp.status}: ${await resp.text()}`)
+  const data = await resp.json()
+  const text = data.content?.[0]?.text ?? ''
+  // Re-prefix the prefilled assistant content so the JSON is complete.
+  return `{\n  "entries":${text}`
+}
+
+function jsonError(status: number, message: string): Response {
+  return new Response(JSON.stringify({ error: message }), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+}
