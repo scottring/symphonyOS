@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { validateGeneratedEntries } from './mealPlanValidation'
+import { validateGeneratedEntries, buildPromptContext } from './mealPlanValidation'
 
 const ROSTER = new Set(['fm-iris', 'fm-scott', 'fm-ella'])
 const SHELF = new Set(['rec-shrimp', 'rec-cauliflower'])
@@ -141,5 +141,44 @@ describe('validateGeneratedEntries', () => {
       SHELF,
     )
     expect(dropped[0].reason).toMatch(/exactly one/i)
+  })
+})
+
+describe('buildPromptContext', () => {
+  it('emits week, roster, shelf, habits, and brief sections', () => {
+    const out = buildPromptContext({
+      weekStart: '2026-04-27',
+      mealPlanId: 'mp-1',
+      members: [
+        { name: 'Iris', family_member_id: 'fm-iris', auth_user_id: 'au-iris' },
+        { name: 'Scott', family_member_id: 'fm-scott', auth_user_id: 'au-scott' },
+      ],
+      shelf: [
+        { recipe_id: 'rec-shrimp', title: 'Bittman Shrimp', tags: ['~80g'], prep_minutes: 15, kid_acceptance: 'Both kids eat this.', is_prep_friendly: false },
+      ],
+      habits: [
+        { owner_auth_user_id: 'au-iris', name: 'Yogurt', slot: 'breakfast', grams_hint: 80 },
+      ],
+      brief: 'Bittman shrimp this week.',
+    })
+    expect(out).toContain('WEEK: 2026-04-27')
+    expect(out).toContain('MEAL_PLAN_ID: mp-1')
+    expect(out).toContain('Iris')
+    expect(out).toContain('rec-shrimp')
+    expect(out).toContain('Yogurt')
+    expect(out).toContain('Bittman shrimp this week.')
+  })
+
+  it('handles empty shelf and empty habits gracefully', () => {
+    const out = buildPromptContext({
+      weekStart: '2026-04-27',
+      mealPlanId: 'mp-1',
+      members: [],
+      shelf: [],
+      habits: [],
+      brief: 'something',
+    })
+    expect(out).toContain('SHELF (household, 0 recipes)')
+    expect(out).toContain('STANDING HABITS:\n  (none)')
   })
 })
