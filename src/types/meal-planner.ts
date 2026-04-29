@@ -292,6 +292,8 @@ export type InverseActionType =
   | 'delete_list_item'
   | 'restore_meal_plan_entry'
   | 'restore_list_item'
+  | 'delete_meal_plan_entries_by_ids'
+  | 'restore_meal_plan_entries'
 
 export interface InverseAction {
   type: InverseActionType
@@ -413,4 +415,28 @@ export function dbUndoTokenToToken(row: DbUndoToken): UndoToken {
     expiresAt: new Date(row.expires_at),
     usedAt: row.used_at ? new Date(row.used_at) : undefined,
   }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// AI brief→plan generation (edge functions: meal-plan-generate / meal-plan-undo)
+// ─────────────────────────────────────────────────────────────────
+
+export interface GeneratedEntry {
+  day_of_week: number       // 0..6 (Mon..Sun)
+  slot: 'breakfast' | 'lunch' | 'snack' | 'dinner'
+  family_member_id: string | null
+  recipe_id: string | null
+  ad_hoc_title: string | null
+}
+
+export interface GeneratePlanResult {
+  insertedCount: number
+  undoToken: { id: string; expiresAt: string } | null
+  notesForPlanner: string
+  validationNotes: string[]
+}
+
+export interface UndoPlanResult {
+  ok: boolean
+  noop: boolean
 }
