@@ -6,11 +6,11 @@ import { useActionableInstances } from '@/hooks/useActionableInstances'
 import type { TimelineItem } from '@/types/timeline'
 import { WallRoutineColumn } from './WallRoutineColumn'
 import { ShoppingListView } from './views/ShoppingListView'
+import { MealPlanColumn } from './views/MealPlanColumn'
 import { WallSwimlane } from './WallSwimlane'
 import { WallMicButton } from './WallMicButton'
 import { WallJaxCareWidget } from './WallJaxCareWidget'
 import { WallDinnerPromptWidget } from './WallDinnerPromptWidget'
-import { WallLookAhead } from './WallLookAhead'
 import { WallItemDetail } from './WallItemDetail'
 import { findDinnerEvent, getMealIcon } from './WallDinnerWidget'
 import { WallRecipeViewer } from './WallRecipeViewer'
@@ -446,13 +446,9 @@ export function WallCalendar() {
           <ShoppingListView appleListName="Need now" title="Need Now" />
         </div>
 
-        {/* ─── PANEL: Look Ahead ─── */}
-        <div className={`${glass} p-6 min-h-0 overflow-hidden flex flex-col`}>
-          <WallLookAhead
-            days={wallData.days}
-            familyMembers={wallData.familyMembers}
-            onItemTap={handleItemTap}
-          />
+        {/* ─── PANEL: This Week's Meals (replaces LookAhead in Phase 7) ─── */}
+        <div className={`${glass} p-5 min-h-0 overflow-hidden flex flex-col`}>
+          <MealPlanColumn />
         </div>
 
         {/* ─── BOTTOM ROW: Widget Strip ─── */}
