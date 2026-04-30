@@ -1,8 +1,13 @@
 import { GramRing } from './GramRing'
-import { DEFAULT_HABITS } from './habits'
 import type { HabitMap } from '@/types/meal-planner'
 
+interface HabitDef {
+  key: string
+  label: string
+}
+
 interface Props {
+  habitDefs: HabitDef[]
   gramsActual: number
   gramsTarget: number | null
   kcalPlanned: number
@@ -12,8 +17,8 @@ interface Props {
 
 /** Three stacked metrics, equal visual weight. Grams target gets the bar
  *  because it's the only metric with an explicit goal. Calories ambient. */
-export function TodayHeader({ gramsActual, gramsTarget, kcalPlanned, habits, variant }: Props) {
-  const habitsHit = DEFAULT_HABITS.reduce((n, h) => n + (habits[h.key] ? 1 : 0), 0)
+export function TodayHeader({ habitDefs, gramsActual, gramsTarget, kcalPlanned, habits, variant }: Props) {
+  const habitsHit = habitDefs.reduce((n, h) => n + (habits[h.key] ? 1 : 0), 0)
 
   if (variant === 'mobile') {
     return (
@@ -28,7 +33,7 @@ export function TodayHeader({ gramsActual, gramsTarget, kcalPlanned, habits, var
           {kcalPlanned > 0 ? `~${kcalPlanned.toLocaleString()} kcal planned` : 'kcal — quietly off'}
         </div>
         <div className="mt-2 text-[12px] text-neutral-500">
-          {habitsHit} of {DEFAULT_HABITS.length} habits hit
+          {habitsHit} of {habitDefs.length} habits hit
         </div>
       </div>
     )
@@ -64,10 +69,10 @@ export function TodayHeader({ gramsActual, gramsTarget, kcalPlanned, habits, var
 
         {/* Row 3 — habits as filled-circle row */}
         <div className="flex items-center gap-3">
-          <span className="font-display text-[1.2rem] text-neutral-800">~{habitsHit} of {DEFAULT_HABITS.length}</span>
+          <span className="font-display text-[1.2rem] text-neutral-800">~{habitsHit} of {habitDefs.length}</span>
           <span className="text-[12px] text-neutral-500">habits hit</span>
           <span className="ml-2 flex items-center gap-1">
-            {DEFAULT_HABITS.map(h => (
+            {habitDefs.map(h => (
               <span key={h.key}
                     className={`inline-block w-2 h-2 rounded-full ${
                       habits[h.key] ? 'bg-sage-500' : 'border border-neutral-300'

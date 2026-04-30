@@ -1,17 +1,22 @@
-import { DEFAULT_HABITS } from './habits'
 import type { HabitMap } from '@/types/meal-planner'
 
+interface HabitDef {
+  key: string
+  label: string
+}
+
 interface Props {
+  habitDefs: HabitDef[]
   habits: HabitMap
   onToggle: (key: string) => void
 }
 
 /** Horizontal pill row. Filled = fired today, empty ring = didn't.
  *  Auto-derived from meal-row state higher up; tap pill = manual override. */
-export function HabitPills({ habits, onToggle }: Props) {
+export function HabitPills({ habitDefs, habits, onToggle }: Props) {
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      {DEFAULT_HABITS.map(h => {
+      {habitDefs.map(h => {
         const fired = habits[h.key] === true
         return (
           <button key={h.key} type="button" onClick={() => onToggle(h.key)}

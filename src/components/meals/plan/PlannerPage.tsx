@@ -19,6 +19,19 @@ import { UndoToast } from './UndoToast'
 import { DAY_MEAL_SLOTS, MEAL_SLOT_LABEL } from '@/types/meal-planner'
 import type { MealPlanEntry, MealSlot, Recipe } from '@/types/meal-planner'
 
+/** Map FamilyMember color to Tailwind classes for initial chip. */
+function memberColorClass(color: string): string {
+  switch (color) {
+    case 'blue':   return 'bg-blue-100 text-blue-700'
+    case 'purple': return 'bg-purple-100 text-purple-700'
+    case 'green':  return 'bg-green-100 text-green-700'
+    case 'orange': return 'bg-orange-100 text-orange-700'
+    case 'pink':   return 'bg-pink-100 text-pink-700'
+    case 'teal':   return 'bg-teal-100 text-teal-700'
+    default:       return 'bg-primary-100 text-primary-700'
+  }
+}
+
 /** Surface 3 — Full Plan View (the document). The week as a single
  *  Family-Meal-Plan document with collapsible sections and day cards. */
 export function PlannerPage() {
@@ -276,15 +289,26 @@ export function PlannerPage() {
           </p>
         ) : (
           <div className="space-y-1">
-            {habits.map(h => (
-              <div key={h.id} className={`text-[13px] text-neutral-700 ${h.paused ? 'opacity-50 line-through' : ''}`}>
-                <span className="font-display">{h.name}</span>
-                {h.gramsHint != null && <span className="ml-1.5 text-primary-500 italic">+{h.gramsHint}g</span>}
-                <span className="ml-2 text-[11px] uppercase tracking-[0.12em] text-neutral-400">
-                  {MEAL_SLOT_LABEL[h.slot]}
-                </span>
-              </div>
-            ))}
+            {habits.map(h => {
+              const owner = familyMembers.find(m => m.auth_user_id === h.userId || (m.user_id === h.userId && !m.auth_user_id))
+              const initial = owner?.name?.[0]?.toUpperCase() ?? '?'
+              const colorClass = owner ? memberColorClass(owner.color) : 'bg-neutral-200 text-neutral-500'
+              return (
+                <div key={h.id} className={`flex items-center gap-2 text-[13px] text-neutral-700 ${h.paused ? 'opacity-50 line-through' : ''}`}>
+                  <span
+                    className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-medium ${colorClass}`}
+                    title={owner?.name ?? 'Unknown'}
+                  >
+                    {initial}
+                  </span>
+                  <span className="font-display">{h.name}</span>
+                  {h.gramsHint != null && <span className="ml-1 text-primary-500 italic">+{h.gramsHint}g</span>}
+                  <span className="ml-1 text-[11px] uppercase tracking-[0.12em] text-neutral-400">
+                    {MEAL_SLOT_LABEL[h.slot]}
+                  </span>
+                </div>
+              )
+            })}
             <div className="mt-2">
               <button onClick={() => navigate('/meals/habits')}
                       className="text-[12px] text-primary-500 italic hover:text-primary-600">

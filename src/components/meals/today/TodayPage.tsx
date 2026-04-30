@@ -4,6 +4,7 @@ import { useRecipes } from '@/hooks/useRecipes'
 import { useMealDayLog, useWeekGramsTrend } from '@/hooks/useMealDayLog'
 import { useMealTracking } from '@/hooks/useMealTracking'
 import { useMobile } from '@/hooks/useMobile'
+import { useStandingHabits } from '@/hooks/useStandingHabits'
 import { mondayOfWeek, isToday } from '@/lib/weekHelpers'
 import { TodayHeader } from './TodayHeader'
 import { HabitPills } from './HabitPills'
@@ -29,6 +30,7 @@ export function TodayPage() {
   const { log, loading: logLoading, update, toggleHabit } = useMealDayLog(today)
   const tracking = useMealTracking(refresh)
   const { days: weekDays } = useWeekGramsTrend(weekStart)
+  const { habits: standingHabits } = useStandingHabits()
 
   const recipesById = useMemo(() => {
     const m = new Map<string, Recipe>()
@@ -42,6 +44,13 @@ export function TodayPage() {
       .filter(e => e.dayOfWeek === dayOfWeek)
       .sort((a, b) => a.slot.localeCompare(b.slot))
   }, [plan, dayOfWeek])
+
+  const habitDefs = useMemo(
+    () => standingHabits
+      .filter(h => !h.paused)
+      .map(h => ({ key: h.id, label: h.name })),
+    [standingHabits],
+  )
 
   const gramsActual = sumActualGrams(todayEntries, recipesById)
   const kcalPlanned = sumPlannedKcal(todayEntries, recipesById)
@@ -115,11 +124,12 @@ export function TodayPage() {
 
       {/* Habit pill row */}
       <div className="mb-5">
-        <HabitPills habits={log?.habits ?? {}} onToggle={k => void toggleHabit(k)} />
+        <HabitPills habitDefs={habitDefs} habits={log?.habits ?? {}} onToggle={k => void toggleHabit(k)} />
       </div>
 
       {/* Header metrics */}
       <TodayHeader
+        habitDefs={habitDefs}
         gramsActual={gramsActual}
         gramsTarget={gramsTarget}
         kcalPlanned={kcalPlanned}
