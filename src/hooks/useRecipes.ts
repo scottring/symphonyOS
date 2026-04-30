@@ -30,6 +30,7 @@ export interface ManualRecipeInput {
   imageUrl?: string
   tags?: string[]
   acceptanceSentence?: string
+  isPrepFriendly?: boolean
 }
 
 export function useRecipes(): UseRecipesResult {
@@ -94,7 +95,7 @@ export function useRecipes(): UseRecipesResult {
       tags: input.tags ?? [],
       kid_acceptance: {},
       acceptance_sentence: input.acceptanceSentence ?? null,
-      is_prep_friendly: false,
+      is_prep_friendly: input.isPrepFriendly ?? false,
       times_cooked: 0,
       last_cooked_at: null,
       streak_note: null,

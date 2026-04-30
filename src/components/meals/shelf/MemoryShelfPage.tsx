@@ -6,12 +6,14 @@ import { AddRecipeButton } from './AddRecipeButton'
 import { RecipeUrlPasteDialog } from './RecipeUrlPasteDialog'
 import { RecipeManualEditor } from './RecipeManualEditor'
 import { RecipeDetailModal } from './RecipeDetailModal'
+import { RecipeDiscoverDialog, type DiscoveredRecipe } from './RecipeDiscoverDialog'
 import { MealsTabs } from '../MealsTabs'
 
 export function MemoryShelfPage() {
   const { recipes, loading, error, filter, setFilter, addByUrl, addManual } = useRecipes()
   const [pasteOpen, setPasteOpen] = useState(false)
   const [manualOpen, setManualOpen] = useState(false)
+  const [discoverOpen, setDiscoverOpen] = useState(false)
   const [detailRecipeId, setDetailRecipeId] = useState<string | null>(null)
 
   const handleAddByUrl = async (url: string) => {
@@ -20,6 +22,19 @@ export function MemoryShelfPage() {
 
   const handleAddManual = async (input: Parameters<typeof addManual>[0]) => {
     await addManual(input)
+  }
+
+  const handleSaveDiscovered = async (recipe: DiscoveredRecipe) => {
+    await addManual({
+      title: recipe.title,
+      ingredients: recipe.ingredients,
+      instructions: recipe.instructions,
+      prepMinutes: recipe.prep_minutes,
+      sourceLabel: 'Symphony AI',
+      tags: recipe.tags,
+      acceptanceSentence: recipe.acceptance_sentence,
+      isPrepFriendly: recipe.is_prep_friendly,
+    })
   }
 
   return (
@@ -37,7 +52,11 @@ export function MemoryShelfPage() {
             Default sort: recently cooked.
           </p>
         </div>
-        <AddRecipeButton onPasteUrl={() => setPasteOpen(true)} onManualEntry={() => setManualOpen(true)} />
+        <AddRecipeButton
+          onPasteUrl={() => setPasteOpen(true)}
+          onManualEntry={() => setManualOpen(true)}
+          onFindRecipe={() => setDiscoverOpen(true)}
+        />
       </div>
 
       <ShelfFilterRow active={filter} onChange={setFilter} />
@@ -78,6 +97,11 @@ export function MemoryShelfPage() {
         isOpen={manualOpen}
         onClose={() => setManualOpen(false)}
         onSave={handleAddManual}
+      />
+      <RecipeDiscoverDialog
+        isOpen={discoverOpen}
+        onClose={() => setDiscoverOpen(false)}
+        onSave={handleSaveDiscovered}
       />
       <RecipeDetailModal
         recipeId={detailRecipeId}
