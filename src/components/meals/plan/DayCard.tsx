@@ -20,6 +20,8 @@ interface Props {
   /** Map of `${owner_family_member_id}|${slot}` → set of habit names, used
    *  to mark plan entries derived from a standing habit. */
   habitsByOwnerSlot?: Map<string, Set<string>>
+  /** When true, apply a highlight ring to this day card. */
+  highlighted?: boolean
   onPickForSlot: (slot: MealSlot, familyMemberId?: string) => void
   onReplace: (entryId: string) => void
   onRemove: (entryId: string) => void
@@ -37,7 +39,7 @@ interface Props {
 export function DayCard({
   dayOfWeek, date, isToday,
   entriesBySlot, recipesById, familyMembers, parameter,
-  parentLabelById, habitsByOwnerSlot,
+  parentLabelById, habitsByOwnerSlot, highlighted,
   onPickForSlot, onReplace, onRemove, onConsolidateSlot, onSplitSharedSlot,
 }: Props) {
   const navigate = useNavigate()
@@ -53,12 +55,19 @@ export function DayCard({
   const hasPrepEntries = (entriesBySlot.get('prep') ?? []).length > 0
   const slotsToRender = (isSunday || hasPrepEntries) ? DAY_MEAL_SLOTS_WITH_PREP : DAY_MEAL_SLOTS
 
+  const highlightClass = highlighted
+    ? 'ring-2 ring-primary-400 ring-offset-2 transition-shadow duration-300'
+    : 'transition-shadow duration-300'
+
   return (
-    <div className={`rounded-2xl px-6 py-5 mb-3 border ${
-      isToday
-        ? 'bg-primary-50/60 border-primary-100 border-l-4 border-l-primary-500'
-        : 'bg-bg-elevated border-neutral-200'
-    }`}>
+    <div
+      data-day-card={dayOfWeek}
+      className={`rounded-2xl px-6 py-5 mb-3 border ${highlightClass} ${
+        isToday
+          ? 'bg-primary-50/60 border-primary-100 border-l-4 border-l-primary-500'
+          : 'bg-bg-elevated border-neutral-200'
+      }`}
+    >
       {/* Header */}
       <div className="grid grid-cols-[1fr_auto] items-center gap-4 mb-3 pb-3 border-b border-neutral-100">
         <div>

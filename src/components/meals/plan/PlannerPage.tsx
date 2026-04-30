@@ -47,6 +47,7 @@ export function PlannerPage() {
   const [picker, setPicker] = useState<{ dayOfWeek: number; slot: MealSlot; familyMemberId?: string; replaceEntryId?: string } | null>(null)
   const [sendOpen, setSendOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
+  const [previewedDay, setPreviewedDay] = useState<number | null>(null)
 
   const recipesById = useMemo(() => {
     const map = new Map<string, Recipe>()
@@ -278,9 +279,24 @@ export function PlannerPage() {
     }
   }
 
-  /** v1: no-op preview. Future: highlight the affected day in the planner. */
-  const onPreviewSuggestion = (_s: Suggestion) => {
-    // intentional no-op for v1
+  /** Preview a suggestion by scrolling to and pulse-highlighting the affected day. */
+  const onPreviewSuggestion = (s: Suggestion) => {
+    let dow: number | null = null
+    if (s.kind === 'add' || s.kind === 'swap') {
+      const apply = s.apply as { dayOfWeek?: number }
+      if (typeof apply.dayOfWeek === 'number') dow = apply.dayOfWeek
+    } else if (s.kind === 'remove') {
+      const apply = s.apply as { entryId?: string }
+      const entry = plan?.entries.find(e => e.id === apply.entryId)
+      if (entry) dow = entry.dayOfWeek
+    }
+    if (dow == null) return
+    setPreviewedDay(dow)
+    // Scroll to the matching DayCard
+    const el = document.querySelector(`[data-day-card="${dow}"]`)
+    if (el) (el as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' })
+    // Clear highlight after 2.5s
+    setTimeout(() => setPreviewedDay(prev => prev === dow ? null : prev), 2500)
   }
 
   /** Split a single shared row into N per-person rows (one per core/full-user member),
@@ -514,6 +530,7 @@ export function PlannerPage() {
               parameter={plan?.parameter}
               parentLabelById={parentLabelById}
               habitsByOwnerSlot={habitsByOwnerSlot}
+              highlighted={previewedDay === d}
               onPickForSlot={(slot, familyMemberId) =>
                 setPicker({ dayOfWeek: d, slot, familyMemberId })
               }
