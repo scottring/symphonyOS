@@ -3,27 +3,43 @@ import { useRecipes } from '@/hooks/useRecipes'
 import { AddRecipeButton } from '../shelf/AddRecipeButton'
 import { RecipeUrlPasteDialog } from '../shelf/RecipeUrlPasteDialog'
 import { RecipeManualEditor } from '../shelf/RecipeManualEditor'
-import type { MealSlot, Recipe } from '@/types/meal-planner'
+import type { MealPlanEntry, MealSlot, Recipe } from '@/types/meal-planner'
 import { MEAL_SLOT_LABEL } from '@/types/meal-planner'
 import type { FamilyMember } from '@/types/family'
+
+export interface LeftoverCandidate {
+  /** The parent entry being referenced. */
+  entry: MealPlanEntry
+  /** Resolved recipe (for title), if the parent has a recipe_id. */
+  recipe?: Recipe
+  /** Display label for "from X" — e.g. "Sun batch" or "Tue dinner". */
+  dayLabel: string
+}
 
 interface Props {
   isOpen: boolean
   slot?: MealSlot
   initialFamilyMemberId?: string
   familyMembers: FamilyMember[]
+  leftoverCandidates?: LeftoverCandidate[]
   onClose: () => void
   onPick: (recipeId: string, familyMemberId: string | null) => void
+  onPickLeftover?: (parentEntryId: string, familyMemberId: string | null) => void
 }
 
-export function RecipePickerModal({ isOpen, slot, initialFamilyMemberId, familyMembers, onClose, onPick }: Props) {
+export function RecipePickerModal({
+  isOpen, slot, initialFamilyMemberId, familyMembers,
+  leftoverCandidates = [],
+  onClose, onPick, onPickLeftover,
+}: Props) {
   const { recipes, loading, addByUrl, addManual } = useRecipes()
   const [q, setQ] = useState('')
   const [pasteOpen, setPasteOpen] = useState(false)
   const [manualOpen, setManualOpen] = useState(false)
   const [forWho, setForWho] = useState<string | null>(initialFamilyMemberId ?? null)
+  const [tab, setTab] = useState<'shelf' | 'leftovers'>('shelf')
 
-  useEffect(() => { if (isOpen) setForWho(initialFamilyMemberId ?? null) }, [isOpen, initialFamilyMemberId])
+  useEffect(() => { if (isOpen) { setForWho(initialFamilyMemberId ?? null); setTab('shelf') } }, [isOpen, initialFamilyMemberId])
 
   if (!isOpen) return null
 
@@ -77,29 +93,76 @@ export function RecipePickerModal({ isOpen, slot, initialFamilyMemberId, familyM
                 </button>
               ))}
           </div>
-          <input type="text" value={q} onChange={(e) => setQ(e.target.value)}
-                 placeholder="Search your shelf…"
-                 className="w-full px-4 py-2 rounded-xl border border-neutral-200 bg-bg-base focus:outline-none focus:border-primary-500"
-                 autoFocus />
+          <div className="flex items-center gap-1 mb-3 border-b border-neutral-200">
+            <button
+              onClick={() => setTab('shelf')}
+              className={`px-3 py-2 text-[12px] -mb-px border-b-2 ${
+                tab === 'shelf'
+                  ? 'border-primary-500 text-primary-700'
+                  : 'border-transparent text-neutral-500 hover:text-neutral-700'
+              }`}
+            >From shelf</button>
+            {leftoverCandidates.length > 0 && (
+              <button
+                onClick={() => setTab('leftovers')}
+                className={`px-3 py-2 text-[12px] -mb-px border-b-2 ${
+                  tab === 'leftovers'
+                    ? 'border-primary-500 text-primary-700'
+                    : 'border-transparent text-neutral-500 hover:text-neutral-700'
+                }`}
+              >Leftovers ({leftoverCandidates.length})</button>
+            )}
+          </div>
+          {tab === 'shelf' && (
+            <input type="text" value={q} onChange={(e) => setQ(e.target.value)}
+                   placeholder="Search your shelf…"
+                   className="w-full px-4 py-2 rounded-xl border border-neutral-200 bg-bg-base focus:outline-none focus:border-primary-500"
+                   autoFocus />
+          )}
         </div>
         <div className="flex-1 overflow-y-auto p-4">
-          {loading && <div className="py-8 text-center text-[12px] uppercase tracking-widest text-neutral-400">Loading…</div>}
-          {!loading && filtered.length === 0 && (
-            <div className="py-12 text-center text-neutral-500">
-              {recipes.length === 0
-                ? <p>Your shelf is empty — add your first recipe above ↑</p>
-                : <p>No recipes match "{q}".</p>}
-            </div>
-          )}
-          {filtered.map((recipe: Recipe) => (
-            <button key={recipe.id} onClick={() => { onPick(recipe.id, forWho); onClose() }}
-                    className="w-full text-left px-5 py-3 rounded-xl hover:bg-neutral-100 transition-colors mb-1">
-              <div className="font-display text-[1.25rem] text-neutral-800">{recipe.title}</div>
-              {recipe.acceptanceSentence && (
-                <div className="font-display italic text-[14px] text-sage-500 mt-0.5">{recipe.acceptanceSentence}</div>
+          {tab === 'leftovers' ? (
+            <div>
+              {leftoverCandidates.length === 0 && (
+                <div className="py-12 text-center text-neutral-500">
+                  <p>No leftover candidates this week.</p>
+                </div>
               )}
-            </button>
-          ))}
+              {leftoverCandidates.map(c => {
+                const title = c.recipe?.title ?? c.entry.adHocTitle ?? '(unnamed)'
+                return (
+                  <button
+                    key={c.entry.id}
+                    onClick={() => { onPickLeftover?.(c.entry.id, forWho); onClose() }}
+                    className="w-full text-left px-5 py-3 rounded-xl hover:bg-neutral-100 transition-colors mb-1"
+                  >
+                    <div className="font-display text-[1.15rem] text-neutral-800">{title}</div>
+                    <div className="font-display italic text-[12px] text-neutral-500 mt-0.5">from {c.dayLabel}</div>
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+            <>
+              {loading && <div className="py-8 text-center text-[12px] uppercase tracking-widest text-neutral-400">Loading…</div>}
+              {!loading && filtered.length === 0 && (
+                <div className="py-12 text-center text-neutral-500">
+                  {recipes.length === 0
+                    ? <p>Your shelf is empty — add your first recipe above ↑</p>
+                    : <p>No recipes match "{q}".</p>}
+                </div>
+              )}
+              {filtered.map((recipe: Recipe) => (
+                <button key={recipe.id} onClick={() => { onPick(recipe.id, forWho); onClose() }}
+                        className="w-full text-left px-5 py-3 rounded-xl hover:bg-neutral-100 transition-colors mb-1">
+                  <div className="font-display text-[1.25rem] text-neutral-800">{recipe.title}</div>
+                  {recipe.acceptanceSentence && (
+                    <div className="font-display italic text-[14px] text-sage-500 mt-0.5">{recipe.acceptanceSentence}</div>
+                  )}
+                </button>
+              ))}
+            </>
+          )}
         </div>
         <div className="p-4 border-t border-neutral-200 text-right">
           <button onClick={onClose} className="px-5 py-2 rounded-2xl text-neutral-600 hover:bg-neutral-100">Cancel</button>

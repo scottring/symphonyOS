@@ -8,6 +8,8 @@ interface Props {
   entries: MealPlanEntry[]
   recipesById: Map<string, Recipe>
   familyMembers: FamilyMember[]
+  /** entry.id → "from X" label, for leftover entries. */
+  parentLabelById?: Map<string, string>
   onPick: (familyMemberId?: string) => void
   onReplace: (entryId: string) => void
   onRemove: (entryId: string) => void
@@ -22,7 +24,7 @@ interface Props {
  *  The picker is invoked with an optional family_member_id to record per-
  *  person context. */
 export function SlotSection({
-  slot, entries, recipesById, familyMembers,
+  slot, entries, recipesById, familyMembers, parentLabelById,
   onPick, onReplace, onRemove, onConsolidate, onSplitShared,
 }: Props) {
   const familyEntries = entries.filter(e => !e.familyMemberId)
@@ -60,6 +62,7 @@ export function SlotSection({
           slot={slot}
           entry={e}
           recipe={e.recipeId ? recipesById.get(e.recipeId) : undefined}
+          parentLabel={parentLabelById?.get(e.id)}
           onPick={() => onPick(undefined)}
           onReplace={onReplace}
           onRemove={onRemove}
@@ -116,6 +119,7 @@ export function SlotSection({
           forColor="text-neutral-400"
           entry={e}
           recipe={e.recipeId ? recipesById.get(e.recipeId) : undefined}
+          parentLabel={parentLabelById?.get(e.id)}
           onReplace={onReplace}
           onRemove={onRemove}
         />
@@ -131,6 +135,7 @@ export function SlotSection({
             forColor={memberColorClass(member)}
             entry={e}
             recipe={e.recipeId ? recipesById.get(e.recipeId) : undefined}
+            parentLabel={parentLabelById?.get(e.id)}
             onReplace={onReplace}
             onRemove={onRemove}
           />
@@ -197,19 +202,27 @@ interface PerPersonRowProps {
   forColor: string
   entry: MealPlanEntry
   recipe?: Recipe
+  parentLabel?: string
   onReplace: (entryId: string) => void
   onRemove: (entryId: string) => void
 }
 
-function PerPersonRow({ forLabel, forColor, entry, recipe, onReplace, onRemove }: PerPersonRowProps) {
+function PerPersonRow({ forLabel, forColor, entry, recipe, parentLabel, onReplace, onRemove }: PerPersonRowProps) {
   const title = recipe?.title ?? entry.adHocTitle ?? '(unnamed)'
   return (
     <div className="grid grid-cols-[80px_1fr_auto] items-start gap-3 py-1">
       <div className={`text-[10px] font-bold uppercase tracking-[0.16em] pt-1 ${forColor}`}>
         {forLabel}
       </div>
-      <div className="font-display text-[1rem] leading-tight text-neutral-800">
-        {title}
+      <div>
+        <div className="font-display text-[1rem] leading-tight text-neutral-800">
+          {title}
+        </div>
+        {entry.leftoverFrom && parentLabel && (
+          <div className="font-display italic text-[12px] text-neutral-400 mt-0.5">
+            from {parentLabel}
+          </div>
+        )}
       </div>
       <div className="flex items-center gap-1 pt-0.5">
         <button onClick={() => onReplace(entry.id)}

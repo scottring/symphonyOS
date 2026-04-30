@@ -7,6 +7,8 @@ interface Props {
   slot: MealSlot
   entry?: MealPlanEntry
   recipe?: Recipe
+  /** "Sun batch" / "Tue dinner" — rendered when the entry is a leftover. */
+  parentLabel?: string
   onPick: () => void
   onReplace?: (entryId: string) => void
   onRemove?: (entryId: string) => void
@@ -15,7 +17,7 @@ interface Props {
 /** One meal slot inside a day card — surface 4 compact idiom.
  *  Empty slots are dashed-italic "tap for ideas" rows; filled slots show
  *  the recipe title + a kid-acceptance / grams hint. */
-export function MealRow({ slot, entry, recipe, onPick, onReplace, onRemove }: Props) {
+export function MealRow({ slot, entry, recipe, parentLabel, onPick, onReplace, onRemove }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const slotLabel = MEAL_SLOT_LABEL[slot]
   const grams = recipe ? sumGramsInTags(recipe.tags) : 0
@@ -59,6 +61,11 @@ export function MealRow({ slot, entry, recipe, onPick, onReplace, onRemove }: Pr
             {recipe.acceptanceSentence}
           </div>
         )}
+        {entry?.leftoverFrom && parentLabel && (
+          <div className="font-display italic text-[12px] text-neutral-400 mt-0.5">
+            from {parentLabel}
+          </div>
+        )}
       </div>
       <div className="relative">
         <button onClick={() => setMenuOpen(o => !o)}
@@ -89,6 +96,7 @@ function emptyCopy(slot: MealSlot): string {
     case 'lunch':     return 'What for lunch?'
     case 'snack':     return 'Snack?'
     case 'dinner':    return 'What for dinner?'
+    case 'prep':      return 'Anything to batch-cook?'
     default:          return 'Add…'
   }
 }

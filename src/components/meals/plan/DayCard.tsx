@@ -3,7 +3,7 @@ import { dayLabelFor } from '@/lib/weekHelpers'
 import { GramRing } from '../today/GramRing'
 import { sumActualGrams, gramsTargetFor } from '../today/grams'
 import { SlotSection } from './SlotSection'
-import { DAY_MEAL_SLOTS } from '@/types/meal-planner'
+import { DAY_MEAL_SLOTS, DAY_MEAL_SLOTS_WITH_PREP } from '@/types/meal-planner'
 import type { MealPlanEntry, MealParameter, MealSlot, Recipe } from '@/types/meal-planner'
 import type { FamilyMember } from '@/types/family'
 
@@ -15,6 +15,8 @@ interface Props {
   recipesById: Map<string, Recipe>
   familyMembers: FamilyMember[]
   parameter?: MealParameter
+  /** entry.id → "from X" label, populated for leftover entries. */
+  parentLabelById?: Map<string, string>
   onPickForSlot: (slot: MealSlot, familyMemberId?: string) => void
   onReplace: (entryId: string) => void
   onRemove: (entryId: string) => void
@@ -32,6 +34,7 @@ interface Props {
 export function DayCard({
   dayOfWeek, date, isToday,
   entriesBySlot, recipesById, familyMembers, parameter,
+  parentLabelById,
   onPickForSlot, onReplace, onRemove, onConsolidateSlot, onSplitSharedSlot,
 }: Props) {
   const navigate = useNavigate()
@@ -40,6 +43,12 @@ export function DayCard({
   const actual = sumActualGrams(allEntries, recipesById)
   const dateLabel = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   const dateIso = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
+
+  // Sun = 6 in our Mon=0..Sun=6 convention. Show PREP slot on Sundays, or any day
+  // that already has prep entries.
+  const isSunday = dayOfWeek === 6
+  const hasPrepEntries = (entriesBySlot.get('prep') ?? []).length > 0
+  const slotsToRender = (isSunday || hasPrepEntries) ? DAY_MEAL_SLOTS_WITH_PREP : DAY_MEAL_SLOTS
 
   return (
     <div className={`rounded-2xl px-6 py-5 mb-3 border ${
@@ -77,13 +86,14 @@ export function DayCard({
       {/* Stacked meal rows — each slot may render a single shared row,
           per-person sub-rows, or both. */}
       <div>
-        {DAY_MEAL_SLOTS.map(slot => (
+        {slotsToRender.map(slot => (
           <SlotSection
             key={slot}
             slot={slot}
             entries={entriesBySlot.get(slot) ?? []}
             recipesById={recipesById}
             familyMembers={familyMembers}
+            parentLabelById={parentLabelById}
             onPick={(forWho) => onPickForSlot(slot, forWho)}
             onReplace={onReplace}
             onRemove={onRemove}

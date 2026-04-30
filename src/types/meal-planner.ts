@@ -30,6 +30,9 @@ export type MealSlot =
 /** The four canonical day-meal slots, in display order. */
 export const DAY_MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'snack', 'dinner']
 
+/** Slot order for day cards that include a PREP row (e.g. Sunday). */
+export const DAY_MEAL_SLOTS_WITH_PREP: MealSlot[] = ['prep', 'breakfast', 'lunch', 'snack', 'dinner']
+
 export const MEAL_SLOT_LABEL: Record<MealSlot, string> = {
   breakfast: 'Breakfast',
   lunch: 'Lunch',

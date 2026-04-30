@@ -6,10 +6,10 @@ import { useGroceryStatus } from '@/hooks/useGroceryStatus'
 import { useWeeklyBrief } from '@/hooks/useWeeklyBrief'
 import { useStandingHabits } from '@/hooks/useStandingHabits'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
-import { mondayOfWeek, dateForDayOfWeek, isToday as isTodayHelper, formatDateMonthDay } from '@/lib/weekHelpers'
+import { mondayOfWeek, dateForDayOfWeek, isToday as isTodayHelper, formatDateMonthDay, dayLabelFor } from '@/lib/weekHelpers'
 import { DayCard } from './DayCard'
 import { CollapseSection } from './PlanDocSections'
-import { RecipePickerModal } from './RecipePickerModal'
+import { RecipePickerModal, type LeftoverCandidate } from './RecipePickerModal'
 import { GroceryStatusCard } from '../groceries/GroceryStatusCard'
 import { SendToGroceriesModal } from '../groceries/SendToGroceriesModal'
 import { MealsTabs } from '../MealsTabs'
@@ -68,6 +68,58 @@ export function PlannerPage() {
       slot: picker.slot,
       recipeId,
       familyMemberId,
+    })
+    setPicker(null)
+  }
+
+  /** Leftover candidates: any prep entry, or any recipe-backed entry whose
+   *  recipe is_prep_friendly. Surfaced as a tab in the picker. */
+  const leftoverCandidates = useMemo<LeftoverCandidate[]>(() => {
+    if (!plan) return []
+    const out: LeftoverCandidate[] = []
+    for (const e of plan.entries) {
+      // Don't list leftover entries themselves as candidates.
+      if (e.leftoverFrom) continue
+      const recipe = e.recipeId ? recipesById.get(e.recipeId) : undefined
+      const isCandidate = e.slot === 'prep' || (recipe?.isPrepFriendly === true)
+      if (!isCandidate) continue
+      const dayLabel = e.slot === 'prep'
+        ? `${dayLabelFor(e.dayOfWeek)} batch`
+        : `${dayLabelFor(e.dayOfWeek)} ${e.slot}`
+      out.push({ entry: e, recipe, dayLabel })
+    }
+    return out
+  }, [plan, recipesById])
+
+  /** Map entry.id → "from X" label, for leftover entries that reference a parent. */
+  const parentLabelById = useMemo(() => {
+    const map = new Map<string, string>()
+    if (!plan) return map
+    const byId = new Map(plan.entries.map(e => [e.id, e]))
+    for (const e of plan.entries) {
+      if (!e.leftoverFrom) continue
+      const parent = byId.get(e.leftoverFrom)
+      if (!parent) continue
+      const label = parent.slot === 'prep'
+        ? `${dayLabelFor(parent.dayOfWeek)} batch`
+        : `${dayLabelFor(parent.dayOfWeek)} ${parent.slot}`
+      map.set(e.id, label)
+    }
+    return map
+  }, [plan])
+
+  const handlePickLeftover = async (parentEntryId: string, familyMemberId: string | null) => {
+    if (!picker) return
+    const parent = plan?.entries.find(e => e.id === parentEntryId)
+    if (!parent) return
+    if (picker.replaceEntryId) await removeMeal(picker.replaceEntryId)
+    await addMeal({
+      dayOfWeek: picker.dayOfWeek,
+      slot: picker.slot,
+      recipeId: parent.recipeId,
+      adHocTitle: parent.recipeId ? undefined : parent.adHocTitle,
+      familyMemberId,
+      leftoverFromId: parentEntryId,
     })
     setPicker(null)
   }
@@ -252,6 +304,7 @@ export function PlannerPage() {
               recipesById={recipesById}
               familyMembers={familyMembers}
               parameter={plan?.parameter}
+              parentLabelById={parentLabelById}
               onPickForSlot={(slot, familyMemberId) =>
                 setPicker({ dayOfWeek: d, slot, familyMemberId })
               }
@@ -278,8 +331,10 @@ export function PlannerPage() {
         slot={picker?.slot}
         initialFamilyMemberId={picker?.familyMemberId}
         familyMembers={familyMembers}
+        leftoverCandidates={leftoverCandidates}
         onClose={() => setPicker(null)}
         onPick={handlePick}
+        onPickLeftover={handlePickLeftover}
       />
 
       <SendToGroceriesModal

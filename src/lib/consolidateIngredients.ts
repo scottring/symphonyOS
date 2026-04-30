@@ -26,6 +26,9 @@ export function consolidateIngredients(plan: MealPlan, recipes: Recipe[]): Conso
   const byKey = new Map<string, ConsolidatedIngredient>()
 
   for (const entry of plan.entries) {
+    // Leftover entries don't contribute ingredients — the parent (batch) entry
+    // already does. Skip them to avoid double-counting on the grocery list.
+    if (entry.leftoverFrom) continue
     const recipe = entry.recipe ?? (entry.recipeId ? recipesById.get(entry.recipeId) : undefined)
     if (!recipe) continue
     for (const ingredient of recipe.ingredients) {
