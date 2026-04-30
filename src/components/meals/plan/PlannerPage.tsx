@@ -123,26 +123,42 @@ export function PlannerPage() {
     return out
   }, [plan, recipesById])
 
-  /** Recipes that appear on 2+ days in the current plan, sorted by frequency. */
+  /** Recipes that appear in 2+ distinct (day, slot) cells in the current plan.
+   *  Dedupe per-person variants — three Iris/Scott/Family entries on the same
+   *  Monday lunch should count as ONE thread cell, not three. Same goes for
+   *  ad-hoc-title entries. */
   const ingredientThreads = useMemo(() => {
     if (!plan) return []
-    const byRecipe = new Map<string, MealPlanEntry[]>()
+    // First, dedupe by recipe + (day, slot) — for each recipe, collect the
+    // unique day-slot cells it occupies.
+    const cellsByRecipe = new Map<string, Map<string, { dayOfWeek: number; slot: MealSlot }>>()
+    const titleByRecipe = new Map<string, string>()
     for (const e of plan.entries) {
-      if (!e.recipeId) continue
-      const arr = byRecipe.get(e.recipeId) ?? []
-      arr.push(e)
-      byRecipe.set(e.recipeId, arr)
+      // Use recipeId as the thread key when present; fall back to ad_hoc_title.
+      const key = e.recipeId ?? (e.adHocTitle ? `adhoc:${e.adHocTitle}` : null)
+      if (!key) continue
+      if (e.recipeId) {
+        const r = recipesById.get(e.recipeId)
+        if (!r) continue
+        titleByRecipe.set(key, r.title)
+      } else if (e.adHocTitle) {
+        titleByRecipe.set(key, e.adHocTitle)
+      }
+      const cells = cellsByRecipe.get(key) ?? new Map<string, { dayOfWeek: number; slot: MealSlot }>()
+      const cellKey = `${e.dayOfWeek}|${e.slot}`
+      if (!cells.has(cellKey)) cells.set(cellKey, { dayOfWeek: e.dayOfWeek, slot: e.slot as MealSlot })
+      cellsByRecipe.set(key, cells)
     }
     const out: Array<{ recipeId: string; title: string; usedAt: string; count: number }> = []
-    for (const [recipeId, entries] of byRecipe) {
-      if (entries.length < 2) continue
-      const recipe = recipesById.get(recipeId)
-      if (!recipe) continue
-      const usedAt = entries
-        .sort((a, b) => a.dayOfWeek - b.dayOfWeek)
-        .map(e => `${dayLabelFor(e.dayOfWeek)} ${MEAL_SLOT_LABEL[e.slot] ?? e.slot}`)
+    for (const [recipeKey, cellMap] of cellsByRecipe) {
+      if (cellMap.size < 2) continue
+      const title = titleByRecipe.get(recipeKey) ?? '(unnamed)'
+      const cells = Array.from(cellMap.values())
+        .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.slot.localeCompare(b.slot))
+      const usedAt = cells
+        .map(c => `${dayLabelFor(c.dayOfWeek)} ${MEAL_SLOT_LABEL[c.slot] ?? c.slot}`)
         .join(' · ')
-      out.push({ recipeId, title: recipe.title, usedAt, count: entries.length })
+      out.push({ recipeId: recipeKey, title, usedAt, count: cells.length })
     }
     out.sort((a, b) => b.count - a.count)
     return out
