@@ -81,7 +81,12 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
         family_member_id: input.familyMemberId ?? null,
         leftover_from: input.leftoverFromId ?? null,
       }).select().single()
-    if (insertErr) { setError(insertErr.message); return }
+    if (insertErr) {
+      setError(insertErr.message)
+      // Surface the DB error to callers so try/catch in handlers (e.g.
+      // Ask-Symphony's onApplySuggestion) can show feedback.
+      throw new Error(`addMeal failed: ${insertErr.message}`)
+    }
     if (data) {
       setPlan(prev => prev ? {
         ...prev,
