@@ -10,6 +10,9 @@ interface Props {
   familyMembers: FamilyMember[]
   /** entry.id → "from X" label, for leftover entries. */
   parentLabelById?: Map<string, string>
+  /** Map of `${owner_family_member_id}|${slot}` → set of habit names. Used to
+   *  mark per-person entries that match a standing habit with a "(habit)" tag. */
+  habitsByOwnerSlot?: Map<string, Set<string>>
   onPick: (familyMemberId?: string) => void
   onReplace: (entryId: string) => void
   onRemove: (entryId: string) => void
@@ -24,9 +27,18 @@ interface Props {
  *  The picker is invoked with an optional family_member_id to record per-
  *  person context. */
 export function SlotSection({
-  slot, entries, recipesById, familyMembers, parentLabelById,
+  slot, entries, recipesById, familyMembers, parentLabelById, habitsByOwnerSlot,
   onPick, onReplace, onRemove, onConsolidate, onSplitShared,
 }: Props) {
+  /** True iff this entry matches a standing habit owned by the same person at
+   *  the same slot, by ad_hoc_title. Family-default entries (no familyMemberId)
+   *  can't match a per-person habit, so they always return false. */
+  function isHabitDerived(e: MealPlanEntry): boolean {
+    if (!habitsByOwnerSlot) return false
+    if (!e.familyMemberId || !e.adHocTitle) return false
+    const set = habitsByOwnerSlot.get(`${e.familyMemberId}|${slot}`)
+    return set?.has(e.adHocTitle) ?? false
+  }
   const familyEntries = entries.filter(e => !e.familyMemberId)
   const personalEntries = entries.filter(e => !!e.familyMemberId)
   const hasSplit = personalEntries.length > 0
@@ -120,6 +132,7 @@ export function SlotSection({
           entry={e}
           recipe={e.recipeId ? recipesById.get(e.recipeId) : undefined}
           parentLabel={parentLabelById?.get(e.id)}
+          isHabitDerived={isHabitDerived(e)}
           onReplace={onReplace}
           onRemove={onRemove}
         />
@@ -136,6 +149,7 @@ export function SlotSection({
             entry={e}
             recipe={e.recipeId ? recipesById.get(e.recipeId) : undefined}
             parentLabel={parentLabelById?.get(e.id)}
+            isHabitDerived={isHabitDerived(e)}
             onReplace={onReplace}
             onRemove={onRemove}
           />
@@ -203,11 +217,12 @@ interface PerPersonRowProps {
   entry: MealPlanEntry
   recipe?: Recipe
   parentLabel?: string
+  isHabitDerived?: boolean
   onReplace: (entryId: string) => void
   onRemove: (entryId: string) => void
 }
 
-function PerPersonRow({ forLabel, forColor, entry, recipe, parentLabel, onReplace, onRemove }: PerPersonRowProps) {
+function PerPersonRow({ forLabel, forColor, entry, recipe, parentLabel, isHabitDerived, onReplace, onRemove }: PerPersonRowProps) {
   const title = recipe?.title ?? entry.adHocTitle ?? '(unnamed)'
   return (
     <div className="grid grid-cols-[80px_1fr_auto] items-start gap-3 py-1">
@@ -217,6 +232,9 @@ function PerPersonRow({ forLabel, forColor, entry, recipe, parentLabel, onReplac
       <div>
         <div className="font-display text-[1rem] leading-tight text-neutral-800">
           {title}
+          {isHabitDerived && (
+            <span className="ml-2 font-display italic text-[11px] text-neutral-400">(habit)</span>
+          )}
         </div>
         {entry.leftoverFrom && parentLabel && (
           <div className="font-display italic text-[12px] text-neutral-400 mt-0.5">

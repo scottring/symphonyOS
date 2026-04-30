@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
       supabase.from('meal_plans').select('id,user_id').eq('week_start', body.weekStart).order('created_at', { ascending: true }).limit(1),
       supabase.from('weekly_briefs').select('id,body').eq('week_start', body.weekStart).order('created_at', { ascending: true }).limit(1),
       supabase.from('recipes').select('id,title,tags,prep_minutes,acceptance_sentence,is_prep_friendly'),
-      supabase.from('standing_habits').select('user_id,name,slot,grams_hint').eq('paused', false),
+      supabase.from('standing_habits').select('user_id,name,slot,grams_hint,paused_for_weeks').eq('paused', false),
       supabase.from('family_members').select('id,name,auth_user_id'),
     ])
     if (planErr || briefErr || recErr || habErr || memErr) {
@@ -150,6 +150,11 @@ Deno.serve(async (req) => {
 
     const habitInjected: GeneratedEntry[] = []
     for (const h of (habits ?? [])) {
+      const pausedThisWeek = (h.paused_for_weeks ?? []).includes(body.weekStart)
+      if (pausedThisWeek) {
+        validationNotes.push(`habit "${h.name}" paused this week`)
+        continue
+      }
       const ownerFamilyMemberId = familyByAuthUser.get(h.user_id)
       if (!ownerFamilyMemberId) {
         validationNotes.push(`habit "${h.name}" skipped: no family_members row for owner`)

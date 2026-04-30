@@ -14,6 +14,7 @@ interface UpdateInput {
   gramsHint?: number | null
   paused?: boolean
   sortOrder?: number
+  pausedForWeeks?: string[]
 }
 
 interface UseStandingHabitsResult {
@@ -23,6 +24,7 @@ interface UseStandingHabitsResult {
   add: (input: AddInput) => Promise<void>
   update: (id: string, input: UpdateInput) => Promise<void>
   remove: (id: string) => Promise<void>
+  toggleWeekPause: (habitId: string, weekStartIso: string) => Promise<void>
   refresh: () => Promise<void>
 }
 
@@ -76,6 +78,7 @@ export function useStandingHabits(): UseStandingHabitsResult {
     if (input.gramsHint !== undefined) patch.grams_hint = input.gramsHint
     if (input.paused !== undefined) patch.paused = input.paused
     if (input.sortOrder !== undefined) patch.sort_order = input.sortOrder
+    if (input.pausedForWeeks !== undefined) patch.paused_for_weeks = input.pausedForWeeks
 
     setHabits(prev => prev.map(h => h.id === id ? {
       ...h,
@@ -84,6 +87,7 @@ export function useStandingHabits(): UseStandingHabitsResult {
       ...(input.gramsHint !== undefined ? { gramsHint: input.gramsHint ?? undefined } : {}),
       ...(input.paused !== undefined ? { paused: input.paused } : {}),
       ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
+      ...(input.pausedForWeeks !== undefined ? { pausedForWeeks: input.pausedForWeeks } : {}),
     } : h))
 
     const { error: updErr } = await supabase
@@ -92,6 +96,23 @@ export function useStandingHabits(): UseStandingHabitsResult {
       .eq('id', id)
     if (updErr) { setHabits(previous); setError(updErr.message) }
   }, [habits])
+
+  const toggleWeekPause = useCallback(async (habitId: string, weekStartIso: string) => {
+    const habit = habits.find(h => h.id === habitId)
+    if (!habit) return
+    const has = habit.pausedForWeeks.includes(weekStartIso)
+    const next = has
+      ? habit.pausedForWeeks.filter(w => w !== weekStartIso)
+      : [...habit.pausedForWeeks, weekStartIso]
+    const previous = habits
+    setHabits(prev => prev.map(h => h.id === habitId ? { ...h, pausedForWeeks: next } : h))
+    const { error: updErr } = await supabase
+      .from('standing_habits')
+      .update({ paused_for_weeks: next })
+      .eq('id', habitId)
+    if (updErr) { setHabits(previous); setError(updErr.message); return }
+    await refresh()
+  }, [habits, refresh])
 
   const remove = useCallback(async (id: string) => {
     const previous = habits
@@ -102,5 +123,5 @@ export function useStandingHabits(): UseStandingHabitsResult {
 
   useEffect(() => { refresh() }, [refresh])
 
-  return { habits, loading, error, add, update, remove, refresh }
+  return { habits, loading, error, add, update, remove, toggleWeekPause, refresh }
 }

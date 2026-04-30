@@ -19,6 +19,15 @@ import { UndoToast } from './UndoToast'
 import { DAY_MEAL_SLOTS, MEAL_SLOT_LABEL } from '@/types/meal-planner'
 import type { MealPlanEntry, MealSlot, Recipe } from '@/types/meal-planner'
 
+/** Local YYYY-MM-DD formatter (matches the inline helpers in
+ *  useMealPlan / useWeeklyBrief — kept local to avoid a refactor). */
+function toIsoDate(d: Date): string {
+  const y = d.getFullYear()
+  const m = (d.getMonth() + 1).toString().padStart(2, '0')
+  const day = d.getDate().toString().padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 /** Map FamilyMember color to Tailwind classes for initial chip. */
 function memberColorClass(color: string): string {
   switch (color) {
@@ -41,7 +50,7 @@ export function PlannerPage() {
   const { recipes } = useRecipes()
   const status = useGroceryStatus(plan, recipes)
   const { brief } = useWeeklyBrief(weekStart)
-  const { habits } = useStandingHabits()
+  const { habits, toggleWeekPause } = useStandingHabits()
   const { members: familyMembers } = useFamilyMembers()
   const [picker, setPicker] = useState<{ dayOfWeek: number; slot: MealSlot; familyMemberId?: string; replaceEntryId?: string } | null>(null)
   const [sendOpen, setSendOpen] = useState(false)
@@ -52,6 +61,23 @@ export function PlannerPage() {
     recipes.forEach(r => map.set(r.id, r))
     return map
   }, [recipes])
+
+  /** Map of `${owner_family_member_id}|${slot}` → Set of habit names, used by
+   *  SlotSection to mark entries as "(habit)" derived. Only non-paused habits
+   *  whose owner has a matching family_members row are included. */
+  const habitsByOwnerSlot = useMemo(() => {
+    const map = new Map<string, Set<string>>()
+    for (const h of habits) {
+      if (h.paused) continue
+      const owner = familyMembers.find(m => (m.auth_user_id ?? m.user_id) === h.userId)
+      if (!owner) continue
+      const key = `${owner.id}|${h.slot}`
+      const set = map.get(key) ?? new Set<string>()
+      set.add(h.name)
+      map.set(key, set)
+    }
+    return map
+  }, [habits, familyMembers])
 
   /** entries keyed first by dayOfWeek then by canonical slot. Each slot
    *  bucket holds an array — multiple entries support per-person variants
@@ -293,8 +319,10 @@ export function PlannerPage() {
               const owner = familyMembers.find(m => m.auth_user_id === h.userId || (m.user_id === h.userId && !m.auth_user_id))
               const initial = owner?.name?.[0]?.toUpperCase() ?? '?'
               const colorClass = owner ? memberColorClass(owner.color) : 'bg-neutral-200 text-neutral-500'
+              const weekStartIso = toIsoDate(weekStart)
+              const pausedThisWeek = h.pausedForWeeks.includes(weekStartIso)
               return (
-                <div key={h.id} className={`flex items-center gap-2 text-[13px] text-neutral-700 ${h.paused ? 'opacity-50 line-through' : ''}`}>
+                <div key={h.id} className={`flex items-center gap-2 text-[13px] text-neutral-700 ${(h.paused || pausedThisWeek) ? 'opacity-50 line-through' : ''}`}>
                   <span
                     className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-medium ${colorClass}`}
                     title={owner?.name ?? 'Unknown'}
@@ -306,6 +334,13 @@ export function PlannerPage() {
                   <span className="ml-1 text-[11px] uppercase tracking-[0.12em] text-neutral-400">
                     {MEAL_SLOT_LABEL[h.slot]}
                   </span>
+                  <button
+                    onClick={() => toggleWeekPause(h.id, weekStartIso)}
+                    title={pausedThisWeek ? 'Resume for this week' : 'Pause for this week'}
+                    className="ml-auto text-[11px] italic text-neutral-400 hover:text-primary-500"
+                  >
+                    {pausedThisWeek ? 'resume this week' : 'pause this week'}
+                  </button>
                 </div>
               )
             })}
@@ -419,6 +454,7 @@ export function PlannerPage() {
               familyMembers={familyMembers}
               parameter={plan?.parameter}
               parentLabelById={parentLabelById}
+              habitsByOwnerSlot={habitsByOwnerSlot}
               onPickForSlot={(slot, familyMemberId) =>
                 setPicker({ dayOfWeek: d, slot, familyMemberId })
               }

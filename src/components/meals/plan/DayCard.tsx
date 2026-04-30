@@ -17,6 +17,9 @@ interface Props {
   parameter?: MealParameter
   /** entry.id → "from X" label, populated for leftover entries. */
   parentLabelById?: Map<string, string>
+  /** Map of `${owner_family_member_id}|${slot}` → set of habit names, used
+   *  to mark plan entries derived from a standing habit. */
+  habitsByOwnerSlot?: Map<string, Set<string>>
   onPickForSlot: (slot: MealSlot, familyMemberId?: string) => void
   onReplace: (entryId: string) => void
   onRemove: (entryId: string) => void
@@ -34,7 +37,7 @@ interface Props {
 export function DayCard({
   dayOfWeek, date, isToday,
   entriesBySlot, recipesById, familyMembers, parameter,
-  parentLabelById,
+  parentLabelById, habitsByOwnerSlot,
   onPickForSlot, onReplace, onRemove, onConsolidateSlot, onSplitSharedSlot,
 }: Props) {
   const navigate = useNavigate()
@@ -94,6 +97,7 @@ export function DayCard({
             recipesById={recipesById}
             familyMembers={familyMembers}
             parentLabelById={parentLabelById}
+            habitsByOwnerSlot={habitsByOwnerSlot}
             onPick={(forWho) => onPickForSlot(slot, forWho)}
             onReplace={onReplace}
             onRemove={onRemove}

@@ -207,6 +207,7 @@ export interface DbStandingHabit {
   grams_hint: number | null
   sort_order: number
   paused: boolean
+  paused_for_weeks: string[]
   created_at: string
   updated_at: string
 }
@@ -219,6 +220,8 @@ export interface StandingHabit {
   gramsHint?: number
   sortOrder: number
   paused: boolean
+  /** ISO date strings (YYYY-MM-DD, Mondays) of weeks this habit is paused for. */
+  pausedForWeeks: string[]
 }
 
 export function dbStandingHabitToStandingHabit(row: DbStandingHabit): StandingHabit {
@@ -230,6 +233,7 @@ export function dbStandingHabitToStandingHabit(row: DbStandingHabit): StandingHa
     gramsHint: row.grams_hint ?? undefined,
     sortOrder: row.sort_order,
     paused: row.paused,
+    pausedForWeeks: row.paused_for_weeks ?? [],
   }
 }
 

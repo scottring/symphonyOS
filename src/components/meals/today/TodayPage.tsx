@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { supabase } from '@/lib/supabase'
 import { useMealPlan } from '@/hooks/useMealPlan'
 import { useRecipes } from '@/hooks/useRecipes'
 import { useMealDayLog, useWeekGramsTrend } from '@/hooks/useMealDayLog'
@@ -74,7 +75,22 @@ export function TodayPage() {
     void tracking.swapEntry(entryId, { title, grams: grams || undefined })
   }
   const handleSkip = (entryId: string) => { void tracking.skipEntry(entryId) }
-  const handleConfirm = (entryId: string) => { void tracking.confirmAsPlanned(entryId) }
+  const handleConfirm = async (entryId: string) => {
+    await tracking.confirmAsPlanned(entryId)
+    // Auto-fire habit pills whose slot matches the confirmed entry's slot,
+    // for habits owned by the currently-logged-in user.
+    const entry = todayEntries.find(e => e.id === entryId)
+    if (!entry) return
+    const { data: { user } } = await supabase.auth.getUser()
+    const myUserId = user?.id
+    if (!myUserId) return
+    const matching = standingHabits.filter(h =>
+      !h.paused && h.slot === entry.slot && h.userId === myUserId
+    )
+    for (const h of matching) {
+      void toggleHabit(h.id, true)  // explicit true (don't toggle off if already true)
+    }
+  }
   const handleUndo = handleConfirm
   const handleAdd = (title: string, grams: string) => {
     if (!plan) return
