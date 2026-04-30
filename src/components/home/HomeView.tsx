@@ -14,9 +14,6 @@ import { MonthView } from './MonthView'
 import { CascadingRiverView } from './CascadingRiverView'
 import { TodaySchedule } from '@/components/schedule/TodaySchedule'
 import { UndoToast } from '@/components/undo/UndoToast'
-import { useMealPlan } from '@/hooks/useMealPlan'
-import { useRecipes } from '@/hooks/useRecipes'
-import { mondayOfWeek } from '@/lib/weekHelpers'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
 
 interface HomeViewProps {
@@ -95,72 +92,9 @@ export function HomeView({
     return projects.filter(project => project.context === currentDomain)
   }, [projects, currentDomain])
 
-  // ── Meal-plan entries → synthesized as CalendarEvent objects ──────────
-  // Default times by canonical slot (legacy slots fall back to closest match).
-  const SLOT_TIMES: Record<string, [number, number]> = {
-    breakfast:    [7, 30],
-    lunch:        [12, 30],
-    snack:        [15, 30],
-    dinner:       [18, 30],
-    prep:         [16, 0],
-    lunch_iris:   [12, 30],
-    lunch_scott:  [12, 30],
-    kid_alternate:[18, 30],
-  }
-  const mealWeekStart = useMemo(() => mondayOfWeek(viewedDate), [viewedDate])
-  const { plan: mealPlan } = useMealPlan(mealWeekStart)
-  const { recipes: mealRecipes } = useRecipes()
-  const mealRecipesById = useMemo(() => {
-    const m = new Map<string, { id: string; title: string }>()
-    mealRecipes.forEach(r => m.set(r.id, { id: r.id, title: r.title }))
-    return m
-  }, [mealRecipes])
-
-  const mealEvents = useMemo<CalendarEvent[]>(() => {
-    if (!mealPlan) return []
-    const dayOfWeek = (viewedDate.getDay() + 6) % 7
-    // Group by (slot, recipe-or-title) so per-person variants of the same
-    // meal collapse into ONE timeline event instead of stacking three.
-    const groups = new Map<string, { slot: string; title: string; entryIds: string[] }>()
-    for (const e of mealPlan.entries) {
-      if (e.dayOfWeek !== dayOfWeek) continue
-      if (!SLOT_TIMES[e.slot]) continue
-      const title = e.recipeId
-        ? (mealRecipesById.get(e.recipeId)?.title ?? '(unnamed)')
-        : (e.adHocTitle ?? '(unnamed)')
-      const key = `${e.slot}|${title}`
-      const existing = groups.get(key)
-      if (existing) {
-        existing.entryIds.push(e.id)
-      } else {
-        groups.set(key, { slot: e.slot, title, entryIds: [e.id] })
-      }
-    }
-    const out: CalendarEvent[] = []
-    for (const [, { slot, title, entryIds }] of groups) {
-      const [hh, mm] = SLOT_TIMES[slot]!
-      const start = new Date(viewedDate)
-      start.setHours(hh, mm, 0, 0)
-      const end = new Date(start.getTime() + 45 * 60 * 1000)
-      const slotLabel = slot.charAt(0).toUpperCase() + slot.slice(1)
-      out.push({
-        id: `meal:${entryIds[0]}`,
-        title: `${slotLabel} · ${title}`,
-        start_time: start.toISOString(),
-        end_time: end.toISOString(),
-        all_day: false,
-        calendar_name: 'Meals',
-        calendar_color: '#0F8A4A',
-      })
-    }
-    return out
-  }, [mealPlan, mealRecipesById, viewedDate])
-
-  // Calendar events always show regardless of domain filter —
-  // domain filtering applies to tasks, routines, and projects only.
-  // Meals are synthesized into the events list so the timeline renders them
-  // as peer items (not a separate card above the schedule).
-  const filteredEvents = useMemo(() => [...events, ...mealEvents], [events, mealEvents])
+  // Calendar events (including meal-plan entries synthesized in App.tsx) flow
+  // through unfiltered — domain filtering applies to tasks/routines/projects only.
+  const filteredEvents = events
 
   // Assignee filter state
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])

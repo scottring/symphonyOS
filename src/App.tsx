@@ -49,6 +49,9 @@ import type { ViewType } from '@/components/layout/Sidebar'
 import type { LinkedActivityType } from '@/types/task'
 import { type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
 import { useHiddenCalendarEvents } from '@/hooks/useHiddenCalendarEvents'
+import { useMealPlan } from '@/hooks/useMealPlan'
+import { useRecipes } from '@/hooks/useRecipes'
+import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { useChat, type EntityContext as ChatEntityContext } from '@/hooks/useChat'
 import { useChatSessions } from '@/hooks/useChatSessions'
 import { useVaultWrite } from '@/hooks/useVaultWrite'
@@ -279,6 +282,57 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [viewedDate, setViewedDate] = useState(() => new Date())
 
+  // ── Meal-plan entries synthesized as CalendarEvent objects ────────────
+  // Lifted to App.tsx so they flow into BOTH HomeView's timeline rendering
+  // AND useDetailPanelState's lookup (which finds events by id).
+  const mealWeekStartForEvents = useMemo(() => {
+    const d = new Date(viewedDate)
+    const day = d.getDay()
+    const diff = day === 0 ? -6 : 1 - day
+    d.setDate(d.getDate() + diff)
+    d.setHours(0, 0, 0, 0)
+    return d
+  }, [viewedDate])
+  const { plan: mealPlanForEvents } = useMealPlan(mealWeekStartForEvents)
+  const { recipes: mealRecipesForEvents } = useRecipes()
+  const mealEvents = useMemo<CalendarEvent[]>(() => {
+    if (!mealPlanForEvents) return []
+    const SLOT_TIMES: Record<string, [number, number]> = {
+      breakfast: [7, 30], lunch: [12, 30], snack: [15, 30], dinner: [18, 30], prep: [16, 0],
+      lunch_iris: [12, 30], lunch_scott: [12, 30], kid_alternate: [18, 30],
+    }
+    const dow = (viewedDate.getDay() + 6) % 7
+    const recipeTitleById = new Map(mealRecipesForEvents.map(r => [r.id, r.title]))
+    const groups = new Map<string, { slot: string; title: string; entryIds: string[] }>()
+    for (const e of mealPlanForEvents.entries) {
+      if (e.dayOfWeek !== dow) continue
+      if (!SLOT_TIMES[e.slot]) continue
+      const title = e.recipeId ? (recipeTitleById.get(e.recipeId) ?? '(unnamed)') : (e.adHocTitle ?? '(unnamed)')
+      const key = `${e.slot}|${title}`
+      const existing = groups.get(key)
+      if (existing) existing.entryIds.push(e.id)
+      else groups.set(key, { slot: e.slot, title, entryIds: [e.id] })
+    }
+    const out: CalendarEvent[] = []
+    for (const [, { slot, title, entryIds }] of groups) {
+      const [hh, mm] = SLOT_TIMES[slot]!
+      const start = new Date(viewedDate); start.setHours(hh, mm, 0, 0)
+      const end = new Date(start.getTime() + 45 * 60 * 1000)
+      const slotLabel = slot.charAt(0).toUpperCase() + slot.slice(1)
+      out.push({
+        id: `meal:${entryIds[0]}`,
+        title: `${slotLabel} · ${title}`,
+        start_time: start.toISOString(),
+        end_time: end.toISOString(),
+        all_day: false,
+        calendar_name: 'Meals',
+        calendar_color: '#0F8A4A',
+      })
+    }
+    return out
+  }, [mealPlanForEvents, mealRecipesForEvents, viewedDate])
+  const eventsWithMeals = useMemo(() => [...events, ...mealEvents], [events, mealEvents])
+
   // Reset to today at midnight
   useEffect(() => {
     const now = new Date()
@@ -412,7 +466,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
 
   const { filteredEvents, filteredRoutines, dateInstances, refreshDateInstances } = useScheduleFiltering({
     viewedDate,
-    events,
+    events: eventsWithMeals,
     allRoutines,
     getRoutinesForDate,
     getInstancesForDate,
@@ -456,7 +510,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   } = useDetailPanelState({
     selectedItemId,
     tasks,
-    events,
+    events: eventsWithMeals,
     activeRoutines,
     allRoutines,
     viewedDate,
@@ -1376,7 +1430,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
           activeView={activeView}
           onViewChange={handleViewChange}
           tasks={tasks}
-          events={events}
+          events={eventsWithMeals}
           filteredEvents={filteredEvents}
           filteredRoutines={filteredRoutines}
           projects={projects}
