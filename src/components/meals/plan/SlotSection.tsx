@@ -11,6 +11,7 @@ interface Props {
   onPick: (familyMemberId?: string) => void
   onReplace: (entryId: string) => void
   onRemove: (entryId: string) => void
+  onConsolidate: (entries: MealPlanEntry[], shared: { recipeId?: string; adHocTitle?: string }) => void
 }
 
 /** One slot inside a day card. May render:
@@ -21,7 +22,7 @@ interface Props {
  *  person context. */
 export function SlotSection({
   slot, entries, recipesById, familyMembers,
-  onPick, onReplace, onRemove,
+  onPick, onReplace, onRemove, onConsolidate,
 }: Props) {
   const familyEntries = entries.filter(e => !e.familyMemberId)
   const personalEntries = entries.filter(e => !!e.familyMemberId)
@@ -73,6 +74,23 @@ export function SlotSection({
   }
 
   // Mixed / split mode — render slot kicker once, then a row per variant.
+  // Detect whether every entry references the same identifier — if so, expose
+  // an inline "Same for everyone" affordance to consolidate the split rows
+  // back into a single family-default row.
+  const sharedIdentifier = (() => {
+    const all = entries
+    if (all.length < 2) return null
+    const firstRecipeId = all[0].recipeId
+    if (firstRecipeId && all.every(e => e.recipeId === firstRecipeId)) {
+      return { recipeId: firstRecipeId }
+    }
+    const firstAdHoc = all[0].adHocTitle
+    if (firstAdHoc && !all[0].recipeId && all.every(e => e.adHocTitle === firstAdHoc && !e.recipeId)) {
+      return { adHocTitle: firstAdHoc }
+    }
+    return null
+  })()
+
   return (
     <div className="border-b border-neutral-100 last:border-b-0 py-1">
       <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-neutral-400 pt-2 pb-1">
@@ -108,12 +126,22 @@ export function SlotSection({
         )
       })}
 
-      <AddAffordances
-        familyMembers={familyMembers}
-        excludeIds={new Set(personalEntries.map(e => e.familyMemberId!).filter(Boolean))}
-        showShared={familyEntries.length === 0}
-        onPick={onPick}
-      />
+      <div className="flex items-center">
+        <AddAffordances
+          familyMembers={familyMembers}
+          excludeIds={new Set(personalEntries.map(e => e.familyMemberId!).filter(Boolean))}
+          showShared={familyEntries.length === 0}
+          onPick={onPick}
+        />
+        {sharedIdentifier && (
+          <button
+            onClick={() => onConsolidate(entries, sharedIdentifier)}
+            className="text-[11px] italic text-primary-500 hover:text-primary-600 transition-colors ml-auto"
+          >
+            ↔ Same for everyone — make shared
+          </button>
+        )}
+      </div>
     </div>
   )
 }

@@ -72,6 +72,26 @@ export function PlannerPage() {
     setPicker(null)
   }
 
+  /** Collapse a split slot (multiple per-person entries that all reference
+   *  the same recipe or ad-hoc title) into a single family-default row. */
+  const handleConsolidateSlot = async (
+    dayOfWeek: number,
+    slot: MealSlot,
+    entries: MealPlanEntry[],
+    shared: { recipeId?: string; adHocTitle?: string },
+  ) => {
+    for (const e of entries) {
+      await removeMeal(e.id)
+    }
+    await addMeal({
+      dayOfWeek,
+      slot,
+      recipeId: shared.recipeId,
+      adHocTitle: shared.adHocTitle,
+      familyMemberId: null,
+    })
+  }
+
   if (loading) {
     return (
       <div className="px-12 py-12 max-w-3xl mx-auto">
@@ -224,6 +244,7 @@ export function PlannerPage() {
                 })
               }}
               onRemove={(entryId) => removeMeal(entryId)}
+              onConsolidateSlot={handleConsolidateSlot}
             />
           )
         })}
