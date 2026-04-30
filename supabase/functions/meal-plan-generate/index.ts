@@ -132,6 +132,45 @@ Deno.serve(async (req) => {
       return jsonError(422, `all ${dropped.length} entries failed validation`)
     }
 
+    // ── Habit injection ─────────────────────────────────────────────────
+    // For each non-paused standing habit, ensure there's an entry at
+    // (every day of week, habit.slot, owner's family_member_id). Skip if
+    // an entry already exists at that coordinate (don't override AI/user).
+    // Habits whose owner has no matching family_members row are skipped
+    // and logged.
+    const familyByAuthUser = new Map<string, string>()  // auth_user_id → family_members.id
+    for (const m of (members ?? [])) {
+      if (m.auth_user_id) familyByAuthUser.set(m.auth_user_id, m.id)
+    }
+
+    const occupiedKeys = new Set<string>()
+    for (const e of kept) {
+      occupiedKeys.add(`${e.day_of_week}|${e.slot}|${e.family_member_id ?? 'family'}`)
+    }
+
+    const habitInjected: GeneratedEntry[] = []
+    for (const h of (habits ?? [])) {
+      const ownerFamilyMemberId = familyByAuthUser.get(h.user_id)
+      if (!ownerFamilyMemberId) {
+        validationNotes.push(`habit "${h.name}" skipped: no family_members row for owner`)
+        continue
+      }
+      for (let day = 0; day <= 6; day++) {
+        const key = `${day}|${h.slot}|${ownerFamilyMemberId}`
+        if (occupiedKeys.has(key)) continue
+        habitInjected.push({
+          day_of_week: day,
+          slot: h.slot as GeneratedEntry['slot'],
+          family_member_id: ownerFamilyMemberId,
+          recipe_id: null,
+          ad_hoc_title: h.name,
+        })
+        occupiedKeys.add(key)
+      }
+    }
+
+    const allEntries = [...kept, ...habitInjected]
+
     // ── Snapshot prior entries for undo ─────────────────────────────────
     const { data: prior } = await supabase
       .from('meal_plan_entries').select('*').eq('meal_plan_id', plan.id)
@@ -139,7 +178,7 @@ Deno.serve(async (req) => {
     // ── Atomic delete + insert via RPC ──────────────────────────────────
     const { data: rpcResult, error: rpcErr } = await supabase.rpc('regenerate_meal_plan', {
       p_meal_plan_id: plan.id,
-      p_entries: kept,
+      p_entries: allEntries,
     })
     if (rpcErr) return jsonError(500, `regenerate_meal_plan failed: ${rpcErr.message}`)
     const insertedIds = (rpcResult?.inserted_ids ?? []) as string[]
@@ -177,6 +216,7 @@ Deno.serve(async (req) => {
       undoToken: tokenRow ? { id: tokenRow.id, expiresAt } : null,
       notesForPlanner: parsed.notes_for_planner ?? '',
       validationNotes,
+      habitsApplied: habitInjected.length,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (e) {
     return jsonError(500, `unexpected: ${e instanceof Error ? e.message : String(e)}`)
