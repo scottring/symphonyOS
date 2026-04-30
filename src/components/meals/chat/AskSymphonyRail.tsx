@@ -24,7 +24,7 @@ export function AskSymphonyRail({
   onApplySuggestion,
   onPreviewSuggestion,
 }: AskSymphonyRailProps) {
-  const { messages, busy, send } = useAskSymphony(weekStart)
+  const { messages, busy, send, clear } = useAskSymphony(weekStart)
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
   // Auto-scroll to bottom on new messages.
@@ -82,10 +82,13 @@ export function AskSymphonyRail({
         <h2 className="flex-1 text-sm font-medium text-neutral-800">Symphony AI</h2>
         <button
           type="button"
-          aria-label="More options"
-          className="flex h-7 w-7 items-center justify-center rounded-full text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-700"
+          onClick={() => { void clear() }}
+          disabled={messages.length === 0}
+          aria-label="Clear conversation"
+          title="Clear conversation"
+          className="flex h-7 items-center justify-center rounded-full px-2.5 text-[11px] font-medium text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-700 disabled:opacity-30 disabled:hover:bg-transparent"
         >
-          <span className="text-base leading-none">…</span>
+          Clear
         </button>
         <button
           type="button"

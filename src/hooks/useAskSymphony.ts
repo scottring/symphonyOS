@@ -96,7 +96,15 @@ export function useAskSymphony(weekStart: Date) {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message, weekStart: toIsoDate(weekStart), sessionId: sessionId ?? undefined }),
+        body: JSON.stringify({
+          message,
+          weekStart: toIsoDate(weekStart),
+          // Send the client's local "today" so date words like "tonight" /
+          // "tomorrow" / "Friday" anchor to the planner's wall clock, not the
+          // edge function's UTC.
+          clientToday: toIsoDate(new Date()),
+          sessionId: sessionId ?? undefined,
+        }),
       })
 
       if (!res.ok || !res.body) {
@@ -161,5 +169,17 @@ export function useAskSymphony(weekStart: Date) {
     }
   }, [weekStart, sessionId])
 
-  return { messages, busy, send, sessionId }
+  /** Clear the chat: delete the chat_sessions row for this week + reset local state.
+   *  Idempotent — safe to call when there's no session yet. */
+  const clear = useCallback(async () => {
+    const id = sessionId
+    setMessages([])
+    setSessionId(null)
+    if (id) {
+      const { error } = await supabase.from('chat_sessions').delete().eq('id', id)
+      if (error) console.warn('[useAskSymphony] failed to delete session:', error.message)
+    }
+  }, [sessionId])
+
+  return { messages, busy, send, sessionId, clear }
 }
