@@ -72,6 +72,7 @@ export function MemoryShelfPage() {
         isOpen={pasteOpen}
         onClose={() => setPasteOpen(false)}
         onSave={handleAddByUrl}
+        onSwitchToManual={() => setManualOpen(true)}
       />
       <RecipeManualEditor
         isOpen={manualOpen}

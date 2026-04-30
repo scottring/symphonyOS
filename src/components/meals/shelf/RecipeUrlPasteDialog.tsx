@@ -5,9 +5,10 @@ interface Props {
   isOpen: boolean
   onClose: () => void
   onSave: (url: string) => Promise<void>
+  onSwitchToManual?: () => void
 }
 
-export function RecipeUrlPasteDialog({ isOpen, onClose, onSave }: Props) {
+export function RecipeUrlPasteDialog({ isOpen, onClose, onSave, onSwitchToManual }: Props) {
   const [url, setUrl] = useState('')
   const [preview, setPreview] = useState<RecipeData | null>(null)
   const [step, setStep] = useState<'paste' | 'preview' | 'saving'>('paste')
@@ -65,7 +66,19 @@ export function RecipeUrlPasteDialog({ isOpen, onClose, onSave }: Props) {
               className="w-full px-5 py-3 rounded-2xl border border-neutral-200 bg-bg-base text-[16px] focus:outline-none focus:border-primary-500"
               autoFocus
             />
-            {error && <p className="mt-3 text-[14px] text-accent-500">{error}</p>}
+            {error && (
+              <div className="mt-3 space-y-2">
+                <p className="text-[14px] text-accent-500">{error}</p>
+                {onSwitchToManual && /403|404|429|503|blocks automated/i.test(error) && (
+                  <button
+                    onClick={() => { handleClose(); onSwitchToManual() }}
+                    className="text-[13px] italic text-primary-500 hover:text-primary-600 underline"
+                  >
+                    Switch to manual entry →
+                  </button>
+                )}
+              </div>
+            )}
             <div className="mt-6 flex gap-3 justify-end">
               <button onClick={handleClose} className="px-5 py-2 rounded-2xl text-neutral-600 hover:bg-neutral-100">
                 Cancel
