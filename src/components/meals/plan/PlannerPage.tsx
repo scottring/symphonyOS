@@ -15,6 +15,7 @@ import { SendToGroceriesModal } from '../groceries/SendToGroceriesModal'
 import { MealsTabs } from '../MealsTabs'
 import { ParameterDropdown } from './ParameterDropdown'
 import { AskSymphonyRail } from '../chat/AskSymphonyRail'
+import type { Suggestion } from '../chat/types'
 import { UndoToast } from './UndoToast'
 import { DAY_MEAL_SLOTS, MEAL_SLOT_LABEL } from '@/types/meal-planner'
 import type { MealPlanEntry, MealSlot, Recipe } from '@/types/meal-planner'
@@ -222,6 +223,47 @@ export function PlannerPage() {
       adHocTitle: shared.adHocTitle,
       familyMemberId: null,
     })
+  }
+
+  /** Apply an Ask-Symphony suggestion card to the plan. The card's `apply`
+   *  payload is shaped per `kind` — see ask-symphony-meal/index.ts. */
+  const onApplySuggestion = async (s: Suggestion) => {
+    if (s.kind === 'add') {
+      const apply = s.apply as {
+        dayOfWeek: number; slot: MealSlot
+        recipeId: string | null; adHocTitle: string | null
+        familyMemberId: string | null
+      }
+      await addMeal({
+        dayOfWeek: apply.dayOfWeek,
+        slot: apply.slot,
+        recipeId: apply.recipeId ?? undefined,
+        adHocTitle: apply.adHocTitle ?? undefined,
+        familyMemberId: apply.familyMemberId,
+      })
+    } else if (s.kind === 'swap') {
+      if (s.originalEntryId) await removeMeal(s.originalEntryId)
+      const apply = s.apply as {
+        dayOfWeek: number; slot: MealSlot
+        recipeId: string | null; adHocTitle: string | null
+        familyMemberId: string | null
+      }
+      await addMeal({
+        dayOfWeek: apply.dayOfWeek,
+        slot: apply.slot,
+        recipeId: apply.recipeId ?? undefined,
+        adHocTitle: apply.adHocTitle ?? undefined,
+        familyMemberId: apply.familyMemberId,
+      })
+    } else if (s.kind === 'remove') {
+      const apply = s.apply as { entryId: string }
+      if (apply.entryId) await removeMeal(apply.entryId)
+    }
+  }
+
+  /** v1: no-op preview. Future: highlight the affected day in the planner. */
+  const onPreviewSuggestion = (_s: Suggestion) => {
+    // intentional no-op for v1
   }
 
   /** Split a single shared row into N per-person rows (one per core/full-user member),
@@ -498,7 +540,10 @@ export function PlannerPage() {
 
       <AskSymphonyRail
         isOpen={chatOpen}
+        weekStart={weekStart}
         onClose={() => setChatOpen(false)}
+        onApplySuggestion={onApplySuggestion}
+        onPreviewSuggestion={onPreviewSuggestion}
       />
     </div>
   )

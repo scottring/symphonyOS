@@ -1,64 +1,46 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { UserBubble } from './UserBubble'
 import { AiBody } from './AiBody'
 import { SuggestionCard } from './SuggestionCard'
 import { ChatInput } from './ChatInput'
-import type { Message, Suggestion } from './types'
+import { useAskSymphony } from '@/hooks/useAskSymphony'
+import type { Suggestion } from './types'
 
 export interface AskSymphonyRailProps {
   isOpen: boolean
+  weekStart: Date
   onClose: () => void
-  onApplySuggestion?: (suggestion: Suggestion) => void
+  onApplySuggestion?: (suggestion: Suggestion) => void | Promise<void>
   onPreviewSuggestion?: (suggestion: Suggestion) => void
 }
 
-/** Hardcoded conversation for the v3 stub. Real LLM wiring lands later. */
-const STUB_MESSAGES: Message[] = [
-  {
-    role: 'user',
-    id: 'u-1',
-    text: "Make Tuesday's dinner kid-friendlier.",
-  },
-  {
-    role: 'ai',
-    id: 'a-1',
-    text: 'Absolutely. Here are 2 options that keep the spirit but are easier for the kids.',
-    suggestions: [
-      {
-        id: 's-1',
-        kicker: 'Tuesday dinner — Kid-friendly swap',
-        originalLabel: 'Original',
-        originalRecipe: 'Bittman shrimp (broiled)',
-        switchLabel: 'Switch to',
-        switchRecipe: 'Creamy lemon shrimp pasta with peas',
-        why: 'Why this works: familiar, mild flavors, easy to portion.',
-      },
-      {
-        id: 's-2',
-        kicker: 'Reduce Wednesday’s prep time',
-        originalLabel: 'Original',
-        originalRecipe: 'Slow-roasted pork shoulder (3 hr)',
-        switchLabel: 'Switch to',
-        switchRecipe: 'Sheet-pan miso salmon + rice (25 min)',
-        why: 'Why this works: same protein-forward energy, weeknight-fast.',
-      },
-    ],
-  },
-]
-
 /** Surface 5 — Symphony AI side rail.
- *  380px right-fixed panel. Slides in when `isOpen`. Stub conversation;
- *  Apply/Preview buttons call props if provided, otherwise no-op. */
+ *  380px right-fixed panel. Slides in when `isOpen`. Real LLM-driven
+ *  conversation via the `ask-symphony-meal` edge function. */
 export function AskSymphonyRail({
   isOpen,
+  weekStart,
   onClose,
   onApplySuggestion,
   onPreviewSuggestion,
 }: AskSymphonyRailProps) {
+  const { messages, busy, send } = useAskSymphony(weekStart)
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+
+  // Auto-scroll to bottom on new messages.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    el.scrollTop = el.scrollHeight
+  }, [messages, busy])
+
   const handleApply = useCallback(
     (s: Suggestion) => {
-      if (onApplySuggestion) onApplySuggestion(s)
-      else console.log('[AskSymphonyRail] apply suggestion (no handler):', s)
+      if (onApplySuggestion) {
+        void onApplySuggestion(s)
+      } else {
+        console.log('[AskSymphonyRail] apply suggestion (no handler):', s)
+      }
     },
     [onApplySuggestion],
   )
@@ -72,9 +54,8 @@ export function AskSymphonyRail({
   )
 
   const handleSend = useCallback((text: string) => {
-    // Stub: no LLM yet. Log for dev visibility.
-    console.log('[AskSymphonyRail] user message (stub):', text)
-  }, [])
+    void send(text)
+  }, [send])
 
   return (
     <aside
@@ -119,17 +100,23 @@ export function AskSymphonyRail({
       </header>
 
       {/* Conversation */}
-      <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
-        {STUB_MESSAGES.map((msg) =>
+      <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+        {messages.length === 0 && !busy && (
+          <p className="font-display text-sm italic text-neutral-400">
+            Ask anything about this week — swaps, additions, kid-friendly tweaks…
+          </p>
+        )}
+
+        {messages.map((msg) =>
           msg.role === 'user' ? (
             <UserBubble key={msg.id} text={msg.text} />
           ) : (
             <AiBody key={msg.id} text={msg.text}>
-              {msg.suggestions && msg.suggestions.length > 0 && (
+              {msg.cards && msg.cards.length > 0 && (
                 <div className="space-y-2">
-                  {msg.suggestions.map((s) => (
+                  {msg.cards.map((s, i) => (
                     <SuggestionCard
-                      key={s.id}
+                      key={`${msg.id}-${i}`}
                       suggestion={s}
                       onPreview={handlePreview}
                       onApply={handleApply}
@@ -140,10 +127,22 @@ export function AskSymphonyRail({
             </AiBody>
           ),
         )}
+
+        {busy && (
+          <div className="flex gap-3" aria-live="polite">
+            <div
+              aria-hidden
+              className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white"
+            >
+              <span className="font-display text-[13px] italic leading-none">S</span>
+            </div>
+            <p className="text-sm italic leading-relaxed text-neutral-400">Thinking…</p>
+          </div>
+        )}
       </div>
 
       {/* Footer input */}
-      <ChatInput onSend={handleSend} />
+      <ChatInput onSend={handleSend} disabled={busy} />
     </aside>
   )
 }

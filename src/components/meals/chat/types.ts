@@ -1,21 +1,13 @@
 /** Local types for the AskSymphony rail (Surface 5).
- *  These describe the stub message + suggestion shape — the real
- *  LLM/agent integration will refine or replace these. */
+ *  These mirror the AskSymphonySuggestion / AskSymphonyMessage shapes from
+ *  `useAskSymphony` so the rail can render them without coupling the
+ *  presentational components to the hook. */
 
-/** A swap suggestion shown as a card under an AI body. */
-export interface Suggestion {
-  id: string
-  /** Small uppercase kicker above the body, e.g. "Tuesday dinner — Kid-friendly swap". */
-  kicker: string
-  /** What's currently planned, e.g. "Bittman shrimp (broiled)". Bold portion is the recipe name. */
-  originalLabel: string
-  originalRecipe: string
-  /** The proposed swap, e.g. "Creamy lemon shrimp pasta with peas". */
-  switchLabel: string
-  switchRecipe: string
-  /** Italic justification line. */
-  why: string
-}
+import type { AskSymphonySuggestion } from '@/hooks/useAskSymphony'
+
+/** Re-export so `<SuggestionCard suggestion={...} />` callers can import
+ *  `Suggestion` from the chat barrel as before. */
+export type Suggestion = AskSymphonySuggestion
 
 /** Conversation message — either a user bubble or the AI body with attached suggestions. */
 export type Message =
