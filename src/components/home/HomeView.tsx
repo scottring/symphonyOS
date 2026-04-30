@@ -13,6 +13,7 @@ import { WeekView } from './WeekView'
 import { MonthView } from './MonthView'
 import { CascadingRiverView } from './CascadingRiverView'
 import { TodaySchedule } from '@/components/schedule/TodaySchedule'
+import { TonightsDinnerCard } from './TonightsDinnerCard'
 import { UndoToast } from '@/components/undo/UndoToast'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
 
@@ -273,6 +274,10 @@ export function HomeView({
 
     // Today view uses TodaySchedule — it reads most props from context
     return (
+      <>
+        <div className="px-4 pt-3">
+          <TonightsDinnerCard viewedDate={viewedDate} />
+        </div>
       <TodaySchedule
         tasks={filteredTasks}
         events={filteredEvents}
@@ -296,6 +301,7 @@ export function HomeView({
         onClosePanel={() => onSelectItem(null)}
         onUpdateTasksBulk={handleUpdateTasksBulk}
       />
+      </>
     )
   }
 
