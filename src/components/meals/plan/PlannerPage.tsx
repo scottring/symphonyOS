@@ -58,7 +58,7 @@ export function PlannerPage() {
     return m
   }, [plan])
 
-  const handlePick = async (recipeId: string) => {
+  const handlePick = async (recipeId: string, familyMemberId: string | null) => {
     if (!picker) return
     if (picker.replaceEntryId) {
       await removeMeal(picker.replaceEntryId)
@@ -67,7 +67,7 @@ export function PlannerPage() {
       dayOfWeek: picker.dayOfWeek,
       slot: picker.slot,
       recipeId,
-      familyMemberId: picker.familyMemberId ?? null,
+      familyMemberId,
     })
     setPicker(null)
   }
@@ -232,9 +232,8 @@ export function PlannerPage() {
       <RecipePickerModal
         isOpen={picker !== null}
         slot={picker?.slot}
-        forLabel={picker?.familyMemberId
-          ? familyMembers.find(m => m.id === picker.familyMemberId)?.name
-          : undefined}
+        initialFamilyMemberId={picker?.familyMemberId}
+        familyMembers={familyMembers}
         onClose={() => setPicker(null)}
         onPick={handlePick}
       />

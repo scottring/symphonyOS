@@ -1,24 +1,29 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRecipes } from '@/hooks/useRecipes'
 import { AddRecipeButton } from '../shelf/AddRecipeButton'
 import { RecipeUrlPasteDialog } from '../shelf/RecipeUrlPasteDialog'
 import { RecipeManualEditor } from '../shelf/RecipeManualEditor'
 import type { MealSlot, Recipe } from '@/types/meal-planner'
 import { MEAL_SLOT_LABEL } from '@/types/meal-planner'
+import type { FamilyMember } from '@/types/family'
 
 interface Props {
   isOpen: boolean
   slot?: MealSlot
-  forLabel?: string
+  initialFamilyMemberId?: string
+  familyMembers: FamilyMember[]
   onClose: () => void
-  onPick: (recipeId: string) => void
+  onPick: (recipeId: string, familyMemberId: string | null) => void
 }
 
-export function RecipePickerModal({ isOpen, slot, forLabel, onClose, onPick }: Props) {
+export function RecipePickerModal({ isOpen, slot, initialFamilyMemberId, familyMembers, onClose, onPick }: Props) {
   const { recipes, loading, addByUrl, addManual } = useRecipes()
   const [q, setQ] = useState('')
   const [pasteOpen, setPasteOpen] = useState(false)
   const [manualOpen, setManualOpen] = useState(false)
+  const [forWho, setForWho] = useState<string | null>(initialFamilyMemberId ?? null)
+
+  useEffect(() => { if (isOpen) setForWho(initialFamilyMemberId ?? null) }, [isOpen, initialFamilyMemberId])
 
   if (!isOpen) return null
 
@@ -40,11 +45,37 @@ export function RecipePickerModal({ isOpen, slot, forLabel, onClose, onPick }: P
         <div className="p-8 pb-4 border-b border-neutral-200">
           <div className="flex items-start justify-between gap-4 mb-3">
             <div className="text-[0.7rem] font-bold uppercase tracking-[0.25em] text-neutral-500 mt-1">
-              {slot
-                ? `PICK A RECIPE · ${MEAL_SLOT_LABEL[slot].toUpperCase()}${forLabel ? ` · FOR ${forLabel.toUpperCase()}` : ''}`
-                : 'PICK A RECIPE'}
+              {slot ? `PICK A RECIPE · ${MEAL_SLOT_LABEL[slot].toUpperCase()}` : 'PICK A RECIPE'}
             </div>
             <AddRecipeButton onPasteUrl={() => setPasteOpen(true)} onManualEntry={() => setManualOpen(true)} />
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5 mb-3">
+            <span className="text-[10px] uppercase tracking-[0.18em] text-neutral-400 mr-1">for:</span>
+            <button
+              onClick={() => setForWho(null)}
+              className={`px-2.5 py-1 rounded-full text-[12px] transition-colors ${
+                forWho === null
+                  ? 'bg-primary-500 text-white border border-primary-500'
+                  : 'bg-bg-elevated text-neutral-500 border border-neutral-200 hover:border-neutral-300'
+              }`}
+            >
+              Family
+            </button>
+            {familyMembers
+              .filter(m => m.is_full_user || m.member_type === 'core')
+              .map(m => (
+                <button
+                  key={m.id}
+                  onClick={() => setForWho(m.id)}
+                  className={`px-2.5 py-1 rounded-full text-[12px] transition-colors ${
+                    forWho === m.id
+                      ? 'bg-primary-500 text-white border border-primary-500'
+                      : 'bg-bg-elevated text-neutral-500 border border-neutral-200 hover:border-neutral-300'
+                  }`}
+                >
+                  {m.name}
+                </button>
+              ))}
           </div>
           <input type="text" value={q} onChange={(e) => setQ(e.target.value)}
                  placeholder="Search your shelf…"
@@ -61,7 +92,7 @@ export function RecipePickerModal({ isOpen, slot, forLabel, onClose, onPick }: P
             </div>
           )}
           {filtered.map((recipe: Recipe) => (
-            <button key={recipe.id} onClick={() => { onPick(recipe.id); onClose() }}
+            <button key={recipe.id} onClick={() => { onPick(recipe.id, forWho); onClose() }}
                     className="w-full text-left px-5 py-3 rounded-xl hover:bg-neutral-100 transition-colors mb-1">
               <div className="font-display text-[1.25rem] text-neutral-800">{recipe.title}</div>
               {recipe.acceptanceSentence && (

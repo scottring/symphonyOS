@@ -39,6 +39,12 @@ export function SlotSection({
           onReplace={onReplace}
           onRemove={onRemove}
         />
+        <AddAffordances
+          familyMembers={familyMembers}
+          excludeIds={new Set()}
+          showShared={false}
+          onPick={onPick}
+        />
       </div>
     )
   }
@@ -55,6 +61,12 @@ export function SlotSection({
           onPick={() => onPick(undefined)}
           onReplace={onReplace}
           onRemove={onRemove}
+        />
+        <AddAffordances
+          familyMembers={familyMembers}
+          excludeIds={new Set()}
+          showShared={false}
+          onPick={onPick}
         />
       </div>
     )
@@ -96,24 +108,47 @@ export function SlotSection({
         )
       })}
 
-      {/* + add for <person> affordance */}
-      <div className="flex flex-wrap gap-2 mt-1.5 mb-1">
-        {familyMembers
-          .filter(m => !personalEntries.some(e => e.familyMemberId === m.id))
-          .filter(m => m.is_full_user || m.member_type === 'core')
-          .map(m => (
-            <button key={m.id} onClick={() => onPick(m.id)}
-                    className="text-[11px] italic text-neutral-400 hover:text-primary-500 transition-colors">
-              + add for {m.name}
-            </button>
-          ))}
-        {familyEntries.length === 0 && (
-          <button onClick={() => onPick(undefined)}
-                  className="text-[11px] italic text-neutral-400 hover:text-primary-500 transition-colors">
-            + add shared
-          </button>
-        )}
-      </div>
+      <AddAffordances
+        familyMembers={familyMembers}
+        excludeIds={new Set(personalEntries.map(e => e.familyMemberId!).filter(Boolean))}
+        showShared={familyEntries.length === 0}
+        onPick={onPick}
+      />
+    </div>
+  )
+}
+
+interface AffordancesProps {
+  familyMembers: FamilyMember[]
+  excludeIds: Set<string>
+  showShared: boolean
+  onPick: (familyMemberId?: string) => void
+}
+
+function AddAffordances({ familyMembers, excludeIds, showShared, onPick }: AffordancesProps) {
+  const candidates = familyMembers
+    .filter(m => m.is_full_user || m.member_type === 'core')
+    .filter(m => !excludeIds.has(m.id))
+  if (candidates.length === 0 && !showShared) return null
+  return (
+    <div className="flex flex-wrap gap-2 mt-1.5 mb-1">
+      {candidates.map(m => (
+        <button
+          key={m.id}
+          onClick={() => onPick(m.id)}
+          className="text-[11px] italic text-neutral-400 hover:text-primary-500 transition-colors"
+        >
+          + add for {m.name}
+        </button>
+      ))}
+      {showShared && (
+        <button
+          onClick={() => onPick(undefined)}
+          className="text-[11px] italic text-neutral-400 hover:text-primary-500 transition-colors"
+        >
+          + add shared
+        </button>
+      )}
     </div>
   )
 }
