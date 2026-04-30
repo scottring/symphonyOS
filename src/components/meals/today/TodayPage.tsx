@@ -39,11 +39,17 @@ export function TodayPage() {
     return m
   }, [recipes])
 
+  // Canonical meal-of-day order. Anything not in the list (e.g. legacy
+  // 'lunch_iris' / 'kid_alternate' / 'prep') goes last.
+  const SLOT_ORDER: Record<string, number> = {
+    breakfast: 0, lunch: 1, snack: 2, dinner: 3,
+    lunch_iris: 1, lunch_scott: 1, kid_alternate: 3, prep: 4,
+  }
   const todayEntries = useMemo(() => {
     if (!plan) return []
     return plan.entries
       .filter(e => e.dayOfWeek === dayOfWeek)
-      .sort((a, b) => a.slot.localeCompare(b.slot))
+      .sort((a, b) => (SLOT_ORDER[a.slot] ?? 99) - (SLOT_ORDER[b.slot] ?? 99))
   }, [plan, dayOfWeek])
 
   const habitDefs = useMemo(
