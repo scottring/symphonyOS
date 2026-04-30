@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 
 /** A single suggestion card returned by the model. The `apply` payload is
@@ -38,15 +38,40 @@ function toIso(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
-/** Thin wrapper around the `ask-symphony-meal` edge function.
- *
- *  v1: each open of the rail starts a fresh in-memory message list. The edge
- *  function still persists turns server-side so future enhancements can read
- *  back the session. */
+/** Thin wrapper around the `ask-symphony-meal` edge function. */
 export function useAskSymphony(weekStart: Date) {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [messages, setMessages] = useState<AskSymphonyMessage[]>([])
   const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || cancelled) return
+      const weekStartIso = toIso(weekStart)
+      const { data } = await supabase
+        .from('chat_sessions')
+        .select('id, messages')
+        .eq('user_id', user.id)
+        .eq('entity_type', 'meal_week')
+        .eq('entity_id', weekStartIso)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (cancelled || !data) return
+      const dbMessages = (data.messages ?? []) as Array<{ role: 'user' | 'assistant'; text: string; cards?: unknown }>
+      const hydrated: AskSymphonyMessage[] = dbMessages.map((m, i) => ({
+        id: `loaded-${data.id}-${i}`,
+        role: m.role,
+        text: m.text,
+        cards: (m.cards as AskSymphonySuggestion[] | undefined) ?? undefined,
+      }))
+      setSessionId(data.id)
+      setMessages(hydrated)
+    })()
+    return () => { cancelled = true }
+  }, [weekStart])
 
   const send = useCallback(async (message: string): Promise<AskResult> => {
     setBusy(true)

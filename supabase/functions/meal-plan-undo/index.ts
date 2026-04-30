@@ -8,7 +8,7 @@ const corsHeaders = {
 interface RequestBody { tokenId: string }
 
 interface InverseAction {
-  type: 'delete_meal_plan_entries_by_ids' | 'restore_meal_plan_entries' | string
+  type: 'delete_meal_plan_entries_by_ids' | 'restore_meal_plan_entries' | 'restore_weekly_brief_status' | string
   payload: Record<string, unknown>
 }
 
@@ -72,6 +72,20 @@ Deno.serve(async (req) => {
           // Restore by the original row shape; the ids come back too.
           const { error } = await supabase.from('meal_plan_entries').insert(rows)
           if (error) return jsonError(500, `restore failed: ${error.message}`)
+        }
+      } else if (action.type === 'restore_weekly_brief_status') {
+        const briefId = action.payload?.brief_id as string | undefined
+        const status = action.payload?.status as string | null | undefined
+        const generatedAt = action.payload?.generated_at as string | null | undefined
+        if (briefId) {
+          const { error } = await supabase
+            .from('weekly_briefs')
+            .update({
+              status: status ?? 'draft',
+              generated_at: generatedAt ?? null,
+            })
+            .eq('id', briefId)
+          if (error) return jsonError(500, `restore brief failed: ${error.message}`)
         }
       }
     }

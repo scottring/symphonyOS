@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
       { data: members,   error: memErr   },
     ] = await Promise.all([
       supabase.from('meal_plans').select('id,user_id').eq('week_start', body.weekStart).order('created_at', { ascending: true }).limit(1),
-      supabase.from('weekly_briefs').select('id,body').eq('week_start', body.weekStart).order('created_at', { ascending: true }).limit(1),
+      supabase.from('weekly_briefs').select('id,body,status,generated_at').eq('week_start', body.weekStart).order('created_at', { ascending: true }).limit(1),
       supabase.from('recipes').select('id,title,tags,prep_minutes,acceptance_sentence,is_prep_friendly'),
       supabase.from('standing_habits').select('user_id,name,slot,grams_hint,paused_for_weeks').eq('paused', false),
       supabase.from('family_members').select('id,name,auth_user_id'),
@@ -180,6 +180,11 @@ Deno.serve(async (req) => {
     const { data: prior } = await supabase
       .from('meal_plan_entries').select('*').eq('meal_plan_id', plan.id)
 
+    // Capture prior brief state too — if the planner undoes, the
+    // generated/generated_at timestamps should revert.
+    const priorBriefStatus = brief.status as string | null
+    const priorBriefGeneratedAt = (brief as { generated_at?: string | null }).generated_at ?? null
+
     // ── Atomic delete + insert via RPC ──────────────────────────────────
     const { data: rpcResult, error: rpcErr } = await supabase.rpc('regenerate_meal_plan', {
       p_meal_plan_id: plan.id,
@@ -200,6 +205,14 @@ Deno.serve(async (req) => {
         inverse_actions: [
           { type: 'delete_meal_plan_entries_by_ids', payload: { ids: insertedIds } },
           { type: 'restore_meal_plan_entries', payload: { rows: prior ?? [] } },
+          {
+            type: 'restore_weekly_brief_status',
+            payload: {
+              brief_id: brief.id,
+              status: priorBriefStatus,
+              generated_at: priorBriefGeneratedAt,
+            },
+          },
         ],
         expires_at: expiresAt,
       })

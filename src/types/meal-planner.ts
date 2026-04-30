@@ -304,6 +304,7 @@ export type InverseActionType =
   | 'restore_list_item'
   | 'delete_meal_plan_entries_by_ids'
   | 'restore_meal_plan_entries'
+  | 'restore_weekly_brief_status'
 
 export interface InverseAction {
   type: InverseActionType
