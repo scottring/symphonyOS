@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRecipes } from '@/hooks/useRecipes'
 import { RecipeCard } from './RecipeCard'
 import { ShelfFilterRow } from './ShelfFilterRow'
@@ -15,6 +15,21 @@ export function MemoryShelfPage() {
   const [manualOpen, setManualOpen] = useState(false)
   const [discoverOpen, setDiscoverOpen] = useState(false)
   const [detailRecipeId, setDetailRecipeId] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+
+  // Search across title, tags, ingredients, source label, and acceptance sentence.
+  const visibleRecipes = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return recipes
+    return recipes.filter(r => {
+      if (r.title.toLowerCase().includes(q)) return true
+      if (r.sourceLabel?.toLowerCase().includes(q)) return true
+      if (r.acceptanceSentence?.toLowerCase().includes(q)) return true
+      if (r.tags.some(t => t.toLowerCase().includes(q))) return true
+      if (r.ingredients.some(i => i.toLowerCase().includes(q))) return true
+      return false
+    })
+  }, [recipes, search])
 
   const handleAddByUrl = async (url: string) => {
     await addByUrl(url)
@@ -59,6 +74,24 @@ export function MemoryShelfPage() {
         />
       </div>
 
+      <div className="mb-5 relative">
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search the shelf — title, tags, ingredients…"
+          className="w-full pl-10 pr-10 py-2.5 rounded-2xl border border-neutral-200 bg-bg-base text-[14px] focus:outline-none focus:border-primary-500"
+        />
+        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 text-[15px]" aria-hidden>⌕</span>
+        {search && (
+          <button
+            onClick={() => setSearch('')}
+            aria-label="Clear search"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700 text-[14px]"
+          >×</button>
+        )}
+      </div>
+
       <ShelfFilterRow active={filter} onChange={setFilter} />
 
       {loading && (
@@ -79,9 +112,16 @@ export function MemoryShelfPage() {
           </h2>
         </div>
       )}
-      {!loading && recipes.length > 0 && (
+      {!loading && recipes.length > 0 && visibleRecipes.length === 0 && (
+        <div className="py-16 text-center">
+          <p className="font-display italic text-[1rem] text-neutral-400">
+            Nothing matches "{search}". <button onClick={() => setSearch('')} className="text-primary-500 underline">Clear</button>
+          </p>
+        </div>
+      )}
+      {!loading && visibleRecipes.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 mt-8">
-          {recipes.map((recipe) => (
+          {visibleRecipes.map((recipe) => (
             <RecipeCard key={recipe.id} recipe={recipe} onClick={(r) => setDetailRecipeId(r.id)} />
           ))}
         </div>
