@@ -10,6 +10,7 @@ function makeQueryMock(returnData: unknown, single: any = null) {
     delete: vi.fn(() => chain),
     eq: vi.fn(() => chain),
     order: vi.fn(() => chain),
+    limit: vi.fn(() => chain),
     single: vi.fn(() => Promise.resolve({ data: single ?? (Array.isArray(returnData) ? returnData[0] : returnData), error: null })),
     maybeSingle: vi.fn(() => Promise.resolve({ data: Array.isArray(returnData) ? returnData[0] : returnData, error: null })),
     then: (resolve: any) => resolve({ data: returnData, error: null }),
@@ -42,7 +43,8 @@ describe('useMealPlan', () => {
     let call = 0
     vi.mocked(__mockFrom as any).mockImplementation(() => {
       call += 1
-      if (call === 1) return makeQueryMock(planRow, planRow)  // meal_plans select.maybeSingle
+      // meal_plans now uses .limit(1) returning an array; pass [planRow]
+      if (call === 1) return makeQueryMock([planRow], planRow)
       return makeQueryMock([])  // meal_plan_entries select
     })
     const { result } = renderHook(() => useMealPlan(new Date('2026-04-27')))
@@ -54,7 +56,8 @@ describe('useMealPlan', () => {
     const planRow = { id: 'p1', user_id: 'u1', week_start: '2026-04-27', parameter: null, created_at: '2026-04-27T00:00:00Z', updated_at: '2026-04-27T00:00:00Z' }
     const insertedEntry = { id: 'e1', meal_plan_id: 'p1', day_of_week: 1, slot: 'dinner', recipe_id: 'r1', ad_hoc_title: null, notes: null, leftover_from: null, created_at: '2026-04-27T00:00:00Z' }
     vi.mocked(__mockFrom as any).mockImplementation((table: string) => {
-      if (table === 'meal_plans') return makeQueryMock(planRow, planRow)
+      // meal_plans now uses .limit(1) returning an array
+      if (table === 'meal_plans') return makeQueryMock([planRow], planRow)
       // meal_plan_entries: select on load returns [], insert on add returns the inserted row
       return makeQueryMock([], insertedEntry)
     })
