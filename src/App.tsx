@@ -15,6 +15,7 @@ import type { Note, NoteEntityType } from '@/types/note'
 import { GoalsProvider } from '@/contexts/GoalsContext'
 import { ListsProvider, useListsContext } from '@/contexts/ListsContext'
 import { NotesProvider, useNotesContext } from '@/contexts/NotesContext'
+import { GeneratePlanProvider } from '@/contexts/GeneratePlanContext'
 import { useSearch, type SearchResult } from '@/hooks/useSearch'
 import { useAttachments } from '@/hooks/useAttachments'
 import { usePinnedItems } from '@/hooks/usePinnedItems'
@@ -187,7 +188,9 @@ function App() {
     <GoalsProvider>
       <ListsProvider>
         <NotesProvider>
-          <AppContent user={user} signOut={signOut} />
+          <GeneratePlanProvider>
+            <AppContent user={user} signOut={signOut} />
+          </GeneratePlanProvider>
         </NotesProvider>
       </ListsProvider>
     </GoalsProvider>
@@ -319,6 +322,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     if (path.startsWith('/routines')) return 'routines'
     if (path === '/contacts') return 'contacts'
     if (path.startsWith('/contacts/')) return 'contact-detail'
+    if (path.startsWith('/meals')) return 'meals'
     return 'today'
   }, [location.pathname, stateView])
 
@@ -526,6 +530,9 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     } else if (view === 'contacts' || view === 'contact-detail') {
       setStateView(null)
       navigate('/contacts')
+    } else if (view === 'meals') {
+      setStateView(null)
+      navigate('/meals/plan')
     }
     // Handle state-based views
     else if (view === 'agent' || view === 'inbox' || view === 'lists' || view === 'notes' || view === 'history' || view === 'settings' || view === 'task-detail') {

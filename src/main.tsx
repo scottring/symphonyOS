@@ -101,6 +101,8 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/contacts" element={<App />} />
               <Route path="/contacts/:contactId" element={<App />} />
               <Route path="/wall" element={<WallCalendar />} />
+              <Route path="/meals/shelf" element={<App />} />
+              <Route path="/meals/plan" element={<App />} />
               <Route path="/join/:token" element={<JoinHousehold />} />
               <Route path="/calendar-callback" element={<CalendarCallback />} />
               <Route path="*" element={<NotFound />} />
