@@ -30,3 +30,6 @@ dist-ssr
 *.sw?
 .vercel
 coverage/
+
+# Deno-generated lockfile (edge function tooling)
+deno.lock

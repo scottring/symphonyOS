@@ -2,6 +2,19 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Personal memory lives in the vault, not here
+
+Scott Kaufman's life and work memory is in his Obsidian vault at `~/Documents/scotts-world`. That vault is the single source of truth across every project, every agent (Michael on Telegram, every Claude Code instance, this one), and every location (MacBook, Mac Mini, phone via Obsidian Mobile).
+
+**When you learn anything about Scott's priorities, people, projects, or goals that extends beyond this codebase:**
+
+- Quick thought / context → append a timestamped line to `~/Documents/scotts-world/inbox/captures.md`
+- Structured info (new person, project, task, idea) → create/update a file under `~/Documents/scotts-world/{people,projects,tasks,ideas}/` following the YAML frontmatter conventions in `~/Documents/scotts-world/CLAUDE.md`
+
+Note: Symphony-OS-the-product is also tracked as a project in the vault (`projects/` + `context/symphony-os.md`). That's separate from Scott's personal use of Symphony-as-a-tool for household/family (which lives in Symphony's own DB via MCP). The vault is for work/strategy; Symphony-the-tool is for household/family; don't cross the streams.
+
+**Do NOT** keep Scott-related memory in this repo's CLAUDE.md, Claude Code auto-memory, or local state. The vault auto-commits every 5 minutes and syncs to every location.
+
 ## Project Overview
 
 Symphony OS is a personal operating system for work, life, and family. The core insight: captured information doesn't surface at the right time with the right context. Symphony fixes this by making **context first-class** — links, phone numbers, notes, files attach to tasks and projects, then surface automatically when you need them.
