@@ -268,7 +268,9 @@ Deno.serve(async (req) => {
             'content-type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'claude-sonnet-4-6',
+            // Haiku 4.5 supports assistant prefill; Sonnet 4.6 does not.
+            // Prefill is what forces the model to emit valid JSON.
+            model: 'claude-haiku-4-5-20251001',
             max_tokens: 2000,
             stream: true,
             system: SYSTEM_PROMPT,
