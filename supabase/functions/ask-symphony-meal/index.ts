@@ -280,7 +280,18 @@ Deno.serve(async (req) => {
           const bodyText = upstream.body ? await upstream.text().catch(() => '') : ''
           const requestId = upstream.headers.get('request-id') ?? upstream.headers.get('x-request-id') ?? null
           console.error('anthropic upstream error', { status: upstream.status, requestId, body: bodyText })
-          send({ type: 'error', message: `anthropic upstream ${upstream.status}${requestId ? ` (request-id: ${requestId})` : ''}` })
+          // Try to extract Anthropic's structured error message from the body for the
+          // user-facing error so we don't have to dig through edge-fn logs.
+          let detail = bodyText.slice(0, 500)
+          try {
+            const parsed = JSON.parse(bodyText)
+            const apiMsg = parsed?.error?.message ?? parsed?.message
+            if (typeof apiMsg === 'string') detail = apiMsg
+          } catch { /* keep raw slice */ }
+          send({
+            type: 'error',
+            message: `anthropic ${upstream.status}: ${detail}${requestId ? ` (req ${requestId})` : ''}`,
+          })
           controller.close()
           return
         }
