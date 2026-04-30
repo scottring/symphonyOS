@@ -92,12 +92,32 @@ A SuggestionCard is one of:
 
 If the planner is just asking a question (no action implied), return cards: [].
 Recipe ids must come from the supplied shelf — never invent one. For meals not on the shelf, use adHocTitle and recipeId: null.
-day_of_week is 0..6 (Mon..Sun).`
+day_of_week is 0..6 (Mon..Sun).
+
+DATE INTERPRETATION (CRITICAL):
+The context block always lists TODAY with its day_of_week. Resolve relative date words against TODAY:
+- "tonight" / "today"     → TODAY's day_of_week
+- "tomorrow"              → (TODAY's day_of_week + 1) mod 7, only if it's still in this week
+- "Friday" / "this Friday" / a weekday name → that weekday's index in this week (Monday=0..Sunday=6)
+- "Mon"/"Tue"/etc. → same lookup
+NEVER guess. If the requested day is outside the current week (WEEK row), say so in the text and emit no card for that day.`
 
 interface RequestBody {
   message: string
-  weekStart: string      // YYYY-MM-DD
+  weekStart: string      // YYYY-MM-DD (Monday)
+  clientToday?: string   // YYYY-MM-DD — anchors "tonight" / "tomorrow" / "Friday" to the planner's wall clock
   sessionId?: string
+}
+
+const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
+/** Compute day-of-week index (Mon=0..Sun=6) for a YYYY-MM-DD date string. */
+function dayOfWeekFor(iso: string, weekStartIso: string): number {
+  // Diff in days between iso and weekStart, modulo 7.
+  const a = new Date(iso + 'T00:00:00Z').getTime()
+  const b = new Date(weekStartIso + 'T00:00:00Z').getTime()
+  const days = Math.round((a - b) / 86400000)
+  return ((days % 7) + 7) % 7
 }
 
 interface StoredMessage {
@@ -224,7 +244,24 @@ Deno.serve(async (req) => {
         return `  - {entry_id: ${JSON.stringify(e.id)}, day_of_week: ${e.day_of_week}, slot: ${JSON.stringify(e.slot)}, title: ${JSON.stringify(title)}, recipe_id: ${e.recipe_id ? JSON.stringify(e.recipe_id) : 'null'}, family_member_id: ${e.family_member_id ? JSON.stringify(e.family_member_id) : 'null'} (${owner})}`
       }).join('\n')
 
+  // TODAY block — anchored to the client's local date so "tonight" /
+  // "tomorrow" / "Friday" resolve to the planner's wall clock, not the edge
+  // function's UTC. Falls back to server time if the client didn't send one
+  // (e.g. older builds / non-browser caller).
+  const todayIso = (body.clientToday && /^\d{4}-\d{2}-\d{2}$/.test(body.clientToday))
+    ? body.clientToday
+    : new Date().toISOString().slice(0, 10)
+  const todayDow = dayOfWeekFor(todayIso, body.weekStart)
+  const todayInWeek = todayDow >= 0 && todayDow <= 6
+    && new Date(todayIso + 'T00:00:00Z').getTime() >= new Date(body.weekStart + 'T00:00:00Z').getTime()
+    && new Date(todayIso + 'T00:00:00Z').getTime() <  new Date(body.weekStart + 'T00:00:00Z').getTime() + 7 * 86400000
+  const todayBlock = todayInWeek
+    ? `TODAY: ${DAY_NAMES[todayDow]} ${todayIso} (day_of_week: ${todayDow})`
+    : `TODAY: ${todayIso} — outside the current week (WEEK ${body.weekStart}). Date words like "tonight" / "tomorrow" do not apply to this week.`
+
   const fullContext = [
+    todayBlock,
+    '',
     planContext,
     '',
     `CURRENT PLAN ENTRIES (${entryRows.length}):`,
