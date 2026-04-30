@@ -86,14 +86,48 @@ export function ListItemRow({ item, onUpdate, onDelete }: ListItemRowProps) {
     )
   }
 
+  const handleToggleComplete = () => {
+    if (onUpdate) {
+      onUpdate({ completed: !item.completed })
+    }
+  }
+
   return (
-    <div className="group flex items-start gap-3 p-3 rounded-xl bg-white border border-neutral-100 hover:border-neutral-200 hover:shadow-sm transition-all">
-      {/* Bullet point */}
-      <div className="w-2 h-2 rounded-full bg-purple-300 flex-shrink-0 mt-1.5" />
+    <div
+      data-completed={item.completed}
+      className="group flex items-start gap-3 p-3 rounded-xl bg-white border border-neutral-100 hover:border-neutral-200 hover:shadow-sm transition-all"
+    >
+      {/* Checkbox */}
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={item.completed}
+        aria-label={item.completed ? `Mark "${item.text}" incomplete` : `Mark "${item.text}" complete`}
+        onClick={handleToggleComplete}
+        disabled={!onUpdate}
+        className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center transition-colors
+          ${item.completed
+            ? 'bg-purple-500 border-purple-500 text-white hover:bg-purple-600'
+            : 'bg-white border-neutral-300 hover:border-purple-400'
+          }
+          ${!onUpdate ? 'cursor-default opacity-60' : 'cursor-pointer'}`}
+      >
+        {item.completed && (
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+          </svg>
+        )}
+      </button>
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <div className="text-sm text-neutral-800">{item.text}</div>
+        <div
+          className={`text-sm transition-colors ${
+            item.completed ? 'text-neutral-400 line-through' : 'text-neutral-800'
+          }`}
+        >
+          {item.text}
+        </div>
         {item.note && (
           <button
             onClick={() => setShowNote(!showNote)}

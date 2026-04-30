@@ -65,11 +65,54 @@ describe('ListItemRow', () => {
       expect(screen.queryByLabelText('Delete item')).not.toBeInTheDocument()
     })
 
-    it('renders bullet point indicator', () => {
-      const { container } = render(<ListItemRow {...defaultProps} />)
+    it('renders an unchecked checkbox by default', () => {
+      render(<ListItemRow {...defaultProps} />)
 
-      const bullet = container.querySelector('.bg-purple-300')
-      expect(bullet).toBeInTheDocument()
+      const checkbox = screen.getByRole('checkbox')
+      expect(checkbox).toBeInTheDocument()
+      expect(checkbox).toHaveAttribute('aria-checked', 'false')
+    })
+
+    it('renders a checked checkbox when item is completed', () => {
+      const completedItem = createMockListItem({ text: 'Done item', completed: true })
+      render(<ListItemRow {...defaultProps} item={completedItem} />)
+
+      const checkbox = screen.getByRole('checkbox')
+      expect(checkbox).toHaveAttribute('aria-checked', 'true')
+    })
+
+    it('applies line-through style when item is completed', () => {
+      const completedItem = createMockListItem({ text: 'Done item', completed: true })
+      render(<ListItemRow {...defaultProps} item={completedItem} />)
+
+      expect(screen.getByText('Done item')).toHaveClass('line-through')
+    })
+  })
+
+  describe('toggling completion', () => {
+    it('calls onUpdate with completed=true when checkbox is clicked on an incomplete item', async () => {
+      const onUpdate = vi.fn()
+      const { user } = render(<ListItemRow {...defaultProps} onUpdate={onUpdate} />)
+
+      await user.click(screen.getByRole('checkbox'))
+
+      expect(onUpdate).toHaveBeenCalledWith({ completed: true })
+    })
+
+    it('calls onUpdate with completed=false when checkbox is clicked on a completed item', async () => {
+      const completedItem = createMockListItem({ text: 'Done item', completed: true })
+      const onUpdate = vi.fn()
+      const { user } = render(<ListItemRow {...defaultProps} item={completedItem} onUpdate={onUpdate} />)
+
+      await user.click(screen.getByRole('checkbox'))
+
+      expect(onUpdate).toHaveBeenCalledWith({ completed: false })
+    })
+
+    it('disables checkbox when onUpdate is not provided', () => {
+      render(<ListItemRow {...defaultProps} onUpdate={undefined} />)
+
+      expect(screen.getByRole('checkbox')).toBeDisabled()
     })
   })
 

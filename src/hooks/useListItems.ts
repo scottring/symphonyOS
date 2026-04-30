@@ -113,9 +113,13 @@ export function useListItems(listId: string | null) {
     const item = items.find((i) => i.id === id)
     if (!item) return
 
-    // Optimistic update
+    // Optimistic update — derive completedAt from completed if caller didn't supply it
+    const optimisticUpdates: Partial<ListItem> = { ...updates }
+    if (updates.completed !== undefined && updates.completedAt === undefined) {
+      optimisticUpdates.completedAt = updates.completed ? new Date() : undefined
+    }
     setItems((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, ...updates, updatedAt: new Date() } : i))
+      prev.map((i) => (i.id === id ? { ...i, ...optimisticUpdates, updatedAt: new Date() } : i))
     )
 
     // Convert ListItem updates to DB format
@@ -123,6 +127,10 @@ export function useListItems(listId: string | null) {
     if (updates.text !== undefined) dbUpdates.text = updates.text
     if (updates.note !== undefined) dbUpdates.note = updates.note ?? null
     if (updates.sortOrder !== undefined) dbUpdates.sort_order = updates.sortOrder
+    if (updates.completed !== undefined) {
+      dbUpdates.completed = updates.completed
+      dbUpdates.completed_at = updates.completed ? new Date().toISOString() : null
+    }
 
     const { error: updateError } = await supabase
       .from('list_items')
