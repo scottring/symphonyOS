@@ -1070,7 +1070,11 @@ export function DetailPanelRedesign({
   const isRoutine = item.type === 'routine'
   // Synthetic meal events (id starts with "meal:") use a dedicated detail
   // section and skip the generic event UI (attendees, calendar move, etc.).
-  const isMeal = isEvent && typeof item.id === 'string' && item.id.startsWith('meal:')
+  // eventToTimelineItem wraps the synthesized event id with an `event-`
+   // prefix, so the TimelineItem's id is `event-meal:<entry-id>`. Match both
+   // shapes defensively.
+  const isMeal = isEvent && typeof item.id === 'string'
+    && (item.id.startsWith('meal:') || item.id.startsWith('event-meal:'))
 
   // Get attachment entity info based on item type
   const getAttachmentEntityInfo = (): { entityType: AttachmentEntityType; entityId: string } | null => {
@@ -1386,7 +1390,7 @@ export function DetailPanelRedesign({
         {/* Scrollable meal-only content */}
         <div className="flex-1 overflow-auto min-h-0 scroll-container">
           <MealEventSection
-            mealEventId={item.id}
+            mealEventId={item.id.replace(/^event-/, '')}
             viewedDate={viewedDate ?? new Date()}
           />
         </div>
@@ -1537,7 +1541,7 @@ export function DetailPanelRedesign({
         {/* Meal-event detail (synthetic event id starts with "meal:") */}
         {isMeal && (
           <MealEventSection
-            mealEventId={item.id}
+            mealEventId={item.id.replace(/^event-/, '')}
             viewedDate={viewedDate ?? new Date()}
           />
         )}
