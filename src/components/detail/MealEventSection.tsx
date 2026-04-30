@@ -1,8 +1,10 @@
-import { useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { supabase } from '@/lib/supabase'
 import { useMealPlan } from '@/hooks/useMealPlan'
 import { useRecipes } from '@/hooks/useRecipes'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
+import { useMealTracking } from '@/hooks/useMealTracking'
 import { mondayOfWeek, dayLabelFor } from '@/lib/weekHelpers'
 import { MEAL_SLOT_LABEL } from '@/types/meal-planner'
 
@@ -15,13 +17,23 @@ interface Props {
 export function MealEventSection({ mealEventId, viewedDate }: Props) {
   const navigate = useNavigate()
   const weekStart = useMemo(() => mondayOfWeek(viewedDate), [viewedDate])
-  const { plan } = useMealPlan(weekStart)
+  const { plan, refresh: mealRefresh } = useMealPlan(weekStart)
   const { recipes } = useRecipes()
   const { members } = useFamilyMembers()
+  const { skipEntry, confirmAsPlanned } = useMealTracking(() => void mealRefresh())
 
   const entryId = mealEventId.replace(/^meal:/, '')
   const primaryEntry = plan?.entries.find(e => e.id === entryId)
   const recipe = primaryEntry?.recipeId ? recipes.find(r => r.id === primaryEntry.recipeId) : undefined
+
+  // Notes draft state — must be declared before any early return so hook order
+  // is consistent across renders.
+  const [noteDraft, setNoteDraft] = useState(primaryEntry?.notes ?? '')
+  const [marking, setMarking] = useState(false)
+
+  useEffect(() => {
+    setNoteDraft(primaryEntry?.notes ?? '')
+  }, [primaryEntry?.id, primaryEntry?.notes])
 
   if (!primaryEntry) {
     return (
@@ -50,8 +62,75 @@ export function MealEventSection({ mealEventId, viewedDate }: Props) {
   const title = recipe?.title ?? primaryEntry.adHocTitle ?? '(unnamed)'
   const slotLabel = MEAL_SLOT_LABEL[primaryEntry.slot] ?? primaryEntry.slot
 
+  // -------- Leftover threading --------
+  // Source: this entry came FROM another entry's leftovers.
+  const leftoverSource = primaryEntry.leftoverFrom
+    ? (plan?.entries ?? []).find(e => e.id === primaryEntry.leftoverFrom)
+    : undefined
+
+  const labelFor = (e: { dayOfWeek: number; slot: string; recipeId?: string; adHocTitle?: string }) => {
+    const day = dayLabelFor(e.dayOfWeek)
+    const slot = MEAL_SLOT_LABEL[e.slot as keyof typeof MEAL_SLOT_LABEL] ?? e.slot
+    const t = e.recipeId
+      ? (recipes.find(r => r.id === e.recipeId)?.title ?? '')
+      : (e.adHocTitle ?? '')
+    return t ? `${day} ${slot.toLowerCase()} · ${t}` : `${day} ${slot.toLowerCase()}`
+  }
+
+  // Destinations: other entries that draw FROM this one — but only count one
+  // per day+slot bucket so per-person variants don't appear N times.
+  const dependentEntries = (plan?.entries ?? []).filter(e => e.leftoverFrom === primaryEntry.id)
+  const dependentBuckets = Array.from(
+    new Map(
+      dependentEntries.map(e => [`${e.dayOfWeek}:${e.slot}:${e.recipeId ?? e.adHocTitle ?? ''}`, e]),
+    ).values(),
+  )
+
+  // -------- Handlers --------
+  const handleMarkCooked = async () => {
+    if (!recipe) return
+    setMarking(true)
+    const { error } = await supabase.from('recipes').update({
+      times_cooked: recipe.timesCooked + 1,
+      last_cooked_at: new Date().toISOString(),
+    }).eq('id', recipe.id)
+    setMarking(false)
+    if (error) console.error('mark cooked failed:', error.message)
+  }
+
+  const handleSkip = async () => {
+    await skipEntry(primaryEntry.id)
+  }
+
+  const handleRestore = async () => {
+    await confirmAsPlanned(primaryEntry.id)
+  }
+
+  const commitNote = async () => {
+    const next = noteDraft.trim()
+    if (next === (primaryEntry.notes ?? '').trim()) return
+    const { error } = await supabase
+      .from('meal_plan_entries')
+      .update({ notes: next || null })
+      .eq('id', primaryEntry.id)
+    if (error) {
+      console.error('save note failed:', error.message)
+      return
+    }
+    void mealRefresh()
+  }
+
+  const isSkipped = primaryEntry.trackingState === 'skipped'
+
   return (
     <div className="space-y-5 p-5">
+      {/* Skipped indicator */}
+      {isSkipped && (
+        <div className="font-display italic text-[13px] text-accent-500">
+          Skipped tonight.
+        </div>
+      )}
+
       {/* Header */}
       <div>
         <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary-500 mb-1">
@@ -84,6 +163,20 @@ export function MealEventSection({ mealEventId, viewedDate }: Props) {
         </p>
       )}
 
+      {/* Leftover source */}
+      {leftoverSource && (
+        <p className="font-display italic text-[13px] text-neutral-600">
+          From: {labelFor(leftoverSource)}
+        </p>
+      )}
+
+      {/* Leftover destinations */}
+      {dependentBuckets.length > 0 && (
+        <p className="font-display italic text-[13px] text-neutral-600">
+          Feeds: {dependentBuckets.map(labelFor).join(' · ')}
+        </p>
+      )}
+
       {/* Ingredients */}
       {recipe && recipe.ingredients.length > 0 && (
         <div>
@@ -112,18 +205,52 @@ export function MealEventSection({ mealEventId, viewedDate }: Props) {
         </div>
       )}
 
-      {/* Notes (per-entry) */}
-      {primaryEntry.notes && (
-        <div>
-          <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-neutral-400 mb-1">
-            Notes
-          </div>
-          <p className="font-display italic text-[14px] text-neutral-600">{primaryEntry.notes}</p>
+      {/* Inline notes editor */}
+      <div>
+        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-neutral-400 mb-2">
+          Notes
         </div>
-      )}
+        <textarea
+          value={noteDraft}
+          onChange={(e) => setNoteDraft(e.target.value)}
+          onBlur={commitNote}
+          placeholder="Notes for this meal…"
+          rows={2}
+          className="w-full px-3 py-2 rounded-md border border-neutral-200 bg-white
+                     font-display italic text-[14px] text-neutral-700
+                     placeholder:italic placeholder:text-neutral-400
+                     focus:outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-400
+                     resize-none"
+        />
+      </div>
 
       {/* Actions */}
       <div className="flex flex-wrap items-center gap-2 pt-2">
+        {recipe && (
+          <button
+            onClick={handleMarkCooked}
+            disabled={marking}
+            className="px-4 py-2 rounded-full border border-primary-200 text-primary-700 text-[12px] font-medium hover:bg-primary-50 disabled:opacity-50"
+          >
+            {marking ? 'Saving…' : '✓ Mark as cooked'}
+          </button>
+        )}
+        {!isSkipped && (
+          <button
+            onClick={handleSkip}
+            className="px-4 py-2 rounded-full border border-neutral-200 text-neutral-700 text-[12px] hover:bg-neutral-50"
+          >
+            ⊘ Skip tonight
+          </button>
+        )}
+        {isSkipped && (
+          <button
+            onClick={handleRestore}
+            className="px-4 py-2 rounded-full border border-neutral-200 text-neutral-700 text-[12px] hover:bg-neutral-50"
+          >
+            ↶ Restore
+          </button>
+        )}
         {recipe && (
           <button
             onClick={() => navigate(`/meals/cook/${recipe.id}`)}

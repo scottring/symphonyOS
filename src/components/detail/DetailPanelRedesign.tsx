@@ -1356,6 +1356,44 @@ export function DetailPanelRedesign({
         : 'All day'
     : 'Unscheduled'
 
+  // Meal events get a fully meal-focused panel: header chrome + close button +
+  // MealEventSection only. No description, notes editor, agent insights,
+  // attendees, calendar selector, or other generic event UI.
+  if (isMeal) {
+    return (
+      <div className="h-full flex flex-col bg-bg-base">
+        {/* Header — title + close */}
+        <div className="p-6 border-b border-neutral-100 bg-white relative">
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 text-neutral-400 hover:text-neutral-600 transition-colors"
+            aria-label="Close"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <div className="flex items-start gap-4 pr-8">
+            <div className="mt-1.5 w-4 h-4 rounded-full bg-gradient-to-br from-blue-400 to-blue-500 flex-shrink-0 shadow-sm" />
+            <div className="flex-1 min-w-0">
+              <h2 className="text-xl font-semibold leading-tight text-neutral-900">
+                {item.title}
+              </h2>
+            </div>
+          </div>
+        </div>
+
+        {/* Scrollable meal-only content */}
+        <div className="flex-1 overflow-auto min-h-0 scroll-container">
+          <MealEventSection
+            mealEventId={item.id}
+            viewedDate={viewedDate ?? new Date()}
+          />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="h-full flex flex-col bg-bg-base">
       {/* ========================================
