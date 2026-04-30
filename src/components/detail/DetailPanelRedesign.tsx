@@ -27,6 +27,7 @@ import { NotesEditorModal } from '@/components/notes/NotesEditorModal'
 import { EventEmailsSection } from '@/components/schedule/EventEmailsSection'
 import { MessageThread } from '@/components/messages/MessageThread'
 import { useMessages } from '@/hooks/useMessages'
+import { MealEventSection } from './MealEventSection'
 
 // Component to render text with clickable links (handles HTML links and plain URLs)
 function RichText({ text }: { text: string }) {
@@ -178,6 +179,8 @@ interface DetailPanelRedesignProps {
   getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
   // Guided reflection
   onOpenGuidedChat?: (entityType: 'task' | 'contact' | 'project' | 'event', entityId: string, entityName: string, prompt?: string) => void
+  // Currently viewed date — needed by meal-event detail to look up the right plan week
+  viewedDate?: Date
 }
 
 function ActionIcon({ type }: { type: DetectedAction['icon'] }) {
@@ -637,6 +640,7 @@ export function DetailPanelRedesign({
   onUpdateEventProject,
   getScheduleItemsForDate,
   onOpenGuidedChat,
+  viewedDate,
 }: DetailPanelRedesignProps) {
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -1064,6 +1068,9 @@ export function DetailPanelRedesign({
   const isTask = item.type === 'task'
   const isEvent = item.type === 'event'
   const isRoutine = item.type === 'routine'
+  // Synthetic meal events (id starts with "meal:") use a dedicated detail
+  // section and skip the generic event UI (attendees, calendar move, etc.).
+  const isMeal = isEvent && typeof item.id === 'string' && item.id.startsWith('meal:')
 
   // Get attachment entity info based on item type
   const getAttachmentEntityInfo = (): { entityType: AttachmentEntityType; entityId: string } | null => {
@@ -1489,6 +1496,14 @@ export function DetailPanelRedesign({
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-auto min-h-0 scroll-container">
+        {/* Meal-event detail (synthetic event id starts with "meal:") */}
+        {isMeal && (
+          <MealEventSection
+            mealEventId={item.id}
+            viewedDate={viewedDate ?? new Date()}
+          />
+        )}
+
         {/* ========================================
             ZONE 2: PRIMARY CONTENT (Subtasks + Notes)
             - Always visible, prominent
@@ -1838,7 +1853,7 @@ export function DetailPanelRedesign({
         </div>
 
         {/* Actionable Actions (events and routines) */}
-        {isEvent && item.originalEvent && item.startTime && (
+        {isEvent && !isMeal && item.originalEvent && item.startTime && (
           <div className="mx-4 mt-4">
             <ActionableActions
               entityType="calendar_event"
@@ -2064,7 +2079,7 @@ export function DetailPanelRedesign({
         )}
 
         {/* Family member assignment (events only - for shared events) */}
-        {isEvent && item.originalEvent && familyMembers.length > 1 && onUpdateEventAssignment && (
+        {isEvent && !isMeal && item.originalEvent && familyMembers.length > 1 && onUpdateEventAssignment && (
           <div className="mx-4 mt-4 p-3 bg-neutral-50 rounded-xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -2098,7 +2113,7 @@ export function DetailPanelRedesign({
         )}
 
         {/* Event Project Link */}
-        {isEvent && item.originalEvent && onUpdateEventProject && (
+        {isEvent && !isMeal && item.originalEvent && onUpdateEventProject && (
           <div className="mx-4 mt-4 p-3 bg-neutral-50 rounded-xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -2138,7 +2153,7 @@ export function DetailPanelRedesign({
         )}
 
         {/* Calendar picker — move event between Google calendars */}
-        {isEvent && item.originalEvent && onMoveEventToCalendar && fetchCalendarList && (() => {
+        {isEvent && !isMeal && item.originalEvent && onMoveEventToCalendar && fetchCalendarList && (() => {
           const currentCalendarId = item.originalEvent.calendar_id || item.originalEvent.calendarId
           const currentCalendarName = item.originalEvent.calendar_name || item.originalEvent.calendarName || 'Primary'
           const googleEventId = item.originalEvent.google_event_id || item.originalEvent.id
@@ -2493,7 +2508,7 @@ export function DetailPanelRedesign({
         )}
 
         {/* Event Location Editor */}
-        {isEvent && (
+        {isEvent && !isMeal && (
           <div className="mx-4 mt-4 p-4 bg-white rounded-2xl shadow-sm border border-neutral-100">
             <div className="flex items-start gap-3">
               <svg className="w-5 h-5 text-neutral-400 mt-0.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
@@ -2574,7 +2589,7 @@ export function DetailPanelRedesign({
         )}
 
         {/* Recipe Section (events only) */}
-        {isEvent && item.originalEvent && (
+        {isEvent && !isMeal && item.originalEvent && (
           <RecipeSection
             recipeUrl={eventRecipeUrl}
             eventTitle={item.title}
@@ -2598,7 +2613,7 @@ export function DetailPanelRedesign({
         )}
 
         {/* Email Threads - for events with attendees */}
-        {isEvent && item.attendees && item.attendees.length > 0 && (
+        {isEvent && !isMeal && item.attendees && item.attendees.length > 0 && (
           <EventEmailsSection
             attendeeEmails={item.attendees
               .filter(a => !a.self && a.email)

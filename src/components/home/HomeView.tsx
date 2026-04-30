@@ -121,7 +121,7 @@ export function HomeView({
     const dayOfWeek = (viewedDate.getDay() + 6) % 7
     // Group by (slot, recipe-or-title) so per-person variants of the same
     // meal collapse into ONE timeline event instead of stacking three.
-    const groups = new Map<string, { slot: string; title: string }>()
+    const groups = new Map<string, { slot: string; title: string; entryIds: string[] }>()
     for (const e of mealPlan.entries) {
       if (e.dayOfWeek !== dayOfWeek) continue
       if (!SLOT_TIMES[e.slot]) continue
@@ -129,17 +129,22 @@ export function HomeView({
         ? (mealRecipesById.get(e.recipeId)?.title ?? '(unnamed)')
         : (e.adHocTitle ?? '(unnamed)')
       const key = `${e.slot}|${title}`
-      if (!groups.has(key)) groups.set(key, { slot: e.slot, title })
+      const existing = groups.get(key)
+      if (existing) {
+        existing.entryIds.push(e.id)
+      } else {
+        groups.set(key, { slot: e.slot, title, entryIds: [e.id] })
+      }
     }
     const out: CalendarEvent[] = []
-    for (const [key, { slot, title }] of groups) {
+    for (const [, { slot, title, entryIds }] of groups) {
       const [hh, mm] = SLOT_TIMES[slot]!
       const start = new Date(viewedDate)
       start.setHours(hh, mm, 0, 0)
       const end = new Date(start.getTime() + 45 * 60 * 1000)
       const slotLabel = slot.charAt(0).toUpperCase() + slot.slice(1)
       out.push({
-        id: `meal:${viewedDate.toISOString().slice(0, 10)}:${key}`,
+        id: `meal:${entryIds[0]}`,
         title: `${slotLabel} · ${title}`,
         start_time: start.toISOString(),
         end_time: end.toISOString(),
