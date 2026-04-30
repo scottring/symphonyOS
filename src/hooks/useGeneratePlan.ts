@@ -1,13 +1,7 @@
 import { useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import { toIsoDate } from '@/lib/weekHelpers'
 import type { GeneratePlanResult, UndoPlanResult } from '@/types/meal-planner'
-
-function toIsoDate(d: Date): string {
-  const y = d.getFullYear()
-  const m = (d.getMonth() + 1).toString().padStart(2, '0')
-  const day = d.getDate().toString().padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
 
 interface GenerateReturn {
   ok: boolean
@@ -24,7 +18,6 @@ interface UndoReturn {
 export function useGeneratePlan() {
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [lastUndoToken, setLastUndoToken] = useState<{ id: string; expiresAt: string } | null>(null)
 
   const generate = useCallback(async (weekStart: Date): Promise<GenerateReturn> => {
     setGenerating(true)
@@ -39,7 +32,6 @@ export function useGeneratePlan() {
         setError(msg)
         return { ok: false, error: msg }
       }
-      setLastUndoToken(data.undoToken)
       return { ok: true, result: data }
     } finally {
       setGenerating(false)
@@ -55,9 +47,8 @@ export function useGeneratePlan() {
       const msg = invokeErr?.message ?? 'undo failed'
       return { ok: false, error: msg }
     }
-    if (data.ok) setLastUndoToken(null)
     return { ok: data.ok, noop: data.noop }
   }, [])
 
-  return { generate, undo, generating, error, lastUndoToken, clearUndoToken: () => setLastUndoToken(null) }
+  return { generate, undo, generating, error }
 }

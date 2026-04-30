@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import { toIsoDate } from '@/lib/weekHelpers'
 import {
   dbMealPlanToMealPlan, type MealPlan, type DbMealPlan, type DbMealPlanEntry,
   type MealParameter, type MealSlot,
@@ -25,13 +26,6 @@ interface UseMealPlanResult {
   addMeal: (input: AddMealInput) => Promise<void>
   removeMeal: (entryId: string) => Promise<void>
   setParameter: (parameter: MealParameter | undefined) => Promise<void>
-}
-
-function toIsoDate(d: Date): string {
-  const y = d.getFullYear()
-  const m = (d.getMonth() + 1).toString().padStart(2, '0')
-  const day = d.getDate().toString().padStart(2, '0')
-  return `${y}-${m}-${day}`
 }
 
 export function useMealPlan(weekStart: Date): UseMealPlanResult {

@@ -1,13 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import { toIsoDate } from '@/lib/weekHelpers'
 import { dbWeeklyBriefToWeeklyBrief, type WeeklyBrief, type DbWeeklyBrief } from '@/types/meal-planner'
-
-function toIsoDate(d: Date): string {
-  const y = d.getFullYear()
-  const m = (d.getMonth() + 1).toString().padStart(2, '0')
-  const day = d.getDate().toString().padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
 
 interface UseWeeklyBriefResult {
   brief: WeeklyBrief | null

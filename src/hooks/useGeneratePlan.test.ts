@@ -25,7 +25,7 @@ describe('useGeneratePlan.generate', () => {
     await act(async () => { r = await result.current.generate(WEEK) })
     expect(invokeMock).toHaveBeenCalledWith('meal-plan-generate', { body: { weekStart: '2026-04-27' } })
     expect((r as { ok: boolean }).ok).toBe(true)
-    await waitFor(() => expect(result.current.lastUndoToken?.id).toBe('t1'))
+    expect((r as { ok: boolean; result?: { undoToken: { id: string } | null } }).result?.undoToken?.id).toBe('t1')
   })
 
   it('surfaces errors from the edge function', async () => {

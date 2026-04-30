@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useMealPlan } from '@/hooks/useMealPlan'
 import { useRecipes } from '@/hooks/useRecipes'
-import { mondayOfWeek, dateForDayOfWeek, dayLabelFor, formatDateMonthDay } from '@/lib/weekHelpers'
+import { mondayOfWeek, dateForDayOfWeek, dayLabelFor, formatDateMonthDay, toIsoDate } from '@/lib/weekHelpers'
 import { gramsTargetFor, sumActualGrams } from '@/components/meals/today/grams'
 import { MealsTabs } from '../MealsTabs'
 import { DayGramRow } from './DayGramRow'
@@ -25,13 +25,6 @@ function noteLabelFor(notes: string | null | undefined): string | undefined {
     if (match.test(trimmed)) return label
   }
   return undefined
-}
-
-function toIsoDate(d: Date): string {
-  const y = d.getFullYear()
-  const m = (d.getMonth() + 1).toString().padStart(2, '0')
-  const day = d.getDate().toString().padStart(2, '0')
-  return `${y}-${m}-${day}`
 }
 
 interface DayLogNoteRow { log_date: string; notes: string | null }

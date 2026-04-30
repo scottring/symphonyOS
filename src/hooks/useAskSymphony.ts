@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { toIsoDate } from '@/lib/weekHelpers'
 
 /** A single suggestion card returned by the model. The `apply` payload is
  *  consumed client-side to mutate the plan. */
@@ -31,13 +32,6 @@ interface AskResult {
   error?: string
 }
 
-function toIso(d: Date): string {
-  const y = d.getFullYear()
-  const m = (d.getMonth() + 1).toString().padStart(2, '0')
-  const day = d.getDate().toString().padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
-
 /** Thin wrapper around the `ask-symphony-meal` edge function. */
 export function useAskSymphony(weekStart: Date) {
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -49,7 +43,7 @@ export function useAskSymphony(weekStart: Date) {
     ;(async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user || cancelled) return
-      const weekStartIso = toIso(weekStart)
+      const weekStartIso = toIsoDate(weekStart)
       const { data } = await supabase
         .from('chat_sessions')
         .select('id, messages')
@@ -79,7 +73,7 @@ export function useAskSymphony(weekStart: Date) {
     setMessages(prev => [...prev, { id: userMsgId, role: 'user', text: message }])
     try {
       const { data, error } = await supabase.functions.invoke('ask-symphony-meal', {
-        body: { message, weekStart: toIso(weekStart), sessionId: sessionId ?? undefined },
+        body: { message, weekStart: toIsoDate(weekStart), sessionId: sessionId ?? undefined },
       })
       if (error || !data) {
         const msg = error?.message ?? 'Symphony is unavailable.'

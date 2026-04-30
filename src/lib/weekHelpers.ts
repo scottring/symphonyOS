@@ -29,3 +29,11 @@ export function dateForDayOfWeek(weekStart: Date, dayOfWeek: number): Date {
   result.setDate(result.getDate() + dayOfWeek)
   return result
 }
+
+/** Format a Date as YYYY-MM-DD using local time. */
+export function toIsoDate(d: Date): string {
+  const y = d.getFullYear()
+  const m = (d.getMonth() + 1).toString().padStart(2, '0')
+  const day = d.getDate().toString().padStart(2, '0')
+  return `${y}-${m}-${day}`
+}

@@ -6,7 +6,7 @@ import { useGroceryStatus } from '@/hooks/useGroceryStatus'
 import { useWeeklyBrief } from '@/hooks/useWeeklyBrief'
 import { useStandingHabits } from '@/hooks/useStandingHabits'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
-import { mondayOfWeek, dateForDayOfWeek, isToday as isTodayHelper, formatDateMonthDay, dayLabelFor } from '@/lib/weekHelpers'
+import { mondayOfWeek, dateForDayOfWeek, isToday as isTodayHelper, formatDateMonthDay, dayLabelFor, toIsoDate } from '@/lib/weekHelpers'
 import { DayCard } from './DayCard'
 import { CollapseSection } from './PlanDocSections'
 import { RecipePickerModal, type LeftoverCandidate } from './RecipePickerModal'
@@ -19,15 +19,6 @@ import type { Suggestion } from '../chat/types'
 import { UndoToast } from './UndoToast'
 import { DAY_MEAL_SLOTS, MEAL_SLOT_LABEL } from '@/types/meal-planner'
 import type { MealPlanEntry, MealSlot, Recipe } from '@/types/meal-planner'
-
-/** Local YYYY-MM-DD formatter (matches the inline helpers in
- *  useMealPlan / useWeeklyBrief — kept local to avoid a refactor). */
-function toIsoDate(d: Date): string {
-  const y = d.getFullYear()
-  const m = (d.getMonth() + 1).toString().padStart(2, '0')
-  const day = d.getDate().toString().padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
 
 /** Map FamilyMember color to Tailwind classes for initial chip. */
 function memberColorClass(color: string): string {
