@@ -92,6 +92,28 @@ export function PlannerPage() {
     })
   }
 
+  /** Split a single shared row into N per-person rows (one per core/full-user member),
+   *  all referencing the same recipe/title. */
+  const handleSplitSharedSlot = async (
+    dayOfWeek: number,
+    slot: MealSlot,
+    entry: MealPlanEntry,
+    members: typeof familyMembers,
+  ) => {
+    // Delete the shared entry
+    await removeMeal(entry.id)
+    // Add one personal entry per "core or full-user" member with the same recipe/title
+    for (const m of members.filter(x => x.is_full_user || x.member_type === 'core')) {
+      await addMeal({
+        dayOfWeek,
+        slot,
+        recipeId: entry.recipeId,
+        adHocTitle: entry.adHocTitle,
+        familyMemberId: m.id,
+      })
+    }
+  }
+
   if (loading) {
     return (
       <div className="px-12 py-12 max-w-3xl mx-auto">
@@ -245,6 +267,7 @@ export function PlannerPage() {
               }}
               onRemove={(entryId) => removeMeal(entryId)}
               onConsolidateSlot={handleConsolidateSlot}
+              onSplitSharedSlot={(slot, entry) => handleSplitSharedSlot(d, slot, entry, familyMembers)}
             />
           )
         })}

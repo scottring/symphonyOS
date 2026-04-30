@@ -12,6 +12,7 @@ interface Props {
   onReplace: (entryId: string) => void
   onRemove: (entryId: string) => void
   onConsolidate: (entries: MealPlanEntry[], shared: { recipeId?: string; adHocTitle?: string }) => void
+  onSplitShared?: (entry: MealPlanEntry) => void
 }
 
 /** One slot inside a day card. May render:
@@ -22,7 +23,7 @@ interface Props {
  *  person context. */
 export function SlotSection({
   slot, entries, recipesById, familyMembers,
-  onPick, onReplace, onRemove, onConsolidate,
+  onPick, onReplace, onRemove, onConsolidate, onSplitShared,
 }: Props) {
   const familyEntries = entries.filter(e => !e.familyMemberId)
   const personalEntries = entries.filter(e => !!e.familyMemberId)
@@ -63,12 +64,22 @@ export function SlotSection({
           onReplace={onReplace}
           onRemove={onRemove}
         />
-        <AddAffordances
-          familyMembers={familyMembers}
-          excludeIds={new Set()}
-          showShared={false}
-          onPick={onPick}
-        />
+        <div className="flex items-center">
+          <AddAffordances
+            familyMembers={familyMembers}
+            excludeIds={new Set()}
+            showShared={false}
+            onPick={onPick}
+          />
+          {onSplitShared && (
+            <button
+              onClick={() => onSplitShared(e)}
+              className="text-[11px] italic text-primary-500 hover:text-primary-600 transition-colors ml-auto"
+            >
+              ↔ Different for each person — split
+            </button>
+          )}
+        </div>
       </div>
     )
   }
