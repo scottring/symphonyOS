@@ -117,44 +117,92 @@ export function SlotSection({
     return null
   })()
 
+  // Visual collapse: when split mode has all entries referencing the same
+  // recipe/title, render ONE row labeled "EVERYONE" instead of N redundant
+  // rows. The action buttons operate on all underlying entries at once.
+  // (The "Same for everyone — make shared" link below still consolidates the
+  // *data* into a single family-default entry if the planner wants that.)
+  const everyoneTitle = sharedIdentifier
+    ? (sharedIdentifier.recipeId
+        ? recipesById.get(sharedIdentifier.recipeId)?.title ?? '(unnamed)'
+        : sharedIdentifier.adHocTitle ?? '(unnamed)')
+    : null
+  const everyoneRecipe = sharedIdentifier?.recipeId
+    ? recipesById.get(sharedIdentifier.recipeId)
+    : undefined
+
   return (
     <div className="border-b border-neutral-100 last:border-b-0 py-1">
       <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-neutral-400 pt-2 pb-1">
         {MEAL_SLOT_LABEL[slot]}
       </div>
 
-      {/* family-default rows first */}
-      {familyEntries.map(e => (
-        <PerPersonRow
-          key={e.id}
-          forLabel="FAMILY"
-          forColor="text-neutral-400"
-          entry={e}
-          recipe={e.recipeId ? recipesById.get(e.recipeId) : undefined}
-          parentLabel={parentLabelById?.get(e.id)}
-          isHabitDerived={isHabitDerived(e)}
-          onReplace={onReplace}
-          onRemove={onRemove}
-        />
-      ))}
+      {sharedIdentifier && everyoneTitle ? (
+        // Collapsed view: one row standing in for N matching entries.
+        <div className="grid grid-cols-[80px_1fr_auto] items-start gap-3 py-1">
+          <div className="text-[10px] font-bold uppercase tracking-[0.16em] pt-1 text-neutral-400">
+            EVERYONE
+          </div>
+          <div>
+            <div className="font-display text-[1rem] leading-tight text-neutral-800">
+              {everyoneTitle}
+              <span className="ml-2 font-display italic text-[11px] text-neutral-400">
+                ({entries.length} entries)
+              </span>
+            </div>
+            {everyoneRecipe?.acceptanceSentence && (
+              <div className="font-display italic text-[12px] text-sage-500 mt-0.5">
+                {everyoneRecipe.acceptanceSentence}
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-1 pt-0.5">
+            <button onClick={() => onReplace(entries[0].id)}
+                    aria-label="Replace"
+                    title="Replace (one entry — to change all, remove and re-add)"
+                    className="px-1 text-neutral-300 hover:text-primary-500 text-[14px]">↻</button>
+            <button onClick={() => entries.forEach(e => onRemove(e.id))}
+                    aria-label="Remove all"
+                    title="Remove all matching entries"
+                    className="px-1 text-neutral-300 hover:text-accent-500 text-[14px]">×</button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* family-default rows first */}
+          {familyEntries.map(e => (
+            <PerPersonRow
+              key={e.id}
+              forLabel="FAMILY"
+              forColor="text-neutral-400"
+              entry={e}
+              recipe={e.recipeId ? recipesById.get(e.recipeId) : undefined}
+              parentLabel={parentLabelById?.get(e.id)}
+              isHabitDerived={isHabitDerived(e)}
+              onReplace={onReplace}
+              onRemove={onRemove}
+            />
+          ))}
 
-      {/* per-person rows */}
-      {personalEntries.map(e => {
-        const member = familyMembers.find(m => m.id === e.familyMemberId)
-        return (
-          <PerPersonRow
-            key={e.id}
-            forLabel={(member?.name ?? '?').toUpperCase()}
-            forColor={memberColorClass(member)}
-            entry={e}
-            recipe={e.recipeId ? recipesById.get(e.recipeId) : undefined}
-            parentLabel={parentLabelById?.get(e.id)}
-            isHabitDerived={isHabitDerived(e)}
-            onReplace={onReplace}
-            onRemove={onRemove}
-          />
-        )
-      })}
+          {/* per-person rows */}
+          {personalEntries.map(e => {
+            const member = familyMembers.find(m => m.id === e.familyMemberId)
+            return (
+              <PerPersonRow
+                key={e.id}
+                forLabel={(member?.name ?? '?').toUpperCase()}
+                forColor={memberColorClass(member)}
+                entry={e}
+                recipe={e.recipeId ? recipesById.get(e.recipeId) : undefined}
+                parentLabel={parentLabelById?.get(e.id)}
+                isHabitDerived={isHabitDerived(e)}
+                onReplace={onReplace}
+                onRemove={onRemove}
+              />
+            )
+          })}
+        </>
+      )}
 
       <div className="flex items-center">
         <AddAffordances
@@ -167,8 +215,9 @@ export function SlotSection({
           <button
             onClick={() => onConsolidate(entries, sharedIdentifier)}
             className="text-[11px] italic text-primary-500 hover:text-primary-600 transition-colors ml-auto"
+            title="Replace these per-person entries with one shared family row"
           >
-            ↔ Same for everyone — make shared
+            ↔ Make one shared row
           </button>
         )}
       </div>
