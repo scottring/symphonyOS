@@ -6,7 +6,6 @@ import { AddRecipeButton } from './AddRecipeButton'
 import { RecipeUrlPasteDialog } from './RecipeUrlPasteDialog'
 import { RecipeManualEditor } from './RecipeManualEditor'
 import { RecipeDetailModal } from './RecipeDetailModal'
-import { RationaleFooter } from './RationaleFooter'
 import { MealsTabs } from '../MealsTabs'
 
 export function MemoryShelfPage() {
@@ -68,8 +67,6 @@ export function MemoryShelfPage() {
           ))}
         </div>
       )}
-
-      <RationaleFooter />
 
       <RecipeUrlPasteDialog
         isOpen={pasteOpen}
