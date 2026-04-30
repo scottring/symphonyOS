@@ -13,8 +13,10 @@ import { WeekView } from './WeekView'
 import { MonthView } from './MonthView'
 import { CascadingRiverView } from './CascadingRiverView'
 import { TodaySchedule } from '@/components/schedule/TodaySchedule'
-import { TonightsDinnerCard } from './TonightsDinnerCard'
 import { UndoToast } from '@/components/undo/UndoToast'
+import { useMealPlan } from '@/hooks/useMealPlan'
+import { useRecipes } from '@/hooks/useRecipes'
+import { mondayOfWeek } from '@/lib/weekHelpers'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
 
 interface HomeViewProps {
@@ -93,9 +95,67 @@ export function HomeView({
     return projects.filter(project => project.context === currentDomain)
   }, [projects, currentDomain])
 
+  // ── Meal-plan entries → synthesized as CalendarEvent objects ──────────
+  // Default times by canonical slot (legacy slots fall back to closest match).
+  const SLOT_TIMES: Record<string, [number, number]> = {
+    breakfast:    [7, 30],
+    lunch:        [12, 30],
+    snack:        [15, 30],
+    dinner:       [18, 30],
+    prep:         [16, 0],
+    lunch_iris:   [12, 30],
+    lunch_scott:  [12, 30],
+    kid_alternate:[18, 30],
+  }
+  const mealWeekStart = useMemo(() => mondayOfWeek(viewedDate), [viewedDate])
+  const { plan: mealPlan } = useMealPlan(mealWeekStart)
+  const { recipes: mealRecipes } = useRecipes()
+  const mealRecipesById = useMemo(() => {
+    const m = new Map<string, { id: string; title: string }>()
+    mealRecipes.forEach(r => m.set(r.id, { id: r.id, title: r.title }))
+    return m
+  }, [mealRecipes])
+
+  const mealEvents = useMemo<CalendarEvent[]>(() => {
+    if (!mealPlan) return []
+    const dayOfWeek = (viewedDate.getDay() + 6) % 7
+    // Group by (slot, recipe-or-title) so per-person variants of the same
+    // meal collapse into ONE timeline event instead of stacking three.
+    const groups = new Map<string, { slot: string; title: string }>()
+    for (const e of mealPlan.entries) {
+      if (e.dayOfWeek !== dayOfWeek) continue
+      if (!SLOT_TIMES[e.slot]) continue
+      const title = e.recipeId
+        ? (mealRecipesById.get(e.recipeId)?.title ?? '(unnamed)')
+        : (e.adHocTitle ?? '(unnamed)')
+      const key = `${e.slot}|${title}`
+      if (!groups.has(key)) groups.set(key, { slot: e.slot, title })
+    }
+    const out: CalendarEvent[] = []
+    for (const [key, { slot, title }] of groups) {
+      const [hh, mm] = SLOT_TIMES[slot]!
+      const start = new Date(viewedDate)
+      start.setHours(hh, mm, 0, 0)
+      const end = new Date(start.getTime() + 45 * 60 * 1000)
+      const slotLabel = slot.charAt(0).toUpperCase() + slot.slice(1)
+      out.push({
+        id: `meal:${viewedDate.toISOString().slice(0, 10)}:${key}`,
+        title: `${slotLabel} · ${title}`,
+        start_time: start.toISOString(),
+        end_time: end.toISOString(),
+        all_day: false,
+        calendar_name: 'Meals',
+        calendar_color: '#0F8A4A',
+      })
+    }
+    return out
+  }, [mealPlan, mealRecipesById, viewedDate])
+
   // Calendar events always show regardless of domain filter —
-  // domain filtering applies to tasks, routines, and projects only
-  const filteredEvents = events
+  // domain filtering applies to tasks, routines, and projects only.
+  // Meals are synthesized into the events list so the timeline renders them
+  // as peer items (not a separate card above the schedule).
+  const filteredEvents = useMemo(() => [...events, ...mealEvents], [events, mealEvents])
 
   // Assignee filter state
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
@@ -274,10 +334,6 @@ export function HomeView({
 
     // Today view uses TodaySchedule — it reads most props from context
     return (
-      <>
-        <div className="px-4 pt-3">
-          <TonightsDinnerCard viewedDate={viewedDate} />
-        </div>
       <TodaySchedule
         tasks={filteredTasks}
         events={filteredEvents}
@@ -301,7 +357,6 @@ export function HomeView({
         onClosePanel={() => onSelectItem(null)}
         onUpdateTasksBulk={handleUpdateTasksBulk}
       />
-      </>
     )
   }
 
