@@ -37,7 +37,7 @@ export function AddRecipeButton({ onPasteUrl, onManualEntry, onFindRecipe }: Pro
         onClick={() => setOpen(o => !o)}
         aria-label={open ? 'Close add-recipe menu' : 'Add a recipe'}
         aria-expanded={open}
-        className={`w-12 h-12 rounded-full bg-primary-500 text-white text-[24px] font-light shadow-card hover:bg-primary-600 transition-transform ${open ? 'rotate-45' : ''}`}
+        className={`text-[28px] leading-none font-light text-neutral-400 hover:text-primary-500 transition-all ${open ? 'rotate-45 text-primary-500' : ''}`}
       >
         +
       </button>
