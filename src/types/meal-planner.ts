@@ -168,6 +168,7 @@ export interface DbWeeklyBrief {
   body: string
   status: BriefStatus
   generated_at: string | null
+  diff_prose: string | null
   created_at: string
   updated_at: string
 }
@@ -179,6 +180,7 @@ export interface WeeklyBrief {
   body: string
   status: BriefStatus
   generatedAt?: Date
+  diffProse?: string
 }
 
 export function dbWeeklyBriefToWeeklyBrief(row: DbWeeklyBrief): WeeklyBrief {
@@ -189,6 +191,7 @@ export function dbWeeklyBriefToWeeklyBrief(row: DbWeeklyBrief): WeeklyBrief {
     body: row.body,
     status: row.status,
     generatedAt: row.generated_at ? new Date(row.generated_at) : undefined,
+    diffProse: row.diff_prose ?? undefined,
   }
 }
 

@@ -27,7 +27,7 @@ function extractJson(s: string): string {
   return s
 }
 
-const SYSTEM_PROMPT = `You draft a one-week meal plan for a household based on a planner's free-form brief. Output strict JSON matching the schema. Every recipe you reference must come from the supplied shelf — never invent a recipe_id. Foods named in the brief that aren't on the shelf become ad_hoc entries (no recipe_id, just a title). Apply each standing habit to the right person each day, unless the brief explicitly overrides it. The four canonical slots are breakfast, lunch, snack, dinner. day_of_week is 0..6 (Mon..Sun).`
+const SYSTEM_PROMPT = `You draft a one-week meal plan for a household based on a planner's free-form brief. Output strict JSON matching the schema. Every recipe you reference must come from the supplied shelf — never invent a recipe_id. Foods named in the brief that aren't on the shelf become ad_hoc entries (no recipe_id, just a title). Apply each standing habit to the right person each day, unless the brief explicitly overrides it. The four canonical slots are breakfast, lunch, snack, dinner. day_of_week is 0..6 (Mon..Sun). The notes_for_planner field should contain a short paragraph (1-3 sentences) describing what's different about this week — what the planner explicitly asked for, what's new, what's being skipped, anything noteworthy. Write it as if explaining the plan to a partner who hasn't read the brief.`
 
 interface RequestBody {
   weekStart: string  // YYYY-MM-DD (Monday)
@@ -208,7 +208,11 @@ Deno.serve(async (req) => {
 
     // ── Mark brief generated ────────────────────────────────────────────
     await supabase.from('weekly_briefs')
-      .update({ status: 'generated', generated_at: new Date().toISOString() })
+      .update({
+        status: 'generated',
+        generated_at: new Date().toISOString(),
+        diff_prose: parsed.notes_for_planner ?? null,
+      })
       .eq('id', brief.id)
 
     return new Response(JSON.stringify({

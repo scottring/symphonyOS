@@ -319,10 +319,23 @@ export function PlannerPage() {
         )}
       </CollapseSection>
 
-      <CollapseSection title="What's different this week" initialOpen={!!brief?.body}>
-        {brief?.body?.trim() ? (
+      <CollapseSection title="What's different this week" initialOpen={!!(brief?.diffProse || brief?.body)}>
+        {brief?.diffProse ? (
           <div>
-            <p className="font-display text-[1.05rem] text-neutral-700 whitespace-pre-line">
+            <p className="font-display text-[1.05rem] text-neutral-700 leading-relaxed whitespace-pre-line">
+              {brief.diffProse}
+            </p>
+            <button onClick={() => navigate('/meals/brief')}
+                    className="mt-3 text-[12px] text-primary-500 italic hover:text-primary-600">
+              edit brief →
+            </button>
+          </div>
+        ) : brief?.body?.trim() ? (
+          <div>
+            <p className="font-display italic text-[0.95rem] text-neutral-500 mb-2">
+              Brief (no AI diff yet — regenerate the plan to produce one):
+            </p>
+            <p className="font-display text-[1rem] text-neutral-600 whitespace-pre-line">
               {brief.body}
             </p>
             <button onClick={() => navigate('/meals/brief')}
