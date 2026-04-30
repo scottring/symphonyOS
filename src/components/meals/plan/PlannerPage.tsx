@@ -91,6 +91,47 @@ export function PlannerPage() {
     return out
   }, [plan, recipesById])
 
+  /** Recipes that appear on 2+ days in the current plan, sorted by frequency. */
+  const ingredientThreads = useMemo(() => {
+    if (!plan) return []
+    const byRecipe = new Map<string, MealPlanEntry[]>()
+    for (const e of plan.entries) {
+      if (!e.recipeId) continue
+      const arr = byRecipe.get(e.recipeId) ?? []
+      arr.push(e)
+      byRecipe.set(e.recipeId, arr)
+    }
+    const out: Array<{ recipeId: string; title: string; usedAt: string; count: number }> = []
+    for (const [recipeId, entries] of byRecipe) {
+      if (entries.length < 2) continue
+      const recipe = recipesById.get(recipeId)
+      if (!recipe) continue
+      const usedAt = entries
+        .sort((a, b) => a.dayOfWeek - b.dayOfWeek)
+        .map(e => `${dayLabelFor(e.dayOfWeek)} ${MEAL_SLOT_LABEL[e.slot] ?? e.slot}`)
+        .join(' · ')
+      out.push({ recipeId, title: recipe.title, usedAt, count: entries.length })
+    }
+    out.sort((a, b) => b.count - a.count)
+    return out
+  }, [plan, recipesById])
+
+  /** Sunday (dayOfWeek === 6) prep entries with a list of where their leftovers feed. */
+  const sundayPrep = useMemo(() => {
+    if (!plan) return []
+    const prepEntries = plan.entries.filter(e => e.slot === 'prep' && e.dayOfWeek === 6)
+    return prepEntries.map(prep => {
+      const title = (prep.recipeId ? recipesById.get(prep.recipeId)?.title : null) ?? prep.adHocTitle ?? '(unnamed)'
+      const feeds = plan.entries
+        .filter(child => child.leftoverFrom === prep.id)
+        .sort((a, b) => a.dayOfWeek - b.dayOfWeek)
+        .map(child => `${dayLabelFor(child.dayOfWeek)} ${child.slot}`)
+      return { id: prep.id, title, feeds }
+    })
+  }, [plan, recipesById])
+
+  const [prepDone, setPrepDone] = useState<Record<string, boolean>>({})
+
   /** Map entry.id → "from X" label, for leftover entries that reference a parent. */
   const parentLabelById = useMemo(() => {
     const map = new Map<string, string>()
@@ -273,16 +314,52 @@ export function PlannerPage() {
         )}
       </CollapseSection>
 
-      <CollapseSection title="Ingredient threads">
-        <p className="text-[13px] italic text-neutral-400">
-          Auto-derived from the week's recipes. (Coming with the per-day expanded view.)
-        </p>
+      <CollapseSection title="Ingredient threads" initialOpen={ingredientThreads.length > 0}>
+        {ingredientThreads.length === 0 ? (
+          <p className="text-[13px] italic text-neutral-400">
+            Nothing repeats this week.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {ingredientThreads.map(thread => (
+              <div key={thread.recipeId} className="grid grid-cols-[1fr_2fr] gap-3 text-[13px]">
+                <div className="font-display text-neutral-800">{thread.title}</div>
+                <div className="font-display italic text-neutral-500">{thread.usedAt}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </CollapseSection>
 
-      <CollapseSection title="Sunday batch-cook">
-        <p className="text-[13px] italic text-neutral-400">
-          Checklist ships with kitchen mode (surface 6).
-        </p>
+      <CollapseSection title="Sunday batch-cook" count={sundayPrep.length} initialOpen={sundayPrep.length > 0}>
+        {sundayPrep.length === 0 ? (
+          <p className="text-[13px] italic text-neutral-400">
+            No batch prep this week. Tap Sunday's PREP slot to schedule one.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {sundayPrep.map(p => (
+              <label key={p.id} className="flex items-start gap-2.5 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={!!prepDone[p.id]}
+                  onChange={e => setPrepDone(prev => ({ ...prev, [p.id]: e.target.checked }))}
+                  className="mt-1 accent-primary-500"
+                />
+                <div className="flex-1">
+                  <div className={`font-display text-[14px] text-neutral-800 ${prepDone[p.id] ? 'line-through opacity-50' : ''}`}>
+                    {p.title}
+                  </div>
+                  {p.feeds.length > 0 && (
+                    <div className="font-display italic text-[12px] text-neutral-400 mt-0.5">
+                      feeds {p.feeds.join(' · ')}
+                    </div>
+                  )}
+                </div>
+              </label>
+            ))}
+          </div>
+        )}
       </CollapseSection>
 
       {/* Day stack */}
