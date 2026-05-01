@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
       supabase.from('meal_plans').select('id,user_id').eq('week_start', body.weekStart).order('created_at', { ascending: true }).limit(1),
       supabase.from('weekly_briefs').select('id,body,status,generated_at').eq('week_start', body.weekStart).order('created_at', { ascending: true }).limit(1),
       supabase.from('recipes').select('id,title,tags,prep_minutes,acceptance_sentence,is_prep_friendly'),
-      supabase.from('standing_habits').select('user_id,name,slot,grams_hint,paused_for_weeks').eq('paused', false),
+      supabase.from('standing_habits').select('user_id,name,slot,grams_hint,paused_for_weeks,assigned_family_member_id').eq('paused', false),
       supabase.from('family_members').select('id,name,auth_user_id'),
       supabase.from('dietary_restrictions').select('family_member_id,label'),
     ])
@@ -258,11 +258,6 @@ Deno.serve(async (req) => {
     }
 
     // ── Step C: habit injection (operates on restKept; never on prep)
-    const familyByAuthUser = new Map<string, string>()
-    for (const m of (members ?? [])) {
-      if (m.auth_user_id) familyByAuthUser.set(m.auth_user_id, m.id)
-    }
-
     const occupiedKeys = new Set<string>()
     for (const e of restKept) {
       occupiedKeys.add(`${e.day_of_week}|${e.slot}|${e.family_member_id ?? 'family'}`)
@@ -275,18 +270,20 @@ Deno.serve(async (req) => {
         validationNotes.push(`habit "${h.name}" paused this week`)
         continue
       }
-      const ownerFamilyMemberId = familyByAuthUser.get(h.user_id)
-      if (!ownerFamilyMemberId) {
-        validationNotes.push(`habit "${h.name}" skipped: no family_members row for owner`)
+      // assigned_family_member_id is the explicit "for whom". NULL = whole family.
+      const assigneeId: string | null = h.assigned_family_member_id ?? null
+      // If non-NULL, validate it's actually in the visible roster.
+      if (assigneeId != null && !roster.has(assigneeId)) {
+        validationNotes.push(`habit "${h.name}" skipped: assignee ${assigneeId} not in roster`)
         continue
       }
       for (let day = 0; day <= 6; day++) {
-        const key = `${day}|${h.slot}|${ownerFamilyMemberId}`
+        const key = `${day}|${h.slot}|${assigneeId ?? 'family'}`
         if (occupiedKeys.has(key)) continue
         habitInjected.push({
           day_of_week: day,
           slot: h.slot as GeneratedEntry['slot'],
-          family_member_id: ownerFamilyMemberId,
+          family_member_id: assigneeId,
           recipe_id: null,
           ad_hoc_title: h.name,
           prepared_by_family_member_id: null,

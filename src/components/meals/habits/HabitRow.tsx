@@ -1,15 +1,18 @@
 import { useState } from 'react'
 import type { StandingHabit } from '@/types/meal-planner'
+import type { FamilyMember } from '@/types/family'
 
 interface Props {
   habit: StandingHabit
-  onChange: (patch: { name?: string; slot?: StandingHabit['slot']; gramsHint?: number | null; paused?: boolean }) => void
+  familyMembers: FamilyMember[]
+  onChange: (patch: { name?: string; slot?: StandingHabit['slot']; gramsHint?: number | null; paused?: boolean; assignedFamilyMemberId?: string | null }) => void
   onDelete: () => void
 }
 
 /** One row in the standing-habits list. Click name → inline rename.
- *  Slot is a select; grams is a numeric input. Kebab → pause/delete. */
-export function HabitRow({ habit, onChange, onDelete }: Props) {
+ *  Slot is a select; grams is a numeric input. Assignee picker chooses
+ *  who the habit applies to (or "Whole family" for NULL). */
+export function HabitRow({ habit, familyMembers, onChange, onDelete }: Props) {
   const [name, setName] = useState(habit.name)
   const [grams, setGrams] = useState(habit.gramsHint != null ? String(habit.gramsHint) : '')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -29,7 +32,7 @@ export function HabitRow({ habit, onChange, onDelete }: Props) {
   }
 
   return (
-    <div className={`relative grid grid-cols-[20px_1fr_120px_140px_24px] items-center gap-3 px-4 py-3 border-t first:border-t-0 border-neutral-100 ${habit.paused ? 'opacity-50' : ''}`}>
+    <div className={`relative grid grid-cols-[20px_1fr_90px_120px_140px_24px] items-center gap-3 px-4 py-3 border-t first:border-t-0 border-neutral-100 ${habit.paused ? 'opacity-50' : ''}`}>
       <span className="text-neutral-300 cursor-grab" aria-label="Drag handle">⋮⋮</span>
 
       <input
@@ -61,6 +64,17 @@ export function HabitRow({ habit, onChange, onDelete }: Props) {
         <option value="lunch">Lunch</option>
         <option value="snack">Snack</option>
         <option value="dinner">Dinner</option>
+      </select>
+
+      <select
+        value={habit.assignedFamilyMemberId ?? ''}
+        onChange={e => onChange({ assignedFamilyMemberId: e.target.value || null })}
+        className="px-2 py-1 rounded-md bg-bg-base border border-neutral-200 text-[13px] focus:outline-none focus:border-primary-500"
+      >
+        <option value="">Whole family</option>
+        {familyMembers.map(m => (
+          <option key={m.id} value={m.id}>{m.name}</option>
+        ))}
       </select>
 
       <div className="relative">

@@ -6,6 +6,7 @@ interface AddInput {
   name: string
   slot: StandingHabit['slot']
   gramsHint?: number
+  assignedFamilyMemberId?: string | null
 }
 
 interface UpdateInput {
@@ -15,6 +16,7 @@ interface UpdateInput {
   paused?: boolean
   sortOrder?: number
   pausedForWeeks?: string[]
+  assignedFamilyMemberId?: string | null
 }
 
 interface UseStandingHabitsResult {
@@ -63,6 +65,7 @@ export function useStandingHabits(): UseStandingHabitsResult {
         slot: input.slot,
         grams_hint: input.gramsHint ?? null,
         sort_order: nextOrder,
+        assigned_family_member_id: input.assignedFamilyMemberId ?? null,
       })
       .select()
       .single()
@@ -79,6 +82,7 @@ export function useStandingHabits(): UseStandingHabitsResult {
     if (input.paused !== undefined) patch.paused = input.paused
     if (input.sortOrder !== undefined) patch.sort_order = input.sortOrder
     if (input.pausedForWeeks !== undefined) patch.paused_for_weeks = input.pausedForWeeks
+    if (input.assignedFamilyMemberId !== undefined) patch.assigned_family_member_id = input.assignedFamilyMemberId
 
     setHabits(prev => prev.map(h => h.id === id ? {
       ...h,
@@ -88,6 +92,7 @@ export function useStandingHabits(): UseStandingHabitsResult {
       ...(input.paused !== undefined ? { paused: input.paused } : {}),
       ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
       ...(input.pausedForWeeks !== undefined ? { pausedForWeeks: input.pausedForWeeks } : {}),
+      ...(input.assignedFamilyMemberId !== undefined ? { assignedFamilyMemberId: input.assignedFamilyMemberId } : {}),
     } : h))
 
     const { error: updErr } = await supabase

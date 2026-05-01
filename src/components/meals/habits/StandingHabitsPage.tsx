@@ -1,14 +1,17 @@
 import { useState } from 'react'
 import { useStandingHabits } from '@/hooks/useStandingHabits'
+import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { MealsTabs } from '../MealsTabs'
 import { HabitRow } from './HabitRow'
 import { RestrictionsSection } from './RestrictionsSection'
 import type { StandingHabit } from '@/types/meal-planner'
+import type { FamilyMember } from '@/types/family'
 
-/** Surface 2 — Standing Habits configuration. Five-row list with name, grams
- *  hint, slot dropdown, and kebab menu. "+ Add habit" up top. */
+/** Surface 2 — Standing Habits configuration. Six-column list with name, grams
+ *  hint, slot dropdown, assignee picker, and kebab menu. "+ Add habit" up top. */
 export function StandingHabitsPage() {
   const { habits, loading, error, add, update, remove } = useStandingHabits()
+  const { members: familyMembers } = useFamilyMembers()
   const [adding, setAdding] = useState(false)
 
   if (loading) {
@@ -55,12 +58,14 @@ export function StandingHabitsPage() {
           <HabitRow
             key={h.id}
             habit={h}
+            familyMembers={familyMembers}
             onChange={(patch) => update(h.id, patch)}
             onDelete={() => remove(h.id)}
           />
         ))}
         {adding && (
           <NewHabitRow
+            familyMembers={familyMembers}
             onSave={async (input) => { await add(input); setAdding(false) }}
             onCancel={() => setAdding(false)}
           />
@@ -80,21 +85,31 @@ interface NewHabitInput {
   name: string
   slot: StandingHabit['slot']
   gramsHint?: number
+  assignedFamilyMemberId?: string | null
 }
 
-function NewHabitRow({ onSave, onCancel }: { onSave: (input: NewHabitInput) => Promise<void>; onCancel: () => void }) {
+function NewHabitRow({
+  familyMembers,
+  onSave,
+  onCancel,
+}: {
+  familyMembers: FamilyMember[]
+  onSave: (input: NewHabitInput) => Promise<void>
+  onCancel: () => void
+}) {
   const [name, setName] = useState('')
   const [slot, setSlot] = useState<StandingHabit['slot']>('breakfast')
   const [grams, setGrams] = useState('')
+  const [who, setWho] = useState<string | null>(null)
 
   const submit = () => {
     if (!name.trim()) return onCancel()
     const gramsHint = grams ? parseInt(grams, 10) : undefined
-    void onSave({ name: name.trim(), slot, gramsHint })
+    void onSave({ name: name.trim(), slot, gramsHint, assignedFamilyMemberId: who })
   }
 
   return (
-    <div className="grid grid-cols-[20px_1fr_120px_140px_24px] items-center gap-3 px-4 py-3 border-t border-neutral-100 bg-primary-50/40">
+    <div className="grid grid-cols-[20px_1fr_90px_120px_140px_24px] items-center gap-3 px-4 py-3 border-t border-neutral-100 bg-primary-50/40">
       <span className="text-neutral-300 cursor-grab">⋮⋮</span>
       <input
         autoFocus value={name} onChange={e => setName(e.target.value)}
@@ -114,6 +129,14 @@ function NewHabitRow({ onSave, onCancel }: { onSave: (input: NewHabitInput) => P
         <option value="lunch">Lunch</option>
         <option value="snack">Snack</option>
         <option value="dinner">Dinner</option>
+      </select>
+      <select value={who ?? ''}
+              onChange={e => setWho(e.target.value || null)}
+              className="px-2 py-1.5 rounded-md border border-neutral-200 bg-bg-base text-[13px] focus:outline-none focus:border-primary-500">
+        <option value="">Whole family</option>
+        {familyMembers.map(m => (
+          <option key={m.id} value={m.id}>{m.name}</option>
+        ))}
       </select>
       <button onClick={submit} className="text-primary-500 hover:text-primary-600 text-[14px]">✓</button>
     </div>

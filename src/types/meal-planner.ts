@@ -211,6 +211,7 @@ export interface DbStandingHabit {
   sort_order: number
   paused: boolean
   paused_for_weeks: string[]
+  assigned_family_member_id: string | null
   created_at: string
   updated_at: string
 }
@@ -225,6 +226,8 @@ export interface StandingHabit {
   paused: boolean
   /** ISO date strings (YYYY-MM-DD, Mondays) of weeks this habit is paused for. */
   pausedForWeeks: string[]
+  /** NULL = whole family. Otherwise a family_members.id. */
+  assignedFamilyMemberId: string | null
 }
 
 export function dbStandingHabitToStandingHabit(row: DbStandingHabit): StandingHabit {
@@ -237,6 +240,7 @@ export function dbStandingHabitToStandingHabit(row: DbStandingHabit): StandingHa
     sortOrder: row.sort_order,
     paused: row.paused,
     pausedForWeeks: row.paused_for_weeks ?? [],
+    assignedFamilyMemberId: row.assigned_family_member_id ?? null,
   }
 }
 
