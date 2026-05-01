@@ -548,11 +548,10 @@ export const ScheduleItem = memo(function ScheduleItem({
             </div>
           )}
 
-          {/* Assignee avatar — always visible, with context color ring */}
+          {/* Assignee avatar — context is conveyed by the chip elsewhere on
+              the row, so the avatar stays clean (no ring). */}
           {familyMembers.length > 0 && onAssignAll ? (
             <div
-              className={contextColor ? 'ring-2 ring-offset-1 rounded-full' : ''}
-              style={contextColor ? { ['--tw-ring-color' as string]: contextColor } : undefined}
               onClick={(e) => {
                 e.stopPropagation()
                 if (panelOpen && onClosePanel) {
@@ -570,8 +569,6 @@ export const ScheduleItem = memo(function ScheduleItem({
             </div>
           ) : familyMembers.length > 0 && onAssign && (
             <div
-              className={contextColor ? 'ring-2 ring-offset-1 rounded-full' : ''}
-              style={contextColor ? { ['--tw-ring-color' as string]: contextColor } : undefined}
               onClick={(e) => {
                 e.stopPropagation()
                 if (panelOpen && onClosePanel) {
