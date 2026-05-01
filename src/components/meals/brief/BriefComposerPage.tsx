@@ -46,7 +46,7 @@ export function BriefComposerPage() {
       setErrorToast(r.error ?? 'Generation failed.')
       return
     }
-    if (r.result?.undoToken) setLastUndoToken(r.result.undoToken)
+    if (r.result?.undoToken) setLastUndoToken({ ...r.result.undoToken, description: 'Plan drafted from your brief.' })
     navigate('/meals/plan')
   }
 

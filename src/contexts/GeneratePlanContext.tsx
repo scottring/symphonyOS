@@ -3,6 +3,7 @@ import { createContext, useContext, useState, useCallback, type ReactNode } from
 interface UndoToken {
   id: string
   expiresAt: string
+  description?: string
 }
 
 interface ContextValue {

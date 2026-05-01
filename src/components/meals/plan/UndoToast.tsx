@@ -36,7 +36,7 @@ export function UndoToast() {
   return (
     <div className="fixed bottom-6 right-6 z-50 max-w-sm rounded-2xl border border-neutral-200 bg-bg-elevated shadow-card px-5 py-3 flex items-center gap-3">
       <span className="font-display italic text-[14px] text-neutral-700">
-        Plan drafted from your brief.
+        {lastUndoToken.description ?? 'Plan drafted from your brief.'}
       </span>
       <button
         onClick={onUndo}

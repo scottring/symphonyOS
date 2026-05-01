@@ -6,6 +6,7 @@ import { useGroceryStatus } from '@/hooks/useGroceryStatus'
 import { useWeeklyBrief } from '@/hooks/useWeeklyBrief'
 import { useStandingHabits } from '@/hooks/useStandingHabits'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
+import { useGeneratePlanContext } from '@/contexts/GeneratePlanContext'
 import { mondayOfWeek, dateForDayOfWeek, isToday as isTodayHelper, formatDateMonthDay, dayLabelFor, toIsoDate } from '@/lib/weekHelpers'
 import { DayCard } from './DayCard'
 import { CollapseSection } from './PlanDocSections'
@@ -14,6 +15,7 @@ import { GroceryStatusCard } from '../groceries/GroceryStatusCard'
 import { SendToGroceriesModal } from '../groceries/SendToGroceriesModal'
 import { MealsTabs } from '../MealsTabs'
 import { ParameterDropdown } from './ParameterDropdown'
+import { ClearWeekButton } from './ClearWeekButton'
 import { AskSymphonyRail } from '../chat/AskSymphonyRail'
 import type { Suggestion } from '../chat/types'
 import { UndoToast } from './UndoToast'
@@ -38,7 +40,8 @@ function memberColorClass(color: string): string {
 export function PlannerPage() {
   const navigate = useNavigate()
   const weekStart = useMemo(() => mondayOfWeek(new Date()), [])
-  const { plan, loading, error, addMeal, removeMeal, setParameter } = useMealPlan(weekStart)
+  const { plan, loading, error, addMeal, removeMeal, setParameter, clearWeek } = useMealPlan(weekStart)
+  const { setLastUndoToken } = useGeneratePlanContext()
   const { recipes } = useRecipes()
   const status = useGroceryStatus(plan, recipes)
   const { brief } = useWeeklyBrief(weekStart)
@@ -120,47 +123,6 @@ export function PlannerPage() {
         : `${dayLabelFor(e.dayOfWeek)} ${e.slot}`
       out.push({ entry: e, recipe, dayLabel })
     }
-    return out
-  }, [plan, recipesById])
-
-  /** Recipes that appear in 2+ distinct (day, slot) cells in the current plan.
-   *  Dedupe per-person variants — three Iris/Scott/Family entries on the same
-   *  Monday lunch should count as ONE thread cell, not three. Same goes for
-   *  ad-hoc-title entries. */
-  const ingredientThreads = useMemo(() => {
-    if (!plan) return []
-    // First, dedupe by recipe + (day, slot) — for each recipe, collect the
-    // unique day-slot cells it occupies.
-    const cellsByRecipe = new Map<string, Map<string, { dayOfWeek: number; slot: MealSlot }>>()
-    const titleByRecipe = new Map<string, string>()
-    for (const e of plan.entries) {
-      // Use recipeId as the thread key when present; fall back to ad_hoc_title.
-      const key = e.recipeId ?? (e.adHocTitle ? `adhoc:${e.adHocTitle}` : null)
-      if (!key) continue
-      if (e.recipeId) {
-        const r = recipesById.get(e.recipeId)
-        if (!r) continue
-        titleByRecipe.set(key, r.title)
-      } else if (e.adHocTitle) {
-        titleByRecipe.set(key, e.adHocTitle)
-      }
-      const cells = cellsByRecipe.get(key) ?? new Map<string, { dayOfWeek: number; slot: MealSlot }>()
-      const cellKey = `${e.dayOfWeek}|${e.slot}`
-      if (!cells.has(cellKey)) cells.set(cellKey, { dayOfWeek: e.dayOfWeek, slot: e.slot as MealSlot })
-      cellsByRecipe.set(key, cells)
-    }
-    const out: Array<{ recipeId: string; title: string; usedAt: string; count: number }> = []
-    for (const [recipeKey, cellMap] of cellsByRecipe) {
-      if (cellMap.size < 2) continue
-      const title = titleByRecipe.get(recipeKey) ?? '(unnamed)'
-      const cells = Array.from(cellMap.values())
-        .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.slot.localeCompare(b.slot))
-      const usedAt = cells
-        .map(c => `${dayLabelFor(c.dayOfWeek)} ${MEAL_SLOT_LABEL[c.slot] ?? c.slot}`)
-        .join(' · ')
-      out.push({ recipeId: recipeKey, title, usedAt, count: cells.length })
-    }
-    out.sort((a, b) => b.count - a.count)
     return out
   }, [plan, recipesById])
 
@@ -380,6 +342,16 @@ export function PlannerPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <ClearWeekButton
+            entryCount={plan?.entries.length ?? 0}
+            weekLabel={weekLabel}
+            onConfirm={async () => {
+              const r = await clearWeek()
+              if (r.ok && r.tokenId) {
+                setLastUndoToken({ id: r.tokenId, expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(), description: 'Week cleared.' })
+              }
+            }}
+          />
           <ParameterDropdown value={plan?.parameter} onChange={setParameter} />
           <button onClick={() => setChatOpen(true)}
                   className="px-3 py-1.5 rounded-full text-[12px] font-medium bg-primary-500 text-white shadow-primary hover:bg-primary-600 flex items-center gap-1.5">
@@ -474,23 +446,6 @@ export function PlannerPage() {
             No brief yet. <button onClick={() => navigate('/meals/brief')}
               className="text-primary-500 underline italic">Compose one →</button>
           </p>
-        )}
-      </CollapseSection>
-
-      <CollapseSection title="Ingredient threads" initialOpen={ingredientThreads.length > 0}>
-        {ingredientThreads.length === 0 ? (
-          <p className="text-[13px] italic text-neutral-400">
-            Nothing repeats this week.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {ingredientThreads.map(thread => (
-              <div key={thread.recipeId} className="grid grid-cols-[1fr_2fr] gap-3 text-[13px]">
-                <div className="font-display text-neutral-800">{thread.title}</div>
-                <div className="font-display italic text-neutral-500">{thread.usedAt}</div>
-              </div>
-            ))}
-          </div>
         )}
       </CollapseSection>
 

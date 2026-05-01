@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 interface Props {
   onPasteUrl: () => void
   onManualEntry: () => void
-  onFindRecipe: () => void
+  onFindRecipe?: () => void
 }
 
 /** A single + button that fans out three add-recipe options on click. */
@@ -44,18 +44,21 @@ export function AddRecipeButton({ onPasteUrl, onManualEntry, onFindRecipe }: Pro
 
       {open && (
         <div className="absolute right-0 top-full mt-2 z-30 w-[260px] rounded-2xl border border-neutral-200 bg-bg-elevated shadow-elevated overflow-hidden">
-          <button
-            onClick={choose(onFindRecipe)}
-            className="w-full px-4 py-3 text-left flex items-start gap-3 hover:bg-primary-50 transition-colors"
-          >
-            <span className="text-primary-500 text-[16px] leading-none mt-0.5">✦</span>
-            <div className="flex-1">
-              <div className="text-[14px] font-medium text-neutral-800">Find a recipe</div>
-              <div className="text-[12px] italic text-neutral-500 mt-0.5">Symphony AI suggests three</div>
-            </div>
-          </button>
-
-          <div className="border-t border-neutral-100" />
+          {onFindRecipe && (
+            <>
+              <button
+                onClick={choose(onFindRecipe)}
+                className="w-full px-4 py-3 text-left flex items-start gap-3 hover:bg-primary-50 transition-colors"
+              >
+                <span className="text-primary-500 text-[16px] leading-none mt-0.5">✦</span>
+                <div className="flex-1">
+                  <div className="text-[14px] font-medium text-neutral-800">Find a recipe</div>
+                  <div className="text-[12px] italic text-neutral-500 mt-0.5">Symphony AI suggests three</div>
+                </div>
+              </button>
+              <div className="border-t border-neutral-100" />
+            </>
+          )}
 
           <button
             onClick={choose(onPasteUrl)}
