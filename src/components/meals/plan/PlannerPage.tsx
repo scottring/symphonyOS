@@ -40,7 +40,7 @@ function memberColorClass(color: string): string {
 export function PlannerPage() {
   const navigate = useNavigate()
   const weekStart = useMemo(() => mondayOfWeek(new Date()), [])
-  const { plan, loading, error, addMeal, removeMeal, setParameter, clearWeek } = useMealPlan(weekStart)
+  const { plan, loading, error, addMeal, removeMeal, setParameter, clearWeek, updateMealPreparer } = useMealPlan(weekStart)
   const { setLastUndoToken } = useGeneratePlanContext()
   const { recipes } = useRecipes()
   const status = useGroceryStatus(plan, recipes)
@@ -518,6 +518,7 @@ export function PlannerPage() {
               onRemove={(entryId) => removeMeal(entryId)}
               onConsolidateSlot={handleConsolidateSlot}
               onSplitSharedSlot={(slot, entry) => handleSplitSharedSlot(d, slot, entry, familyMembers)}
+              onAssignCook={(entryId, fmId) => updateMealPreparer(entryId, fmId)}
             />
           )
         })}

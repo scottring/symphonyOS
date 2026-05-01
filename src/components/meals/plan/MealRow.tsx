@@ -2,6 +2,8 @@ import { useState } from 'react'
 import type { MealPlanEntry, MealSlot, Recipe } from '@/types/meal-planner'
 import { MEAL_SLOT_LABEL } from '@/types/meal-planner'
 import { sumGramsInTags } from '../today/grams'
+import { CookChip } from './CookChip'
+import type { FamilyMember } from '@/types/family'
 
 interface Props {
   slot: MealSlot
@@ -12,12 +14,14 @@ interface Props {
   onPick: () => void
   onReplace?: (entryId: string) => void
   onRemove?: (entryId: string) => void
+  familyMembers?: FamilyMember[]
+  onAssignCook?: (entryId: string, familyMemberId: string | null) => void
 }
 
 /** One meal slot inside a day card — surface 4 compact idiom.
  *  Empty slots are dashed-italic "tap for ideas" rows; filled slots show
  *  the recipe title + a kid-acceptance / grams hint. */
-export function MealRow({ slot, entry, recipe, parentLabel, onPick, onReplace, onRemove }: Props) {
+export function MealRow({ slot, entry, recipe, parentLabel, onPick, onReplace, onRemove, familyMembers, onAssignCook }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const slotLabel = MEAL_SLOT_LABEL[slot]
   const grams = recipe ? sumGramsInTags(recipe.tags) : 0
@@ -67,24 +71,33 @@ export function MealRow({ slot, entry, recipe, parentLabel, onPick, onReplace, o
           </div>
         )}
       </div>
-      <div className="relative">
-        <button onClick={() => setMenuOpen(o => !o)}
-                aria-label="Replace or remove"
-                className="px-2 text-neutral-400 hover:text-neutral-700 text-[14px]">
-          ⋯
-        </button>
-        {menuOpen && (
-          <div className="absolute right-0 top-full mt-1 z-10 min-w-[140px] rounded-xl border border-neutral-200 bg-bg-elevated shadow-card py-1">
-            <button onClick={() => { onReplace?.(entry.id); setMenuOpen(false) }}
-                    className="w-full text-left px-3 py-1.5 text-[13px] hover:bg-primary-50">
-              Replace
-            </button>
-            <button onClick={() => { onRemove?.(entry.id); setMenuOpen(false) }}
-                    className="w-full text-left px-3 py-1.5 text-[13px] hover:bg-accent-50 text-accent-500">
-              Remove
-            </button>
-          </div>
+      <div className="flex items-center gap-2">
+        {entry && familyMembers && onAssignCook && (
+          <CookChip
+            preparedBy={entry.preparedBy ?? null}
+            members={familyMembers}
+            onAssign={(id) => onAssignCook(entry.id, id)}
+          />
         )}
+        <div className="relative">
+          <button onClick={() => setMenuOpen(o => !o)}
+                  aria-label="Replace or remove"
+                  className="px-2 text-neutral-400 hover:text-neutral-700 text-[14px]">
+            ⋯
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 top-full mt-1 z-10 min-w-[140px] rounded-xl border border-neutral-200 bg-bg-elevated shadow-card py-1">
+              <button onClick={() => { onReplace?.(entry.id); setMenuOpen(false) }}
+                      className="w-full text-left px-3 py-1.5 text-[13px] hover:bg-primary-50">
+                Replace
+              </button>
+              <button onClick={() => { onRemove?.(entry.id); setMenuOpen(false) }}
+                      className="w-full text-left px-3 py-1.5 text-[13px] hover:bg-accent-50 text-accent-500">
+                Remove
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

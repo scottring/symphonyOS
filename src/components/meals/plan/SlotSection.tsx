@@ -1,4 +1,5 @@
 import { MealRow } from './MealRow'
+import { CookChip } from './CookChip'
 import { MEAL_SLOT_LABEL } from '@/types/meal-planner'
 import type { MealPlanEntry, MealSlot, Recipe } from '@/types/meal-planner'
 import type { FamilyMember } from '@/types/family'
@@ -18,6 +19,7 @@ interface Props {
   onRemove: (entryId: string) => void
   onConsolidate: (entries: MealPlanEntry[], shared: { recipeId?: string; adHocTitle?: string }) => void
   onSplitShared?: (entry: MealPlanEntry) => void
+  onAssignCook?: (entryId: string, familyMemberId: string | null) => void
 }
 
 /** One slot inside a day card. May render:
@@ -28,7 +30,7 @@ interface Props {
  *  person context. */
 export function SlotSection({
   slot, entries, recipesById, familyMembers, parentLabelById, habitsByOwnerSlot,
-  onPick, onReplace, onRemove, onConsolidate, onSplitShared,
+  onPick, onReplace, onRemove, onConsolidate, onSplitShared, onAssignCook,
 }: Props) {
   /** True iff this entry matches a standing habit owned by the same person at
    *  the same slot, by ad_hoc_title. Family-default entries (no familyMemberId)
@@ -54,6 +56,8 @@ export function SlotSection({
           onPick={() => onPick(undefined)}
           onReplace={onReplace}
           onRemove={onRemove}
+          familyMembers={familyMembers}
+          onAssignCook={onAssignCook}
         />
         <AddAffordances
           familyMembers={familyMembers}
@@ -78,6 +82,8 @@ export function SlotSection({
           onPick={() => onPick(undefined)}
           onReplace={onReplace}
           onRemove={onRemove}
+          familyMembers={familyMembers}
+          onAssignCook={onAssignCook}
         />
         <div className="flex items-center">
           <AddAffordances
@@ -179,8 +185,10 @@ export function SlotSection({
               recipe={e.recipeId ? recipesById.get(e.recipeId) : undefined}
               parentLabel={parentLabelById?.get(e.id)}
               isHabitDerived={isHabitDerived(e)}
+              familyMembers={familyMembers}
               onReplace={onReplace}
               onRemove={onRemove}
+              onAssignCook={onAssignCook}
             />
           ))}
 
@@ -196,8 +204,10 @@ export function SlotSection({
                 recipe={e.recipeId ? recipesById.get(e.recipeId) : undefined}
                 parentLabel={parentLabelById?.get(e.id)}
                 isHabitDerived={isHabitDerived(e)}
+                familyMembers={familyMembers}
                 onReplace={onReplace}
                 onRemove={onRemove}
+                onAssignCook={onAssignCook}
               />
             )
           })}
@@ -267,11 +277,13 @@ interface PerPersonRowProps {
   recipe?: Recipe
   parentLabel?: string
   isHabitDerived?: boolean
+  familyMembers?: FamilyMember[]
   onReplace: (entryId: string) => void
   onRemove: (entryId: string) => void
+  onAssignCook?: (entryId: string, familyMemberId: string | null) => void
 }
 
-function PerPersonRow({ forLabel, forColor, entry, recipe, parentLabel, isHabitDerived, onReplace, onRemove }: PerPersonRowProps) {
+function PerPersonRow({ forLabel, forColor, entry, recipe, parentLabel, isHabitDerived, familyMembers, onReplace, onRemove, onAssignCook }: PerPersonRowProps) {
   const title = recipe?.title ?? entry.adHocTitle ?? '(unnamed)'
   return (
     <div className="grid grid-cols-[80px_1fr_auto] items-start gap-3 py-1">
@@ -292,6 +304,13 @@ function PerPersonRow({ forLabel, forColor, entry, recipe, parentLabel, isHabitD
         )}
       </div>
       <div className="flex items-center gap-1 pt-0.5">
+        {familyMembers && onAssignCook && (
+          <CookChip
+            preparedBy={entry.preparedBy ?? null}
+            members={familyMembers}
+            onAssign={(id) => onAssignCook(entry.id, id)}
+          />
+        )}
         <button onClick={() => onReplace(entry.id)}
                 aria-label="Replace"
                 className="px-1 text-neutral-300 hover:text-primary-500 text-[14px]">↻</button>

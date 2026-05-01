@@ -32,6 +32,7 @@ interface Props {
     shared: { recipeId?: string; adHocTitle?: string },
   ) => void
   onSplitSharedSlot: (slot: MealSlot, entry: MealPlanEntry) => void
+  onAssignCook?: (entryId: string, familyMemberId: string | null) => void
 }
 
 /** Compact in-document day card — surface 4 (compact). Header row with ring
@@ -40,7 +41,7 @@ export function DayCard({
   dayOfWeek, date, isToday,
   entriesBySlot, recipesById, familyMembers, parameter,
   parentLabelById, habitsByOwnerSlot, highlighted,
-  onPickForSlot, onReplace, onRemove, onConsolidateSlot, onSplitSharedSlot,
+  onPickForSlot, onReplace, onRemove, onConsolidateSlot, onSplitSharedSlot, onAssignCook,
 }: Props) {
   const navigate = useNavigate()
   const target = gramsTargetFor(parameter)
@@ -112,6 +113,7 @@ export function DayCard({
             onRemove={onRemove}
             onConsolidate={(entries, shared) => onConsolidateSlot(dayOfWeek, slot, entries, shared)}
             onSplitShared={(entry) => onSplitSharedSlot(slot, entry)}
+            onAssignCook={onAssignCook}
           />
         ))}
       </div>
