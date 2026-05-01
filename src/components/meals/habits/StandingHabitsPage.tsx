@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useStandingHabits } from '@/hooks/useStandingHabits'
 import { MealsTabs } from '../MealsTabs'
 import { HabitRow } from './HabitRow'
+import { RestrictionsSection } from './RestrictionsSection'
 import type { StandingHabit } from '@/types/meal-planner'
 
 /** Surface 2 — Standing Habits configuration. Five-row list with name, grams
@@ -69,6 +70,8 @@ export function StandingHabitsPage() {
       <p className="mt-4 text-[12px] italic text-neutral-500">
         These habits are included in every plan unless you override them.
       </p>
+
+      <RestrictionsSection />
     </div>
   )
 }
