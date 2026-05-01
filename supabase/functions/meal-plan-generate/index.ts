@@ -27,7 +27,30 @@ function extractJson(s: string): string {
   return s
 }
 
-const SYSTEM_PROMPT = `You draft a one-week meal plan for a household based on a planner's free-form brief. Output strict JSON matching the schema. Every recipe you reference must come from the supplied shelf — never invent a recipe_id. Foods named in the brief that aren't on the shelf become ad_hoc entries (no recipe_id, just a title). Apply each standing habit to the right person each day, unless the brief explicitly overrides it. The four canonical slots are breakfast, lunch, snack, dinner. day_of_week is 0..6 (Mon..Sun). The notes_for_planner field should contain a short paragraph (1-3 sentences) describing what's different about this week — what the planner explicitly asked for, what's new, what's being skipped, anything noteworthy. Write it as if explaining the plan to a partner who hasn't read the brief.`
+const SYSTEM_PROMPT = `You draft a one-week meal plan for a household based on a planner's free-form brief. Output strict JSON matching the schema.
+
+SLOTS
+The five canonical slots are breakfast, lunch, snack, dinner, prep. day_of_week is 0..6 (Mon..Sun).
+- breakfast/lunch/snack/dinner are eaten meals.
+- prep is a batch-cooking session — typically Sunday (day_of_week=6). Use it when the brief implies cooking once and eating across the week, or when an is_prep_friendly recipe will feed multiple meals.
+
+LEFTOVER THREADING
+When you create a prep entry, give it a placeholder id like "prep_1", "prep_2", etc. in a top-level field "placeholder_id". Then, on every other entry that gets eaten from that batch, set "leftover_from" to that placeholder. The server resolves placeholders to real ids after insert. Example: a Sunday prep of "Big pot of beans" with placeholder_id "prep_1" → Mon lunch and Wed dinner each set leftover_from="prep_1". Don't set leftover_from on entries that aren't from a batch.
+
+RECIPES
+Every recipe_id you reference must come from the supplied shelf — never invent a recipe_id. Foods named in the brief that aren't on the shelf become ad_hoc entries (no recipe_id, just an ad_hoc_title). If you're unsure whether a shelf item matches, prefer ad_hoc_title.
+
+COOK ASSIGNMENT
+prepared_by_family_member_id is who cooks the meal. Set it ONLY when the brief explicitly assigns cooks ("Iris cooks weeknights", "Scott does Sundays"). Otherwise leave it null and the household will decide.
+
+RESTRICTIONS
+The RESTRICTIONS block lists per-person and household-wide dietary rules. Treat them as hard filters: never produce an entry whose recipe or ad_hoc_title violates a restriction for the person eating it. Household-wide restrictions apply to every entry.
+
+HABITS
+Apply each standing habit to the right person each day, unless the brief explicitly overrides it.
+
+NOTES
+The notes_for_planner field should contain a short paragraph (1-3 sentences) describing what's different about this week — what the planner explicitly asked for, what's new, what's being skipped, anything noteworthy. Write it as if explaining the plan to a partner who hasn't read the brief.`
 
 interface RequestBody {
   weekStart: string  // YYYY-MM-DD (Monday)
@@ -54,20 +77,22 @@ Deno.serve(async (req) => {
 
     // ── Load context (RLS filters to household-visible rows) ───────────
     const [
-      { data: planRows, error: planErr },
-      { data: briefRows, error: briefErr },
-      { data: recipes,   error: recErr   },
-      { data: habits,    error: habErr   },
-      { data: members,   error: memErr   },
+      { data: planRows,     error: planErr    },
+      { data: briefRows,    error: briefErr   },
+      { data: recipes,      error: recErr     },
+      { data: habits,       error: habErr     },
+      { data: members,      error: memErr     },
+      { data: restrictions, error: restErr    },
     ] = await Promise.all([
       supabase.from('meal_plans').select('id,user_id').eq('week_start', body.weekStart).order('created_at', { ascending: true }).limit(1),
       supabase.from('weekly_briefs').select('id,body,status,generated_at').eq('week_start', body.weekStart).order('created_at', { ascending: true }).limit(1),
       supabase.from('recipes').select('id,title,tags,prep_minutes,acceptance_sentence,is_prep_friendly'),
       supabase.from('standing_habits').select('user_id,name,slot,grams_hint,paused_for_weeks').eq('paused', false),
       supabase.from('family_members').select('id,name,auth_user_id'),
+      supabase.from('dietary_restrictions').select('family_member_id,label'),
     ])
-    if (planErr || briefErr || recErr || habErr || memErr) {
-      return jsonError(500, `context load failed: ${(planErr || briefErr || recErr || habErr || memErr)?.message}`)
+    if (planErr || briefErr || recErr || habErr || memErr || restErr) {
+      return jsonError(500, `context load failed: ${(planErr || briefErr || recErr || habErr || memErr || restErr)?.message}`)
     }
 
     let plan = planRows?.[0]
@@ -88,6 +113,8 @@ Deno.serve(async (req) => {
     }
     if (!brief || !brief.body?.trim()) return jsonError(400, 'brief is empty')
 
+    const memberById = new Map((members ?? []).map(m => [m.id, m.name]))
+
     const promptContext = buildPromptContext({
       weekStart: body.weekStart,
       mealPlanId: plan.id,
@@ -99,6 +126,11 @@ Deno.serve(async (req) => {
       })),
       habits: (habits ?? []).map(h => ({
         owner_auth_user_id: h.user_id, name: h.name, slot: h.slot, grams_hint: h.grams_hint,
+      })),
+      restrictions: (restrictions ?? []).map(r => ({
+        scope: r.family_member_id ? 'person' as const : 'household' as const,
+        person_name: r.family_member_id ? (memberById.get(r.family_member_id) ?? null) : null,
+        label: r.label,
       })),
       brief: brief.body,
     })
@@ -122,29 +154,101 @@ Deno.serve(async (req) => {
       return jsonError(422, 'model returned 0 entries — try a more specific brief')
     }
 
-    // ── Validate ────────────────────────────────────────────────────────
+    // ── Validate ──────────────────────────────────────────────────────
+    type AnyParsedEntry = GeneratedEntry & { placeholder_id?: string | null }
+    const allParsed = parsed.entries as AnyParsedEntry[]
+    const rawPrepEntries = allParsed.filter(e => e.slot === 'prep')
+    const rawNonPrepEntries = allParsed.filter(e => e.slot !== 'prep')
+
     const roster = new Set((members ?? []).map(m => m.id))
-    const shelf  = new Set((recipes ?? []).map(r => r.id))
-    const { kept, dropped } = validateGeneratedEntries(parsed.entries, roster, shelf)
+    const shelfSet = new Set((recipes ?? []).map(r => r.id))
+    const { kept: prepKept, dropped: prepDropped } = validateGeneratedEntries(rawPrepEntries, roster, shelfSet)
+    const { kept: restKept, dropped: restDropped } = validateGeneratedEntries(rawNonPrepEntries, roster, shelfSet)
+
+    const dropped = [...prepDropped, ...restDropped]
     const validationNotes = dropped.map(d => d.reason)
 
-    if (kept.length === 0) {
-      return jsonError(422, `all ${dropped.length} entries failed validation`)
+    if (prepKept.length + restKept.length === 0) {
+      // Surface category counts + sample so the planner can debug.
+      const counts = new Map<string, number>()
+      for (const d of dropped) {
+        const key = d.reason.replace(/: .*$/, '')
+        counts.set(key, (counts.get(key) ?? 0) + 1)
+      }
+      const summary = Array.from(counts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([r, n]) => `${r} (${n})`)
+        .join('; ')
+      const sample = dropped.slice(0, 2).map(d => d.reason).join(' | ')
+      return jsonError(422, `all ${dropped.length} entries failed validation — ${summary}; sample: ${sample}`)
     }
 
-    // ── Habit injection ─────────────────────────────────────────────────
-    // For each non-paused standing habit, ensure there's an entry at
-    // (every day of week, habit.slot, owner's family_member_id). Skip if
-    // an entry already exists at that coordinate (don't override AI/user).
-    // Habits whose owner has no matching family_members row are skipped
-    // and logged.
-    const familyByAuthUser = new Map<string, string>()  // auth_user_id → family_members.id
+    // Map kept prep entries back to their original placeholder_id by structural
+    // matching (validate strips unknown fields). Walk both lists in order; the
+    // validator preserves order for kept entries.
+    const keptPlaceholders: string[] = []
+    {
+      let cursor = 0
+      for (const raw of rawPrepEntries) {
+        if (cursor >= prepKept.length) break
+        const k = prepKept[cursor]
+        if (
+          raw.day_of_week === k.day_of_week &&
+          raw.slot === k.slot &&
+          (raw.family_member_id ?? null) === k.family_member_id
+        ) {
+          keptPlaceholders.push(typeof raw.placeholder_id === 'string' ? raw.placeholder_id : '')
+          cursor++
+        }
+      }
+      while (keptPlaceholders.length < prepKept.length) keptPlaceholders.push('')
+    }
+
+    // ── Snapshot prior entries for undo ─────────────────────────────
+    const { data: prior } = await supabase
+      .from('meal_plan_entries').select('*').eq('meal_plan_id', plan.id)
+
+    const priorBriefStatus = brief.status as string | null
+    const priorBriefGeneratedAt = (brief as { generated_at?: string | null }).generated_at ?? null
+
+    // ── Step A: clear via RPC (acquires row lock; serializes concurrent gens)
+    const { error: clearErr } = await supabase.rpc('regenerate_meal_plan', {
+      p_meal_plan_id: plan.id, p_entries: [],
+    })
+    if (clearErr) return jsonError(500, `clear failed: ${clearErr.message}`)
+
+    // ── Step B: insert prep entries first to capture real ids
+    const prepRows = prepKept.map(e => ({
+      meal_plan_id: plan.id,
+      day_of_week: e.day_of_week,
+      slot: e.slot,
+      family_member_id: e.family_member_id,
+      recipe_id: e.recipe_id,
+      ad_hoc_title: e.ad_hoc_title,
+      prepared_by_family_member_id: e.prepared_by_family_member_id,
+    }))
+    let prepInsertedIds: string[] = []
+    if (prepRows.length > 0) {
+      const { data: prepInserted, error: prepErr } = await supabase
+        .from('meal_plan_entries').insert(prepRows).select('id')
+      if (prepErr) return jsonError(500, `prep insert failed: ${prepErr.message}`)
+      prepInsertedIds = (prepInserted ?? []).map(r => r.id)
+    }
+
+    // Build placeholder_id → real id map
+    const placeholderToRealId = new Map<string, string>()
+    keptPlaceholders.forEach((ph, idx) => {
+      if (ph) placeholderToRealId.set(ph, prepInsertedIds[idx])
+    })
+
+    // ── Step C: habit injection (operates on restKept; never on prep)
+    const familyByAuthUser = new Map<string, string>()
     for (const m of (members ?? [])) {
       if (m.auth_user_id) familyByAuthUser.set(m.auth_user_id, m.id)
     }
 
     const occupiedKeys = new Set<string>()
-    for (const e of kept) {
+    for (const e of restKept) {
       occupiedKeys.add(`${e.day_of_week}|${e.slot}|${e.family_member_id ?? 'family'}`)
     }
 
@@ -169,29 +273,33 @@ Deno.serve(async (req) => {
           family_member_id: ownerFamilyMemberId,
           recipe_id: null,
           ad_hoc_title: h.name,
+          prepared_by_family_member_id: null,
+          leftover_from: null,
         })
         occupiedKeys.add(key)
       }
     }
 
-    const allEntries = [...kept, ...habitInjected]
+    // ── Step D: insert non-prep entries with leftover_from resolved
+    const restRows = [...restKept, ...habitInjected].map(e => ({
+      meal_plan_id: plan.id,
+      day_of_week: e.day_of_week,
+      slot: e.slot,
+      family_member_id: e.family_member_id,
+      recipe_id: e.recipe_id,
+      ad_hoc_title: e.ad_hoc_title,
+      prepared_by_family_member_id: e.prepared_by_family_member_id,
+      leftover_from: e.leftover_from ? (placeholderToRealId.get(e.leftover_from) ?? null) : null,
+    }))
+    let restInsertedIds: string[] = []
+    if (restRows.length > 0) {
+      const { data: restInserted, error: restErr } = await supabase
+        .from('meal_plan_entries').insert(restRows).select('id')
+      if (restErr) return jsonError(500, `entries insert failed: ${restErr.message}`)
+      restInsertedIds = (restInserted ?? []).map(r => r.id)
+    }
 
-    // ── Snapshot prior entries for undo ─────────────────────────────────
-    const { data: prior } = await supabase
-      .from('meal_plan_entries').select('*').eq('meal_plan_id', plan.id)
-
-    // Capture prior brief state too — if the planner undoes, the
-    // generated/generated_at timestamps should revert.
-    const priorBriefStatus = brief.status as string | null
-    const priorBriefGeneratedAt = (brief as { generated_at?: string | null }).generated_at ?? null
-
-    // ── Atomic delete + insert via RPC ──────────────────────────────────
-    const { data: rpcResult, error: rpcErr } = await supabase.rpc('regenerate_meal_plan', {
-      p_meal_plan_id: plan.id,
-      p_entries: allEntries,
-    })
-    if (rpcErr) return jsonError(500, `regenerate_meal_plan failed: ${rpcErr.message}`)
-    const insertedIds = (rpcResult?.inserted_ids ?? []) as string[]
+    const insertedIds = [...prepInsertedIds, ...restInsertedIds]
 
     // ── Persist undo token ──────────────────────────────────────────────
     const { data: { user } } = await supabase.auth.getUser()
@@ -259,7 +367,7 @@ async function callAnthropic(apiKey: string, context: string, retried: boolean):
     },
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 4000,
+      max_tokens: 16000,
       system: SYSTEM_PROMPT,
       messages: [
         { role: 'user', content: userMessage },
@@ -275,6 +383,11 @@ async function callAnthropic(apiKey: string, context: string, retried: boolean):
   }
   const data = await resp.json()
   const text = data.content?.[0]?.text ?? ''
+  // If we hit the output cap the JSON will be truncated; surface that explicitly
+  // so callers don't see a misleading "non-JSON" error.
+  if (data.stop_reason === 'max_tokens') {
+    throw new Error('model response truncated at max_tokens — bump cap or shorten brief')
+  }
   // Re-prefix the prefilled assistant content so the JSON is complete.
   return `{\n  "entries":${text}`
 }
