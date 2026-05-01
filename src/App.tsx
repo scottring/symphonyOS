@@ -302,11 +302,20 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       lunch_iris: [12, 30], lunch_scott: [12, 30], kid_alternate: [18, 30],
     }
     const dow = (viewedDate.getDay() + 6) % 7
+    const currentMemberId = getCurrentUserMember()?.id ?? null
+    const memberById = new Map(familyMembers.map(m => [m.id, m]))
     const recipeTitleById = new Map(mealRecipesForEvents.map(r => [r.id, r.title]))
     const groups = new Map<string, { slot: string; title: string; entryIds: string[] }>()
     for (const e of mealPlanForEvents.entries) {
       if (e.dayOfWeek !== dow) continue
       if (!SLOT_TIMES[e.slot]) continue
+      // Per-user filter: show family-shared (null), self, or kids (members without auth_user_id).
+      if (e.familyMemberId != null) {
+        const isCurrent = e.familyMemberId === currentMemberId
+        const target = memberById.get(e.familyMemberId)
+        const isKid = target ? !target.auth_user_id : false
+        if (!isCurrent && !isKid) continue
+      }
       const title = e.recipeId ? (recipeTitleById.get(e.recipeId) ?? '(unnamed)') : (e.adHocTitle ?? '(unnamed)')
       const key = `${e.slot}|${title}`
       const existing = groups.get(key)
@@ -330,7 +339,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       })
     }
     return out
-  }, [mealPlanForEvents, mealRecipesForEvents, viewedDate])
+  }, [mealPlanForEvents, mealRecipesForEvents, viewedDate, familyMembers, getCurrentUserMember])
   const eventsWithMeals = useMemo(() => [...events, ...mealEvents], [events, mealEvents])
 
   // Reset to today at midnight
