@@ -541,6 +541,7 @@ export function PlannerPage() {
         consolidated={status.consolidated}
         groceriesListId={status.groceriesListId}
         currentItemTexts={[]}
+        recipesById={recipesById}
         onSent={() => status.refresh()}
       />
 

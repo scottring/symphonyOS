@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { CATEGORY_ORDER, type GroceryCategory } from '@/lib/categorizeIngredient'
 import type { ConsolidatedIngredient } from '@/lib/consolidateIngredients'
+import type { Recipe } from '@/types/meal-planner'
 import { IngredientLineRow } from './IngredientLineRow'
 
 interface Props {
@@ -10,10 +11,13 @@ interface Props {
   consolidated: ConsolidatedIngredient[]
   groceriesListId: string | null
   currentItemTexts: string[]
+  /** Optional. When provided, the modal annotates each ingredient with the
+   *  source recipe titles so the planner sees what they're stocking up for. */
+  recipesById?: Map<string, Recipe>
   onSent: () => void
 }
 
-export function SendToGroceriesModal({ isOpen, onClose, consolidated, groceriesListId, currentItemTexts, onSent }: Props) {
+export function SendToGroceriesModal({ isOpen, onClose, consolidated, groceriesListId, currentItemTexts, recipesById, onSent }: Props) {
   const [items, setItems] = useState<ConsolidatedIngredient[]>([])
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -78,14 +82,22 @@ export function SendToGroceriesModal({ isOpen, onClose, consolidated, groceriesL
             <div key={category} className="mb-5">
               <div className="text-[11px] font-bold uppercase tracking-widest text-neutral-500 mb-2">{category}</div>
               <div>
-                {list.map((item, idx) => (
-                  <IngredientLineRow
-                    key={`${item.text}-${idx}`}
-                    item={item}
-                    onChange={(text) => setItems(prev => prev.map(i => i === item ? { ...i, text } : i))}
-                    onRemove={() => setItems(prev => prev.filter(i => i !== item))}
-                  />
-                ))}
+                {list.map((item, idx) => {
+                  const titles = recipesById
+                    ? item.fromRecipeIds
+                        .map(id => recipesById.get(id)?.title)
+                        .filter((t): t is string => !!t)
+                    : []
+                  return (
+                    <IngredientLineRow
+                      key={`${item.text}-${idx}`}
+                      item={item}
+                      fromRecipeTitles={titles}
+                      onChange={(text) => setItems(prev => prev.map(i => i === item ? { ...i, text } : i))}
+                      onRemove={() => setItems(prev => prev.filter(i => i !== item))}
+                    />
+                  )
+                })}
               </div>
             </div>
           ))}
