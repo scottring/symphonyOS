@@ -16,6 +16,8 @@ interface AddMealInput {
   familyMemberId?: string | null
   /** NULL/undefined = not a leftover. Otherwise the meal_plan_entries.id of the parent batch. */
   leftoverFromId?: string | null
+  /** NULL/undefined = unassigned. Otherwise a family_members.id. */
+  preparedByFamilyMemberId?: string | null
 }
 
 interface UseMealPlanResult {
@@ -26,6 +28,8 @@ interface UseMealPlanResult {
   addMeal: (input: AddMealInput) => Promise<void>
   removeMeal: (entryId: string) => Promise<void>
   setParameter: (parameter: MealParameter | undefined) => Promise<void>
+  updateMealPreparer: (entryId: string, preparedByFamilyMemberId: string | null) => Promise<void>
+  clearWeek: () => Promise<{ ok: boolean; tokenId?: string; error?: string }>
 }
 
 export function useMealPlan(weekStart: Date): UseMealPlanResult {
@@ -80,6 +84,7 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
         notes: input.notes ?? null,
         family_member_id: input.familyMemberId ?? null,
         leftover_from: input.leftoverFromId ?? null,
+        prepared_by_family_member_id: input.preparedByFamilyMemberId ?? null,
       }).select().single()
     if (insertErr) {
       setError(insertErr.message)
@@ -100,6 +105,7 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
           swapGrams: data.swap_grams ?? undefined,
           actualGrams: data.actual_grams ?? undefined,
           familyMemberId: data.family_member_id ?? undefined,
+          preparedBy: data.prepared_by_family_member_id ?? null,
         }],
       } : prev)
     }
@@ -128,7 +134,56 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
     }
   }, [plan])
 
+  const updateMealPreparer = useCallback(async (entryId: string, preparedByFamilyMemberId: string | null) => {
+    if (!plan) return
+    // Optimistic update
+    const previous = plan.entries
+    setPlan(prev => prev ? {
+      ...prev,
+      entries: prev.entries.map(e => e.id === entryId ? { ...e, preparedBy: preparedByFamilyMemberId } : e),
+    } : prev)
+    const { error: updErr } = await supabase
+      .from('meal_plan_entries')
+      .update({ prepared_by_family_member_id: preparedByFamilyMemberId })
+      .eq('id', entryId)
+    if (updErr) {
+      setPlan(prev => prev ? { ...prev, entries: previous } : prev)
+      setError(updErr.message)
+    }
+  }, [plan])
+
+  const clearWeek = useCallback(async (): Promise<{ ok: boolean; tokenId?: string; error?: string }> => {
+    if (!plan) return { ok: false, error: 'no plan loaded' }
+    // Snapshot for undo
+    const { data: prior, error: snapErr } = await supabase
+      .from('meal_plan_entries').select('*').eq('meal_plan_id', plan.id)
+    if (snapErr) return { ok: false, error: snapErr.message }
+    // Wipe via RPC (acquires row lock; serializes concurrent writers)
+    const { error: rpcErr } = await supabase.rpc('regenerate_meal_plan', {
+      p_meal_plan_id: plan.id, p_entries: [],
+    })
+    if (rpcErr) return { ok: false, error: rpcErr.message }
+    // Persist undo token
+    const { data: { user } } = await supabase.auth.getUser()
+    const userId = user?.id
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString()
+    const { data: tokenRow, error: tokenErr } = await supabase.from('ai_undo_tokens').insert({
+      user_id: userId,
+      description: `Cleared week of ${weekStartIso}`,
+      inverse_actions: [
+        { type: 'restore_meal_plan_entries', payload: { rows: prior ?? [] } },
+      ],
+      expires_at: expiresAt,
+    }).select('id').single()
+    await refresh()
+    if (tokenErr) {
+      // Wipe succeeded but undo token didn't — surface as ok-but-no-undo
+      return { ok: true }
+    }
+    return { ok: true, tokenId: tokenRow?.id }
+  }, [plan, refresh, weekStartIso])
+
   useEffect(() => { refresh() }, [refresh])
 
-  return { plan, loading, error, refresh, addMeal, removeMeal, setParameter }
+  return { plan, loading, error, refresh, addMeal, removeMeal, setParameter, updateMealPreparer, clearWeek }
 }
