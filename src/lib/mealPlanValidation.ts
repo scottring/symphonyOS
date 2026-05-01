@@ -22,8 +22,15 @@ export interface ValidationResult {
   dropped: ValidationDrop[]
 }
 
-/** Validates AI-generated entries against the supplied roster + shelf.
- *  Pure function; no side effects. Mirrored at supabase/functions/_shared/. */
+/** Validates AI-generated entries against the supplied roster + shelf. Pure
+ *  function; no side effects.
+ *
+ *  CONTRACT: Kept entries are returned in input order. Callers (notably the
+ *  edge function's placeholder→real-id alignment) rely on this. Don't change
+ *  this without updating the callers.
+ *
+ *  Mirrored at supabase/functions/_shared/mealPlanGenerate.ts (the other direction).
+ */
 export function validateGeneratedEntries(
   entries: unknown[],
   roster: Set<string>,

@@ -241,6 +241,16 @@ Deno.serve(async (req) => {
       if (ph) placeholderToRealId.set(ph, prepInsertedIds[idx])
     })
 
+    // Warn if any leftover_from references a placeholder that didn't survive validation
+    // (e.g. its source prep entry was dropped). The reference will resolve to null in the
+    // final insert, but the planner deserves to know why.
+    const knownPlaceholders = new Set(placeholderToRealId.keys())
+    for (const e of restKept) {
+      if (e.leftover_from && !knownPlaceholders.has(e.leftover_from)) {
+        validationNotes.push(`leftover_from "${e.leftover_from}" could not be resolved — source prep entry was dropped`)
+      }
+    }
+
     // ── Step C: habit injection (operates on restKept; never on prep)
     const familyByAuthUser = new Map<string, string>()
     for (const m of (members ?? [])) {
@@ -293,9 +303,9 @@ Deno.serve(async (req) => {
     }))
     let restInsertedIds: string[] = []
     if (restRows.length > 0) {
-      const { data: restInserted, error: restErr } = await supabase
+      const { data: restInserted, error: restInsertErr } = await supabase
         .from('meal_plan_entries').insert(restRows).select('id')
-      if (restErr) return jsonError(500, `entries insert failed: ${restErr.message}`)
+      if (restInsertErr) return jsonError(500, `entries insert failed: ${restInsertErr.message}`)
       restInsertedIds = (restInserted ?? []).map(r => r.id)
     }
 
