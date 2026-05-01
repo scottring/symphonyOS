@@ -10,6 +10,7 @@ interface UseGroceryStatusResult {
   missingItems: ConsolidatedIngredient[]
   consolidated: ConsolidatedIngredient[]
   groceriesListId: string | null
+  stores: { id: string; title: string }[]
   refresh: () => Promise<void>
 }
 
@@ -20,6 +21,7 @@ export function useGroceryStatus(plan: MealPlan | null, recipes: Recipe[]): UseG
   const [error, setError] = useState<string | null>(null)
   const [groceriesListId, setGroceriesListId] = useState<string | null>(null)
   const [currentItems, setCurrentItems] = useState<string[]>([])
+  const [stores, setStores] = useState<{ id: string; title: string }[]>([])
 
   const consolidated = useMemo(() => {
     if (!plan) return []
@@ -45,6 +47,13 @@ export function useGroceryStatus(plan: MealPlan | null, recipes: Recipe[]): UseG
       .eq('list_id', list.id)
     if (itemsErr) { setError(itemsErr.message); setLoading(false); return }
     setCurrentItems((items ?? []).map((i: any) => i.text.toLowerCase()))
+
+    const { data: storeRows } = await supabase
+      .from('lists').select('id,title')
+      .eq('external_source', 'apple_reminders')
+      .order('title', { ascending: true })
+    setStores((storeRows ?? []) as { id: string; title: string }[])
+
     setLoading(false)
   }, [])
 
@@ -63,5 +72,5 @@ export function useGroceryStatus(plan: MealPlan | null, recipes: Recipe[]): UseG
 
   useEffect(() => { refresh() }, [refresh])
 
-  return { loading, error, stockedPercent, missingItems, consolidated, groceriesListId, refresh }
+  return { loading, error, stockedPercent, missingItems, consolidated, groceriesListId, stores, refresh }
 }

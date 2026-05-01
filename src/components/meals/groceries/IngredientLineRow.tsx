@@ -1,3 +1,4 @@
+import type React from 'react'
 import type { ConsolidatedIngredient } from '@/lib/consolidateIngredients'
 
 interface Props {
@@ -6,11 +7,13 @@ interface Props {
    *  rendered as a small italic line under the input so the planner can see
    *  what they're stocking up for. */
   fromRecipeTitles?: string[]
+  /** Optional accessory rendered between the Nx badge and the × button. */
+  rightAccessory?: React.ReactNode
   onChange: (newText: string) => void
   onRemove: () => void
 }
 
-export function IngredientLineRow({ item, fromRecipeTitles, onChange, onRemove }: Props) {
+export function IngredientLineRow({ item, fromRecipeTitles, rightAccessory, onChange, onRemove }: Props) {
   return (
     <div className="flex items-start gap-3 py-2 border-b border-neutral-100">
       <div className="flex-1 min-w-0">
@@ -30,6 +33,9 @@ export function IngredientLineRow({ item, fromRecipeTitles, onChange, onRemove }
         <span className="text-[11px] uppercase tracking-wider font-bold text-neutral-400 mt-1.5">
           {item.fromRecipeIds.length}×
         </span>
+      )}
+      {rightAccessory && (
+        <div className="mt-1 shrink-0">{rightAccessory}</div>
       )}
       <button onClick={onRemove}
               className="text-neutral-400 hover:text-accent-500 px-2 mt-0.5 text-[16px]"

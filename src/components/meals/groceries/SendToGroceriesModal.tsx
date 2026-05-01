@@ -4,6 +4,8 @@ import { CATEGORY_ORDER, type GroceryCategory } from '@/lib/categorizeIngredient
 import type { ConsolidatedIngredient } from '@/lib/consolidateIngredients'
 import type { Recipe } from '@/types/meal-planner'
 import { IngredientLineRow } from './IngredientLineRow'
+import { useStoreOverrides } from '@/hooks/useStoreOverrides'
+import { StoreChip } from './StoreChip'
 
 interface Props {
   isOpen: boolean
@@ -14,13 +16,21 @@ interface Props {
   /** Optional. When provided, the modal annotates each ingredient with the
    *  source recipe titles so the planner sees what they're stocking up for. */
   recipesById?: Map<string, Recipe>
+  stores: { id: string; title: string }[]
   onSent: () => void
 }
 
-export function SendToGroceriesModal({ isOpen, onClose, consolidated, groceriesListId, currentItemTexts, recipesById, onSent }: Props) {
+function keyOf(text: string): string {
+  return text.toLowerCase().trim()
+}
+
+export function SendToGroceriesModal({ isOpen, onClose, consolidated, groceriesListId, currentItemTexts, recipesById, stores, onSent }: Props) {
   const [items, setItems] = useState<ConsolidatedIngredient[]>([])
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [localDestinationByItem, setLocalDestinationByItem] = useState<Map<string, string>>(new Map())
+
+  const { items: storeOverrides, upsert: upsertStoreOverride } = useStoreOverrides()
 
   useEffect(() => {
     if (isOpen) {
@@ -30,6 +40,7 @@ export function SendToGroceriesModal({ isOpen, onClose, consolidated, groceriesL
         return !lower.some(it => it.includes(key) || key.includes(it))
       }))
       setError(null)
+      setLocalDestinationByItem(new Map())
     }
   }, [isOpen, consolidated, currentItemTexts])
 
@@ -40,23 +51,62 @@ export function SendToGroceriesModal({ isOpen, onClose, consolidated, groceriesL
     return groups
   }, [items])
 
+  function getDestinationListId(item: ConsolidatedIngredient): string | null {
+    const localOverride = localDestinationByItem.get(keyOf(item.text))
+    if (localOverride) return localOverride
+    const persistentOverride = storeOverrides.find(o => o.pattern === keyOf(item.text))
+    if (persistentOverride) return persistentOverride.targetListId
+    return groceriesListId
+  }
+
+  function sendButtonLabel(): string {
+    if (sending) return 'Sending…'
+    const groups = new Map<string, number>()
+    for (const it of items) {
+      const dest = getDestinationListId(it)
+      if (!dest) continue
+      groups.set(dest, (groups.get(dest) ?? 0) + 1)
+    }
+    if (groups.size <= 1) return `Send ${items.length} to Groceries`
+    const parts: string[] = []
+    for (const [listId, count] of groups) {
+      const store = stores.find(s => s.id === listId)
+      parts.push(`${count} to ${store?.title ?? '?'}`)
+    }
+    return `Send ${items.length} — ${parts.join(' · ')}`
+  }
+
   const handleSend = async () => {
-    if (!groceriesListId || items.length === 0) return
-    setSending(true)
-    setError(null)
+    if (items.length === 0) return
+    setSending(true); setError(null)
     const { data: userResult } = await supabase.auth.getUser()
     const userId = userResult?.user?.id
     if (!userId) { setError('not authenticated'); setSending(false); return }
 
-    const inserts = items.map((it, idx) => ({
-      list_id: groceriesListId,
-      user_id: userId,
-      text: it.text,
-      sort_order: idx,
-      completed: false,
-    }))
-    const { error: insertErr } = await supabase.from('list_items').insert(inserts)
-    if (insertErr) { setError(insertErr.message); setSending(false); return }
+    // Group items by destination list id
+    const groups = new Map<string, ConsolidatedIngredient[]>()
+    for (const it of items) {
+      const dest = getDestinationListId(it)
+      if (!dest) continue
+      const arr = groups.get(dest) ?? []
+      arr.push(it)
+      groups.set(dest, arr)
+    }
+
+    if (groups.size === 0) { setError('no destination list available'); setSending(false); return }
+
+    for (const [listId, list] of groups) {
+      const inserts = list.map((it, idx) => ({
+        list_id: listId,
+        user_id: userId,
+        text: it.text,
+        sort_order: idx,
+        completed: false,
+      }))
+      const { error: err } = await supabase.from('list_items').insert(inserts)
+      if (err) { setError(err.message); setSending(false); return }
+    }
+
     setSending(false)
     onSent()
     onClose()
@@ -88,11 +138,26 @@ export function SendToGroceriesModal({ isOpen, onClose, consolidated, groceriesL
                         .map(id => recipesById.get(id)?.title)
                         .filter((t): t is string => !!t)
                     : []
+                  const dest = getDestinationListId(item)
                   return (
                     <IngredientLineRow
                       key={`${item.text}-${idx}`}
                       item={item}
                       fromRecipeTitles={titles}
+                      rightAccessory={stores.length >= 2 && dest ? (
+                        <StoreChip
+                          selectedListId={dest}
+                          stores={stores}
+                          onSelect={async (listId) => {
+                            setLocalDestinationByItem(prev => {
+                              const next = new Map(prev)
+                              next.set(keyOf(item.text), listId)
+                              return next
+                            })
+                            await upsertStoreOverride(keyOf(item.text), listId)
+                          }}
+                        />
+                      ) : undefined}
                       onChange={(text) => setItems(prev => prev.map(i => i === item ? { ...i, text } : i))}
                       onRemove={() => setItems(prev => prev.filter(i => i !== item))}
                     />
@@ -107,9 +172,9 @@ export function SendToGroceriesModal({ isOpen, onClose, consolidated, groceriesL
 
         <div className="p-4 border-t border-neutral-200 flex justify-end gap-3">
           <button onClick={onClose} className="px-5 py-2 rounded-2xl text-neutral-600 hover:bg-neutral-100">Cancel</button>
-          <button onClick={handleSend} disabled={sending || items.length === 0 || !groceriesListId}
+          <button onClick={handleSend} disabled={sending || items.length === 0 || (!groceriesListId && stores.length === 0)}
                   className="px-6 py-2 rounded-2xl bg-primary-500 text-white font-medium disabled:opacity-40 hover:bg-primary-600">
-            {sending ? 'Sending…' : `Send ${items.length} to Groceries`}
+            {sendButtonLabel()}
           </button>
         </div>
       </div>
