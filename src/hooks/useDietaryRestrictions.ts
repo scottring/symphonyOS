@@ -31,13 +31,13 @@ export function useDietaryRestrictions() {
       label: trimmed,
     })
     if (err) { setError(err.message); return }
-    refresh()
+    await refresh()
   }, [refresh])
 
   const remove = useCallback(async (id: string) => {
     const { error: err } = await supabase.from('dietary_restrictions').delete().eq('id', id)
     if (err) { setError(err.message); return }
-    refresh()
+    await refresh()
   }, [refresh])
 
   return { items, loading, error, add, remove, refresh }

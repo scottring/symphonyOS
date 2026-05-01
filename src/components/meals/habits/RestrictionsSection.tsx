@@ -3,7 +3,7 @@ import { useDietaryRestrictions } from '@/hooks/useDietaryRestrictions'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 
 export function RestrictionsSection() {
-  const { items, add, remove, loading } = useDietaryRestrictions()
+  const { items, add, remove, loading, error } = useDietaryRestrictions()
   const { members } = useFamilyMembers()
   const [draftLabel, setDraftLabel] = useState('')
   const [draftWho, setDraftWho] = useState<string | null>(null)
@@ -22,6 +22,11 @@ export function RestrictionsSection() {
       </div>
 
       <div className="mt-6 rounded-3xl border border-neutral-200 bg-bg-elevated shadow-card overflow-hidden">
+        {error && (
+          <div className="px-4 py-2 border-b border-neutral-100 text-[13px] text-accent-500 italic">
+            {error}
+          </div>
+        )}
         {loading ? (
           <p className="px-4 py-3 text-[13px] italic text-neutral-400">Loading…</p>
         ) : items.length === 0 ? (
