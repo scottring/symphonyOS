@@ -558,6 +558,7 @@ export function PlannerPage() {
 /** Map any legacy or canonical slot to a canonical day-meal slot. */
 function canonicalSlot(slot: string): MealSlot | undefined {
   if (DAY_MEAL_SLOTS.includes(slot as MealSlot)) return slot as MealSlot
+  if (slot === 'prep') return 'prep'
   if (slot === 'lunch_iris' || slot === 'lunch_scott') return 'lunch'
   if (slot === 'kid_alternate') return 'dinner'
   return undefined

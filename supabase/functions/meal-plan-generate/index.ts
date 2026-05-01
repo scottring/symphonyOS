@@ -231,7 +231,13 @@ Deno.serve(async (req) => {
     if (prepRows.length > 0) {
       const { data: prepInserted, error: prepErr } = await supabase
         .from('meal_plan_entries').insert(prepRows).select('id')
-      if (prepErr) return jsonError(500, `prep insert failed: ${prepErr.message}`)
+      if (prepErr) {
+        // Compensation: restore prior entries so the user isn't left with an empty week.
+        if ((prior ?? []).length > 0) {
+          await supabase.from('meal_plan_entries').insert(prior as never[])
+        }
+        return jsonError(500, `prep insert failed: ${prepErr.message}`)
+      }
       prepInsertedIds = (prepInserted ?? []).map(r => r.id)
     }
 
@@ -305,7 +311,16 @@ Deno.serve(async (req) => {
     if (restRows.length > 0) {
       const { data: restInserted, error: restInsertErr } = await supabase
         .from('meal_plan_entries').insert(restRows).select('id')
-      if (restInsertErr) return jsonError(500, `entries insert failed: ${restInsertErr.message}`)
+      if (restInsertErr) {
+        // Compensation: roll back the prep entries we just wrote, then restore prior.
+        if (prepInsertedIds.length > 0) {
+          await supabase.from('meal_plan_entries').delete().in('id', prepInsertedIds)
+        }
+        if ((prior ?? []).length > 0) {
+          await supabase.from('meal_plan_entries').insert(prior as never[])
+        }
+        return jsonError(500, `entries insert failed: ${restInsertErr.message}`)
+      }
       restInsertedIds = (restInserted ?? []).map(r => r.id)
     }
 

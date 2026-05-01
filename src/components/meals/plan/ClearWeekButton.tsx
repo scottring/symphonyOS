@@ -40,6 +40,7 @@ export function ClearWeekButton({ entryCount, weekLabel, onConfirm }: Props) {
       </button>
       {confirming && (
         <div
+          onClick={(e) => { if (e.target === e.currentTarget) setConfirming(false) }}
           className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
