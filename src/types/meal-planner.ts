@@ -483,3 +483,55 @@ export function dbRestrictionToRestriction(row: DbDietaryRestriction): DietaryRe
     label: row.label,
   }
 }
+
+// ─────────────────────────────────────────────────────────────────
+// grocery_store_overrides · routing rules per ingredient pattern
+// ─────────────────────────────────────────────────────────────────
+
+export interface DbStoreOverride {
+  id: string
+  user_id: string
+  pattern: string
+  target_list_id: string
+  created_at: string
+}
+
+export interface StoreOverride {
+  id: string
+  pattern: string
+  targetListId: string
+}
+
+export function dbStoreOverrideToOverride(row: DbStoreOverride): StoreOverride {
+  return { id: row.id, pattern: row.pattern, targetListId: row.target_list_id }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// pantry_inventory · per-ingredient stock level
+// ─────────────────────────────────────────────────────────────────
+
+export type PantryLevel = 'high' | 'medium' | 'low' | 'out'
+
+export interface DbPantryInventory {
+  id: string
+  user_id: string
+  pattern: string
+  level: PantryLevel
+  last_checked_at: string
+}
+
+export interface PantryInventory {
+  id: string
+  pattern: string
+  level: PantryLevel
+  lastCheckedAt: Date
+}
+
+export function dbPantryToPantry(row: DbPantryInventory): PantryInventory {
+  return {
+    id: row.id,
+    pattern: row.pattern,
+    level: row.level,
+    lastCheckedAt: new Date(row.last_checked_at),
+  }
+}
