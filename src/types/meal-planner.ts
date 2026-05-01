@@ -438,10 +438,12 @@ export function dbUndoTokenToToken(row: DbUndoToken): UndoToken {
 
 export interface GeneratedEntry {
   day_of_week: number       // 0..6 (Mon..Sun)
-  slot: 'breakfast' | 'lunch' | 'snack' | 'dinner'
+  slot: 'breakfast' | 'lunch' | 'snack' | 'dinner' | 'prep'
   family_member_id: string | null
   recipe_id: string | null
   ad_hoc_title: string | null
+  prepared_by_family_member_id: string | null
+  leftover_from: string | null
 }
 
 export interface GeneratePlanResult {

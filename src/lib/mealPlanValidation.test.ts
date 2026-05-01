@@ -159,6 +159,7 @@ describe('buildPromptContext', () => {
       habits: [
         { owner_auth_user_id: 'au-iris', name: 'Yogurt', slot: 'breakfast', grams_hint: 80 },
       ],
+      restrictions: [],
       brief: 'Bittman shrimp this week.',
     })
     expect(out).toContain('WEEK: 2026-04-27')
@@ -176,6 +177,7 @@ describe('buildPromptContext', () => {
       members: [],
       shelf: [],
       habits: [],
+      restrictions: [],
       brief: 'something',
     })
     expect(out).toContain('SHELF (household, 0 recipes)')
@@ -189,6 +191,7 @@ describe('buildPromptContext', () => {
       members: [{ name: 'Iris "The Great"', family_member_id: 'fm-iris', auth_user_id: null }],
       shelf: [{ recipe_id: 'rec-1', title: 'A "fancy" dish', tags: [], prep_minutes: null, kid_acceptance: null, is_prep_friendly: false }],
       habits: [{ owner_auth_user_id: 'au-1', name: 'Eat "well"', slot: 'breakfast', grams_hint: null }],
+      restrictions: [],
       brief: 'with "quotes" inside',
     })
     expect(out).toContain('"Iris \\"The Great\\""')
@@ -213,6 +216,10 @@ describe('Node ↔ Deno mirror equivalence', () => {
     habits: [
       { owner_auth_user_id: 'au-iris', name: 'Yogurt + tomatoes', slot: 'breakfast', grams_hint: 80 },
     ],
+    restrictions: [
+      { scope: 'household' as const, person_name: null, label: 'gluten-free' },
+      { scope: 'person' as const, person_name: 'Iris', label: 'no shellfish' },
+    ],
     brief: '800g challenge · No "stir fry" this week',
   }
 
@@ -231,5 +238,55 @@ describe('Node ↔ Deno mirror equivalence', () => {
     ]
     expect(JSON.stringify(denoMirror.validateGeneratedEntries(ENTRIES, ROSTER, SHELF)))
       .toBe(JSON.stringify(srcFn(ENTRIES, ROSTER, SHELF)))
+  })
+})
+
+describe('validateGeneratedEntries — prep + leftover + soft drop', () => {
+  const roster = new Set(['fm-iris', 'fm-scott'])
+  const shelf = new Set(['rec-1'])
+
+  it('accepts prep as a canonical slot', () => {
+    const r = validateGeneratedEntries(
+      [{ day_of_week: 6, slot: 'prep', family_member_id: null, recipe_id: 'rec-1', ad_hoc_title: null }],
+      roster, shelf,
+    )
+    expect(r.kept).toHaveLength(1)
+    expect(r.kept[0].slot).toBe('prep')
+  })
+
+  it('preserves leftover_from string', () => {
+    const r = validateGeneratedEntries(
+      [{ day_of_week: 1, slot: 'lunch', family_member_id: null, recipe_id: 'rec-1', ad_hoc_title: null, leftover_from: 'prep_1' }],
+      roster, shelf,
+    )
+    expect(r.kept[0].leftover_from).toBe('prep_1')
+  })
+
+  it('demotes a hallucinated recipe_id to ad-hoc when title is present', () => {
+    const r = validateGeneratedEntries(
+      [{ day_of_week: 1, slot: 'dinner', family_member_id: null, recipe_id: 'rec-fake', ad_hoc_title: 'Salmon something', leftover_from: null }],
+      roster, shelf,
+    )
+    expect(r.dropped).toHaveLength(0)
+    expect(r.kept[0].recipe_id).toBeNull()
+    expect(r.kept[0].ad_hoc_title).toBe('Salmon something')
+  })
+
+  it('still drops recipe_id miss with no title', () => {
+    const r = validateGeneratedEntries(
+      [{ day_of_week: 1, slot: 'dinner', family_member_id: null, recipe_id: 'rec-fake', ad_hoc_title: null, leftover_from: null }],
+      roster, shelf,
+    )
+    expect(r.kept).toHaveLength(0)
+    expect(r.dropped[0].reason).toMatch(/recipe_id not in shelf/)
+  })
+
+  it('rejects prepared_by not in roster', () => {
+    const r = validateGeneratedEntries(
+      [{ day_of_week: 1, slot: 'dinner', family_member_id: null, recipe_id: 'rec-1', ad_hoc_title: null, prepared_by_family_member_id: 'fm-fake' }],
+      roster, shelf,
+    )
+    expect(r.kept).toHaveLength(0)
+    expect(r.dropped[0].reason).toMatch(/prepared_by_family_member_id not in roster/)
   })
 })
