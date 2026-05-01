@@ -1,11 +1,14 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { CATEGORY_ORDER, type GroceryCategory } from '@/lib/categorizeIngredient'
 import type { ConsolidatedIngredient } from '@/lib/consolidateIngredients'
 import type { Recipe } from '@/types/meal-planner'
+import type { PantryInventory, PantryLevel } from '@/types/meal-planner'
 import { IngredientLineRow } from './IngredientLineRow'
 import { useStoreOverrides } from '@/hooks/useStoreOverrides'
+import { usePantryInventory } from '@/hooks/usePantryInventory'
 import { StoreChip } from './StoreChip'
+import { PantryLevelPicker } from './PantryLevelPicker'
 
 interface Props {
   isOpen: boolean
@@ -24,13 +27,23 @@ function keyOf(text: string): string {
   return text.toLowerCase().trim()
 }
 
+const PANTRY_CATEGORIES: Set<string> = new Set(['Pantry', 'Other', 'Spices'])
+
+function pantryContext(pantry: PantryInventory | undefined, useCount: number): string | undefined {
+  if (!pantry) return undefined
+  const days = Math.max(1, Math.round((Date.now() - pantry.lastCheckedAt.getTime()) / 86400000))
+  return `marked ${pantry.level} ${days}d ago — used in ${useCount} recipe${useCount === 1 ? '' : 's'}`
+}
+
 export function SendToGroceriesModal({ isOpen, onClose, consolidated, groceriesListId, currentItemTexts, recipesById, stores, onSent }: Props) {
   const [items, setItems] = useState<ConsolidatedIngredient[]>([])
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [localDestinationByItem, setLocalDestinationByItem] = useState<Map<string, string>>(new Map())
+  const [suppressedHighItems, setSuppressedHighItems] = useState<ConsolidatedIngredient[]>([])
 
   const { items: storeOverrides, upsert: upsertStoreOverride } = useStoreOverrides()
+  const { items: pantryItems, setLevel: setPantryLevel, clear: clearPantryLevel } = usePantryInventory()
 
   useEffect(() => {
     if (isOpen) {
@@ -41,8 +54,15 @@ export function SendToGroceriesModal({ isOpen, onClose, consolidated, groceriesL
       }))
       setError(null)
       setLocalDestinationByItem(new Map())
+      setSuppressedHighItems([])
     }
   }, [isOpen, consolidated, currentItemTexts])
+
+  const pantryByPattern = useMemo(() => {
+    const m = new Map<string, PantryInventory>()
+    for (const p of pantryItems) m.set(p.pattern, p)
+    return m
+  }, [pantryItems])
 
   const grouped = useMemo(() => {
     const groups = new Map<GroceryCategory, ConsolidatedIngredient[]>()
@@ -58,6 +78,14 @@ export function SendToGroceriesModal({ isOpen, onClose, consolidated, groceriesL
     if (persistentOverride) return persistentOverride.targetListId
     return groceriesListId
   }
+
+  const handlePantryLevel = useCallback(async (item: ConsolidatedIngredient, level: PantryLevel) => {
+    await setPantryLevel(keyOf(item.text), level)
+    if (level === 'high') {
+      setItems(prev => prev.filter(i => i !== item))
+      setSuppressedHighItems(prev => [...prev, item])
+    }
+  }, [setPantryLevel])
 
   function sendButtonLabel(): string {
     if (sending) return 'Sending…'
@@ -139,12 +167,13 @@ export function SendToGroceriesModal({ isOpen, onClose, consolidated, groceriesL
                         .filter((t): t is string => !!t)
                     : []
                   const dest = getDestinationListId(item)
-                  return (
-                    <IngredientLineRow
-                      key={`${item.text}-${idx}`}
-                      item={item}
-                      fromRecipeTitles={titles}
-                      rightAccessory={stores.length >= 2 && dest ? (
+                  const isPantry = PANTRY_CATEGORIES.has(item.category)
+                  const pantry = pantryByPattern.get(keyOf(item.text))
+                  const ctx = pantryContext(pantry, item.fromRecipeIds.length)
+                  const showAccessory = (stores.length >= 2 && dest != null) || isPantry
+                  const accessory = showAccessory ? (
+                    <div className="flex flex-col items-end gap-1">
+                      {stores.length >= 2 && dest != null && (
                         <StoreChip
                           selectedListId={dest}
                           stores={stores}
@@ -157,7 +186,22 @@ export function SendToGroceriesModal({ isOpen, onClose, consolidated, groceriesL
                             await upsertStoreOverride(keyOf(item.text), listId)
                           }}
                         />
-                      ) : undefined}
+                      )}
+                      {isPantry && (
+                        <PantryLevelPicker
+                          level={pantry?.level ?? null}
+                          onSelect={(level) => handlePantryLevel(item, level)}
+                          context={ctx}
+                        />
+                      )}
+                    </div>
+                  ) : undefined
+                  return (
+                    <IngredientLineRow
+                      key={`${item.text}-${idx}`}
+                      item={item}
+                      fromRecipeTitles={titles}
+                      rightAccessory={accessory}
                       onChange={(text) => setItems(prev => prev.map(i => i === item ? { ...i, text } : i))}
                       onRemove={() => setItems(prev => prev.filter(i => i !== item))}
                     />
@@ -167,6 +211,24 @@ export function SendToGroceriesModal({ isOpen, onClose, consolidated, groceriesL
             </div>
           ))}
         </div>
+
+        {suppressedHighItems.length > 0 && (
+          <div className="px-6 pt-2 pb-1 text-[12px] italic text-neutral-500">
+            {suppressedHighItems.length} item{suppressedHighItems.length === 1 ? '' : 's'} marked sufficient: {suppressedHighItems.map(i => i.text).join(', ')}.{' '}
+            <button
+              onClick={async () => {
+                setItems(prev => [...prev, ...suppressedHighItems])
+                for (const it of suppressedHighItems) {
+                  await clearPantryLevel(keyOf(it.text))
+                }
+                setSuppressedHighItems([])
+              }}
+              className="not-italic text-primary-500 hover:text-primary-600 underline"
+            >
+              Show / Restore
+            </button>
+          </div>
+        )}
 
         {error && <p className="px-6 pb-2 text-[14px] text-accent-500">{error}</p>}
 
