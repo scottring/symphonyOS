@@ -123,6 +123,7 @@ export interface DbMealPlanEntry {
   tracking_updated_at?: string | null
   // Per-person variants (migration 079)
   family_member_id?: string | null
+  prepared_by_family_member_id?: string | null
 }
 
 export interface MealPlan {
@@ -153,6 +154,8 @@ export interface MealPlanEntry {
   actualGrams?: string
   /** NULL = family-default. Otherwise a family_members.id. */
   familyMemberId?: string
+  /** NULL = unassigned. Otherwise a family_members.id of the cook. */
+  preparedBy?: string | null
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -373,6 +376,7 @@ export function dbMealPlanEntryToMealPlanEntry(row: DbMealPlanEntry): MealPlanEn
     swapGrams: row.swap_grams ?? undefined,
     actualGrams: row.actual_grams ?? undefined,
     familyMemberId: row.family_member_id ?? undefined,
+    preparedBy: row.prepared_by_family_member_id ?? null,
   }
 }
 
@@ -450,4 +454,30 @@ export interface GeneratePlanResult {
 export interface UndoPlanResult {
   ok: boolean
   noop: boolean
+}
+
+// ─────────────────────────────────────────────────────────────────
+// dietary_restrictions · per-person and household-wide constraints
+// ─────────────────────────────────────────────────────────────────
+
+export interface DbDietaryRestriction {
+  id: string
+  user_id: string
+  family_member_id: string | null
+  label: string
+  created_at: string
+}
+
+export interface DietaryRestriction {
+  id: string
+  familyMemberId: string | null
+  label: string
+}
+
+export function dbRestrictionToRestriction(row: DbDietaryRestriction): DietaryRestriction {
+  return {
+    id: row.id,
+    familyMemberId: row.family_member_id,
+    label: row.label,
+  }
 }
