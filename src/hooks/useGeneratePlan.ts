@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { toIsoDate } from '@/lib/weekHelpers'
+import { useGeneratePlanContext } from '@/contexts/GeneratePlanContext'
 import type { GeneratePlanResult, UndoPlanResult } from '@/types/meal-planner'
 
 interface GenerateReturn {
@@ -40,6 +41,7 @@ async function unwrapInvokeError(err: unknown, fallback: string): Promise<string
 export function useGeneratePlan() {
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { bumpRefreshSignal } = useGeneratePlanContext()
 
   const generate = useCallback(async (weekStart: Date): Promise<GenerateReturn> => {
     setGenerating(true)
@@ -54,11 +56,14 @@ export function useGeneratePlan() {
         setError(msg)
         return { ok: false, error: msg }
       }
+      // The edge function inserted entries server-side; ping any subscribed
+      // hooks (useMealPlan, useWeeklyBrief) so they re-fetch with the new state.
+      bumpRefreshSignal()
       return { ok: true, result: data }
     } finally {
       setGenerating(false)
     }
-  }, [])
+  }, [bumpRefreshSignal])
 
   const undo = useCallback(async (tokenId: string): Promise<UndoReturn> => {
     const { data, error: invokeErr } = await supabase.functions.invoke<UndoPlanResult>(
@@ -69,8 +74,10 @@ export function useGeneratePlan() {
       const msg = await unwrapInvokeError(invokeErr, 'undo failed')
       return { ok: false, error: msg }
     }
+    // Undo also mutated server state — refresh consumers.
+    bumpRefreshSignal()
     return { ok: data.ok, noop: data.noop }
-  }, [])
+  }, [bumpRefreshSignal])
 
   return { generate, undo, generating, error }
 }

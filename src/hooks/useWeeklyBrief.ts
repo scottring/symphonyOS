@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { toIsoDate } from '@/lib/weekHelpers'
+import { useGeneratePlanContext } from '@/contexts/GeneratePlanContext'
 import { dbWeeklyBriefToWeeklyBrief, type WeeklyBrief, type DbWeeklyBrief } from '@/types/meal-planner'
 
 interface UseWeeklyBriefResult {
@@ -17,6 +18,7 @@ export function useWeeklyBrief(weekStart: Date): UseWeeklyBriefResult {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const weekStartIso = toIsoDate(weekStart)
+  const { refreshSignal } = useGeneratePlanContext()
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -76,7 +78,8 @@ export function useWeeklyBrief(weekStart: Date): UseWeeklyBriefResult {
     setBrief({ ...existing, status: 'generated', generatedAt: new Date() })
   }, [ensureBrief])
 
-  useEffect(() => { refresh() }, [refresh])
+  // Refetch on mount, when the week changes, and when generate bumps the signal.
+  useEffect(() => { refresh() }, [refresh, refreshSignal])
 
   return { brief, loading, error, setBody, markGenerated, refresh }
 }

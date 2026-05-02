@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { toIsoDate } from '@/lib/weekHelpers'
+import { useGeneratePlanContext } from '@/contexts/GeneratePlanContext'
 import {
   dbMealPlanToMealPlan, type MealPlan, type DbMealPlan, type DbMealPlanEntry,
   type MealParameter, type MealSlot,
@@ -37,6 +38,7 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const weekStartIso = toIsoDate(weekStart)
+  const { refreshSignal } = useGeneratePlanContext()
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -183,7 +185,9 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
     return { ok: true, tokenId: tokenRow?.id }
   }, [plan, refresh, weekStartIso])
 
-  useEffect(() => { refresh() }, [refresh])
+  // Refetch on mount, when the week changes, and after a server-side
+  // generate/undo bumps the shared refresh signal.
+  useEffect(() => { refresh() }, [refresh, refreshSignal])
 
   return { plan, loading, error, refresh, addMeal, removeMeal, setParameter, updateMealPreparer, clearWeek }
 }
