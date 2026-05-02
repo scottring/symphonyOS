@@ -1,9 +1,9 @@
 import { Suspense } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, Navigate } from 'react-router-dom'
 import { SectionErrorBoundary } from '@/components/SectionErrorBoundary'
 import { AgentHomeView } from '@/components/agent/AgentHomeView'
 import {
-  MemoryShelfPage, PlannerPage, TodayPage, BriefComposerPage, StandingHabitsPage,
+  MemoryShelfPage, PlannerPage, TodayPage, StandingHabitsPage,
   DayDetailPage, CookPage, GramTrackingPage, TonightPage,
 } from '@/components/meals'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
@@ -435,7 +435,7 @@ export function ViewRouter(props: ViewRouterProps) {
       )}
 
       {props.activeView === 'meals' && location.pathname.startsWith('/meals/brief') && (
-        <BriefComposerPage />
+        <Navigate to="/meals/plan#brief" replace />
       )}
 
       {props.activeView === 'meals' && location.pathname.startsWith('/meals/habits') && (
@@ -461,7 +461,6 @@ export function ViewRouter(props: ViewRouterProps) {
       {props.activeView === 'meals'
         && !location.pathname.startsWith('/meals/shelf')
         && !location.pathname.startsWith('/meals/today')
-        && !location.pathname.startsWith('/meals/brief')
         && !location.pathname.startsWith('/meals/habits')
         && !location.pathname.startsWith('/meals/day/')
         && !location.pathname.startsWith('/meals/cook/')

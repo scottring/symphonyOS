@@ -11,8 +11,6 @@ import { mondayOfWeek, dateForDayOfWeek, isToday as isTodayHelper, formatDateMon
 import { DayCard } from './DayCard'
 import { CollapseSection } from './PlanDocSections'
 import { RecipePickerModal, type LeftoverCandidate } from './RecipePickerModal'
-import { GroceryStatusCard } from '../groceries/GroceryStatusCard'
-import { SendToGroceriesModal } from '../groceries/SendToGroceriesModal'
 import { MealsTabs } from '../MealsTabs'
 import { ParameterDropdown } from './ParameterDropdown'
 import { ClearWeekButton } from './ClearWeekButton'
@@ -22,6 +20,11 @@ import { UndoToast } from './UndoToast'
 import { DistributeLeftoversModal } from './DistributeLeftoversModal'
 import { DAY_MEAL_SLOTS, MEAL_SLOT_LABEL } from '@/types/meal-planner'
 import type { MealPlanEntry, MealSlot, Recipe } from '@/types/meal-planner'
+import { RitualStatus } from './RitualStatus'
+import { InlineBriefComposer } from './InlineBriefComposer'
+import { RitualTour } from './RitualTour'
+import { GroceryReviewSection } from '../groceries/GroceryReviewSection'
+import { RestrictionsSection } from '../habits/RestrictionsSection'
 
 /** Map FamilyMember color to Tailwind classes for initial chip. */
 function memberColorClass(color: string): string {
@@ -37,8 +40,10 @@ function memberColorClass(color: string): string {
 }
 
 /** Surface 3 — Full Plan View (the document). The week as a single
- *  Family-Meal-Plan document with collapsible sections and day cards. */
-export function PlannerPage() {
+ *  Family-Meal-Plan document with collapsible sections and day cards.
+ *  Unified with the Brief composer (previously BriefComposerPage) and
+ *  the inline grocery review (previously SendToGroceriesModal). */
+export function MealPlanRitualPage() {
   const navigate = useNavigate()
   const weekStart = useMemo(() => mondayOfWeek(new Date()), [])
   const { plan, loading, error, addMeal, removeMeal, setParameter, clearWeek, updateMealPreparer } = useMealPlan(weekStart)
@@ -49,9 +54,14 @@ export function PlannerPage() {
   const { habits, toggleWeekPause } = useStandingHabits()
   const { members: familyMembers } = useFamilyMembers()
   const [picker, setPicker] = useState<{ dayOfWeek: number; slot: MealSlot; familyMemberId?: string; replaceEntryId?: string } | null>(null)
-  const [sendOpen, setSendOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
   const [previewedDay, setPreviewedDay] = useState<number | null>(null)
+
+  const [tourMounted, setTourMounted] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem('symphony_meal_tour_v1_completed') !== 'true'
+  })
+  const [lastSendAt, setLastSendAt] = useState<Date | null>(null)
 
   const recipesById = useMemo(() => {
     const map = new Map<string, Recipe>()
@@ -319,11 +329,8 @@ export function PlannerPage() {
     )
   }
 
-  // Build week-of label + subtitle. Prefer the brief body if present.
+  // Build week-of label.
   const weekLabel = formatDateMonthDay(weekStart)
-  const briefLine = brief?.body?.trim()
-    ? brief.body.trim().split('\n')[0]
-    : (plan?.parameter ? `Monday–Sunday · ${plan.parameter}` : 'Monday–Sunday')
 
   return (
     <div className="px-12 py-12 max-w-3xl mx-auto">
@@ -339,9 +346,6 @@ export function PlannerPage() {
           <h1 className="font-display text-[3rem] leading-[1.05] text-neutral-800">
             Family Meal <span className="italic text-primary-500">Plan.</span>
           </h1>
-          <p className="font-display italic text-[1.1rem] text-neutral-500 mt-2">
-            {briefLine}
-          </p>
         </div>
         <div className="flex items-center gap-2">
           <ClearWeekButton
@@ -362,176 +366,209 @@ export function PlannerPage() {
         </div>
       </div>
 
-      <div className="mt-6 mb-8">
-        <GroceryStatusCard
-          stockedPercent={status.stockedPercent}
-          missingCount={status.missingItems.length}
-          totalCount={status.consolidated.length}
-          onSendToGroceries={() => setSendOpen(true)}
+      {/* 1. Status indicator — anchor #top */}
+      <section id="top" className="mt-4 mb-8 scroll-mt-8">
+        <RitualStatus
+          hasBrief={!!brief?.body?.trim()}
+          planDrafted={!!brief?.generatedAt || (plan?.entries.length ?? 0) > 0}
+          prepCount={sundayPrep.length}
+          missingGroceriesCount={status.missingItems.length}
+          onRestartTour={() => {
+            localStorage.removeItem('symphony_meal_tour_v1_completed')
+            setTourMounted(true)
+          }}
         />
-      </div>
+      </section>
 
-      {/* Doc sections */}
-      <CollapseSection title="Standing habits" count={habits.length} initialOpen={habits.length > 0}>
-        {habits.length === 0 ? (
-          <p className="text-[13px] italic text-neutral-400">
-            None configured. <button onClick={() => navigate('/meals/habits')}
-              className="text-primary-500 underline italic">Configure habits →</button>
-          </p>
-        ) : (
-          <div className="space-y-1">
-            {habits.map(h => {
-              const owner = familyMembers.find(m => m.auth_user_id === h.userId || (m.user_id === h.userId && !m.auth_user_id))
-              const initial = owner?.name?.[0]?.toUpperCase() ?? '?'
-              const colorClass = owner ? memberColorClass(owner.color) : 'bg-neutral-200 text-neutral-500'
-              const weekStartIso = toIsoDate(weekStart)
-              const pausedThisWeek = h.pausedForWeeks.includes(weekStartIso)
-              return (
-                <div key={h.id} className={`flex items-center gap-2 text-[13px] text-neutral-700 ${(h.paused || pausedThisWeek) ? 'opacity-50 line-through' : ''}`}>
-                  <span
-                    className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-medium ${colorClass}`}
-                    title={owner?.name ?? 'Unknown'}
-                  >
-                    {initial}
-                  </span>
-                  <span className="font-display">{h.name}</span>
-                  {h.gramsHint != null && <span className="ml-1 text-primary-500 italic">+{h.gramsHint}g</span>}
-                  <span className="ml-1 text-[11px] uppercase tracking-[0.12em] text-neutral-400">
-                    {MEAL_SLOT_LABEL[h.slot]}
-                  </span>
-                  <button
-                    onClick={() => toggleWeekPause(h.id, weekStartIso)}
-                    title={pausedThisWeek ? 'Resume for this week' : 'Pause for this week'}
-                    className="ml-auto text-[11px] italic text-neutral-400 hover:text-primary-500"
-                  >
-                    {pausedThisWeek ? 'resume this week' : 'pause this week'}
-                  </button>
-                </div>
-              )
-            })}
-            <div className="mt-2">
-              <button onClick={() => navigate('/meals/habits')}
-                      className="text-[12px] text-primary-500 italic hover:text-primary-600">
-                edit habits →
-              </button>
+      {/* 2. Brief composer — anchor #brief */}
+      <section id="brief" className="mb-8 scroll-mt-8">
+        <InlineBriefComposer weekStart={weekStart} />
+      </section>
+
+      {/* 3. Habits + Restrictions — anchor #habits, COLLAPSED by default */}
+      <section id="habits" className="scroll-mt-8">
+        <CollapseSection
+          title="Standing habits + restrictions"
+          count={habits.length}
+          initialOpen={false}
+        >
+          {habits.length === 0 ? (
+            <p className="text-[13px] italic text-neutral-400">
+              None configured. <button onClick={() => navigate('/meals/habits')}
+                className="text-primary-500 underline italic">Configure habits →</button>
+            </p>
+          ) : (
+            <div className="space-y-1">
+              {habits.map(h => {
+                const owner = familyMembers.find(m => m.auth_user_id === h.userId || (m.user_id === h.userId && !m.auth_user_id))
+                const initial = owner?.name?.[0]?.toUpperCase() ?? '?'
+                const colorClass = owner ? memberColorClass(owner.color) : 'bg-neutral-200 text-neutral-500'
+                const weekStartIso = toIsoDate(weekStart)
+                const pausedThisWeek = h.pausedForWeeks.includes(weekStartIso)
+                return (
+                  <div key={h.id} className={`flex items-center gap-2 text-[13px] text-neutral-700 ${(h.paused || pausedThisWeek) ? 'opacity-50 line-through' : ''}`}>
+                    <span
+                      className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-medium ${colorClass}`}
+                      title={owner?.name ?? 'Unknown'}
+                    >
+                      {initial}
+                    </span>
+                    <span className="font-display">{h.name}</span>
+                    {h.gramsHint != null && <span className="ml-1 text-primary-500 italic">+{h.gramsHint}g</span>}
+                    <span className="ml-1 text-[11px] uppercase tracking-[0.12em] text-neutral-400">
+                      {MEAL_SLOT_LABEL[h.slot]}
+                    </span>
+                    <button
+                      onClick={() => toggleWeekPause(h.id, weekStartIso)}
+                      title={pausedThisWeek ? 'Resume for this week' : 'Pause for this week'}
+                      className="ml-auto text-[11px] italic text-neutral-400 hover:text-primary-500"
+                    >
+                      {pausedThisWeek ? 'resume this week' : 'pause this week'}
+                    </button>
+                  </div>
+                )
+              })}
+              <div className="mt-2">
+                <button onClick={() => navigate('/meals/habits')}
+                        className="text-[12px] text-primary-500 italic hover:text-primary-600">
+                  edit habits →
+                </button>
+              </div>
             </div>
+          )}
+          {/* Restrictions inline below habits */}
+          <div className="mt-4">
+            <RestrictionsSection />
           </div>
-        )}
-      </CollapseSection>
+        </CollapseSection>
+      </section>
 
-      <CollapseSection title="What's different this week" initialOpen={!!(brief?.diffProse || brief?.body)}>
-        {brief?.diffProse ? (
-          <div>
+      {/* 4. Symphony's read on this week — anchor #read, visible when diffProse exists */}
+      {brief?.diffProse && (
+        <section id="read" className="mb-8 scroll-mt-8">
+          <div className="rounded-3xl border border-neutral-200 bg-bg-elevated shadow-card p-5">
+            <div className="text-[0.7rem] font-bold uppercase tracking-[0.25em] text-neutral-500 mb-2">
+              SYMPHONY'S READ ON THIS WEEK
+            </div>
             <p className="font-display text-[1.05rem] text-neutral-700 leading-relaxed whitespace-pre-line">
               {brief.diffProse}
             </p>
-            <button onClick={() => navigate('/meals/brief')}
-                    className="mt-3 text-[12px] text-primary-500 italic hover:text-primary-600">
-              edit brief →
-            </button>
           </div>
-        ) : brief?.body?.trim() ? (
-          <div>
-            <p className="font-display italic text-[0.95rem] text-neutral-500 mb-2">
-              Brief (no AI diff yet — regenerate the plan to produce one):
-            </p>
-            <p className="font-display text-[1rem] text-neutral-600 whitespace-pre-line">
-              {brief.body}
-            </p>
-            <button onClick={() => navigate('/meals/brief')}
-                    className="mt-3 text-[12px] text-primary-500 italic hover:text-primary-600">
-              edit brief →
-            </button>
-          </div>
-        ) : (
-          <p className="text-[13px] italic text-neutral-400">
-            No brief yet. <button onClick={() => navigate('/meals/brief')}
-              className="text-primary-500 underline italic">Compose one →</button>
-          </p>
-        )}
-      </CollapseSection>
+        </section>
+      )}
 
-      <CollapseSection title="Sunday batch-cook" count={sundayPrep.length} initialOpen={sundayPrep.length > 0}>
-        {sundayPrep.length === 0 ? (
-          <p className="text-[13px] italic text-neutral-400">
-            No batch prep this week. Tap Sunday's PREP slot to schedule one.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {sundayPrep.map(p => (
-              <div key={p.id} className="flex items-start gap-2.5 group">
-                <input
-                  type="checkbox"
-                  checked={!!prepDone[p.id]}
-                  onChange={e => setPrepDone(prev => ({ ...prev, [p.id]: e.target.checked }))}
-                  className="mt-1 accent-primary-500"
-                />
-                <div className="flex-1">
-                  <div className={`font-display text-[14px] text-neutral-800 ${prepDone[p.id] ? 'line-through opacity-50' : ''}`}>
-                    {p.title}
-                  </div>
-                  {p.feeds.length > 0 && (
-                    <div className="font-display italic text-[12px] text-neutral-400 mt-0.5">
-                      feeds {p.feeds.join(' · ')}
-                    </div>
-                  )}
-                </div>
-                <button
-                  onClick={() => setDistributePrepId(p.id)}
-                  className="text-[12px] uppercase tracking-[0.18em] text-primary-500 hover:text-primary-600 transition-colors shrink-0 mt-0.5"
-                >
-                  Distribute →
-                </button>
-              </div>
-            ))}
+      {/* 5. The week — day stack — anchor #plan */}
+      <section id="plan" className="scroll-mt-8">
+        <div className="mt-2">
+          <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-neutral-500 mb-3">
+            THE WEEK
           </div>
-        )}
-      </CollapseSection>
-
-      {/* Day stack */}
-      <div className="mt-8">
-        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-neutral-500 mb-3">
-          THE WEEK
+          {[0, 1, 2, 3, 4, 5, 6].map(d => {
+            const date = dateForDayOfWeek(weekStart, d)
+            const today = isTodayHelper(date)
+            const slotMap = entriesByDayBySlot.get(d) ?? new Map<MealSlot, MealPlanEntry[]>()
+            return (
+              <DayCard
+                key={d}
+                dayOfWeek={d}
+                date={date}
+                isToday={today}
+                entriesBySlot={slotMap}
+                recipesById={recipesById}
+                familyMembers={familyMembers}
+                parameter={plan?.parameter}
+                parentLabelById={parentLabelById}
+                habitsByOwnerSlot={habitsByOwnerSlot}
+                highlighted={previewedDay === d}
+                onPickForSlot={(slot, familyMemberId) =>
+                  setPicker({ dayOfWeek: d, slot, familyMemberId })
+                }
+                onReplace={(entryId) => {
+                  const entry = plan?.entries.find(e => e.id === entryId)
+                  if (!entry) return
+                  setPicker({
+                    dayOfWeek: d,
+                    slot: canonicalSlot(entry.slot) ?? 'dinner',
+                    familyMemberId: entry.familyMemberId,
+                    replaceEntryId: entryId,
+                  })
+                }}
+                onRemove={(entryId) => removeMeal(entryId)}
+                onConsolidateSlot={handleConsolidateSlot}
+                onSplitSharedSlot={(slot, entry) => handleSplitSharedSlot(d, slot, entry, familyMembers)}
+                onAssignCook={(entryId, fmId) => updateMealPreparer(entryId, fmId)}
+              />
+            )
+          })}
         </div>
-        {[0, 1, 2, 3, 4, 5, 6].map(d => {
-          const date = dateForDayOfWeek(weekStart, d)
-          const today = isTodayHelper(date)
-          const slotMap = entriesByDayBySlot.get(d) ?? new Map<MealSlot, MealPlanEntry[]>()
-          return (
-            <DayCard
-              key={d}
-              dayOfWeek={d}
-              date={date}
-              isToday={today}
-              entriesBySlot={slotMap}
-              recipesById={recipesById}
-              familyMembers={familyMembers}
-              parameter={plan?.parameter}
-              parentLabelById={parentLabelById}
-              habitsByOwnerSlot={habitsByOwnerSlot}
-              highlighted={previewedDay === d}
-              onPickForSlot={(slot, familyMemberId) =>
-                setPicker({ dayOfWeek: d, slot, familyMemberId })
-              }
-              onReplace={(entryId) => {
-                const entry = plan?.entries.find(e => e.id === entryId)
-                if (!entry) return
-                setPicker({
-                  dayOfWeek: d,
-                  slot: canonicalSlot(entry.slot) ?? 'dinner',
-                  familyMemberId: entry.familyMemberId,
-                  replaceEntryId: entryId,
-                })
-              }}
-              onRemove={(entryId) => removeMeal(entryId)}
-              onConsolidateSlot={handleConsolidateSlot}
-              onSplitSharedSlot={(slot, entry) => handleSplitSharedSlot(d, slot, entry, familyMembers)}
-              onAssignCook={(entryId, fmId) => updateMealPreparer(entryId, fmId)}
-            />
-          )
-        })}
-      </div>
+      </section>
 
+      {/* 6. Distribute the batch — anchor #prep, COLLAPSED by default */}
+      <section id="prep" className="mt-8 scroll-mt-8">
+        <CollapseSection
+          title="Distribute the batch"
+          count={sundayPrep.length}
+          initialOpen={false}
+        >
+          {sundayPrep.length === 0 ? (
+            <p className="text-[13px] italic text-neutral-400">
+              No batch prep this week. Tap Sunday's PREP slot to schedule one.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {sundayPrep.map(p => (
+                <div key={p.id} className="flex items-start gap-2.5 group">
+                  <input
+                    type="checkbox"
+                    checked={!!prepDone[p.id]}
+                    onChange={e => setPrepDone(prev => ({ ...prev, [p.id]: e.target.checked }))}
+                    className="mt-1 accent-primary-500"
+                  />
+                  <div className="flex-1">
+                    <div className={`font-display text-[14px] text-neutral-800 ${prepDone[p.id] ? 'line-through opacity-50' : ''}`}>
+                      {p.title}
+                    </div>
+                    {p.feeds.length > 0 && (
+                      <div className="font-display italic text-[12px] text-neutral-400 mt-0.5">
+                        feeds {p.feeds.join(' · ')}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setDistributePrepId(p.id)}
+                    className="text-[12px] uppercase tracking-[0.18em] text-primary-500 hover:text-primary-600 transition-colors shrink-0 mt-0.5"
+                  >
+                    Distribute →
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CollapseSection>
+      </section>
+
+      {/* 7. Grocery review — anchor #groceries, COLLAPSED by default */}
+      <section id="groceries" className="mt-8 scroll-mt-8">
+        <CollapseSection
+          title="Review & send to groceries"
+          count={status.missingItems.length}
+          initialOpen={false}
+        >
+          <GroceryReviewSection
+            consolidated={status.consolidated}
+            groceriesListId={status.groceriesListId}
+            stores={status.stores}
+            currentItemTexts={[]}
+            recipesById={recipesById}
+            onSent={() => {
+              setLastSendAt(new Date())
+              status.refresh()
+            }}
+          />
+        </CollapseSection>
+      </section>
+
+      {/* Modals */}
       <RecipePickerModal
         isOpen={picker !== null}
         slot={picker?.slot}
@@ -541,17 +578,6 @@ export function PlannerPage() {
         onClose={() => setPicker(null)}
         onPick={handlePick}
         onPickLeftover={handlePickLeftover}
-      />
-
-      <SendToGroceriesModal
-        isOpen={sendOpen}
-        onClose={() => setSendOpen(false)}
-        consolidated={status.consolidated}
-        groceriesListId={status.groceriesListId}
-        currentItemTexts={[]}
-        recipesById={recipesById}
-        stores={status.stores}
-        onSent={() => status.refresh()}
       />
 
       <AskSymphonyRail
@@ -590,9 +616,23 @@ export function PlannerPage() {
           />
         )
       })()}
+
+      {/* Tour — mounts conditionally based on localStorage */}
+      {tourMounted && (
+        <RitualTour
+          briefBody={brief?.body ?? ''}
+          planGeneratedAt={brief?.generatedAt}
+          planEntryCount={plan?.entries.length ?? 0}
+          lastSendAt={lastSendAt}
+          onDismiss={() => setTourMounted(false)}
+        />
+      )}
     </div>
   )
 }
+
+// Re-export shim so existing imports of PlannerPage continue to work.
+export { MealPlanRitualPage as PlannerPage }
 
 /** Map any legacy or canonical slot to a canonical day-meal slot. */
 function canonicalSlot(slot: string): MealSlot | undefined {

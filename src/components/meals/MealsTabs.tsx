@@ -1,11 +1,8 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 
-const TABS: { key: 'brief' | 'plan' | 'today' | 'shelf' | 'habits'; path: string; label: string }[] = [
-  { key: 'brief',  path: '/meals/brief',  label: 'Brief'   },
-  { key: 'plan',   path: '/meals/plan',   label: 'Plan'    },
-  { key: 'today',  path: '/meals/today',  label: 'Today'   },
-  { key: 'shelf',  path: '/meals/shelf',  label: 'Shelf'   },
-  { key: 'habits', path: '/meals/habits', label: 'Habits'  },
+const TABS: { key: 'plan' | 'today'; path: string; label: string }[] = [
+  { key: 'plan',  path: '/meals/plan',  label: 'Plan'  },
+  { key: 'today', path: '/meals/today', label: 'Today' },
 ]
 
 /** Editorial-calm tab strip used at the top of every meals surface. */
@@ -14,10 +11,7 @@ export function MealsTabs() {
   const navigate = useNavigate()
 
   const active: typeof TABS[number]['key'] =
-    location.pathname.startsWith('/meals/today')  ? 'today'
-    : location.pathname.startsWith('/meals/shelf')  ? 'shelf'
-    : location.pathname.startsWith('/meals/brief')  ? 'brief'
-    : location.pathname.startsWith('/meals/habits') ? 'habits'
+    location.pathname.startsWith('/meals/today') ? 'today'
     : 'plan'
 
   return (
