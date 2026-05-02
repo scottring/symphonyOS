@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, type ReactNode } from 'react'
+import { useState, useCallback, useRef, useEffect, Suspense, type ReactNode } from 'react'
 import { Sidebar, type ViewType } from './Sidebar'
 import { SidebarKinetic } from './SidebarKinetic'
 import { MoreSheet } from './MoreSheet'
@@ -7,6 +7,7 @@ import { ChatPanel } from '@/components/chat/ChatPanel'
 import { useMobile } from '@/hooks/useMobile'
 import { useTheme } from '@/hooks/useTheme'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
+import { HelpPanel as OnboardingHelpPanel } from '@/components/lazy'
 import type { PinnedItem } from '@/types/pin'
 import type { PinnableEntityType } from '@/types/pin'
 import type { Task } from '@/types/task'
@@ -149,6 +150,8 @@ export function AppShell({
   const [moreSheetOpen, setMoreSheetOpen] = useState(false)
   const setChatOpen = (open: boolean) => onChatOpenChange?.(open)
   const mainRef = useRef<HTMLElement>(null)
+  const [helpOpen, setHelpOpen] = useState(false)
+  const helpButtonRef = useRef<HTMLButtonElement>(null)
 
   // Track window width for three-panel mode
   // Breakpoint: sidebar(240) + min content(360) + detail(420) + chat(380) ≈ 1400px
@@ -259,6 +262,14 @@ export function AppShell({
                     </svg>
                   </button>
                 )}
+                <button
+                  ref={helpButtonRef}
+                  onClick={() => setHelpOpen(o => !o)}
+                  className={`p-2.5 rounded-xl text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-all font-display italic text-[15px] w-9 h-9 grid place-items-center ${
+                    helpOpen ? 'ring-2 ring-primary-500/30 text-primary-500' : ''
+                  }`}
+                  aria-label="Help"
+                >?</button>
                 {onSignOut && (
                   <button
                     onClick={onSignOut}
@@ -277,8 +288,29 @@ export function AppShell({
         )}
         {/* Domain switcher on non-Today views (Today has its own in HomeView) */}
         {!isMobile && activeView !== 'today' && (
-          <div className="absolute top-4 right-6 z-20">
+          <div className="absolute top-4 right-6 z-20 flex items-center gap-2">
             <DomainSwitcher />
+            <button
+              ref={helpButtonRef}
+              onClick={() => setHelpOpen(o => !o)}
+              className={`w-9 h-9 rounded-full bg-bg-elevated border border-neutral-200 text-neutral-500 hover:text-primary-500 hover:border-primary-300 transition-all font-display italic text-[16px] grid place-items-center shadow-card ${
+                helpOpen ? 'ring-2 ring-primary-500/30 text-primary-500 border-primary-500' : ''
+              }`}
+              aria-label="Help"
+            >?</button>
+          </div>
+        )}
+        {/* Desktop ?-button on Today view (no DomainSwitcher) */}
+        {!isMobile && activeView === 'today' && (
+          <div className="absolute top-4 right-6 z-20">
+            <button
+              ref={helpButtonRef}
+              onClick={() => setHelpOpen(o => !o)}
+              className={`w-9 h-9 rounded-full bg-bg-elevated border border-neutral-200 text-neutral-500 hover:text-primary-500 hover:border-primary-300 transition-all font-display italic text-[16px] grid place-items-center shadow-card ${
+                helpOpen ? 'ring-2 ring-primary-500/30 text-primary-500 border-primary-500' : ''
+              }`}
+              aria-label="Help"
+            >?</button>
           </div>
         )}
         {children}
@@ -560,6 +592,17 @@ export function AppShell({
           onNavigate={onViewChange}
           activeView={activeView}
         />
+      )}
+
+      {/* Help panel — floating, anchored to the ? button in the topbar */}
+      {helpOpen && (
+        <Suspense fallback={null}>
+          <OnboardingHelpPanel
+            open={helpOpen}
+            onClose={() => setHelpOpen(false)}
+            anchorRef={helpButtonRef}
+          />
+        </Suspense>
       )}
 
     </div>

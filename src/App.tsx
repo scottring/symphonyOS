@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback, useRef, Suspense } from 'react'
-import { useNavigate, useParams, useLocation } from 'react-router-dom'
+import { useNavigate, useParams, useLocation, Navigate } from 'react-router-dom'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useAuth } from '@/hooks/useAuth'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
@@ -35,7 +35,6 @@ import { Toast, ConfirmationToast, type ConfirmationToastMessage } from '@/compo
 import { UndoToast } from '@/components/undo/UndoToast'
 import {
   RecipeViewer,
-  OnboardingWizard,
   AuthForm,
   FocusMode,
   DetailPanelRedesign as DetailPanel,
@@ -179,13 +178,9 @@ function App() {
   }
 
   if (onboardingComplete === false) {
-    return (
-      <div className="min-h-screen bg-bg-base">
-        <Suspense fallback={<LoadingFallback />}>
-          <OnboardingWizard onComplete={() => setOnboardingComplete(true)} />
-        </Suspense>
-      </div>
-    )
+    // Onboarding lives at /onboarding as a top-level route. Redirect any
+    // App-rendered path (e.g. /, /meals/plan) there until the user finishes.
+    return <Navigate to="/onboarding" replace />
   }
 
   return (

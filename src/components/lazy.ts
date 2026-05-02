@@ -47,9 +47,15 @@ export const CalendarConnect = lazy(() =>
   import('./CalendarConnect').then(m => ({ default: m.CalendarConnect }))
 )
 
-// Onboarding
-export const OnboardingWizard = lazy(() =>
-  import('./onboarding/OnboardingWizard').then(m => ({ default: m.OnboardingWizard }))
+// Onboarding (v2 — meal-first first-run experience)
+export const OnboardingFlow = lazy(() =>
+  import('./onboarding/v2/OnboardingFlow').then(m => ({ default: m.OnboardingFlow }))
+)
+export const SamplePlanPage = lazy(() =>
+  import('./onboarding/v2/SamplePlanPage').then(m => ({ default: m.SamplePlanPage }))
+)
+export const HelpPanel = lazy(() =>
+  import('./onboarding/v2/HelpPanel').then(m => ({ default: m.HelpPanel }))
 )
 
 // Goals views

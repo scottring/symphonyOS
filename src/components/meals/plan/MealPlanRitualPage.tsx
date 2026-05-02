@@ -25,6 +25,7 @@ import { InlineBriefComposer } from './InlineBriefComposer'
 import { RitualTour } from './RitualTour'
 import { GroceryReviewSection } from '../groceries/GroceryReviewSection'
 import { RestrictionsSection } from '../habits/RestrictionsSection'
+import { EmptyState as OnboardingEmptyState } from '../../onboarding/v2/EmptyState'
 
 /** Map FamilyMember color to Tailwind classes for initial chip. */
 function memberColorClass(color: string): string {
@@ -457,7 +458,19 @@ export function MealPlanRitualPage() {
         </section>
       )}
 
-      {/* 5. The week — day stack — anchor #plan */}
+      {/* 5. The week — day stack — anchor #plan. When the week is fully empty
+              (no brief + no entries), surface the onboarding-style EmptyState
+              in place of the day stack. The brief composer above (#brief) stays
+              visible so the user can write their first brief inline. */}
+      {!brief?.body?.trim() && (plan?.entries.length ?? 0) === 0 ? (
+        <section id="plan" className="scroll-mt-8">
+          <OnboardingEmptyState
+            weekStart={weekStart}
+            brief={brief}
+            habitsCount={habits.length}
+          />
+        </section>
+      ) : (
       <section id="plan" className="scroll-mt-8">
         <div className="mt-2">
           <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-neutral-500 mb-3">
@@ -502,6 +515,7 @@ export function MealPlanRitualPage() {
           })}
         </div>
       </section>
+      )}
 
       {/* 6. Distribute the batch — anchor #prep, COLLAPSED by default */}
       <section id="prep" className="mt-8 scroll-mt-8">

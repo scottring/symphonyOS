@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Symphony · Meal Planner — Designs</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- v1 fonts (kept for v1 artboards that already use them) -->
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@300;400;500;600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Real Editorial Calm fonts for v2 -->
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; height: 100%; background: #2C2520; }
+  body { font-family: 'Satoshi', 'DM Sans', system-ui, sans-serif; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="artboards/RecipeLibrary.jsx"></script>
+<script type="text/babel" src="artboards/WeeklyPlanner.jsx"></script>
+<script type="text/babel" src="artboards/GroceriesModal.jsx"></script>
+<script type="text/babel" src="artboards/KioskMealPlan.jsx"></script>
+<script type="text/babel" src="artboards/StatesAndDocs.jsx"></script>
+<script type="text/babel" src="artboards/PlannerV2.jsx"></script>
+<script type="text/babel" src="artboards/AskSymphony.jsx"></script>
+<script type="text/babel" src="artboards/PlannerV3.jsx"></script>
+<script type="text/babel" src="artboards/Onboarding.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+function App() {
+  return (
+    <DesignCanvas title="Symphony · Meal Planner" subtitle="v1 (warm cream) and v2 (real Editorial Calm) side-by-side. v2 regrounds in Symphony's actual tokens — Instrument Serif, Satoshi, teal-forest primary, terracotta accent — and rethinks the planner around tap-to-suggest + language over pills.">
+
+      <DCSection id="onboarding" title="Onboarding · First-run experience (NEW · ~3 min, 6 screens + supporting surfaces)">
+        <DCArtboard id="ob-welcome"   label="1 · Welcome — Hi Iris"                 width={1280} height={800}>
+          <OB_Welcome />
+        </DCArtboard>
+        <DCArtboard id="ob-household" label="2 · Step 1 — Household"                width={1280} height={800}>
+          <OB_Household />
+        </DCArtboard>
+        <DCArtboard id="ob-goals"     label="3 · Step 2 — Goals"                    width={1280} height={800}>
+          <OB_Goal />
+        </DCArtboard>
+        <DCArtboard id="ob-rhythms"   label="4 · Step 3 — Rhythms (the magic step)" width={1280} height={800}>
+          <OB_Rhythms />
+        </DCArtboard>
+        <DCArtboard id="ob-brief"     label="5 · Step 4 — First brief"              width={1280} height={800}>
+          <OB_Brief />
+        </DCArtboard>
+        <DCArtboard id="ob-nowwhat"   label="6 · Now what? — three next actions"    width={1280} height={800}>
+          <OB_NowWhat />
+        </DCArtboard>
+        <DCArtboard id="ob-sample"    label="A · Sample plan landing"               width={1280} height={800}>
+          <OB_Sample />
+        </DCArtboard>
+        <DCArtboard id="ob-empty"     label="B · Empty state — returning user"      width={1280} height={800}>
+          <OB_Empty />
+        </DCArtboard>
+        <DCArtboard id="ob-help"      label="C · Help panel — re-entry surface"     width={1280} height={800}>
+          <OB_Help />
+        </DCArtboard>
+        <DCArtboard id="ob-rationale" label="D · Design rationale"                  width={1280} height={1100}>
+          <OB_Rationale />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="v3" title="v3 · Document-shaped plan · AI generates, Iris edits">
+        <DCArtboard id="v3-brief"      label="1 · Weekly brief composer" width={1280} height={880}>
+          <PV3_Brief />
+        </DCArtboard>
+        <DCArtboard id="v3-habits"     label="2 · Standing habits configuration" width={1280} height={1100}>
+          <PV3_Habits />
+        </DCArtboard>
+        <DCArtboard id="v3-plan"       label="3 · Full plan view (the document)" width={1440} height={3200}>
+          <PV3_PlanView />
+        </DCArtboard>
+        <DCArtboard id="v3-day"        label="4 · Per-day card · compact + detail" width={1280} height={1100}>
+          <PV3_DayDetail />
+        </DCArtboard>
+        <DCArtboard id="v3-chat"       label="5 · AI chat companion (side rail)" width={1600} height={1100}>
+          <PV3_Chat />
+        </DCArtboard>
+        <DCArtboard id="v3-scaffold"   label="6 · Recipe scaffold view (kitchen mode)" width={1280} height={1700}>
+          <PV3_Scaffold />
+        </DCArtboard>
+        <DCArtboard id="v3-grams"      label="7 · Vegetable-gram tracking" width={1280} height={980}>
+          <PV3_Grams />
+        </DCArtboard>
+        <DCArtboard id="v3-groceries"  label="8 · Send-to-Groceries modal v2" width={1280} height={1640}>
+          <PV3_Groceries />
+        </DCArtboard>
+        <DCArtboard id="v3-kiosk"      label="9 · Kiosk · tonight view" width={1280} height={800}>
+          <PV3_Kiosk />
+        </DCArtboard>
+        <DCArtboard id="v3-mobile"     label="10 · Mobile read-only (Scott)" width={390} height={844}>
+          <PV3_Mobile />
+        </DCArtboard>
+        <DCArtboard id="v3-components" label="11 · Components · flow · judgment calls" width={1280} height={1480}>
+          <PV3_Components />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="v2" title="v2 · Editorial Calm regrounding">
+        <DCArtboard id="v2-tokens" label="0 · Token parity check" width={1280} height={1080}>
+          <PlannerV2_TokenSheet />
+        </DCArtboard>
+        <DCArtboard id="v2-planner" label="1 · Planner — tap-to-suggest, narrative" width={1280} height={1480}>
+          <PlannerV2_Planner />
+        </DCArtboard>
+        <DCArtboard id="v2-shelf" label="2 · Memory Shelf — language, not pills" width={1280} height={1640}>
+          <PlannerV2_Shelf />
+        </DCArtboard>
+        <DCArtboard id="v2-chat" label="3 · Ask Symphony — chat rail at every phase" width={1600} height={1340}>
+          <PlannerV2_AskSymphony />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="desktop" title="v1 · Desktop · Iris plans on her laptop">
+        <DCArtboard id="library" label="1 · Recipe library" width={1280} height={880}>
+          <RecipeLibrary />
+        </DCArtboard>
+        <DCArtboard id="planner" label="2 · Weekly planner" width={1440} height={1040}>
+          <WeeklyPlanner />
+        </DCArtboard>
+        <DCArtboard id="groceries" label="3 · Send-to-Groceries review" width={1440} height={920}>
+          <GroceriesModal />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="kiosk" title="v1 · Kiosk · 24″ wall · read-only meal-plan column">
+        <DCArtboard id="wall" label="4 · Kiosk meal-plan view" width={1280} height={800}>
+          <KioskMealPlan />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="docs" title="v1 · States, flow, components & the kid-acceptance call">
+        <DCArtboard id="states" label="5 · States, flow & rationale" width={1440} height={1100}>
+          <StatesAndDocs />
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
