@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { PinnedSection } from '@/components/pins'
 import { useDomain } from '@/hooks/useDomain'
 import type { PinnedItem } from '@/types/pin'
@@ -83,6 +83,7 @@ export function Sidebar({
   onPinRefreshStale,
 }: SidebarProps) {
   const navigate = useNavigate()
+  const location = useLocation()
   const { currentDomain } = useDomain()
   const theme = DOMAIN_THEME[currentDomain]
 
@@ -355,6 +356,35 @@ export function Sidebar({
           </svg>
           {!collapsed && <span className="text-[15px]">Meals</span>}
         </button>
+
+        {!collapsed && activeView === 'meals' && (
+          <>
+            <button
+              onClick={() => navigate('/meals/shelf')}
+              className={`
+                w-full flex items-center gap-3 pl-9 pr-3.5 py-2 rounded-lg transition-all duration-200
+                ${location.pathname.startsWith('/meals/shelf')
+                  ? 'text-primary-700 bg-primary-50/60 font-medium'
+                  : 'text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700'
+                }
+              `}
+            >
+              <span className="text-[14px]">Shelf</span>
+            </button>
+            <button
+              onClick={() => navigate('/meals/habits')}
+              className={`
+                w-full flex items-center gap-3 pl-9 pr-3.5 py-2 rounded-lg transition-all duration-200
+                ${location.pathname.startsWith('/meals/habits')
+                  ? 'text-primary-700 bg-primary-50/60 font-medium'
+                  : 'text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700'
+                }
+              `}
+            >
+              <span className="text-[14px]">Habits</span>
+            </button>
+          </>
+        )}
 
         <button
           onClick={() => onViewChange('contacts')}
