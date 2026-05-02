@@ -19,6 +19,7 @@ import { ClearWeekButton } from './ClearWeekButton'
 import { AskSymphonyRail } from '../chat/AskSymphonyRail'
 import type { Suggestion } from '../chat/types'
 import { UndoToast } from './UndoToast'
+import { DistributeLeftoversModal } from './DistributeLeftoversModal'
 import { DAY_MEAL_SLOTS, MEAL_SLOT_LABEL } from '@/types/meal-planner'
 import type { MealPlanEntry, MealSlot, Recipe } from '@/types/meal-planner'
 
@@ -141,6 +142,7 @@ export function PlannerPage() {
   }, [plan, recipesById])
 
   const [prepDone, setPrepDone] = useState<Record<string, boolean>>({})
+  const [distributePrepId, setDistributePrepId] = useState<string | null>(null)
 
   /** Map entry.id → "from X" label, for leftover entries that reference a parent. */
   const parentLabelById = useMemo(() => {
@@ -457,7 +459,7 @@ export function PlannerPage() {
         ) : (
           <div className="space-y-2">
             {sundayPrep.map(p => (
-              <label key={p.id} className="flex items-start gap-2.5 cursor-pointer group">
+              <div key={p.id} className="flex items-start gap-2.5 group">
                 <input
                   type="checkbox"
                   checked={!!prepDone[p.id]}
@@ -474,7 +476,13 @@ export function PlannerPage() {
                     </div>
                   )}
                 </div>
-              </label>
+                <button
+                  onClick={() => setDistributePrepId(p.id)}
+                  className="text-[12px] uppercase tracking-[0.18em] text-primary-500 hover:text-primary-600 transition-colors shrink-0 mt-0.5"
+                >
+                  Distribute →
+                </button>
+              </div>
             ))}
           </div>
         )}
@@ -553,6 +561,35 @@ export function PlannerPage() {
         onApplySuggestion={onApplySuggestion}
         onPreviewSuggestion={onPreviewSuggestion}
       />
+
+      {distributePrepId && plan && (() => {
+        const prepEntry = plan.entries.find(e => e.id === distributePrepId)
+        if (!prepEntry) return null
+        const prepRecipe = prepEntry.recipeId ? recipesById.get(prepEntry.recipeId) : undefined
+        const prepTitle = prepRecipe?.title ?? prepEntry.adHocTitle ?? '(unnamed)'
+        return (
+          <DistributeLeftoversModal
+            isOpen={true}
+            onClose={() => setDistributePrepId(null)}
+            prep={{ id: prepEntry.id, title: prepTitle, recipeId: prepEntry.recipeId, adHocTitle: prepEntry.adHocTitle }}
+            allEntries={plan.entries}
+            familyMembers={familyMembers}
+            onAdd={async ({ dayOfWeek, slot, familyMemberId }) => {
+              await addMeal({
+                dayOfWeek,
+                slot,
+                recipeId: prepEntry.recipeId,
+                adHocTitle: prepEntry.recipeId ? undefined : prepEntry.adHocTitle,
+                familyMemberId,
+                leftoverFromId: prepEntry.id,
+              })
+            }}
+            onRemove={async (entryId) => {
+              await removeMeal(entryId)
+            }}
+          />
+        )
+      })()}
     </div>
   )
 }

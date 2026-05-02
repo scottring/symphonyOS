@@ -35,7 +35,15 @@ The five canonical slots are breakfast, lunch, snack, dinner, prep. day_of_week 
 - prep is a batch-cooking session — typically Sunday (day_of_week=6). Use it when the brief implies cooking once and eating across the week, or when an is_prep_friendly recipe will feed multiple meals.
 
 LEFTOVER THREADING
-When you create a prep entry, give it a placeholder id like "prep_1", "prep_2", etc. in a top-level field "placeholder_id". Then, on every other entry that gets eaten from that batch, set "leftover_from" to that placeholder. The server resolves placeholders to real ids after insert. Example: a Sunday prep of "Big pot of beans" with placeholder_id "prep_1" → Mon lunch and Wed dinner each set leftover_from="prep_1". Don't set leftover_from on entries that aren't from a batch.
+When you create a prep entry, give it a placeholder id like "prep_1", "prep_2", etc. in a top-level field "placeholder_id". Then, on every other entry that gets eaten from that batch, set "leftover_from" to that placeholder.
+
+Example: brief says "Big batch of lentil soup Sunday. Iris takes lunches Monday, Tuesday, Wednesday. Scott takes Monday and Tuesday lunches." Output:
+- One prep entry: day_of_week=6, slot="prep", recipe_id=<lentil soup>, family_member_id=null, placeholder_id="prep_1"
+- Iris's three lunches: day_of_week=0/1/2, slot="lunch", recipe_id=<lentil soup>, family_member_id=<iris>, leftover_from="prep_1"
+- Scott's two lunches: day_of_week=0/1, slot="lunch", recipe_id=<lentil soup>, family_member_id=<scott>, leftover_from="prep_1"
+- Total: 1 prep + 5 leftover entries, all referencing prep_1.
+
+Don't set leftover_from on entries that aren't from a batch. The server resolves placeholders to real ids after insert.
 
 RECIPES
 Every recipe_id you reference must come from the supplied shelf — never invent a recipe_id. Foods named in the brief that aren't on the shelf become ad_hoc entries (no recipe_id, just an ad_hoc_title). If you're unsure whether a shelf item matches, prefer ad_hoc_title.
