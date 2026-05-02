@@ -30,17 +30,17 @@ function extractJson(s: string): string {
 const SYSTEM_PROMPT = `You draft a one-week meal plan for a household based on a planner's free-form brief. Output strict JSON matching the schema.
 
 SLOTS
-The five canonical slots are breakfast, lunch, snack, dinner, prep. day_of_week is 0..6 (Mon..Sun).
+The five canonical slots are breakfast, lunch, snack, dinner, prep. day_of_week is 0..6 (Sun..Sat).
 - breakfast/lunch/snack/dinner are eaten meals.
-- prep is a batch-cooking session — typically Sunday (day_of_week=6). Use it when the brief implies cooking once and eating across the week, or when an is_prep_friendly recipe will feed multiple meals.
+- prep is a batch-cooking session — typically Sunday (day_of_week=0). Use it when the brief implies cooking once and eating across the week, or when an is_prep_friendly recipe will feed multiple meals.
 
 LEFTOVER THREADING
 When you create a prep entry, give it a placeholder id like "prep_1", "prep_2", etc. in a top-level field "placeholder_id". Then, on every other entry that gets eaten from that batch, set "leftover_from" to that placeholder.
 
 Example: brief says "Big batch of lentil soup Sunday. Iris takes lunches Monday, Tuesday, Wednesday. Scott takes Monday and Tuesday lunches." Output:
-- One prep entry: day_of_week=6, slot="prep", recipe_id=<lentil soup>, family_member_id=null, placeholder_id="prep_1"
-- Iris's three lunches: day_of_week=0/1/2, slot="lunch", recipe_id=<lentil soup>, family_member_id=<iris>, leftover_from="prep_1"
-- Scott's two lunches: day_of_week=0/1, slot="lunch", recipe_id=<lentil soup>, family_member_id=<scott>, leftover_from="prep_1"
+- One prep entry: day_of_week=0 (Sunday), slot="prep", recipe_id=<lentil soup>, family_member_id=null, placeholder_id="prep_1"
+- Iris's three lunches: day_of_week=1/2/3 (Mon/Tue/Wed), slot="lunch", recipe_id=<lentil soup>, family_member_id=<iris>, leftover_from="prep_1"
+- Scott's two lunches: day_of_week=1/2 (Mon/Tue), slot="lunch", recipe_id=<lentil soup>, family_member_id=<scott>, leftover_from="prep_1"
 - Total: 1 prep + 5 leftover entries, all referencing prep_1.
 
 Don't set leftover_from on entries that aren't from a batch. The server resolves placeholders to real ids after insert.
@@ -61,7 +61,7 @@ NOTES
 The notes_for_planner field should contain a short paragraph (1-3 sentences) describing what's different about this week — what the planner explicitly asked for, what's new, what's being skipped, anything noteworthy. Write it as if explaining the plan to a partner who hasn't read the brief.`
 
 interface RequestBody {
-  weekStart: string  // YYYY-MM-DD (Monday)
+  weekStart: string  // YYYY-MM-DD (Sunday)
 }
 
 Deno.serve(async (req) => {

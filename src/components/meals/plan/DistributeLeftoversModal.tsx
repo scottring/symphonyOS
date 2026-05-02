@@ -16,13 +16,13 @@ interface Props {
 }
 
 const DAYS: { dow: number; label: string }[] = [
-  { dow: 0, label: 'Mon' },
-  { dow: 1, label: 'Tue' },
-  { dow: 2, label: 'Wed' },
-  { dow: 3, label: 'Thu' },
-  { dow: 4, label: 'Fri' },
-  { dow: 5, label: 'Sat' },
-  { dow: 6, label: 'Sun' },
+  { dow: 0, label: 'Sun' },
+  { dow: 1, label: 'Mon' },
+  { dow: 2, label: 'Tue' },
+  { dow: 3, label: 'Wed' },
+  { dow: 4, label: 'Thu' },
+  { dow: 5, label: 'Fri' },
+  { dow: 6, label: 'Sat' },
 ]
 
 const SLOTS: { value: MealSlot; label: string }[] = [
