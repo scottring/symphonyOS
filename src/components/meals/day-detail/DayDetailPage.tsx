@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useMealPlan } from '@/hooks/useMealPlan'
 import { useRecipes } from '@/hooks/useRecipes'
-import { mondayOfWeek } from '@/lib/weekHelpers'
+import { sundayOfWeek } from '@/lib/weekHelpers'
 import { GramRing } from '../today/GramRing'
 import { sumActualGrams, gramsTargetFor } from '../today/grams'
 import { MealsTabs } from '../MealsTabs'
@@ -321,7 +321,7 @@ function buildAssignments(
 
 interface DateResolution {
   date: Date
-  dayOfWeek: number  // 0=Mon … 6=Sun (matches DbMealPlanEntry.day_of_week)
+  dayOfWeek: number  // 0=Sun … 6=Sat (matches Date.getDay() and DbMealPlanEntry.day_of_week)
   weekStart: Date
   isValid: boolean
 }
@@ -330,13 +330,13 @@ function resolveDate(dateParam: string | undefined): DateResolution {
   const today = new Date()
   if (!dateParam) {
     const d = today
-    const ws = mondayOfWeek(d)
-    return { date: d, dayOfWeek: dowFromMonday(d), weekStart: ws, isValid: true }
+    const ws = sundayOfWeek(d)
+    return { date: d, dayOfWeek: d.getDay(), weekStart: ws, isValid: true }
   }
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateParam)
   if (!m) {
-    const ws = mondayOfWeek(today)
-    return { date: today, dayOfWeek: dowFromMonday(today), weekStart: ws, isValid: false }
+    const ws = sundayOfWeek(today)
+    return { date: today, dayOfWeek: today.getDay(), weekStart: ws, isValid: false }
   }
   const y = parseInt(m[1], 10)
   const mm = parseInt(m[2], 10) - 1
@@ -345,16 +345,10 @@ function resolveDate(dateParam: string | undefined): DateResolution {
   d.setHours(0, 0, 0, 0)
   return {
     date: d,
-    dayOfWeek: dowFromMonday(d),
-    weekStart: mondayOfWeek(d),
+    dayOfWeek: d.getDay(),
+    weekStart: sundayOfWeek(d),
     isValid: !Number.isNaN(d.getTime()),
   }
-}
-
-/** Convert a Date to 0=Mon … 6=Sun. Date.getDay() returns 0=Sun…6=Sat. */
-function dowFromMonday(d: Date): number {
-  const sundayBased = d.getDay()  // 0=Sun…6=Sat
-  return (sundayBased + 6) % 7
 }
 
 function formatHeaderDate(d: Date): string {

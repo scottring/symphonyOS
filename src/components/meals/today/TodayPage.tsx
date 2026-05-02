@@ -6,7 +6,7 @@ import { useMealDayLog, useWeekGramsTrend } from '@/hooks/useMealDayLog'
 import { useMealTracking } from '@/hooks/useMealTracking'
 import { useMobile } from '@/hooks/useMobile'
 import { useStandingHabits } from '@/hooks/useStandingHabits'
-import { mondayOfWeek, isToday } from '@/lib/weekHelpers'
+import { sundayOfWeek, isToday } from '@/lib/weekHelpers'
 import { TodayHeader } from './TodayHeader'
 import { HabitPills } from './HabitPills'
 import { MealStateRow } from './MealStateRow'
@@ -22,8 +22,8 @@ import type { Recipe } from '@/types/meal-planner'
  *  tracker: most days you ate the plan; you only mark deviations. */
 export function TodayPage() {
   const today = useMemo(() => new Date(), [])
-  const weekStart = useMemo(() => mondayOfWeek(today), [today])
-  const dayOfWeek = (today.getDay() + 6) % 7  // Mon=0 … Sun=6
+  const weekStart = useMemo(() => sundayOfWeek(today), [today])
+  const dayOfWeek = today.getDay()
 
   const isMobile = useMobile()
   const { plan, loading, error, refresh, removeMeal } = useMealPlan(weekStart)

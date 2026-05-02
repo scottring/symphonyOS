@@ -1,11 +1,11 @@
 import { useMemo } from 'react'
 import { useMealPlan } from '@/hooks/useMealPlan'
 import { useRecipes } from '@/hooks/useRecipes'
-import { mondayOfWeek, dayLabelFor } from '@/lib/weekHelpers'
+import { sundayOfWeek, dayLabelFor } from '@/lib/weekHelpers'
 import type { Recipe, MealPlanEntry } from '@/types/meal-planner'
 
 export function MealPlanColumn() {
-  const weekStart = useMemo(() => mondayOfWeek(new Date()), [])
+  const weekStart = useMemo(() => sundayOfWeek(new Date()), [])
   const { plan, loading, error } = useMealPlan(weekStart)
   const { recipes } = useRecipes()
 
@@ -16,7 +16,7 @@ export function MealPlanColumn() {
   }, [recipes])
 
   const today = new Date()
-  const todayDow = (today.getDay() + 6) % 7  // 0=Mon
+  const todayDow = today.getDay()
   const tomorrowDow = (todayDow + 1) % 7
 
   const dinnerForDay = (day: number): { entry: MealPlanEntry; recipe?: Recipe } | undefined => {

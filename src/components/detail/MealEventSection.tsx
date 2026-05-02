@@ -5,7 +5,7 @@ import { useMealPlan } from '@/hooks/useMealPlan'
 import { useRecipes } from '@/hooks/useRecipes'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useMealTracking } from '@/hooks/useMealTracking'
-import { mondayOfWeek, dayLabelFor } from '@/lib/weekHelpers'
+import { sundayOfWeek, dayLabelFor } from '@/lib/weekHelpers'
 import { MEAL_SLOT_LABEL } from '@/types/meal-planner'
 
 interface Props {
@@ -16,7 +16,7 @@ interface Props {
 
 export function MealEventSection({ mealEventId, viewedDate }: Props) {
   const navigate = useNavigate()
-  const weekStart = useMemo(() => mondayOfWeek(viewedDate), [viewedDate])
+  const weekStart = useMemo(() => sundayOfWeek(viewedDate), [viewedDate])
   const { plan, refresh: mealRefresh } = useMealPlan(weekStart)
   const { recipes } = useRecipes()
   const { members } = useFamilyMembers()

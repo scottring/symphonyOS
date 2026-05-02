@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useMealPlan } from '@/hooks/useMealPlan'
 import { useRecipes } from '@/hooks/useRecipes'
-import { mondayOfWeek, dateForDayOfWeek, dayLabelFor, formatDateMonthDay, toIsoDate } from '@/lib/weekHelpers'
+import { sundayOfWeek, dateForDayOfWeek, dayLabelFor, formatDateMonthDay, toIsoDate } from '@/lib/weekHelpers'
 import { gramsTargetFor, sumActualGrams } from '@/components/meals/today/grams'
 import { MealsTabs } from '../MealsTabs'
 import { DayGramRow } from './DayGramRow'
@@ -33,7 +33,7 @@ interface DayLogNoteRow { log_date: string; notes: string | null }
  *  showing 200g-increment circles against the configured daily target. */
 export function GramTrackingPage() {
   const navigate = useNavigate()
-  const weekStart = useMemo(() => mondayOfWeek(new Date()), [])
+  const weekStart = useMemo(() => sundayOfWeek(new Date()), [])
   const { plan, loading: planLoading, error: planError } = useMealPlan(weekStart)
   const { recipes } = useRecipes()
   const [notesByDate, setNotesByDate] = useState<Map<string, string | null>>(new Map())

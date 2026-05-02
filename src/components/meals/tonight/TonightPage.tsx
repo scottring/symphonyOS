@@ -3,20 +3,20 @@ import { useNavigate } from 'react-router-dom'
 import { useMealPlan } from '@/hooks/useMealPlan'
 import { useRecipes } from '@/hooks/useRecipes'
 import { useMealDayLog } from '@/hooks/useMealDayLog'
-import { mondayOfWeek, dateForDayOfWeek } from '@/lib/weekHelpers'
+import { sundayOfWeek, dateForDayOfWeek } from '@/lib/weekHelpers'
 import type { MealPlanEntry, Recipe } from '@/types/meal-planner'
 import { TonightHero } from './TonightHero'
 import { UpcomingDayRow } from './UpcomingDayRow'
 import { MobileTabBar } from './MobileTabBar'
 
-const DAY_LABEL_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const DAY_LABEL_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 /** Surface 10 · Mobile read-only "Tonight" view (Scott's view). */
 export function TonightPage() {
   const navigate = useNavigate()
   const today = useMemo(() => new Date(), [])
-  const weekStart = useMemo(() => mondayOfWeek(today), [today])
-  const todayDow = (today.getDay() + 6) % 7  // Mon=0 … Sun=6
+  const weekStart = useMemo(() => sundayOfWeek(today), [today])
+  const todayDow = today.getDay()
 
   const { plan, loading, error } = useMealPlan(weekStart)
   const { recipes } = useRecipes()

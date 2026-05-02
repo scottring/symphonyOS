@@ -1,10 +1,13 @@
-const DAY_LABELS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
+const DAY_LABELS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 
-export function mondayOfWeek(d: Date): Date {
+/** Returns the Sunday at the start of the week containing the given date.
+ *
+ *  Convention: 0=Sun, 1=Mon, ..., 6=Sat — matches `Date.getDay()` directly,
+ *  no offset arithmetic. */
+export function sundayOfWeek(d: Date): Date {
   const date = new Date(d)
-  const day = date.getDay() // 0=Sun, 1=Mon, …
-  const diff = day === 0 ? -6 : 1 - day
-  date.setDate(date.getDate() + diff)
+  const day = date.getDay()
+  date.setDate(date.getDate() - day)
   date.setHours(0, 0, 0, 0)
   return date
 }

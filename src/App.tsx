@@ -23,6 +23,7 @@ import { useUndo } from '@/hooks/useUndo'
 import { useToast } from '@/hooks/useToast'
 import type { PinnableEntityType } from '@/types/pin'
 import { supabase } from '@/lib/supabase'
+import { sundayOfWeek } from '@/lib/weekHelpers'
 import { detectContextSharingChange } from '@/lib/contextSharingToast'
 import { DomainPageOutline } from '@/components/domain/DomainPageOutline'
 import { ViewRouter } from '@/components/layout/ViewRouter'
@@ -285,14 +286,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   // ── Meal-plan entries synthesized as CalendarEvent objects ────────────
   // Lifted to App.tsx so they flow into BOTH HomeView's timeline rendering
   // AND useDetailPanelState's lookup (which finds events by id).
-  const mealWeekStartForEvents = useMemo(() => {
-    const d = new Date(viewedDate)
-    const day = d.getDay()
-    const diff = day === 0 ? -6 : 1 - day
-    d.setDate(d.getDate() + diff)
-    d.setHours(0, 0, 0, 0)
-    return d
-  }, [viewedDate])
+  const mealWeekStartForEvents = useMemo(() => sundayOfWeek(viewedDate), [viewedDate])
   const { plan: mealPlanForEvents } = useMealPlan(mealWeekStartForEvents)
   const { recipes: mealRecipesForEvents } = useRecipes()
   const mealEvents = useMemo<CalendarEvent[]>(() => {
@@ -301,7 +295,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       breakfast: [7, 30], lunch: [12, 30], snack: [15, 30], dinner: [18, 30], prep: [16, 0],
       lunch_iris: [12, 30], lunch_scott: [12, 30], kid_alternate: [18, 30],
     }
-    const dow = (viewedDate.getDay() + 6) % 7
+    const dow = viewedDate.getDay()
     const currentMemberId = getCurrentUserMember()?.id ?? null
     const memberById = new Map(familyMembers.map(m => [m.id, m]))
     const recipeTitleById = new Map(mealRecipesForEvents.map(r => [r.id, r.title]))

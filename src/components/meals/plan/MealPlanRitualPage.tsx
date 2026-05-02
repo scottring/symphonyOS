@@ -7,7 +7,7 @@ import { useWeeklyBrief } from '@/hooks/useWeeklyBrief'
 import { useStandingHabits } from '@/hooks/useStandingHabits'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useGeneratePlanContext } from '@/contexts/GeneratePlanContext'
-import { mondayOfWeek, dateForDayOfWeek, isToday as isTodayHelper, formatDateMonthDay, dayLabelFor, toIsoDate } from '@/lib/weekHelpers'
+import { sundayOfWeek, dateForDayOfWeek, isToday as isTodayHelper, formatDateMonthDay, dayLabelFor, toIsoDate } from '@/lib/weekHelpers'
 import { DayCard } from './DayCard'
 import { CollapseSection } from './PlanDocSections'
 import { RecipePickerModal, type LeftoverCandidate } from './RecipePickerModal'
@@ -45,7 +45,7 @@ function memberColorClass(color: string): string {
  *  the inline grocery review (previously SendToGroceriesModal). */
 export function MealPlanRitualPage() {
   const navigate = useNavigate()
-  const weekStart = useMemo(() => mondayOfWeek(new Date()), [])
+  const weekStart = useMemo(() => sundayOfWeek(new Date()), [])
   const { plan, loading, error, addMeal, removeMeal, setParameter, clearWeek, updateMealPreparer } = useMealPlan(weekStart)
   const { setLastUndoToken } = useGeneratePlanContext()
   const { recipes } = useRecipes()
@@ -137,10 +137,10 @@ export function MealPlanRitualPage() {
     return out
   }, [plan, recipesById])
 
-  /** Sunday (dayOfWeek === 6) prep entries with a list of where their leftovers feed. */
+  /** Sunday (dayOfWeek === 0) prep entries with a list of where their leftovers feed. */
   const sundayPrep = useMemo(() => {
     if (!plan) return []
-    const prepEntries = plan.entries.filter(e => e.slot === 'prep' && e.dayOfWeek === 6)
+    const prepEntries = plan.entries.filter(e => e.slot === 'prep' && e.dayOfWeek === 0)
     return prepEntries.map(prep => {
       const title = (prep.recipeId ? recipesById.get(prep.recipeId)?.title : null) ?? prep.adHocTitle ?? '(unnamed)'
       const feeds = plan.entries

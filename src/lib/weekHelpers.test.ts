@@ -1,24 +1,24 @@
 import { describe, it, expect } from 'vitest'
-import { mondayOfWeek, dayLabelFor, isToday, formatDateMonthDay } from './weekHelpers'
+import { sundayOfWeek, dayLabelFor, isToday, formatDateMonthDay } from './weekHelpers'
 
 describe('weekHelpers', () => {
-  it('mondayOfWeek returns Monday in the same week', () => {
+  it('sundayOfWeek returns Sunday at the start of the week', () => {
     // Use noon UTC to keep the local-day stable across timezones.
-    const monday = (d: Date) => {
-      const m = mondayOfWeek(d)
-      const y = m.getFullYear()
-      const mm = String(m.getMonth() + 1).padStart(2, '0')
-      const dd = String(m.getDate()).padStart(2, '0')
+    const sunday = (d: Date) => {
+      const s = sundayOfWeek(d)
+      const y = s.getFullYear()
+      const mm = String(s.getMonth() + 1).padStart(2, '0')
+      const dd = String(s.getDate()).padStart(2, '0')
       return `${y}-${mm}-${dd}`
     }
-    expect(monday(new Date('2026-04-28T12:00:00Z'))).toBe('2026-04-27') // Tuesday → Monday
-    expect(monday(new Date('2026-04-27T12:00:00Z'))).toBe('2026-04-27') // Monday → Monday
-    expect(monday(new Date('2026-05-03T12:00:00Z'))).toBe('2026-04-27') // Sunday → previous Monday
+    expect(sunday(new Date('2026-04-28T12:00:00Z'))).toBe('2026-04-26') // Tuesday → Sunday
+    expect(sunday(new Date('2026-04-26T12:00:00Z'))).toBe('2026-04-26') // Sunday → Sunday
+    expect(sunday(new Date('2026-05-03T12:00:00Z'))).toBe('2026-05-03') // Sunday → same Sunday
   })
 
   it('dayLabelFor returns the abbreviated day name', () => {
-    expect(dayLabelFor(0)).toBe('MON')
-    expect(dayLabelFor(6)).toBe('SUN')
+    expect(dayLabelFor(0)).toBe('SUN')
+    expect(dayLabelFor(6)).toBe('SAT')
   })
 
   it('isToday compares against current local date', () => {

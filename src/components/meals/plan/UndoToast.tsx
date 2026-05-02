@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react'
 import { useGeneratePlanContext } from '@/contexts/GeneratePlanContext'
 import { useGeneratePlan } from '@/hooks/useGeneratePlan'
 import { useMealPlan } from '@/hooks/useMealPlan'
-import { mondayOfWeek } from '@/lib/weekHelpers'
+import { sundayOfWeek } from '@/lib/weekHelpers'
 
 const VISIBLE_MS = 30_000
 
 export function UndoToast() {
   const { lastUndoToken, setLastUndoToken } = useGeneratePlanContext()
   const { undo } = useGeneratePlan()
-  const { refresh } = useMealPlan(mondayOfWeek(new Date()))
+  const { refresh } = useMealPlan(sundayOfWeek(new Date()))
   const [busy, setBusy] = useState(false)
   const [hidden, setHidden] = useState(false)
 
