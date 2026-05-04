@@ -9,7 +9,6 @@ import { ShoppingListView } from './views/ShoppingListView'
 import { MealPlanColumn } from './views/MealPlanColumn'
 import { WallSwimlane } from './WallSwimlane'
 import { WallMicButton } from './WallMicButton'
-import { WallJaxCareWidget } from './WallJaxCareWidget'
 import { WallDinnerPromptWidget } from './WallDinnerPromptWidget'
 import { WallItemDetail } from './WallItemDetail'
 import { findDinnerEvent, getMealIcon } from './WallDinnerWidget'
@@ -19,7 +18,6 @@ import { useContextEngine, ContextDock, ContextOverlay } from './contexts'
 import type { ContextEvalData } from './contexts'
 import { useWeather } from '@/hooks/useWeather'
 import { getWeatherMessage, getWeatherEmoji } from './weatherMessages'
-import { getDailyJoke } from './alienJokes'
 import { useKioskCards } from '@/hooks/useKioskCards'
 import { WallAgentCards } from './WallAgentCards'
 import { useEmailActionItems } from '@/hooks/useEmailActionItems'
@@ -453,11 +451,6 @@ export function WallCalendar() {
 
         {/* ─── BOTTOM ROW: Widget Strip ─── */}
         <div className="flex gap-3 col-span-3 items-stretch">
-          {/* Jax Care Widget (meds + fed + bone + treat + sleep tracker) */}
-          <div className={`${glass} px-4 py-2`} style={{ flex: '2 1 0%' }}>
-            <WallJaxCareWidget />
-          </div>
-
           {/* Dinner Widget */}
           <div className={`${glass} px-4 py-2 flex-1 flex items-center gap-3 ${recipeUrl ? 'cursor-pointer' : ''}`}
             onClick={recipeUrl ? handleOpenRecipe : undefined}
@@ -505,38 +498,29 @@ export function WallCalendar() {
             </div>
           )}
 
-          {/* Context Dock (inline) */}
+          {/* Context Dock (inline, compact) */}
           {!activeContext && surfacedRules.length > 0 && (
-            <div className={`${glass} px-4 py-3 flex items-center gap-2`}>
+            <div className={`${glass} px-2 py-1.5 flex items-center gap-1`}>
               {surfacedRules.map((rule) => (
                 <button
                   key={rule.id}
                   onClick={() => activateContext(rule.id)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl border backdrop-blur-md transition-all hover:scale-[1.03] active:scale-[0.97] select-none"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border backdrop-blur-md transition-all hover:scale-[1.03] active:scale-[0.97] select-none"
                   style={{
                     backgroundColor: rule.color + '20',
                     borderColor: rule.color + '35',
                     touchAction: 'manipulation',
                   }}
+                  title={rule.label}
                 >
-                  <span className="text-[1.2rem]">{rule.icon}</span>
-                  <span className="text-white font-black text-[0.7rem] uppercase tracking-wider leading-none">
+                  <span className="text-[1rem]">{rule.icon}</span>
+                  <span className="text-white font-black text-[0.6rem] uppercase tracking-wider leading-none">
                     {rule.label}
                   </span>
                 </button>
               ))}
             </div>
           )}
-
-          {/* Alien Joke Widget */}
-          <div className={`${glass} px-4 py-3 flex items-center gap-2`} style={{ maxWidth: 280 }}>
-            <div className="text-[2rem] flex-shrink-0" style={{ transform: 'scaleX(-1)' }}>
-              👽
-            </div>
-            <p className="text-white/60 font-bold uppercase tracking-wider text-[0.55rem] leading-snug" style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-              {getDailyJoke()}
-            </p>
-          </div>
 
           {/* Camera — inline live thumbnail (tap to expand) */}
           {cameraEnabled && (
