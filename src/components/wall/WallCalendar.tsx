@@ -157,6 +157,9 @@ export function WallCalendar() {
         if (item.type === 'event') {
           events.push(item)
         } else if (item.type === 'routine') {
+          // Hide routines whose author opted out of timeline display (e.g. kid
+          // morning/bedtime checklists, which surface only via context views).
+          if (item.originalRoutine?.show_on_timeline === false) continue
           const isDaily = item.recurrencePattern?.type === 'daily'
           if (isDaily) dailyChores.push(item)
           else nonDailyRoutines.push(item)
