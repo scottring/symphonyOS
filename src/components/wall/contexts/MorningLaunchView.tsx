@@ -129,8 +129,8 @@ function KidChecklist({
   const allDone = progress === 1
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center gap-3 mb-4">
+    <div className="flex flex-col h-full min-h-0">
+      <div className="flex items-center gap-3 mb-4 flex-shrink-0">
         <div
           className="w-10 h-10 rounded-full flex items-center justify-center text-white font-black text-[1rem] border-2"
           style={{ backgroundColor: color + '30', borderColor: color + '50' }}
@@ -143,7 +143,7 @@ function KidChecklist({
       </div>
 
       {/* Progress */}
-      <div className="h-2 bg-white/10 rounded-full mb-4 overflow-hidden">
+      <div className="h-2 bg-white/10 rounded-full mb-4 overflow-hidden flex-shrink-0">
         <div
           className="h-full rounded-full transition-all duration-500 ease-out"
           style={{ width: `${progress * 100}%`, backgroundColor: color }}
@@ -151,7 +151,7 @@ function KidChecklist({
       </div>
 
       {/* Items */}
-      <div className="flex-1 flex flex-col gap-2 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+      <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
         {items.map((item) => {
           const isDone = completedSet.has(item.id)
           const isPressing = pressingId === item.id

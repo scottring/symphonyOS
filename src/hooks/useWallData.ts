@@ -239,9 +239,11 @@ export function useWallData(): UseWallDataReturn {
           return toDateString(new Date(t.scheduledFor)) === dateStr
         })
 
-        // Get routines for this day
+        // Get routines for this day. The kiosk wall shows kid routines via
+        // morning/bedtime context views even when show_on_timeline=false (which
+        // is set to keep the today view in the app uncluttered), so don't
+        // filter them out here.
         const dayRoutines = getRoutinesForDatePure(routines, date)
-          .filter(r => r.show_on_timeline !== false)
 
         // Filter events for this day
         const dayEvents = events.filter(event => {
