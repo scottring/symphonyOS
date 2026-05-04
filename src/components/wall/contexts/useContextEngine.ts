@@ -66,10 +66,12 @@ export function useContextEngine(
 
     return rules
       .filter(rule => {
-        // Must be in time window
-        if (!isInTimeWindow(data.now, rule)) return false
         // Must not be dismissed
         if (isDismissed(rule, dismissed)) return false
+        // Always-available rules bypass time and condition checks
+        if (rule.alwaysAvailable) return true
+        // Must be in time window
+        if (!isInTimeWindow(data.now, rule)) return false
         // Must pass condition (if any)
         if (rule.condition && !rule.condition(data)) return false
         return true

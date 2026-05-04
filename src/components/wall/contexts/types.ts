@@ -39,6 +39,8 @@ export interface ContextRule {
   ttlMinutes?: number
   /** Accent color for the button */
   color: string
+  /** When true, the rule surfaces in the dock regardless of time window or conditions */
+  alwaysAvailable?: boolean
 }
 
 // ============================================================================

@@ -74,6 +74,7 @@ export const DEFAULT_CONTEXT_RULES: ContextRule[] = [
     priority: 90,
     ttlMinutes: 0,
     color: '#F9C35C',
+    alwaysAvailable: true,
   },
   {
     id: 'after-school',
@@ -95,6 +96,7 @@ export const DEFAULT_CONTEXT_RULES: ContextRule[] = [
     priority: 70,
     ttlMinutes: 0,
     color: '#A78BFA',
+    alwaysAvailable: true,
   },
   {
     id: 'weekend-morning',

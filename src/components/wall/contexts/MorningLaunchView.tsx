@@ -4,6 +4,7 @@ import type { ContextViewProps } from './types'
 import type { TimelineItem } from '@/types/timeline'
 import { useWeather } from '@/hooks/useWeather'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
+import { getKidMembers } from '@/lib/familyMembers'
 import { EmailActionStrip } from './EmailActionStrip'
 
 function parseRoutineId(timelineItemId: string): string | null {
@@ -295,14 +296,7 @@ export function MorningLaunchView({ data }: ContextViewProps) {
   }, [morningItems, localOverrides])
 
   // Find kids in family members
-  const kids = useMemo(() => {
-    return data.familyMembers.filter(m =>
-      m.role_label === 'child' || m.member_type === 'core'
-    ).filter(m => {
-      const lower = m.name.toLowerCase()
-      return lower.includes('ella') || lower.includes('kaleb')
-    })
-  }, [data.familyMembers])
+  const kids = useMemo(() => getKidMembers(data.familyMembers), [data.familyMembers])
 
   // Build per-kid checklists from assigned items + defaults
   const kidChecklists = useMemo(() => {

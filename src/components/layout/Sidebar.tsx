@@ -38,7 +38,7 @@ const DOMAIN_THEME = {
   },
 } as const
 
-export type ViewType = 'agent' | 'home' | 'today' | 'inbox' | 'goals' | 'projects' | 'routines' | 'lists' | 'notes' | 'contacts' | 'history' | 'task-detail' | 'contact-detail' | 'settings' | 'meals'
+export type ViewType = 'agent' | 'home' | 'today' | 'inbox' | 'goals' | 'projects' | 'routines' | 'lists' | 'notes' | 'contacts' | 'history' | 'task-detail' | 'contact-detail' | 'settings' | 'meals' | 'morning' | 'bedtime'
 
 interface EntityData {
   tasks: Task[]

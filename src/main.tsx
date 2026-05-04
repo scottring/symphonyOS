@@ -86,8 +86,6 @@ import { GeneratePlanProvider } from './contexts/GeneratePlanContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { OnboardingFlow, SamplePlanPage } from './components/lazy'
 import { LoadingFallback } from './components/layout/LoadingFallback'
-import { MorningPage } from './pages/MorningPage'
-import { BedtimePage } from './pages/BedtimePage'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -107,8 +105,8 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/contacts" element={<App />} />
               <Route path="/contacts/:contactId" element={<App />} />
               <Route path="/wall" element={<GeneratePlanProvider><WallCalendar /></GeneratePlanProvider>} />
-              <Route path="/morning" element={<GeneratePlanProvider><MorningPage /></GeneratePlanProvider>} />
-              <Route path="/bedtime" element={<GeneratePlanProvider><BedtimePage /></GeneratePlanProvider>} />
+              <Route path="/morning" element={<App />} />
+              <Route path="/bedtime" element={<App />} />
               <Route path="/onboarding" element={<Suspense fallback={<LoadingFallback />}><OnboardingFlow /></Suspense>} />
               <Route path="/onboarding/sample" element={<Suspense fallback={<LoadingFallback />}><SamplePlanPage /></Suspense>} />
               <Route path="/meals/shelf" element={<App />} />

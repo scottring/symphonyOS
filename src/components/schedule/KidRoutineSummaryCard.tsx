@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { FamilyMember } from '@/types/family'
+import { getKidMembers } from '@/lib/familyMembers'
 
 interface KidRoutineSummaryCardProps {
   section: 'morning' | 'evening'
@@ -10,13 +11,7 @@ interface KidRoutineSummaryCardProps {
 export function KidRoutineSummaryCard({ section, familyMembers }: KidRoutineSummaryCardProps) {
   const navigate = useNavigate()
 
-  const kids = useMemo(
-    () => familyMembers.filter(m => {
-      const lower = m.name.toLowerCase()
-      return lower.includes('ella') || lower.includes('kaleb')
-    }),
-    [familyMembers],
-  )
+  const kids = useMemo(() => getKidMembers(familyMembers), [familyMembers])
 
   if (kids.length === 0) return null
 

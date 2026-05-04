@@ -3,6 +3,7 @@ import confetti from 'canvas-confetti'
 import type { ContextViewProps } from './types'
 import type { TimelineItem } from '@/types/timeline'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
+import { getKidMembers } from '@/lib/familyMembers'
 import { EmailActionStrip } from './EmailActionStrip'
 
 function parseRoutineId(timelineItemId: string): string | null {
@@ -299,12 +300,7 @@ export function BedtimeView({ data }: ContextViewProps) {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Find kids
-  const kids = useMemo(() => {
-    return data.familyMembers.filter(m => {
-      const lower = m.name.toLowerCase()
-      return lower.includes('ella') || lower.includes('kaleb')
-    })
-  }, [data.familyMembers])
+  const kids = useMemo(() => getKidMembers(data.familyMembers), [data.familyMembers])
 
   // Get evening routine items per kid
   const todayData = data.days.find(d => d.isToday)
