@@ -2,7 +2,12 @@ import { useMemo, useState, useCallback, useRef } from 'react'
 import confetti from 'canvas-confetti'
 import type { ContextViewProps } from './types'
 import type { TimelineItem } from '@/types/timeline'
+import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { EmailActionStrip } from './EmailActionStrip'
+
+function parseRoutineId(timelineItemId: string): string | null {
+  return timelineItemId.startsWith('routine-') ? timelineItemId.slice(8) : null
+}
 
 // ============================================================================
 // HELPERS
@@ -288,7 +293,8 @@ function CenterColumn({ data }: { data: ContextViewProps['data'] }) {
 // ============================================================================
 
 export function BedtimeView({ data }: ContextViewProps) {
-  const [completedItems, setCompletedItems] = useState<Set<string>>(new Set())
+  const { markDone, undoDone } = useActionableInstances()
+  const [localOverrides, setLocalOverrides] = useState<Map<string, boolean>>(new Map())
   const [pressingId, setPressingId] = useState<string | null>(null)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -308,8 +314,18 @@ export function BedtimeView({ data }: ContextViewProps) {
     for (const section of ['evening', 'allday'] as const) {
       items.push(...(todayData.items[section] || []))
     }
-    return items.filter(i => !i.completed && !i.skipped && i.type === 'routine')
+    return items.filter(i => !i.skipped && i.type === 'routine')
   }, [todayData])
+
+  // Displayed completion = DB-backed item.completed, with optimistic local toggles applied on top
+  const completedItems = useMemo(() => {
+    const result = new Set(eveningItems.filter(i => i.completed).map(i => i.id))
+    for (const [id, done] of localOverrides) {
+      if (done) result.add(id)
+      else result.delete(id)
+    }
+    return result
+  }, [eveningItems, localOverrides])
 
   // Build per-kid routines
   const kidRoutines = useMemo(() => {
@@ -347,11 +363,13 @@ export function BedtimeView({ data }: ContextViewProps) {
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>, id: string) => {
     if (completedItems.has(id)) {
-      setCompletedItems(prev => {
-        const next = new Set(prev)
-        next.delete(id)
-        return next
-      })
+      setLocalOverrides(prev => new Map(prev).set(id, false))
+      const routineId = parseRoutineId(id)
+      if (routineId) {
+        undoDone('routine', routineId, data.now).catch(err => {
+          console.error('Failed to undo bedtime routine completion:', err)
+        })
+      }
       return
     }
 
@@ -363,9 +381,15 @@ export function BedtimeView({ data }: ContextViewProps) {
     timeoutRef.current = setTimeout(() => {
       setPressingId(null)
       confetti({ particleCount: 30, spread: 40, origin: { x, y }, colors: ['#A78BFA', '#6DC4A7', '#FFFFFF'], gravity: 1.2 })
-      setCompletedItems(prev => new Set(prev).add(id))
+      setLocalOverrides(prev => new Map(prev).set(id, true))
+      const routineId = parseRoutineId(id)
+      if (routineId) {
+        markDone('routine', routineId, data.now).catch(err => {
+          console.error('Failed to persist bedtime routine completion:', err)
+        })
+      }
     }, 500)
-  }, [completedItems])
+  }, [completedItems, markDone, undoDone, data.now])
 
   const handlePointerCancel = useCallback(() => {
     if (timeoutRef.current) {

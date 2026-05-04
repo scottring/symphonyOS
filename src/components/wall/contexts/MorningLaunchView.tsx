@@ -3,7 +3,12 @@ import confetti from 'canvas-confetti'
 import type { ContextViewProps } from './types'
 import type { TimelineItem } from '@/types/timeline'
 import { useWeather } from '@/hooks/useWeather'
+import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { EmailActionStrip } from './EmailActionStrip'
+
+function parseRoutineId(timelineItemId: string): string | null {
+  return timelineItemId.startsWith('routine-') ? timelineItemId.slice(8) : null
+}
 
 // ============================================================================
 // HELPERS
@@ -217,9 +222,9 @@ function DepartureCountdown() {
     return () => clearInterval(interval)
   }, [])
 
-  // Default school departure: 7:45 AM
+  // Default school departure: 7:20 AM
   const departure = new Date(now)
-  departure.setHours(7, 45, 0, 0)
+  departure.setHours(7, 20, 0, 0)
 
   const diff = departure.getTime() - now.getTime()
   if (diff <= 0) {
@@ -262,8 +267,9 @@ function DepartureCountdown() {
 
 export function MorningLaunchView({ data }: ContextViewProps) {
   const { weather, loading, error, requestLocation } = useWeather()
+  const { markDone, undoDone } = useActionableInstances()
   const [locationRequested, setLocationRequested] = useState(false)
-  const [completedItems, setCompletedItems] = useState<Set<string>>(new Set())
+  const [localOverrides, setLocalOverrides] = useState<Map<string, boolean>>(new Map())
   const [pressingId, setPressingId] = useState<string | null>(null)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -275,8 +281,18 @@ export function MorningLaunchView({ data }: ContextViewProps) {
     for (const section of ['morning', 'allday'] as const) {
       items.push(...(todayData.items[section] || []))
     }
-    return items.filter(i => !i.completed && !i.skipped)
+    return items.filter(i => !i.skipped)
   }, [todayData])
+
+  // Displayed completion = DB-backed item.completed, with optimistic local toggles applied on top
+  const completedItems = useMemo(() => {
+    const result = new Set(morningItems.filter(i => i.completed).map(i => i.id))
+    for (const [id, done] of localOverrides) {
+      if (done) result.add(id)
+      else result.delete(id)
+    }
+    return result
+  }, [morningItems, localOverrides])
 
   // Find kids in family members
   const kids = useMemo(() => {
@@ -318,11 +334,13 @@ export function MorningLaunchView({ data }: ContextViewProps) {
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>, id: string) => {
     if (completedItems.has(id)) {
-      setCompletedItems(prev => {
-        const next = new Set(prev)
-        next.delete(id)
-        return next
-      })
+      setLocalOverrides(prev => new Map(prev).set(id, false))
+      const routineId = parseRoutineId(id)
+      if (routineId) {
+        undoDone('routine', routineId, data.now).catch(err => {
+          console.error('Failed to undo morning routine completion:', err)
+        })
+      }
       return
     }
 
@@ -334,9 +352,15 @@ export function MorningLaunchView({ data }: ContextViewProps) {
     timeoutRef.current = setTimeout(() => {
       setPressingId(null)
       confetti({ particleCount: 40, spread: 50, origin: { x, y }, colors: ['#F9C35C', '#6DC4A7', '#FFFFFF'] })
-      setCompletedItems(prev => new Set(prev).add(id))
+      setLocalOverrides(prev => new Map(prev).set(id, true))
+      const routineId = parseRoutineId(id)
+      if (routineId) {
+        markDone('routine', routineId, data.now).catch(err => {
+          console.error('Failed to persist morning routine completion:', err)
+        })
+      }
     }, 500)
-  }, [completedItems])
+  }, [completedItems, markDone, undoDone, data.now])
 
   const handlePointerCancel = useCallback(() => {
     if (timeoutRef.current) {
