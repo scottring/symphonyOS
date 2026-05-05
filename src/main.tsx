@@ -86,6 +86,19 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { OnboardingFlow, SamplePlanPage } from './components/lazy'
 import { LoadingFallback } from './components/layout/LoadingFallback'
 
+// P4.8 cutover feature flag. When enabled, /, /today, /inbox, /task/:id
+// route to the new Shell-mounted TasksApp. Default OFF — legacy App.tsx
+// remains active. Flip via dev tools:
+//   localStorage.setItem('symphony.useNewTasks', '1'); location.reload()
+// Revert with:
+//   localStorage.removeItem('symphony.useNewTasks'); location.reload()
+//
+// /tasks-new/* always routes to Shell regardless of flag (kept for parallel
+// access during P4 and rollback safety; planned to remove in P5 cleanup).
+const useNewTasks =
+  typeof window !== 'undefined' &&
+  window.localStorage.getItem('symphony.useNewTasks') === '1'
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
@@ -93,7 +106,10 @@ createRoot(document.getElementById('root')!).render(
         <BrowserRouter>
           <GoogleCalendarProvider>
             <Routes>
-              <Route path="/" element={<App />} />
+              <Route path="/" element={useNewTasks ? <Shell /> : <App />} />
+              <Route path="/today" element={useNewTasks ? <Shell /> : <App />} />
+              <Route path="/inbox" element={useNewTasks ? <Shell /> : <App />} />
+              <Route path="/task/:taskId" element={useNewTasks ? <Shell /> : <App />} />
               <Route path="/goals" element={<App />} />
               <Route path="/goals/:goalId" element={<App />} />
               <Route path="/projects" element={<App />} />
