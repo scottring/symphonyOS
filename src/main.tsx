@@ -86,15 +86,21 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { OnboardingFlow, SamplePlanPage } from './components/lazy'
 import { LoadingFallback } from './components/layout/LoadingFallback'
 
-// P5 cutover. /, /today, /inbox, /task/:id route to the new Shell-mounted
-// TasksApp by default. Set localStorage `symphony.useNewTasks=0` to revert
-// to legacy App.tsx for those routes (rollback safety). /tasks-new/* always
-// routes to Shell regardless of the flag.
-//   localStorage.setItem('symphony.useNewTasks', '0'); location.reload()  // revert
-//   localStorage.removeItem('symphony.useNewTasks'); location.reload()    // back to default (new)
+// P5 cutover (gated). /, /today, /inbox, /task/:id route to the new Shell-mounted
+// TasksApp when the flag is enabled. Default OFF — legacy App.tsx still owns
+// auth gating + onboarding redirect for those routes. Flipping default-ON in
+// P5.8.1 surfaced an unfinished piece: Shell does not yet host the auth gate,
+// so the auth-form e2e specs at `/` regressed (e2e/app.spec.ts). Restored to
+// default-OFF and tracked in tasks/lift-auth-gate-into-shell.md. Flip locally
+// for parallel-path testing:
+//   localStorage.setItem('symphony.useNewTasks', '1'); location.reload()  // shell-mounted
+//   localStorage.removeItem('symphony.useNewTasks'); location.reload()    // back to legacy (default)
+//
+// /tasks-new/* always routes to Shell regardless of the flag (planned to
+// remove together with the legacy mounts once auth is lifted).
 const useNewTasks =
-  typeof window === 'undefined' ||
-  window.localStorage.getItem('symphony.useNewTasks') !== '0'
+  typeof window !== 'undefined' &&
+  window.localStorage.getItem('symphony.useNewTasks') === '1'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
