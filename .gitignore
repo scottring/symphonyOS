@@ -33,3 +33,6 @@ coverage/
 
 # Deno-generated lockfile (edge function tooling)
 deno.lock
+
+# Git worktrees
+.worktrees/
