@@ -1,14 +1,16 @@
 // src/apps/job-pipeline/JobPipelineApp.tsx
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApplications } from './data/useApplications';
 import { PipelineSection } from './components/PipelineSection';
 import { ApplicationRow } from './components/ApplicationRow';
+import { NewApplicationModal } from './NewApplicationModal';
 
 export function JobPipelineApp() {
   const { applications, byStatus, stalled } = useApplications();
   const [searchParams, setSearchParams] = useSearchParams();
   const showArchived = searchParams.get('archived') === '1';
+  const [newOpen, setNewOpen] = useState(false);
 
   const visible = useMemo(() => {
     function filter<T extends { archived: boolean }>(rows: T[]): T[] {
@@ -39,13 +41,23 @@ export function JobPipelineApp() {
     <main className="max-w-3xl mx-auto px-6 py-12 leading-relaxed">
       <div className="flex items-baseline justify-between gap-4">
         <h1 className="font-display text-4xl text-neutral-900">Job Applications</h1>
-        <button
-          type="button"
-          onClick={toggleArchived}
-          className="text-sm text-neutral-500 underline"
-        >
-          {showArchived ? 'Hide archived' : 'Show archived'}
-        </button>
+        <div className="flex items-baseline gap-4">
+          <button
+            type="button"
+            onClick={() => setNewOpen(true)}
+            className="text-sm text-neutral-700 hover:text-neutral-900 inline-flex items-center gap-1"
+          >
+            <span aria-hidden="true">+</span>
+            <span>New</span>
+          </button>
+          <button
+            type="button"
+            onClick={toggleArchived}
+            className="text-sm text-neutral-500 underline"
+          >
+            {showArchived ? 'Hide archived' : 'Show archived'}
+          </button>
+        </div>
       </div>
       <p className="mt-2 text-sm text-neutral-500 italic">
         Auto-rendered from <code>tasks/apply-*.md</code> in the vault.
@@ -116,6 +128,8 @@ export function JobPipelineApp() {
           ))}
         </PipelineSection>
       )}
+
+      <NewApplicationModal open={newOpen} onClose={() => setNewOpen(false)} />
     </main>
   );
 }

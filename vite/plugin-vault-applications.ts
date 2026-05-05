@@ -9,6 +9,10 @@ import {
   writeApplicationFile,
   type ApplicationPatch,
 } from './write-application-file';
+import {
+  createApplicationFile,
+  type NewApplicationInput,
+} from './create-application-file';
 
 const VIRTUAL_ID = 'virtual:vault-applications';
 const RESOLVED_VIRTUAL_ID = '\0' + VIRTUAL_ID;
@@ -129,9 +133,10 @@ function makeWriteMiddleware(tasksDir: string, server: ServerLike) {
     next: (err?: unknown) => void,
   ) {
     if (!req.url || !req.method) return next();
-    // Match POST /__vault/applications/<slug>
-    const m = /^\/__vault\/applications\/([^/?#]+)(?:[?#].*)?$/.exec(req.url);
-    if (!m) return next();
+    // Match POST /__vault/applications (create) or /__vault/applications/<slug> (patch).
+    const createMatch = /^\/__vault\/applications\/?(?:[?#].*)?$/.exec(req.url);
+    const patchMatch = /^\/__vault\/applications\/([^/?#]+)(?:[?#].*)?$/.exec(req.url);
+    if (!createMatch && !patchMatch) return next();
     if (req.method !== 'POST') {
       res.statusCode = 405;
       res.setHeader('content-type', 'application/json');
@@ -144,7 +149,6 @@ function makeWriteMiddleware(tasksDir: string, server: ServerLike) {
       res.end(JSON.stringify({ error: 'vault tasks directory not found' }));
       return;
     }
-    const slug = m[1];
     let body = '';
     try {
       for await (const chunk of req) body += chunk;
@@ -154,9 +158,9 @@ function makeWriteMiddleware(tasksDir: string, server: ServerLike) {
       res.end(JSON.stringify({ error: `read body failed: ${(err as Error).message}` }));
       return;
     }
-    let patch: ApplicationPatch;
+    let payload: unknown;
     try {
-      patch = body ? (JSON.parse(body) as ApplicationPatch) : {};
+      payload = body ? JSON.parse(body) : {};
     } catch (err) {
       res.statusCode = 400;
       res.setHeader('content-type', 'application/json');
@@ -164,21 +168,39 @@ function makeWriteMiddleware(tasksDir: string, server: ServerLike) {
       return;
     }
 
-    const result = writeApplicationFile(tasksDir, slug, patch);
+    if (patchMatch) {
+      const slug = patchMatch[1];
+      const result = writeApplicationFile(tasksDir, slug, payload as ApplicationPatch);
+      if (!result.ok) {
+        res.statusCode = result.status;
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify({ error: result.error }));
+        return;
+      }
+      // Invalidate the virtual module so the next request reads the new state.
+      if (isDevServer(server)) {
+        const mod = server.moduleGraph.getModuleById(RESOLVED_VIRTUAL_ID);
+        if (mod) server.moduleGraph.invalidateModule(mod);
+      }
+      res.statusCode = 200;
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify(result.value));
+      return;
+    }
+
+    // Create flow: POST /__vault/applications
+    const result = createApplicationFile(tasksDir, payload as NewApplicationInput);
     if (!result.ok) {
       res.statusCode = result.status;
       res.setHeader('content-type', 'application/json');
       res.end(JSON.stringify({ error: result.error }));
       return;
     }
-
-    // Invalidate the virtual module so the next request reads the new state.
     if (isDevServer(server)) {
       const mod = server.moduleGraph.getModuleById(RESOLVED_VIRTUAL_ID);
       if (mod) server.moduleGraph.invalidateModule(mod);
     }
-
-    res.statusCode = 200;
+    res.statusCode = 201;
     res.setHeader('content-type', 'application/json');
     res.end(JSON.stringify(result.value));
   };
