@@ -1,9 +1,10 @@
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import { vaultApplicationsPlugin } from './vite/plugin-vault-applications'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), vaultApplicationsPlugin()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
