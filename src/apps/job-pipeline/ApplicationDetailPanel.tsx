@@ -1,8 +1,9 @@
 // src/apps/job-pipeline/ApplicationDetailPanel.tsx
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { applications } from 'virtual:vault-applications';
 import type { VaultApplication } from 'virtual:vault-applications';
 import type { SelectionRef } from '@/shell/types';
+import { useSelection } from '@/shell/providers/SelectionProvider';
 import {
   patchApplication,
   type ApplicationPatch,
@@ -40,7 +41,9 @@ function todayIso(): string {
 }
 
 export function ApplicationDetailPanel({ selection }: Props) {
+  const { clearSelection } = useSelection();
   const [tab, setTab] = useState<Tab>('overview');
+  const panelRef = useRef<HTMLElement | null>(null);
   const initial = useMemo(
     () => applications.find((a: VaultApplication) => a.slug === selection.id),
     [selection.id],
@@ -50,9 +53,37 @@ export function ApplicationDetailPanel({ selection }: Props) {
   const [app, setApp] = useState<VaultApplication | undefined>(initial);
   const [confirm, setConfirm] = useState<string | null>(null);
 
+  // Close on click-outside and ESC. Per feedback_panel_design.md memory:
+  // click-outside-to-close is the standard for Symphony panels.
+  useEffect(() => {
+    function onPointerDown(e: MouseEvent) {
+      const target = e.target as Element | null;
+      if (!target || !panelRef.current) return;
+      if (panelRef.current.contains(target)) return;
+      clearSelection();
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') clearSelection();
+    }
+    // Defer attaching the click listener by a tick so the click that opened
+    // the panel doesn't immediately close it.
+    const timer = window.setTimeout(() => {
+      document.addEventListener('mousedown', onPointerDown);
+    }, 0);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [clearSelection]);
+
   if (!app) {
     return (
-      <aside className="fixed right-0 top-0 h-screen w-[420px] border-l border-neutral-200 bg-neutral-50 p-6">
+      <aside
+        ref={panelRef}
+        className="fixed right-0 top-0 h-screen w-[420px] border-l border-neutral-200 bg-neutral-50 p-6"
+      >
         <p className="text-neutral-500">Application not found.</p>
       </aside>
     );
@@ -97,8 +128,21 @@ export function ApplicationDetailPanel({ selection }: Props) {
   }
 
   return (
-    <aside className="fixed right-0 top-0 h-screen w-[420px] border-l border-neutral-200 bg-neutral-50 overflow-y-auto">
-      <header className="px-6 pt-6 pb-4">
+    <aside
+      ref={panelRef}
+      className="fixed right-0 top-0 h-screen w-[420px] border-l border-neutral-200 bg-neutral-50 overflow-y-auto"
+    >
+      <button
+        type="button"
+        onClick={clearSelection}
+        aria-label="Close application detail"
+        className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+          <path fillRule="evenodd" d="M4.28 3.22a.75.75 0 00-1.06 1.06L8.94 10l-5.72 5.72a.75.75 0 101.06 1.06L10 11.06l5.72 5.72a.75.75 0 101.06-1.06L11.06 10l5.72-5.72a.75.75 0 00-1.06-1.06L10 8.94 4.28 3.22z" clipRule="evenodd" />
+        </svg>
+      </button>
+      <header className="px-6 pt-6 pb-4 pr-14">
         <h2 className="font-display text-2xl text-neutral-900">{app.company}</h2>
         <p className="text-neutral-600">{app.role}</p>
       </header>

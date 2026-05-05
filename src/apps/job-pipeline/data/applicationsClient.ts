@@ -30,7 +30,22 @@ export async function patchApplication(
       body: JSON.stringify(patch),
     });
   } catch (err) {
-    return { ok: false, error: (err as Error).message };
+    const e = err as Error;
+    // The browser reports the same "Failed to fetch" / "NetworkError" for any
+    // unreachable origin. The likeliest cause here is that the local Vite
+    // middleware that handles writes isn't reachable — either the dev/preview
+    // server isn't running, or this build was served as static files.
+    if (
+      e.name === 'TypeError' &&
+      /failed to fetch|network/i.test(e.message)
+    ) {
+      return {
+        ok: false,
+        error:
+          "Couldn't reach the local write-back endpoint. Restart `npm run dev` (or `npm run preview` if that's how you run it). Static deploys don't support edits — use Obsidian instead.",
+      };
+    }
+    return { ok: false, error: e.message };
   }
   if (!res.ok) {
     let error = `${res.status} ${res.statusText}`;
