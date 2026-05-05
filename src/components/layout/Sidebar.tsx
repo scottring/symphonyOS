@@ -1,6 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { PinnedSection } from '@/components/pins'
 import { useDomain } from '@/hooks/useDomain'
+import { appRegistry } from '@/shell/appRegistry'
 import type { PinnedItem } from '@/types/pin'
 import type { PinnableEntityType } from '@/types/pin'
 import type { Task } from '@/types/task'
@@ -419,6 +420,45 @@ export function Sidebar({
           </svg>
           {!collapsed && <span className="text-[15px]">History</span>}
         </button>
+
+        {/* Registry-driven app entries (Shell-mounted apps that opt in via sidebar metadata) */}
+        {(() => {
+          const registryEntries = appRegistry
+            .filter((a) => a.sidebar)
+            .sort((a, b) => a.sidebar!.order - b.sidebar!.order)
+          if (registryEntries.length === 0) return null
+          return (
+            <>
+              {!collapsed && (
+                <p className="px-3.5 pt-4 pb-1 text-[11px] font-medium text-neutral-400 uppercase tracking-wider">
+                  Apps
+                </p>
+              )}
+              {collapsed && <div className="h-3" />}
+              {registryEntries.map((app) => {
+                const Icon = app.sidebar!.icon
+                const isActive = location.pathname === app.route || location.pathname.startsWith(`${app.route}/`)
+                return (
+                  <button
+                    key={app.id}
+                    onClick={() => navigate(app.route)}
+                    className={`
+                      w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
+                      ${isActive
+                        ? 'text-primary-700 bg-primary-50/80 font-medium'
+                        : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
+                      }
+                      ${collapsed ? 'justify-center' : ''}
+                    `}
+                  >
+                    <Icon className="w-5 h-5 shrink-0" />
+                    {!collapsed && <span className="text-[15px]">{app.sidebar!.label}</span>}
+                  </button>
+                )
+              })}
+            </>
+          )
+        })()}
       </nav>
 
       {/* User section */}
