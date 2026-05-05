@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Job Pipeline interactions', () => {
   test('clicking a row opens the detail panel', async ({ page }) => {
     await page.goto('/jobs');
-    const firstRow = page.locator('main button').first();
+    const firstRow = page.locator('main section button').first();
     if ((await firstRow.count()) === 0) test.skip(); // empty pipeline
     await firstRow.click();
     // URL should contain ?detail=application:<slug> (colon may be URL-encoded as %3A)
@@ -17,7 +17,7 @@ test.describe('Job Pipeline interactions', () => {
 
   test('Edit in Obsidian link uses the obsidian:// scheme', async ({ page }) => {
     await page.goto('/jobs');
-    const firstRow = page.locator('main button').first();
+    const firstRow = page.locator('main section button').first();
     if ((await firstRow.count()) === 0) test.skip();
     await firstRow.click();
     const link = page.getByRole('link', { name: /edit in obsidian/i });
