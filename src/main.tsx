@@ -83,6 +83,7 @@ import { WallCalendar } from './components/wall/WallCalendar'
 import { GoogleCalendarProvider } from './hooks/useGoogleCalendar'
 import { DomainProvider } from './hooks/useDomain'
 import { GeneratePlanProvider } from './contexts/GeneratePlanContext'
+import { Shell } from './shell/Shell'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { OnboardingFlow, SamplePlanPage } from './components/lazy'
 import { LoadingFallback } from './components/layout/LoadingFallback'
@@ -105,6 +106,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/contacts" element={<App />} />
               <Route path="/contacts/:contactId" element={<App />} />
               <Route path="/wall" element={<GeneratePlanProvider><WallCalendar /></GeneratePlanProvider>} />
+              <Route path="/wall-new/*" element={<Shell />} />
               <Route path="/morning" element={<App />} />
               <Route path="/bedtime" element={<App />} />
               <Route path="/onboarding" element={<Suspense fallback={<LoadingFallback />}><OnboardingFlow /></Suspense>} />

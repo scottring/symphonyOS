@@ -1,5 +1,6 @@
 // src/shell/appRegistry.ts
 import type { AppDef } from './types';
+import { wallAppDef } from '@/apps/wall';
 
 export type AppRegistry = ReadonlyArray<AppDef>;
 
@@ -46,5 +47,5 @@ export function resolveAppForSelection(
   );
 }
 
-// Live registry — populated phase-by-phase. Empty for P1.
-export const appRegistry: AppRegistry = createRegistry([]);
+// Live registry — populated phase-by-phase. Wall added in P2.
+export const appRegistry: AppRegistry = createRegistry([wallAppDef]);
