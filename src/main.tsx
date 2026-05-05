@@ -105,6 +105,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/contacts/:contactId" element={<App />} />
               <Route path="/wall/*" element={<Shell />} />
               <Route path="/jobs/*" element={<Shell />} />
+              <Route path="/tasks-new/*" element={<Shell />} />
               <Route path="/morning" element={<App />} />
               <Route path="/bedtime" element={<App />} />
               <Route path="/onboarding" element={<Suspense fallback={<LoadingFallback />}><OnboardingFlow /></Suspense>} />
