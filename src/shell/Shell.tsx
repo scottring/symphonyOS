@@ -1,20 +1,50 @@
 // src/shell/Shell.tsx
-import type { ReactNode } from 'react';
+import type { ComponentType, ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import { SelectionProvider } from './providers/SelectionProvider';
 import { MealEventsProvider } from './providers/MealEventsProvider';
 import { ShellRoutes } from './ShellRoutes';
 import { DetailPanel } from './DetailPanel';
 import { LegacyDetailPanelHost } from './LegacyDetailPanelHost';
 import { appRegistry } from './appRegistry';
+import { ShellLayout as DefaultShellLayout } from './ShellLayout';
 
 interface Props {
   /** Optional override for tests. Defaults to the live appRegistry. */
   registry?: typeof appRegistry;
-  /** Cross-cutting layout chrome (sidebar, topbar, capture). Provided by ShellLayout in production. */
+  /**
+   * Cross-cutting layout chrome (sidebar, topbar). Defaults to the
+   * production ShellLayout. Override in tests with a stub.
+   */
+  Layout?: ComponentType<{ children: ReactNode }>;
+  /**
+   * Legacy escape hatch kept for transition: a render-prop layout.
+   * Prefer `Layout` (component) for new callers. If supplied, this
+   * unconditionally wraps content (used by old call sites that don't
+   * yet know about chromeless apps).
+   */
   layout?: (children: ReactNode) => ReactNode;
 }
 
-export function Shell({ registry = appRegistry, layout }: Props) {
+/**
+ * Identifies the active app by pathname, mirroring ShellRoutes' resolution.
+ * Used here (one level above ShellRoutes) so we can decide whether to wrap
+ * with ShellLayout before mounting routes.
+ */
+function resolveActiveApp(registry: typeof appRegistry, pathname: string) {
+  const explicit = registry.find((app) => {
+    if (app.index) return false;
+    if (app.route === '/' || app.route === '') return pathname === '/';
+    return pathname === app.route || pathname.startsWith(`${app.route}/`);
+  });
+  return explicit ?? registry.find((app) => app.index);
+}
+
+export function Shell({ registry = appRegistry, Layout = DefaultShellLayout, layout }: Props) {
+  const { pathname } = useLocation();
+  const activeApp = resolveActiveApp(registry, pathname);
+  const useChrome = activeApp ? activeApp.chromeless !== true : true;
+
   const content = (
     <>
       <ShellRoutes registry={registry} />
@@ -22,11 +52,18 @@ export function Shell({ registry = appRegistry, layout }: Props) {
       <LegacyDetailPanelHost registry={registry} />
     </>
   );
+
+  // Render-prop override (legacy) wins over the default Layout component
+  // — kept so existing test sites keep working unchanged.
+  const wrapped = layout
+    ? layout(content)
+    : useChrome
+      ? <Layout>{content}</Layout>
+      : content;
+
   return (
     <SelectionProvider registry={registry}>
-      <MealEventsProvider>
-        {layout ? layout(content) : content}
-      </MealEventsProvider>
+      <MealEventsProvider>{wrapped}</MealEventsProvider>
     </SelectionProvider>
   );
 }
