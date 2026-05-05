@@ -86,18 +86,15 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { OnboardingFlow, SamplePlanPage } from './components/lazy'
 import { LoadingFallback } from './components/layout/LoadingFallback'
 
-// P4.8 cutover feature flag. When enabled, /, /today, /inbox, /task/:id
-// route to the new Shell-mounted TasksApp. Default OFF — legacy App.tsx
-// remains active. Flip via dev tools:
-//   localStorage.setItem('symphony.useNewTasks', '1'); location.reload()
-// Revert with:
-//   localStorage.removeItem('symphony.useNewTasks'); location.reload()
-//
-// /tasks-new/* always routes to Shell regardless of flag (kept for parallel
-// access during P4 and rollback safety; planned to remove in P5 cleanup).
+// P5 cutover. /, /today, /inbox, /task/:id route to the new Shell-mounted
+// TasksApp by default. Set localStorage `symphony.useNewTasks=0` to revert
+// to legacy App.tsx for those routes (rollback safety). /tasks-new/* always
+// routes to Shell regardless of the flag.
+//   localStorage.setItem('symphony.useNewTasks', '0'); location.reload()  // revert
+//   localStorage.removeItem('symphony.useNewTasks'); location.reload()    // back to default (new)
 const useNewTasks =
-  typeof window !== 'undefined' &&
-  window.localStorage.getItem('symphony.useNewTasks') === '1'
+  typeof window === 'undefined' ||
+  window.localStorage.getItem('symphony.useNewTasks') !== '0'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
