@@ -1,6 +1,7 @@
 // src/shell/Shell.tsx
 import type { ReactNode } from 'react';
 import { SelectionProvider } from './providers/SelectionProvider';
+import { MealEventsProvider } from './providers/MealEventsProvider';
 import { ShellRoutes } from './ShellRoutes';
 import { DetailPanel } from './DetailPanel';
 import { appRegistry } from './appRegistry';
@@ -21,7 +22,9 @@ export function Shell({ registry = appRegistry, layout }: Props) {
   );
   return (
     <SelectionProvider registry={registry}>
-      {layout ? layout(content) : content}
+      <MealEventsProvider>
+        {layout ? layout(content) : content}
+      </MealEventsProvider>
     </SelectionProvider>
   );
 }

@@ -6,13 +6,13 @@
 // HomeView component. The two parallel mounts share zero state during the
 // parallel-path phase (P4-A) and will be unified at cutover (P4.8).
 //
-// NOTE: The meal-events synthesis is duplicated from App.tsx. P4.5 lifts that
-// into a MealEventsProvider so both paths share one implementation; until then
-// the duplication is intentional.
+// P4.5 lifted meal-events synthesis to MealEventsProvider; this container now
+// consumes useMealEventsForDate(viewedDate). The legacy App.tsx still has its
+// own copy until full cutover (then the legacy synthesis becomes dead code).
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
-import { useGoogleCalendar, type CalendarEvent } from '@/hooks/useGoogleCalendar';
+import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 import { useEventNotes } from '@/hooks/useEventNotes';
 import { useContacts } from '@/hooks/useContacts';
 import { useProjects } from '@/hooks/useProjects';
@@ -20,8 +20,6 @@ import { useRoutines } from '@/hooks/useRoutines';
 import { useActionableInstances } from '@/hooks/useActionableInstances';
 import { useFamilyMembers } from '@/hooks/useFamilyMembers';
 import { useHiddenCalendarEvents } from '@/hooks/useHiddenCalendarEvents';
-import { useMealPlan } from '@/hooks/useMealPlan';
-import { useRecipes } from '@/hooks/useRecipes';
 import { useScheduleFiltering } from '@/hooks/useScheduleFiltering';
 import { useScheduleActions } from '@/hooks/useScheduleActions';
 import { useDomain } from '@/hooks/useDomain';
@@ -29,9 +27,9 @@ import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings';
 import { useListsContext } from '@/contexts/ListsContext';
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext';
 import { useUndo } from '@/hooks/useUndo';
-import { sundayOfWeek } from '@/lib/weekHelpers';
 import { HomeView } from '@/components/home';
 import { useSelection } from '@/shell/providers/SelectionProvider';
+import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
 
 export function HomeViewContainer() {
   // Data hooks
@@ -97,54 +95,9 @@ export function HomeViewContainer() {
   }, [isConnected, viewedDate, fetchEvents]);
 
   // ── Meal-plan entries synthesized as CalendarEvent objects ──
-  // Duplicated from App.tsx until P4.5 lifts to MealEventsProvider.
-  const mealWeekStart = useMemo(() => sundayOfWeek(viewedDate), [viewedDate]);
-  const { plan: mealPlanForEvents } = useMealPlan(mealWeekStart);
-  const { recipes: mealRecipesForEvents } = useRecipes();
-  const mealEvents = useMemo<CalendarEvent[]>(() => {
-    if (!mealPlanForEvents) return [];
-    const SLOT_TIMES: Record<string, [number, number]> = {
-      breakfast: [7, 30], lunch: [12, 30], snack: [15, 30], dinner: [18, 30], prep: [16, 0],
-      lunch_iris: [12, 30], lunch_scott: [12, 30], kid_alternate: [18, 30],
-    };
-    const dow = viewedDate.getDay();
-    const currentMemberId = getCurrentUserMember()?.id ?? null;
-    const memberById = new Map(familyMembers.map(m => [m.id, m]));
-    const recipeTitleById = new Map(mealRecipesForEvents.map(r => [r.id, r.title]));
-    const groups = new Map<string, { slot: string; title: string; entryIds: string[] }>();
-    for (const e of mealPlanForEvents.entries) {
-      if (e.dayOfWeek !== dow) continue;
-      if (!SLOT_TIMES[e.slot]) continue;
-      if (e.familyMemberId != null) {
-        const isCurrent = e.familyMemberId === currentMemberId;
-        const target = memberById.get(e.familyMemberId);
-        const isKid = target ? !target.auth_user_id : false;
-        if (!isCurrent && !isKid) continue;
-      }
-      const title = e.recipeId ? (recipeTitleById.get(e.recipeId) ?? '(unnamed)') : (e.adHocTitle ?? '(unnamed)');
-      const key = `${e.slot}|${title}`;
-      const existing = groups.get(key);
-      if (existing) existing.entryIds.push(e.id);
-      else groups.set(key, { slot: e.slot, title, entryIds: [e.id] });
-    }
-    const out: CalendarEvent[] = [];
-    for (const [, { slot, title, entryIds }] of groups) {
-      const [hh, mm] = SLOT_TIMES[slot]!;
-      const start = new Date(viewedDate); start.setHours(hh, mm, 0, 0);
-      const end = new Date(start.getTime() + 45 * 60 * 1000);
-      const slotLabel = slot.charAt(0).toUpperCase() + slot.slice(1);
-      out.push({
-        id: `meal:${entryIds[0]}`,
-        title: `${slotLabel} · ${title}`,
-        start_time: start.toISOString(),
-        end_time: end.toISOString(),
-        all_day: false,
-        calendar_name: 'Meals',
-        calendar_color: '#0F8A4A',
-      });
-    }
-    return out;
-  }, [mealPlanForEvents, mealRecipesForEvents, viewedDate, familyMembers, getCurrentUserMember]);
+  // Sourced from <MealEventsProvider> mounted in Shell. Legacy App.tsx still
+  // has its own copy of this synthesis; that becomes dead code post-cutover.
+  const mealEvents = useMealEventsForDate(viewedDate);
   const eventsWithMeals = useMemo(() => [...events, ...mealEvents], [events, mealEvents]);
 
   // Schedule filtering (events/routines/instances filtered to viewed date + domain)
