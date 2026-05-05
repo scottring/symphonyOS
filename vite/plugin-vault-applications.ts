@@ -1,9 +1,14 @@
 // vite/plugin-vault-applications.ts
-import type { Plugin } from 'vite';
+import type { Plugin, ViteDevServer, PreviewServer } from 'vite';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import { parseApplicationFile, type ParsedApplication } from './parse-application-file';
+import {
+  writeApplicationFile,
+  type ApplicationPatch,
+} from './write-application-file';
 
 const VIRTUAL_ID = 'virtual:vault-applications';
 const RESOLVED_VIRTUAL_ID = '\0' + VIRTUAL_ID;
@@ -101,6 +106,80 @@ export function vaultApplicationsPlugin(opts: Options = {}): Plugin {
       if (existsSync(tasksDir)) {
         server.watcher.add(tasksDir);
       }
+      server.middlewares.use(makeWriteMiddleware(tasksDir, server));
     },
+    configurePreviewServer(server) {
+      // Same write-back middleware works against `vite preview` since the
+      // Mac Mini kiosk runs under preview, not pure static.
+      server.middlewares.use(makeWriteMiddleware(tasksDir, server));
+    },
+  };
+}
+
+type ServerLike = ViteDevServer | PreviewServer;
+
+function isDevServer(s: ServerLike): s is ViteDevServer {
+  return (s as ViteDevServer).moduleGraph !== undefined;
+}
+
+function makeWriteMiddleware(tasksDir: string, server: ServerLike) {
+  return async function vaultApplicationsMiddleware(
+    req: IncomingMessage,
+    res: ServerResponse,
+    next: (err?: unknown) => void,
+  ) {
+    if (!req.url || !req.method) return next();
+    // Match POST /__vault/applications/<slug>
+    const m = /^\/__vault\/applications\/([^/?#]+)(?:[?#].*)?$/.exec(req.url);
+    if (!m) return next();
+    if (req.method !== 'POST') {
+      res.statusCode = 405;
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ error: 'method not allowed' }));
+      return;
+    }
+    if (!existsSync(tasksDir)) {
+      res.statusCode = 503;
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ error: 'vault tasks directory not found' }));
+      return;
+    }
+    const slug = m[1];
+    let body = '';
+    try {
+      for await (const chunk of req) body += chunk;
+    } catch (err) {
+      res.statusCode = 400;
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ error: `read body failed: ${(err as Error).message}` }));
+      return;
+    }
+    let patch: ApplicationPatch;
+    try {
+      patch = body ? (JSON.parse(body) as ApplicationPatch) : {};
+    } catch (err) {
+      res.statusCode = 400;
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ error: `invalid json: ${(err as Error).message}` }));
+      return;
+    }
+
+    const result = writeApplicationFile(tasksDir, slug, patch);
+    if (!result.ok) {
+      res.statusCode = result.status;
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ error: result.error }));
+      return;
+    }
+
+    // Invalidate the virtual module so the next request reads the new state.
+    if (isDevServer(server)) {
+      const mod = server.moduleGraph.getModuleById(RESOLVED_VIRTUAL_ID);
+      if (mod) server.moduleGraph.invalidateModule(mod);
+    }
+
+    res.statusCode = 200;
+    res.setHeader('content-type', 'application/json');
+    res.end(JSON.stringify(result.value));
   };
 }
