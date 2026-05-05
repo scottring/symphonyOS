@@ -12,5 +12,8 @@ export function DetailPanel({ registry }: Props) {
   const app = resolveAppForSelection(registry, selection.kind);
   if (!app?.DetailPanelComponent) return null;
   const Component = app.DetailPanelComponent;
-  return <Component selection={selection} />;
+  // Keying on the selection forces a fresh mount when the selection changes,
+  // so panels reset their local state (active tab, optimistic edits, etc.)
+  // without each panel having to handle prop-driven resets internally.
+  return <Component key={`${selection.kind}:${selection.id}`} selection={selection} />;
 }

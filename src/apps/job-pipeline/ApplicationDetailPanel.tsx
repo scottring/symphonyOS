@@ -53,6 +53,14 @@ export function ApplicationDetailPanel({ selection }: Props) {
   const [app, setApp] = useState<VaultApplication | undefined>(initial);
   const [confirm, setConfirm] = useState<string | null>(null);
 
+  // If the parent re-uses this component instance for a different selection
+  // (e.g. some consumer renders <ApplicationDetailPanel> without keying on
+  // selection.id), keep local app state in sync with the selection.
+  useEffect(() => {
+    setApp(initial);
+    setConfirm(null);
+  }, [selection.id, initial]);
+
   // Close on click-outside and ESC. Per feedback_panel_design.md memory:
   // click-outside-to-close is the standard for Symphony panels.
   useEffect(() => {
