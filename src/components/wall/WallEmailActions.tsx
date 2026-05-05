@@ -11,7 +11,7 @@ export function WallEmailActions({ items, urgentItems, onClick }: WallEmailActio
   if (items.length === 0) return null
 
   const topItem = urgentItems[0] || items[0]
-  const cat = CATEGORY_CONFIG[topItem.category]
+  const _cat = CATEGORY_CONFIG[topItem.category]
   const hasUrgent = urgentItems.length > 0
 
   return (

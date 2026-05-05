@@ -79,13 +79,28 @@ import { Suspense } from 'react'
 import { CalendarCallback } from './pages/CalendarCallback'
 import { NotFound } from './components/NotFound'
 import { JoinHousehold } from './components/JoinHousehold'
-import { WallCalendar } from './components/wall/WallCalendar'
 import { GoogleCalendarProvider } from './hooks/useGoogleCalendar'
 import { DomainProvider } from './hooks/useDomain'
-import { GeneratePlanProvider } from './contexts/GeneratePlanContext'
+import { Shell } from './shell/Shell'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { OnboardingFlow, SamplePlanPage } from './components/lazy'
 import { LoadingFallback } from './components/layout/LoadingFallback'
+
+// P5 cutover (gated). /, /today, /inbox, /task/:id route to the new Shell-mounted
+// TasksApp when the flag is enabled. Default OFF — legacy App.tsx still owns
+// auth gating + onboarding redirect for those routes. Flipping default-ON in
+// P5.8.1 surfaced an unfinished piece: Shell does not yet host the auth gate,
+// so the auth-form e2e specs at `/` regressed (e2e/app.spec.ts). Restored to
+// default-OFF and tracked in tasks/lift-auth-gate-into-shell.md. Flip locally
+// for parallel-path testing:
+//   localStorage.setItem('symphony.useNewTasks', '1'); location.reload()  // shell-mounted
+//   localStorage.removeItem('symphony.useNewTasks'); location.reload()    // back to legacy (default)
+//
+// /tasks-new/* always routes to Shell regardless of the flag (planned to
+// remove together with the legacy mounts once auth is lifted).
+const useNewTasks =
+  typeof window !== 'undefined' &&
+  window.localStorage.getItem('symphony.useNewTasks') === '1'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -94,7 +109,10 @@ createRoot(document.getElementById('root')!).render(
         <BrowserRouter>
           <GoogleCalendarProvider>
             <Routes>
-              <Route path="/" element={<App />} />
+              <Route path="/" element={useNewTasks ? <Shell /> : <App />} />
+              <Route path="/today" element={useNewTasks ? <Shell /> : <App />} />
+              <Route path="/inbox" element={useNewTasks ? <Shell /> : <App />} />
+              <Route path="/task/:taskId" element={useNewTasks ? <Shell /> : <App />} />
               <Route path="/goals" element={<App />} />
               <Route path="/goals/:goalId" element={<App />} />
               <Route path="/projects" element={<App />} />
@@ -104,7 +122,9 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/routines/:routineId" element={<App />} />
               <Route path="/contacts" element={<App />} />
               <Route path="/contacts/:contactId" element={<App />} />
-              <Route path="/wall" element={<GeneratePlanProvider><WallCalendar /></GeneratePlanProvider>} />
+              <Route path="/wall/*" element={<Shell />} />
+              <Route path="/jobs/*" element={<Shell />} />
+              <Route path="/tasks-new/*" element={<Shell />} />
               <Route path="/morning" element={<App />} />
               <Route path="/bedtime" element={<App />} />
               <Route path="/onboarding" element={<Suspense fallback={<LoadingFallback />}><OnboardingFlow /></Suspense>} />

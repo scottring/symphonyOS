@@ -168,7 +168,7 @@ function getStorageKey(): string {
 // COMPONENT
 // ============================================================================
 
-export function WallTravelDay({ calendarEvents, weather, currentTime, onBack }: WallTravelDayProps) {
+export function WallTravelDay({ calendarEvents, weather: _weather, currentTime, onBack }: WallTravelDayProps) {
   // ═══ CHECKED STATE (localStorage, keyed by date) ═══
   const [checked, setChecked] = useState<Record<string, boolean>>(() => {
     try {

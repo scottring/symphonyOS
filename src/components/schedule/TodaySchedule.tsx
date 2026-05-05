@@ -447,7 +447,7 @@ export function TodaySchedule({
   panelOpen,
   bothPanelsOpen,
   onClosePanel,
-  onUpdateTasksBulk,
+  onUpdateTasksBulk: _onUpdateTasksBulk,
 }: TodayScheduleProps) {
   // Get actions + reference data from context
   const {
@@ -537,7 +537,7 @@ export function TodaySchedule({
     title: string
     sourceRect: { top: number; left: number; width: number; height: number }
   } | null>(null)
-  const [organizePulse, setOrganizePulse] = useState(false)
+  const [_organizePulse, setOrganizePulse] = useState(false)
 
   // Scroll to pull strip (no-op now — pull strip is always visible)
   const scrollToInbox = useCallback(() => {
@@ -678,7 +678,7 @@ export function TodaySchedule({
   }, [tasks, isToday, selectedAssignee, projectsMap])
 
   // This Month pool — bucket='month'
-  const monthTasks = useMemo(() => {
+  const _monthTasks = useMemo(() => {
     if (!isToday) return []
     return tasks.filter((task) => {
       if (task.completed) return false

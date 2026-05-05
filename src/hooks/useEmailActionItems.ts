@@ -136,7 +136,7 @@ export function useEmailActionItems() {
       clearInterval(interval)
       supabase.removeChannel(channel)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [fetchItems, runScanner])
 
   return {

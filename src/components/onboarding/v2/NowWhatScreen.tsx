@@ -22,7 +22,7 @@ type Props = Record<string, never>
  *  household + season_goals to user_profiles, insert the parsed rhythm habits
  *  as standing_habits rows, and stamp onboarding_completed_at. Failures
  *  surface a toast but do NOT block the user from leaving with their plan. */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 export function NowWhatScreen(_props: Props = {} as Props) {
   const navigate = useNavigate()
   const { user } = useAuth()
