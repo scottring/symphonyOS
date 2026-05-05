@@ -36,6 +36,32 @@ describe('parseApplicationFile', () => {
     if (result.ok) return;
     expect(result.error).toMatch(/status/i);
   });
+
+  it('defaults archived to false when frontmatter is absent', () => {
+    const raw = fixture('apply-test-company.md');
+    const result = parseApplicationFile('apply-test-company.md', raw);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.archived).toBe(false);
+  });
+
+  it('parses archived: true from frontmatter', () => {
+    const raw =
+      '---\n' +
+      'type: task\n' +
+      'domain: job-search\n' +
+      'status: looking-at\n' +
+      'company: Archive Co\n' +
+      'role: Engineer\n' +
+      'created: 2026-04-01\n' +
+      'archived: true\n' +
+      '---\n' +
+      '\nbody\n';
+    const result = parseApplicationFile('apply-archive-co.md', raw);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.archived).toBe(true);
+  });
 });
 
 describe('computeIsStalled', () => {
@@ -59,6 +85,7 @@ describe('computeIsStalled', () => {
     filename: 'apply-s.md',
     body: '',
     isStalled: false,
+    archived: false,
   };
 
   it('returns true when next_step_due is in the past and status is not decided', () => {
@@ -85,6 +112,15 @@ describe('computeIsStalled', () => {
     ).toBe(false);
     expect(
       computeIsStalled({ ...base, next_step_due: '2026-05-06' }, new Date('2026-05-05')),
+    ).toBe(false);
+  });
+
+  it('returns false when archived even if otherwise stalled', () => {
+    expect(
+      computeIsStalled(
+        { ...base, archived: true, status: 'applied', next_step_due: '2025-01-01' },
+        new Date('2026-05-05'),
+      ),
     ).toBe(false);
   });
 });

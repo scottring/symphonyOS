@@ -25,6 +25,7 @@ declare module 'virtual:vault-applications' {
     filename: string;
     body: string;
     isStalled: boolean;
+    archived: boolean;
   }
   export const applications: VaultApplication[];
 }

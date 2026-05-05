@@ -30,6 +30,7 @@ vi.mock('virtual:vault-applications', () => ({
       filename: 'apply-test-co.md',
       body: '# Apply for Test Co — Engineer\n\nSome notes about the role.',
       isStalled: false,
+      archived: false,
     } satisfies VaultApplication,
   ],
 }));

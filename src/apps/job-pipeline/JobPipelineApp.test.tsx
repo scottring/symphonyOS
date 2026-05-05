@@ -29,6 +29,7 @@ vi.mock('virtual:vault-applications', () => {
       filename: 'apply-overdue-co.md',
       body: '',
       isStalled: true,
+      archived: false,
     },
     {
       slug: 'on-time',
@@ -50,6 +51,7 @@ vi.mock('virtual:vault-applications', () => {
       filename: 'apply-on-time.md',
       body: '',
       isStalled: false,
+      archived: false,
     },
   ];
   return { applications: apps };

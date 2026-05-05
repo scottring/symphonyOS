@@ -26,6 +26,7 @@ export interface ParsedApplication {
   filename: string;
   body: string;
   isStalled: boolean;
+  archived: boolean;
 }
 
 export type ParseResult =
@@ -127,6 +128,7 @@ export function parseApplicationFile(
     filename,
     body: parsed.content,
     isStalled: false, // computed below
+    archived: fm.archived === true,
   };
 
   value.isStalled = computeIsStalled(value, new Date());
@@ -135,6 +137,7 @@ export function parseApplicationFile(
 }
 
 export function computeIsStalled(app: ParsedApplication, today: Date): boolean {
+  if (app.archived) return false;
   if (app.status === 'decided') return false;
   if (!app.next_step_due) return false;
   // Compare ISO date strings only (yyyy-mm-dd) to avoid TZ skew.
