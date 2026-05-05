@@ -105,7 +105,7 @@
     "type": "task",
     "domain": "job-search",
     "status": "decided",
-    "decision": "withdrawn",
+    "decision": "rejected",
     "company": "WRI / GHG Protocol",
     "role": "Executive Director, GHG Protocol",
     "comp_low": 300000,
