@@ -73,6 +73,34 @@
     "isStalled": false
   },
   {
+    "slug": "erm-senior-consultant-sustainability",
+    "type": "task",
+    "domain": "job-search",
+    "status": "looking-at",
+    "company": "ERM",
+    "role": "Senior Consultant, Sustainability & Climate Change",
+    "comp_low": 95000,
+    "comp_high": 130000,
+    "location": "Boston, MA",
+    "remote": "hybrid",
+    "applied": null,
+    "next_step": "Submit application",
+    "next_step_due": "2026-05-10",
+    "created": "2026-05-05",
+    "tags": [
+      "lane-1",
+      "lane-2"
+    ],
+    "linked": [
+      "[[resume-erm-senior-consultant-sustainability]]",
+      "[[cover-letter-erm-senior-consultant-sustainability]]",
+      "[[role-description-erm-senior-consultant-sustainability]]"
+    ],
+    "filename": "apply-erm-senior-consultant-sustainability.md",
+    "body": "\n# Apply for ERM — Senior Consultant, Sustainability & Climate Change\n\nMid-sized sustainability consulting Senior Consultant role with a corporate sustainability + climate strategy focus. Lane 1/2 hybrid: lane 1 framing for the corporate sustainability strategy work, lane 2 framing for the technical depth in carbon accounting and supply chain compliance. Per the 2026-05-05 morning capture, ERM is a target — they need the rare profile that combines technical + software sides of carbon/supply-chain compliance, which is exactly Scott's shape.\n\n## Steps\n\n- [ ] Tailor resume → `[[resume-erm-senior-consultant-sustainability]]`\n- [ ] Draft cover letter → `[[cover-letter-erm-senior-consultant-sustainability]]`\n- [ ] Submit application via ERM careers portal\n- [ ] Follow up after 14 days if no response\n",
+    "isStalled": false
+  },
+  {
     "slug": "ghg-protocol-ed",
     "type": "task",
     "domain": "job-search",
@@ -125,6 +153,33 @@
     ],
     "filename": "apply-gw-director-sustainability.md",
     "body": "\n# Apply for GW — Director, Office of Sustainability\n\n$105–182k. Hybrid Foggy Bottom DC. Cover letter and resume already drafted (March 6); submission has been delayed. Lane 1 fit (Director of Sustainability at a corporation/institution).\n\n## Steps\n\n- [x] Tailor resume → `[[resume-gw-sustainability]]`\n- [x] Draft cover letter → `[[cover-letter-gw-sustainability]]`\n- [ ] Confirm posting is still open\n- [ ] Submit application via GW careers portal\n- [ ] Follow up after 14 days if no response\n",
+    "isStalled": false
+  },
+  {
+    "slug": "new-balance-project-dev-lead",
+    "type": "task",
+    "domain": "job-search",
+    "status": "looking-at",
+    "company": "New Balance",
+    "role": "Project Dev Lead, Sustainability",
+    "comp_low": 100200,
+    "comp_high": 158400,
+    "location": "Boston, MA",
+    "remote": "onsite",
+    "applied": null,
+    "next_step": "Submit application",
+    "next_step_due": "2026-05-08",
+    "created": "2026-05-04",
+    "tags": [
+      "high-priority"
+    ],
+    "linked": [
+      "[[resume-new-balance-project-dev-lead-sustainability]]",
+      "[[cover-letter-new-balance-project-dev-lead-sustainability]]",
+      "[[role-description-new-balance-project-dev-lead]]"
+    ],
+    "filename": "apply-new-balance-project-dev-lead.md",
+    "body": "\n# Apply for New Balance — Project Dev Lead, Sustainability\n\n$100,200–$158,400, Boston HQ, in-line footwear sustainability lead. The role drives validation and adoption of New Balance sustainability initiatives, translating strategy into in-line footwear development across Design, Development, Product Management, Sustainable Innovation, Materials Development, Advanced Concepts Engineering, and the Product Sustainability Team. Lane 1 fit (Director-of-Sustainability-adjacent corporate role with deep cross-functional reach).\n\n## Steps\n\n- [x] Tailor resume → `[[resume-new-balance-project-dev-lead-sustainability]]`\n- [x] Draft cover letter → `[[cover-letter-new-balance-project-dev-lead-sustainability]]`\n- [ ] Submit application via New Balance careers portal\n- [ ] Follow up after 14 days if no response\n",
     "isStalled": false
   },
   {
