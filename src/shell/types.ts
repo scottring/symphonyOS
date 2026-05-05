@@ -27,6 +27,12 @@ export interface AppDef {
   DetailPanelComponent?: ComponentType<{ selection: SelectionRef }>;
   /** Selection kinds this app owns (e.g., ['task'] or ['application']). Must be unique across registry. */
   ownsSelectionKinds?: string[];
+  /**
+   * If true, the app renders without Shell chrome (sidebar / topbar / etc.).
+   * Default (omitted or false) wraps the app's Component in <ShellLayout>.
+   * Use this for kiosk/fullscreen surfaces like Wall.
+   */
+  chromeless?: boolean;
 }
 
 export type SelectionResolver = (kind: string) => AppDef | undefined;
