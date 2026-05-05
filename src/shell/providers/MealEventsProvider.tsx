@@ -23,6 +23,7 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers';
 import { useMealPlan } from '@/hooks/useMealPlan';
 import { useRecipes } from '@/hooks/useRecipes';
 import { sundayOfWeek } from '@/lib/weekHelpers';
+import { GeneratePlanProvider } from '@/contexts/GeneratePlanContext';
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar';
 import type { MealPlan, Recipe } from '@/types/meal-planner';
 import type { FamilyMember } from '@/types/family';
@@ -91,10 +92,17 @@ interface MealEventsProviderProps {
 }
 
 export function MealEventsProvider({ children }: MealEventsProviderProps) {
+  // GeneratePlanProvider is required transitively by useMealPlan (the hook
+  // useMealEventsForDate calls). We wrap here so consumers don't need to know
+  // about the dependency chain. Legacy /today path mounts GeneratePlanProvider
+  // independently in App.tsx; double-mounting is safe — context lookups bind
+  // to the nearest provider.
   return (
-    <MealEventsContext.Provider value={true}>
-      {children}
-    </MealEventsContext.Provider>
+    <GeneratePlanProvider>
+      <MealEventsContext.Provider value={true}>
+        {children}
+      </MealEventsContext.Provider>
+    </GeneratePlanProvider>
   );
 }
 
