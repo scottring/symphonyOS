@@ -64,8 +64,6 @@ export function OverdueSection({
 }: OverdueSectionProps) {
   const isMobile = useMobile()
 
-  if (tasks.length === 0) return null
-
   // Sort: incomplete first (oldest at top), then completed at bottom
   const sortedTasks = useMemo(() => [...tasks].sort((a, b) => {
     if (a.completed !== b.completed) return a.completed ? 1 : -1
@@ -73,6 +71,8 @@ export function OverdueSection({
     const dateB = b.scheduledFor ? new Date(b.scheduledFor).getTime() : 0
     return dateA - dateB
   }), [tasks])
+
+  if (tasks.length === 0) return null
 
   const handleToggle = (taskId: string, wasCompleted: boolean) => {
     if (onToggleWithFollowUp) {

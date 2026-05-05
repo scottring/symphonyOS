@@ -148,8 +148,8 @@ const overdueColors = {
   warning600: 'hsl(32 40% 52%)',
 }
 
-// Domain context colors - shared utility
-const contextColors: Record<string, { dot: string; bg: string }> = DOMAIN_COLORS
+// Domain context colors - shared utility (kept for future use)
+const _contextColors: Record<string, { dot: string; bg: string }> = DOMAIN_COLORS
 
 // Start Meeting button - uses context to avoid prop drilling
 function StartMeetingButton({ item }: { item: TimelineItem }) {
@@ -215,7 +215,7 @@ export const ScheduleItem = memo(function ScheduleItem({
   routineStreak,
   suggestions,
   onActSuggestion,
-  onDismissSuggestion,
+  onDismissSuggestion: _onDismissSuggestion,
   onOpenGuidedChat,
 }: ScheduleItemProps) {
   const isMobile = useMobile()

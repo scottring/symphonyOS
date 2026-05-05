@@ -4,7 +4,7 @@
 // container scaffolding from HomeViewContainer to keep the existing
 // InboxView component unchanged.
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 import { useEventNotes } from '@/hooks/useEventNotes';

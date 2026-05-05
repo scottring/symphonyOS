@@ -137,7 +137,7 @@ export function DayDetailPage() {
   const dayActual = sumActualGrams(entriesForDay, recipesById)
   const baseline = readBaselineGrams(notesValue)
 
-  const longLabel = date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+  const _longLabel = date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
   const challengeLabel = plan?.parameter ? `${plan.parameter} challenge` : 'meal plan'
 
   return (

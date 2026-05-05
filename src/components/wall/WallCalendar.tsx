@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useWallData } from '@/hooks/useWallData'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import type { TimelineItem } from '@/types/timeline'
-import { WallRoutineColumn } from './WallRoutineColumn'
+// import { WallRoutineColumn } from './WallRoutineColumn' // unused — kept for context
 import { ShoppingListView } from './views/ShoppingListView'
 import { MealPlanColumn } from './views/MealPlanColumn'
 import { WallSwimlane } from './WallSwimlane'
@@ -14,7 +14,7 @@ import { WallItemDetail } from './WallItemDetail'
 import { findDinnerEvent, getMealIcon } from './WallDinnerWidget'
 import { WallRecipeViewer } from './WallRecipeViewer'
 import { extractRecipeNameHint, detectRecipeUrl } from '@/lib/recipeDetection'
-import { useContextEngine, ContextDock, ContextOverlay } from './contexts'
+import { useContextEngine, ContextOverlay } from './contexts'
 import type { ContextEvalData } from './contexts'
 import { useWeather } from '@/hooks/useWeather'
 import { getWeatherMessage, getWeatherEmoji } from './weatherMessages'
@@ -236,7 +236,7 @@ export function WallCalendar() {
     activeContext,
     activateContext,
     dismissActiveContext,
-    dismissRule,
+    dismissRule: _dismissRule,
     debugMode,
     toggleDebugMode,
   } = useContextEngine(contextEvalData)

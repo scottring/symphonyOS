@@ -166,7 +166,7 @@ function PublicBuilding({ colors }: { colors: { wall: string; roof: string } }) 
   )
 }
 
-function CastleBuilding({ colors }: { colors: { wall: string; roof: string } }) {
+function _CastleBuilding({ colors }: { colors: { wall: string; roof: string } }) {
   return (
     <g>
       <ellipse cx={0} cy={22} rx={26} ry={6} fill="rgba(0,0,0,0.12)" />

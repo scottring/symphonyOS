@@ -13,8 +13,9 @@ interface WhenPickerProps {
 
 type Step = 'bucket' | 'date-input' | 'time'| 'time-input'
 
-export function WhenPicker({ bucket, value, isAllDay: _isAllDay, onChange }: WhenPickerProps) {
+export function WhenPicker({ bucket, value: _value, isAllDay: _isAllDay, onChange }: WhenPickerProps) {
   void _isAllDay
+  void _value
   const [isOpen, setIsOpen] = useState(false)
   const [step, setStep] = useState<Step>('bucket')
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)

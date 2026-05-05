@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import type { Project, ProjectStatus } from '@/types/project'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'

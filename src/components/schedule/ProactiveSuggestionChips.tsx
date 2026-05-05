@@ -31,7 +31,7 @@ const ICONS: Record<string, string> = {
 export function ProactiveSuggestionChips({
   suggestions,
   onAct,
-  onDismiss,
+  onDismiss: _onDismiss,
   onPush,
   onDelete,
   onOpenGuidedChat,

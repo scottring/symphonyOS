@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import confetti from 'canvas-confetti'
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
-import { FAMILY_COLORS, type FamilyMemberColor } from '@/types/family'
+import { type FamilyMemberColor } from '@/types/family'
 
 interface WallSwimlaneProps {
   familyMembers: FamilyMember[]

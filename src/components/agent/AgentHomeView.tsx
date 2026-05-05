@@ -5,7 +5,7 @@ import { BriefingSection } from './BriefingSection'
 import { AgentChatInput } from './AgentChatInput'
 
 export function AgentHomeView() {
-  const { messages, loading: chatLoading, error: chatError, sendMessage, resetSession } = useAgentChat()
+  const { messages, loading: chatLoading, error: chatError, sendMessage } = useAgentChat()
   const { briefing, loading: briefingLoading, error: briefingError, refresh } = useAgentBriefing()
   const bottomRef = useRef<HTMLDivElement>(null)
 

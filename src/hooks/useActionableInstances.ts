@@ -157,7 +157,7 @@ export function useActionableInstances() {
     date: Date
   ): Promise<ActionableInstance | null> => {
     // First try direct date match
-    let instance = await getInstance(entityType, entityId, date)
+    const instance = await getInstance(entityType, entityId, date)
     if (instance) return instance
 
     // Check for an instance deferred TO this date

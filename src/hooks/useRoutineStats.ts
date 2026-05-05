@@ -54,7 +54,7 @@ export function useRoutineStats() {
       byRoutine.set(row.entity_id, list)
     }
 
-    const today = new Date().toISOString().split('T')[0]
+    const _today = new Date().toISOString().split('T')[0]
     const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0]
 
     const newStats = new Map<string, RoutineStat>()
