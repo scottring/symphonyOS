@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
@@ -7,6 +7,7 @@ import type { ProactiveSuggestion, SuggestionEntityType } from '@/types/proactiv
 import { ScheduleItem } from './ScheduleItem'
 import { SwipeableCard } from './SwipeableCard'
 import { FollowUpInput } from './FollowUpInput'
+import { ExpandingPanel } from './ExpandingPanel'
 import { taskToTimelineItem } from '@/types/timeline'
 import { formatOverdueDate } from '@/lib/timeUtils'
 import { useMobile } from '@/hooks/useMobile'
@@ -149,7 +150,19 @@ export function OverdueSection({
           const fallbackSuggs = getOverdueSuggestions(task, contactName || undefined)
 
           return (
-            <div key={task.id} className={`group/card ${parentVisible ? 'ml-6 border-l-2 border-neutral-200 pl-2' : ''}`}>
+            <OverdueCard
+              key={task.id}
+              parentVisible={parentVisible}
+              showFallbackSuggestions={proactiveSuggs.length === 0 && fallbackSuggs.length > 0}
+              fallbackSuggestionsContent={
+                <SuggestionChips
+                  suggestions={fallbackSuggs}
+                  taskId={taskId}
+                  onPush={onPushTask}
+                  onDelete={onDeleteTask}
+                />
+              }
+            >
               <ScheduleItem
                 item={item}
                 selected={selectedItemId === `task-${task.id}`}
@@ -179,17 +192,6 @@ export function OverdueSection({
                 onDismissSuggestion={onDismissSuggestion}
                 onOpenGuidedChat={onOpenGuidedChat}
               />
-              {/* Fallback rule-based suggestions (proactive ones show inline via ScheduleItem) */}
-              {proactiveSuggs.length === 0 && fallbackSuggs.length > 0 && (
-                <div className="h-0 group-hover/card:h-auto overflow-hidden transition-all">
-                  <SuggestionChips
-                    suggestions={fallbackSuggs}
-                    taskId={taskId}
-                    onPush={onPushTask}
-                    onDelete={onDeleteTask}
-                  />
-                </div>
-              )}
               {followUpTaskId === taskId && onFollowUpSubmit && onFollowUpDismiss && (
                 <FollowUpInput
                   sourceTask={task}
@@ -198,10 +200,44 @@ export function OverdueSection({
                   projectName={projectName || undefined}
                 />
               )}
-            </div>
+            </OverdueCard>
           )
         })}
       </div>
+    </div>
+  )
+}
+
+/**
+ * Wrapper that owns the per-card hover state. Replaces the legacy
+ * `group/card` + `group-hover/card:h-auto` pattern (which jerked because
+ * CSS cannot animate `height: 0 → auto`) with state-driven smooth
+ * expansion via ExpandingPanel.
+ */
+function OverdueCard({
+  children,
+  parentVisible,
+  showFallbackSuggestions,
+  fallbackSuggestionsContent,
+}: {
+  children: React.ReactNode
+  parentVisible: boolean
+  showFallbackSuggestions: boolean
+  fallbackSuggestionsContent: React.ReactNode
+}) {
+  const [isHovered, setIsHovered] = useState(false)
+  return (
+    <div
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className={parentVisible ? 'ml-6 border-l-2 border-neutral-200 pl-2' : ''}
+    >
+      {children}
+      {showFallbackSuggestions && (
+        <ExpandingPanel open={isHovered}>
+          {fallbackSuggestionsContent}
+        </ExpandingPanel>
+      )}
     </div>
   )
 }

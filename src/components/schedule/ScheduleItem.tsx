@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useState } from 'react'
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
 import type { TaskContext } from '@/types/task'
@@ -12,6 +12,7 @@ import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useMobile } from '@/hooks/useMobile'
 import { TaskCheckbox } from './TaskCheckbox'
 import { PromoteToProjectButton } from './PromoteToProjectButton'
+import { ExpandingPanel } from './ExpandingPanel'
 import { DOMAIN_COLORS } from '@/lib/domainColors'
 
 // Nordic Journal calendar icon - minimal, elegant design
@@ -219,6 +220,10 @@ export const ScheduleItem = memo(function ScheduleItem({
   onOpenGuidedChat,
 }: ScheduleItemProps) {
   const isMobile = useMobile()
+  // Hover state powers the smooth expanding banner (proactive suggestions,
+  // location-only metadata row). On mobile we never expand — preserves the
+  // pre-existing behavior where these were never visible without hover.
+  const [isHovered, setIsHovered] = useState(false)
   const isTask = item.type === 'task'
   const isRoutine = item.type === 'routine'
   const isEvent = item.type === 'event'
@@ -289,6 +294,8 @@ export const ScheduleItem = memo(function ScheduleItem({
         onSelect()
       }}
       onKeyDown={handleKeyDown}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       tabIndex={0}
       role="button"
       aria-pressed={selected}
@@ -588,63 +595,69 @@ export const ScheduleItem = memo(function ScheduleItem({
       </div>
 
       {/* Metadata row — location on hover, contact/project always compact */}
-      {(item.location || hasContactChip || parentTaskName || projectName) && (
-        <div className={`flex items-center gap-2 ml-[5.75rem] flex-wrap ${
-          /* If only location (no other metadata), collapse row until hover */
-          !hasContactChip && !parentTaskName && !projectName
-            ? 'h-0 group-hover:h-auto group-hover:mt-1 overflow-hidden transition-all'
-            : 'mt-1'
-        }`}>
-          {/* Location chip — hover-only for cleaner default view */}
-          {item.location && (
-            <a
-              href={`https://www.google.com/maps/dir/?api=1&destination=${
-                item.locationPlaceId
-                  ? `place_id:${item.locationPlaceId}`
-                  : encodeURIComponent(item.location)
-              }`}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 text-primary-600 hover:text-primary-700 rounded text-[11px] font-medium transition-all opacity-0 group-hover:opacity-100 max-w-[220px]"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-              </svg>
-              <span className="truncate">{item.location}</span>
-            </a>
-          )}
+      {(item.location || hasContactChip || parentTaskName || projectName) && (() => {
+        const onlyLocation = !hasContactChip && !parentTaskName && !projectName
+        const metadataContent = (
+          <div className={`flex items-center gap-2 ml-[5.75rem] flex-wrap ${onlyLocation ? 'pt-1' : 'mt-1'}`}>
+            {/* Location chip — hover-only for cleaner default view */}
+            {item.location && (
+              <a
+                href={`https://www.google.com/maps/dir/?api=1&destination=${
+                  item.locationPlaceId
+                    ? `place_id:${item.locationPlaceId}`
+                    : encodeURIComponent(item.location)
+                }`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 text-primary-600 hover:text-primary-700 rounded text-[11px] font-medium transition-all opacity-0 group-hover:opacity-100 max-w-[220px]"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                </svg>
+                <span className="truncate">{item.location}</span>
+              </a>
+            )}
 
-          {/* Contact chip - desktop only */}
-          {hasContactChip && (
-            <span className="hidden md:inline-flex items-center gap-1 text-[11px] text-neutral-500">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-              </svg>
-              <span className="truncate max-w-[80px]">{contactName}</span>
-            </span>
-          )}
+            {/* Contact chip - desktop only */}
+            {hasContactChip && (
+              <span className="hidden md:inline-flex items-center gap-1 text-[11px] text-neutral-500">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                </svg>
+                <span className="truncate max-w-[80px]">{contactName}</span>
+              </span>
+            )}
 
-          {/* Parent task or project context */}
-          {parentTaskName && parentTaskId ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onOpenParentTask?.(parentTaskId)
-              }}
-              className="text-[11px] text-neutral-400 hover:text-neutral-600 hover:underline truncate max-w-[180px]"
-            >
-              {parentTaskName}
-            </button>
-          ) : projectName ? (
-            <span className="text-[11px] text-neutral-400 truncate max-w-[180px]">{projectName}</span>
-          ) : null}
-        </div>
-      )}
+            {/* Parent task or project context */}
+            {parentTaskName && parentTaskId ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpenParentTask?.(parentTaskId)
+                }}
+                className="text-[11px] text-neutral-400 hover:text-neutral-600 hover:underline truncate max-w-[180px]"
+              >
+                {parentTaskName}
+              </button>
+            ) : projectName ? (
+              <span className="text-[11px] text-neutral-400 truncate max-w-[180px]">{projectName}</span>
+            ) : null}
+          </div>
+        )
 
-      {/* Proactive suggestions — hover-only, ambient */}
+        // If location is the only metadata, the row collapses until hover.
+        // Wrap in ExpandingPanel so layout shifts smoothly instead of jumping.
+        return onlyLocation
+          ? <ExpandingPanel open={isHovered && !isMobile}>{metadataContent}</ExpandingPanel>
+          : metadataContent
+      })()}
+
+      {/* Proactive suggestions — hover-only, ambient. Wrapped in ExpandingPanel
+          so the layout below shifts smoothly when the banner appears/disappears
+          rather than jerking. */}
       {suggestions && suggestions.length > 0 && !item.completed && !item.skipped && onActSuggestion && (
-        <div className="h-0 group-hover:h-auto overflow-hidden transition-all ml-[5.75rem]">
+        <ExpandingPanel open={isHovered && !isMobile} className="ml-[5.75rem]">
           <div className="flex gap-1.5 pt-1 pb-0.5 flex-wrap">
             {suggestions.map((s) => {
               const icons: Record<string, string> = {
@@ -717,7 +730,7 @@ export const ScheduleItem = memo(function ScheduleItem({
               )
             })}
           </div>
-        </div>
+        </ExpandingPanel>
       )}
     </div>
   )
