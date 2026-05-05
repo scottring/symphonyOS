@@ -1,5 +1,6 @@
 // vite/parse-application-file.ts
 import matter from 'gray-matter';
+import { matterOptions } from './yaml-engine';
 
 export type ApplicationStatus = 'looking-at' | 'applied' | 'interviewing' | 'decided';
 export type ApplicationDecision = 'rejected' | 'accepted' | 'withdrawn';
@@ -71,7 +72,7 @@ export function parseApplicationFile(
 ): ParseResult {
   let parsed: ReturnType<typeof matter>;
   try {
-    parsed = matter(raw);
+    parsed = matter(raw, matterOptions);
   } catch (err) {
     return { ok: false, error: `frontmatter parse error: ${(err as Error).message}` };
   }

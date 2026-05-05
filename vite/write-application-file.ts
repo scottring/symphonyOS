@@ -16,6 +16,7 @@ import {
   type ApplicationStatus,
   type ParsedApplication,
 } from './parse-application-file';
+import { matterOptions } from './yaml-engine';
 
 export interface ApplicationPatch {
   status?: ApplicationStatus;
@@ -86,7 +87,7 @@ export function writeApplicationFile(
 
   let parsed: ReturnType<typeof matter>;
   try {
-    parsed = matter(raw);
+    parsed = matter(raw, matterOptions);
   } catch (err) {
     return { ok: false, status: 500, error: `frontmatter parse error: ${(err as Error).message}` };
   }
@@ -134,7 +135,7 @@ export function writeApplicationFile(
 
   let stringified: string;
   try {
-    stringified = matter.stringify(parsed.content, data);
+    stringified = matter.stringify(parsed.content, data, matterOptions);
   } catch (err) {
     return { ok: false, status: 500, error: `stringify failed: ${(err as Error).message}` };
   }
