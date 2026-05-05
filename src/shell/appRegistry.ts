@@ -1,6 +1,7 @@
 // src/shell/appRegistry.ts
 import type { AppDef } from './types';
 import { wallAppDef } from '@/apps/wall';
+import { jobPipelineAppDef } from '@/apps/job-pipeline';
 
 export type AppRegistry = ReadonlyArray<AppDef>;
 
@@ -47,5 +48,5 @@ export function resolveAppForSelection(
   );
 }
 
-// Live registry — populated phase-by-phase. Wall added in P2.
-export const appRegistry: AppRegistry = createRegistry([wallAppDef]);
+// Live registry — populated phase-by-phase. Wall added in P2, Job Pipeline in P3.
+export const appRegistry: AppRegistry = createRegistry([wallAppDef, jobPipelineAppDef]);
