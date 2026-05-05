@@ -2,10 +2,12 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { sentryVitePlugin } from '@sentry/vite-plugin'
 import path from 'path'
+import { vaultApplicationsPlugin } from './vite/plugin-vault-applications'
 
 export default defineConfig({
   plugins: [
     react(),
+    vaultApplicationsPlugin(),
     // Add Sentry plugin for production builds
     sentryVitePlugin({
       org: process.env.SENTRY_ORG,
