@@ -4,6 +4,7 @@ import { ListsProvider } from '@/contexts/ListsContext';
 import { NotesProvider } from '@/contexts/NotesContext';
 import { GoalsProvider } from '@/contexts/GoalsContext';
 import { HomeViewContainer } from './HomeViewContainer';
+import { InboxViewContainer } from './InboxViewContainer';
 
 // IMPORTANT: this is the parallel /tasks-new path during P4. It mirrors what
 // App.tsx renders for /today, /inbox, /task/:id but uses the new Shell+app
@@ -20,7 +21,7 @@ export function TasksApp() {
           <Routes>
             <Route path="/" element={<Navigate to="today" replace />} />
             <Route path="today" element={<HomeViewContainer />} />
-            <Route path="inbox" element={<div>tasks app: inbox (P4 in progress)</div>} />
+            <Route path="inbox" element={<InboxViewContainer />} />
             <Route path="task/:taskId" element={<div>tasks app: task detail (P4 in progress)</div>} />
           </Routes>
         </NotesProvider>
