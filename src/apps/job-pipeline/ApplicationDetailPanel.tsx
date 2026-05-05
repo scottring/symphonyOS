@@ -3,6 +3,13 @@ import { useMemo, useState } from 'react';
 import { applications } from 'virtual:vault-applications';
 import type { VaultApplication } from 'virtual:vault-applications';
 import type { SelectionRef } from '@/shell/types';
+import {
+  patchApplication,
+  type ApplicationPatch,
+} from './data/applicationsClient';
+import { StatusControl } from './components/StatusControl';
+import { ArchiveButton } from './components/ArchiveButton';
+import { AddToTodayButton } from './components/AddToTodayButton';
 
 interface Props {
   selection: SelectionRef;
@@ -28,12 +35,20 @@ function unwrapWikilink(link: string): string {
   return link.replace(/^\[\[/, '').replace(/\]\]$/, '');
 }
 
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export function ApplicationDetailPanel({ selection }: Props) {
   const [tab, setTab] = useState<Tab>('overview');
-  const app = useMemo(
+  const initial = useMemo(
     () => applications.find((a: VaultApplication) => a.slug === selection.id),
     [selection.id],
   );
+  // Local state mirrors the persisted application so optimistic updates
+  // re-render without waiting for an HMR reload of the virtual module.
+  const [app, setApp] = useState<VaultApplication | undefined>(initial);
+  const [confirm, setConfirm] = useState<string | null>(null);
 
   if (!app) {
     return (
@@ -41,6 +56,44 @@ export function ApplicationDetailPanel({ selection }: Props) {
         <p className="text-neutral-500">Application not found.</p>
       </aside>
     );
+  }
+
+  async function applyPatch(
+    patch: ApplicationPatch,
+  ): Promise<{ ok: boolean; error?: string }> {
+    if (!app) return { ok: false, error: 'no application loaded' };
+    // For status=applied without an applied date, auto-fill today so the
+    // pipeline reflects the move correctly.
+    const effective: ApplicationPatch = { ...patch };
+    if (
+      patch.status === 'applied' &&
+      app.applied == null &&
+      patch.applied === undefined
+    ) {
+      effective.applied = todayIso();
+    }
+    const prev = app;
+    // Optimistic update: merge the patch into the local copy.
+    setApp({
+      ...prev,
+      ...(effective.status !== undefined ? { status: effective.status } : {}),
+      ...(effective.decision !== undefined
+        ? { decision: effective.decision === null ? undefined : effective.decision }
+        : {}),
+      ...(effective.applied !== undefined ? { applied: effective.applied } : {}),
+      ...(effective.next_step !== undefined ? { next_step: effective.next_step } : {}),
+      ...(effective.next_step_due !== undefined ? { next_step_due: effective.next_step_due } : {}),
+      ...(effective.archived !== undefined ? { archived: effective.archived } : {}),
+    });
+    setConfirm(null);
+    const result = await patchApplication(prev.slug, effective);
+    if (!result.ok) {
+      setApp(prev);
+      return { ok: false, error: result.error };
+    }
+    setApp(result.application);
+    setConfirm(describeChange(effective));
+    return { ok: true };
   }
 
   return (
@@ -63,33 +116,82 @@ export function ApplicationDetailPanel({ selection }: Props) {
         ))}
       </div>
       <div className="px-6 py-6">
-        {tab === 'overview' && <OverviewPane app={app} />}
+        {tab === 'overview' && (
+          <OverviewPane app={app} onPatch={applyPatch} confirm={confirm} />
+        )}
         {tab === 'notes' && <NotesPane app={app} />}
         {tab === 'documents' && <DocumentsPane app={app} />}
       </div>
-      <footer className="px-6 py-4 border-t border-neutral-200">
+      <footer className="px-6 py-4 border-t border-neutral-200 flex items-center justify-between">
         <a
           href={obsidianUrl(app.filename)}
           className="text-sm text-neutral-700 underline"
         >
           Edit in Obsidian
         </a>
+        <ArchiveButton
+          archived={app.archived}
+          onToggle={(archived) => applyPatch({ archived })}
+        />
       </footer>
     </aside>
   );
 }
 
-function OverviewPane({ app }: { app: VaultApplication }) {
+function describeChange(patch: ApplicationPatch): string {
+  if (patch.archived === true) return 'Archived.';
+  if (patch.archived === false) return 'Restored.';
+  if (patch.status) return `Status set to ${patch.status}.`;
+  if (patch.decision) return `Decision set to ${patch.decision}.`;
+  return 'Saved.';
+}
+
+function OverviewPane({
+  app,
+  onPatch,
+  confirm,
+}: {
+  app: VaultApplication;
+  onPatch: (patch: ApplicationPatch) => Promise<{ ok: boolean; error?: string }>;
+  confirm: string | null;
+}) {
+  const showAddToToday =
+    app.next_step != null &&
+    (app.next_step_due == null || app.next_step_due >= todayIso());
+
   return (
-    <dl className="space-y-3 text-sm">
-      <Row label="Status" value={app.status + (app.decision ? ` (${app.decision})` : '')} />
-      <Row label="Comp" value={compString(app.comp_low, app.comp_high)} />
-      <Row label="Location" value={app.location ?? '—'} />
-      <Row label="Remote" value={app.remote ?? '—'} />
-      {app.applied && <Row label="Applied" value={app.applied} />}
-      {app.next_step && <Row label="Next step" value={app.next_step} />}
-      {app.next_step_due && <Row label="Due" value={app.next_step_due} />}
-    </dl>
+    <div className="space-y-5 text-sm">
+      <StatusControl
+        status={app.status}
+        decision={app.decision}
+        onChange={onPatch}
+      />
+      {confirm && (
+        <p
+          role="status"
+          aria-live="polite"
+          className="text-xs text-neutral-500 italic"
+        >
+          {confirm}
+        </p>
+      )}
+      <dl className="space-y-3">
+        <Row label="Comp" value={compString(app.comp_low, app.comp_high)} />
+        <Row label="Location" value={app.location ?? '—'} />
+        <Row label="Remote" value={app.remote ?? '—'} />
+        {app.applied && <Row label="Applied" value={app.applied} />}
+        {app.next_step && <Row label="Next step" value={app.next_step} />}
+        {app.next_step_due && <Row label="Due" value={app.next_step_due} />}
+      </dl>
+      {showAddToToday && app.next_step && (
+        <AddToTodayButton
+          slug={app.slug}
+          filename={app.filename}
+          company={app.company}
+          next_step={app.next_step}
+        />
+      )}
+    </div>
   );
 }
 

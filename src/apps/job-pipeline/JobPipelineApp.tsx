@@ -1,26 +1,64 @@
 // src/apps/job-pipeline/JobPipelineApp.tsx
+import { useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useApplications } from './data/useApplications';
 import { PipelineSection } from './components/PipelineSection';
 import { ApplicationRow } from './components/ApplicationRow';
 
 export function JobPipelineApp() {
-  const { byStatus, stalled } = useApplications();
+  const { applications, byStatus, stalled } = useApplications();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const showArchived = searchParams.get('archived') === '1';
+
+  const visible = useMemo(() => {
+    function filter<T extends { archived: boolean }>(rows: T[]): T[] {
+      return rows.filter((r) => !r.archived);
+    }
+    return {
+      stalled: filter(stalled),
+      lookingAt: filter(byStatus['looking-at']),
+      applied: filter(byStatus.applied),
+      interviewing: filter(byStatus.interviewing),
+      decided: filter(byStatus.decided),
+    };
+  }, [byStatus, stalled]);
+
+  const archived = useMemo(
+    () => applications.filter((a) => a.archived),
+    [applications],
+  );
+
+  function toggleArchived() {
+    const next = new URLSearchParams(searchParams);
+    if (showArchived) next.delete('archived');
+    else next.set('archived', '1');
+    setSearchParams(next, { replace: true });
+  }
 
   return (
     <main className="max-w-3xl mx-auto px-6 py-12 leading-relaxed">
-      <h1 className="font-display text-4xl text-neutral-900">Job Applications</h1>
+      <div className="flex items-baseline justify-between gap-4">
+        <h1 className="font-display text-4xl text-neutral-900">Job Applications</h1>
+        <button
+          type="button"
+          onClick={toggleArchived}
+          className="text-sm text-neutral-500 underline"
+        >
+          {showArchived ? 'Hide archived' : 'Show archived'}
+        </button>
+      </div>
       <p className="mt-2 text-sm text-neutral-500 italic">
         Auto-rendered from <code>tasks/apply-*.md</code> in the vault.
       </p>
 
-      {stalled.length > 0 && (
+      {visible.stalled.length > 0 && (
         <PipelineSection
           title="Stalled"
           subtitle="These need attention."
           emptyState="Nothing stalled."
-          isEmpty={stalled.length === 0}
+          isEmpty={visible.stalled.length === 0}
         >
-          {stalled.map((app) => (
+          {visible.stalled.map((app) => (
             <ApplicationRow key={app.slug} app={app} showOverdue />
           ))}
         </PipelineSection>
@@ -29,9 +67,9 @@ export function JobPipelineApp() {
       <PipelineSection
         title="Looking At"
         emptyState="Nothing tracked yet."
-        isEmpty={byStatus['looking-at'].length === 0}
+        isEmpty={visible.lookingAt.length === 0}
       >
-        {byStatus['looking-at'].map((app) => (
+        {visible.lookingAt.map((app) => (
           <ApplicationRow key={app.slug} app={app} />
         ))}
       </PipelineSection>
@@ -39,9 +77,9 @@ export function JobPipelineApp() {
       <PipelineSection
         title="Applied"
         emptyState="Nothing in flight."
-        isEmpty={byStatus.applied.length === 0}
+        isEmpty={visible.applied.length === 0}
       >
-        {byStatus.applied.map((app) => (
+        {visible.applied.map((app) => (
           <ApplicationRow key={app.slug} app={app} showApplied />
         ))}
       </PipelineSection>
@@ -49,9 +87,9 @@ export function JobPipelineApp() {
       <PipelineSection
         title="Interviewing"
         emptyState="Nothing interviewing."
-        isEmpty={byStatus.interviewing.length === 0}
+        isEmpty={visible.interviewing.length === 0}
       >
-        {byStatus.interviewing.map((app) => (
+        {visible.interviewing.map((app) => (
           <ApplicationRow key={app.slug} app={app} />
         ))}
       </PipelineSection>
@@ -59,12 +97,25 @@ export function JobPipelineApp() {
       <PipelineSection
         title="Decided"
         emptyState="Nothing decided yet."
-        isEmpty={byStatus.decided.length === 0}
+        isEmpty={visible.decided.length === 0}
       >
-        {byStatus.decided.map((app) => (
+        {visible.decided.map((app) => (
           <ApplicationRow key={app.slug} app={app} showApplied showDecision />
         ))}
       </PipelineSection>
+
+      {showArchived && (
+        <PipelineSection
+          title="Archived"
+          subtitle="Hidden from the main pipeline."
+          emptyState="No archived applications."
+          isEmpty={archived.length === 0}
+        >
+          {archived.map((app) => (
+            <ApplicationRow key={app.slug} app={app} showApplied />
+          ))}
+        </PipelineSection>
+      )}
     </main>
   );
 }
