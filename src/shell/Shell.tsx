@@ -4,6 +4,7 @@ import { SelectionProvider } from './providers/SelectionProvider';
 import { MealEventsProvider } from './providers/MealEventsProvider';
 import { ShellRoutes } from './ShellRoutes';
 import { DetailPanel } from './DetailPanel';
+import { LegacyDetailPanelHost } from './LegacyDetailPanelHost';
 import { appRegistry } from './appRegistry';
 
 interface Props {
@@ -18,6 +19,7 @@ export function Shell({ registry = appRegistry, layout }: Props) {
     <>
       <ShellRoutes registry={registry} />
       <DetailPanel registry={registry} />
+      <LegacyDetailPanelHost registry={registry} />
     </>
   );
   return (
