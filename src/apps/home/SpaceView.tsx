@@ -89,13 +89,21 @@ export function SpaceView() {
 
       <div className="flex items-center justify-between mb-2">
         <h2 className="font-display text-lg">Assets</h2>
-        <button
-          className="text-sm text-primary-700"
-          onClick={async () => {
-            const name = prompt('Asset name')
-            if (name) await captureAsset({ name, spaceId: id ?? null })
-          }}
-        >+ Asset here</button>
+        <div className="flex items-center">
+          {!isZone && (
+            <Link
+              to={`/home/space/${id}/session`}
+              className="text-sm text-neutral-600 hover:text-primary-700 mr-2"
+            >Start room session →</Link>
+          )}
+          <button
+            className="text-sm text-primary-700"
+            onClick={async () => {
+              const name = prompt('Asset name')
+              if (name) await captureAsset({ name, spaceId: id ?? null })
+            }}
+          >+ Asset here</button>
+        </div>
       </div>
       {here.length === 0 ? (
         <p className="text-sm text-neutral-500">No assets here yet.</p>

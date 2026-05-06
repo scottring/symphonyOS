@@ -4,11 +4,13 @@ import { HomeOverview } from './HomeOverview'
 import { SpaceView } from './SpaceView'
 import { AssetView } from './AssetView'
 import { AssetCapture } from './capture/AssetCapture'
+import { RoomSessionMode } from './capture/RoomSessionMode'
 
 export function HomeApp() {
   return (
     <Routes>
       <Route index element={<HomeOverview />} />
+      <Route path="space/:id/session" element={<RoomSessionMode />} />
       <Route path="space/:id" element={<SpaceView />} />
       <Route path="asset/new" element={<AssetCapture />} />
       <Route path="asset/:id" element={<AssetView />} />
