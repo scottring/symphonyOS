@@ -42,6 +42,9 @@ create table spaces (
   id uuid primary key default gen_random_uuid(),
   home_id uuid not null references homes(id) on delete cascade,
   parent_space_id uuid references spaces(id) on delete cascade,
+  -- NOTE: cross-home consistency (parent_space_id and assets.space_id pointing
+  -- at a space in the same home) is enforced at the application layer.
+  -- Add a composite FK in a follow-up if service-role writes ever land here.
   space_type text not null check (space_type in ('room','zone')),
   name text not null check (length(trim(name)) > 0),
   photo_url text,
