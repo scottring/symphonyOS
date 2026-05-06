@@ -23,6 +23,7 @@ export function AssetCapture() {
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined)
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
 
   const fileInput = useRef<HTMLInputElement>(null)
 
@@ -37,7 +38,10 @@ export function AssetCapture() {
     const { error } = await supabase.storage.from('asset-photos').upload(path, file, {
       cacheControl: '3600', upsert: false,
     })
-    if (error) return undefined
+    if (error) {
+      setUploadError(error.message)
+      throw error
+    }
     const { data } = supabase.storage.from('asset-photos').getPublicUrl(path)
     return data?.publicUrl
   }
@@ -45,8 +49,16 @@ export function AssetCapture() {
   async function save(addAnother: boolean) {
     if (!name.trim() || !roomId) return
     setSaving(true)
-    let url = photoUrl
-    if (!url && photoFile) url = await uploadPhoto(photoFile)
+    setUploadError(null)
+    let url: string | undefined = undefined
+    if (photoFile) {
+      try {
+        url = await uploadPhoto(photoFile)
+      } catch {
+        setSaving(false)
+        return
+      }
+    }
     const spaceId = zoneId || roomId
     await captureAsset({
       name: name.trim(),
@@ -56,6 +68,7 @@ export function AssetCapture() {
     })
     setSaving(false)
     if (addAnother) {
+      if (photoUrl) URL.revokeObjectURL(photoUrl)
       setName(''); setIsCollection(false); setPhotoFile(null); setPhotoUrl(undefined)
       // Re-trigger camera with same room/zone retained
       fileInput.current?.click()
@@ -63,6 +76,11 @@ export function AssetCapture() {
       navigate(`/home/space/${spaceId}`)
     }
   }
+
+  // Revoke blob URL on unmount or when it changes
+  useEffect(() => {
+    return () => { if (photoUrl) URL.revokeObjectURL(photoUrl) }
+  }, [photoUrl])
 
   return (
     <div className="p-4 max-w-md mx-auto">
@@ -78,7 +96,10 @@ export function AssetCapture() {
           const f = e.target.files?.[0]
           if (f) {
             setPhotoFile(f)
-            setPhotoUrl(URL.createObjectURL(f))
+            setPhotoUrl((prev) => {
+              if (prev) URL.revokeObjectURL(prev)
+              return URL.createObjectURL(f)
+            })
           }
         }}
       />
@@ -93,6 +114,10 @@ export function AssetCapture() {
           <p className="text-neutral-500">Take a photo</p>
         )}
       </div>
+
+      {uploadError && (
+        <p className="text-sm text-red-600 mb-2" role="alert">Photo upload failed: {uploadError}</p>
+      )}
 
       <label className="block mb-2">
         <span className="text-sm text-neutral-600">Name</span>

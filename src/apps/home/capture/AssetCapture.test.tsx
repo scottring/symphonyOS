@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { AssetCapture } from './AssetCapture'
@@ -23,6 +23,8 @@ const captureAsset = vi.fn().mockResolvedValue({ id: 'a-new' })
 vi.mock('@/hooks/useAssets', () => ({
   useAssets: () => ({ assets: [], needsDetailsAssets: [], loading: false, captureAsset }),
 }))
+
+beforeEach(() => captureAsset.mockClear())
 
 describe('AssetCapture', () => {
   it('renders camera prompt and name field', () => {
