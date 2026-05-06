@@ -8,6 +8,7 @@ import {
 } from '@/components/meals'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 import { HomeView } from '@/components/home'
+import { HomeApp } from '@/apps/home'
 import { MorningPage } from '@/pages/MorningPage'
 import { BedtimePage } from '@/pages/BedtimePage'
 import { MeetingNotesView } from '@/components/meeting/MeetingNotesView'
@@ -470,6 +471,8 @@ export function ViewRouter(props: ViewRouterProps) {
         && !location.pathname.startsWith('/meals/tonight') && (
         <PlannerPage />
       )}
+
+      {props.activeView === 'home-app' && <HomeApp />}
 
       {props.activeView === 'morning' && <MorningPage />}
       {props.activeView === 'bedtime' && <BedtimePage />}

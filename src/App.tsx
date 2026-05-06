@@ -375,6 +375,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     if (path === '/contacts') return 'contacts'
     if (path.startsWith('/contacts/')) return 'contact-detail'
     if (path.startsWith('/meals')) return 'meals'
+    if (path.startsWith('/home')) return 'home-app'
     if (path === '/morning') return 'morning'
     if (path === '/bedtime') return 'bedtime'
     return 'today'
@@ -587,6 +588,9 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     } else if (view === 'meals') {
       setStateView(null)
       navigate('/meals/plan')
+    } else if (view === 'home-app') {
+      setStateView(null)
+      navigate('/home')
     }
     // Handle state-based views
     else if (view === 'agent' || view === 'inbox' || view === 'lists' || view === 'notes' || view === 'history' || view === 'settings' || view === 'task-detail') {
