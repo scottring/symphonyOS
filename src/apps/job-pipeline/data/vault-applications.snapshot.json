@@ -23,7 +23,7 @@
     "filename": "apply-3e-director-product.md",
     "body": "\n# Apply for 3E — Director, Product Management, Supply Chain and Sustainability\n\n$130–145k base + incentives + equity. Bethesda MD, remote-friendly East Coast. Lane 2 fit (PM in climate/compliance/regtech). Has post-application strategy document.\n\n## Steps\n\n- [x] Tailor resume → `[[resume-3e-director-product]]`\n- [x] Draft cover letter → `[[cover-letter-3e-director-product]]`\n- [x] Submit application\n- [ ] Execute post-application strategy steps → `[[3e-post-application-strategy]]`\n",
     "isStalled": false,
-    "archived": false
+    "archived": true
   },
   {
     "slug": "assent-sustainability",
@@ -73,7 +73,7 @@
     "filename": "apply-ben-jerrys-sustainability-metrics.md",
     "body": "\n# Apply for Ben & Jerry's — Sustainability Metrics Analyst\n\n12-month temp role via agency. $35–40/hr (annualized $72,800–$83,200 at 40 hrs/wk). South Burlington, VT. Recruiter contact: Hannah Fanton.\n\nComp is below the W2 target band but the role is mission-aligned and a foot in the door at a serious sustainability-led brand.\n\n## Steps\n\n- [x] Tailor resume → `[[resume-ben-jerrys]]`\n- [x] Draft cover letter → `[[cover-letter-ben-jerrys]]`\n- [x] Submit application via Hannah Fanton (agency)\n- [ ] Follow up if no response by mid-May\n",
     "isStalled": false,
-    "archived": false
+    "archived": true
   },
   {
     "slug": "erm-senior-consultant-sustainability",
@@ -165,7 +165,8 @@
     "slug": "new-balance-project-dev-lead",
     "type": "task",
     "domain": "job-search",
-    "status": "applied",
+    "status": "decided",
+    "decision": "withdrawn",
     "company": "New Balance",
     "role": "Project Dev Lead, Sustainability",
     "comp_low": 100200,
@@ -173,8 +174,8 @@
     "location": "Boston, MA",
     "remote": "onsite",
     "applied": null,
-    "next_step": "Submit application",
-    "next_step_due": "2026-05-08",
+    "next_step": null,
+    "next_step_due": null,
     "created": "2026-05-04",
     "tags": [
       "high-priority"
