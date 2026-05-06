@@ -19,6 +19,7 @@ import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useDomain } from '@/hooks/useDomain'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { InboxTaskCard } from './InboxTaskCard'
+import { HomeNeedsDetailsSection } from '@/apps/home/inbox/HomeNeedsDetailsSection'
 
 // ═══════════════════════════════════════════════════════════════
 // Drop zone configuration
@@ -427,6 +428,8 @@ export function InboxView({
             }
           </p>
         </header>
+
+        <HomeNeedsDetailsSection />
 
         {totalCount === 0 ? (
           <div className="text-center py-16">
