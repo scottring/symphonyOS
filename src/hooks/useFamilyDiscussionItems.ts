@@ -28,7 +28,7 @@ export type DiscussionItem = DiscussionTaskItem | DiscussionEventItem
 
 export function useFamilyDiscussionItems() {
   const { tasks } = useSupabaseTasks()
-  const { flags } = useEventDiscussionFlags()
+  const { flags, flagEvent, unflagEvent, updateNote, isFlagged, getFlag } = useEventDiscussionFlags()
   const { events } = useGoogleCalendar()
   const { getDomainForCalendar } = useCalendarDomainMappings()
 
@@ -77,5 +77,17 @@ export function useFamilyDiscussionItems() {
     return [...taskItems, ...eventItems]
   }, [taskItems, eventItems])
 
-  return { items, taskItems, eventItems, count: items.length }
+  return {
+    items,
+    taskItems,
+    eventItems,
+    count: items.length,
+    // Re-export event-flag mutators so callers can use them without re-subscribing
+    // to a duplicate realtime channel.
+    flagEvent,
+    unflagEvent,
+    updateNote,
+    isFlagged,
+    getFlag,
+  }
 }

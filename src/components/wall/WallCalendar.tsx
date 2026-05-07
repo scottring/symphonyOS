@@ -27,7 +27,6 @@ import { WallDiscussionWidget } from './WallDiscussionWidget'
 import { WallDiscussionOverlay } from './WallDiscussionOverlay'
 import { useFamilyDiscussionItems, type DiscussionItem } from '@/hooks/useFamilyDiscussionItems'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
-import { useEventDiscussionFlags } from '@/hooks/useEventDiscussionFlags'
 import { WallCameraView } from './WallCameraView'
 import { WallTodayTimeline } from './WallTodayTimeline'
 import { WallTravelDay, detectTravelDay } from './WallTravelDay'
@@ -74,9 +73,8 @@ export function WallCalendar() {
     markDone: emailMarkDone,
   } = useEmailActionItems()
   const [showEmailActions, setShowEmailActions] = useState(false)
-  const { items: discussionItems } = useFamilyDiscussionItems()
+  const { items: discussionItems, unflagEvent } = useFamilyDiscussionItems()
   const { updateTask } = useSupabaseTasks()
-  const { unflagEvent } = useEventDiscussionFlags()
   const [showDiscussion, setShowDiscussion] = useState(false)
   const [travelDayDismissed, setTravelDayDismissed] = useState(false)
 
