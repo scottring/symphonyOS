@@ -51,7 +51,7 @@ import { type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
 import { useHiddenCalendarEvents } from '@/hooks/useHiddenCalendarEvents'
 import { useMealPlan } from '@/hooks/useMealPlan'
 import { useRecipes } from '@/hooks/useRecipes'
-import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
+import { CalendarReconnectError, type CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { useChat, type EntityContext as ChatEntityContext } from '@/hooks/useChat'
 import { useChatSessions } from '@/hooks/useChatSessions'
 import { useVaultWrite } from '@/hooks/useVaultWrite'
@@ -198,7 +198,7 @@ function App() {
 
 function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask } = useSupabaseTasks()
-  const { isConnected, events, fetchEvents, isFetching: eventsFetching, createEvent, updateEvent, moveEvent, fetchCalendarList, connect: connectCalendar } = useGoogleCalendar()
+  const { isConnected, events, fetchEvents, isFetching: eventsFetching, createEvent, updateEvent, moveEvent, deleteEvent, removeEventLocal, restoreEventLocal, fetchCalendarList, connect: connectCalendar } = useGoogleCalendar()
   const attachments = useAttachments()
   const { fetchAttachments } = attachments
   const pinnedItems = usePinnedItems()
@@ -1105,6 +1105,80 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     lists: lists.map(l => ({ id: l.id, name: l.title })),
   }), [tasks, projects, contacts, allRoutines, lists])
 
+  // Delete a calendar event. Orchestrates optimistic UI, undo (single events),
+  // and confirmation toast (recurring series). The DetailPanel just signals intent.
+  const handleDeleteEvent = useCallback((event: CalendarEvent) => {
+    const eventId = event.google_event_id || event.id
+    const calendarId = event.calendar_id || event.calendarId
+    const recurringParentId = event.recurring_event_id || event.recurringEventId
+
+    const fireDelete = async (deleteSeries: boolean) => {
+      try {
+        await deleteEvent({ eventId, calendarId, deleteSeries })
+      } catch (err) {
+        if (err instanceof CalendarReconnectError) {
+          showToast('Calendar connection expired. Please reconnect.', 'warning')
+        } else {
+          console.error('Failed to delete event:', err)
+          showToast(err instanceof Error ? err.message : 'Failed to delete event', 'warning')
+        }
+        // Restore on failure so UI matches reality
+        restoreEventLocal(event)
+      }
+    }
+
+    if (recurringParentId) {
+      // Recurring instance — confirm scope before doing anything destructive.
+      setConfirmationToast({
+        id: Math.random().toString(36).substring(7),
+        message: 'This is a recurring event. Delete just this one, or the whole series?',
+        actions: [
+          {
+            label: 'This event only',
+            variant: 'secondary',
+            onClick: () => {
+              removeEventLocal(event.id)
+              let cancelled = false
+              const timer = setTimeout(() => {
+                if (cancelled) return
+                fireDelete(false)
+              }, 5500)
+              undo.pushAction('Event deleted', () => {
+                cancelled = true
+                clearTimeout(timer)
+                restoreEventLocal(event)
+              })
+            },
+          },
+          {
+            label: 'Entire series',
+            variant: 'primary',
+            onClick: async () => {
+              // Series deletes are not undoable — confirmation toast is the safety.
+              removeEventLocal(event.id)
+              await fireDelete(true)
+              showToast('Recurring event series deleted', 'success', 2500)
+            },
+          },
+        ],
+      })
+      return
+    }
+
+    // Single event — optimistic remove, defer the API call until the undo window expires.
+    removeEventLocal(event.id)
+    let cancelled = false
+    const timer = setTimeout(() => {
+      if (cancelled) return
+      fireDelete(false)
+    }, 5500)
+    undo.pushAction('Event deleted', () => {
+      cancelled = true
+      clearTimeout(timer)
+      restoreEventLocal(event)
+    })
+  }, [deleteEvent, removeEventLocal, restoreEventLocal, undo, showToast])
+
   // Bundle schedule actions + reference data into context to eliminate prop drilling
   // Defined before early returns to satisfy rules-of-hooks
   const scheduleActionsValue: ScheduleActionsValue = useMemo(() => ({
@@ -1351,6 +1425,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
                 }
               }}
               fetchCalendarList={fetchCalendarList}
+              onDeleteEvent={handleDeleteEvent}
               onMoveEventToCalendar={async (eventId: string, sourceCalendarId: string, destinationCalendarId: string) => {
                 try {
                   await moveEvent({ eventId, sourceCalendarId, destinationCalendarId })

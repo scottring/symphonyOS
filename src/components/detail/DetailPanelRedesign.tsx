@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { logger } from '@/lib/logger'
 import type { TimelineItem } from '@/types/timeline'
+import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Task, TaskLink, LinkedActivity, LinkType, LinkedActivityType } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import { useGooglePlaces } from '@/hooks/useGooglePlaces'
@@ -93,6 +94,11 @@ interface DetailPanelRedesignProps {
   // Calendar list + move for reassigning events between calendars
   fetchCalendarList?: () => Promise<Array<{ id: string; summary: string; accessRole: 'owner' | 'writer' | 'reader'; primary: boolean; backgroundColor?: string }>>
   onMoveEventToCalendar?: (googleEventId: string, sourceCalendarId: string, destinationCalendarId: string) => Promise<void>
+  /**
+   * Delete an event. App orchestrates optimistic removal, undo (single events),
+   * and confirmation toast (recurring series). Panel just signals intent.
+   */
+  onDeleteEvent?: (event: CalendarEvent) => void
 
   // Recipe support
   eventRecipeUrl?: string | null
@@ -593,6 +599,7 @@ export function DetailPanelRedesign({
   onUpdateEventLocation,
   fetchCalendarList,
   onMoveEventToCalendar,
+  onDeleteEvent,
   eventRecipeUrl,
   onUpdateRecipeUrl,
   onOpenRecipe,
@@ -1255,6 +1262,13 @@ export function DetailPanelRedesign({
   const handleDelete = () => {
     if (isTask && item.originalTask && onDelete) {
       onDelete(item.originalTask.id)
+      onClose()
+    }
+  }
+
+  const handleDeleteEvent = () => {
+    if (isEvent && item.originalEvent && onDeleteEvent) {
+      onDeleteEvent(item.originalEvent)
       onClose()
     }
   }
@@ -2834,6 +2848,18 @@ export function DetailPanelRedesign({
               Delete task
             </button>
           )}
+        </div>
+      )}
+
+      {isEvent && onDeleteEvent && (
+        <div className="p-6 safe-area-bottom">
+          <button
+            onClick={handleDeleteEvent}
+            className="w-full p-3 text-sm text-red-600 hover:bg-red-50
+                       rounded-lg transition-colors text-center"
+          >
+            Delete event
+          </button>
         </div>
       )}
 
