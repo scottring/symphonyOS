@@ -26,16 +26,8 @@ CREATE POLICY "Users manage their own discussion flags"
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
--- updated_at trigger
-CREATE OR REPLACE FUNCTION set_updated_at_event_discussion_flags()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER tr_event_discussion_flags_updated_at
+-- updated_at trigger uses shared function defined in 002_*.sql.
+CREATE TRIGGER update_event_discussion_flags_updated_at
   BEFORE UPDATE ON event_discussion_flags
   FOR EACH ROW
-  EXECUTE FUNCTION set_updated_at_event_discussion_flags();
+  EXECUTE FUNCTION update_updated_at_column();
