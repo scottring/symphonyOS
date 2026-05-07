@@ -5,7 +5,8 @@ ALTER TABLE tasks
   ADD COLUMN IF NOT EXISTS needs_discussion BOOLEAN NOT NULL DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS discussion_note TEXT;
 
--- Partial index speeds up the kiosk family-domain query
+-- Partial index covers the kiosk query: needs_discussion = TRUE AND user_id = ?
+-- AND context IN (...) AND completed = FALSE.
 CREATE INDEX IF NOT EXISTS idx_tasks_needs_discussion
-  ON tasks (user_id, context)
+  ON tasks (user_id, context, completed)
   WHERE needs_discussion = TRUE;
