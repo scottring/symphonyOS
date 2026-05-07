@@ -23,6 +23,11 @@ import { WallAgentCards } from './WallAgentCards'
 import { useEmailActionItems } from '@/hooks/useEmailActionItems'
 import { WallEmailActions } from './WallEmailActions'
 import { WallEmailActionsOverlay } from './WallEmailActionsOverlay'
+import { WallDiscussionWidget } from './WallDiscussionWidget'
+import { WallDiscussionOverlay } from './WallDiscussionOverlay'
+import { useFamilyDiscussionItems, type DiscussionItem } from '@/hooks/useFamilyDiscussionItems'
+import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
+import { useEventDiscussionFlags } from '@/hooks/useEventDiscussionFlags'
 import { WallCameraView } from './WallCameraView'
 import { WallTodayTimeline } from './WallTodayTimeline'
 import { WallTravelDay, detectTravelDay } from './WallTravelDay'
@@ -69,6 +74,10 @@ export function WallCalendar() {
     markDone: emailMarkDone,
   } = useEmailActionItems()
   const [showEmailActions, setShowEmailActions] = useState(false)
+  const { items: discussionItems } = useFamilyDiscussionItems()
+  const { updateTask } = useSupabaseTasks()
+  const { unflagEvent } = useEventDiscussionFlags()
+  const [showDiscussion, setShowDiscussion] = useState(false)
   const [travelDayDismissed, setTravelDayDismissed] = useState(false)
 
   const isTravelDay = useMemo(
@@ -216,6 +225,15 @@ export function WallCalendar() {
   }, [recipeUrl])
   const handleCloseRecipe = useCallback(() => setShowRecipeViewer(false), [])
 
+  // ═══ DISCUSSION ═══
+  const handleMarkDiscussed = useCallback(async (item: DiscussionItem) => {
+    if (item.kind === 'task') {
+      await updateTask(item.id, { needsDiscussion: false, discussionNote: undefined })
+    } else {
+      await unflagEvent(item.id)
+    }
+  }, [updateTask, unflagEvent])
+
   // ═══ CONTEXT ENGINE ═══
   const contextEvalData = useMemo((): ContextEvalData | null => {
     if (wallData.loading) return null
@@ -266,6 +284,12 @@ export function WallCalendar() {
     const m = currentTime.getMinutes()
     return h >= 22 || h < 5 || (h === 5 && m < 30)
   }, [currentTime])
+
+  useEffect(() => {
+    if (showDiscussion && discussionItems.length === 0) {
+      setShowDiscussion(false)
+    }
+  }, [showDiscussion, discussionItems.length])
 
   useEffect(() => {
     if (!isNighttime) {
@@ -494,6 +518,16 @@ export function WallCalendar() {
             </div>
           )}
 
+          {/* Discussion Widget */}
+          {discussionItems.length > 0 && (
+            <div className={`${glass} px-4 py-2 flex-1 flex items-center`}>
+              <WallDiscussionWidget
+                items={discussionItems}
+                onClick={() => setShowDiscussion(true)}
+              />
+            </div>
+          )}
+
           {/* Agent Cards Widget */}
           {agentCards.length > 0 && (
             <div className={`${glass} px-4 py-2 flex-1 flex flex-col justify-center`}>
@@ -615,6 +649,17 @@ export function WallCalendar() {
           onDismiss={emailDismiss}
           onDone={emailMarkDone}
           onClose={() => setShowEmailActions(false)}
+        />
+      )}
+
+      {showDiscussion && (
+        <WallDiscussionOverlay
+          items={discussionItems}
+          onMarkDiscussed={async (item) => {
+            await handleMarkDiscussed(item)
+            // Don't auto-close — let the user keep marking; auto-close handled by effect below
+          }}
+          onClose={() => setShowDiscussion(false)}
         />
       )}
 
