@@ -14,6 +14,7 @@ export function dbListItemToListItem(dbItem: DbListItem): ListItem {
     externalSource: dbItem.external_source ?? undefined,
     completed: dbItem.completed,
     completedAt: dbItem.completed_at ? new Date(dbItem.completed_at) : undefined,
+    parentItemId: dbItem.parent_item_id ?? undefined,
     createdAt: new Date(dbItem.created_at),
     updatedAt: new Date(dbItem.updated_at),
   }
@@ -63,11 +64,14 @@ export function useListItems(listId: string | null) {
   const addItem = useCallback(async (item: {
     text: string
     note?: string
+    parentItemId?: string
   }) => {
     if (!user || !listId) return null
 
-    // Determine next sort order
-    const maxSortOrder = items.length > 0 ? Math.max(...items.map((i) => i.sortOrder)) : 0
+    // Sort order is scoped to siblings (same parent), so subitems sort
+    // independently of top-level items.
+    const siblings = items.filter((i) => i.parentItemId === item.parentItemId)
+    const maxSortOrder = siblings.length > 0 ? Math.max(...siblings.map((i) => i.sortOrder)) : 0
 
     // Optimistic update
     const tempId = crypto.randomUUID()
@@ -78,6 +82,7 @@ export function useListItems(listId: string | null) {
       note: item.note,
       sortOrder: maxSortOrder + 1,
       completed: false,
+      parentItemId: item.parentItemId,
       createdAt: new Date(),
       updatedAt: new Date(),
     }
@@ -91,6 +96,7 @@ export function useListItems(listId: string | null) {
         text: item.text,
         note: item.note ?? null,
         sort_order: maxSortOrder + 1,
+        parent_item_id: item.parentItemId ?? null,
       })
       .select()
       .single()
@@ -127,6 +133,7 @@ export function useListItems(listId: string | null) {
     if (updates.text !== undefined) dbUpdates.text = updates.text
     if (updates.note !== undefined) dbUpdates.note = updates.note ?? null
     if (updates.sortOrder !== undefined) dbUpdates.sort_order = updates.sortOrder
+    if (updates.parentItemId !== undefined) dbUpdates.parent_item_id = updates.parentItemId ?? null
     if (updates.completed !== undefined) {
       dbUpdates.completed = updates.completed
       dbUpdates.completed_at = updates.completed ? new Date().toISOString() : null
