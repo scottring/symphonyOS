@@ -505,6 +505,8 @@ export function useSupabaseTasks() {
               completed: newCompleted,
               // Clear waiting state when completing
               ...(newCompleted && t.isWaiting ? { isWaiting: false, waitingSince: undefined } : {}),
+              // Clear discussion flag when completing
+              ...(newCompleted && t.needsDiscussion ? { needsDiscussion: false, discussionNote: undefined } : {}),
               subtasks: newCompleted
                 ? t.subtasks?.map((s) => ({ ...s, completed: true }))
                 : t.subtasks,
@@ -519,6 +521,10 @@ export function useSupabaseTasks() {
       if (newCompleted && task.isWaiting) {
         dbUpdate.is_waiting = false
         dbUpdate.waiting_since = null
+      }
+      if (newCompleted && task.needsDiscussion) {
+        dbUpdate.needs_discussion = false
+        dbUpdate.discussion_note = null
       }
       const { error: updateError } = await supabase
         .from('tasks')
