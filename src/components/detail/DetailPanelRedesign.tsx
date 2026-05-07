@@ -29,6 +29,8 @@ import { EventEmailsSection } from '@/components/schedule/EventEmailsSection'
 import { MessageThread } from '@/components/messages/MessageThread'
 import { useMessages } from '@/hooks/useMessages'
 import { MealEventSection } from './MealEventSection'
+import { useEventDiscussionFlags } from '@/hooks/useEventDiscussionFlags'
+import { MessageCircle } from 'lucide-react'
 
 // Component to render text with clickable links (handles HTML links and plain URLs)
 function RichText({ text }: { text: string }) {
@@ -718,6 +720,9 @@ export function DetailPanelRedesign({
   // Actionable instances (for events)
   const [actionableInstance, setActionableInstance] = useState<ActionableInstance | null>(null)
   const actionable = useActionableInstances()
+
+  // Event discussion flags
+  const { isFlagged, getFlag, flagEvent, unflagEvent, updateNote } = useEventDiscussionFlags()
 
   // Location picker (for tasks with Places autocomplete)
   const [showLocationPicker, setShowLocationPicker] = useState(false)
@@ -1933,6 +1938,52 @@ export function DetailPanelRedesign({
             />
           </div>
         )}
+        {/* Needs discussion toggle (events only) */}
+        {isEvent && !isMeal && item.originalEvent && (() => {
+          const event = item.originalEvent
+          const eventId = event.id || event.google_event_id || ''
+          if (!eventId) return null
+          const flagged = isFlagged(eventId)
+          const flag = getFlag(eventId)
+          return (
+            <div className="px-4 py-3 border-t border-neutral-100">
+              <label className="flex items-center gap-2 text-sm text-neutral-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={flagged}
+                  onChange={async (e) => {
+                    if (e.target.checked) {
+                      await flagEvent(eventId, {
+                        title: event.title,
+                        calendarId: event.calendar_id || event.calendarId || undefined,
+                      })
+                    } else {
+                      await unflagEvent(eventId)
+                    }
+                  }}
+                  className="rounded"
+                />
+                <MessageCircle className="w-4 h-4 text-neutral-500" />
+                <span>Needs discussion</span>
+              </label>
+              {flagged && (
+                <textarea
+                  defaultValue={flag?.discussionNote ?? ''}
+                  onBlur={(e) => {
+                    if ((e.target.value || '') !== (flag?.discussionNote ?? '')) {
+                      updateNote(eventId, e.target.value)
+                    }
+                  }}
+                  placeholder="What's the question?"
+                  rows={2}
+                  className="mt-2 w-full px-2 py-1.5 text-sm rounded-lg border border-neutral-200
+                             focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              )}
+            </div>
+          )
+        })()}
+
         {isRoutine && item.originalRoutine && (
           <div className="mx-4 mt-4">
             <ActionableActions
