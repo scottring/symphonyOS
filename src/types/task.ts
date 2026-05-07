@@ -53,4 +53,7 @@ export interface Task {
   estimatedDuration?: number // Duration in minutes (default 30 in UI)
   location?: string // Address or place name for location-based tasks
   locationPlaceId?: string // Google Place ID for precise directions
+  // Needs-discussion flag — surfaces on family kiosk's For Discussion list
+  needsDiscussion?: boolean
+  discussionNote?: string
 }
