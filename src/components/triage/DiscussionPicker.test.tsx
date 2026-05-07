@@ -15,11 +15,12 @@ describe('DiscussionPicker', () => {
     expect(button.className).toMatch(/text-primary/)
   })
 
-  it('opens popover on click and toggles flag', () => {
+  it('opens popover on click and toggles flag via checkbox', () => {
     const onChange = vi.fn()
     render(<DiscussionPicker flagged={false} note="" onChange={onChange} />)
     fireEvent.click(screen.getByRole('button', { name: /needs discussion/i }))
-    fireEvent.click(screen.getByRole('checkbox', { name: /needs discussion/i }))
+    const checkbox = screen.getByRole('checkbox')
+    fireEvent.click(checkbox)
     expect(onChange).toHaveBeenCalledWith({ flagged: true, note: '' })
   })
 
@@ -32,11 +33,26 @@ describe('DiscussionPicker', () => {
     expect(onChange).toHaveBeenCalledWith({ flagged: true, note: 'Push delivery?' })
   })
 
+  it('auto-flags when user types in textarea while unflagged', () => {
+    const onChange = vi.fn()
+    render(<DiscussionPicker flagged={false} note="" onChange={onChange} />)
+    fireEvent.click(screen.getByRole('button', { name: /needs discussion/i }))
+    const textarea = screen.getByPlaceholderText(/what's the question/i)
+    fireEvent.change(textarea, { target: { value: 'Hi' } })
+    expect(onChange).toHaveBeenCalledWith({ flagged: true, note: 'Hi' })
+  })
+
   it('shows clear button only when flagged, calls onChange with flagged=false', () => {
     const onChange = vi.fn()
     render(<DiscussionPicker flagged={true} note="hello" onChange={onChange} />)
     fireEvent.click(screen.getByRole('button', { name: /needs discussion/i }))
     fireEvent.click(screen.getByRole('button', { name: /clear/i }))
     expect(onChange).toHaveBeenCalledWith({ flagged: false, note: '' })
+  })
+
+  it('hides clear button when not flagged', () => {
+    render(<DiscussionPicker flagged={false} note="" onChange={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /needs discussion/i }))
+    expect(screen.queryByRole('button', { name: /clear/i })).not.toBeInTheDocument()
   })
 })

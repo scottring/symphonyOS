@@ -9,22 +9,13 @@ interface DiscussionPickerProps {
 
 export function DiscussionPicker({ flagged, note, onChange }: DiscussionPickerProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [draftNote, setDraftNote] = useState(note)
   const containerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Sync draft when external note changes (e.g., panel open with new task)
-  useEffect(() => {
-    setDraftNote(note)
-  }, [note])
-
-  // Close on outside click; persist any draft note edits via onChange
+  // Close on outside click
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        if (draftNote !== note) {
-          onChange({ flagged, note: draftNote })
-        }
         setIsOpen(false)
       }
     }
@@ -32,7 +23,7 @@ export function DiscussionPicker({ flagged, note, onChange }: DiscussionPickerPr
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [isOpen, draftNote, note, flagged, onChange])
+  }, [isOpen])
 
   // Focus textarea when opening if already flagged
   useEffect(() => {
@@ -61,31 +52,29 @@ export function DiscussionPicker({ flagged, note, onChange }: DiscussionPickerPr
             <input
               type="checkbox"
               checked={flagged}
-              onChange={(e) => onChange({ flagged: e.target.checked, note: draftNote })}
-              aria-label="Needs discussion"
+              onChange={(e) => onChange({ flagged: e.target.checked, note })}
               className="rounded"
             />
             <span>Needs discussion</span>
           </label>
           <textarea
             ref={textareaRef}
-            value={draftNote}
+            value={note}
             onChange={(e) => {
-              setDraftNote(e.target.value)
-              onChange({ flagged, note: e.target.value })
+              // If user starts typing in an unflagged state, auto-flag.
+              const nextFlagged = flagged || e.target.value.length > 0
+              onChange({ flagged: nextFlagged, note: e.target.value })
             }}
             placeholder="What's the question?"
-            disabled={!flagged}
             rows={3}
-            className="w-full px-2 py-1.5 text-sm rounded-lg border border-neutral-200
-                       focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-neutral-50 disabled:text-neutral-400"
+            className={`w-full px-2 py-1.5 text-sm rounded-lg border border-neutral-200
+                       focus:outline-none focus:ring-2 focus:ring-primary-500 ${flagged ? '' : 'opacity-60'}`}
           />
           {flagged && (
             <>
               <div className="border-t border-neutral-100 my-2" />
               <button
                 onClick={() => {
-                  setDraftNote('')
                   onChange({ flagged: false, note: '' })
                   setIsOpen(false)
                 }}
