@@ -1941,7 +1941,7 @@ export function DetailPanelRedesign({
         {/* Needs discussion toggle (events only) */}
         {isEvent && !isMeal && item.originalEvent && (() => {
           const event = item.originalEvent
-          const eventId = event.id || event.google_event_id || ''
+          const eventId = event.google_event_id || event.id || ''
           if (!eventId) return null
           const flagged = isFlagged(eventId)
           const flag = getFlag(eventId)
