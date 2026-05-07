@@ -398,6 +398,23 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     localStorage.setItem('symphony-sidebar-collapsed', String(sidebarCollapsed))
   }, [sidebarCollapsed])
 
+  // When the URL changes to a path that maps to a URL-based view, clear
+  // any state-based view so in-app <Link> navigation isn't trapped inside
+  // a state view (e.g. Inbox → "Fill in →" /home/asset/:id).
+  useEffect(() => {
+    const path = location.pathname
+    const isUrlBased =
+      path.startsWith('/goals') ||
+      path.startsWith('/projects') ||
+      path.startsWith('/routines') ||
+      path.startsWith('/contacts') ||
+      path.startsWith('/meals') ||
+      path.startsWith('/home') ||
+      path === '/morning' ||
+      path === '/bedtime'
+    if (isUrlBased && stateView !== null) setStateView(null)
+  }, [location.pathname, stateView])
+
   // Global keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

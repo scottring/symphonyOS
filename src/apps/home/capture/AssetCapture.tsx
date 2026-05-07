@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useAuth } from '@/hooks/useAuth'
 import { useHomes } from '@/hooks/useHomes'
 import { useSpaces } from '@/hooks/useSpaces'
 import { useAssets } from '@/hooks/useAssets'
@@ -11,6 +12,7 @@ export function AssetCapture() {
   const initialRoom = params.get('room') ?? ''
   const initialZone = params.get('zone') ?? ''
 
+  const { user } = useAuth()
   const { homes } = useHomes()
   const home = homes[0]
   const { rooms, spaces } = useSpaces(home?.id)
@@ -33,8 +35,9 @@ export function AssetCapture() {
   const zonesForRoom = spaces.filter((s) => s.parentSpaceId === roomId)
 
   async function uploadPhoto(file: File): Promise<string | undefined> {
-    if (!home) return undefined
-    const path = `${home.id}/${Date.now()}-${file.name}`
+    if (!user) return undefined
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+    const path = `${user.id}/${Date.now()}-${safeName}`
     const { error } = await supabase.storage.from('asset-photos').upload(path, file, {
       cacheControl: '3600', upsert: false,
     })

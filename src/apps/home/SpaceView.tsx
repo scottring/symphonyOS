@@ -1,17 +1,43 @@
-import { useMemo } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useAuth } from '@/hooks/useAuth'
 import { useHomes } from '@/hooks/useHomes'
 import { useSpaces } from '@/hooks/useSpaces'
 import { useAssets } from '@/hooks/useAssets'
+import { supabase } from '@/lib/supabase'
 import { ReferenceFactsCard } from './facts/ReferenceFactsCard'
 
 export function SpaceView() {
   const { id } = useParams<{ id: string }>()
+  const { user } = useAuth()
   const { homes } = useHomes()
   const home = homes[0]
 
   const { spaces, updateSpace, addZone } = useSpaces(home?.id)
   const { assets, captureAsset } = useAssets(home?.id)
+
+  const photoInput = useRef<HTMLInputElement>(null)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+
+  async function uploadSpacePhoto(file: File): Promise<string | undefined> {
+    if (!user) return undefined
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+    const path = `${user.id}/${Date.now()}-${safeName}`
+    const { error } = await supabase.storage.from('asset-photos').upload(path, file, {
+      cacheControl: '3600', upsert: false,
+    })
+    if (error) return undefined
+    const { data } = supabase.storage.from('asset-photos').getPublicUrl(path)
+    return data?.publicUrl
+  }
+
+  async function handleSpacePhotoFile(file: File) {
+    if (!id) return
+    setUploadingPhoto(true)
+    const url = await uploadSpacePhoto(file)
+    setUploadingPhoto(false)
+    if (url) await updateSpace(id, { photoUrl: url })
+  }
 
   const space = useMemo(() => spaces.find((s) => s.id === id), [spaces, id])
   const childZones = useMemo(
@@ -43,12 +69,29 @@ export function SpaceView() {
 
       <div className="grid md:grid-cols-3 gap-4 mb-6">
         <div className="md:col-span-2 card p-0 overflow-hidden">
-          <div className="aspect-[16/9] bg-neutral-200 flex items-center justify-center">
+          <div className="relative aspect-[16/9] bg-neutral-200 flex items-center justify-center">
             {space.photoUrl ? (
               <img src={space.photoUrl} alt={space.name} className="w-full h-full object-cover" />
             ) : (
               <span className="text-5xl">🏠</span>
             )}
+            <input
+              ref={photoInput}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) handleSpacePhotoFile(f)
+              }}
+            />
+            <button
+              type="button"
+              className="absolute bottom-2 right-2 px-3 py-1.5 rounded-md bg-black/60 text-white text-xs hover:bg-black/75 disabled:opacity-50"
+              disabled={uploadingPhoto}
+              onClick={() => photoInput.current?.click()}
+            >{uploadingPhoto ? 'Uploading…' : space.photoUrl ? 'Replace photo' : 'Add photo'}</button>
           </div>
         </div>
         <ReferenceFactsCard

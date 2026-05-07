@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { SpaceView } from './SpaceView'
 
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'u1' } }) }))
 vi.mock('@/hooks/useHomes', () => ({
   useHomes: () => ({
     homes: [{ id: 'h1', userId: 'u1', name: 'Main', createdAt: new Date(), updatedAt: new Date() }],
