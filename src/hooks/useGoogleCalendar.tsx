@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
 import { logger } from '@/lib/logger'
+import { getRecurringBaseId } from './useHiddenCalendarEvents'
 
 export interface CreateEventParams {
   title: string
@@ -523,6 +524,24 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
         throw new CalendarReconnectError()
       }
       throw new Error(data.error)
+    }
+
+    // Clear any "needs discussion" flag for this event's base id (eager cleanup
+    // so the kiosk For-Discussion list doesn't show orphaned items pointing at
+    // a Google event that no longer exists).
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const baseId = getRecurringBaseId(params.eventId)
+        await supabase
+          .from('event_discussion_flags')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('google_event_base_id', baseId)
+      }
+    } catch (err) {
+      console.warn('Failed to clear discussion flag for deleted event:', err)
+      // Non-fatal: realtime sub will eventually reconcile, and the orphan is harmless.
     }
   }, [isConnected])
 
