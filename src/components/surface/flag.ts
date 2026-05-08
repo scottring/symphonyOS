@@ -1,6 +1,6 @@
 /**
- * Toggle the new TapContextPanel for tasks. While false, the existing
- * DetailPanelRedesign is rendered. Flip to true once the panel covers all
- * task render paths and we're ready to validate on real data.
+ * When true, tasks and events render in the new single-scroll TapContextPanel
+ * (and TapEventPanel) instead of DetailPanelRedesign. Other entity types
+ * still fall through to DetailPanel until Plan 2.5 wires their routing.
  */
-export const SURFACE_PANEL_ENABLED = false
+export const SURFACE_PANEL_ENABLED = true
