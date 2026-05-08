@@ -151,17 +151,18 @@ export function Sidebar({
         </button>
       )}
 
-      {/* Search button */}
-      {onOpenSearch && (
-        <div className="px-3 mt-4">
+      {/* Search + launcher icons */}
+      <div className="px-3 mt-4 flex items-center gap-1">
+        {onOpenSearch && (
           <button
             onClick={onOpenSearch}
             className={`
-              w-full flex items-center gap-3 px-3.5 py-3 rounded-lg
+              flex-1 flex items-center gap-3 px-3.5 py-3 rounded-lg
               text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100/80
               transition-all duration-200
               ${collapsed ? 'justify-center' : ''}
             `}
+            aria-label="Search"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
@@ -172,6 +173,61 @@ export function Sidebar({
                 <kbd className="hidden lg:inline text-[11px] text-neutral-400 font-medium">⌘/</kbd>
               </>
             )}
+          </button>
+        )}
+
+        {!collapsed && (
+          <>
+            {onOpenChat && (
+              <button
+                onClick={onOpenChat}
+                className="p-2 rounded-lg text-primary-600 hover:bg-primary-50/80 hover:text-primary-700 transition-colors"
+                aria-label="Open AI chat"
+                title="AI chat"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+                </svg>
+              </button>
+            )}
+            <button
+              onClick={() => window.open('/wall', '_blank')}
+              className="p-2 rounded-lg text-neutral-500 hover:bg-neutral-100/80 hover:text-neutral-700 transition-colors"
+              aria-label="Open Wall in new tab"
+              title="Wall"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* AI/Wall icons stacked when sidebar collapsed */}
+      {collapsed && (
+        <div className="px-3 mt-2 flex flex-col items-center gap-1">
+          {onOpenChat && (
+            <button
+              onClick={onOpenChat}
+              className="p-2 rounded-lg text-primary-600 hover:bg-primary-50/80 hover:text-primary-700 transition-colors"
+              aria-label="Open AI chat"
+              title="AI"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+              </svg>
+            </button>
+          )}
+          <button
+            onClick={() => window.open('/wall', '_blank')}
+            className="p-2 rounded-lg text-neutral-500 hover:bg-neutral-100/80 hover:text-neutral-700 transition-colors"
+            aria-label="Open Wall in new tab"
+            title="Wall"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clipRule="evenodd" />
+            </svg>
           </button>
         </div>
       )}
