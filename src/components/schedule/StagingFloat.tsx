@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { CalendarDays, CalendarRange, Check, MoreHorizontal, Trash2 } from 'lucide-react'
 import { useMobile } from '@/hooks/useMobile'
 import type { Task } from '@/types/task'
 
@@ -8,6 +9,9 @@ interface StagingFloatProps {
   weekTasks: Task[]
   onPullToToday: (taskId: string) => void
   onSelectTask: (taskId: string) => void
+  onCompleteTask?: (taskId: string) => void
+  onDeferTask?: (taskId: string, target: 'month' | 'quarter') => void
+  onDeleteTask?: (taskId: string) => void
   /** Render as a compact inline trigger (for desktop stats row) */
   inline?: boolean
 }
@@ -20,7 +24,114 @@ function InboxIcon({ className }: { className?: string }) {
   )
 }
 
-export function StagingFloat({ inboxTasks, weekTasks, onPullToToday, onSelectTask, inline }: StagingFloatProps) {
+interface RowMenuProps {
+  taskId: string
+  onDefer?: (target: 'month' | 'quarter') => void
+  onDelete?: () => void
+}
+
+function RowMenu({ onDefer, onDelete }: RowMenuProps) {
+  const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState({ top: 0, right: 0 })
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (open && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      const estimatedHeight = 140
+      const spaceBelow = window.innerHeight - rect.bottom - 4
+      const flipUp = spaceBelow < estimatedHeight && rect.top > estimatedHeight
+      setPos({
+        top: flipUp ? rect.top - estimatedHeight - 4 : rect.bottom + 4,
+        right: window.innerWidth - rect.right,
+      })
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node
+      if (!buttonRef.current?.contains(target) && !menuRef.current?.contains(target)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [open])
+
+  if (!onDefer && !onDelete) return null
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        onClick={(e) => {
+          e.stopPropagation()
+          setOpen((prev) => !prev)
+        }}
+        className="flex-shrink-0 p-1 rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/70 transition-colors
+                   md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 aria-expanded:opacity-100"
+        aria-label="More actions"
+        aria-expanded={open}
+      >
+        <MoreHorizontal className="w-4 h-4" />
+      </button>
+
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          className="fixed z-[100] bg-white rounded-xl border border-neutral-200 shadow-lg p-1.5 min-w-[170px]"
+          style={{ top: pos.top, right: pos.right }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {onDefer && (
+            <>
+              <button
+                onClick={() => { onDefer('month'); setOpen(false) }}
+                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-neutral-700 hover:bg-amber-50 hover:text-amber-700 transition-colors"
+              >
+                <CalendarDays className="w-4 h-4" />
+                <span>This Month</span>
+              </button>
+              <button
+                onClick={() => { onDefer('quarter'); setOpen(false) }}
+                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-neutral-700 hover:bg-purple-50 hover:text-purple-700 transition-colors"
+              >
+                <CalendarRange className="w-4 h-4" />
+                <span>Someday</span>
+              </button>
+            </>
+          )}
+          {onDefer && onDelete && <div className="border-t border-neutral-100 my-1" />}
+          {onDelete && (
+            <button
+              onClick={() => { onDelete(); setOpen(false) }}
+              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-rose-600 hover:bg-rose-50 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Delete</span>
+            </button>
+          )}
+        </div>,
+        document.body
+      )}
+    </>
+  )
+}
+
+export function StagingFloat({
+  inboxTasks,
+  weekTasks,
+  onPullToToday,
+  onSelectTask,
+  onCompleteTask,
+  onDeferTask,
+  onDeleteTask,
+  inline,
+}: StagingFloatProps) {
   const [open, setOpen] = useState(false)
   const isMobile = useMobile()
 
@@ -30,6 +141,11 @@ export function StagingFloat({ inboxTasks, weekTasks, onPullToToday, onSelectTas
     e.stopPropagation()
     onPullToToday(taskId)
   }, [onPullToToday])
+
+  const handleComplete = useCallback((e: React.MouseEvent, taskId: string) => {
+    e.stopPropagation()
+    onCompleteTask?.(taskId)
+  }, [onCompleteTask])
 
   if (totalCount === 0) return null
 
@@ -59,7 +175,7 @@ export function StagingFloat({ inboxTasks, weekTasks, onPullToToday, onSelectTas
             </h3>
             <span className="text-xs text-neutral-400">
               {inboxTasks.length > 0 && `${inboxTasks.length} inbox`}
-              {inboxTasks.length > 0 && weekTasks.length > 0 && ' \u00b7 '}
+              {inboxTasks.length > 0 && weekTasks.length > 0 && ' · '}
               {weekTasks.length > 0 && `${weekTasks.length} this week`}
             </span>
           </div>
@@ -85,25 +201,40 @@ export function StagingFloat({ inboxTasks, weekTasks, onPullToToday, onSelectTas
                 <div
                   key={task.id}
                   data-selectable
-                  className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl hover:bg-neutral-100/60 transition-colors cursor-pointer group"
-                  onClick={() => {
-                    onSelectTask(task.id)
-                    setOpen(false)
-                  }}
+                  className="flex items-start gap-2 px-2 py-2.5 rounded-xl hover:bg-neutral-100/60 transition-colors group"
                 >
-                  {/* Source icon */}
-                  <div className="flex-shrink-0 mt-0.5">
-                    {isInbox ? (
-                      <InboxIcon className="w-4 h-4 text-neutral-400" />
-                    ) : (
-                      <span className="block w-2.5 h-2.5 mt-0.5 rounded-full bg-blue-400" />
-                    )}
-                  </div>
+                  {/* Complete checkbox (or source icon if no handler) */}
+                  {onCompleteTask ? (
+                    <button
+                      onClick={(e) => handleComplete(e, task.id)}
+                      className={`group/check flex-shrink-0 mt-0.5 w-4 h-4 rounded-full border transition-all flex items-center justify-center
+                        ${isInbox ? 'border-neutral-300' : 'border-blue-300'}
+                        hover:border-primary-500 hover:bg-primary-50`}
+                      aria-label="Mark complete"
+                      title="Mark complete"
+                    >
+                      <Check className="w-2.5 h-2.5 text-primary-600 opacity-0 group-hover/check:opacity-100 transition-opacity" />
+                    </button>
+                  ) : (
+                    <div className="flex-shrink-0 mt-0.5">
+                      {isInbox ? (
+                        <InboxIcon className="w-4 h-4 text-neutral-400" />
+                      ) : (
+                        <span className="block w-2.5 h-2.5 mt-0.5 rounded-full bg-blue-400" />
+                      )}
+                    </div>
+                  )}
 
-                  {/* Title — full text, no truncation */}
-                  <span className="text-sm text-neutral-700 flex-1 leading-snug">
+                  {/* Title — clickable to open task */}
+                  <button
+                    onClick={() => {
+                      onSelectTask(task.id)
+                      setOpen(false)
+                    }}
+                    className="flex-1 text-left text-sm text-neutral-700 leading-snug cursor-pointer min-w-0"
+                  >
                     {task.title}
-                  </span>
+                  </button>
 
                   {/* Pull button */}
                   <button
@@ -114,6 +245,13 @@ export function StagingFloat({ inboxTasks, weekTasks, onPullToToday, onSelectTas
                   >
                     Today
                   </button>
+
+                  {/* More menu — defer / delete */}
+                  <RowMenu
+                    taskId={task.id}
+                    onDefer={onDeferTask ? (target) => onDeferTask(task.id, target) : undefined}
+                    onDelete={onDeleteTask ? () => onDeleteTask(task.id) : undefined}
+                  />
                 </div>
               )
             })}

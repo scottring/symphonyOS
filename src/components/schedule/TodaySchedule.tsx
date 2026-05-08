@@ -451,7 +451,7 @@ export function TodaySchedule({
 }: TodayScheduleProps) {
   // Get actions + reference data from context
   const {
-    onToggleWaiting, onUpdateTask, onPushTask, onCreateTask,
+    onToggleWaiting, onUpdateTask, onPushTask, onDeleteTask, onCreateTask,
     onAssignTask, onAssignTaskAll, onAssignEvent, onAssignEventAll,
     onAssignRoutine, onAssignRoutineAll,
     onSkipRoutine, onPushRoutine, onUpdateRoutine,
@@ -1058,6 +1058,9 @@ export function TodaySchedule({
                     onUpdateTask(taskId, { bucket: 'timed' as const, scheduledFor: today, isAllDay: true })
                   }}
                   onSelectTask={(taskId) => handleSelectItem(`task-${taskId}`)}
+                  onCompleteTask={onToggleTask}
+                  onDeferTask={onPushTask ? (taskId, target) => onPushTask(taskId, target) : undefined}
+                  onDeleteTask={onDeleteTask}
                   inline
                 />
               )}
@@ -1129,6 +1132,9 @@ export function TodaySchedule({
                     onUpdateTask(taskId, { bucket: 'timed' as const, scheduledFor: today, isAllDay: true })
                   }}
                   onSelectTask={(taskId) => handleSelectItem(`task-${taskId}`)}
+                  onCompleteTask={onToggleTask}
+                  onDeferTask={onPushTask ? (taskId, target) => onPushTask(taskId, target) : undefined}
+                  onDeleteTask={onDeleteTask}
                   inline
                 />
               )}
