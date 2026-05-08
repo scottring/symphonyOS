@@ -30,6 +30,7 @@ import { WallCameraView } from './WallCameraView'
 import { WallTodayTimeline } from './WallTodayTimeline'
 import { WallTravelDay, detectTravelDay } from './WallTravelDay'
 import { RoomsKioskView } from '@/apps/home/kiosk/RoomsKioskView'
+import { WallNowView } from './now/WallNowView'
 
 // ============================================================================
 // HELPERS
@@ -76,7 +77,7 @@ export function WallCalendar() {
   const { items: discussionItems, unflagEvent, updateTask } = useFamilyDiscussionItems()
   const [showDiscussion, setShowDiscussion] = useState(false)
   const [travelDayDismissed, setTravelDayDismissed] = useState(false)
-  const [tab, setTab] = useState<'calendar' | 'rooms'>('calendar')
+  const [tab, setTab] = useState<'calendar' | 'rooms' | 'now'>('calendar')
 
   const isTravelDay = useMemo(
     () => detectTravelDay(wallData.calendarEvents),
@@ -397,6 +398,13 @@ export function WallCalendar() {
           }`}
           onClick={() => setTab('rooms')}
         >Rooms</button>
+        <button
+          type="button"
+          className={`px-4 py-1.5 rounded-full text-sm font-bold tracking-wide transition ${
+            tab === 'now' ? 'bg-white/15 text-white' : 'text-white/50 hover:text-white/70'
+          }`}
+          onClick={() => setTab('now')}
+        >Now</button>
       </div>
 
       {/* ═══ HEADER BAR ═══ */}
@@ -686,8 +694,17 @@ export function WallCalendar() {
         <WallItemDetail item={detailItem} onClose={handleCloseDetail} />
       )}
       </>
-      ) : (
+      ) : tab === 'rooms' ? (
         <RoomsKioskView />
+      ) : (
+        <WallNowView
+          events={wallData.calendarEvents}
+          tasks={allTasks}
+          dinner={null /* TODO Plan 3.5: connect to meal plan */}
+          openListCount={0 /* TODO Plan 3.5: connect to lists */}
+          discussionCount={0 /* TODO Plan 3.5: connect to discussion flags */}
+          now={new Date()}
+        />
       )}
     </div>
   )
