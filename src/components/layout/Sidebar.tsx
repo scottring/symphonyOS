@@ -5,6 +5,9 @@ import { useDomain } from '@/hooks/useDomain'
 import { appRegistry } from '@/shell/appRegistry'
 import { SidebarGroup } from './SidebarGroup'
 import { useSidebarGroupState } from '@/hooks/useSidebarGroupState'
+import { useHomes } from '@/hooks/useHomes'
+import { useSpaces } from '@/hooks/useSpaces'
+import { useLists } from '@/hooks/useLists'
 import type { PinnedItem } from '@/types/pin'
 import type { PinnableEntityType } from '@/types/pin'
 import type { Task } from '@/types/task'
@@ -107,6 +110,23 @@ export function Sidebar({
     if (libraryActive) openGroup('library')
     if (spacesActive) openGroup('spaces')
   }, [planActive, libraryActive, spacesActive, openGroup])
+
+  // Inline contextual children — only fetch when the relevant view is active
+  const homeAppActive = activeView === 'home-app'
+  const listsActive = activeView === 'lists'
+
+  const { homes } = useHomes()
+  const home = homes[0]
+  const { rooms } = useSpaces(homeAppActive ? home?.id : undefined)
+  const { lists: allLists } = useLists()
+
+  const inlineRooms = homeAppActive ? rooms.slice(0, 5) : []
+  const moreRoomsCount = homeAppActive ? Math.max(0, rooms.length - 5) : 0
+
+  const inlineLists = listsActive
+    ? [...allLists].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()).slice(0, 5)
+    : []
+  const moreListsCount = listsActive ? Math.max(0, allLists.length - 5) : 0
 
   return (
     <aside
@@ -370,22 +390,41 @@ export function Sidebar({
           )}
 
           {FEATURES.lists && (
-            <button
-              onClick={() => onViewChange('lists')}
-              className={`
-                w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
-                ${activeView === 'lists'
-                  ? 'text-primary-700 bg-primary-50/80 font-medium'
-                  : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
-                }
-                ${collapsed ? 'justify-center' : ''}
-              `}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-              </svg>
-              {!collapsed && <span className="text-[15px]">Lists</span>}
-            </button>
+            <>
+              <button
+                onClick={() => onViewChange('lists')}
+                className={`
+                  w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
+                  ${activeView === 'lists'
+                    ? 'text-primary-700 bg-primary-50/80 font-medium'
+                    : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
+                  }
+                  ${collapsed ? 'justify-center' : ''}
+                `}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                </svg>
+                {!collapsed && <span className="text-[15px]">Lists</span>}
+              </button>
+              {!collapsed && listsActive && inlineLists.map((l) => (
+                <button
+                  key={l.id}
+                  onClick={() => onViewChange('lists')}
+                  className="w-full flex items-center gap-3 pl-9 pr-3.5 py-2 rounded-lg text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700 transition-all duration-200"
+                >
+                  <span className="text-[14px] truncate">{l.icon ?? '📋'} {l.title}</span>
+                </button>
+              ))}
+              {!collapsed && listsActive && moreListsCount > 0 && (
+                <button
+                  onClick={() => onViewChange('lists')}
+                  className="w-full flex items-center gap-3 pl-9 pr-3.5 py-1.5 text-[13px] text-neutral-400 hover:text-neutral-600"
+                >
+                  All lists ({allLists.length}) →
+                </button>
+              )}
+            </>
           )}
 
           <button
@@ -449,6 +488,30 @@ export function Sidebar({
             </svg>
             {!collapsed && <span className="text-[15px]">Home</span>}
           </button>
+
+          {!collapsed && homeAppActive && inlineRooms.map((r) => (
+            <button
+              key={r.id}
+              onClick={() => navigate(`/home/space/${r.id}`)}
+              className={`
+                w-full flex items-center gap-3 pl-9 pr-3.5 py-2 rounded-lg transition-all duration-200
+                ${location.pathname === `/home/space/${r.id}`
+                  ? 'text-primary-700 bg-primary-50/60 font-medium'
+                  : 'text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700'
+                }
+              `}
+            >
+              <span className="text-[14px] truncate">{r.name}</span>
+            </button>
+          ))}
+          {!collapsed && homeAppActive && moreRoomsCount > 0 && (
+            <button
+              onClick={() => navigate('/home')}
+              className="w-full flex items-center gap-3 pl-9 pr-3.5 py-1.5 text-[13px] text-neutral-400 hover:text-neutral-600"
+            >
+              All rooms ({rooms.length}) →
+            </button>
+          )}
 
           <button
             onClick={() => onViewChange('meals')}
