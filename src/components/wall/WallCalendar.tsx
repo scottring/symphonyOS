@@ -699,7 +699,7 @@ export function WallCalendar() {
       ) : (
         <WallNowView
           events={wallData.calendarEvents}
-          tasks={allTasks}
+          tasks={[] /* TODO Plan 3.5: connect to scheduled Task[] (allTasks here is TimelineItem[]) */}
           dinner={null /* TODO Plan 3.5: connect to meal plan */}
           openListCount={0 /* TODO Plan 3.5: connect to lists */}
           discussionCount={0 /* TODO Plan 3.5: connect to discussion flags */}
