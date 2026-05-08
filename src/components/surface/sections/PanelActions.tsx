@@ -1,14 +1,17 @@
 import { SchedulePopover } from '@/components/triage/SchedulePopover'
+import { PanelMoreMenu } from './PanelMoreMenu'
 
 interface PanelActionsProps {
   completed: boolean
   phoneNumber?: string
   scheduledFor?: Date
   isAllDay?: boolean
+  isPinned: boolean
   onToggleComplete: () => void
   onSchedule: (date: Date, isAllDay: boolean) => void
   onClearSchedule?: () => void
-  onMore: () => void
+  onTogglePin: () => void
+  onDelete: () => void
 }
 
 export function PanelActions({
@@ -16,10 +19,12 @@ export function PanelActions({
   phoneNumber,
   scheduledFor,
   isAllDay,
+  isPinned,
   onToggleComplete,
   onSchedule,
   onClearSchedule,
-  onMore,
+  onTogglePin,
+  onDelete,
 }: PanelActionsProps) {
   return (
     <div className="flex flex-wrap gap-2 pb-4 mb-4 border-b border-neutral-200">
@@ -48,13 +53,7 @@ export function PanelActions({
           </button>
         }
       />
-      <button
-        onClick={onMore}
-        aria-label="More actions"
-        className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
-      >
-        ···
-      </button>
+      <PanelMoreMenu isPinned={isPinned} onTogglePin={onTogglePin} onDelete={onDelete} />
     </div>
   )
 }

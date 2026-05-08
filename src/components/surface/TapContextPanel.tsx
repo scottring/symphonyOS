@@ -34,7 +34,9 @@ interface TapContextPanelProps {
   onToggleComplete: () => void
   onSchedule: (date: Date, isAllDay: boolean) => void
   onClearSchedule?: () => void
-  onMore: () => void
+  isPinned: boolean
+  onTogglePin: () => void
+  onDelete: () => void
   onOpenContact: (id: string) => void
   onOpenMember: (id: string) => void
   onOpenProject: (id: string) => void
@@ -79,10 +81,12 @@ export function TapContextPanel(props: TapContextPanelProps) {
         phoneNumber={task.phoneNumber || linked.contact?.phone}
         scheduledFor={task.scheduledFor || undefined}
         isAllDay={task.isAllDay}
+        isPinned={props.isPinned}
         onToggleComplete={props.onToggleComplete}
         onSchedule={props.onSchedule}
         onClearSchedule={props.onClearSchedule}
-        onMore={props.onMore}
+        onTogglePin={props.onTogglePin}
+        onDelete={props.onDelete}
       />
       <PanelWhy notes={task.notes} onChange={props.onNotesChange} />
       <PanelPeople

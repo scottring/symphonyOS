@@ -1456,7 +1456,16 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
                   isAllDay: undefined,
                 })
               }
-              onMore={() => {}} // TODO Plan 2: open more menu
+              isPinned={pinnedItems.isPinned('task', selectedItem.originalTask.id)}
+              onTogglePin={() => {
+                const id = selectedItem.originalTask!.id
+                if (pinnedItems.isPinned('task', id)) pinnedItems.unpin('task', id)
+                else pinnedItems.pin('task', id)
+              }}
+              onDelete={() => {
+                deleteTask(selectedItem.originalTask!.id)
+                setSelectedItemId(null)
+              }}
               onOpenContact={() => {}} // TODO Plan 2 wires this
               onOpenMember={() => {}} // TODO Plan 2 wires this
               onOpenProject={() => {}} // TODO Plan 2 wires this

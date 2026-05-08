@@ -6,9 +6,11 @@ import { PanelActions } from './PanelActions'
 describe('PanelActions', () => {
   const baseProps = {
     completed: false,
+    isPinned: false,
     onToggleComplete: vi.fn(),
     onSchedule: vi.fn<[Date, boolean], void>(),
-    onMore: vi.fn(),
+    onTogglePin: vi.fn(),
+    onDelete: vi.fn(),
   }
 
   it('renders Done button when not completed', () => {
@@ -42,5 +44,17 @@ describe('PanelActions', () => {
   it('renders Schedule trigger button', () => {
     render(<PanelActions {...baseProps} />)
     expect(screen.getByText(/schedule/i)).toBeInTheDocument()
+  })
+
+  it('renders More menu trigger', () => {
+    render(<PanelActions
+      completed={false}
+      isPinned={false}
+      onToggleComplete={vi.fn()}
+      onSchedule={vi.fn()}
+      onTogglePin={vi.fn()}
+      onDelete={vi.fn()}
+    />)
+    expect(screen.getByLabelText('More actions')).toBeInTheDocument()
   })
 })
