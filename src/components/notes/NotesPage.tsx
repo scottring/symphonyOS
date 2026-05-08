@@ -87,7 +87,13 @@ export function NotesPage({
   const isHiddenVaultNote = (vaultPath?: string) =>
     !!vaultPath && HIDDEN_VAULT_PREFIXES.some((p) => vaultPath.startsWith(p))
 
-  // Filter notes by selected topic + hide work-artifact vault notes
+  // Hide task-attached notes whose source task is a meal/dinner task —
+  // these surface in the Meals app, not Notes.
+  const MEAL_TASK_KEYWORDS = /\b(breakfast|lunch|dinner|brunch|meal prep|meal plan|snack)s?\b/i
+  const isMealTaskNote = (sourceTaskTitle?: string) =>
+    !!sourceTaskTitle && MEAL_TASK_KEYWORDS.test(sourceTaskTitle)
+
+  // Filter notes by selected topic + hide work-artifact and meal notes
   const filteredNotesByDate = useMemo(() => {
     return notesByDate
       .map((group) => ({
@@ -95,6 +101,7 @@ export function NotesPage({
         notes: group.notes.filter((note) => {
           if (selectedTopicId && note.topicId !== selectedTopicId) return false
           if (isHiddenVaultNote(note.vaultPath)) return false
+          if (isMealTaskNote(note.sourceTaskTitle)) return false
           return true
         }),
       }))
