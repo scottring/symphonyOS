@@ -68,6 +68,7 @@ export function TapProjectPanel(props: TapProjectPanelProps) {
       </div>
 
       <PanelWhy
+        key={project.id}
         notes={project.notes}
         onChange={props.onNotesChange}
         label="What this is"

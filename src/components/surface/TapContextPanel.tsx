@@ -93,7 +93,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
         onTogglePin={props.onTogglePin}
         onDelete={props.onDelete}
       />
-      <PanelWhy notes={task.notes} onChange={props.onNotesChange} />
+      <PanelWhy key={task.id} notes={task.notes} onChange={props.onNotesChange} />
       <PanelSubtasks
         subtasks={task.subtasks ?? []}
         onToggleSubtask={props.onToggleSubtask}

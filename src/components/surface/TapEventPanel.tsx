@@ -86,6 +86,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
       </div>
 
       <PanelWhy
+        key={event.id}
         notes={props.notes}
         onChange={props.onNotesChange}
         label="What to bring"

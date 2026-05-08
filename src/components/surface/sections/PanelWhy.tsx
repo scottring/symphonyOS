@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react'
+import { useState, lazy, Suspense } from 'react'
 
 const TiptapEditor = lazy(() =>
   import('@/components/notes/TiptapEditor').then(m => ({ default: m.TiptapEditor }))
@@ -11,11 +11,12 @@ interface PanelWhyProps {
   label?: string
 }
 
+// Editing state must persist across the parent re-renders that happen on every
+// keystroke. The parent passes a `key={entityId}` so this component remounts
+// when the user switches entities — that handles the "reset on task switch"
+// case without trapping focus on each keystroke.
 export function PanelWhy({ notes, onChange, label = 'Why' }: PanelWhyProps) {
   const [editing, setEditing] = useState(false)
-
-  // Reset editing state when notes prop changes (e.g. switching tasks)
-  useEffect(() => { setEditing(false) }, [notes])
 
   if (!notes && !onChange) return null
 

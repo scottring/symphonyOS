@@ -80,6 +80,7 @@ export function TapContactPanel(props: TapContactPanelProps) {
       </div>
 
       <PanelWhy
+        key={contact.id}
         notes={contact.notes}
         onChange={props.onNotesChange}
         label="About"
