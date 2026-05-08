@@ -14,7 +14,6 @@ describe('useMightBeRelevant', () => {
     const unrelated = createMockTask({ id: 't3', contactId: 'c9' })
     const { result } = renderHook(() => useMightBeRelevant(target, {
       allTasks: [target, sameContact, unrelated],
-      now: new Date('2026-05-08'),
     }))
     const ids = result.current.map(r => r.id)
     expect(ids).toContain('t2')
@@ -28,7 +27,6 @@ describe('useMightBeRelevant', () => {
     const samePerson = createMockTask({ id: 't2', assignedTo: 'm1', title: 'Other Liam task' })
     const { result } = renderHook(() => useMightBeRelevant(target, {
       allTasks: [target, samePerson],
-      now: new Date('2026-05-08'),
     }))
     const ids = result.current.map(r => r.id)
     expect(ids).toContain('t2')
@@ -42,7 +40,6 @@ describe('useMightBeRelevant', () => {
     const noOverlap = createMockTask({ id: 't3', title: 'Buy groceries' })
     const { result } = renderHook(() => useMightBeRelevant(target, {
       allTasks: [target, keywordMatch, noOverlap],
-      now: new Date('2026-05-08'),
     }))
     const ids = result.current.map(r => r.id)
     expect(ids).toContain('t2')
@@ -56,7 +53,6 @@ describe('useMightBeRelevant', () => {
     )
     const { result } = renderHook(() => useMightBeRelevant(target, {
       allTasks: [target, ...candidates],
-      now: new Date('2026-05-08'),
     }))
     expect(result.current.length).toBeLessThanOrEqual(3)
   })
@@ -65,7 +61,6 @@ describe('useMightBeRelevant', () => {
     const target = createMockTask({ id: 't1', title: 'lonely' })
     const { result } = renderHook(() => useMightBeRelevant(target, {
       allTasks: [target],
-      now: new Date('2026-05-08'),
     }))
     expect(result.current).toEqual([])
   })

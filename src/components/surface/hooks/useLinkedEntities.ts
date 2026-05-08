@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
-import type { CalendarEvent } from '@/types/calendar'
+import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { FamilyMember } from '@/types/family'
 import type { LinkedEntities } from '../types'
 

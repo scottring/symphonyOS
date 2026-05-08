@@ -4,7 +4,6 @@ import type { MightBeRelevantItem } from '../types'
 
 export interface MightBeRelevantData {
   allTasks: Task[]
-  now: Date
 }
 
 const STOPWORDS = new Set([

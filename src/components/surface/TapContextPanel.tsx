@@ -58,7 +58,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
     siblingTaskCandidates: props.siblingTaskCandidates,
   })
 
-  const mightBeRelevant = useMightBeRelevant(task, { allTasks, now: new Date() })
+  const mightBeRelevant = useMightBeRelevant(task, { allTasks })
 
   return (
     <article className="bg-bg-elevated rounded-2xl p-5 max-w-md w-full">
