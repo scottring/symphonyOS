@@ -10,7 +10,7 @@ interface ListViewProps {
   onBack: () => void
   onUpdateList: (listId: string, updates: Partial<List>) => void
   onDeleteList?: (listId: string) => void
-  onAddItem?: (item: { text: string; note?: string }) => Promise<ListItem | null>
+  onAddItem?: (item: { text: string; note?: string; parentItemId?: string }) => Promise<ListItem | null>
   onUpdateItem?: (itemId: string, updates: Partial<ListItem>) => void
   onDeleteItem?: (itemId: string) => void
   onReorderItems?: (itemIds: string[]) => void
@@ -323,12 +323,16 @@ export function ListView({
             </div>
           ) : (
             <div className="space-y-2">
-              {items.map((item) => (
+              {items.filter((i) => !i.parentItemId).map((item) => (
                 <ListItemRow
                   key={item.id}
                   item={item}
+                  childItems={items.filter((c) => c.parentItemId === item.id)}
                   onUpdate={onUpdateItem ? (updates) => onUpdateItem(item.id, updates) : undefined}
                   onDelete={onDeleteItem ? () => onDeleteItem(item.id) : undefined}
+                  onUpdateChild={onUpdateItem}
+                  onDeleteChild={onDeleteItem}
+                  onAddSubitem={onAddItem ? (text) => onAddItem({ text, parentItemId: item.id }) : undefined}
                 />
               ))}
             </div>

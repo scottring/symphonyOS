@@ -29,6 +29,7 @@ import { useFamilyDiscussionItems, type DiscussionItem } from '@/hooks/useFamily
 import { WallCameraView } from './WallCameraView'
 import { WallTodayTimeline } from './WallTodayTimeline'
 import { WallTravelDay, detectTravelDay } from './WallTravelDay'
+import { RoomsKioskView } from '@/apps/home/kiosk/RoomsKioskView'
 
 // ============================================================================
 // HELPERS
@@ -75,6 +76,7 @@ export function WallCalendar() {
   const { items: discussionItems, unflagEvent, updateTask } = useFamilyDiscussionItems()
   const [showDiscussion, setShowDiscussion] = useState(false)
   const [travelDayDismissed, setTravelDayDismissed] = useState(false)
+  const [tab, setTab] = useState<'calendar' | 'rooms'>('calendar')
 
   const isTravelDay = useMemo(
     () => detectTravelDay(wallData.calendarEvents),
@@ -379,6 +381,24 @@ export function WallCalendar() {
       className="wall-calendar w-[1920px] h-[1080px] overflow-hidden flex flex-col select-none relative mx-auto bg-[#141414]"
     >
 
+      {/* ═══ TAB TOGGLE (top-center floating) ═══ */}
+      <div className="absolute top-4 right-1/2 translate-x-1/2 z-20 flex items-center gap-1 px-1 py-1 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/[0.1]">
+        <button
+          type="button"
+          className={`px-4 py-1.5 rounded-full text-sm font-bold tracking-wide transition ${
+            tab === 'calendar' ? 'bg-white/15 text-white' : 'text-white/50 hover:text-white/70'
+          }`}
+          onClick={() => setTab('calendar')}
+        >Calendar</button>
+        <button
+          type="button"
+          className={`px-4 py-1.5 rounded-full text-sm font-bold tracking-wide transition ${
+            tab === 'rooms' ? 'bg-white/15 text-white' : 'text-white/50 hover:text-white/70'
+          }`}
+          onClick={() => setTab('rooms')}
+        >Rooms</button>
+      </div>
+
       {/* ═══ HEADER BAR ═══ */}
       <header className="relative z-10 px-10 pt-6 pb-4 flex items-center justify-between">
         {/* Left: Weather cluster */}
@@ -440,6 +460,8 @@ export function WallCalendar() {
         </div>
       </header>
 
+      {tab === 'calendar' ? (
+      <>
       {/* ═══ TODAY'S SCHEDULE — Calendar Events ═══ */}
       <div className="relative z-10 px-10" style={{ height: 170 }}>
         <WallTodayTimeline todayData={todayData} />
@@ -662,6 +684,10 @@ export function WallCalendar() {
 
       {detailItem && (
         <WallItemDetail item={detailItem} onClose={handleCloseDetail} />
+      )}
+      </>
+      ) : (
+        <RoomsKioskView />
       )}
     </div>
   )

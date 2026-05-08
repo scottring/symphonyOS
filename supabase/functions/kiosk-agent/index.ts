@@ -176,6 +176,119 @@ Deno.serve(async (req) => {
       })
     }
 
+    // ════════════════════════════════════════════════════════════════
+    // HOME APP RULES — surface kiosk cards for Symphony Home assets
+    // ════════════════════════════════════════════════════════════════
+    try {
+      // Rule: home.asset_added — surface 24h after needs_details asset was created
+      {
+        const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+        const cutoff = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString()
+        const { data } = await supabase
+          .from('assets')
+          .select('id, name, space_id')
+          .eq('needs_details', true)
+          .lte('created_at', since)
+          .gte('created_at', cutoff)
+        await supabase.from('kiosk_cards').delete()
+          .eq('user_id', user.id).eq('card_type', 'home.asset_added')
+        if (data?.length) {
+          const rows = data.map((a) => ({
+            user_id: user.id,
+            card_type: 'home.asset_added',
+            title: `${a.name} — needs details`,
+            subtitle: 'Tap your phone to fill in the rest',
+            body: { asset_id: a.id },
+            source_asset_id: a.id,
+            icon: '📦',
+            priority: 30,
+            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          }))
+          await supabase.from('kiosk_cards').insert(rows)
+        }
+      }
+
+      // Rule: home.warranty_expiring — 60 days before warranty expiration
+      {
+        const today = new Date().toISOString().slice(0, 10)
+        const inSixty = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+        const { data } = await supabase
+          .from('assets')
+          .select('id, name, warranty_expires_at')
+          .gte('warranty_expires_at', today)
+          .lte('warranty_expires_at', inSixty)
+        await supabase.from('kiosk_cards').delete()
+          .eq('user_id', user.id).eq('card_type', 'home.warranty_expiring')
+        if (data?.length) {
+          const rows = data.map((a) => ({
+            user_id: user.id,
+            card_type: 'home.warranty_expiring',
+            title: `${a.name} warranty expires soon`,
+            subtitle: a.warranty_expires_at,
+            body: { asset_id: a.id },
+            source_asset_id: a.id,
+            icon: '⏰',
+            priority: 40,
+            expires_at: new Date(`${a.warranty_expires_at}T00:00:00Z`).toISOString(),
+          }))
+          await supabase.from('kiosk_cards').insert(rows)
+        }
+      }
+
+      // Rule: home.needs_details — only when count > 5
+      {
+        const { count } = await supabase
+          .from('assets')
+          .select('id', { count: 'exact', head: true })
+          .eq('needs_details', true)
+        await supabase.from('kiosk_cards').delete()
+          .eq('user_id', user.id).eq('card_type', 'home.needs_details')
+        if (count && count > 5) {
+          await supabase.from('kiosk_cards').insert([{
+            user_id: user.id,
+            card_type: 'home.needs_details',
+            title: `${count} assets need details`,
+            subtitle: 'Open Symphony Home to fill in',
+            body: { count },
+            source_asset_id: null,
+            icon: '⚠️',
+            priority: 25,
+            expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          }])
+        }
+      }
+
+      // Rule: home.recently_added — Sunday digest only
+      {
+        const today = new Date()
+        await supabase.from('kiosk_cards').delete()
+          .eq('user_id', user.id).eq('card_type', 'home.recently_added')
+        if (today.getDay() === 0) {
+          const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+          const { count } = await supabase
+            .from('assets')
+            .select('id', { count: 'exact', head: true })
+            .gte('created_at', weekAgo)
+          if (count && count > 0) {
+            await supabase.from('kiosk_cards').insert([{
+              user_id: user.id,
+              card_type: 'home.recently_added',
+              title: `${count} new asset${count === 1 ? '' : 's'} this week`,
+              subtitle: 'Tap to review',
+              body: { count },
+              source_asset_id: null,
+              icon: '🆕',
+              priority: 15,
+              expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            }])
+          }
+        }
+      }
+    } catch (homeErr) {
+      console.error('Home rules error:', homeErr)
+      // Don't fail the entire agent run — let flight-deal logic continue
+    }
+
     // Step 1: Fetch active tasks and projects
     const { data: tasks } = await supabase
       .from('tasks')

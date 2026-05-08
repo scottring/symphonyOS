@@ -375,6 +375,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     if (path === '/contacts') return 'contacts'
     if (path.startsWith('/contacts/')) return 'contact-detail'
     if (path.startsWith('/meals')) return 'meals'
+    if (path.startsWith('/home')) return 'home-app'
     if (path === '/morning') return 'morning'
     if (path === '/bedtime') return 'bedtime'
     return 'today'
@@ -396,6 +397,23 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   useEffect(() => {
     localStorage.setItem('symphony-sidebar-collapsed', String(sidebarCollapsed))
   }, [sidebarCollapsed])
+
+  // When the URL changes to a path that maps to a URL-based view, clear
+  // any state-based view so in-app <Link> navigation isn't trapped inside
+  // a state view (e.g. Inbox → "Fill in →" /home/asset/:id).
+  useEffect(() => {
+    const path = location.pathname
+    const isUrlBased =
+      path.startsWith('/goals') ||
+      path.startsWith('/projects') ||
+      path.startsWith('/routines') ||
+      path.startsWith('/contacts') ||
+      path.startsWith('/meals') ||
+      path.startsWith('/home') ||
+      path === '/morning' ||
+      path === '/bedtime'
+    if (isUrlBased && stateView !== null) setStateView(null)
+  }, [location.pathname, stateView])
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -587,6 +605,9 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     } else if (view === 'meals') {
       setStateView(null)
       navigate('/meals/plan')
+    } else if (view === 'home-app') {
+      setStateView(null)
+      navigate('/home')
     }
     // Handle state-based views
     else if (view === 'agent' || view === 'inbox' || view === 'lists' || view === 'notes' || view === 'history' || view === 'settings' || view === 'task-detail') {

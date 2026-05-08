@@ -59,6 +59,7 @@ export interface DbListItem {
   external_source: string | null
   completed: boolean
   completed_at: string | null
+  parent_item_id: string | null
   created_at: string
   updated_at: string
 }
@@ -74,6 +75,7 @@ export interface ListItem {
   externalSource?: string
   completed: boolean
   completedAt?: Date
+  parentItemId?: string
   createdAt: Date
   updatedAt: Date
 }
