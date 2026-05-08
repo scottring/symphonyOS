@@ -1475,6 +1475,8 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
                 if (kind === 'task') setSelectedItemId(`task-${id}`)
                 // other kinds: no-op in Plan 1; Plan 2 wires them
               }}
+              onToggleSubtask={(id) => handleToggleTask(id)}
+              onAddSubtask={(title) => addSubtask(selectedItem.originalTask!.id, title)}
             />
           ) : (
             <Suspense fallback={<LoadingFallback variant="card" />}>

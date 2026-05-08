@@ -20,6 +20,8 @@ describe('TapContextPanel', () => {
     onOpenEvent: vi.fn(),
     onOpenTask: vi.fn(),
     onOpenRelated: vi.fn(),
+    onToggleSubtask: vi.fn(),
+    onAddSubtask: vi.fn(),
   }
 
   beforeEach(() => { vi.clearAllMocks() })
@@ -84,5 +86,16 @@ describe('TapContextPanel', () => {
     expect(screen.queryByText(/^People$/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/^Linked$/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/^Might be relevant$/i)).not.toBeInTheDocument()
+  })
+
+  it('renders subtasks when present', () => {
+    const sub = createMockTask({ id: 's1', title: 'Sub one', parentTaskId: 't1' })
+    const task = createMockTask({ id: 't1', title: 'Parent', subtasks: [sub] })
+    render(<TapContextPanel
+      task={task}
+      contacts={[]} projects={[]} events={[]} familyMembers={[]} siblingTaskCandidates={[]} allTasks={[task]}
+      {...baseHandlers}
+    />)
+    expect(screen.getByText('Sub one')).toBeInTheDocument()
   })
 })

@@ -7,6 +7,7 @@ import { PanelHeader } from './sections/PanelHeader'
 import { PanelMetaRow } from './sections/PanelMetaRow'
 import { PanelActions } from './sections/PanelActions'
 import { PanelWhy } from './sections/PanelWhy'
+import { PanelSubtasks } from './sections/PanelSubtasks'
 import { PanelPeople } from './sections/PanelPeople'
 import { PanelLinked } from './sections/PanelLinked'
 import { PanelMightBeRelevant } from './sections/PanelMightBeRelevant'
@@ -43,6 +44,8 @@ interface TapContextPanelProps {
   onOpenEvent: (id: string) => void
   onOpenTask: (id: string) => void
   onOpenRelated: (kind: MightBeRelevantItem['kind'], id: string) => void
+  onToggleSubtask: (id: string) => void
+  onAddSubtask: (title: string) => void
 }
 
 function contextToDomain(ctx: TaskContext | null | undefined): 'work' | 'family' | 'personal' | undefined {
@@ -89,6 +92,11 @@ export function TapContextPanel(props: TapContextPanelProps) {
         onDelete={props.onDelete}
       />
       <PanelWhy notes={task.notes} onChange={props.onNotesChange} />
+      <PanelSubtasks
+        subtasks={task.subtasks ?? []}
+        onToggleSubtask={props.onToggleSubtask}
+        onAddSubtask={props.onAddSubtask}
+      />
       <PanelPeople
         contact={linked.contact}
         assignee={linked.assignee}
