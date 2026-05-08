@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
 import { logger } from '@/lib/logger'
+import { getRecurringBaseId } from './useHiddenCalendarEvents'
 
 export interface CreateEventParams {
   title: string
@@ -49,6 +50,7 @@ export interface CalendarEvent {
   calendar_id?: string
   calendar_name?: string | null
   calendar_color?: string | null // Google Calendar color (hex)
+  recurring_event_id?: string | null // Set when this event is an instance of a recurring series
   // Camel case (observed in runtime)
   startTime?: string
   endTime?: string
@@ -56,9 +58,17 @@ export interface CalendarEvent {
   calendarId?: string
   calendarName?: string | null
   calendarColor?: string | null
+  recurringEventId?: string | null
   location?: string | null
   // Attendees (from Google Calendar API)
   attendees?: { email: string; displayName?: string; responseStatus?: string; self?: boolean }[]
+}
+
+export interface DeleteEventParams {
+  eventId: string
+  calendarId?: string
+  /** When true, deletes the entire recurring series, not just this instance. */
+  deleteSeries?: boolean
 }
 
 export interface UpdateEventParams {
@@ -92,6 +102,11 @@ interface GoogleCalendarContextValue {
   createEvent: (params: CreateEventParams) => Promise<CreateEventResult>
   updateEvent: (params: UpdateEventParams) => Promise<void>
   moveEvent: (params: MoveEventParams) => Promise<void>
+  deleteEvent: (params: DeleteEventParams) => Promise<void>
+  /** Optimistically remove an event from the local cache (caller orchestrates undo). */
+  removeEventLocal: (eventId: string) => void
+  /** Restore a previously-removed event into the local cache (used by undo). */
+  restoreEventLocal: (event: CalendarEvent) => void
 }
 
 const GoogleCalendarContext = createContext<GoogleCalendarContextValue | null>(null)
@@ -462,6 +477,74 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     await fetchTodayEvents()
   }, [isConnected, fetchTodayEvents])
 
+  // Optimistically remove an event from the local cache.
+  // Caller is responsible for orchestrating any undo + the actual API call.
+  const removeEventLocal = useCallback((eventId: string) => {
+    setEvents(prev => prev.filter(e => e.id !== eventId && e.google_event_id !== eventId))
+  }, [])
+
+  // Restore a previously removed event into the local cache.
+  const restoreEventLocal = useCallback((event: CalendarEvent) => {
+    setEvents(prev => {
+      const exists = prev.some(e => e.id === event.id)
+      if (exists) return prev
+      return [...prev, event]
+    })
+  }, [])
+
+  // Delete an event (or recurring series) via Google Calendar.
+  // Throws CalendarReconnectError if permissions are expired.
+  const deleteEvent = useCallback(async (params: DeleteEventParams): Promise<void> => {
+    if (!isConnected) {
+      throw new Error('Not connected to Google Calendar')
+    }
+
+    const { data, error } = await supabase.functions.invoke('google-calendar-delete-event', {
+      body: {
+        eventId: params.eventId,
+        calendarId: params.calendarId || 'primary',
+        deleteSeries: params.deleteSeries === true,
+      },
+    })
+
+    if (error) throw error
+
+    if (data?.error) {
+      const isAuthError =
+        data.error.includes('Unauthorized') ||
+        data.error.includes('invalid_grant') ||
+        data.error.includes('Token has been expired or revoked') ||
+        data.error.includes('No calendar connection found') ||
+        data.needsReconnect
+
+      if (isAuthError) {
+        setError('Calendar connection expired. Please reconnect.')
+        setIsConnected(false)
+        setNeedsReconnect(true)
+        throw new CalendarReconnectError()
+      }
+      throw new Error(data.error)
+    }
+
+    // Clear any "needs discussion" flag for this event's base id (eager cleanup
+    // so the kiosk For-Discussion list doesn't show orphaned items pointing at
+    // a Google event that no longer exists).
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const baseId = getRecurringBaseId(params.eventId)
+        await supabase
+          .from('event_discussion_flags')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('google_event_base_id', baseId)
+      }
+    } catch (err) {
+      console.warn('Failed to clear discussion flag for deleted event:', err)
+      // Non-fatal: realtime sub will eventually reconcile, and the orphan is harmless.
+    }
+  }, [isConnected])
+
   // Move an event between calendars (Google events.move endpoint)
   const moveEvent = useCallback(async (params: MoveEventParams): Promise<void> => {
     if (!isConnected) {
@@ -511,6 +594,9 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     createEvent,
     updateEvent,
     moveEvent,
+    deleteEvent,
+    removeEventLocal,
+    restoreEventLocal,
   }
 
   return (

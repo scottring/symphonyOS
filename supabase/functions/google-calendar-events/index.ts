@@ -165,6 +165,7 @@ serve(async (req) => {
       start: { dateTime?: string; date?: string }
       end: { dateTime?: string; date?: string }
       attendees?: GoogleCalendarAttendee[]
+      recurringEventId?: string
     }
 
     let calendars: GoogleCalendar[] = calendarListData.items || []
@@ -272,6 +273,7 @@ serve(async (req) => {
             calendar_id: calendar.id,
             calendar_name: calendar.summary || null,
             calendar_color: calendar.backgroundColor || null, // Google Calendar color
+            recurring_event_id: event.recurringEventId || null,
             attendees: (event.attendees || []).map((a: GoogleCalendarAttendee) => ({
               email: a.email,
               displayName: a.displayName || undefined,

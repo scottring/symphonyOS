@@ -5,7 +5,7 @@ import type { TaskContext } from '@/types/task'
 import type { ProactiveSuggestion } from '@/types/proactiveSuggestion'
 import { formatTime, formatTimeRange, inferMealTime } from '@/lib/timeUtils'
 import { getProjectColor } from '@/lib/projectUtils'
-import { PushDropdown, SchedulePopover, ContextPicker, type ScheduleContextItem } from '@/components/triage'
+import { PushDropdown, SchedulePopover, ContextPicker, DiscussionPicker, type ScheduleContextItem } from '@/components/triage'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
 import { Redo2, Video } from 'lucide-react'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
@@ -117,6 +117,8 @@ interface ScheduleItemProps {
   onAssignAll?: (memberIds: string[]) => void
   // Context assignment (work/family/personal)
   onContextChange?: (context: TaskContext | undefined) => void
+  // Needs-discussion flag — task variant only
+  onUpdateDiscussion?: (next: { needsDiscussion: boolean; discussionNote?: string }) => void
   // Overdue styling
   isOverdue?: boolean
   overdueLabel?: string
@@ -204,6 +206,7 @@ export const ScheduleItem = memo(function ScheduleItem({
   assignedToAll = [],
   onAssignAll,
   onContextChange,
+  onUpdateDiscussion,
   isOverdue,
   overdueLabel,
   getScheduleItemsForDate,
@@ -551,6 +554,30 @@ export const ScheduleItem = memo(function ScheduleItem({
               <ContextPicker
                 value={item.context ?? undefined}
                 onChange={onContextChange}
+              />
+            </div>
+          )}
+
+          {/* Needs-discussion picker — tasks only (events use detail-panel toggle) */}
+          {isTask && onUpdateDiscussion && (
+            <div
+              className="transition-opacity"
+              onClick={(e) => {
+                e.stopPropagation()
+                if (panelOpen && onClosePanel) {
+                  onClosePanel()
+                }
+              }}
+            >
+              <DiscussionPicker
+                flagged={item.needsDiscussion ?? false}
+                note={item.discussionNote ?? ''}
+                onChange={({ flagged, note }) => {
+                  onUpdateDiscussion({
+                    needsDiscussion: flagged,
+                    discussionNote: flagged ? note : undefined,
+                  })
+                }}
               />
             </div>
           )}

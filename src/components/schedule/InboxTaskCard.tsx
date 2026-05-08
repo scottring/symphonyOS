@@ -4,7 +4,7 @@ import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
 import type { List, ListCategory } from '@/types/list'
 import { FamilyBadge, MultiAssigneeDropdown } from '@/components/family'
-import { SchedulePopover, DeferPicker, ContextPicker } from '@/components/triage'
+import { SchedulePopover, DeferPicker, ContextPicker, DiscussionPicker } from '@/components/triage'
 import { ListPicker } from '@/components/triage/ListPicker'
 import type { ScheduleContextItem } from '@/components/triage'
 import { TaskCheckbox } from './TaskCheckbox'
@@ -187,6 +187,18 @@ export const InboxTaskCard = memo(function InboxTaskCard({
           <ContextPicker
             value={task.context}
             onChange={(context) => onUpdate({ context })}
+          />
+
+          {/* Needs-discussion picker - always visible */}
+          <DiscussionPicker
+            flagged={task.needsDiscussion ?? false}
+            note={task.discussionNote ?? ''}
+            onChange={({ flagged, note }) => {
+              onUpdate({
+                needsDiscussion: flagged,
+                discussionNote: flagged ? note : undefined,
+              })
+            }}
           />
 
           {/* Always visible - avatars provide at-a-glance context */}

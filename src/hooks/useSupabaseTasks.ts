@@ -37,6 +37,8 @@ interface DbTask {
   location_place_id: string | null
   is_waiting: boolean | null
   waiting_since: string | null
+  needs_discussion: boolean | null
+  discussion_note: string | null
   created_at: string
   updated_at: string
 }
@@ -89,6 +91,8 @@ function dbTaskToTask(dbTask: DbTask): Task {
     locationPlaceId: dbTask.location_place_id ?? undefined,
     isWaiting: dbTask.is_waiting ?? undefined,
     waitingSince: dbTask.waiting_since ? new Date(dbTask.waiting_since) : undefined,
+    needsDiscussion: dbTask.needs_discussion ?? undefined,
+    discussionNote: dbTask.discussion_note ?? undefined,
   }
 }
 
@@ -501,6 +505,8 @@ export function useSupabaseTasks() {
               completed: newCompleted,
               // Clear waiting state when completing
               ...(newCompleted && t.isWaiting ? { isWaiting: false, waitingSince: undefined } : {}),
+              // Clear discussion flag when completing
+              ...(newCompleted && t.needsDiscussion ? { needsDiscussion: false, discussionNote: undefined } : {}),
               subtasks: newCompleted
                 ? t.subtasks?.map((s) => ({ ...s, completed: true }))
                 : t.subtasks,
@@ -515,6 +521,10 @@ export function useSupabaseTasks() {
       if (newCompleted && task.isWaiting) {
         dbUpdate.is_waiting = false
         dbUpdate.waiting_since = null
+      }
+      if (newCompleted && task.needsDiscussion) {
+        dbUpdate.needs_discussion = false
+        dbUpdate.discussion_note = null
       }
       const { error: updateError } = await supabase
         .from('tasks')
@@ -718,6 +728,8 @@ export function useSupabaseTasks() {
     if ('locationPlaceId' in updates) dbUpdates.location_place_id = updates.locationPlaceId ?? null
     if ('isWaiting' in updates) dbUpdates.is_waiting = updates.isWaiting ?? false
     if ('waitingSince' in updates) dbUpdates.waiting_since = updates.waitingSince?.toISOString() ?? null
+    if ('needsDiscussion' in updates) dbUpdates.needs_discussion = updates.needsDiscussion ?? false
+    if ('discussionNote' in updates) dbUpdates.discussion_note = updates.discussionNote ?? null
 
     logger.debug('[updateTask] Sending to DB:', { id, dbUpdates })
     const { data, error: updateError, status, count } = await supabase
@@ -808,6 +820,8 @@ export function useSupabaseTasks() {
     if ('locationPlaceId' in updates) dbUpdates.location_place_id = updates.locationPlaceId ?? null
     if ('isWaiting' in updates) dbUpdates.is_waiting = updates.isWaiting ?? false
     if ('waitingSince' in updates) dbUpdates.waiting_since = updates.waitingSince?.toISOString() ?? null
+    if ('needsDiscussion' in updates) dbUpdates.needs_discussion = updates.needsDiscussion ?? false
+    if ('discussionNote' in updates) dbUpdates.discussion_note = updates.discussionNote ?? null
 
     logger.debug('[updateTasksBulk] Sending to DB:', { taskIds, dbUpdates })
 

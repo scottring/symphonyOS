@@ -1460,6 +1460,11 @@ export function TodaySchedule({
                           ? (context) => onUpdateEventContext(item.id.replace('event-', ''), context ?? null)
                           : undefined
                       }
+                      onUpdateDiscussion={
+                        item.type === 'task' && taskId && onUpdateTask
+                          ? (next) => onUpdateTask(taskId, next)
+                          : undefined
+                      }
                       getScheduleItemsForDate={getScheduleItemsForDate}
                       panelOpen={panelOpen}
                       onClosePanel={onClosePanel}

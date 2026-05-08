@@ -182,6 +182,7 @@ export function OverdueSection({
                     : undefined
                 }
                 onContextChange={onUpdateTask ? (context) => onUpdateTask(taskId, { context }) : undefined}
+                onUpdateDiscussion={onUpdateTask ? (next) => onUpdateTask(taskId, next) : undefined}
                 isOverdue={!task.completed}
                 overdueLabel={task.completed ? undefined : overdueLabel}
                 hideTime={shouldHideTime}

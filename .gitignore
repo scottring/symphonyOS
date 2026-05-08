@@ -36,3 +36,6 @@ deno.lock
 
 # Git worktrees
 .worktrees/
+
+# Brainstorming visual companion
+.superpowers/
