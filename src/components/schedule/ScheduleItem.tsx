@@ -246,6 +246,18 @@ export const ScheduleItem = memo(function ScheduleItem({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Don't hijack Enter/Space when focus is inside a text-entry element
+    // (e.g., a popover textarea like DiscussionPicker's). Without this guard,
+    // typing a space in any text field nested under the row would select the
+    // row instead of inserting the space.
+    const target = e.target as HTMLElement
+    if (
+      target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.isContentEditable
+    ) {
+      return
+    }
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
       onSelect()
