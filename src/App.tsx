@@ -1428,9 +1428,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
               onClose={() => setRecipeUrl(null)}
             />
           </Suspense>
-        ) : (
-          // TapContextPanel: gated by feature flag, tasks only. Plan 2 will extend to events/routines.
-          SURFACE_PANEL_ENABLED && selectedItem?.type === 'task' && selectedItem.originalTask ? (
+        ) : SURFACE_PANEL_ENABLED && selectedItem?.type === 'task' && selectedItem.originalTask ? (
             <TapContextPanel
               task={selectedItem.originalTask}
               contacts={contacts}
@@ -1548,7 +1546,6 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
               />
             </Suspense>
           )
-        )
       }
     >
       <DomainPageOutline>
