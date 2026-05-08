@@ -32,7 +32,8 @@ interface TapContextPanelProps {
   onTitleChange: (next: string) => void
   onNotesChange: (next: string) => void
   onToggleComplete: () => void
-  onSchedule: () => void
+  onSchedule: (date: Date, isAllDay: boolean) => void
+  onClearSchedule?: () => void
   onMore: () => void
   onOpenContact: (id: string) => void
   onOpenMember: (id: string) => void
@@ -76,8 +77,11 @@ export function TapContextPanel(props: TapContextPanelProps) {
       <PanelActions
         completed={task.completed}
         phoneNumber={task.phoneNumber || linked.contact?.phone}
+        scheduledFor={task.scheduledFor || undefined}
+        isAllDay={task.isAllDay}
         onToggleComplete={props.onToggleComplete}
         onSchedule={props.onSchedule}
+        onClearSchedule={props.onClearSchedule}
         onMore={props.onMore}
       />
       <PanelWhy notes={task.notes} onChange={props.onNotesChange} />

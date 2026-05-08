@@ -1442,7 +1442,20 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
               onTitleChange={(t) => updateTask(selectedItem.originalTask!.id, { title: t })}
               onNotesChange={(n) => updateTask(selectedItem.originalTask!.id, { notes: n })}
               onToggleComplete={() => handleToggleTask(selectedItem.originalTask!.id)}
-              onSchedule={() => {}} // TODO Plan 2: open schedule popover
+              onSchedule={(date, isAllDay) =>
+                updateTask(selectedItem.originalTask!.id, {
+                  bucket: 'timed',
+                  scheduledFor: date,
+                  isAllDay,
+                })
+              }
+              onClearSchedule={() =>
+                updateTask(selectedItem.originalTask!.id, {
+                  bucket: 'inbox',
+                  scheduledFor: undefined,
+                  isAllDay: undefined,
+                })
+              }
               onMore={() => {}} // TODO Plan 2: open more menu
               onOpenContact={() => {}} // TODO Plan 2 wires this
               onOpenMember={() => {}} // TODO Plan 2 wires this

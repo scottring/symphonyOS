@@ -1,12 +1,26 @@
+import { SchedulePopover } from '@/components/triage/SchedulePopover'
+
 interface PanelActionsProps {
   completed: boolean
   phoneNumber?: string
+  scheduledFor?: Date
+  isAllDay?: boolean
   onToggleComplete: () => void
-  onSchedule: () => void
+  onSchedule: (date: Date, isAllDay: boolean) => void
+  onClearSchedule?: () => void
   onMore: () => void
 }
 
-export function PanelActions({ completed, phoneNumber, onToggleComplete, onSchedule, onMore }: PanelActionsProps) {
+export function PanelActions({
+  completed,
+  phoneNumber,
+  scheduledFor,
+  isAllDay,
+  onToggleComplete,
+  onSchedule,
+  onClearSchedule,
+  onMore,
+}: PanelActionsProps) {
   return (
     <div className="flex flex-wrap gap-2 pb-4 mb-4 border-b border-neutral-200">
       <button
@@ -23,12 +37,17 @@ export function PanelActions({ completed, phoneNumber, onToggleComplete, onSched
           📞 {phoneNumber}
         </a>
       )}
-      <button
-        onClick={onSchedule}
-        className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
-      >
-        📅 Schedule
-      </button>
+      <SchedulePopover
+        value={scheduledFor}
+        isAllDay={isAllDay}
+        onSchedule={onSchedule}
+        onClear={onClearSchedule}
+        trigger={
+          <button className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors">
+            📅 Schedule
+          </button>
+        }
+      />
       <button
         onClick={onMore}
         aria-label="More actions"

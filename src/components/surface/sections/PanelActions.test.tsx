@@ -7,7 +7,7 @@ describe('PanelActions', () => {
   const baseProps = {
     completed: false,
     onToggleComplete: vi.fn(),
-    onSchedule: vi.fn(),
+    onSchedule: vi.fn<[Date, boolean], void>(),
     onMore: vi.fn(),
   }
 
@@ -37,5 +37,10 @@ describe('PanelActions', () => {
     const { user } = render(<PanelActions {...baseProps} onToggleComplete={onToggleComplete} />)
     await user.click(screen.getByRole('button', { name: /done/i }))
     expect(onToggleComplete).toHaveBeenCalledOnce()
+  })
+
+  it('renders Schedule trigger button', () => {
+    render(<PanelActions {...baseProps} />)
+    expect(screen.getByText(/schedule/i)).toBeInTheDocument()
   })
 })
