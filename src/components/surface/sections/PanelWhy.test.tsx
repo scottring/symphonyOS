@@ -5,7 +5,7 @@ import { PanelWhy } from './PanelWhy'
 
 describe('PanelWhy', () => {
   it('renders notes when present', () => {
-    render(<PanelWhy notes="ear pulling 3 days" onChange={vi.fn()} />)
+    render(<PanelWhy notes="<p>ear pulling 3 days</p>" onChange={vi.fn()} />)
     expect(screen.getByText(/ear pulling 3 days/)).toBeInTheDocument()
   })
 
@@ -14,20 +14,17 @@ describe('PanelWhy', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it('shows editable input when clicked', async () => {
-    const { user } = render(<PanelWhy notes="hello" onChange={vi.fn()} />)
-    await user.click(screen.getByText('hello'))
-    expect(screen.getByRole('textbox')).toHaveValue('hello')
+  it('renders editor when clicked and onChange provided', async () => {
+    const { user } = render(<PanelWhy notes="<p>hello</p>" onChange={vi.fn()} />)
+    await user.click(screen.getByText(/hello/))
+    // After click, the trigger button is replaced by the editor wrapper
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
-  it('calls onChange with new value on blur', async () => {
-    const onChange = vi.fn()
-    const { user } = render(<PanelWhy notes="hello" onChange={onChange} />)
-    await user.click(screen.getByText('hello'))
-    const ta = screen.getByRole('textbox') as HTMLTextAreaElement
-    await user.clear(ta)
-    await user.type(ta, 'updated')
-    ta.blur()
-    expect(onChange).toHaveBeenCalledWith('updated')
+  it('does not switch to editor when read-only (no onChange)', async () => {
+    const { user } = render(<PanelWhy notes="<p>hello</p>" />)
+    await user.click(screen.getByText(/hello/))
+    // Button should still be present (disabled, click was a no-op)
+    expect(screen.getByRole('button')).toBeInTheDocument()
   })
 })

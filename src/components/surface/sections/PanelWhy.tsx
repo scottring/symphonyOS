@@ -1,4 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
+
+const TiptapEditor = lazy(() =>
+  import('@/components/notes/TiptapEditor').then(m => ({ default: m.TiptapEditor }))
+)
 
 interface PanelWhyProps {
   notes: string | undefined
@@ -9,33 +13,35 @@ interface PanelWhyProps {
 
 export function PanelWhy({ notes, onChange, label = 'Why' }: PanelWhyProps) {
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(notes ?? '')
+
+  // Reset editing state when notes prop changes (e.g. switching tasks)
+  useEffect(() => { setEditing(false) }, [notes])
 
   if (!notes && !onChange) return null
-
-  function commit() {
-    setEditing(false)
-    if (onChange && draft !== (notes ?? '')) onChange(draft)
-  }
 
   return (
     <section className="mb-4">
       <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-1">{label}</div>
-      {editing ? (
-        <textarea
-          autoFocus
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
-          className="w-full text-sm text-neutral-700 bg-neutral-50 border border-neutral-200 rounded-md p-2 focus:outline-none focus:border-primary-400"
-          rows={3}
-        />
+      {editing && onChange ? (
+        <div className="rounded-md border border-primary-200 bg-white p-2">
+          <Suspense fallback={null}>
+            <TiptapEditor
+              content={notes ?? ''}
+              onChange={onChange}
+              placeholder="Add notes…"
+              autoFocus
+            />
+          </Suspense>
+        </div>
       ) : (
         <button
-          onClick={() => { setDraft(notes ?? ''); setEditing(true) }}
+          onClick={() => onChange && setEditing(true)}
+          disabled={!onChange}
           className="w-full text-left text-sm italic text-neutral-600 border-l-2 border-neutral-300 pl-3 py-1 hover:text-neutral-900"
         >
-          {notes || <span className="not-italic text-neutral-400">Add notes…</span>}
+          {notes
+            ? <div dangerouslySetInnerHTML={{ __html: notes }} className="prose-sm" />
+            : <span className="not-italic text-neutral-400">Add notes…</span>}
         </button>
       )}
     </section>
