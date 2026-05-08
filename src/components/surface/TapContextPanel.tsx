@@ -10,6 +10,7 @@ import { PanelWhy } from './sections/PanelWhy'
 import { PanelSubtasks } from './sections/PanelSubtasks'
 import { PanelPeople } from './sections/PanelPeople'
 import { PanelLinked } from './sections/PanelLinked'
+import { PanelLinks } from './sections/PanelLinks'
 import { PanelMightBeRelevant } from './sections/PanelMightBeRelevant'
 import { PanelFooter } from './sections/PanelFooter'
 import { useLinkedEntities } from './hooks/useLinkedEntities'
@@ -46,6 +47,7 @@ interface TapContextPanelProps {
   onOpenRelated: (kind: MightBeRelevantItem['kind'], id: string) => void
   onToggleSubtask: (id: string) => void
   onAddSubtask: (title: string) => void
+  onAddLink: (url: string) => void
 }
 
 function contextToDomain(ctx: TaskContext | null | undefined): 'work' | 'family' | 'personal' | undefined {
@@ -110,6 +112,10 @@ export function TapContextPanel(props: TapContextPanelProps) {
         onOpenProject={props.onOpenProject}
         onOpenEvent={props.onOpenEvent}
         onOpenTask={props.onOpenTask}
+      />
+      <PanelLinks
+        links={task.links}
+        onAddLink={props.onAddLink}
       />
       <PanelMightBeRelevant items={mightBeRelevant} onOpen={props.onOpenRelated} />
       <PanelFooter

@@ -46,7 +46,7 @@ import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings'
 import { useDetailPanelState } from '@/hooks/useDetailPanelState'
 import { useScheduleFiltering } from '@/hooks/useScheduleFiltering'
 import type { ViewType } from '@/components/layout/Sidebar'
-import type { LinkedActivityType } from '@/types/task'
+import type { LinkedActivityType, TaskLink } from '@/types/task'
 import { type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
 import { useHiddenCalendarEvents } from '@/hooks/useHiddenCalendarEvents'
 import { useMealPlan } from '@/hooks/useMealPlan'
@@ -1477,6 +1477,11 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
               }}
               onToggleSubtask={(id) => handleToggleTask(id)}
               onAddSubtask={(title) => addSubtask(selectedItem.originalTask!.id, title)}
+              onAddLink={(url) => {
+                const t = selectedItem.originalTask!
+                const next: TaskLink[] = [...(t.links ?? []), { url }]
+                updateTask(t.id, { links: next })
+              }}
             />
           ) : (
             <Suspense fallback={<LoadingFallback variant="card" />}>

@@ -22,6 +22,7 @@ describe('TapContextPanel', () => {
     onOpenRelated: vi.fn(),
     onToggleSubtask: vi.fn(),
     onAddSubtask: vi.fn(),
+    onAddLink: vi.fn(),
   }
 
   beforeEach(() => { vi.clearAllMocks() })
