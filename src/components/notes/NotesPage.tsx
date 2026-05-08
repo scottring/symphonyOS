@@ -80,14 +80,23 @@ export function NotesPage({
     }
   }, [selectedNoteId, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Filter notes by selected topic
-  const filteredNotesByDate = useMemo(() => {
-    if (!selectedTopicId) return notesByDate
+  // Hide noisy vault folders (work artifacts, plan/spec docs) from the
+  // Notes list. They're still in the DB and searchable elsewhere; this
+  // is a display-side filter so the Notes surface reads as personal notes.
+  const HIDDEN_VAULT_PREFIXES = ['outputs/', 'docs/', 'projects/', 'tasks/']
+  const isHiddenVaultNote = (vaultPath?: string) =>
+    !!vaultPath && HIDDEN_VAULT_PREFIXES.some((p) => vaultPath.startsWith(p))
 
+  // Filter notes by selected topic + hide work-artifact vault notes
+  const filteredNotesByDate = useMemo(() => {
     return notesByDate
       .map((group) => ({
         ...group,
-        notes: group.notes.filter((note) => note.topicId === selectedTopicId),
+        notes: group.notes.filter((note) => {
+          if (selectedTopicId && note.topicId !== selectedTopicId) return false
+          if (isHiddenVaultNote(note.vaultPath)) return false
+          return true
+        }),
       }))
       .filter((group) => group.notes.length > 0)
   }, [notesByDate, selectedTopicId])
@@ -97,17 +106,12 @@ export function NotesPage({
     return notes.find((n) => n.id === selectedNoteId) ?? null
   }, [notes, selectedNoteId])
 
-  // Fetch entity links when note is selected
+  // Show the note in the center viewer. Task-attached notes still show
+  // their content here; the "From task: …" chip in the row is the route
+  // to jump to the parent task if the user wants.
   const handleSelectNote = useCallback(
     async (noteId: string) => {
       const note = notes.find((n) => n.id === noteId)
-
-      // If this is a task note, navigate to the task instead
-      if (note?.sourceTaskId && onNavigateToTask) {
-        onNavigateToTask(note.sourceTaskId)
-        return
-      }
-
       setSelectedNoteId(noteId)
 
       // Fetch vault note content if needed
@@ -120,7 +124,7 @@ export function NotesPage({
         setEntityLinks(links)
       }
     },
-    [notes, getEntityLinks, getVaultNoteContent, onNavigateToTask]
+    [notes, getEntityLinks, getVaultNoteContent]
   )
 
   const handleQuickCapture = useCallback(

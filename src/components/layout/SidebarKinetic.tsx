@@ -1,3 +1,8 @@
+// NOTE: SidebarKinetic is a styling variant of the Nordic Sidebar. It is
+// currently missing items the Nordic Sidebar has (Today, Inbox, Lists,
+// Contacts, Home-app, Wall + AI launchers, registry-driven Apps section)
+// and does NOT have the Do/Plan/Library/Spaces collapsible hierarchy.
+// Don't switch themes to kinetic until this is reconciled.
 import { PinnedSection } from '@/components/pins'
 import type { PinnedItem } from '@/types/pin'
 import type { PinnableEntityType } from '@/types/pin'

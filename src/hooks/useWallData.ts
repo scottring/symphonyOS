@@ -43,6 +43,8 @@ export interface UseWallDataReturn {
   calendarEvents: CalendarEvent[]
   screenTimeSummaries: ChildScreenTimeSummary[]
   overdueTasks: TimelineItem[]
+  /** Raw Task[] for surfaces (e.g. WallNow) that need real Task shape, not TimelineItem. */
+  tasks: Task[]
   inboxCount: number
   loading: boolean
   error: string | null
@@ -84,6 +86,7 @@ export function useWallData(): UseWallDataReturn {
   const [calendarEventsState, setCalendarEventsState] = useState<CalendarEvent[]>([])
   const [screenTimeSummaries, setScreenTimeSummaries] = useState<ChildScreenTimeSummary[]>([])
   const [overdueTasks, setOverdueTasks] = useState<TimelineItem[]>([])
+  const [allTasks, setAllTasks] = useState<Task[]>([])
   const [inboxCount, setInboxCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -354,6 +357,7 @@ export function useWallData(): UseWallDataReturn {
         setCalendarEventsState(events)
         setScreenTimeSummaries(stSummaries)
         setOverdueTasks(overdueItems)
+        setAllTasks(tasks)
         setInboxCount(inboxCountRes.count ?? 0)
         setError(null)
         setLastRefresh(new Date())
@@ -381,5 +385,5 @@ export function useWallData(): UseWallDataReturn {
     }
   }, [fetchAllData])
 
-  return { days, familyMembers, calendarEvents: calendarEventsState, screenTimeSummaries, overdueTasks, inboxCount, loading, error, lastRefresh, refetch: fetchAllData }
+  return { days, familyMembers, calendarEvents: calendarEventsState, screenTimeSummaries, overdueTasks, tasks: allTasks, inboxCount, loading, error, lastRefresh, refetch: fetchAllData }
 }
