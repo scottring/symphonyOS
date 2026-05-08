@@ -46,7 +46,7 @@ describe('TapContextPanel', () => {
       {...baseHandlers}
     />)
     expect(screen.getByText('Dr. Smith')).toBeInTheDocument()
-    expect(screen.getByText(/555-0107/)).toBeInTheDocument()
+    expect(screen.getAllByText(/555-0107/).length).toBeGreaterThan(0)
   })
 
   it('renders project when linked', () => {

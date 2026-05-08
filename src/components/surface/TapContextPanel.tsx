@@ -75,7 +75,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
       />
       <PanelActions
         completed={task.completed}
-        phoneNumber={task.phoneNumber}
+        phoneNumber={task.phoneNumber || linked.contact?.phone}
         onToggleComplete={props.onToggleComplete}
         onSchedule={props.onSchedule}
         onMore={props.onMore}
