@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { useLinkedEntities } from './useLinkedEntities'
-import { createMockTask, createMockContact, createMockProject, createMockFamilyMember } from '@/test/mocks/factories'
+import { createMockTask, createMockContact } from '@/test/mocks/factories'
 
 describe('useLinkedEntities', () => {
   it('returns contact when task.contactId matches', () => {

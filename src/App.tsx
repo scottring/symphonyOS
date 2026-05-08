@@ -56,6 +56,7 @@ import { useChat, type EntityContext as ChatEntityContext } from '@/hooks/useCha
 import { useChatSessions } from '@/hooks/useChatSessions'
 import { useVaultWrite } from '@/hooks/useVaultWrite'
 import { useMeetingNotes } from '@/hooks/useMeetingNotes'
+import { TapContextPanel, SURFACE_PANEL_ENABLED } from '@/components/surface'
 
 function PasswordResetForm({ onSubmit }: { onSubmit: (password: string) => Promise<{ error: { message: string } | null }> }) {
   const [password, setPassword] = useState('')
@@ -1428,96 +1429,125 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
             />
           </Suspense>
         ) : (
-          <Suspense fallback={<LoadingFallback variant="card" />}>
-            <DetailPanel
-              item={selectedItem}
-              onClose={() => setSelectedItemId(null)}
-              onUpdate={updateTask}
-              onDelete={deleteTask}
-              onToggleComplete={handleToggleTask}
-              onUpdateEventNote={updateNote}
-              onUpdateEventLocation={async (eventId: string, location: string | null, calendarId?: string) => {
-                try {
-                  await updateEvent({ eventId, location, calendarId })
-                  showToast('Location updated successfully')
-                } catch (error) {
-                  console.error('Failed to update event location:', error)
-                  showToast(error instanceof Error ? error.message : 'Failed to update location', 'warning')
-                }
-              }}
-              fetchCalendarList={fetchCalendarList}
-              onDeleteEvent={handleDeleteEvent}
-              onMoveEventToCalendar={async (eventId: string, sourceCalendarId: string, destinationCalendarId: string) => {
-                try {
-                  await moveEvent({ eventId, sourceCalendarId, destinationCalendarId })
-                  // Refresh events so the moved event reflects its new calendar
-                  const today = new Date()
-                  today.setHours(0, 0, 0, 0)
-                  const weekLater = new Date(today)
-                  weekLater.setDate(weekLater.getDate() + 7)
-                  await fetchEvents(today, weekLater)
-                  showToast('Event moved to new calendar', 'success')
-                } catch (error) {
-                  console.error('Failed to move event:', error)
-                  showToast(error instanceof Error ? error.message : 'Failed to move event', 'warning')
-                }
-              }}
-              eventRecipeUrl={selectedEventRecipeUrl}
-              onUpdateRecipeUrl={updateRecipeUrl}
-              onOpenRecipe={setRecipeUrl}
-              contact={selectedContact}
+          // TapContextPanel: gated by feature flag, tasks only. Plan 2 will extend to events/routines.
+          SURFACE_PANEL_ENABLED && selectedItem?.type === 'task' && selectedItem.originalTask ? (
+            <TapContextPanel
+              task={selectedItem.originalTask}
               contacts={contacts}
-              onSearchContacts={searchContacts}
-              onUpdateContact={updateContact}
-              onOpenContact={handleOpenContact}
-              onAddContact={addContact}
-              project={selectedItemProject}
               projects={projects}
-              onSearchProjects={searchProjects}
-              onUpdateProject={handleUpdateProject}
-              onOpenProject={handleOpenProject}
-              onAddProject={addProject}
-              allTasks={tasks}
-              onAddSubtask={addSubtask}
-              onActionComplete={refreshDateInstances}
-              onHideEvent={hideEvent}
-              prepTasks={tasks}
-              onAddPrepTask={addPrepTask}
-              onTogglePrepTask={handleToggleTask}
-              attachments={selectedItemAttachments}
-              onUploadAttachment={attachments.uploadAttachment}
-              onDeleteAttachment={attachments.deleteAttachment}
-              onOpenAttachment={async (attachment) => {
-                const url = await attachments.getSignedUrl(attachment.storagePath)
-                if (url) window.open(url, '_blank')
-              }}
-              isUploadingAttachment={attachments.isLoading}
-              attachmentError={attachments.error}
-              isPinned={selectedItem?.originalTask ? pinnedItems.isPinned('task', selectedItem.originalTask.id) : false}
-              canPin={pinnedItems.canPin()}
-              onPin={pinnedItems.pin}
-              onUnpin={pinnedItems.unpin}
-              parentTask={selectedItem?.originalTask?.parentTaskId
-                ? tasks.find(t => t.id === selectedItem.originalTask?.parentTaskId) ?? null
-                : null
-              }
-              onOpenParentTask={(taskId) => setSelectedItemId(`task-${taskId}`)}
-              linkedTasks={selectedItemLinkedTasks}
-              onAddLinkedTask={handleAddLinkedTask}
-              onLinkExistingTask={handleLinkExistingTask}
-              onToggleLinkedTask={handleToggleLinkedTask}
-              onDeleteLinkedTask={handleDeleteLinkedTask}
-              routine={selectedItemRoutine}
-              onUpdateRoutine={updateRoutine}
+              events={eventsWithMeals}
               familyMembers={familyMembers}
-              eventAssignedToAll={selectedEventAssignedToAll}
-              onUpdateEventAssignment={updateEventAssignmentAll}
-              eventProjectId={selectedEventProjectId}
-              onUpdateEventProject={updateEventProject}
-              onOpenGuidedChat={handleOpenGuidedChat}
-              viewedDate={viewedDate}
+              siblingTaskCandidates={tasks}
+              allTasks={tasks}
+              // createdByName not tracked in current data model — TODO Plan 2
+              onClose={() => setSelectedItemId(null)}
+              onTitleChange={(t) => updateTask(selectedItem.originalTask!.id, { title: t })}
+              onNotesChange={(n) => updateTask(selectedItem.originalTask!.id, { notes: n })}
+              onToggleComplete={() => handleToggleTask(selectedItem.originalTask!.id)}
+              onSchedule={() => {}} // TODO Plan 2: open schedule popover
+              onMore={() => {}} // TODO Plan 2: open more menu
+              onOpenContact={() => {}} // TODO Plan 2 wires this
+              onOpenMember={() => {}} // TODO Plan 2 wires this
+              onOpenProject={() => {}} // TODO Plan 2 wires this
+              onOpenEvent={() => {}} // TODO Plan 2 wires this
+              onOpenTask={(id) => setSelectedItemId(`task-${id}`)}
+              onOpenRelated={(kind, id) => {
+                if (kind === 'task') setSelectedItemId(`task-${id}`)
+                // other kinds: no-op in Plan 1; Plan 2 wires them
+              }}
             />
-          </Suspense>
+          ) : (
+            <Suspense fallback={<LoadingFallback variant="card" />}>
+              <DetailPanel
+                item={selectedItem}
+                onClose={() => setSelectedItemId(null)}
+                onUpdate={updateTask}
+                onDelete={deleteTask}
+                onToggleComplete={handleToggleTask}
+                onUpdateEventNote={updateNote}
+                onUpdateEventLocation={async (eventId: string, location: string | null, calendarId?: string) => {
+                  try {
+                    await updateEvent({ eventId, location, calendarId })
+                    showToast('Location updated successfully')
+                  } catch (error) {
+                    console.error('Failed to update event location:', error)
+                    showToast(error instanceof Error ? error.message : 'Failed to update location', 'warning')
+                  }
+                }}
+                fetchCalendarList={fetchCalendarList}
+                onDeleteEvent={handleDeleteEvent}
+                onMoveEventToCalendar={async (eventId: string, sourceCalendarId: string, destinationCalendarId: string) => {
+                  try {
+                    await moveEvent({ eventId, sourceCalendarId, destinationCalendarId })
+                    // Refresh events so the moved event reflects its new calendar
+                    const today = new Date()
+                    today.setHours(0, 0, 0, 0)
+                    const weekLater = new Date(today)
+                    weekLater.setDate(weekLater.getDate() + 7)
+                    await fetchEvents(today, weekLater)
+                    showToast('Event moved to new calendar', 'success')
+                  } catch (error) {
+                    console.error('Failed to move event:', error)
+                    showToast(error instanceof Error ? error.message : 'Failed to move event', 'warning')
+                  }
+                }}
+                eventRecipeUrl={selectedEventRecipeUrl}
+                onUpdateRecipeUrl={updateRecipeUrl}
+                onOpenRecipe={setRecipeUrl}
+                contact={selectedContact}
+                contacts={contacts}
+                onSearchContacts={searchContacts}
+                onUpdateContact={updateContact}
+                onOpenContact={handleOpenContact}
+                onAddContact={addContact}
+                project={selectedItemProject}
+                projects={projects}
+                onSearchProjects={searchProjects}
+                onUpdateProject={handleUpdateProject}
+                onOpenProject={handleOpenProject}
+                onAddProject={addProject}
+                allTasks={tasks}
+                onAddSubtask={addSubtask}
+                onActionComplete={refreshDateInstances}
+                onHideEvent={hideEvent}
+                prepTasks={tasks}
+                onAddPrepTask={addPrepTask}
+                onTogglePrepTask={handleToggleTask}
+                attachments={selectedItemAttachments}
+                onUploadAttachment={attachments.uploadAttachment}
+                onDeleteAttachment={attachments.deleteAttachment}
+                onOpenAttachment={async (attachment) => {
+                  const url = await attachments.getSignedUrl(attachment.storagePath)
+                  if (url) window.open(url, '_blank')
+                }}
+                isUploadingAttachment={attachments.isLoading}
+                attachmentError={attachments.error}
+                isPinned={selectedItem?.originalTask ? pinnedItems.isPinned('task', selectedItem.originalTask.id) : false}
+                canPin={pinnedItems.canPin()}
+                onPin={pinnedItems.pin}
+                onUnpin={pinnedItems.unpin}
+                parentTask={selectedItem?.originalTask?.parentTaskId
+                  ? tasks.find(t => t.id === selectedItem.originalTask?.parentTaskId) ?? null
+                  : null
+                }
+                onOpenParentTask={(taskId) => setSelectedItemId(`task-${taskId}`)}
+                linkedTasks={selectedItemLinkedTasks}
+                onAddLinkedTask={handleAddLinkedTask}
+                onLinkExistingTask={handleLinkExistingTask}
+                onToggleLinkedTask={handleToggleLinkedTask}
+                onDeleteLinkedTask={handleDeleteLinkedTask}
+                routine={selectedItemRoutine}
+                onUpdateRoutine={updateRoutine}
+                familyMembers={familyMembers}
+                eventAssignedToAll={selectedEventAssignedToAll}
+                onUpdateEventAssignment={updateEventAssignmentAll}
+                eventProjectId={selectedEventProjectId}
+                onUpdateEventProject={updateEventProject}
+                onOpenGuidedChat={handleOpenGuidedChat}
+                viewedDate={viewedDate}
+              />
+            </Suspense>
+          )
         )
       }
     >
