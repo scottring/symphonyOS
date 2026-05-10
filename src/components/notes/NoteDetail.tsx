@@ -190,7 +190,9 @@ export function NoteDetail({
   const displayTitle = note.title || lines[0] || 'Untitled'
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden p-4 md:p-8 bg-bg-base">
+      {/* Notebook page — elevated paper card holding the note */}
+      <div className="flex-1 min-h-0 w-full max-w-3xl mx-auto bg-white rounded-xl border border-neutral-200/70 shadow-[0_4px_24px_-6px_rgba(15,15,15,0.10),0_2px_6px_rgba(15,15,15,0.04)] flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-start justify-between p-6 pb-0 gap-4">
         <div className="flex-1 min-w-0">
@@ -358,6 +360,7 @@ export function NoteDetail({
           )}
         </div>
       </div>
+      </div>{/* end notebook paper card */}
 
       {/* Delete confirmation */}
       {showDeleteConfirm && (
