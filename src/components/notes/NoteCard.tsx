@@ -10,46 +10,66 @@ interface NoteCardProps {
   onClick?: () => void
 }
 
+/** Derive a clean, short title for display.
+ *  Priority: explicit note.title → source task title → first sentence (≤60 chars). */
+function deriveTitle(note: DisplayNote, plainContent: string): string {
+  if (note.title?.trim()) return note.title.trim()
+  if (note.sourceTaskId && note.sourceTaskTitle?.trim()) return note.sourceTaskTitle.trim()
+  const firstLine = plainContent.split('\n')[0].trim()
+  if (!firstLine) return 'Untitled'
+  // First sentence boundary (3–60 chars before .!?:)
+  const sentenceMatch = firstLine.match(/^([^.!?:]{3,60}[.!?:])/)
+  if (sentenceMatch) return sentenceMatch[1].trim().replace(/[.!?:]+$/, '')
+  if (firstLine.length > 60) return firstLine.slice(0, 60).trimEnd() + '…'
+  return firstLine
+}
+
 export function NoteCard({ note, topic, isSelected, onClick }: NoteCardProps) {
-  // Check if content contains HTML tags
   const hasHtml = /<[^>]+>/.test(note.content)
-
-  // Convert HTML to plain text if needed
   const plainContent = hasHtml ? htmlToPlainText(note.content) : note.content
+  const displayTitle = deriveTitle(note, plainContent)
+  const isTaskAttached = !!(note.sourceTaskId && note.sourceTaskTitle)
 
-  // Extract first line as title, rest as preview
-  const lines = plainContent.split('\n')
-  const displayTitle = note.title || lines[0] || 'Untitled'
-  const preview = lines.slice(1).join(' ').trim()
+  // Preview = the rest of the content after the title material.
+  // For task-attached notes (title comes from elsewhere), show the full first line.
+  // For derived titles, skip the part already consumed by the title.
+  const previewSource = isTaskAttached || !!note.title?.trim()
+    ? plainContent
+    : plainContent.slice(displayTitle.length)
+  const preview = previewSource.replace(/\s+/g, ' ').trim()
 
   return (
     <button
       className={`
-        w-full text-left p-4 rounded-lg transition-colors group
-        ${isSelected ? 'bg-white shadow-sm' : 'hover:bg-white/50'}
+        w-full text-left card card-interactive p-4 mb-2
+        relative overflow-hidden
+        ${isSelected ? 'ring-2 ring-primary-300/60' : ''}
       `}
       onClick={onClick}
     >
-      {/* Type indicator - subtle left border color */}
-      <div className={`border-l-2 pl-3 -ml-1 ${noteTypeColors[note.type]}`}>
-        {/* Title/First line - Fraunces serif */}
+      {/* Type indicator — colored hairline along the left edge */}
+      <span
+        aria-hidden
+        className={`absolute left-0 top-0 bottom-0 w-1 ${noteTypeColors[note.type]}`}
+      />
+
+      <div className="pl-2">
         <h4 className="font-display text-lg leading-snug mb-1 line-clamp-2 text-neutral-800">
           {displayTitle}
         </h4>
 
-        {/* Preview - DM Sans body */}
         {preview && (
           <p className="text-sm text-neutral-500 line-clamp-2 mb-2">{preview}</p>
         )}
 
-        {/* Task indicator */}
-        {note.sourceTaskId && note.sourceTaskTitle && (
-          <div className="flex items-center gap-1.5 text-xs text-primary-600 mb-2">
+        {isTaskAttached && !note.title?.trim() && (
+          <div className="flex items-center gap-1.5 text-xs text-primary-600/80 mb-2">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="w-3.5 h-3.5"
               viewBox="0 0 20 20"
               fill="currentColor"
+              aria-hidden
             >
               <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
               <path
@@ -58,15 +78,13 @@ export function NoteCard({ note, topic, isSelected, onClick }: NoteCardProps) {
                 clipRule="evenodd"
               />
             </svg>
-            <span>From task: {note.sourceTaskTitle}</span>
+            <span>Task note</span>
           </div>
         )}
 
-        {/* Metadata row */}
         <div className="flex items-center gap-2 text-xs text-neutral-400">
           <time>{formatRelativeTime(note.createdAt)}</time>
 
-          {/* Vault domain pill */}
           {'vaultDomain' in note && note.vaultDomain && (
             <>
               <span>·</span>
@@ -76,7 +94,6 @@ export function NoteCard({ note, topic, isSelected, onClick }: NoteCardProps) {
             </>
           )}
 
-          {/* Topic pill - only if assigned */}
           {topic && (
             <>
               <span>•</span>
@@ -89,7 +106,6 @@ export function NoteCard({ note, topic, isSelected, onClick }: NoteCardProps) {
             </>
           )}
 
-          {/* Linked entity count - subtle */}
           {note.entityLinks && note.entityLinks.length > 0 && (
             <>
               <span>•</span>
@@ -99,6 +115,7 @@ export function NoteCard({ note, topic, isSelected, onClick }: NoteCardProps) {
                   className="w-3 h-3"
                   viewBox="0 0 20 20"
                   fill="currentColor"
+                  aria-hidden
                 >
                   <path
                     fillRule="evenodd"

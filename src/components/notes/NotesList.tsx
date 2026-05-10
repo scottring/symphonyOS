@@ -41,7 +41,7 @@ export function NotesList({ notesByDate, topicsMap, selectedNoteId, onSelectNote
           <h3 className="text-xs uppercase tracking-wide text-neutral-400 mb-3 font-medium">
             {group.label}
           </h3>
-          <div className="space-y-1">
+          <div className="space-y-3">
             {group.notes.map((note) => (
               <NoteCard
                 key={note.id}
