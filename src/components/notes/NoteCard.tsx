@@ -41,16 +41,22 @@ export function NoteCard({ note, topic, isSelected, onClick }: NoteCardProps) {
   return (
     <button
       className={`
-        w-full text-left card card-interactive p-4 mb-2
+        w-full text-left p-4 mb-3
         relative overflow-hidden
-        ${isSelected ? 'ring-2 ring-primary-300/60' : ''}
+        bg-white rounded-lg
+        border border-neutral-200/80
+        shadow-[0_1px_2px_rgba(15,15,15,0.04),0_4px_12px_-2px_rgba(15,15,15,0.06)]
+        hover:shadow-[0_2px_4px_rgba(15,15,15,0.06),0_12px_24px_-4px_rgba(15,15,15,0.10)]
+        hover:-translate-y-0.5
+        transition-all duration-200
+        ${isSelected ? 'ring-2 ring-primary-400 border-primary-200' : ''}
       `}
       onClick={onClick}
     >
       {/* Type indicator — colored hairline along the left edge */}
       <span
         aria-hidden
-        className={`absolute left-0 top-0 bottom-0 w-1 ${noteTypeColors[note.type]}`}
+        className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-lg ${noteTypeColors[note.type]}`}
       />
 
       <div className="pl-2">
