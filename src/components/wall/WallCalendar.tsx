@@ -30,7 +30,9 @@ import { WallCameraView } from './WallCameraView'
 import { WallTodayTimeline } from './WallTodayTimeline'
 import { WallTravelDay, detectTravelDay } from './WallTravelDay'
 import { RoomsKioskView } from '@/apps/home/kiosk/RoomsKioskView'
-import { WallNowView } from './now/WallNowView'
+import { WallNowFocusCard } from './now/WallNowFocusCard'
+import { WallNowRail } from './now/WallNowRail'
+import { useImminentEntity } from './now/useImminentEntity'
 import { useMealPlan } from '@/hooks/useMealPlan'
 import { useRecipes } from '@/hooks/useRecipes'
 import { useOpenListCount } from '@/hooks/useOpenListCount'
@@ -81,7 +83,7 @@ export function WallCalendar() {
   const { items: discussionItems, unflagEvent, updateTask } = useFamilyDiscussionItems()
   const [showDiscussion, setShowDiscussion] = useState(false)
   const [travelDayDismissed, setTravelDayDismissed] = useState(false)
-  const [tab, setTab] = useState<'calendar' | 'rooms' | 'now'>('calendar')
+  const [tab, setTab] = useState<'calendar' | 'rooms'>('calendar')
 
   const nowWeekStart = useMemo(() => sundayOfWeek(new Date()), [])
   const { plan: nowMealPlan } = useMealPlan(nowWeekStart)
@@ -98,6 +100,12 @@ export function WallCalendar() {
     return entry.adHocTitle ?? null
   }, [nowMealPlan, nowRecipes])
   const openListCount = useOpenListCount()
+  const imminent = useImminentEntity({
+    events: wallData.calendarEvents,
+    tasks: wallData.tasks,
+    now: currentTime,
+    windowMinutes: 240,
+  })
 
   const isTravelDay = useMemo(
     () => detectTravelDay(wallData.calendarEvents),
@@ -418,13 +426,6 @@ export function WallCalendar() {
           }`}
           onClick={() => setTab('rooms')}
         >Rooms</button>
-        <button
-          type="button"
-          className={`px-4 py-1.5 rounded-full text-sm font-bold tracking-wide transition ${
-            tab === 'now' ? 'bg-white/15 text-white' : 'text-white/50 hover:text-white/70'
-          }`}
-          onClick={() => setTab('now')}
-        >Now</button>
       </div>
 
       {/* ═══ HEADER BAR ═══ */}
@@ -490,6 +491,16 @@ export function WallCalendar() {
 
       {tab === 'calendar' ? (
       <>
+      {/* ═══ NOW BAND — Imminent focus + standing rail ═══ */}
+      <div className="relative z-10 px-10 pb-4 grid grid-cols-2 gap-4">
+        <WallNowFocusCard imminent={imminent} now={currentTime} />
+        <WallNowRail
+          dinner={tonightDinner}
+          openListCount={openListCount}
+          discussionCount={discussionItems.length}
+        />
+      </div>
+
       {/* ═══ TODAY'S SCHEDULE — Calendar Events ═══ */}
       <div className="relative z-10 px-10" style={{ height: 170 }}>
         <WallTodayTimeline todayData={todayData} />
@@ -714,17 +725,8 @@ export function WallCalendar() {
         <WallItemDetail item={detailItem} onClose={handleCloseDetail} />
       )}
       </>
-      ) : tab === 'rooms' ? (
-        <RoomsKioskView />
       ) : (
-        <WallNowView
-          events={wallData.calendarEvents}
-          tasks={wallData.tasks}
-          dinner={tonightDinner}
-          openListCount={openListCount}
-          discussionCount={discussionItems.length}
-          now={new Date()}
-        />
+        <RoomsKioskView />
       )}
     </div>
   )
