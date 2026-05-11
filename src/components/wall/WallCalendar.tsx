@@ -89,16 +89,25 @@ export function WallCalendar() {
   const { plan: nowMealPlan } = useMealPlan(nowWeekStart)
   const { recipes: nowRecipes } = useRecipes()
   const tonightDinner = useMemo(() => {
-    if (!nowMealPlan) return null
-    const dow = new Date().getDay()
-    const entry = nowMealPlan.entries.find((e) => e.dayOfWeek === dow && e.slot === 'dinner')
-    if (!entry) return null
-    if (entry.recipeId) {
-      const r = nowRecipes.find((rr) => rr.id === entry.recipeId)
-      if (r?.title) return r.title
+    // 1) Prefer the meal planner if it has tonight's dinner
+    if (nowMealPlan) {
+      const dow = new Date().getDay()
+      const entry = nowMealPlan.entries.find((e) => e.dayOfWeek === dow && e.slot === 'dinner')
+      if (entry) {
+        if (entry.recipeId) {
+          const r = nowRecipes.find((rr) => rr.id === entry.recipeId)
+          if (r?.title) return r.title
+        }
+        if (entry.adHocTitle) return entry.adHocTitle
+      }
     }
-    return entry.adHocTitle ?? null
-  }, [nowMealPlan, nowRecipes])
+    // 2) Fall back to a calendar-based dinner event for today
+    const calendarDinner = findDinnerEvent(wallData.calendarEvents, new Date())
+    if (calendarDinner) {
+      return extractRecipeNameHint(calendarDinner.title) || calendarDinner.title
+    }
+    return null
+  }, [nowMealPlan, nowRecipes, wallData.calendarEvents])
   const openListCount = useOpenListCount()
   const imminent = useImminentEntity({
     events: wallData.calendarEvents,
