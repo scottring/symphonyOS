@@ -5,7 +5,7 @@ import { useGeneratePlanContext } from '@/contexts/GeneratePlanContext'
 
 const PLACEHOLDER = `800g challenge · No stir fry this week · Bittman shrimp — finally!`
 const HINT = 'Add more thoughts, goals, exclusions, cravings, experiments…'
-const MAX = 500
+const MAX = 4000
 
 interface Props {
   /** Current week start (Monday for now; will become Sunday in Phase B). */
@@ -27,8 +27,10 @@ export function InlineBriefComposer({ weekStart }: Props) {
   const charCount = draft.length
 
   const onChange = (next: string) => {
-    setDraft(next.slice(0, MAX))
+    setDraft(next)
   }
+
+  const overLimit = charCount > MAX
 
   const onBlur = () => {
     if (draft !== brief?.body) void setBody(draft)
@@ -72,7 +74,7 @@ export function InlineBriefComposer({ weekStart }: Props) {
         <p className="font-display italic text-[0.95rem] text-neutral-400 max-w-md">
           {HINT}
         </p>
-        <span className="text-[11px] font-medium text-neutral-400 tabular-nums">
+        <span className={`text-[11px] font-medium tabular-nums ${overLimit ? 'text-accent-500' : 'text-neutral-400'}`}>
           {charCount}/{MAX}
         </span>
       </div>
