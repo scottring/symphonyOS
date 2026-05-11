@@ -1491,7 +1491,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
           ) : selectedItem.type === 'event' && selectedItem.originalEvent ? (
             <TapEventPanel
               event={selectedItem.originalEvent}
-              notes={getNote(selectedItem.originalEvent.google_event_id || selectedItem.originalEvent.id)?.notes}
+              notes={getNote(selectedItem.originalEvent.google_event_id || selectedItem.originalEvent.id)?.notes ?? undefined}
               allTasks={tasks}
               onClose={() => setSelectedItemId(null)}
               onNotesChange={(html) => updateNote(selectedItem.originalEvent!.google_event_id || selectedItem.originalEvent!.id, html)}

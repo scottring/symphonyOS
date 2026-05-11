@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useWallData } from '@/hooks/useWallData'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import type { TimelineItem } from '@/types/timeline'
+import type { Task } from '@/types/task'
 // import { WallRoutineColumn } from './WallRoutineColumn' // unused — kept for context
 import { ShoppingListView } from './views/ShoppingListView'
 import { MealPlanColumn } from './views/MealPlanColumn'
@@ -699,7 +700,7 @@ export function WallCalendar() {
       ) : (
         <WallNowView
           events={wallData.calendarEvents}
-          tasks={allTasks}
+          tasks={allTasks.map(t => t.originalTask).filter((t): t is Task => !!t)}
           dinner={null /* TODO Plan 3.5: connect to meal plan */}
           openListCount={0 /* TODO Plan 3.5: connect to lists */}
           discussionCount={0 /* TODO Plan 3.5: connect to discussion flags */}
