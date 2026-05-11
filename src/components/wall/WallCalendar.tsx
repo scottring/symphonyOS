@@ -31,6 +31,10 @@ import { WallTodayTimeline } from './WallTodayTimeline'
 import { WallTravelDay, detectTravelDay } from './WallTravelDay'
 import { RoomsKioskView } from '@/apps/home/kiosk/RoomsKioskView'
 import { WallNowView } from './now/WallNowView'
+import { useMealPlan } from '@/hooks/useMealPlan'
+import { useRecipes } from '@/hooks/useRecipes'
+import { useOpenListCount } from '@/hooks/useOpenListCount'
+import { sundayOfWeek } from '@/lib/weekHelpers'
 
 // ============================================================================
 // HELPERS
@@ -78,6 +82,22 @@ export function WallCalendar() {
   const [showDiscussion, setShowDiscussion] = useState(false)
   const [travelDayDismissed, setTravelDayDismissed] = useState(false)
   const [tab, setTab] = useState<'calendar' | 'rooms' | 'now'>('calendar')
+
+  const nowWeekStart = useMemo(() => sundayOfWeek(new Date()), [])
+  const { plan: nowMealPlan } = useMealPlan(nowWeekStart)
+  const { recipes: nowRecipes } = useRecipes()
+  const tonightDinner = useMemo(() => {
+    if (!nowMealPlan) return null
+    const dow = new Date().getDay()
+    const entry = nowMealPlan.entries.find((e) => e.dayOfWeek === dow && e.slot === 'dinner')
+    if (!entry) return null
+    if (entry.recipeId) {
+      const r = nowRecipes.find((rr) => rr.id === entry.recipeId)
+      if (r?.title) return r.title
+    }
+    return entry.adHocTitle ?? null
+  }, [nowMealPlan, nowRecipes])
+  const openListCount = useOpenListCount()
 
   const isTravelDay = useMemo(
     () => detectTravelDay(wallData.calendarEvents),
@@ -700,9 +720,9 @@ export function WallCalendar() {
         <WallNowView
           events={wallData.calendarEvents}
           tasks={wallData.tasks}
-          dinner={null /* TODO Plan 3.5: connect to meal plan */}
-          openListCount={0 /* TODO Plan 3.5: connect to lists */}
-          discussionCount={0 /* TODO Plan 3.5: connect to discussion flags */}
+          dinner={tonightDinner}
+          openListCount={openListCount}
+          discussionCount={discussionItems.length}
           now={new Date()}
         />
       )}
