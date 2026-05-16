@@ -3,6 +3,21 @@ import confetti from 'canvas-confetti'
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
 import { type FamilyMemberColor } from '@/types/family'
+import { inferMealTime } from '@/lib/timeUtils'
+
+// All-day events whose title implies a meal (e.g. "Dinner: salmon")
+// should display at the inferred mealtime, not as "All day".
+function effectiveStart(item: TimelineItem): { time: Date | null; allDay: boolean } {
+  if (item.allDay && item.startTime) {
+    const inferred = inferMealTime(item.title)
+    if (inferred) {
+      const d = new Date(item.startTime)
+      d.setHours(inferred.hour, inferred.minute, 0, 0)
+      return { time: d, allDay: false }
+    }
+  }
+  return { time: item.startTime ?? null, allDay: !!item.allDay }
+}
 
 interface WallSwimlaneProps {
   familyMembers: FamilyMember[]
@@ -43,13 +58,15 @@ function resolveOwners(item: TimelineItem, members: FamilyMember[]): string[] {
 function sortItems(a: TimelineItem, b: TimelineItem): number {
   // Completed sink to bottom
   if (a.completed !== b.completed) return a.completed ? 1 : -1
-  // All-day events pinned to top
-  const aAll = a.allDay ? 1 : 0
-  const bAll = b.allDay ? 1 : 0
+  const aEff = effectiveStart(a)
+  const bEff = effectiveStart(b)
+  // All-day events pinned to top (meal-inferred items count as timed)
+  const aAll = aEff.allDay ? 1 : 0
+  const bAll = bEff.allDay ? 1 : 0
   if (aAll !== bAll) return bAll - aAll
   // Untimed items below timed
-  const aT = a.startTime ? a.startTime.getTime() : Infinity
-  const bT = b.startTime ? b.startTime.getTime() : Infinity
+  const aT = aEff.time ? aEff.time.getTime() : Infinity
+  const bT = bEff.time ? bEff.time.getTime() : Infinity
   if (aT !== bT) return aT - bT
   return a.title.localeCompare(b.title)
 }
@@ -59,11 +76,11 @@ function sortItems(a: TimelineItem, b: TimelineItem): number {
 // ============================================================================
 
 function formatTime(item: TimelineItem): string | null {
-  if (item.allDay) return 'All day'
-  if (!item.startTime) return null
-  const d = new Date(item.startTime)
-  const h = d.getHours()
-  const m = d.getMinutes()
+  const eff = effectiveStart(item)
+  if (eff.allDay) return 'All day'
+  if (!eff.time) return null
+  const h = eff.time.getHours()
+  const m = eff.time.getMinutes()
   const period = h >= 12 ? 'p' : 'a'
   const hour = h % 12 || 12
   return m === 0 ? `${hour}${period}` : `${hour}:${m.toString().padStart(2, '0')}${period}`
