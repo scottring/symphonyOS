@@ -49,7 +49,8 @@ export function useContextEngine(
   data: ContextEvalData | null,
   rules: ContextRule[] = DEFAULT_CONTEXT_RULES,
 ): UseContextEngineReturn {
-  const [activeContext, setActiveContext] = useState<ActiveContext | null>(null)
+  // User-picked context overrides the auto-selected one (manual switch).
+  const [userPickedContext, setUserPickedContext] = useState<ActiveContext | null>(null)
   const [dismissed, setDismissed] = useState<DismissedContext[]>([])
   const [debugMode, setDebugMode] = useState(false)
 
@@ -79,6 +80,20 @@ export function useContextEngine(
       .sort((a, b) => b.priority - a.priority)
   }, [data, rules, dismissed, debugMode])
 
+  // Auto-active context: the top surfaced rule, used when the user hasn't
+  // explicitly picked one. The wall *is* the matched context by default;
+  // Calendar is the fallback when nothing applies.
+  const activeContext = useMemo<ActiveContext | null>(() => {
+    if (userPickedContext) return userPickedContext
+    const top = surfacedRules[0]
+    if (!top) return null
+    return {
+      ruleId: top.id,
+      viewId: top.viewId as ContextViewId,
+      activatedAt: new Date(),
+    }
+  }, [userPickedContext, surfacedRules])
+
   // Re-evaluate every 60 seconds
   useEffect(() => {
     const interval = setInterval(() => {
@@ -97,7 +112,7 @@ export function useContextEngine(
 
     const timeout = setTimeout(() => {
       setDismissed([])
-      setActiveContext(null)
+      setUserPickedContext(null)
     }, msUntilMidnight)
 
     return () => clearTimeout(timeout)
@@ -107,7 +122,7 @@ export function useContextEngine(
     const rule = rules.find(r => r.id === ruleId)
     if (!rule) return
 
-    setActiveContext({
+    setUserPickedContext({
       ruleId,
       viewId: rule.viewId as ContextViewId,
       activatedAt: new Date(),
@@ -115,8 +130,13 @@ export function useContextEngine(
   }, [rules])
 
   const dismissActiveContext = useCallback(() => {
-    setActiveContext(null)
-  }, [])
+    // Dismiss whatever is currently showing for the rest of today, then
+    // fall back to the next surfaced rule (or Calendar if none left).
+    if (activeContext) {
+      setDismissed(prev => [...prev, { ruleId: activeContext.ruleId, dismissedAt: new Date() }])
+    }
+    setUserPickedContext(null)
+  }, [activeContext])
 
   const dismissRule = useCallback((ruleId: string) => {
     setDismissed(prev => [...prev, { ruleId, dismissedAt: new Date() }])
