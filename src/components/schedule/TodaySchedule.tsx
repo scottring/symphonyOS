@@ -366,20 +366,6 @@ function ProgressIndicator({ completed, total }: ProgressIndicatorProps) {
   )
 }
 
-function InboxPill({ count, onClick, inline }: { count: number; onClick: () => void; inline?: boolean }) {
-  if (count === 0) return null
-  const cls = inline
-    ? 'inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] text-neutral-500 hover:bg-neutral-100 transition-colors'
-    : 'flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-neutral-600 bg-white border border-neutral-200 shadow-sm hover:bg-neutral-50 transition-colors'
-  return (
-    <button type="button" onClick={onClick} className={cls} aria-label="Inbox">
-      <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 2h10v7h-2l-1 2H8l-1-2H5V5z" clipRule="evenodd" /></svg>
-      <span>Inbox</span>
-      <span className="font-semibold tabular-nums">{count}</span>
-    </button>
-  )
-}
-
 interface TodayScheduleProps {
   // View-specific data
   tasks: Task[]
@@ -407,8 +393,6 @@ interface TodayScheduleProps {
   onClosePanel?: () => void
   // Bulk actions (managed by HomeView)
   onUpdateTasksBulk?: (taskIds: string[], updates: Partial<Task>) => Promise<void>
-  // Inbox navigation
-  onOpenInbox?: () => void
 }
 
 function LoadingSkeleton() {
@@ -464,7 +448,6 @@ export function TodaySchedule({
   bothPanelsOpen,
   onClosePanel,
   onUpdateTasksBulk: _onUpdateTasksBulk,
-  onOpenInbox,
 }: TodayScheduleProps) {
   // Get actions + reference data from context
   const {
@@ -1064,10 +1047,9 @@ export function TodaySchedule({
             <div className="flex-1" />
             {/* Right side controls - unified group */}
             <div className="flex items-center gap-1 pr-3">
-              {/* Inbox + This week — compact in header */}
+              {/* This week — compact in header (Inbox lives in sidebar) */}
               {isToday && onUpdateTask && (
                 <>
-                  <InboxPill count={inboxTasks.length} onClick={onOpenInbox ?? (() => {})} inline />
                   <StagingFloat
                     weekTasks={weekTasks}
                     projects={projects}
@@ -1143,10 +1125,9 @@ export function TodaySchedule({
                 />
               )}
 
-              {/* Inbox + This week — inline in stats row */}
+              {/* This week — inline in stats row (Inbox lives in sidebar) */}
               {isToday && onUpdateTask && (
                 <>
-                  <InboxPill count={inboxTasks.length} onClick={onOpenInbox ?? (() => {})} />
                   <StagingFloat
                     weekTasks={weekTasks}
                     projects={projects}

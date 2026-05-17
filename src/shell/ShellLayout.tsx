@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar, type ViewType } from '@/components/layout/Sidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { useMobile } from '@/hooks/useMobile';
+import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 
 /**
  * ShellLayout wraps Shell-mounted apps with the Symphony app chrome — the
@@ -65,6 +66,12 @@ export function ShellLayout({ children }: Props) {
 
   const activeView = useMemo(() => deriveActiveView(location.pathname), [location.pathname]);
 
+  const { tasks } = useSupabaseTasks();
+  const inboxCount = useMemo(
+    () => tasks.filter((t) => t.bucket === 'inbox' && !t.completed).length,
+    [tasks],
+  );
+
   const handleViewChange = useCallback(
     (view: ViewType) => {
       // Mirror App.tsx's handleViewChange URL routing, minus state-based
@@ -120,6 +127,7 @@ export function ShellLayout({ children }: Props) {
           onSignOut={signOut}
           activeView={activeView}
           onViewChange={handleViewChange}
+          inboxCount={inboxCount}
         />
       )}
       {/* Content frame — uses <div> (not <main>) because individual apps

@@ -1,5 +1,4 @@
 import { useState, useMemo, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -49,10 +48,8 @@ export function HomeView({
   const ctx = useScheduleActionsContext()
   const { currentView, setCurrentView } = useHomeView()
   const isMobile = useMobile()
-  const navigate = useNavigate()
   const { currentAction, pushAction, executeUndo, dismiss } = useUndo({ duration: 5000 })
   const { currentDomain } = useDomain()
-  const handleOpenInbox = useCallback(() => navigate('/inbox'), [navigate])
 
   // Filter tasks, routines, projects, and events by current domain
   // Specific domains show ONLY matching items — untagged items stay in universal
@@ -298,7 +295,6 @@ export function HomeView({
         bothPanelsOpen={bothPanelsOpen}
         onClosePanel={() => onSelectItem(null)}
         onUpdateTasksBulk={handleUpdateTasksBulk}
-        onOpenInbox={handleOpenInbox}
       />
     )
   }

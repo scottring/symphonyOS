@@ -213,6 +213,7 @@ export function AppShell({
           onViewChange={onViewChange}
           onOpenSearch={onOpenSearch}
           onOpenChat={onChatOpenChange ? () => onChatOpenChange(true) : undefined}
+          inboxCount={entities?.tasks.filter(t => t.bucket === 'inbox' && !t.completed).length}
           pins={pins}
           entities={entities}
           onPinNavigate={onPinNavigate}
