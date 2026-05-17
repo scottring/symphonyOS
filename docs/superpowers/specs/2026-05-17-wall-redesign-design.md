@@ -313,6 +313,17 @@ function useWallRhythm(): {
 
 The 5-minute idle timer resets on any tap interaction within the wall surface.
 
+### Recall a past time-window card
+
+The rhythm bar is the recovery mechanism for any time-bounded content. Concrete example: it's 5 PM and the dinner-prep card was supposed to surface at 4 PM but the auto rhythm has already moved on to the 5–7 PM Dinner mode (which may show a different card). To bring the prep card back:
+
+1. **Tap "Dinner" on the rhythm bar** → Now Card overrides to the dinner mode (whatever that mode's default is, e.g., recipe + prep instructions).
+2. **Tap 📌 Pin** → card stays up even if you wait past 7 PM and auto rhythm moves on.
+
+Same mechanism for any other time-bound content. The rhythm bar is *always visible* at the bottom, which is by design — it's the time-recovery affordance.
+
+Today list items remain tappable regardless of time-of-day. A morning routine row at 8 PM is still tappable to mark it done or open its detail.
+
 ---
 
 ## Visual style
