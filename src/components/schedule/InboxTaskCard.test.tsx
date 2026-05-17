@@ -106,24 +106,24 @@ describe('InboxTaskCard', () => {
       expect(screen.getByRole('button', { name: 'Defer item' })).toBeInTheDocument()
     })
 
-    it('calls onDefer with "week" when Next Week is selected', () => {
+    it('calls onDefer with "week" when This Week is selected', () => {
       render(<InboxTaskCard {...defaultProps} />)
 
       // Open DeferPicker
       fireEvent.click(screen.getByRole('button', { name: 'Defer item' }))
-      // Select Next Week
-      fireEvent.click(screen.getByText('Next Week'))
+      // Select This Week
+      fireEvent.click(screen.getByText('This Week'))
 
       expect(mockOnDefer).toHaveBeenCalledWith('week')
     })
 
-    it('calls onDefer with "month" when Next Month is selected', () => {
+    it('calls onDefer with "month" when This Month is selected', () => {
       render(<InboxTaskCard {...defaultProps} />)
 
       // Open DeferPicker
       fireEvent.click(screen.getByRole('button', { name: 'Defer item' }))
-      // Select Next Month
-      fireEvent.click(screen.getByText('Next Month'))
+      // Select This Month
+      fireEvent.click(screen.getByText('This Month'))
 
       expect(mockOnDefer).toHaveBeenCalledWith('month')
     })

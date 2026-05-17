@@ -31,6 +31,7 @@ export interface Task {
   scheduledFor?: Date // When this task is scheduled (only set when bucket='timed')
   deferredUntil?: Date // Legacy — kept for backwards compat, prefer bucket
   deferCount?: number // Times this task has been deferred
+  weekDeferredAt?: Date // Set when an item already in 'week' bucket is bumped to next week — sinks it to the bottom of the This Week popover
   isAllDay?: boolean // True = all day task, false/undefined = specific time
   isSomeday?: boolean // Legacy — replaced by bucket system
   isWaiting?: boolean // True = waiting on someone else (all actions done, pending response)

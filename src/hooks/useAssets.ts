@@ -27,6 +27,17 @@ interface DbAsset {
   updated_at: string
 }
 
+function patchHasMeaningfulDetail(patch: Partial<Asset>): boolean {
+  if (patch.purchaseDate) return true
+  if (patch.purchasePrice !== undefined && patch.purchasePrice !== null) return true
+  if (patch.warrantyExpiresAt) return true
+  if (patch.serialNumber) return true
+  if (patch.manualUrl) return true
+  if (patch.assetType && patch.assetType !== 'other') return true
+  if (patch.details && Object.values(patch.details).some((v) => v !== '' && v !== null && v !== undefined)) return true
+  return false
+}
+
 function dbToAsset(db: DbAsset): Asset {
   return {
     id: db.id,
@@ -133,9 +144,21 @@ export function useAssets(homeId: string | undefined) {
     if (patch.domain !== undefined) dbPatch.domain = patch.domain
     if (patch.needsDetails !== undefined) dbPatch.needs_details = patch.needsDetails
 
+    // Auto-clear needs_details when the patch supplies meaningful detail content.
+    // Only flips to false; never re-raises the flag.
+    if (patch.needsDetails === undefined && patchHasMeaningfulDetail(patch)) {
+      dbPatch.needs_details = false
+    }
+
     const { error: e } = await supabase.from('assets').update(dbPatch).eq('id', id)
     if (e) { setError(e.message); return }
-    setAssets((prev) => prev.map((a) => a.id === id ? { ...a, ...patch, updatedAt: new Date() } as Asset : a))
+    const autoCleared = dbPatch.needs_details === false && patch.needsDetails === undefined
+    setAssets((prev) => prev.map((a) => {
+      if (a.id !== id) return a
+      const next = { ...a, ...patch, updatedAt: new Date() } as Asset
+      if (autoCleared) next.needsDetails = false
+      return next
+    }))
   }, [])
 
   const deleteAsset = useCallback(async (id: string): Promise<void> => {

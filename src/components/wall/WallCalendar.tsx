@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useWallData } from '@/hooks/useWallData'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import type { TimelineItem } from '@/types/timeline'
+import type { Task } from '@/types/task'
 // import { WallRoutineColumn } from './WallRoutineColumn' // unused — kept for context
 import { ShoppingListView } from './views/ShoppingListView'
 import { MealPlanColumn } from './views/MealPlanColumn'

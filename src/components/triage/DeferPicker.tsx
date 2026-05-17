@@ -83,7 +83,7 @@ export function DeferPicker({ onDefer }: DeferPickerProps) {
                 transition-all duration-150"
             >
               <Calendar className="w-4 h-4" />
-              <span>Next Week</span>
+              <span>This Week</span>
             </button>
             <button
               onClick={() => handleDefer('month')}
@@ -92,7 +92,7 @@ export function DeferPicker({ onDefer }: DeferPickerProps) {
                 transition-all duration-150"
             >
               <CalendarDays className="w-4 h-4" />
-              <span>Next Month</span>
+              <span>This Month</span>
             </button>
             <button
               onClick={() => handleDefer('quarter')}
