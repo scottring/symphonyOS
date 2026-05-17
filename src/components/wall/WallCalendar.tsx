@@ -5,12 +5,7 @@ import { useWallData } from '@/hooks/useWallData'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import type { TimelineItem } from '@/types/timeline'
 import type { Task } from '@/types/task'
-// import { WallRoutineColumn } from './WallRoutineColumn' // unused — kept for context
-import { ShoppingListView } from './views/ShoppingListView'
-import { MealPlanColumn } from './views/MealPlanColumn'
-import { WallSwimlane } from './WallSwimlane'
 import { WallMicButton } from './WallMicButton'
-import { WallDinnerPromptWidget } from './WallDinnerPromptWidget'
 import { WallItemDetail } from './WallItemDetail'
 import { findDinnerEvent, getMealIcon } from './WallDinnerWidget'
 import { WallRecipeViewer } from './WallRecipeViewer'
@@ -18,20 +13,23 @@ import { extractRecipeNameHint, detectRecipeUrl } from '@/lib/recipeDetection'
 import { useContextEngine, ContextOverlay } from './contexts'
 import type { ContextEvalData } from './contexts'
 import { useWeather } from '@/hooks/useWeather'
-import { getWeatherMessage, getWeatherEmoji } from './weatherMessages'
+import { getWeatherMessage } from './weatherMessages'
 import { useKioskCards } from '@/hooks/useKioskCards'
-import { WallAgentCards } from './WallAgentCards'
 import { useEmailActionItems } from '@/hooks/useEmailActionItems'
-import { WallEmailActions } from './WallEmailActions'
 import { WallEmailActionsOverlay } from './WallEmailActionsOverlay'
-import { WallDiscussionWidget } from './WallDiscussionWidget'
 import { WallDiscussionOverlay } from './WallDiscussionOverlay'
 import { useFamilyDiscussionItems, type DiscussionItem } from '@/hooks/useFamilyDiscussionItems'
 import { WallCameraView } from './WallCameraView'
-import { WallTodayTimeline } from './WallTodayTimeline'
 import { WallTravelDay, detectTravelDay } from './WallTravelDay'
-import { RoomsKioskView } from '@/apps/home/kiosk/RoomsKioskView'
-import { WallNowView } from './now/WallNowView'
+import { useWallRhythm } from './rhythm/useWallRhythm'
+import { useDailyDiscussionPrompt } from '@/hooks/useDailyDiscussionPrompt'
+import { WallChrome } from './WallChrome'
+import { WallRhythmBar } from './WallRhythmBar'
+import { WallNowCard } from './WallNowCard'
+import { WallRightColumn } from './WallRightColumn'
+import { buildTodayItems } from './today/todayItem'
+import { resolveNowFocus, type PinnedFocus, type OverrideRef } from './nowFocus'
+import { useImminentEntity } from './now/useImminentEntity'
 
 // ============================================================================
 // HELPERS
@@ -65,10 +63,9 @@ export function WallCalendar() {
   const nightWakeTimerRef = useRef<NodeJS.Timeout | null>(null)
   const [showRecipeViewer, setShowRecipeViewer] = useState(false)
   const [detailItem, setDetailItem] = useState<TimelineItem | null>(null)
-  const { cards: agentCards, dismissCard } = useKioskCards()
+  const { dismissCard: _dismissCard } = useKioskCards()
   const {
     items: emailItems,
-    urgentItems: emailUrgentItems,
     acknowledge: emailAcknowledge,
     snooze: emailSnooze,
     dismiss: emailDismiss,
@@ -78,14 +75,25 @@ export function WallCalendar() {
   const { items: discussionItems, unflagEvent, updateTask } = useFamilyDiscussionItems()
   const [showDiscussion, setShowDiscussion] = useState(false)
   const [travelDayDismissed, setTravelDayDismissed] = useState(false)
-  const [tab, setTab] = useState<'calendar' | 'rooms' | 'now'>('calendar')
+  const [cameraEnabled, setCameraEnabled] = useState(() =>
+    localStorage.getItem('wall-camera-enabled') !== 'false'
+  )
+
+  // ─── New layout state ───
+  const rhythm = useWallRhythm()
+  const { prompt, dismissed: promptDismissed } = useDailyDiscussionPrompt()
+  const [pinned, setPinned] = useState<PinnedFocus | null>(null)
+  const [override, setOverride] = useState<OverrideRef | null>(null)
+  const [selectedOwnerId, setSelectedOwnerId] = useState<string | null>(null)
+
+  // Mirror rhythm override into the local override state
+  useEffect(() => {
+    setOverride(rhythm.overrideMode ? { kind: 'mode', mode: rhythm.overrideMode } : null)
+  }, [rhythm.overrideMode])
 
   const isTravelDay = useMemo(
     () => detectTravelDay(wallData.calendarEvents),
     [wallData.calendarEvents]
-  )
-  const [cameraEnabled, setCameraEnabled] = useState(() =>
-    localStorage.getItem('wall-camera-enabled') !== 'false'
   )
 
   const toggleCamera = useCallback((enabled?: boolean) => {
@@ -96,30 +104,77 @@ export function WallCalendar() {
     })
   }, [])
 
-  // ═══ COMPLETION ═══
-  const handleComplete = useCallback(async (item: TimelineItem) => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    if (item.type === 'routine') {
-      const routineId = item.id.replace('routine-', '')
-      if (item.completed) {
-        await undoDone('routine', routineId, today)
-      } else {
-        await markDone('routine', routineId, today)
+  // ─── Today data derived ───
+  const todayDayData = useMemo(() => wallData.days.find(d => d.isToday), [wallData.days])
+
+  const todayItems = useMemo(() =>
+    todayDayData ? buildTodayItems(todayDayData.items, selectedOwnerId) : [],
+    [todayDayData, selectedOwnerId]
+  )
+  const discussItems = useMemo(() => todayItems.filter((it) => it.needsDiscussion), [todayItems])
+  const upcomingDays = useMemo(() => wallData.days.filter(d => !d.isToday), [wallData.days])
+
+  // Tasks for the imminent entity calculation
+  const todayTasksForImminent = useMemo((): Task[] => {
+    if (!todayDayData) return []
+    const result: Task[] = []
+    for (const section of ['allday', 'morning', 'afternoon', 'evening'] as const) {
+      for (const item of todayDayData.items[section] ?? []) {
+        if (item.type === 'task' && item.originalTask) {
+          result.push(item.originalTask)
+        }
       }
-    } else if (item.type === 'event') {
-      const eventId = item.id.replace('event-', '')
-      if (item.completed) {
-        await undoDone('calendar_event', eventId, today)
-      } else {
-        await markDone('calendar_event', eventId, today)
-      }
-    } else if (item.type === 'task') {
-      const taskId = item.id.replace('task-', '')
-      await supabase.from('tasks').update({ completed: !item.completed }).eq('id', taskId)
     }
+    return result
+  }, [todayDayData])
+
+  const imminentEntity = useImminentEntity({
+    events: wallData.calendarEvents,
+    tasks: todayTasksForImminent,
+    now: currentTime,
+    windowMinutes: 30,
+  })
+
+  const focus = useMemo(() =>
+    resolveNowFocus({
+      pinned,
+      override,
+      rhythmMode: rhythm.mode,
+      imminent: imminentEntity,
+    }),
+    [pinned, override, rhythm.mode, imminentEntity]
+  )
+
+  // ─── Action handlers ───
+  const handleCheckItem = useCallback(async (id: string, completed: boolean) => {
+    const item = todayItems.find(i => i.id === id)
+    if (!item) return
+    if (item.kind === 'routine-step') {
+      const routineId = item.sourceId.replace('routine-', '')
+      if (completed) await markDone('routine', routineId, currentTime)
+      else await undoDone('routine', routineId, currentTime)
+    } else {
+      const taskId = item.sourceId.replace('task-', '')
+      await supabase.from('tasks').update({ completed }).eq('id', taskId)
+      wallData.refetch()
+    }
+  }, [todayItems, markDone, undoDone, currentTime, wallData])
+
+  const handleResolveDiscussion = useCallback(async (taskId: string) => {
+    await supabase.from('tasks').update({
+      needs_discussion: false,
+      discussion_note: null,
+    }).eq('id', taskId)
     wallData.refetch()
-  }, [markDone, undoDone, wallData])
+  }, [wallData])
+
+  const handleTapEvent = useCallback((id: string) => {
+    if (!todayDayData) return
+    for (const section of ['allday', 'morning', 'afternoon', 'evening'] as const) {
+      const found = todayDayData.items[section]?.find(it => it.id === id)
+      if (found) { setDetailItem(found); return }
+    }
+  }, [todayDayData])
 
   // ═══ CLOCK ═══
   useEffect(() => {
@@ -145,86 +200,6 @@ export function WallCalendar() {
     return () => { supabase.removeChannel(channel) }
   }, [toggleCamera])
 
-  // ═══ ITEMS ═══
-  const { dailyChoreItems, nonDailyRoutineItems, taskItems, todayEventItems } = useMemo(() => {
-    const today = wallData.days.find(d => d.isToday)
-    if (!today) {
-      return {
-        dailyChoreItems: [] as TimelineItem[],
-        nonDailyRoutineItems: [] as TimelineItem[],
-        taskItems: [] as TimelineItem[],
-        todayEventItems: [] as TimelineItem[],
-      }
-    }
-    const dailyChores: TimelineItem[] = []
-    const nonDailyRoutines: TimelineItem[] = []
-    const tasks: TimelineItem[] = []
-    const events: TimelineItem[] = []
-    for (const section of ['morning', 'afternoon', 'evening', 'allday'] as const) {
-      for (const item of (today.items[section] || [])) {
-        if (item.skipped) continue
-        if (item.type === 'event') {
-          events.push(item)
-        } else if (item.type === 'routine') {
-          // Hide routines whose author opted out of timeline display (e.g. kid
-          // morning/bedtime checklists, which surface only via context views).
-          if (item.originalRoutine?.show_on_timeline === false) continue
-          const isDaily = item.recurrencePattern?.type === 'daily'
-          if (isDaily) dailyChores.push(item)
-          else nonDailyRoutines.push(item)
-        } else if (item.type === 'task') {
-          tasks.push(item)
-        }
-      }
-    }
-    // Filter Jax-related daily chores — handled by the Jax care widget
-    const JAX_KEYWORDS = ['jax', 'walk jax', 'feed jax', 'jax dinner', 'jax med']
-    const nonJaxDailyChores = dailyChores.filter(item => {
-      const lower = item.title.toLowerCase()
-      return !JAX_KEYWORDS.some(kw => lower.includes(kw))
-    })
-    return {
-      dailyChoreItems: nonJaxDailyChores,
-      nonDailyRoutineItems: nonDailyRoutines,
-      taskItems: tasks,
-      todayEventItems: events,
-    }
-  }, [wallData.days])
-
-  // ═══ ALL TASKS: today's scheduled + overdue, in one list ═══
-  const allTasks = useMemo(
-    () => [...taskItems, ...wallData.overdueTasks],
-    [taskItems, wallData.overdueTasks],
-  )
-
-  // ═══ DETAIL OVERLAY ═══
-  const todayData = useMemo(() => wallData.days.find(d => d.isToday), [wallData.days])
-
-  const handleItemTap = useCallback((item: TimelineItem) => {
-    setDetailItem(item)
-  }, [])
-  const handleCloseDetail = useCallback(() => {
-    setDetailItem(null)
-  }, [])
-
-  // ═══ RECIPE ═══
-  const dinnerEvent = useMemo(
-    () => findDinnerEvent(wallData.calendarEvents, currentTime),
-    [wallData.calendarEvents, currentTime]
-  )
-  const dinnerMealName = dinnerEvent
-    ? extractRecipeNameHint(dinnerEvent.title) || dinnerEvent.title
-    : 'Dinner'
-  const recipeUrl = useMemo(() => {
-    if (!dinnerEvent) return null
-    return detectRecipeUrl(dinnerEvent.description)
-  }, [dinnerEvent])
-
-  const handleOpenRecipe = useCallback(() => {
-    if (recipeUrl) setShowRecipeViewer(true)
-  }, [recipeUrl])
-  const handleCloseRecipe = useCallback(() => setShowRecipeViewer(false), [])
-
   // ═══ DISCUSSION ═══
   const handleMarkDiscussed = useCallback(async (item: DiscussionItem) => {
     if (item.kind === 'task') {
@@ -233,6 +208,31 @@ export function WallCalendar() {
       await unflagEvent(item.id)
     }
   }, [updateTask, unflagEvent])
+
+  // ═══ ITEMS for context engine ═══
+  const { taskItems: taskItemsForContext, dailyChoreItems: dailyChoreItemsForContext } = useMemo(() => {
+    const today = wallData.days.find(d => d.isToday)
+    if (!today) {
+      return {
+        taskItems: [] as TimelineItem[],
+        dailyChoreItems: [] as TimelineItem[],
+      }
+    }
+    const tasks: TimelineItem[] = []
+    const dailyChores: TimelineItem[] = []
+    for (const section of ['morning', 'afternoon', 'evening', 'allday'] as const) {
+      for (const item of (today.items[section] || [])) {
+        if (item.skipped) continue
+        if (item.type === 'task') {
+          tasks.push(item)
+        } else if (item.type === 'routine') {
+          const isDaily = item.recurrencePattern?.type === 'daily'
+          if (isDaily) dailyChores.push(item)
+        }
+      }
+    }
+    return { taskItems: tasks, dailyChoreItems: dailyChores }
+  }, [wallData.days])
 
   // ═══ CONTEXT ENGINE ═══
   const contextEvalData = useMemo((): ContextEvalData | null => {
@@ -243,18 +243,16 @@ export function WallCalendar() {
       calendarEvents: wallData.calendarEvents,
       familyMembers: wallData.familyMembers,
       overdueTasks: wallData.overdueTasks,
-      todayChores: dailyChoreItems,
-      todayTasks: taskItems,
+      todayChores: dailyChoreItemsForContext,
+      todayTasks: taskItemsForContext,
       emailActionItems: emailItems,
     }
-  }, [currentTime, wallData, dailyChoreItems, taskItems])
+  }, [currentTime, wallData, dailyChoreItemsForContext, taskItemsForContext, emailItems])
 
   const {
-    surfacedRules,
     activeContext,
-    activateContext,
+    activateContext: _activateContext,
     dismissActiveContext,
-    dismissRule: _dismissRule,
     debugMode,
     toggleDebugMode,
   } = useContextEngine(contextEvalData)
@@ -306,6 +304,21 @@ export function WallCalendar() {
     if (nightWakeTimerRef.current) clearTimeout(nightWakeTimerRef.current)
     nightWakeTimerRef.current = setTimeout(() => setNightWake(false), 30_000)
   }, [])
+
+  // ═══ RECIPE ═══
+  const dinnerEvent = useMemo(
+    () => findDinnerEvent(wallData.calendarEvents, currentTime),
+    [wallData.calendarEvents, currentTime]
+  )
+  const dinnerMealName = dinnerEvent
+    ? extractRecipeNameHint(dinnerEvent.title) || dinnerEvent.title
+    : 'Dinner'
+  const recipeUrl = useMemo(() => {
+    if (!dinnerEvent) return null
+    return detectRecipeUrl(dinnerEvent.description)
+  }, [dinnerEvent])
+
+  const handleCloseRecipe = useCallback(() => setShowRecipeViewer(false), [])
 
   // ════════════════════════════════════════════════════════════════
   // RENDER: Night mode
@@ -373,289 +386,58 @@ export function WallCalendar() {
   // RENDER: Main kiosk view
   // ════════════════════════════════════════════════════════════════
 
-  const { time, period, dateStr } = formatWallTime(currentTime)
-
-  // Glass card style — consistent across all modules
-  const glass = 'bg-white/[0.08] backdrop-blur-md border border-white/[0.1] rounded-[1.25rem]'
+  // Suppress unused-variable warnings for hooks that are kept for side-effects
+  void weatherMsg
+  void handleClockTap
+  void weatherError
+  void _activateContext
+  void _dismissCard
 
   return (
     <div
-      className="wall-calendar w-[1920px] h-[1080px] overflow-hidden flex flex-col select-none relative mx-auto bg-[#141414]"
+      className="h-screen w-screen flex flex-col bg-neutral-950 text-white p-5 overflow-hidden"
+      onPointerDown={rhythm.resetIdleTimer}
     >
+      <WallChrome
+        now={currentTime}
+        weather={weather ? {
+          temp: weather.currentTemp,
+          description: weather.condition,
+          high: weather.highTemp,
+          low: weather.lowTemp,
+        } : null}
+      />
 
-      {/* ═══ TAB TOGGLE (top-center floating) ═══ */}
-      <div className="absolute top-4 right-1/2 translate-x-1/2 z-20 flex items-center gap-1 px-1 py-1 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/[0.1]">
-        <button
-          type="button"
-          className={`px-4 py-1.5 rounded-full text-sm font-bold tracking-wide transition ${
-            tab === 'calendar' ? 'bg-white/15 text-white' : 'text-white/50 hover:text-white/70'
-          }`}
-          onClick={() => setTab('calendar')}
-        >Calendar</button>
-        <button
-          type="button"
-          className={`px-4 py-1.5 rounded-full text-sm font-bold tracking-wide transition ${
-            tab === 'rooms' ? 'bg-white/15 text-white' : 'text-white/50 hover:text-white/70'
-          }`}
-          onClick={() => setTab('rooms')}
-        >Rooms</button>
-        <button
-          type="button"
-          className={`px-4 py-1.5 rounded-full text-sm font-bold tracking-wide transition ${
-            tab === 'now' ? 'bg-white/15 text-white' : 'text-white/50 hover:text-white/70'
-          }`}
-          onClick={() => setTab('now')}
-        >Now</button>
-      </div>
-
-      {/* ═══ HEADER BAR ═══ */}
-      <header className="relative z-10 px-10 pt-6 pb-4 flex items-center justify-between">
-        {/* Left: Weather cluster */}
-        <div className="flex items-center gap-5">
-          {weather ? (
-            <>
-              <span className="text-[3.5rem] leading-none drop-shadow-lg">
-                {getWeatherEmoji(weather.weatherCode)}
-              </span>
-              <div className="flex items-baseline gap-2.5">
-                <span className="text-white font-black text-[3.5rem] leading-none tracking-tight">
-                  {weather.currentTemp}°
-                </span>
-                <span className="text-white/50 font-bold text-[1.3rem] uppercase tracking-wider">
-                  {weather.condition}
-                </span>
-              </div>
-              <div className="text-white/30 font-bold text-[1.05rem] tracking-wide ml-2">
-                {weather.highTemp}° / {weather.lowTemp}°
-              </div>
-            </>
-          ) : (
-            <div className="flex items-center gap-3">
-              <span className="text-[3.5rem] leading-none">🌤️</span>
-              <span className="text-white/30 font-bold text-[2rem]">--°</span>
-              {weatherError && (
-                <span className="text-red-400/60 font-bold text-[0.7rem] uppercase tracking-wider ml-2">
-                  {weatherError}
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Weather message — inline */}
-          {weatherMsg && (
-            <div className="flex items-center gap-2.5 ml-6 px-4 py-1.5 rounded-xl bg-white/[0.06] border border-white/[0.08]">
-              <span className="text-[1.1rem]">{weatherMsg.icon}</span>
-              <span className="text-white/60 font-bold text-[1rem]">{weatherMsg.message}</span>
-              {weatherMsg.screenTimeAdvice === 'none' && (
-                <span className="text-[#6DC4A7] font-black text-[0.8rem] uppercase tracking-widest">No Screens</span>
-              )}
-              {weatherMsg.screenTimeAdvice === 'reading-first' && (
-                <span className="text-[#F9C35C] font-black text-[0.8rem] uppercase tracking-widest">Reading First</span>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Right: Clock */}
-        <div className="flex items-baseline gap-2">
-          <time
-            className="font-black text-[3.5rem] leading-none text-white tracking-tight cursor-default"
-            onClick={handleClockTap}
-          >
-            {time}
-          </time>
-          <span className="text-[1.5rem] font-bold text-white/50">{period}</span>
-          <span className="text-[1.1rem] font-bold text-white/30 tracking-wider ml-3">{dateStr}</span>
-        </div>
-      </header>
-
-      {tab === 'calendar' ? (
-      <>
-      {/* ═══ TODAY'S SCHEDULE — Calendar Events ═══ */}
-      <div className="relative z-10 px-10" style={{ height: 170 }}>
-        <WallTodayTimeline todayData={todayData} />
-      </div>
-
-      {/* ═══ MAIN CONTENT — CSS Grid ═══ */}
-      <main className="flex-1 grid min-h-0 relative z-10 px-10 pb-6 gap-4"
-        style={{ gridTemplateColumns: '1fr 260px 380px', gridTemplateRows: '1fr auto' }}
-      >
-
-        {/* ─── PANEL: Swimlane (per-person Today view, includes routines/chores) ─── */}
-        <div className={`${glass} p-5 min-h-0 flex flex-col overflow-hidden`}>
-          <WallSwimlane
-            familyMembers={wallData.familyMembers}
-            taskItems={allTasks}
-            routineItems={[...nonDailyRoutineItems, ...dailyChoreItems]}
-            calendarEvents={todayEventItems}
-            onComplete={handleComplete}
-            onItemTap={handleItemTap}
-          />
-        </div>
-
-        {/* ─── PANEL: Need now (synced from Apple Reminders via the bridge) ─── */}
-        <div className={`${glass} p-5 min-h-0 overflow-hidden flex flex-col`}>
-          <ShoppingListView appleListName="Need now" title="Need Now" />
-        </div>
-
-        {/* ─── PANEL: This Week's Meals (replaces LookAhead in Phase 7) ─── */}
-        <div className={`${glass} p-5 min-h-0 overflow-hidden flex flex-col`}>
-          <MealPlanColumn />
-        </div>
-
-        {/* ─── BOTTOM ROW: Widget Strip ─── */}
-        <div className="flex gap-3 col-span-3 items-stretch">
-          {/* Dinner Widget */}
-          <div className={`${glass} px-4 py-2 flex-1 flex items-center gap-3 ${recipeUrl ? 'cursor-pointer' : ''}`}
-            onClick={recipeUrl ? handleOpenRecipe : undefined}
-          >
-            <div className="text-[1.8rem]">
-              {dinnerEvent ? getMealIcon(dinnerEvent.title) : '🍽️'}
-            </div>
-            <div className="flex flex-col min-w-0 flex-1">
-              <span className="text-white/40 font-black uppercase tracking-widest text-[0.6rem]">
-                Tonight
-              </span>
-              {dinnerEvent ? (
-                <span className="text-white font-bold text-[1rem] truncate leading-tight">
-                  {dinnerMealName}
-                </span>
-              ) : (
-                <span className="text-white/30 text-[0.9rem] italic">No dinner planned</span>
-              )}
-            </div>
-            {recipeUrl && (
-              <span className="text-white/30 text-[0.9rem]">📖</span>
-            )}
-          </div>
-
-          {/* Dinner conversation prompt from Relish */}
-          <div className={`${glass} px-4 py-2`} style={{ flex: '2 1 0%' }}>
-            <WallDinnerPromptWidget />
-          </div>
-
-          {/* Email Action Items Widget */}
-          {emailItems.length > 0 && (
-            <div className={`${glass} px-4 py-2 flex-1 flex items-center`}>
-              <WallEmailActions
-                items={emailItems}
-                urgentItems={emailUrgentItems}
-                onClick={() => setShowEmailActions(true)}
-              />
-            </div>
-          )}
-
-          {/* Discussion Widget */}
-          {discussionItems.length > 0 && (
-            <div className={`${glass} px-4 py-2 flex-1 flex items-center`}>
-              <WallDiscussionWidget
-                items={discussionItems}
-                onClick={() => setShowDiscussion(true)}
-              />
-            </div>
-          )}
-
-          {/* Agent Cards Widget */}
-          {agentCards.length > 0 && (
-            <div className={`${glass} px-4 py-2 flex-1 flex flex-col justify-center`}>
-              <WallAgentCards cards={agentCards} onDismiss={dismissCard} />
-            </div>
-          )}
-
-          {/* Context Dock (inline, compact) */}
-          {!activeContext && surfacedRules.length > 0 && (
-            <div className={`${glass} px-2 py-1.5 flex items-center gap-1`}>
-              {surfacedRules.map((rule) => (
-                <button
-                  key={rule.id}
-                  onClick={() => activateContext(rule.id)}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border backdrop-blur-md transition-all hover:scale-[1.03] active:scale-[0.97] select-none"
-                  style={{
-                    backgroundColor: rule.color + '20',
-                    borderColor: rule.color + '35',
-                    touchAction: 'manipulation',
-                  }}
-                  title={rule.label}
-                >
-                  <span className="text-[1rem]">{rule.icon}</span>
-                  <span className="text-white font-black text-[0.6rem] uppercase tracking-wider leading-none">
-                    {rule.label}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Camera — inline live thumbnail (tap to expand) */}
-          {cameraEnabled && (
-            <div
-              className={`${glass} flex-shrink-0 overflow-hidden`}
-              style={{ width: 150, padding: 4 }}
-            >
-              <WallCameraView />
-            </div>
-          )}
-        </div>
-      </main>
-
-      {/* ═══ UTILITIES ═══ */}
-
-      {/* Floating mic — voice → family inbox */}
-      <WallMicButton />
-
-      {/* Camera toggle */}
-      <button
-        onClick={() => toggleCamera()}
-        className="fixed bottom-2 right-24 flex items-center gap-1.5 px-2.5 py-1 rounded-lg
-                   bg-white/5 hover:bg-white/10 border border-white/10
-                   text-white/20 hover:text-white/50 transition-all z-10 text-[0.7rem]"
-      >
-        <span>{cameraEnabled ? '📷' : '📷'}</span>
-        <span className="font-bold uppercase tracking-wider">
-          {cameraEnabled ? 'Cam On' : 'Cam Off'}
-        </span>
-      </button>
-
-      <button
-        onClick={() => window.location.reload()}
-        className="fixed bottom-2 right-3 flex items-center gap-2 px-2.5 py-1 rounded-lg
-                   bg-white/5 hover:bg-white/10 border border-white/10
-                   text-white/20 hover:text-white/50 transition-all z-10 text-[0.7rem]"
-      >
-        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M4.5 9A8 8 0 0119.8 7.5M19.5 15A8 8 0 014.2 16.5" />
-        </svg>
-        {wallData.lastRefresh
-          ? wallData.lastRefresh.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-          : 'Refresh'}
-      </button>
-
-      {wallData.error && (
-        <div className="fixed top-6 right-6 bg-red-900/80 text-red-200 px-5 py-3 rounded-xl text-[1rem] shadow-lg border border-red-500/30 backdrop-blur z-50">
-          {wallData.error}
-        </div>
-      )}
-
-      {isNighttime && nightWake && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white/5 text-white/30 px-4 py-2 rounded-xl text-[0.85rem] font-bold uppercase tracking-widest border border-white/10 z-50">
-          Sleeping soon...
-        </div>
-      )}
-
-      {debugMode && (
-        <div className="fixed top-6 left-6 bg-amber-500/20 text-amber-300 px-4 py-2 rounded-xl text-[0.85rem] font-bold uppercase tracking-widest border border-amber-500/30 z-50">
-          Debug: All Contexts
-        </div>
-      )}
-
-      {/* ContextDock moved inline to widget strip */}
-
-      {activeContext && contextEvalData && (
-        <ContextOverlay
-          activeContext={activeContext}
-          data={contextEvalData}
-          onDismiss={dismissActiveContext}
+      <div className="grid grid-cols-[1.85fr_1fr] gap-4 flex-1 min-h-0">
+        <WallNowCard
+          focus={focus}
+          pinned={pinned !== null}
+          onPinToggle={() => setPinned(p => p ? null : { kind: 'mode', title: 'Pinned view' })}
+          familyPrompt={promptDismissed ? null : prompt}
         />
+        <WallRightColumn
+          todayItems={todayItems}
+          discussItems={discussItems}
+          upcomingDays={upcomingDays}
+          members={wallData.familyMembers}
+          selectedOwnerId={selectedOwnerId}
+          onSelectOwner={setSelectedOwnerId}
+          onCheckItem={handleCheckItem}
+          onTapEvent={handleTapEvent}
+          onResolveDiscussion={handleResolveDiscussion}
+          onTapUpcoming={(item) => setDetailItem(item)}
+        />
+      </div>
+
+      <WallRhythmBar
+        currentMode={rhythm.mode}
+        overrideMode={rhythm.overrideMode}
+        onSelectMode={rhythm.setOverride}
+      />
+
+      {/* Preserved overlays */}
+      {detailItem && (
+        <WallItemDetail item={detailItem} onClose={() => setDetailItem(null)} />
       )}
 
       {showRecipeViewer && recipeUrl && (
@@ -684,29 +466,73 @@ export function WallCalendar() {
           items={discussionItems}
           onMarkDiscussed={async (item) => {
             await handleMarkDiscussed(item)
-            // Don't auto-close — let the user keep marking; auto-close handled by effect below
           }}
           onClose={() => setShowDiscussion(false)}
         />
       )}
 
-
-      {detailItem && (
-        <WallItemDetail item={detailItem} onClose={handleCloseDetail} />
+      {/* Camera — inline live thumbnail */}
+      {cameraEnabled && (
+        <div className="fixed bottom-16 right-4 w-[150px] overflow-hidden rounded-xl border border-white/10">
+          <WallCameraView />
+        </div>
       )}
-      </>
-      ) : tab === 'rooms' ? (
-        <RoomsKioskView />
-      ) : (
-        <WallNowView
-          events={wallData.calendarEvents}
-          tasks={allTasks.map(t => t.originalTask).filter((t): t is Task => !!t)}
-          dinner={null /* TODO Plan 3.5: connect to meal plan */}
-          openListCount={0 /* TODO Plan 3.5: connect to lists */}
-          discussionCount={0 /* TODO Plan 3.5: connect to discussion flags */}
-          now={new Date()}
+
+      <WallMicButton />
+
+      {isNighttime && nightWake && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white/5 text-white/30 px-4 py-2 rounded-xl text-[0.85rem] font-bold uppercase tracking-widest border border-white/10 z-50">
+          Sleeping soon...
+        </div>
+      )}
+
+      {debugMode && (
+        <div className="fixed top-6 left-6 bg-amber-500/20 text-amber-300 px-4 py-2 rounded-xl text-[0.85rem] font-bold uppercase tracking-widest border border-amber-500/30 z-50">
+          Debug: All Contexts
+        </div>
+      )}
+
+      {wallData.error && (
+        <div className="fixed top-6 right-6 bg-red-900/80 text-red-200 px-5 py-3 rounded-xl text-[1rem] shadow-lg border border-red-500/30 backdrop-blur z-50">
+          {wallData.error}
+        </div>
+      )}
+
+      {activeContext && contextEvalData && (
+        <ContextOverlay
+          activeContext={activeContext}
+          data={contextEvalData}
+          onDismiss={dismissActiveContext}
         />
       )}
+
+      {/* Camera toggle */}
+      <button
+        onClick={() => toggleCamera()}
+        className="fixed bottom-2 right-24 flex items-center gap-1.5 px-2.5 py-1 rounded-lg
+                   bg-white/5 hover:bg-white/10 border border-white/10
+                   text-white/20 hover:text-white/50 transition-all z-10 text-[0.7rem]"
+      >
+        <span>📷</span>
+        <span className="font-bold uppercase tracking-wider">
+          {cameraEnabled ? 'Cam On' : 'Cam Off'}
+        </span>
+      </button>
+
+      {/* Reload button */}
+      <button
+        onClick={() => window.location.reload()}
+        className="fixed bottom-2 right-3 flex items-center gap-2 px-2.5 py-1 rounded-lg
+                   bg-white/5 hover:bg-white/10 border border-white/10
+                   text-white/20 hover:text-white/50 transition-all z-10 text-[0.7rem]"
+      >
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M4.5 9A8 8 0 0119.8 7.5M19.5 15A8 8 0 014.2 16.5" />
+        </svg>
+        {wallData.lastRefresh
+          ? wallData.lastRefresh.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+          : 'Refresh'}
+      </button>
     </div>
   )
 }
