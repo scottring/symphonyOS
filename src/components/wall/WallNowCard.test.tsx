@@ -24,7 +24,7 @@ describe('WallNowCard', () => {
         familyPrompt={null}
       />
     )
-    expect(screen.getByText(/dinner/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/dinner/i).length).toBeGreaterThan(0)
   })
 
   it('toggles pin on pin button tap', () => {

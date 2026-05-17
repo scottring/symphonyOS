@@ -3,15 +3,16 @@ import { resolveNowFocus } from './nowFocus'
 
 describe('resolveNowFocus', () => {
   const baseInput = {
-    pinned: null,
+    pinnedMode: null,
     override: null,
     rhythmMode: 'day' as const,
     imminent: null,
   }
 
-  it('returns pinned when pinned', () => {
-    const focus = resolveNowFocus({ ...baseInput, pinned: { kind: 'recipe', title: 'Pinned recipe' } })
-    expect(focus.kind).toBe('pinned')
+  it('returns pinned-mode when pinnedMode is set', () => {
+    const focus = resolveNowFocus({ ...baseInput, pinnedMode: 'dinner' })
+    expect(focus.kind).toBe('pinned-mode')
+    expect((focus as { mode: string }).mode).toBe('dinner')
   })
 
   it('returns override-mode when override is set', () => {

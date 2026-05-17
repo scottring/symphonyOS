@@ -28,7 +28,8 @@ import { WallRhythmBar } from './WallRhythmBar'
 import { WallNowCard } from './WallNowCard'
 import { WallRightColumn } from './WallRightColumn'
 import { buildTodayItems } from './today/todayItem'
-import { resolveNowFocus, type PinnedFocus, type OverrideRef } from './nowFocus'
+import { resolveNowFocus, type OverrideRef } from './nowFocus'
+import type { RhythmMode } from './rhythm/rhythmMode'
 import { useImminentEntity } from './now/useImminentEntity'
 
 // ============================================================================
@@ -82,7 +83,7 @@ export function WallCalendar() {
   // ─── New layout state ───
   const rhythm = useWallRhythm()
   const { prompt, dismissed: promptDismissed } = useDailyDiscussionPrompt()
-  const [pinned, setPinned] = useState<PinnedFocus | null>(null)
+  const [pinnedMode, setPinnedMode] = useState<RhythmMode | null>(null)
   const [override, setOverride] = useState<OverrideRef | null>(null)
   const [selectedOwnerId, setSelectedOwnerId] = useState<string | null>(null)
 
@@ -111,7 +112,10 @@ export function WallCalendar() {
     todayDayData ? buildTodayItems(todayDayData.items, selectedOwnerId) : [],
     [todayDayData, selectedOwnerId]
   )
-  const discussItems = useMemo(() => todayItems.filter((it) => it.needsDiscussion), [todayItems])
+  // Routine steps are used by the Now Card; everything else goes to the Today list
+  const todayItemsForList = useMemo(() => todayItems.filter(i => i.kind !== 'routine-step'), [todayItems])
+  const routineSteps = useMemo(() => todayItems.filter(i => i.kind === 'routine-step'), [todayItems])
+  const discussItems = useMemo(() => todayItemsForList.filter(it => it.needsDiscussion), [todayItemsForList])
   const upcomingDays = useMemo(() => wallData.days.filter(d => !d.isToday), [wallData.days])
 
   // Tasks for the imminent entity calculation
@@ -137,13 +141,43 @@ export function WallCalendar() {
 
   const focus = useMemo(() =>
     resolveNowFocus({
-      pinned,
+      pinnedMode,
       override,
       rhythmMode: rhythm.mode,
       imminent: imminentEntity,
     }),
-    [pinned, override, rhythm.mode, imminentEntity]
+    [pinnedMode, override, rhythm.mode, imminentEntity]
   )
+
+  // ─── Now Card data: mode-specific routine steps ───
+  const morningRoutineSteps = useMemo(() => routineSteps.filter(s => {
+    if (!s.startTime) return false
+    const h = s.startTime.getHours()
+    return h >= 6 && h < 9
+  }), [routineSteps])
+  const bedtimeRoutineSteps = useMemo(() => routineSteps.filter(s => {
+    if (!s.startTime) return false
+    const h = s.startTime.getHours()
+    return h >= 19 && h < 22
+  }), [routineSteps])
+  const activeRoutineSteps = useMemo(() => {
+    const m =
+      focus.kind === 'pinned-mode' || focus.kind === 'override-mode' || focus.kind === 'mode-default'
+        ? focus.mode
+        : rhythm.mode
+    return m === 'morning' ? morningRoutineSteps : m === 'bedtime' ? bedtimeRoutineSteps : []
+  }, [focus, rhythm.mode, morningRoutineSteps, bedtimeRoutineSteps])
+
+  // ─── Now Card data: tomorrow first item ───
+  const tomorrowPreview = useMemo(() => {
+    const tomorrow = wallData.days.find(d => !d.isToday && d.date > new Date(new Date().setHours(0, 0, 0, 0)))
+    if (!tomorrow) return null
+    for (const section of ['morning', 'afternoon', 'evening', 'allday'] as const) {
+      const first = tomorrow.items[section]?.[0]
+      if (first) return { title: first.title, startTime: first.startTime ?? null }
+    }
+    return null
+  }, [wallData.days])
 
   // ─── Action handlers ───
   const handleCheckItem = useCallback(async (id: string, completed: boolean) => {
@@ -411,12 +445,17 @@ export function WallCalendar() {
       <div className="grid grid-cols-[1.85fr_1fr] gap-4 flex-1 min-h-0">
         <WallNowCard
           focus={focus}
-          pinned={pinned !== null}
-          onPinToggle={() => setPinned(p => p ? null : { kind: 'mode', title: 'Pinned view' })}
+          pinned={pinnedMode !== null}
+          onPinToggle={() => setPinnedMode(p => p ? null : rhythm.mode)}
           familyPrompt={promptDismissed ? null : prompt}
+          todayItems={todayItemsForList}
+          routineSteps={activeRoutineSteps}
+          dinnerPlanTitle={dinnerEvent ? (extractRecipeNameHint(dinnerEvent.title) || dinnerEvent.title) : null}
+          tomorrowPreview={tomorrowPreview}
+          onCheckItem={handleCheckItem}
         />
         <WallRightColumn
-          todayItems={todayItems}
+          todayItems={todayItemsForList}
           discussItems={discussItems}
           upcomingDays={upcomingDays}
           members={wallData.familyMembers}
