@@ -130,6 +130,23 @@ A vertical list of today's actionable items, sorted by time, then by status (unc
 
 **Filter behavior:** filter applies in real time. If no items for selected person, show "No items for Mia today · tap any other avatar".
 
+### TO DISCUSS section (middle of column)
+
+Items flagged with `needsDiscussion: true` (from the triage Discussion picker — set elsewhere in Symphony when an item needs Scott + Iris to talk about it). The kiosk is exactly where they should appear: both adults are nearby at dinner / cleanup.
+
+**Row anatomy:** same shape as Today rows, but with a 💬 icon instead of a checkbox. The icon doubles as the check-off button — tap it to set `needsDiscussion: false` (and clear `discussionNote`), which makes the row fade out and remove.
+
+```
+[ 💬 ]  Summer camp dates                💬
+[ 💬 ]  Mia's piano teacher payment      💬
+```
+
+Each row is also tappable on the title to see the `discussionNote` (if any) — opens a small inline expansion or a brief detail overlay.
+
+Hidden entirely when no items flagged. Header label: `TO DISCUSS (3)` with count.
+
+This section is distinct from the daily Family Conversation Prompt — the prompt rotates by date and is a dinner-table conversation starter; "to discuss" items are real action items between adults.
+
 ### COMING UP section (bottom of column)
 
 A compressed week preview — one line per day. Uses existing `WallLookAhead` component, simplified to: `DAY · top 2 items joined with comma`.
@@ -174,7 +191,9 @@ The list is editable by anyone; new prompts can be appended without breaking the
 | Tap 📌 Pin on Now Card | Pin locks the card; tap again to unpin |
 | Tap checkbox in Today list | Mark task/chore/routine-step complete; optimistic update + Supabase write |
 | Tap event row in Today list | Open detail overlay (existing `WallItemDetail`) |
-| Long-press a family discussion chip | Dismiss for today |
+| Tap 💬 button on a "To Discuss" row | Sets `needsDiscussion: false` on the task; row fades out |
+| Tap title in a "To Discuss" row | Inline expansion showing `discussionNote` |
+| Long-press a family discussion chip | Dismiss daily family conversation prompt for today |
 | Tap family avatar | Filter Today section to that person |
 | Tap floating 🎤 button | Existing mic input flow |
 
@@ -219,6 +238,7 @@ src/components/wall/
 ├── WallRhythmBar.tsx             ← NEW: bottom strip with 6 mode buttons + Now pill
 ├── WallRightColumn.tsx           ← NEW: family filter + Today list + Coming Up
 ├── WallTodayList.tsx             ← NEW: checkable list of today's tasks/chores/routines/events
+├── WallDiscussList.tsx           ← NEW: needs-discussion items with inline check-off
 ├── WallFamilyFilter.tsx          ← NEW: avatar strip with selected-state
 ├── WallChrome.tsx                ← NEW: clock + weather header strip (extracted from current code)
 ├── WallLookAhead.tsx             ← MODIFY: compressed mode (1-line per day) when not expanded
