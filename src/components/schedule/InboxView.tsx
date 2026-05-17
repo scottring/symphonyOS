@@ -186,6 +186,7 @@ export function InboxView({
 
   return (
     <div className="h-full overflow-y-auto px-4 md:px-6 py-6">
+      <div className="max-w-4xl mx-auto">
       <header className="mb-6 flex items-start justify-between">
         <div>
           <h1 className="font-display text-2xl font-semibold text-neutral-800">Inbox</h1>
@@ -262,6 +263,7 @@ export function InboxView({
           onDismiss={() => setUndo(null)}
         />
       )}
+      </div>
     </div>
   )
 }
