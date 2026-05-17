@@ -261,3 +261,26 @@ export function StagingFloat({
     </>
   )
 }
+
+function groupTasksByProject(
+  tasks: Task[],
+  projects: Project[],
+): Array<{ key: string; label: string; tasks: Task[] }> {
+  const buckets = new Map<string, { label: string; tasks: Task[] }>()
+  for (const task of tasks) {
+    const key = task.projectId ?? '__none__'
+    const label = task.projectId
+      ? projects.find((p) => p.id === task.projectId)?.name ?? 'Unknown project'
+      : 'No project'
+    const existing = buckets.get(key)
+    if (existing) existing.tasks.push(task)
+    else buckets.set(key, { label, tasks: [task] })
+  }
+  return Array.from(buckets.entries())
+    .map(([key, v]) => ({ key, label: v.label, tasks: v.tasks }))
+    .sort((a, b) => {
+      if (a.key === '__none__') return 1
+      if (b.key === '__none__') return -1
+      return a.label.localeCompare(b.label)
+    })
+}

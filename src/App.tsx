@@ -374,6 +374,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
 
     // URL-based views
     const path = location.pathname
+    if (path === '/inbox') return 'inbox'
     if (path.startsWith('/goals')) return 'goals'
     if (path.startsWith('/projects')) return 'projects'
     if (path.startsWith('/routines')) return 'routines'
@@ -409,6 +410,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   useEffect(() => {
     const path = location.pathname
     const isUrlBased =
+      path === '/inbox' ||
       path.startsWith('/goals') ||
       path.startsWith('/projects') ||
       path.startsWith('/routines') ||
