@@ -39,6 +39,7 @@ interface DbTask {
   waiting_since: string | null
   needs_discussion: boolean | null
   discussion_note: string | null
+  week_deferred_at: string | null
   created_at: string
   updated_at: string
 }
@@ -93,6 +94,7 @@ function dbTaskToTask(dbTask: DbTask): Task {
     waitingSince: dbTask.waiting_since ? new Date(dbTask.waiting_since) : undefined,
     needsDiscussion: dbTask.needs_discussion ?? undefined,
     discussionNote: dbTask.discussion_note ?? undefined,
+    weekDeferredAt: dbTask.week_deferred_at ? new Date(dbTask.week_deferred_at) : undefined,
   }
 }
 
@@ -730,6 +732,7 @@ export function useSupabaseTasks() {
     if ('waitingSince' in updates) dbUpdates.waiting_since = updates.waitingSince?.toISOString() ?? null
     if ('needsDiscussion' in updates) dbUpdates.needs_discussion = updates.needsDiscussion ?? false
     if ('discussionNote' in updates) dbUpdates.discussion_note = updates.discussionNote ?? null
+    if ('weekDeferredAt' in updates) dbUpdates.week_deferred_at = updates.weekDeferredAt?.toISOString() ?? null
 
     logger.debug('[updateTask] Sending to DB:', { id, dbUpdates })
     const { data, error: updateError, status, count } = await supabase
@@ -822,6 +825,7 @@ export function useSupabaseTasks() {
     if ('waitingSince' in updates) dbUpdates.waiting_since = updates.waitingSince?.toISOString() ?? null
     if ('needsDiscussion' in updates) dbUpdates.needs_discussion = updates.needsDiscussion ?? false
     if ('discussionNote' in updates) dbUpdates.discussion_note = updates.discussionNote ?? null
+    if ('weekDeferredAt' in updates) dbUpdates.week_deferred_at = updates.weekDeferredAt?.toISOString() ?? null
 
     logger.debug('[updateTasksBulk] Sending to DB:', { taskIds, dbUpdates })
 
