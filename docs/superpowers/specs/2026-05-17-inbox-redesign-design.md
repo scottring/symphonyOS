@@ -1,12 +1,18 @@
-# Inbox Redesign — Forced "When?" Triage
+# Inbox + This-Week Popover Redesign — Forced "When?" Triage
 
 **Date:** 2026-05-17
 **Status:** Spec — pending review
 **Branch:** feat/surface-future
 
+**Scope:** Two related surfaces that share a row component:
+1. **Inbox view** (`InboxView.tsx`) — forced "when?" triage with dense rows + focus mode.
+2. **"This Week" popover** (`StagingFloat.tsx` on the Today page) — same dense row, different quick-action set, scoped to week-bucket items only.
+
 ---
 
 ## Problem
+
+### Inbox view
 
 The Inbox view is the daily triage surface, but at 30+ items it feels slow and ugly. Concretely:
 
@@ -17,6 +23,15 @@ The Inbox view is the daily triage surface, but at 30+ items it feels slow and u
 - **Vertical density is poor.** 5–7 cards fit per screen on a 13" laptop. With 34 items, triage requires constant scrolling.
 
 The redesign keeps the underlying data model unchanged and replaces the row-interaction model.
+
+### "This Week" popover (on Today page)
+
+The "This week 27" pill at the top of the Today page opens a popover (`StagingFloat`) that conflates two distinct things into one list:
+
+- 23 items with `bucket: 'inbox'` (unprocessed)
+- 4 items with `bucket: 'week'` (already triaged to this week)
+
+This makes the popover misleading — it claims to be "This Week" but is mostly an inbox spillover. The popover also has limited per-row actions (just pull-to-today and an overflow menu); you can't push to next week, demote to someday, or change context from here. Visually it uses a simpler row anatomy than the Inbox cards, creating inconsistency between surfaces.
 
 ---
 
@@ -132,6 +147,56 @@ After any triage action (`1`–`4`, `D`), auto-advance with a 150ms slide-out an
 
 ---
 
+---
+
+## "This Week" popover redesign (Today page)
+
+The popover stays as the right surface for a quick peek from inside the Today page (the full Week tab in the upper-right covers deep-dive needs). It gets rescoped, restyled, and gets the same dense row anatomy as Inbox — with a different quick-action set since these items are already in the Week bucket.
+
+### Surface changes on the Today page
+
+The current single "This week 27" pill becomes **two pills**:
+
+```
+[ 📥 Inbox 23 ]   [ 📅 This week 4 ]
+```
+
+- **Inbox pill** — clicking navigates to the Inbox view. Replaces the "go to inbox" link buried in the current StagingFloat menu. Hidden when count is 0.
+- **This week pill** — opens the popover described below. Hidden when count is 0.
+
+Both pills live in the same place where the current combined pill sits (mobile: compact header; desktop: stats row).
+
+### Popover content
+
+The popover (`StagingFloat`) is rescoped to **only show items with `bucket: 'week'`** — no inbox items, no mixing.
+
+**Header:** "This Week · 4 items"
+
+**Body:** vertical list of `DenseInboxRow` components (same component as Inbox view, different `quickActions` prop).
+
+**Quick-action set for this surface** (replaces the inbox set):
+
+| Button | Action |
+|---|---|
+| **Today** | Promote to today — `bucket: 'timed'`, `scheduledFor: today`, `isAllDay: true` |
+| **Next Week** | Bump out one week — keep `bucket: 'week'`, update sort order so the item appears at the bottom (so we can distinguish "deferred again" from "fresh this week"). Implementation: set `weekDeferredAt: new Date()` field on task (new metadata field). |
+| **Someday** | Demote — `bucket: 'quarter'` |
+| **×** | Delete (soft, with undo toast) |
+
+**Same animation + undo behavior as inbox:** 200ms fade-out, count decrements, undo toast bottom-left for 5s.
+
+**Empty state:** "Nothing scheduled this week."
+
+The popover keeps its current dismiss behavior (click outside, Esc).
+
+### Out of scope for the popover
+
+- Focus-mode for the popover. Focus mode is Inbox-only — week items are typically few and don't need batch processing.
+- Drag-and-drop within the popover.
+- A new `weekDeferredAt` field beyond the simple Date type — sorting logic is plain "rows without `weekDeferredAt` first, then by `weekDeferredAt` ascending."
+
+---
+
 ## Preserved features
 
 These current Inbox capabilities remain unchanged:
@@ -163,16 +228,53 @@ These current Inbox capabilities remain unchanged:
 ```
 src/components/schedule/
 ├── InboxView.tsx              ← MAJOR REWRITE: remove DnD, add mode toggle, render dense or focus
-├── InboxTaskCard.tsx          ← REWRITE: new dense row anatomy (one line, "when" buttons inline)
-├── DenseInboxRow.tsx          ← NEW: extracted dense-mode row component
+├── InboxTaskCard.tsx          ← UNCHANGED: still used by TodaySchedule + InboxSection
+├── DenseInboxRow.tsx          ← NEW: shared single-row component (used by InboxView AND StagingFloat)
 ├── FocusInboxCard.tsx         ← NEW: focus-mode large card with keyboard handler
-├── InboxModeToggle.tsx        ← NEW: header toggle between dense / focus
-└── InboxUndoToast.tsx         ← NEW: 5-second undo notification after triage
+├── InboxModeToggle.tsx        ← NEW: header toggle between dense / focus (Inbox only)
+├── InboxUndoToast.tsx         ← NEW: 5-second undo notification (used by both surfaces)
+├── StagingFloat.tsx           ← REWRITE: scope to weekTasks only, render DenseInboxRow with week quick-actions
+└── TodaySchedule.tsx          ← MINOR: split combined pill into two (Inbox + This Week), wire navigation
 
 src/components/triage/
-├── DeferPicker.tsx            ← KEEP but no longer used inside InboxTaskCard
+├── DeferPicker.tsx            ← UNCHANGED (still used elsewhere)
 └── (other pickers unchanged)
 ```
+
+**`InboxTaskCard.tsx` is NOT modified.** It is still used by `TodaySchedule.tsx` and `InboxSection.tsx`. Modifying it would break those views — out of scope for this redesign.
+
+### `DenseInboxRow` — the shared row component
+
+Used by both Inbox view and "This Week" popover. The component's props expose the row data + a configurable quick-action set:
+
+```tsx
+type QuickAction =
+  | { kind: 'today' }
+  | { kind: 'week' }
+  | { kind: 'month' }
+  | { kind: 'someday' }
+  | { kind: 'next-week' }   // bumps an item already in week-bucket out by 1 week
+  | { kind: 'delete' }
+
+interface DenseInboxRowProps {
+  task: Task
+  project?: Project
+  familyMembers: FamilyMember[]
+  quickActions: QuickAction[]              // surface-specific button set
+  onQuickAction: (action: QuickAction) => void
+  onToggleComplete: () => void
+  onUpdate: (updates: Partial<Task>) => void
+  onSelect: () => void                     // open detail panel
+  onOpenProject?: (projectId: string) => void
+  onAssign?: (memberIds: string[]) => void
+  isLeaving?: boolean                      // triggers 200ms fade-out CSS transition
+}
+```
+
+- **Inbox surface** passes `quickActions: [{kind:'today'}, {kind:'week'}, {kind:'month'}, {kind:'someday'}, {kind:'delete'}]`
+- **This Week popover** passes `quickActions: [{kind:'today'}, {kind:'next-week'}, {kind:'someday'}, {kind:'delete'}]`
+
+The component maps each action to a labeled button with consistent styling. The owning view handles the data update + animation + undo toast.
 
 **Animation primitives:** use `framer-motion`'s `AnimatePresence` + `motion.div` for the fade-out-and-collapse on triage. Already a dependency.
 
@@ -198,31 +300,38 @@ The redesign is a layout + interaction change, not a re-skin. The existing **Nor
 
 **Unit tests** (Vitest):
 
-- `DenseInboxRow.test.tsx` — renders row anatomy correctly; clicking each "when" button calls `onUpdate` with correct bucket/scheduledFor; clicking `×` calls `onDelete`; project chip absent renders "+" button.
-- `FocusInboxCard.test.tsx` — keyboard shortcuts trigger the right actions; auto-advance fires `onAdvance` callback; back button decrements index.
-- `InboxModeToggle.test.tsx` — toggling updates localStorage and switches the rendered mode.
-- `InboxUndoToast.test.tsx` — appears for 5s, undo reverts the bucket change, toast dismissible.
-- Update `InboxTaskCard.test.tsx` — adapt to the new row anatomy; remove DnD-related test cases.
+- `DenseInboxRow.test.tsx` — renders row anatomy; renders the supplied `quickActions` button set (inbox set vs. week set); clicking each button calls `onQuickAction` with the right kind; project chip absent renders "+" button; `isLeaving` applies the fade-out class.
+- `FocusInboxCard.test.tsx` — keyboard shortcuts trigger the right actions; auto-advance fires `onAdvance` callback; back button decrements index; Esc fires `onExit`.
+- `InboxModeToggle.test.tsx` — toggling updates localStorage and switches mode.
+- `InboxUndoToast.test.tsx` — appears for 5s, undo callback fires, toast dismissible by ×.
+- `StagingFloat.test.tsx` — popover renders only week-bucket tasks; clicking "Today" calls `onPullToToday`; clicking "Next Week" calls update with `weekDeferredAt`; clicking "Someday" sets `bucket: 'quarter'`; empty state renders.
+- `InboxTaskCard.test.tsx` — UNCHANGED (component is unchanged).
 
 **Integration tests** (Vitest):
 
 - `InboxView` renders correct mode based on localStorage preference.
-- Triaging an item in dense mode removes it from view with animation and increments the appropriate bucket section.
-- The "needs details" section, assignee filter, and domain filter still function unchanged.
+- Triaging an item in dense mode removes it from view with animation and shows undo toast.
+- Undoing reverts the bucket and re-inserts the row.
+- The "needs details" section, assignee filter, and domain filter still function.
+- `TodaySchedule` renders two separate pills (Inbox + This Week) with correct counts.
+- Clicking the Inbox pill navigates to inbox view (route change or `onSelectItem` analog).
 
 **E2E** (Playwright):
 
 - Dense mode: click "Week" on a row → row disappears, "Sent to Week · Undo" toast shows, count decrements.
 - Focus mode: press `1` → next card appears.
 - Mode toggle persists across reload.
+- This Week popover: open from Today page, click "Today" on an item → item disappears from popover and appears in today's schedule.
+- Inbox pill: click → routes to Inbox view.
 
 ---
 
 ## Migration / rollout
 
-- No data migration required. Bucket values (`'inbox' | 'timed' | 'week' | 'month' | 'quarter'`) are unchanged.
+- Bucket values (`'inbox' | 'timed' | 'week' | 'month' | 'quarter'`) are unchanged.
+- **New optional field on Task:** `weekDeferredAt?: Date` — only set when the user clicks "Next Week" in the This Week popover on an item already in the week bucket. Used for sort order (deferred items sink to the bottom of the popover). Nullable, no migration needed for existing tasks.
 - This is a single PR. Feature-flag not necessary — the new design is strictly better and there's no user base depending on the old UX.
-- Existing E2E tests that exercise drag-and-drop will be updated or replaced.
+- Existing E2E tests that exercise drag-and-drop or the combined StagingFloat will be updated or replaced.
 
 ---
 
