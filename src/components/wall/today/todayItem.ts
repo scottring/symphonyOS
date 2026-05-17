@@ -27,8 +27,14 @@ export function buildTodayItems(
   ownerFilter: string | null = null,
 ): TodayItem[] {
   const all: TodayItem[] = []
-  for (const section of ['allday', 'morning', 'afternoon', 'evening'] as DaySection[]) {
+  // Include 'unscheduled' so routines without a time_of_day (e.g. weekly
+  // "water the plants") still surface on the kiosk on the day they're due.
+  // Restrict the 'unscheduled' bucket to routines — bucketed tasks
+  // (week/month/quarter) also live in 'unscheduled' and would otherwise
+  // spam the kiosk.
+  for (const section of ['allday', 'morning', 'afternoon', 'evening', 'unscheduled'] as DaySection[]) {
     for (const item of sections[section] ?? []) {
+      if (section === 'unscheduled' && item.type !== 'routine') continue
       const owner = item.assignedTo ?? null
       if (ownerFilter && owner && owner !== ownerFilter) continue
       all.push({
