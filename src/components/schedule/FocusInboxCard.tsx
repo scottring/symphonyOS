@@ -106,7 +106,7 @@ export function FocusInboxCard({
           )}
           {project && (
             <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs">
-              {project.name}
+              📁 {project.name}
             </span>
           )}
         </div>
