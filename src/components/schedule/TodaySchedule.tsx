@@ -795,11 +795,18 @@ export function TodaySchedule({
     return map
   }, [dateInstances])
 
-  // Filter to only routines that should show on timeline (respects both per-routine and global toggle)
-  const visibleRoutines = useMemo(() =>
-    hideRoutines ? [] : routines.filter(r => r.show_on_timeline !== false),
-    [routines, hideRoutines]
-  )
+  // Filter to only routines that should show on timeline.
+  // - Per-routine `show_on_timeline` flag is always honored.
+  // - "Hide daily activities" toggle hides DAILY routines only; weekly/
+  //   monthly/etc. stay visible because they're rare-enough signal that
+  //   hiding them defeats the point of opening Today. Routines without
+  //   a recurrence_pattern default to visible (don't hide what we can't
+  //   classify).
+  const visibleRoutines = useMemo(() => {
+    const showable = routines.filter(r => r.show_on_timeline !== false)
+    if (!hideRoutines) return showable
+    return showable.filter(r => r.recurrence_pattern?.type !== 'daily')
+  }, [routines, hideRoutines])
 
   // Build instance status map for events
   const eventStatusMap = useMemo(() => {
@@ -1075,7 +1082,7 @@ export function TodaySchedule({
                   className={`relative flex items-center transition-all ${
                     hideRoutines ? 'text-neutral-300' : 'text-neutral-400'
                   }`}
-                  title={hideRoutines ? 'Show routines' : 'Hide routines'}
+                  title={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -1166,7 +1173,7 @@ export function TodaySchedule({
                       ? 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100'
                       : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100'
                   }`}
-                  title={hideRoutines ? 'Show routines' : 'Hide routines'}
+                  title={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
