@@ -73,13 +73,13 @@ export const DenseInboxRow = memo(function DenseInboxRow({
       data-row
       data-task-id={task.id}
       className={`
-        group flex items-center gap-2 bg-white rounded-xl border border-neutral-100
+        group flex items-start gap-2 bg-white rounded-xl border border-neutral-100
         px-3 py-2 shadow-sm transition-all duration-200
         ${isLeaving ? 'opacity-0 translate-x-2 max-h-0 py-0 my-0 overflow-hidden border-transparent' : 'hover:shadow-md'}
       `}
     >
       {/* Checkbox */}
-      <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+      <div className="shrink-0 mt-0.5" onClick={(e) => e.stopPropagation()}>
         <TaskCheckbox
           completed={task.completed}
           isWaiting={task.isWaiting}
@@ -90,7 +90,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
       </div>
 
       {/* Context dot button */}
-      <div className="relative shrink-0">
+      <div className="relative shrink-0 mt-1.5">
         <button
           type="button"
           aria-label="Context"
@@ -121,7 +121,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
       <button
         type="button"
         onClick={onSelect}
-        className={`flex-1 min-w-0 text-left text-sm leading-snug truncate ${
+        className={`flex-1 min-w-0 text-left text-sm leading-snug break-words py-0.5 ${
           task.completed
             ? 'text-neutral-400 line-through'
             : task.isWaiting
@@ -144,7 +144,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
 
       {/* Assignee avatar */}
       {familyMembers.length > 0 && onAssign && (
-        <div className="hidden md:block shrink-0" onClick={(e) => e.stopPropagation()}>
+        <div className="hidden md:block shrink-0 mt-0.5" onClick={(e) => e.stopPropagation()}>
           <MultiAssigneeDropdown
             members={familyMembers}
             selectedIds={task.assignedToAll ?? []}
@@ -155,7 +155,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
       )}
 
       {/* Quick action buttons */}
-      <div className="flex items-center gap-1 shrink-0">
+      <div className="flex items-center gap-1 shrink-0 mt-0.5">
         {quickActions.map((action) => {
           const label = ACTION_LABELS[action.kind]
           if (action.kind === 'delete') {
@@ -222,7 +222,7 @@ function ProjectControl({ project, projects, onOpenProject, onAssign, onClear }:
 
   if (project) {
     return (
-      <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs max-w-[140px] shrink-0">
+      <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs max-w-[220px] shrink-0 mt-0.5">
         {onOpenProject ? (
           <button type="button" onClick={() => onOpenProject(project.id)} className="truncate hover:underline">
             {project.name}
