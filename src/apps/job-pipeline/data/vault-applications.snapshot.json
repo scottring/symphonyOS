@@ -47,7 +47,7 @@
     ],
     "filename": "apply-assent-sustainability.md",
     "body": "\n# Apply for Assent — Sustainability role\n\nApplied late the week of 4/27 (per inbox capture 2026-05-04). Specific role title to be filled in from Scott's records (Senior PM Sustainability or similar).\n\nAssent is a regulatory-data company; Scott's pivot thesis on Stacks Data (compliance data router) directly aligns with where Assent operates. Cover letter built around the Compliance Data Router concept.\n\n## Steps\n\n- [x] Tailor resume → `[[resume-assent-product-sustainability-expert]]`\n- [x] Draft cover letter → `[[cover-letter-assent-senior-pm]]`\n- [x] Submit application\n- [ ] Follow up after 14 days if no response (by 2026-05-15)\n",
-    "isStalled": false,
+    "isStalled": true,
     "archived": false
   },
   {
@@ -72,6 +72,32 @@
     ],
     "filename": "apply-ben-jerrys-sustainability-metrics.md",
     "body": "\n# Apply for Ben & Jerry's — Sustainability Metrics Analyst\n\n12-month temp role via agency. $35–40/hr (annualized $72,800–$83,200 at 40 hrs/wk). South Burlington, VT. Recruiter contact: Hannah Fanton.\n\nComp is below the W2 target band but the role is mission-aligned and a foot in the door at a serious sustainability-led brand.\n\n## Steps\n\n- [x] Tailor resume → `[[resume-ben-jerrys]]`\n- [x] Draft cover letter → `[[cover-letter-ben-jerrys]]`\n- [x] Submit application via Hannah Fanton (agency)\n- [ ] Follow up if no response by mid-May\n",
+    "isStalled": false,
+    "archived": true
+  },
+  {
+    "slug": "constellation-environmental-project-engineer",
+    "type": "task",
+    "domain": "job-search",
+    "status": "looking-at",
+    "company": "Constellation",
+    "role": "Environmental Project Engineer",
+    "comp_low": 113400,
+    "comp_high": 126000,
+    "location": null,
+    "remote": null,
+    "applied": null,
+    "next_step": "Submit application",
+    "next_step_due": "2026-05-13",
+    "created": "2026-05-08",
+    "tags": [],
+    "linked": [
+      "[[resume-constellation-environmental-project-engineer]]",
+      "[[cover-letter-constellation-environmental-project-engineer]]",
+      "[[role-description-constellation-environmental-project-engineer]]"
+    ],
+    "filename": "apply-constellation-environmental-project-engineer.md",
+    "body": "\n# Apply for Constellation — Environmental Project Engineer\n\nEnvironmental Subject Matter Expert role on Constellation's Projects & Services team supporting new build and large capital projects across nuclear, gas, geothermal, hydro, wind, and solar facilities. Day-to-day is permitting, agency consultation, due diligence on M&A activity, and contractor management for the environmental scope of large infrastructure projects. Sits outside Scott's three named lanes — it's IC-level environmental engineering for clean-energy infrastructure, not a sustainability strategy or product role — but the underlying competencies (regulatory interpretation across multiple frameworks, multi-stakeholder project management, scientific literacy with EPC/OEM contractors and agency staff) map cleanly to Scott's PhD + Carbon Trust + Stacks Data history.\n\n## Steps\n\n- [ ] Tailor resume → `[[resume-constellation-environmental-project-engineer]]`\n- [ ] Draft cover letter → `[[cover-letter-constellation-environmental-project-engineer]]`\n- [ ] Submit application via Constellation's careers portal\n- [ ] Follow up after 14 days if no response\n",
     "isStalled": false,
     "archived": true
   },
@@ -102,7 +128,7 @@
     "filename": "apply-erm-senior-consultant-sustainability.md",
     "body": "\n# Apply for ERM — Senior Consultant, Sustainability & Climate Change\n\nMid-sized sustainability consulting Senior Consultant role with a corporate sustainability + climate strategy focus. Lane 1/2 hybrid: lane 1 framing for the corporate sustainability strategy work, lane 2 framing for the technical depth in carbon accounting and supply chain compliance. Per the 2026-05-05 morning capture, ERM is a target — they need the rare profile that combines technical + software sides of carbon/supply-chain compliance, which is exactly Scott's shape.\n\n## Steps\n\n- [ ] Tailor resume → `[[resume-erm-senior-consultant-sustainability]]`\n- [ ] Draft cover letter → `[[cover-letter-erm-senior-consultant-sustainability]]`\n- [ ] Submit application via ERM careers portal\n- [ ] Follow up after 14 days if no response\n",
     "isStalled": false,
-    "archived": false
+    "archived": true
   },
   {
     "slug": "ghg-protocol-ed",
@@ -211,6 +237,32 @@
     "filename": "apply-organic-valley-sustainability.md",
     "body": "\n# Apply for Organic Valley — Sustainability role\n\nOne interview completed before rejection (per `context/job-search.md`). Lane 1 fit (Director/Sustainability at a mission-aligned corporation).\n\n## Steps\n\n- [x] Submit application\n- [x] First-round interview\n- [x] Receive rejection\n",
     "isStalled": false,
+    "archived": false
+  },
+  {
+    "slug": "reworld-senior-manager-industry-research",
+    "type": "task",
+    "domain": "job-search",
+    "status": "applied",
+    "company": "Recycled Materials Association (ReMA)",
+    "role": "Senior Manager, Industry Research & Insights",
+    "comp_low": 120000,
+    "comp_high": 135000,
+    "location": "Washington, DC",
+    "remote": null,
+    "applied": "2026-05-08",
+    "next_step": "Submit application",
+    "next_step_due": "2026-05-13",
+    "created": "2026-05-08",
+    "tags": [],
+    "linked": [
+      "[[resume-rema-senior-manager-industry-research]]",
+      "[[cover-letter-rema-senior-manager-industry-research]]",
+      "[[role-description-rema-senior-manager-industry-research]]"
+    ],
+    "filename": "apply-reworld-senior-manager-industry-research.md",
+    "body": "\n# Apply for ReMA — Senior Manager, Industry Research & Insights\n\nApplied industry research role at the trade association for the recycled materials industry, reporting to the Chief Economist. Leads sector coverage (focus on non-metals), runs multi-month research projects, builds data products and member-facing reports, and presents findings at industry events. Outside Scott's three named lanes — closer to \"applied research / trade association economist\" — but the topical match is unusually strong: PhD dissertation on LCA of municipal solid waste, peer-reviewed publications on US recycling/waste characterization, and 13 years running applied research with Fortune 500 manufacturers via Stacks Data and the Carbon Trust. Comp ($120–135K) is well above target.\n\n## Steps\n\n- [ ] Tailor resume → `[[resume-rema-senior-manager-industry-research]]`\n- [ ] Draft cover letter → `[[cover-letter-rema-senior-manager-industry-research]]`\n- [ ] Submit application via ReMA careers portal\n- [ ] Follow up after 14 days if no response\n",
+    "isStalled": true,
     "archived": false
   },
   {
