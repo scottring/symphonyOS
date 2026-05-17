@@ -10,11 +10,31 @@ function formatDateString(date: Date): string {
   return `${year}-${month}-${day}`
 }
 
+function startOfDay(date: Date): Date {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+/**
+ * Map of routineId → most recent completion date. Used by 'since_last'
+ * recurrence to compute the next due date.
+ */
+export type LastCompletionMap = Map<string, Date>
+
 /**
  * Check if a routine's recurrence pattern matches a given date.
  * Pure function — no React dependencies.
+ *
+ * @param lastCompletedAt only required for 'since_last' routines. Pass the
+ *        most recent completion timestamp; null/undefined means "never done"
+ *        which surfaces the routine immediately.
  */
-export function matchesRecurrenceForDate(routine: Routine, date: Date): boolean {
+export function matchesRecurrenceForDate(
+  routine: Routine,
+  date: Date,
+  lastCompletedAt?: Date | null,
+): boolean {
   const dayOfWeek = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][date.getDay()]
   const dayOfMonth = date.getDate()
   const month = date.getMonth() + 1 // 1-12
@@ -57,6 +77,20 @@ export function matchesRecurrenceForDate(routine: Routine, date: Date): boolean 
     }
     case 'specific_days':
       return pattern.dates?.includes(dateStr) ?? false
+    case 'since_last': {
+      // Surface once N units have passed since the last completion (or
+      // immediately if never completed). Stays surfaced every day until
+      // the next completion resets the timer — the user requested
+      // "show until you check it off."
+      if (!lastCompletedAt) return true
+      const interval = pattern.interval ?? 1
+      const unit = pattern.unit ?? 'weeks'
+      const due = new Date(lastCompletedAt)
+      if (unit === 'days') due.setDate(due.getDate() + interval)
+      else if (unit === 'weeks') due.setDate(due.getDate() + interval * 7)
+      else if (unit === 'months') due.setMonth(due.getMonth() + interval)
+      return startOfDay(date).getTime() >= startOfDay(due).getTime()
+    }
     default:
       return false
   }
@@ -64,7 +98,16 @@ export function matchesRecurrenceForDate(routine: Routine, date: Date): boolean 
 
 /**
  * Filter routines that match a given date.
+ *
+ * @param lastCompletionByRoutine optional map for 'since_last' lookups; if
+ *        omitted, since_last routines are treated as never-completed (always due).
  */
-export function getRoutinesForDatePure(routines: Routine[], date: Date): Routine[] {
-  return routines.filter(r => matchesRecurrenceForDate(r, date))
+export function getRoutinesForDatePure(
+  routines: Routine[],
+  date: Date,
+  lastCompletionByRoutine?: LastCompletionMap,
+): Routine[] {
+  return routines.filter(r =>
+    matchesRecurrenceForDate(r, date, lastCompletionByRoutine?.get(r.id) ?? null),
+  )
 }

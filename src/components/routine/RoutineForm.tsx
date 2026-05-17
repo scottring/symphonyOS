@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Routine, RecurrencePattern } from '@/types/actionable'
+import type { Routine, RecurrencePattern, RecurrenceUnit } from '@/types/actionable'
 import type { UpdateRoutineInput } from '@/hooks/useRoutines'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
@@ -50,6 +50,13 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
   const [dayOfMonth, setDayOfMonth] = useState<number>(routine.recurrence_pattern.day_of_month || 1)
   const [weeklyInterval, setWeeklyInterval] = useState<number>(routine.recurrence_pattern.interval || 1)
   const [startDate, setStartDate] = useState<string>(routine.recurrence_pattern.start_date || '')
+  // since_last: surface N units after each completion
+  const [sinceLastInterval, setSinceLastInterval] = useState<number>(
+    routine.recurrence_pattern.type === 'since_last' ? (routine.recurrence_pattern.interval || 1) : 1,
+  )
+  const [sinceLastUnit, setSinceLastUnit] = useState<RecurrenceUnit>(
+    routine.recurrence_pattern.type === 'since_last' ? (routine.recurrence_pattern.unit || 'weeks') : 'weeks',
+  )
   const [timeOfDay, setTimeOfDay] = useState(routine.time_of_day || '')
 
   const [isSaving, setIsSaving] = useState(false)
@@ -84,6 +91,12 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
     if (recurrenceType === 'monthly') {
       if (dayOfMonth !== (routine.recurrence_pattern.day_of_month || 1)) return true
     }
+    if (recurrenceType === 'since_last') {
+      const originalInterval = routine.recurrence_pattern.type === 'since_last' ? (routine.recurrence_pattern.interval || 1) : 1
+      const originalUnit = routine.recurrence_pattern.type === 'since_last' ? (routine.recurrence_pattern.unit || 'weeks') : 'weeks'
+      if (sinceLastInterval !== originalInterval) return true
+      if (sinceLastUnit !== originalUnit) return true
+    }
     return false
   }
 
@@ -116,6 +129,10 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
       }
       if (recurrenceType === 'monthly') {
         recurrence_pattern.day_of_month = dayOfMonth
+      }
+      if (recurrenceType === 'since_last') {
+        recurrence_pattern.interval = sinceLastInterval
+        recurrence_pattern.unit = sinceLastUnit
       }
 
       await onUpdate(routine.id, {
@@ -269,6 +286,7 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
                     { value: 'weekly', label: 'Weekly' },
                     { value: 'monthly', label: 'Monthly' },
                     { value: 'quarterly', label: 'Quarterly' },
+                    { value: 'since_last', label: 'After completion' },
                   ] as const).map(({ value, label }) => (
                     <button
                       key={value}
@@ -341,6 +359,42 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
                       </p>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Interval + unit for since_last */}
+              {recurrenceType === 'since_last' && (
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">
+                    Repeat after each completion
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-neutral-600">Every</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={sinceLastInterval}
+                      onChange={(e) => setSinceLastInterval(Math.max(1, Number(e.target.value) || 1))}
+                      className="w-20 px-3 py-2 rounded-lg border border-neutral-200 bg-white text-neutral-800 text-center
+                                 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    />
+                    <select
+                      value={sinceLastUnit}
+                      onChange={(e) => setSinceLastUnit(e.target.value as RecurrenceUnit)}
+                      className="px-3 py-2 rounded-lg border border-neutral-200 bg-white text-neutral-800
+                                 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    >
+                      <option value="days">{sinceLastInterval === 1 ? 'day' : 'days'}</option>
+                      <option value="weeks">{sinceLastInterval === 1 ? 'week' : 'weeks'}</option>
+                      <option value="months">{sinceLastInterval === 1 ? 'month' : 'months'}</option>
+                    </select>
+                    <span className="text-sm text-neutral-500">after I check it off</span>
+                  </div>
+                  <p className="text-xs text-neutral-500 mt-2">
+                    Example: a haircut every 6 weeks shows up 6 weeks after the last one,
+                    stays in Today until checked, then resets the timer.
+                  </p>
                 </div>
               )}
 

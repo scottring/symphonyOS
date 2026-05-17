@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Routine, RecurrencePattern, RoutineVisibility, PrepFollowupTemplate } from '@/types/actionable'
-import { matchesRecurrenceForDate } from '@/lib/routineUtils'
+import { matchesRecurrenceForDate, type LastCompletionMap } from '@/lib/routineUtils'
 
 export interface CreateRoutineInput {
   name: string
@@ -40,6 +40,37 @@ export function useRoutines() {
   const [routines, setRoutines] = useState<Routine[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [lastCompletionByRoutine, setLastCompletionByRoutine] = useState<LastCompletionMap>(() => new Map())
+
+  // Fetch the most recent completion date for each routine. Only required
+  // for 'since_last' routines (the only type whose due-state depends on
+  // last completion), but the query is cheap so we fetch unconditionally.
+  const fetchLastCompletions = useCallback(async () => {
+    try {
+      // Pull every completed routine instance and reduce to a map of
+      // routineId → most recent date. PostgREST doesn't expose GROUP BY,
+      // so we sort desc by date and take the first occurrence per routine.
+      const { data, error: fetchError } = await supabase
+        .from('actionable_instances')
+        .select('entity_id, date, updated_at')
+        .eq('entity_type', 'routine')
+        .eq('status', 'completed')
+        .order('date', { ascending: false })
+
+      if (fetchError) throw fetchError
+
+      const map: LastCompletionMap = new Map()
+      for (const row of (data || []) as Array<{ entity_id: string; date: string; updated_at: string }>) {
+        if (map.has(row.entity_id)) continue // already have a later date
+        const d = new Date(row.date)
+        if (!isNaN(d.getTime())) map.set(row.entity_id, d)
+      }
+      setLastCompletionByRoutine(map)
+    } catch (err) {
+      console.error('fetchLastCompletions error:', err)
+      // Non-fatal: since_last routines just fall back to "always due"
+    }
+  }, [])
 
   // Fetch all routines for the user
   const fetchRoutines = useCallback(async () => {
@@ -94,7 +125,8 @@ export function useRoutines() {
   // Initial fetch
   useEffect(() => {
     fetchRoutines()
-  }, [fetchRoutines])
+    fetchLastCompletions()
+  }, [fetchRoutines, fetchLastCompletions])
 
   // Create a new routine
   const addRoutine = useCallback(async (input: CreateRoutineInput): Promise<Routine | null> => {
@@ -221,8 +253,10 @@ export function useRoutines() {
 
   // Get routines scheduled for a specific date
   const getRoutinesForDate = useCallback((date: Date): Routine[] => {
-    return activeRoutines.filter(routine => matchesRecurrenceForDate(routine, date))
-  }, [activeRoutines])
+    return activeRoutines.filter(routine =>
+      matchesRecurrenceForDate(routine, date, lastCompletionByRoutine.get(routine.id) ?? null),
+    )
+  }, [activeRoutines, lastCompletionByRoutine])
 
   return {
     routines,
@@ -235,6 +269,8 @@ export function useRoutines() {
     deleteRoutine,
     toggleVisibility,
     getRoutinesForDate,
+    lastCompletionByRoutine,
+    refetchLastCompletions: fetchLastCompletions,
     refetch: fetchRoutines,
   }
 }

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import { useAuth } from '@/hooks/useAuth'
-import { getRoutinesForDatePure } from '@/lib/routineUtils'
+import { getRoutinesForDatePure, type LastCompletionMap } from '@/lib/routineUtils'
 import {
   taskToTimelineItem,
   eventToTimelineItem,
@@ -116,6 +116,7 @@ export function useWallData(): UseWallDataReturn {
         stAdjustmentsRes,
         overdueRes,
         inboxCountRes,
+        routineCompletionsRes,
       ] = await Promise.all([
         // 1. Family members
         supabase.from('family_members').select('*').order('display_order'),
@@ -181,6 +182,16 @@ export function useWallData(): UseWallDataReturn {
           .eq('completed', false)
           .or('is_someday.is.null,is_someday.eq.false')
           .eq('context', 'family'),
+
+        // 13. Most-recent completion per routine (no date filter — needed
+        // for 'since_last' recurrence which depends on history beyond the
+        // 7-day wall window).
+        supabase
+          .from('actionable_instances')
+          .select('entity_id, date')
+          .eq('entity_type', 'routine')
+          .eq('status', 'completed')
+          .order('date', { ascending: false }),
       ])
 
       if (!mountedRef.current) return
@@ -231,6 +242,15 @@ export function useWallData(): UseWallDataReturn {
         instanceMap.set(`${inst.entity_id}:${inst.date}`, inst)
       }
 
+      // Build last-completion map for 'since_last' recurrence. Rows are sorted
+      // desc by date in the query, so first-seen-wins gives the most recent.
+      const lastCompletionByRoutine: LastCompletionMap = new Map()
+      for (const row of (routineCompletionsRes.data || []) as Array<{ entity_id: string; date: string }>) {
+        if (lastCompletionByRoutine.has(row.entity_id)) continue
+        const d = new Date(row.date)
+        if (!isNaN(d.getTime())) lastCompletionByRoutine.set(row.entity_id, d)
+      }
+
       // Build per-day data
       const wallDays: WallDayData[] = dates.map(date => {
         const dateStr = toDateString(date)
@@ -246,7 +266,7 @@ export function useWallData(): UseWallDataReturn {
         // morning/bedtime context views even when show_on_timeline=false (which
         // is set to keep the today view in the app uncluttered), so don't
         // filter them out here.
-        const dayRoutines = getRoutinesForDatePure(routines, date)
+        const dayRoutines = getRoutinesForDatePure(routines, date, lastCompletionByRoutine)
 
         // Filter events for this day
         const dayEvents = events.filter(event => {

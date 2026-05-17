@@ -1,0 +1,104 @@
+import { describe, it, expect } from 'vitest'
+import type { Routine, RecurrencePattern } from '@/types/actionable'
+import { matchesRecurrenceForDate, getRoutinesForDatePure } from './routineUtils'
+
+function makeRoutine(pattern: RecurrencePattern, overrides: Partial<Routine> = {}): Routine {
+  return {
+    id: 'r1',
+    user_id: 'u1',
+    name: 'Test',
+    description: null,
+    default_assignee: null,
+    assigned_to: null,
+    assigned_to_all: null,
+    visibility: 'active',
+    paused_until: null,
+    recurrence_pattern: pattern,
+    time_of_day: null,
+    raw_input: null,
+    show_on_timeline: true,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+    ...overrides,
+  }
+}
+
+describe('matchesRecurrenceForDate — since_last', () => {
+  const today = new Date(2026, 4, 17) // 2026-05-17 local
+
+  it('surfaces immediately when never completed', () => {
+    const routine = makeRoutine({ type: 'since_last', interval: 6, unit: 'weeks' })
+    expect(matchesRecurrenceForDate(routine, today, null)).toBe(true)
+  })
+
+  it('hides while still within the interval (weeks)', () => {
+    const routine = makeRoutine({ type: 'since_last', interval: 6, unit: 'weeks' })
+    const lastCompleted = new Date(2026, 4, 10) // 7 days ago
+    expect(matchesRecurrenceForDate(routine, today, lastCompleted)).toBe(false)
+  })
+
+  it('surfaces once the interval has elapsed (weeks)', () => {
+    const routine = makeRoutine({ type: 'since_last', interval: 6, unit: 'weeks' })
+    const lastCompleted = new Date(2026, 2, 1) // ~11 weeks ago
+    expect(matchesRecurrenceForDate(routine, today, lastCompleted)).toBe(true)
+  })
+
+  it('surfaces exactly on the due date boundary', () => {
+    const routine = makeRoutine({ type: 'since_last', interval: 7, unit: 'days' })
+    const lastCompleted = new Date(2026, 4, 10) // exactly 7 days ago
+    expect(matchesRecurrenceForDate(routine, today, lastCompleted)).toBe(true)
+  })
+
+  it('keeps surfacing every day after the due date (until completed)', () => {
+    const routine = makeRoutine({ type: 'since_last', interval: 6, unit: 'weeks' })
+    const lastCompleted = new Date(2025, 11, 1) // way over 6 weeks
+    // matches today
+    expect(matchesRecurrenceForDate(routine, today, lastCompleted)).toBe(true)
+    // and tomorrow
+    const tomorrow = new Date(2026, 4, 18)
+    expect(matchesRecurrenceForDate(routine, tomorrow, lastCompleted)).toBe(true)
+  })
+
+  it('handles months unit via calendar math (not naive 30-day)', () => {
+    const routine = makeRoutine({ type: 'since_last', interval: 6, unit: 'months' })
+    // Completed on 2025-11-17, due date = 2026-05-17 (calendar +6 months)
+    const lastCompleted = new Date(2025, 10, 17)
+    expect(matchesRecurrenceForDate(routine, today, lastCompleted)).toBe(true)
+    // One day before the calendar boundary → still hidden
+    const dayBefore = new Date(2026, 4, 16)
+    expect(matchesRecurrenceForDate(routine, dayBefore, lastCompleted)).toBe(false)
+  })
+
+  it('defaults to interval=1, unit=weeks when fields missing', () => {
+    const routine = makeRoutine({ type: 'since_last' })
+    const lastCompleted = new Date(2026, 4, 9) // 8 days ago
+    expect(matchesRecurrenceForDate(routine, today, lastCompleted)).toBe(true)
+    const lastWeek = new Date(2026, 4, 13) // 4 days ago → still hidden
+    expect(matchesRecurrenceForDate(routine, today, lastWeek)).toBe(false)
+  })
+})
+
+describe('getRoutinesForDatePure with since_last', () => {
+  it('uses the completion map per routine', () => {
+    const haircut = makeRoutine({ type: 'since_last', interval: 6, unit: 'weeks' }, { id: 'haircut' })
+    const plants = makeRoutine({ type: 'since_last', interval: 1, unit: 'weeks' }, { id: 'plants' })
+    const daily = makeRoutine({ type: 'daily' }, { id: 'brush' })
+    const today = new Date(2026, 4, 17)
+
+    const completions = new Map<string, Date>([
+      ['haircut', new Date(2026, 4, 10)], // 1 week ago — still hidden
+      ['plants', new Date(2026, 4, 8)], // 9 days ago — surfaces
+    ])
+
+    const result = getRoutinesForDatePure([haircut, plants, daily], today, completions)
+    const ids = result.map(r => r.id).sort()
+    expect(ids).toEqual(['brush', 'plants'])
+  })
+
+  it('falls back to "always due" when no completion map supplied', () => {
+    const haircut = makeRoutine({ type: 'since_last', interval: 6, unit: 'weeks' }, { id: 'haircut' })
+    const today = new Date(2026, 4, 17)
+    const result = getRoutinesForDatePure([haircut], today)
+    expect(result.map(r => r.id)).toEqual(['haircut'])
+  })
+})

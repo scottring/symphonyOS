@@ -6,7 +6,9 @@ export type CoverageStatus = 'pending' | 'accepted' | 'declined'
 export type RoutineVisibility = 'active' | 'reference'
 
 // Recurrence pattern types
-export type RecurrenceType = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'specific_days'
+export type RecurrenceType = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'specific_days' | 'since_last'
+
+export type RecurrenceUnit = 'days' | 'weeks' | 'months'
 
 export interface RecurrencePattern {
   type: RecurrenceType
@@ -14,7 +16,8 @@ export interface RecurrencePattern {
   day_of_month?: number // For monthly: 1-31
   month_of_year?: number // For yearly: 1-12
   dates?: string[] // For specific_days: ['2025-01-01', '2025-07-04']
-  interval?: number // Every N days/weeks/months (e.g., 2 = every other)
+  interval?: number // Every N days/weeks/months (e.g., 2 = every other; for since_last: N units after completion)
+  unit?: RecurrenceUnit // For since_last: the unit of `interval` (days/weeks/months)
   start_date?: string // Reference date for interval calculations (YYYY-MM-DD)
 }
 
