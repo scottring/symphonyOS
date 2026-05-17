@@ -33,4 +33,10 @@ describe('InboxUndoToast', () => {
     fireEvent.click(screen.getByRole('button', { name: /dismiss/i }))
     expect(onDismiss).toHaveBeenCalledTimes(1)
   })
+
+  it('does not render Undo button when onUndo is undefined', () => {
+    render(<InboxUndoToast message="Deleted" onDismiss={() => {}} />)
+    expect(screen.queryByRole('button', { name: /undo/i })).not.toBeInTheDocument()
+    expect(screen.getByText('Deleted')).toBeInTheDocument()
+  })
 })

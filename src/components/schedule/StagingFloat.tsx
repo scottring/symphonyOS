@@ -29,6 +29,7 @@ type UndoEntry = {
   taskId: string
   message: string
   previous: Partial<Task>
+  undoable: boolean
 }
 
 export function StagingFloat({
@@ -99,7 +100,7 @@ export function StagingFloat({
         message = 'Deleted'
       }
       setLeavingIds((s) => { const n = new Set(s); n.delete(task.id); return n })
-      setUndo({ taskId: task.id, message, previous })
+      setUndo({ taskId: task.id, message, previous, undoable: action.kind !== 'delete' })
     }, 220)
   }, [onPullToToday, onDeferTask, onDeleteTask, onUpdateTask])
 
@@ -173,7 +174,7 @@ export function StagingFloat({
       {undo && (
         <InboxUndoToast
           message={undo.message}
-          onUndo={handleUndo}
+          onUndo={undo.undoable ? handleUndo : undefined}
           onDismiss={() => setUndo(null)}
         />
       )}

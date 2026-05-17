@@ -3,7 +3,7 @@ import { X } from 'lucide-react'
 
 interface InboxUndoToastProps {
   message: string
-  onUndo: () => void
+  onUndo?: () => void
   onDismiss: () => void
   durationMs?: number
 }
@@ -20,13 +20,15 @@ export function InboxUndoToast({ message, onUndo, onDismiss, durationMs = 5000 }
       className="fixed bottom-6 left-6 z-50 flex items-center gap-3 bg-neutral-800 text-white text-sm rounded-xl px-4 py-2.5 shadow-lg animate-fade-in"
     >
       <span>{message}</span>
-      <button
-        type="button"
-        onClick={onUndo}
-        className="px-2 py-0.5 rounded-md text-primary-200 hover:text-white hover:bg-white/10 transition-colors font-medium"
-      >
-        Undo
-      </button>
+      {onUndo && (
+        <button
+          type="button"
+          onClick={onUndo}
+          className="px-2 py-0.5 rounded-md text-primary-200 hover:text-white hover:bg-white/10 transition-colors font-medium"
+        >
+          Undo
+        </button>
+      )}
       <button
         type="button"
         aria-label="Dismiss"

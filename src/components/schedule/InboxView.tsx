@@ -26,6 +26,7 @@ type UndoEntry = {
   taskId: string
   message: string
   previous: Partial<Task>
+  undoable: boolean
 }
 
 interface InboxViewProps {
@@ -137,7 +138,7 @@ export function InboxView({
       }
 
       setLeavingIds((s) => { const next = new Set(s); next.delete(task.id); return next })
-      setUndo({ taskId: task.id, message, previous })
+      setUndo({ taskId: task.id, message, previous, undoable: action.kind !== 'delete' })
     }, 220)
   }, [onPushTask, onDeleteTask])
 
@@ -257,7 +258,7 @@ export function InboxView({
       {undo && (
         <InboxUndoToast
           message={undo.message}
-          onUndo={handleUndo}
+          onUndo={undo.undoable ? handleUndo : undefined}
           onDismiss={() => setUndo(null)}
         />
       )}
