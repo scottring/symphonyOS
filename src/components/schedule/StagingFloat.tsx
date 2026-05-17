@@ -155,6 +155,7 @@ export function StagingFloat({
                     key={task.id}
                     task={task}
                     project={project}
+                    projects={projects}
                     familyMembers={familyMembers}
                     quickActions={WEEK_ACTIONS}
                     isLeaving={leavingIds.has(task.id)}

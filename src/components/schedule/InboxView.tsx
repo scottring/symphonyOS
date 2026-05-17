@@ -171,6 +171,7 @@ export function InboxView({
         key={task.id}
         task={task}
         project={project}
+        projects={projects}
         familyMembers={familyMembers}
         quickActions={INBOX_ACTIONS}
         isLeaving={leavingIds.has(task.id)}

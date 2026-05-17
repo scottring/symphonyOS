@@ -1,5 +1,5 @@
-import { memo, useState, useCallback } from 'react'
-import { X, Trash2 } from 'lucide-react'
+import { memo, useState, useCallback, useEffect, useRef } from 'react'
+import { X, Trash2, FolderPlus } from 'lucide-react'
 import type { Task, TaskContext } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
@@ -27,6 +27,7 @@ const ACTION_LABELS: Record<QuickAction['kind'], string> = {
 interface DenseInboxRowProps {
   task: Task
   project?: Project
+  projects?: Project[]
   familyMembers: FamilyMember[]
   quickActions: QuickAction[]
   onQuickAction: (action: QuickAction) => void
@@ -48,6 +49,7 @@ const CONTEXT_OPTIONS: Array<{ value: TaskContext | null; label: string }> = [
 export const DenseInboxRow = memo(function DenseInboxRow({
   task,
   project,
+  projects,
   familyMembers,
   quickActions,
   onQuickAction,
@@ -130,26 +132,15 @@ export const DenseInboxRow = memo(function DenseInboxRow({
         {task.title}
       </button>
 
-      {/* Project chip */}
-      {project && (
-        <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs max-w-[140px] shrink-0">
-          {onOpenProject ? (
-            <button type="button" onClick={() => onOpenProject(project.id)} className="truncate hover:underline">
-              {project.name}
-            </button>
-          ) : (
-            <span className="truncate">{project.name}</span>
-          )}
-          <button
-            type="button"
-            aria-label="Remove project"
-            onClick={() => onUpdate({ projectId: undefined })}
-            className="ml-0.5 hover:text-blue-900 shrink-0"
-          >
-            <X className="w-3 h-3" />
-          </button>
-        </span>
-      )}
+      {/* Project chip (assigned) or picker (unassigned) */}
+      <ProjectControl
+        project={project}
+        projects={projects}
+        onOpenProject={onOpenProject}
+        onAssign={(projectId) => onUpdate({ projectId })}
+        onClear={() => onUpdate({ projectId: undefined })}
+      />
+
 
       {/* Assignee avatar */}
       {familyMembers.length > 0 && onAssign && (
@@ -202,3 +193,83 @@ export const DenseInboxRow = memo(function DenseInboxRow({
     </div>
   )
 })
+
+interface ProjectControlProps {
+  project?: Project
+  projects?: Project[]
+  onOpenProject?: (projectId: string) => void
+  onAssign: (projectId: string) => void
+  onClear: () => void
+}
+
+function ProjectControl({ project, projects, onOpenProject, onAssign, onClear }: ProjectControlProps) {
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function handleClickOutside(e: MouseEvent) {
+      if (!containerRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    function handleEsc(e: KeyboardEvent) { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEsc)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEsc)
+    }
+  }, [open])
+
+  if (project) {
+    return (
+      <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs max-w-[140px] shrink-0">
+        {onOpenProject ? (
+          <button type="button" onClick={() => onOpenProject(project.id)} className="truncate hover:underline">
+            {project.name}
+          </button>
+        ) : (
+          <span className="truncate">{project.name}</span>
+        )}
+        <button
+          type="button"
+          aria-label="Remove project"
+          onClick={onClear}
+          className="ml-0.5 hover:text-blue-900 shrink-0"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      </span>
+    )
+  }
+
+  if (!projects || projects.length === 0) return null
+
+  return (
+    <div ref={containerRef} className="relative hidden md:block shrink-0">
+      <button
+        type="button"
+        aria-label="Assign project"
+        onClick={() => setOpen((v) => !v)}
+        className="opacity-0 group-hover:opacity-100 aria-expanded:opacity-100 transition-opacity p-1 rounded-md text-neutral-400 hover:text-blue-600 hover:bg-blue-50"
+        aria-expanded={open}
+        title="Assign project"
+      >
+        <FolderPlus className="w-3.5 h-3.5" />
+      </button>
+      {open && (
+        <div className="absolute z-30 top-full right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg py-1 min-w-[180px] max-h-64 overflow-y-auto">
+          {projects.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              className="block w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 hover:text-blue-700 truncate"
+              onClick={() => { onAssign(p.id); setOpen(false) }}
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
