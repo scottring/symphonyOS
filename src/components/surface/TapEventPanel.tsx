@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Task } from '@/types/task'
 import { PanelHeader } from './sections/PanelHeader'
@@ -8,6 +9,7 @@ import { PanelMightBeRelevant } from './sections/PanelMightBeRelevant'
 import { PanelFooter } from './sections/PanelFooter'
 import { useEntityRelations } from './hooks/useEntityRelations'
 import type { MightBeRelevantItem } from './types'
+import { DirectionsBuilder } from '@/components/directions'
 
 interface TapEventPanelProps {
   event: CalendarEvent
@@ -44,6 +46,7 @@ function formatTime(iso?: string): string {
 
 export function TapEventPanel(props: TapEventPanelProps) {
   const { event, allTasks } = props
+  const [showDirections, setShowDirections] = useState(false)
 
   const relations = useEntityRelations({
     kind: 'event',
@@ -67,14 +70,13 @@ export function TapEventPanel(props: TapEventPanelProps) {
       />
       <div className="flex flex-wrap gap-2 pb-4 mb-4 border-b border-neutral-200">
         {event.location && (
-          <a
-            href={`https://maps.apple.com/?q=${encodeURIComponent(event.location)}`}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            onClick={() => setShowDirections((v) => !v)}
+            aria-expanded={showDirections}
             className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
           >
-            📍 Directions
-          </a>
+            📍 Directions {showDirections ? '▾' : '▸'}
+          </button>
         )}
         <button
           onClick={props.onMore}
@@ -84,6 +86,18 @@ export function TapEventPanel(props: TapEventPanelProps) {
           ···
         </button>
       </div>
+
+      {event.location && showDirections && (
+        <div className="mb-4 -mx-1 bg-white rounded-2xl border border-neutral-100 overflow-hidden">
+          <DirectionsBuilder
+            destination={{
+              name: event.title,
+              address: event.location,
+            }}
+            eventTitle={event.title}
+          />
+        </div>
+      )}
 
       <PanelWhy
         notes={props.notes}
