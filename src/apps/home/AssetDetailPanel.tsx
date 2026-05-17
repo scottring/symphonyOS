@@ -36,7 +36,16 @@ export function AssetDetailPanel({ asset, spaces, onClose, onUpdate, onDelete, o
           onCommit={(v) => onUpdate({ name: v })}
           className="font-display text-2xl"
         />
-        <button onClick={onClose} aria-label="Close" className="text-neutral-500 text-xl">✕</button>
+        <div className="flex items-center gap-3">
+          {asset.needsDetails && (
+            <button
+              type="button"
+              onClick={() => onUpdate({ needsDetails: false })}
+              className="text-sm text-primary-700 hover:underline"
+            >Mark as done</button>
+          )}
+          <button onClick={onClose} aria-label="Close" className="text-neutral-500 text-xl">✕</button>
+        </div>
       </div>
 
       <div className="mb-3">
