@@ -27,27 +27,27 @@ describe('DeferPicker', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Defer item' }))
 
-      expect(screen.getByText('Next Week')).toBeInTheDocument()
-      expect(screen.getByText('Next Month')).toBeInTheDocument()
+      expect(screen.getByText('This Week')).toBeInTheDocument()
+      expect(screen.getByText('This Month')).toBeInTheDocument()
       expect(screen.getByText('This Quarter')).toBeInTheDocument()
     })
   })
 
   describe('defer options', () => {
-    it('calls onDefer with "week" when Next Week is clicked', () => {
+    it('calls onDefer with "week" when This Week is clicked', () => {
       render(<DeferPicker {...defaultProps} />)
 
       fireEvent.click(screen.getByRole('button', { name: 'Defer item' }))
-      fireEvent.click(screen.getByText('Next Week'))
+      fireEvent.click(screen.getByText('This Week'))
 
       expect(mockOnDefer).toHaveBeenCalledWith('week')
     })
 
-    it('calls onDefer with "month" when Next Month is clicked', () => {
+    it('calls onDefer with "month" when This Month is clicked', () => {
       render(<DeferPicker {...defaultProps} />)
 
       fireEvent.click(screen.getByRole('button', { name: 'Defer item' }))
-      fireEvent.click(screen.getByText('Next Month'))
+      fireEvent.click(screen.getByText('This Month'))
 
       expect(mockOnDefer).toHaveBeenCalledWith('month')
     })
@@ -63,13 +63,13 @@ describe('DeferPicker', () => {
   })
 
   describe('closing behavior', () => {
-    it('closes dropdown after selecting Next Week', () => {
+    it('closes dropdown after selecting This Week', () => {
       render(<DeferPicker {...defaultProps} />)
 
       fireEvent.click(screen.getByRole('button', { name: 'Defer item' }))
-      fireEvent.click(screen.getByText('Next Week'))
+      fireEvent.click(screen.getByText('This Week'))
 
-      expect(screen.queryByText('Next Month')).not.toBeInTheDocument()
+      expect(screen.queryByText('This Month')).not.toBeInTheDocument()
     })
   })
 })
