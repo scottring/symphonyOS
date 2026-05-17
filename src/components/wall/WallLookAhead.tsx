@@ -9,6 +9,7 @@ interface WallLookAheadProps {
   familyMembers: FamilyMember[]
   onItemTap?: (item: TimelineItem) => void
   className?: string
+  compressed?: boolean
 }
 
 interface HighlightItem {
@@ -88,8 +89,34 @@ function getDayHighlights(days: WallDayData[], _familyMembers: FamilyMember[]): 
   return highlights
 }
 
-export function WallLookAhead({ days, familyMembers, onItemTap, className = '' }: WallLookAheadProps) {
+export function WallLookAhead({ days, familyMembers, onItemTap, className = '', compressed }: WallLookAheadProps) {
   const highlights = getDayHighlights(days, familyMembers)
+
+  if (compressed) {
+    return (
+      <ul className={`space-y-2 ${className ?? ''}`}>
+        {highlights.map((day) => (
+          <li key={day.dayLabel} className="flex items-baseline gap-2 text-sm">
+            <span className="text-[10px] uppercase tracking-widest text-white/40 w-16 shrink-0">
+              {day.dayLabel}
+            </span>
+            <span className="text-white/70 truncate">
+              {day.items.length === 0 ? (
+                <span className="text-white/30">—</span>
+              ) : (
+                day.items.slice(0, 3).map((it, i) => (
+                  <span key={i}>
+                    {i > 0 && ', '}
+                    {it.time ? `${it.time} ` : ''}{it.title.toLowerCase()}
+                  </span>
+                ))
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
+    )
+  }
 
   return (
     <div className={`flex flex-col ${className}`}>
