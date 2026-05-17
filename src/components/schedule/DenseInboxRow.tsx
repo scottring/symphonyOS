@@ -242,7 +242,11 @@ function ProjectControl({ project, projects, onOpenProject, onAssign, onClear }:
     )
   }
 
-  if (!projects || projects.length === 0) return null
+  const activeProjects = (projects ?? []).filter(
+    (p) => p.status !== 'completed' && p.status !== 'on_hold',
+  )
+
+  if (activeProjects.length === 0) return null
 
   return (
     <div ref={containerRef} className="relative hidden md:block shrink-0">
@@ -258,7 +262,7 @@ function ProjectControl({ project, projects, onOpenProject, onAssign, onClear }:
       </button>
       {open && (
         <div className="absolute z-30 top-full right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg py-1 min-w-[180px] max-h-64 overflow-y-auto">
-          {projects.map((p) => (
+          {activeProjects.map((p) => (
             <button
               key={p.id}
               type="button"
