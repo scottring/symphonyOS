@@ -32,6 +32,18 @@ type UndoEntry = {
   undoable: boolean
 }
 
+const GROUP_MODE_KEY = 'symphony.thisweek.group'
+type GroupMode = 'list' | 'project'
+
+function loadGroupMode(): GroupMode {
+  try {
+    const v = localStorage.getItem(GROUP_MODE_KEY)
+    return v === 'project' ? 'project' : 'list'
+  } catch {
+    return 'list'
+  }
+}
+
 export function StagingFloat({
   weekTasks, projects, familyMembers,
   onPullToToday, onSelectTask, onCompleteTask, onDeferTask, onDeleteTask, onUpdateTask,
@@ -41,6 +53,12 @@ export function StagingFloat({
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
   const [leavingIds, setLeavingIds] = useState<Set<string>>(new Set())
   const [undo, setUndo] = useState<UndoEntry | null>(null)
+  const [groupMode, setGroupModeState] = useState<GroupMode>(() => loadGroupMode())
+
+  const setGroupMode = useCallback((mode: GroupMode) => {
+    setGroupModeState(mode)
+    try { localStorage.setItem(GROUP_MODE_KEY, mode) } catch { /* ignore */ }
+  }, [])
 
   const buttonRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -48,7 +66,10 @@ export function StagingFloat({
   useEffect(() => {
     if (!open || !buttonRef.current) return
     const rect = buttonRef.current.getBoundingClientRect()
-    setPos({ top: rect.bottom + 6, left: Math.max(rect.left - 80, 12) })
+    const PANEL_WIDTH = Math.min(720, window.innerWidth - 24)
+    const idealLeft = rect.right - PANEL_WIDTH
+    const left = Math.max(12, Math.min(idealLeft, window.innerWidth - PANEL_WIDTH - 12))
+    setPos({ top: rect.bottom + 6, left })
   }, [open])
 
   useEffect(() => {
@@ -133,7 +154,7 @@ export function StagingFloat({
       {open && pos && createPortal(
         <div
           ref={panelRef}
-          style={{ position: 'fixed', top: pos.top, left: pos.left, width: 'min(440px, calc(100vw - 24px))' }}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, width: 'min(720px, calc(100vw - 24px))' }}
           className="z-50 bg-white rounded-xl border border-neutral-200 shadow-xl p-3 max-h-[70vh] overflow-y-auto"
           role="dialog"
           aria-label="This Week"
@@ -142,10 +163,68 @@ export function StagingFloat({
             <h3 className="font-display text-sm font-medium text-neutral-700">
               This Week · {sorted.length} item{sorted.length !== 1 ? 's' : ''}
             </h3>
+            <div className="flex items-center gap-1 text-[11px]">
+              <button
+                type="button"
+                onClick={() => setGroupMode('list')}
+                aria-pressed={groupMode === 'list'}
+                className={`px-2 py-0.5 rounded-md transition-colors ${
+                  groupMode === 'list'
+                    ? 'bg-neutral-200 text-neutral-800 font-medium'
+                    : 'text-neutral-500 hover:bg-neutral-100'
+                }`}
+              >
+                List
+              </button>
+              <button
+                type="button"
+                onClick={() => setGroupMode('project')}
+                aria-pressed={groupMode === 'project'}
+                className={`px-2 py-0.5 rounded-md transition-colors ${
+                  groupMode === 'project'
+                    ? 'bg-neutral-200 text-neutral-800 font-medium'
+                    : 'text-neutral-500 hover:bg-neutral-100'
+                }`}
+              >
+                By project
+              </button>
+            </div>
           </div>
 
           {sorted.length === 0 ? (
             <p className="text-sm text-neutral-400 text-center py-6">Nothing scheduled this week.</p>
+          ) : groupMode === 'project' ? (
+            <div className="space-y-4">
+              {groupTasksByProject(sorted, projects).map(({ key, label, tasks }) => (
+                <div key={key}>
+                  <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-1.5 px-1 flex items-center gap-2">
+                    <span>{label}</span>
+                    <span className="text-neutral-300 font-normal normal-case tracking-normal">·</span>
+                    <span className="text-neutral-400 font-normal normal-case tracking-normal">{tasks.length}</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {tasks.map((task) => {
+                      const project = projects.find((p) => p.id === task.projectId)
+                      return (
+                        <DenseInboxRow
+                          key={task.id}
+                          task={task}
+                          project={project}
+                          projects={projects}
+                          familyMembers={familyMembers}
+                          quickActions={WEEK_ACTIONS}
+                          isLeaving={leavingIds.has(task.id)}
+                          onQuickAction={(action) => applyAction(task, action)}
+                          onToggleComplete={() => onCompleteTask?.(task.id)}
+                          onUpdate={(updates) => onUpdateTask?.(task.id, updates)}
+                          onSelect={() => { onSelectTask(task.id); setOpen(false) }}
+                        />
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
             <div className="space-y-1.5">
               {sorted.map((task) => {
