@@ -1,4 +1,19 @@
 import * as Sentry from '@sentry/react'
+import { isChunkLoadError } from '@/lib/lazyWithRetry'
+
+const RELOAD_FLAG = 'symphony:chunk-reload'
+
+// Safety net for chunk-load failures that surface during render rather
+// than at the lazy() import (lazyWithRetry handles the import path). On a
+// stale-deploy chunk error, reload once to fetch fresh hashes instead of
+// showing the dead-end "hit an error" card.
+function maybeReloadOnStaleChunk(error: unknown): boolean {
+  if (!isChunkLoadError(error)) return false
+  if (window.sessionStorage.getItem(RELOAD_FLAG) === '1') return false
+  window.sessionStorage.setItem(RELOAD_FLAG, '1')
+  window.location.reload()
+  return true
+}
 
 interface Props {
   children: React.ReactNode
@@ -9,6 +24,9 @@ interface Props {
 export function SectionErrorBoundary({ children, sectionName = 'This section', onReset }: Props) {
   return (
     <Sentry.ErrorBoundary
+      onError={(error) => {
+        maybeReloadOnStaleChunk(error)
+      }}
       fallback={(errorData) => (
         <div className="h-full flex items-center justify-center p-8">
           <div className="max-w-sm w-full text-center">

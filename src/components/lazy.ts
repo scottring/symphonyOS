@@ -1,4 +1,7 @@
-import { lazy } from 'react'
+// All views go through lazyWithRetry: a post-deploy stale-chunk failure
+// triggers a one-time full reload (fresh index.html + new chunk hashes)
+// instead of dead-ending at the section error boundary.
+import { lazyWithRetry as lazy } from '@/lib/lazyWithRetry'
 
 // Project views - Switch to ProjectsListRedesign to test new layout
 export const ProjectsList = lazy(() =>
