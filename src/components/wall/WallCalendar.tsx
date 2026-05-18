@@ -27,6 +27,8 @@ import { WallChrome } from './WallChrome'
 import { WallRhythmBar } from './WallRhythmBar'
 import { WallNowCard } from './WallNowCard'
 import { WallRightColumn } from './WallRightColumn'
+import { buildDayGrid, type DayGridTapTarget, type QuadrantContent } from './now/buildDayGrid'
+import { WallQuadrantExpand } from './now/WallQuadrantExpand'
 import { buildTodayItems } from './today/todayItem'
 import { resolveNowFocus, type OverrideRef } from './nowFocus'
 import type { RhythmMode } from './rhythm/rhythmMode'
@@ -186,6 +188,28 @@ export function WallCalendar() {
     }
     return null
   }, [wallData.days])
+
+  const dayGrid = useMemo(() => buildDayGrid({
+    days: wallData.days,
+    now: currentTime,
+    todayItems: todayItemsForList,
+    overdueTasks: wallData.overdueTasks,
+    inboxCount: wallData.inboxCount,
+    emailCount: emailItems.length,
+    familyPrompt: promptDismissed ? null : prompt,
+  }), [wallData.days, wallData.overdueTasks, wallData.inboxCount, currentTime, todayItemsForList, emailItems.length, promptDismissed, prompt])
+
+  const [expandedQuadrant, setExpandedQuadrant] = useState<QuadrantContent | null>(null)
+
+  const handleQuadrantTap = useCallback((target: DayGridTapTarget) => {
+    const map: Record<DayGridTapTarget['quadrant'], QuadrantContent> = {
+      upNext: dayGrid.upNext,
+      today: dayGrid.today,
+      pending: dayGrid.pending,
+      familyQuestion: dayGrid.familyQuestion,
+    }
+    setExpandedQuadrant(map[target.quadrant])
+  }, [dayGrid])
 
   // ─── Action handlers ───
   const handleCheckItem = useCallback(async (id: string, completed: boolean) => {
@@ -461,6 +485,8 @@ export function WallCalendar() {
           dinnerPlanTitle={dinnerEvent ? (extractRecipeNameHint(dinnerEvent.title) || dinnerEvent.title) : null}
           tomorrowPreview={tomorrowPreview}
           onCheckItem={handleCheckItem}
+          dayGrid={dayGrid}
+          onQuadrantTap={handleQuadrantTap}
         />
         <WallRightColumn
           todayItems={todayItemsForList}
@@ -475,6 +501,13 @@ export function WallCalendar() {
           onTapUpcoming={(item) => setDetailItem(item)}
         />
       </div>
+
+      {expandedQuadrant && (
+        <WallQuadrantExpand
+          content={expandedQuadrant}
+          onClose={() => setExpandedQuadrant(null)}
+        />
+      )}
 
       <WallRhythmBar
         currentMode={rhythm.mode}
