@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { screen, fireEvent } from '@testing-library/react'
+import { render } from '@/test/test-utils'
 import { StagingFloat } from './StagingFloat'
 import { createMockTask } from '@/test/mocks/factories'
 
@@ -21,6 +22,28 @@ vi.mock('@/hooks/useProjects', () => ({
     getProjectById: vi.fn(),
     getChildProjects: vi.fn().mockReturnValue([]),
     recalculateProjectStatus: vi.fn(),
+  }),
+}))
+
+vi.mock('@/hooks/useNotes', () => ({
+  useNotes: () => ({
+    notes: [],
+    loading: false,
+    error: null,
+    addNote: vi.fn().mockResolvedValue(null),
+    updateNote: vi.fn().mockResolvedValue(null),
+    deleteNote: vi.fn().mockResolvedValue(null),
+  }),
+}))
+
+vi.mock('@/hooks/useSupabaseTasks', () => ({
+  useSupabaseTasks: () => ({
+    tasks: [],
+    loading: false,
+    error: null,
+    addTask: vi.fn().mockResolvedValue(null),
+    updateTask: vi.fn().mockResolvedValue(null),
+    deleteTask: vi.fn().mockResolvedValue(null),
   }),
 }))
 
