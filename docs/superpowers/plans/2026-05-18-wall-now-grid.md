@@ -203,7 +203,7 @@ describe('buildDayGrid', () => {
     expect(grid.upNext.tap).toEqual({ quadrant: 'upNext', itemId: null })
   })
 
-  it('Today caps the list at 3 remaining timed items and uses the quiet headline', () => {
+  it('Today returns all remaining timed items (visual cap applied downstream)', () => {
     const grid = buildDayGrid(baseInput({
       todayItems: [
         todayItem('t1', 'A', 14), todayItem('t2', 'B', 15),
@@ -212,8 +212,21 @@ describe('buildDayGrid', () => {
       ],
     }))
     expect(grid.today.headline).toBe('A quiet afternoon')
-    expect(grid.today.lines).toHaveLength(3)
-    expect(grid.today.lines.map(l => l.text)).toEqual(['A', 'B', 'C'])
+    expect(grid.today.lines).toHaveLength(4)
+    expect(grid.today.lines.map(l => l.text)).toEqual(['A', 'B', 'C', 'D'])
+  })
+
+  it('Pending returns all overflow items so the expand view can show them', () => {
+    const grid = buildDayGrid(baseInput({
+      overdueTasks: [
+        timeline('o1', 'One', 9, -1), timeline('o2', 'Two', 9, -1),
+        timeline('o3', 'Three', 9, -1), timeline('o4', 'Four', 9, -1),
+        timeline('o5', 'Five', 9, -1),
+      ],
+    }))
+    expect(grid.pending.headline).toBe('5 things waiting')
+    expect(grid.pending.lines).toHaveLength(5)
+    expect(grid.pending.lines.every(l => l.tag === 'overdue')).toBe(true)
   })
 
   it('Pending is neutral by default and tags only overdue lines', () => {
@@ -297,7 +310,9 @@ export interface BuildDayGridInput {
   familyPrompt: string | null
 }
 
-const MAX_LINES = 3
+// The builder returns the FULL (bounded) list. The visual 3-line cap is
+// applied by WallNowQuadrant; the tap-to-expand overlay shows all of these.
+const MAX_DATA_LINES = 8
 const SECTION_ORDER: DaySection[] = ['allday', 'morning', 'afternoon', 'evening', 'unscheduled']
 
 function nextFutureItem(days: WallDayData[], now: Date): TimelineItem | null {
@@ -333,7 +348,7 @@ function buildUpNext(input: BuildDayGridInput): QuadrantContent {
 function buildToday(input: BuildDayGridInput): QuadrantContent {
   const remaining = input.todayItems
     .filter(i => !i.completed && i.startTime !== null)
-    .slice(0, MAX_LINES)
+    .slice(0, MAX_DATA_LINES)
   return {
     eyebrow: 'TODAY',
     headline: remaining.length === 0 ? 'All clear today' : 'A quiet afternoon',
@@ -345,13 +360,13 @@ function buildToday(input: BuildDayGridInput): QuadrantContent {
 function buildPending(input: BuildDayGridInput): QuadrantContent {
   const lines: QuadrantLine[] = []
   for (const t of input.overdueTasks) {
-    if (lines.length >= MAX_LINES) break
+    if (lines.length >= MAX_DATA_LINES) break
     lines.push({ text: t.title, tag: 'overdue' })
   }
-  if (lines.length < MAX_LINES && input.inboxCount > 0) {
+  if (lines.length < MAX_DATA_LINES && input.inboxCount > 0) {
     lines.push({ text: `${input.inboxCount} inbox item${input.inboxCount === 1 ? '' : 's'}` })
   }
-  if (lines.length < MAX_LINES && input.emailCount > 0) {
+  if (lines.length < MAX_DATA_LINES && input.emailCount > 0) {
     lines.push({ text: `${input.emailCount} email${input.emailCount === 1 ? '' : 's'} waiting` })
   }
   const total = input.overdueTasks.length + (input.inboxCount > 0 ? 1 : 0) + (input.emailCount > 0 ? 1 : 0)
@@ -449,6 +464,26 @@ describe('WallNowQuadrant', () => {
     fireEvent.click(screen.getByRole('button', { name: /today/i }))
     expect(onTap).toHaveBeenCalledTimes(1)
   })
+
+  it('renders the "Soon" tag for an urgent line', () => {
+    const content: QuadrantContent = {
+      ...base,
+      lines: [{ text: 'Leave soon', tag: 'urgent' }],
+    }
+    render(<WallNowQuadrant content={content} onTap={() => {}} variant="event" />)
+    expect(screen.getByText('Soon')).toBeInTheDocument()
+  })
+
+  it('renders no list when there are no lines', () => {
+    render(
+      <WallNowQuadrant
+        content={{ ...base, lines: [] }}
+        onTap={() => {}}
+        variant="family"
+      />
+    )
+    expect(screen.queryByRole('list')).not.toBeInTheDocument()
+  })
 })
 ```
 
@@ -482,7 +517,7 @@ export function WallNowQuadrant({ content, onTap, variant }: WallNowQuadrantProp
   return (
     <button
       type="button"
-      aria-label={content.eyebrow}
+      aria-label={`${content.eyebrow}: ${content.headline}`}
       onClick={onTap}
       className={`text-left rounded-2xl p-6 flex flex-col h-full min-h-0 ${VARIANT_BG[variant]}`}
     >
@@ -493,9 +528,9 @@ export function WallNowQuadrant({ content, onTap, variant }: WallNowQuadrantProp
         {content.headline}
       </h3>
       {lines.length > 0 && (
-        <ul className="mt-4 space-y-1.5 text-white/75 text-base">
+        <div role="list" className="mt-4 space-y-1.5 text-white/75 text-base">
           {lines.map((line, i) => (
-            <li key={i} className="truncate">
+            <div role="listitem" key={i} className="truncate">
               {line.text}
               {line.tag === 'overdue' && (
                 <span className="ml-2 text-[10px] uppercase tracking-[0.1em] text-red-400 border border-red-400/40 rounded px-1.5 py-0.5">
@@ -507,9 +542,9 @@ export function WallNowQuadrant({ content, onTap, variant }: WallNowQuadrantProp
                   Soon
                 </span>
               )}
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
       {content.footer && (
         <div className="mt-auto pt-3 text-xs text-white/45">{content.footer}</div>
@@ -566,11 +601,32 @@ describe('WallNowGrid', () => {
     expect(screen.getByText('"Best part of today?"')).toBeInTheDocument()
   })
 
-  it('passes the tap target of the tapped quadrant to the handler', () => {
+  it('forwards the Up Next tap target', () => {
     const onQuadrantTap = vi.fn()
     render(<WallNowGrid grid={grid} onQuadrantTap={onQuadrantTap} />)
-    fireEvent.click(screen.getByRole('button', { name: /up next/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^UP NEXT:/i }))
     expect(onQuadrantTap).toHaveBeenCalledWith({ quadrant: 'upNext', itemId: 'e1' })
+  })
+
+  it('forwards the Today tap target', () => {
+    const onQuadrantTap = vi.fn()
+    render(<WallNowGrid grid={grid} onQuadrantTap={onQuadrantTap} />)
+    fireEvent.click(screen.getByRole('button', { name: /^TODAY:/i }))
+    expect(onQuadrantTap).toHaveBeenCalledWith({ quadrant: 'today' })
+  })
+
+  it('forwards the Pending tap target', () => {
+    const onQuadrantTap = vi.fn()
+    render(<WallNowGrid grid={grid} onQuadrantTap={onQuadrantTap} />)
+    fireEvent.click(screen.getByRole('button', { name: /^WHILE IT'S QUIET:/i }))
+    expect(onQuadrantTap).toHaveBeenCalledWith({ quadrant: 'pending' })
+  })
+
+  it('forwards the Family Question tap target', () => {
+    const onQuadrantTap = vi.fn()
+    render(<WallNowGrid grid={grid} onQuadrantTap={onQuadrantTap} />)
+    fireEvent.click(screen.getByRole('button', { name: /^TONIGHT'S QUESTION:/i }))
+    expect(onQuadrantTap).toHaveBeenCalledWith({ quadrant: 'familyQuestion' })
   })
 })
 ```
@@ -656,6 +712,27 @@ describe('WallQuadrantExpand', () => {
     fireEvent.click(screen.getByRole('button', { name: /close/i }))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
+
+  it('renders the "Soon" tag for an urgent line', () => {
+    render(
+      <WallQuadrantExpand
+        content={{ ...content, lines: [{ text: 'Leave for soccer', tag: 'urgent' }] }}
+        onClose={() => {}}
+      />
+    )
+    expect(screen.getByText('Soon')).toBeInTheDocument()
+  })
+
+  it('renders no lines and keeps the headline when lines is empty', () => {
+    render(
+      <WallQuadrantExpand
+        content={{ ...content, lines: [] }}
+        onClose={() => {}}
+      />
+    )
+    expect(screen.queryByText('Reply to Caitlin')).not.toBeInTheDocument()
+    expect(screen.getByText('3 things waiting')).toBeInTheDocument()
+  })
 })
 ```
 
@@ -679,9 +756,9 @@ export function WallQuadrantExpand({ content, onClose }: WallQuadrantExpandProps
   return (
     <button
       type="button"
-      aria-label="Close"
+      aria-label="Close expanded view"
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-neutral-950/95 flex flex-col items-center justify-center p-16 text-center"
+      className="fixed inset-0 z-[100] bg-neutral-950/95 flex flex-col items-center justify-center p-16 text-center"
     >
       <div className="text-sm uppercase tracking-[0.25em] text-white/50 mb-4">
         {content.eyebrow}
@@ -690,9 +767,9 @@ export function WallQuadrantExpand({ content, onClose }: WallQuadrantExpandProps
         {content.headline}
       </h2>
       {content.lines.length > 0 && (
-        <ul className="mt-10 space-y-4 text-2xl text-white/80">
+        <div role="list" className="mt-10 space-y-4 text-2xl text-white/80">
           {content.lines.map((line, i) => (
-            <li key={i}>
+            <div role="listitem" key={i}>
               {line.text}
               {line.tag === 'overdue' && (
                 <span className="ml-3 text-base uppercase tracking-[0.1em] text-red-400">Overdue</span>
@@ -700,10 +777,11 @@ export function WallQuadrantExpand({ content, onClose }: WallQuadrantExpandProps
               {line.tag === 'urgent' && (
                 <span className="ml-3 text-base uppercase tracking-[0.1em] text-amber-400">Soon</span>
               )}
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
+      {/* footer intentionally omitted in the expand view — the full lines list is the content here */}
       <div className="mt-12 text-white/40 text-sm">Tap anywhere to close</div>
     </button>
   )
@@ -729,6 +807,7 @@ git commit -m "feat(wall): add WallQuadrantExpand overlay"
 `WallNowCard` gains an optional `dayGrid` + `onQuadrantTap` prop pair. When focus resolves to `mode-default` with `mode === 'day'` AND `dayGrid` is supplied, render `<WallNowGrid>` instead of the single list. All other branches unchanged. Wrap the rendered content in a cross-fade keyed by focus, gated by `usePrefersReducedMotion`.
 
 **Files:**
+- Create: `src/components/wall/now/wallNowFade.css` — `@keyframes wall-now-fade-in` (from opacity 0 to 1, 450ms ease-out) + `.wall-now-fade-in` class + `prefers-reduced-motion: reduce` disables animation
 - Modify: `src/components/wall/WallNowCard.tsx`
 - Modify (add test): `src/components/wall/WallNowCard.test.tsx`
 
@@ -771,6 +850,42 @@ Add these two `it` blocks inside the existing `describe('WallNowCard', ...)` in 
     )
     expect(screen.getByText('All clear')).toBeInTheDocument()
   })
+
+  it('applies the fade-in class to the content wrapper by default', () => {
+    const { container } = render(
+      <WallNowCard
+        focus={{ kind: 'mode-default', mode: 'day' }}
+        pinned={false}
+        onPinToggle={() => {}}
+        familyPrompt={null}
+        todayItems={[]}
+      />
+    )
+    expect(container.querySelector('.wall-now-fade-in')).not.toBeNull()
+  })
+
+  it('omits the fade-in class when the user prefers reduced motion', () => {
+    const original = window.matchMedia
+    window.matchMedia = ((q: string) => ({
+      matches: true, media: q, onchange: null,
+      addEventListener: () => {}, removeEventListener: () => {},
+      addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia
+    try {
+      const { container } = render(
+        <WallNowCard
+          focus={{ kind: 'mode-default', mode: 'day' }}
+          pinned={false}
+          onPinToggle={() => {}}
+          familyPrompt={null}
+          todayItems={[]}
+        />
+      )
+      expect(container.querySelector('.wall-now-fade-in')).toBeNull()
+    } finally {
+      window.matchMedia = original
+    }
+  })
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -783,10 +898,10 @@ Expected: FAIL — `dayGrid`/`onQuadrantTap` props don't exist; grid not rendere
 3a. Add imports after line 4 (`import type { TodayItem } ...`):
 
 ```tsx
-import { useEffect, useRef, useState } from 'react'
 import { WallNowGrid } from './now/WallNowGrid'
 import type { DayGridData, DayGridTapTarget } from './now/buildDayGrid'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
+import './now/wallNowFade.css'
 ```
 
 3b. Extend `WallNowCardProps` (the interface ending at line 148) — add two optional props before the closing brace:
@@ -807,7 +922,7 @@ import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
     }
 ```
 
-3e. Add the cross-fade wrapper. Replace the component's final `return (...)` block (lines 213–228) with:
+3e. Add the CSS fade wrapper. Replace the component's final `return (...)` block with:
 
 ```tsx
   const reducedMotion = usePrefersReducedMotion()
@@ -817,19 +932,6 @@ import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
       : focus.kind === 'override-item'
         ? `override-item:${focus.itemId}`
         : 'imminent'
-
-  const [fadeKey, setFadeKey] = useState(focusKey)
-  const [visible, setVisible] = useState(true)
-  const prev = useRef(focusKey)
-
-  useEffect(() => {
-    if (prev.current === focusKey) return
-    prev.current = focusKey
-    if (reducedMotion) { setFadeKey(focusKey); return }
-    setVisible(false)
-    const t = setTimeout(() => { setFadeKey(focusKey); setVisible(true) }, 220)
-    return () => clearTimeout(t)
-  }, [focusKey, reducedMotion])
 
   return (
     <div className="rounded-2xl bg-gradient-to-br from-emerald-900 to-teal-900 p-7 text-white flex flex-col gap-3 h-full shadow-lg overflow-hidden">
@@ -845,9 +947,8 @@ import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
         </button>
       </div>
       <div
-        key={fadeKey}
-        className="flex-1 min-h-0 flex flex-col transition-opacity duration-200"
-        style={{ opacity: visible || reducedMotion ? 1 : 0 }}
+        key={focusKey}
+        className={`flex-1 min-h-0 flex flex-col ${reducedMotion ? '' : 'wall-now-fade-in'}`}
       >
         {renderContent()}
       </div>
@@ -855,7 +956,7 @@ import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
   )
 ```
 
-> The 220ms fade-out + 200ms fade-in ≈ the spec's 400–500ms total. `reducedMotion` makes the swap instant (opacity stays 1, key flips immediately).
+> Incoming content fades in over 450ms via a CSS keyframe on the keyed wrapper; prefers-reduced-motion (and the hook) disable it. No JS timers.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -897,6 +998,8 @@ Add near the other hook calls (after `const wallData = useWallData()` ~line 59):
 Add after the `tomorrowPreview` memo (ends ~line 188):
 
 ```tsx
+  // Rebuilds each clock tick (currentTime dep) so "Up Next" stays minute-fresh;
+  // buildDayGrid is a cheap pure object build — same cadence as imminentEntity.
   const dayGrid = useMemo(() => buildDayGrid({
     days: wallData.days,
     now: currentTime,
@@ -918,6 +1021,8 @@ Add after the `tomorrowPreview` memo (ends ~line 188):
     }
     setExpandedQuadrant(map[target.quadrant])
   }, [dayGrid])
+
+  const handleCloseExpanded = useCallback(() => setExpandedQuadrant(null), [])
 ```
 
 > `useState`/`useCallback`/`useMemo` are already imported in WallCalendar — verify the import line at the top includes them; if `useState` is missing, add it.
@@ -939,7 +1044,7 @@ Immediately after the closing `</div>` of the `grid grid-cols-[1.85fr_1fr]` bloc
       {expandedQuadrant && (
         <WallQuadrantExpand
           content={expandedQuadrant}
-          onClose={() => setExpandedQuadrant(null)}
+          onClose={handleCloseExpanded}
         />
       )}
 ```
@@ -985,10 +1090,10 @@ cross-fade smooth on mode change, reduced-motion instant."
 - 2×2 grid in Day-mode default only → Tasks 2, 6 (focus.kind/mode guard).
 - Four fixed quadrants Up Next / Today / Pending / Family Question → Task 2 (`buildDayGrid`), Task 4 (layout order).
 - No quadrant ever blank (wider-window fallbacks) → Task 2 tests (`Nothing scheduled`, `All clear today`, `All caught up`, `No question today`).
-- Refinement 1 (3-line cap, big serif headline, no scroll) → Task 2 (`MAX_LINES`), Task 3 (`slice(0,3)`, `font-display text-3xl`, `line-clamp-2`).
+- Refinement 1 (visual 3-line cap + no scroll) → Task 3 ('slice(0,3)'); builder returns full bounded list (MAX_DATA_LINES) so the expand overlay (Task 5) shows everything.
 - Refinement 2 (Family = prompt only, no Jax/photo footer) → Task 2 `buildFamilyQuestion` emits no footer/lines.
 - Refinement 3 (Pending neutral, color on line only) → Task 2 (`tag` per line, headline neutral), Task 3 (`neutral` variant bg, tag styling on `<li>` only).
-- Refinement 4 (400–500ms cross-fade, reduced-motion instant, no surrounding shift) → Task 1 + Task 6 (keyed fade wrapper inside the card; chrome/right column untouched).
+- Refinement 4 (incoming fades in ~450ms, reduced-motion disables, no surrounding shift) → Task 1 + Task 6 (CSS keyframe on keyed wrapper inside the card; chrome/right column untouched).
 - Refinement 5 (quadrants tappable, expand) → Tasks 3/4 (`onTap`), Task 5 (`WallQuadrantExpand`), Task 7 (wiring). **Deviation:** Pending → uniform expand, not triage overlay — flagged in header.
 - Active modes unchanged → Task 6 guard returns grid ONLY for `mode-default` + `day` + `dayGrid`; every other branch falls through to existing renderers.
 - Out-of-scope items (no resolver change, no right column/rhythm bar change, fixed quadrants) → respected; no task touches `nowFocus.ts`, `WallRightColumn`, or `WallRhythmBar`.

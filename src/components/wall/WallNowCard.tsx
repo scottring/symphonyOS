@@ -2,6 +2,10 @@ import { Pin } from 'lucide-react'
 import { RHYTHM_MODE_LABELS, type RhythmMode } from './rhythm/rhythmMode'
 import type { NowFocus } from './nowFocus'
 import type { TodayItem } from './today/todayItem'
+import { WallNowGrid } from './now/WallNowGrid'
+import type { DayGridData, DayGridTapTarget } from './now/buildDayGrid'
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
+import './now/wallNowFade.css'
 
 // ─── helpers ─────────────────────────────────────────────────────
 
@@ -145,6 +149,8 @@ interface WallNowCardProps {
   dinnerPlanTitle?: string | null
   tomorrowPreview?: { title: string; startTime: Date | null } | null
   onCheckItem?: (id: string, completed: boolean) => void
+  dayGrid?: DayGridData
+  onQuadrantTap?: (target: DayGridTapTarget) => void
 }
 
 export function WallNowCard({
@@ -157,6 +163,8 @@ export function WallNowCard({
   dinnerPlanTitle,
   tomorrowPreview,
   onCheckItem,
+  dayGrid,
+  onQuadrantTap,
 }: WallNowCardProps) {
 
   function renderContent() {
@@ -179,6 +187,11 @@ export function WallNowCard({
           <h2 className="font-display text-3xl font-semibold leading-tight">Tapped item</h2>
         </>
       )
+    }
+
+    // Day mode-default with assembled grid → 2x2 grid instead of single list
+    if (focus.kind === 'mode-default' && focus.mode === 'day' && dayGrid) {
+      return <WallNowGrid grid={dayGrid} onQuadrantTap={(t) => onQuadrantTap?.(t)} />
     }
 
     // Pinned mode, override mode, or default — all render mode content
@@ -210,8 +223,16 @@ export function WallNowCard({
     )
   }
 
+  const reducedMotion = usePrefersReducedMotion()
+  const focusKey =
+    focus.kind === 'mode-default' || focus.kind === 'pinned-mode' || focus.kind === 'override-mode'
+      ? `${focus.kind}:${focus.mode}`
+      : focus.kind === 'override-item'
+        ? `override-item:${focus.itemId}`
+        : 'imminent'
+
   return (
-    <div className="rounded-2xl bg-gradient-to-br from-emerald-900 to-teal-900 p-7 text-white flex flex-col gap-3 h-full shadow-lg">
+    <div className="rounded-2xl bg-gradient-to-br from-emerald-900 to-teal-900 p-7 text-white flex flex-col gap-3 h-full shadow-lg overflow-hidden">
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0" />
         <button
@@ -223,7 +244,12 @@ export function WallNowCard({
           <Pin className="w-5 h-5" />
         </button>
       </div>
-      {renderContent()}
+      <div
+        key={focusKey}
+        className={`flex-1 min-h-0 flex flex-col ${reducedMotion ? '' : 'wall-now-fade-in'}`}
+      >
+        {renderContent()}
+      </div>
     </div>
   )
 }
