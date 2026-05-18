@@ -57,7 +57,7 @@ export function InboxView({
 
   const { addProject, deleteProject } = useProjects()
   const { notes, addNote, updateNote, deleteNote } = useNotes()
-  const { addTask } = useSupabaseTasks()
+  const { addTask, updateTask } = useSupabaseTasks()
 
   const { currentDomain } = useDomain()
 
@@ -86,6 +86,34 @@ export function InboxView({
     [addProject, deleteProject, onUpdateTask],
   )
 
+  // Restore a task snapshot after a note-route deletion — two-step to preserve rich fields
+  const restoreTask = useCallback(async (snapshot: Task) => {
+    const newId = await addTask(
+      snapshot.title,
+      snapshot.contactId,
+      snapshot.projectId,
+      snapshot.scheduledFor,
+      {
+        context: snapshot.context,
+        assignedTo: snapshot.assignedTo ?? null,
+        assignedToAll: snapshot.assignedToAll,
+        category: snapshot.category,
+        isAllDay: snapshot.isAllDay,
+        location: snapshot.location,
+        locationPlaceId: snapshot.locationPlaceId,
+      },
+    )
+    if (!newId) return
+    await updateTask(newId, {
+      notes: snapshot.notes,
+      links: snapshot.links,
+      phoneNumber: snapshot.phoneNumber,
+      needsDiscussion: snapshot.needsDiscussion,
+      discussionNote: snapshot.discussionNote,
+      bucket: snapshot.bucket,
+    })
+  }, [addTask, updateTask])
+
   const handleNoteSelect = useCallback(async (task: Task, selection: NotePickerSelection) => {
     const now = new Date()
     const bullet = formatInboxBullet({ title: task.title, notes: task.notes }, now)
@@ -98,8 +126,19 @@ export function InboxView({
         return
       }
       const previousContent = target.content
-      const newContent = previousContent + '\n' + bullet
-      await updateNote(target.id, { content: newContent })
+
+      let appendOk = false
+      try {
+        await updateNote(target.id, { content: previousContent + '\n' + bullet })
+        appendOk = true
+      } catch (err) {
+        console.error('Failed to append to note:', err)
+      }
+      if (!appendOk) {
+        setNotePickerTaskId(null)
+        return
+      }
+
       if (onDeleteTask) onDeleteTask(task.id)
       setUndo({
         taskId: task.id,
@@ -108,36 +147,28 @@ export function InboxView({
         undoable: true,
         onUndoExtra: async () => {
           await updateNote(target.id, { content: previousContent })
-          await addTask(
-            taskSnapshot.title,
-            taskSnapshot.contactId,
-            taskSnapshot.projectId,
-            taskSnapshot.scheduledFor,
-            {
-              context: taskSnapshot.context,
-              assignedTo: taskSnapshot.assignedTo ?? null,
-              assignedToAll: taskSnapshot.assignedToAll,
-              category: taskSnapshot.category,
-              isAllDay: taskSnapshot.isAllDay,
-              location: taskSnapshot.location,
-              locationPlaceId: taskSnapshot.locationPlaceId,
-            },
-          )
+          await restoreTask(taskSnapshot)
         },
       })
     } else {
       // kind === 'new'
-      const created = await addNote({
-        title: selection.title,
-        content: bullet,
-        type: 'general',
-        source: 'inbox_triage',
-        context: taskSnapshot.context ?? (currentDomain !== 'universal' ? currentDomain : undefined),
-      })
+      let created: Awaited<ReturnType<typeof addNote>> | null = null
+      try {
+        created = await addNote({
+          title: selection.title,
+          content: bullet,
+          type: 'general',
+          source: 'inbox_triage',
+          context: taskSnapshot.context ?? (currentDomain !== 'universal' ? currentDomain : undefined),
+        })
+      } catch (err) {
+        console.error('Failed to create note:', err)
+      }
       if (!created) {
         setNotePickerTaskId(null)
         return
       }
+
       if (onDeleteTask) onDeleteTask(task.id)
       setUndo({
         taskId: task.id,
@@ -146,26 +177,12 @@ export function InboxView({
         undoable: true,
         onUndoExtra: async () => {
           await deleteNote(created.id)
-          await addTask(
-            taskSnapshot.title,
-            taskSnapshot.contactId,
-            taskSnapshot.projectId,
-            taskSnapshot.scheduledFor,
-            {
-              context: taskSnapshot.context,
-              assignedTo: taskSnapshot.assignedTo ?? null,
-              assignedToAll: taskSnapshot.assignedToAll,
-              category: taskSnapshot.category,
-              isAllDay: taskSnapshot.isAllDay,
-              location: taskSnapshot.location,
-              locationPlaceId: taskSnapshot.locationPlaceId,
-            },
-          )
+          await restoreTask(taskSnapshot)
         },
       })
     }
     setNotePickerTaskId(null)
-  }, [notes, updateNote, deleteNote, addNote, addTask, onDeleteTask, currentDomain])
+  }, [notes, updateNote, deleteNote, addNote, restoreTask, onDeleteTask, currentDomain])
 
   // Domain + privacy filter
   const filteredByDomain = useMemo(() => {
