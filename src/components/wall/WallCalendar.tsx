@@ -112,9 +112,17 @@ export function WallCalendar() {
     todayDayData ? buildTodayItems(todayDayData.items, selectedOwnerId) : [],
     [todayDayData, selectedOwnerId]
   )
-  // Routine steps are used by the Now Card; everything else goes to the Today list
-  const todayItemsForList = useMemo(() => todayItems.filter(i => i.kind !== 'routine-step'), [todayItems])
-  const routineSteps = useMemo(() => todayItems.filter(i => i.kind === 'routine-step'), [todayItems])
+  // Daily timed routines (morning/bedtime steps) feed the Now Card. Non-daily
+  // routines arrive with startTime=null (from the 'unscheduled' bucket) and
+  // surface in the right column's Today list so they're still glanceable.
+  const todayItemsForList = useMemo(
+    () => todayItems.filter(i => i.kind !== 'routine-step' || i.startTime === null),
+    [todayItems],
+  )
+  const routineSteps = useMemo(
+    () => todayItems.filter(i => i.kind === 'routine-step' && i.startTime !== null),
+    [todayItems],
+  )
   const discussItems = useMemo(() => todayItemsForList.filter(it => it.needsDiscussion), [todayItemsForList])
   const upcomingDays = useMemo(() => wallData.days.filter(d => !d.isToday), [wallData.days])
 
