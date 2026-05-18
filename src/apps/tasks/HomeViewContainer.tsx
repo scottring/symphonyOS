@@ -50,7 +50,7 @@ export function HomeViewContainer() {
   const { getDomainForCalendar } = useCalendarDomainMappings();
   const { lists, listsByCategory } = useListsContext();
   const { currentDomain } = useDomain();
-  const undo = useUndo({ duration: 5000 });
+  const undo = useUndo();
 
   // UI state local to this container
   const [viewedDate, setViewedDate] = useState<Date>(() => new Date());

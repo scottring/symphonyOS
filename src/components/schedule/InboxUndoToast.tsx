@@ -8,7 +8,7 @@ interface InboxUndoToastProps {
   durationMs?: number
 }
 
-export function InboxUndoToast({ message, onUndo, onDismiss, durationMs = 5000 }: InboxUndoToastProps) {
+export function InboxUndoToast({ message, onUndo, onDismiss, durationMs = 10000 }: InboxUndoToastProps) {
   useEffect(() => {
     const id = setTimeout(onDismiss, durationMs)
     return () => clearTimeout(id)

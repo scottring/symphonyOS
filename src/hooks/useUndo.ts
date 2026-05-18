@@ -13,7 +13,7 @@ interface UseUndoOptions {
 }
 
 export function useUndo(options: UseUndoOptions = {}) {
-  const { duration = 5000 } = options
+  const { duration = 10000 } = options
   const [currentAction, setCurrentAction] = useState<UndoAction | null>(null)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 

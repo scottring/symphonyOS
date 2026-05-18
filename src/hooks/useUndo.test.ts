@@ -82,7 +82,7 @@ describe('useUndo', () => {
       expect(result.current.currentAction?.message).toBe('Second action')
     })
 
-    it('auto-dismisses after default duration (5000ms)', () => {
+    it('auto-dismisses after default duration (10000ms)', () => {
       const { result } = renderHook(() => useUndo())
       const undoFn = vi.fn()
 
@@ -93,7 +93,7 @@ describe('useUndo', () => {
       expect(result.current.currentAction).not.toBeNull()
 
       act(() => {
-        vi.advanceTimersByTime(5000)
+        vi.advanceTimersByTime(10000)
       })
 
       expect(result.current.currentAction).toBeNull()

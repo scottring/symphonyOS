@@ -36,7 +36,7 @@ export function InboxViewContainer() {
   const { getDomainForCalendar } = useCalendarDomainMappings();
   const { lists, listsByCategory } = useListsContext();
   const { currentDomain } = useDomain();
-  const undo = useUndo({ duration: 5000 });
+  const undo = useUndo();
 
   const { selection, setSelection, clearSelection } = useSelection();
 

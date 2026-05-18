@@ -48,7 +48,7 @@ export function HomeView({
   const ctx = useScheduleActionsContext()
   const { currentView, setCurrentView } = useHomeView()
   const isMobile = useMobile()
-  const { currentAction, pushAction, executeUndo, dismiss } = useUndo({ duration: 5000 })
+  const { currentAction, pushAction, executeUndo, dismiss } = useUndo()
   const { currentDomain } = useDomain()
 
   // Filter tasks, routines, projects, and events by current domain
