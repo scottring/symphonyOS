@@ -19,10 +19,31 @@ describe('WallNowGrid', () => {
     expect(screen.getByText('"Best part of today?"')).toBeInTheDocument()
   })
 
-  it('passes the tap target of the tapped quadrant to the handler', () => {
+  it('forwards the Up Next tap target', () => {
     const onQuadrantTap = vi.fn()
     render(<WallNowGrid grid={grid} onQuadrantTap={onQuadrantTap} />)
-    fireEvent.click(screen.getByRole('button', { name: /up next/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^UP NEXT:/i }))
     expect(onQuadrantTap).toHaveBeenCalledWith({ quadrant: 'upNext', itemId: 'e1' })
+  })
+
+  it('forwards the Today tap target', () => {
+    const onQuadrantTap = vi.fn()
+    render(<WallNowGrid grid={grid} onQuadrantTap={onQuadrantTap} />)
+    fireEvent.click(screen.getByRole('button', { name: /^TODAY:/i }))
+    expect(onQuadrantTap).toHaveBeenCalledWith({ quadrant: 'today' })
+  })
+
+  it('forwards the Pending tap target', () => {
+    const onQuadrantTap = vi.fn()
+    render(<WallNowGrid grid={grid} onQuadrantTap={onQuadrantTap} />)
+    fireEvent.click(screen.getByRole('button', { name: /^WHILE IT'S QUIET:/i }))
+    expect(onQuadrantTap).toHaveBeenCalledWith({ quadrant: 'pending' })
+  })
+
+  it('forwards the Family Question tap target', () => {
+    const onQuadrantTap = vi.fn()
+    render(<WallNowGrid grid={grid} onQuadrantTap={onQuadrantTap} />)
+    fireEvent.click(screen.getByRole('button', { name: /^TONIGHT'S QUESTION:/i }))
+    expect(onQuadrantTap).toHaveBeenCalledWith({ quadrant: 'familyQuestion' })
   })
 })
