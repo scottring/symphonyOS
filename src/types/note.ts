@@ -111,6 +111,7 @@ export interface CreateNoteInput {
   type?: NoteType
   source?: NoteSource
   topicId?: string
+  context?: 'work' | 'family' | 'personal'
 }
 
 export interface UpdateNoteInput {

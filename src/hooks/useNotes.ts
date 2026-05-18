@@ -193,6 +193,7 @@ export function useNotes() {
         type: input.type ?? 'quick_capture',
         source: input.source ?? 'manual',
         topicId: input.topicId,
+        context: input.context,
         createdAt: new Date(),
         updatedAt: new Date(),
       }
@@ -207,6 +208,7 @@ export function useNotes() {
           type: input.type ?? 'quick_capture',
           source: input.source ?? 'manual',
           topic_id: input.topicId ?? null,
+          context: input.context ?? null,
         })
         .select()
         .single()
