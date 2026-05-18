@@ -24,4 +24,25 @@ describe('WallQuadrantExpand', () => {
     fireEvent.click(screen.getByRole('button', { name: /close/i }))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
+
+  it('renders the "Soon" tag for an urgent line', () => {
+    render(
+      <WallQuadrantExpand
+        content={{ ...content, lines: [{ text: 'Leave for soccer', tag: 'urgent' }] }}
+        onClose={() => {}}
+      />
+    )
+    expect(screen.getByText('Soon')).toBeInTheDocument()
+  })
+
+  it('renders no lines and keeps the headline when lines is empty', () => {
+    render(
+      <WallQuadrantExpand
+        content={{ ...content, lines: [] }}
+        onClose={() => {}}
+      />
+    )
+    expect(screen.queryByText('Reply to Caitlin')).not.toBeInTheDocument()
+    expect(screen.getByText('3 things waiting')).toBeInTheDocument()
+  })
 })

@@ -9,7 +9,7 @@ export function WallQuadrantExpand({ content, onClose }: WallQuadrantExpandProps
   return (
     <button
       type="button"
-      aria-label="Close"
+      aria-label="Close expanded view"
       onClick={onClose}
       className="fixed inset-0 z-50 bg-neutral-950/95 flex flex-col items-center justify-center p-16 text-center"
     >
@@ -34,6 +34,7 @@ export function WallQuadrantExpand({ content, onClose }: WallQuadrantExpandProps
           ))}
         </div>
       )}
+      {/* footer intentionally omitted in the expand view — the full lines list is the content here */}
       <div className="mt-12 text-white/40 text-sm">Tap anywhere to close</div>
     </button>
   )

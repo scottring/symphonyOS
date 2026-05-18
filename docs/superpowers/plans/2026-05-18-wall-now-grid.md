@@ -712,6 +712,27 @@ describe('WallQuadrantExpand', () => {
     fireEvent.click(screen.getByRole('button', { name: /close/i }))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
+
+  it('renders the "Soon" tag for an urgent line', () => {
+    render(
+      <WallQuadrantExpand
+        content={{ ...content, lines: [{ text: 'Leave for soccer', tag: 'urgent' }] }}
+        onClose={() => {}}
+      />
+    )
+    expect(screen.getByText('Soon')).toBeInTheDocument()
+  })
+
+  it('renders no lines and keeps the headline when lines is empty', () => {
+    render(
+      <WallQuadrantExpand
+        content={{ ...content, lines: [] }}
+        onClose={() => {}}
+      />
+    )
+    expect(screen.queryByText('Reply to Caitlin')).not.toBeInTheDocument()
+    expect(screen.getByText('3 things waiting')).toBeInTheDocument()
+  })
 })
 ```
 
@@ -735,7 +756,7 @@ export function WallQuadrantExpand({ content, onClose }: WallQuadrantExpandProps
   return (
     <button
       type="button"
-      aria-label="Close"
+      aria-label="Close expanded view"
       onClick={onClose}
       className="fixed inset-0 z-50 bg-neutral-950/95 flex flex-col items-center justify-center p-16 text-center"
     >
@@ -760,6 +781,7 @@ export function WallQuadrantExpand({ content, onClose }: WallQuadrantExpandProps
           ))}
         </div>
       )}
+      {/* footer intentionally omitted in the expand view — the full lines list is the content here */}
       <div className="mt-12 text-white/40 text-sm">Tap anywhere to close</div>
     </button>
   )
