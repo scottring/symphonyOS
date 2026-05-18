@@ -80,19 +80,15 @@ export function useContextEngine(
       .sort((a, b) => b.priority - a.priority)
   }, [data, rules, dismissed, debugMode])
 
-  // Auto-active context: the top surfaced rule, used when the user hasn't
-  // explicitly picked one. The wall *is* the matched context by default;
-  // Calendar is the fallback when nothing applies.
-  const activeContext = useMemo<ActiveContext | null>(() => {
-    if (userPickedContext) return userPickedContext
-    const top = surfacedRules[0]
-    if (!top) return null
-    return {
-      ruleId: top.id,
-      viewId: top.viewId as ContextViewId,
-      activatedAt: new Date(),
-    }
-  }, [userPickedContext, surfacedRules])
+  // Active context = user-picked only. The new wall layout (Now Card +
+  // Right Column + Rhythm Bar) is the primary surface; ContextOverlay only
+  // appears when the user explicitly invokes activateContext(ruleId).
+  // (Previously this auto-activated the top surfaced rule, which caused the
+  // ContextOverlay to render on top of the wall, hiding it and blocking taps.)
+  const activeContext = useMemo<ActiveContext | null>(
+    () => userPickedContext,
+    [userPickedContext],
+  )
 
   // Re-evaluate every 60 seconds
   useEffect(() => {
