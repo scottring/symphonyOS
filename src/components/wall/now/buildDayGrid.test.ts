@@ -67,7 +67,7 @@ describe('buildDayGrid', () => {
     expect(grid.upNext.tap).toEqual({ quadrant: 'upNext', itemId: null })
   })
 
-  it('Today caps the list at 3 remaining timed items and uses the quiet headline', () => {
+  it('Today returns all remaining timed items (visual cap applied downstream)', () => {
     const grid = buildDayGrid(baseInput({
       todayItems: [
         todayItem('t1', 'A', 14), todayItem('t2', 'B', 15),
@@ -76,8 +76,21 @@ describe('buildDayGrid', () => {
       ],
     }))
     expect(grid.today.headline).toBe('A quiet afternoon')
-    expect(grid.today.lines).toHaveLength(3)
-    expect(grid.today.lines.map(l => l.text)).toEqual(['A', 'B', 'C'])
+    expect(grid.today.lines).toHaveLength(4)
+    expect(grid.today.lines.map(l => l.text)).toEqual(['A', 'B', 'C', 'D'])
+  })
+
+  it('Pending returns all overflow items so the expand view can show them', () => {
+    const grid = buildDayGrid(baseInput({
+      overdueTasks: [
+        timeline('o1', 'One', 9, -1), timeline('o2', 'Two', 9, -1),
+        timeline('o3', 'Three', 9, -1), timeline('o4', 'Four', 9, -1),
+        timeline('o5', 'Five', 9, -1),
+      ],
+    }))
+    expect(grid.pending.headline).toBe('5 things waiting')
+    expect(grid.pending.lines).toHaveLength(5)
+    expect(grid.pending.lines.every(l => l.tag === 'overdue')).toBe(true)
   })
 
   it('Pending is neutral by default and tags only overdue lines', () => {

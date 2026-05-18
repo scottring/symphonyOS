@@ -203,7 +203,7 @@ describe('buildDayGrid', () => {
     expect(grid.upNext.tap).toEqual({ quadrant: 'upNext', itemId: null })
   })
 
-  it('Today caps the list at 3 remaining timed items and uses the quiet headline', () => {
+  it('Today returns all remaining timed items (visual cap applied downstream)', () => {
     const grid = buildDayGrid(baseInput({
       todayItems: [
         todayItem('t1', 'A', 14), todayItem('t2', 'B', 15),
@@ -212,8 +212,21 @@ describe('buildDayGrid', () => {
       ],
     }))
     expect(grid.today.headline).toBe('A quiet afternoon')
-    expect(grid.today.lines).toHaveLength(3)
-    expect(grid.today.lines.map(l => l.text)).toEqual(['A', 'B', 'C'])
+    expect(grid.today.lines).toHaveLength(4)
+    expect(grid.today.lines.map(l => l.text)).toEqual(['A', 'B', 'C', 'D'])
+  })
+
+  it('Pending returns all overflow items so the expand view can show them', () => {
+    const grid = buildDayGrid(baseInput({
+      overdueTasks: [
+        timeline('o1', 'One', 9, -1), timeline('o2', 'Two', 9, -1),
+        timeline('o3', 'Three', 9, -1), timeline('o4', 'Four', 9, -1),
+        timeline('o5', 'Five', 9, -1),
+      ],
+    }))
+    expect(grid.pending.headline).toBe('5 things waiting')
+    expect(grid.pending.lines).toHaveLength(5)
+    expect(grid.pending.lines.every(l => l.tag === 'overdue')).toBe(true)
   })
 
   it('Pending is neutral by default and tags only overdue lines', () => {
@@ -297,7 +310,9 @@ export interface BuildDayGridInput {
   familyPrompt: string | null
 }
 
-const MAX_LINES = 3
+// The builder returns the FULL (bounded) list. The visual 3-line cap is
+// applied by WallNowQuadrant; the tap-to-expand overlay shows all of these.
+const MAX_DATA_LINES = 8
 const SECTION_ORDER: DaySection[] = ['allday', 'morning', 'afternoon', 'evening', 'unscheduled']
 
 function nextFutureItem(days: WallDayData[], now: Date): TimelineItem | null {
@@ -333,7 +348,7 @@ function buildUpNext(input: BuildDayGridInput): QuadrantContent {
 function buildToday(input: BuildDayGridInput): QuadrantContent {
   const remaining = input.todayItems
     .filter(i => !i.completed && i.startTime !== null)
-    .slice(0, MAX_LINES)
+    .slice(0, MAX_DATA_LINES)
   return {
     eyebrow: 'TODAY',
     headline: remaining.length === 0 ? 'All clear today' : 'A quiet afternoon',
@@ -345,13 +360,13 @@ function buildToday(input: BuildDayGridInput): QuadrantContent {
 function buildPending(input: BuildDayGridInput): QuadrantContent {
   const lines: QuadrantLine[] = []
   for (const t of input.overdueTasks) {
-    if (lines.length >= MAX_LINES) break
+    if (lines.length >= MAX_DATA_LINES) break
     lines.push({ text: t.title, tag: 'overdue' })
   }
-  if (lines.length < MAX_LINES && input.inboxCount > 0) {
+  if (lines.length < MAX_DATA_LINES && input.inboxCount > 0) {
     lines.push({ text: `${input.inboxCount} inbox item${input.inboxCount === 1 ? '' : 's'}` })
   }
-  if (lines.length < MAX_LINES && input.emailCount > 0) {
+  if (lines.length < MAX_DATA_LINES && input.emailCount > 0) {
     lines.push({ text: `${input.emailCount} email${input.emailCount === 1 ? '' : 's'} waiting` })
   }
   const total = input.overdueTasks.length + (input.inboxCount > 0 ? 1 : 0) + (input.emailCount > 0 ? 1 : 0)
@@ -985,7 +1000,7 @@ cross-fade smooth on mode change, reduced-motion instant."
 - 2×2 grid in Day-mode default only → Tasks 2, 6 (focus.kind/mode guard).
 - Four fixed quadrants Up Next / Today / Pending / Family Question → Task 2 (`buildDayGrid`), Task 4 (layout order).
 - No quadrant ever blank (wider-window fallbacks) → Task 2 tests (`Nothing scheduled`, `All clear today`, `All caught up`, `No question today`).
-- Refinement 1 (3-line cap, big serif headline, no scroll) → Task 2 (`MAX_LINES`), Task 3 (`slice(0,3)`, `font-display text-3xl`, `line-clamp-2`).
+- Refinement 1 (visual 3-line cap + no scroll) → Task 3 ('slice(0,3)'); builder returns full bounded list (MAX_DATA_LINES) so the expand overlay (Task 5) shows everything.
 - Refinement 2 (Family = prompt only, no Jax/photo footer) → Task 2 `buildFamilyQuestion` emits no footer/lines.
 - Refinement 3 (Pending neutral, color on line only) → Task 2 (`tag` per line, headline neutral), Task 3 (`neutral` variant bg, tag styling on `<li>` only).
 - Refinement 4 (400–500ms cross-fade, reduced-motion instant, no surrounding shift) → Task 1 + Task 6 (keyed fade wrapper inside the card; chrome/right column untouched).

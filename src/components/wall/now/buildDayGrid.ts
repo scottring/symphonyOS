@@ -42,7 +42,9 @@ export interface BuildDayGridInput {
   familyPrompt: string | null
 }
 
-const MAX_LINES = 3
+// The builder returns the FULL (bounded) list. The visual 3-line cap is
+// applied by WallNowQuadrant; the tap-to-expand overlay shows all of these.
+const MAX_DATA_LINES = 8
 const SECTION_ORDER: DaySection[] = ['allday', 'morning', 'afternoon', 'evening', 'unscheduled']
 
 function nextFutureItem(days: WallDayData[], now: Date): TimelineItem | null {
@@ -78,7 +80,7 @@ function buildUpNext(input: BuildDayGridInput): QuadrantContent {
 function buildToday(input: BuildDayGridInput): QuadrantContent {
   const remaining = input.todayItems
     .filter(i => !i.completed && i.startTime !== null)
-    .slice(0, MAX_LINES)
+    .slice(0, MAX_DATA_LINES)
   return {
     eyebrow: 'TODAY',
     headline: remaining.length === 0 ? 'All clear today' : 'A quiet afternoon',
@@ -90,13 +92,13 @@ function buildToday(input: BuildDayGridInput): QuadrantContent {
 function buildPending(input: BuildDayGridInput): QuadrantContent {
   const lines: QuadrantLine[] = []
   for (const t of input.overdueTasks) {
-    if (lines.length >= MAX_LINES) break
+    if (lines.length >= MAX_DATA_LINES) break
     lines.push({ text: t.title, tag: 'overdue' })
   }
-  if (lines.length < MAX_LINES && input.inboxCount > 0) {
+  if (lines.length < MAX_DATA_LINES && input.inboxCount > 0) {
     lines.push({ text: `${input.inboxCount} inbox item${input.inboxCount === 1 ? '' : 's'}` })
   }
-  if (lines.length < MAX_LINES && input.emailCount > 0) {
+  if (lines.length < MAX_DATA_LINES && input.emailCount > 0) {
     lines.push({ text: `${input.emailCount} email${input.emailCount === 1 ? '' : 's'} waiting` })
   }
   const total = input.overdueTasks.length + (input.inboxCount > 0 ? 1 : 0) + (input.emailCount > 0 ? 1 : 0)
