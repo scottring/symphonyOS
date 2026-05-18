@@ -54,7 +54,7 @@ Per quadrant, hard limits:
 - **Body:** **at most 3 list items**, single line each, ellipsis after. Never 4, never 5.
 - **Footer (optional):** one line, low-emphasis, only if it earns the space.
 
-If a data source has more than 3 items, show the top 3 by the source's own sort and append a `+N more` affordance (which is also the tap target — see Refinement 5). No quadrant scrolls.
+If a data source has more than 3 items, show the top 3 by the source's own sort. The **headline carries the overflow signal** (e.g. "6 things waiting" while 3 lines show) — there is no separate `+N more` line. The whole quadrant is the tap target (Refinement 5); the expand overlay shows the full list. The builder returns the full bounded list (≤8) so the expand has everything; the visual 3-line cap is applied by the quadrant shell. No quadrant scrolls.
 
 ### Refinement 2 — Family Question quadrant is the prompt, full stop
 
@@ -138,7 +138,7 @@ New components (under the existing wall directory, alongside the redesign):
 
 ## Testing
 
-- **Unit:** each content adapter — empty source → fallback headline (no blank quadrant); >3 items → exactly 3 + `+N more`; Pending neutral by default, red tag only when an item is overdue.
+- **Unit:** each content adapter — empty source → fallback headline (no blank quadrant); >3 items → full bounded list returned (≤8), headline reflects true count, quadrant shell renders only 3; Pending neutral by default, red tag only when an item is overdue.
 - **Unit:** `WallNowGrid` renders only for Day mode + priority row 6; rows 1–5 and non-Day modes still render the single hero.
 - **Component:** tapping each quadrant triggers the correct override (Up Next → event hero, Pending → triage overlay, etc.) and inherits 5-min auto-return.
 - **Visual/manual:** 1920×1080 at 8 feet — every headline and body line legible; no quadrant scrolls or clips; cross-fade is smooth and shifts nothing in chrome/right column; `prefers-reduced-motion` → instant swap.
