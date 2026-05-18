@@ -64,7 +64,13 @@ export function StagingFloat({
     (taskId: string) => async (name: string, context: TaskContext | null) => {
       const project = await addProject({ name, context: context ?? undefined })
       if (!project) return
-      await onUpdateTask?.(taskId, { projectId: project.id })
+      try {
+        await onUpdateTask?.(taskId, { projectId: project.id })
+      } catch (err) {
+        console.error('Failed to attach project to task:', err)
+        await deleteProject(project.id)
+        return
+      }
       setUndo({
         taskId,
         message: `Attached to '${project.name}'`,
@@ -146,10 +152,10 @@ export function StagingFloat({
     }, 220)
   }, [onPullToToday, onDeferTask, onDeleteTask, onUpdateTask])
 
-  const handleUndo = useCallback(() => {
+  const handleUndo = useCallback(async () => {
     if (!undo || !onUpdateTask) { setUndo(null); return }
     onUpdateTask(undo.taskId, undo.previous)
-    if (undo.onUndoExtra) undo.onUndoExtra()
+    if (undo.onUndoExtra) await undo.onUndoExtra()
     setUndo(null)
   }, [undo, onUpdateTask])
 
