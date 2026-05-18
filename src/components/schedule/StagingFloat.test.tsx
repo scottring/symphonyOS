@@ -119,8 +119,16 @@ describe('StagingFloat', () => {
     })
   })
 
-  it('renders nothing when no week tasks', () => {
-    const { container } = render(<StagingFloat {...baseProps} weekTasks={[]} />)
-    expect(container.firstChild).toBeNull()
+  it('still renders the trigger (count 0) when there are no week tasks', () => {
+    render(<StagingFloat {...baseProps} weekTasks={[]} />)
+    const trigger = screen.getByRole('button', { name: /this week/i })
+    expect(trigger).toBeInTheDocument()
+    expect(trigger).toHaveTextContent('0')
+  })
+
+  it('shows an empty state in the dialog when opened with no week tasks', () => {
+    render(<StagingFloat {...baseProps} weekTasks={[]} />)
+    fireEvent.click(screen.getByRole('button', { name: /this week/i }))
+    expect(screen.getByText(/nothing scheduled this week/i)).toBeInTheDocument()
   })
 })

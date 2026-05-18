@@ -271,7 +271,9 @@ export function StagingFloat({
     setUndo(null)
   }, [undo, onUpdateTask])
 
-  if (weekTasks.length === 0) return null
+  // The trigger always renders (even at count 0) so "This Week" stays a
+  // stable triage target. The dialog body shows an empty state when there
+  // are no week tasks rather than the whole control disappearing.
 
   const triggerClass = inline
     ? 'inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] text-neutral-500 hover:bg-neutral-100 transition-colors'
