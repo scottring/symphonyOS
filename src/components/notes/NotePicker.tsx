@@ -132,6 +132,7 @@ export function NotePicker({ task, notes, domain, onSelect, onClose }: NotePicke
       <div className="px-3 py-2 border-b border-neutral-100">
         <input
           type="text"
+          aria-label="Search notes"
           placeholder="Search notes…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
