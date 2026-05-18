@@ -100,4 +100,40 @@ describe('WallNowCard', () => {
     )
     expect(screen.getByText('All clear')).toBeInTheDocument()
   })
+
+  it('applies the fade-in class to the content wrapper by default', () => {
+    const { container } = render(
+      <WallNowCard
+        focus={{ kind: 'mode-default', mode: 'day' }}
+        pinned={false}
+        onPinToggle={() => {}}
+        familyPrompt={null}
+        todayItems={[]}
+      />
+    )
+    expect(container.querySelector('.wall-now-fade-in')).not.toBeNull()
+  })
+
+  it('omits the fade-in class when the user prefers reduced motion', () => {
+    const original = window.matchMedia
+    window.matchMedia = ((q: string) => ({
+      matches: true, media: q, onchange: null,
+      addEventListener: () => {}, removeEventListener: () => {},
+      addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia
+    try {
+      const { container } = render(
+        <WallNowCard
+          focus={{ kind: 'mode-default', mode: 'day' }}
+          pinned={false}
+          onPinToggle={() => {}}
+          familyPrompt={null}
+          todayItems={[]}
+        />
+      )
+      expect(container.querySelector('.wall-now-fade-in')).toBeNull()
+    } finally {
+      window.matchMedia = original
+    }
+  })
 })

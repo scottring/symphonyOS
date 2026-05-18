@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from 'react'
 import { Pin } from 'lucide-react'
 import { RHYTHM_MODE_LABELS, type RhythmMode } from './rhythm/rhythmMode'
 import type { NowFocus } from './nowFocus'
@@ -6,6 +5,7 @@ import type { TodayItem } from './today/todayItem'
 import { WallNowGrid } from './now/WallNowGrid'
 import type { DayGridData, DayGridTapTarget } from './now/buildDayGrid'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
+import './now/wallNowFade.css'
 
 // ─── helpers ─────────────────────────────────────────────────────
 
@@ -231,19 +231,6 @@ export function WallNowCard({
         ? `override-item:${focus.itemId}`
         : 'imminent'
 
-  const [fadeKey, setFadeKey] = useState(focusKey)
-  const [visible, setVisible] = useState(true)
-  const prev = useRef(focusKey)
-
-  useEffect(() => {
-    if (prev.current === focusKey) return
-    prev.current = focusKey
-    if (reducedMotion) { setFadeKey(focusKey); return }
-    setVisible(false)
-    const t = setTimeout(() => { setFadeKey(focusKey); setVisible(true) }, 220)
-    return () => clearTimeout(t)
-  }, [focusKey, reducedMotion])
-
   return (
     <div className="rounded-2xl bg-gradient-to-br from-emerald-900 to-teal-900 p-7 text-white flex flex-col gap-3 h-full shadow-lg overflow-hidden">
       <div className="flex items-start justify-between">
@@ -258,9 +245,8 @@ export function WallNowCard({
         </button>
       </div>
       <div
-        key={fadeKey}
-        className="flex-1 min-h-0 flex flex-col transition-opacity duration-200"
-        style={{ opacity: visible || reducedMotion ? 1 : 0 }}
+        key={focusKey}
+        className={`flex-1 min-h-0 flex flex-col ${reducedMotion ? '' : 'wall-now-fade-in'}`}
       >
         {renderContent()}
       </div>

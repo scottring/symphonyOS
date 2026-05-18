@@ -807,6 +807,7 @@ git commit -m "feat(wall): add WallQuadrantExpand overlay"
 `WallNowCard` gains an optional `dayGrid` + `onQuadrantTap` prop pair. When focus resolves to `mode-default` with `mode === 'day'` AND `dayGrid` is supplied, render `<WallNowGrid>` instead of the single list. All other branches unchanged. Wrap the rendered content in a cross-fade keyed by focus, gated by `usePrefersReducedMotion`.
 
 **Files:**
+- Create: `src/components/wall/now/wallNowFade.css` — `@keyframes wall-now-fade-in` (from opacity 0 to 1, 450ms ease-out) + `.wall-now-fade-in` class + `prefers-reduced-motion: reduce` disables animation
 - Modify: `src/components/wall/WallNowCard.tsx`
 - Modify (add test): `src/components/wall/WallNowCard.test.tsx`
 
@@ -849,6 +850,42 @@ Add these two `it` blocks inside the existing `describe('WallNowCard', ...)` in 
     )
     expect(screen.getByText('All clear')).toBeInTheDocument()
   })
+
+  it('applies the fade-in class to the content wrapper by default', () => {
+    const { container } = render(
+      <WallNowCard
+        focus={{ kind: 'mode-default', mode: 'day' }}
+        pinned={false}
+        onPinToggle={() => {}}
+        familyPrompt={null}
+        todayItems={[]}
+      />
+    )
+    expect(container.querySelector('.wall-now-fade-in')).not.toBeNull()
+  })
+
+  it('omits the fade-in class when the user prefers reduced motion', () => {
+    const original = window.matchMedia
+    window.matchMedia = ((q: string) => ({
+      matches: true, media: q, onchange: null,
+      addEventListener: () => {}, removeEventListener: () => {},
+      addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia
+    try {
+      const { container } = render(
+        <WallNowCard
+          focus={{ kind: 'mode-default', mode: 'day' }}
+          pinned={false}
+          onPinToggle={() => {}}
+          familyPrompt={null}
+          todayItems={[]}
+        />
+      )
+      expect(container.querySelector('.wall-now-fade-in')).toBeNull()
+    } finally {
+      window.matchMedia = original
+    }
+  })
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -861,10 +898,10 @@ Expected: FAIL — `dayGrid`/`onQuadrantTap` props don't exist; grid not rendere
 3a. Add imports after line 4 (`import type { TodayItem } ...`):
 
 ```tsx
-import { useEffect, useRef, useState } from 'react'
 import { WallNowGrid } from './now/WallNowGrid'
 import type { DayGridData, DayGridTapTarget } from './now/buildDayGrid'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
+import './now/wallNowFade.css'
 ```
 
 3b. Extend `WallNowCardProps` (the interface ending at line 148) — add two optional props before the closing brace:
@@ -885,7 +922,7 @@ import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
     }
 ```
 
-3e. Add the cross-fade wrapper. Replace the component's final `return (...)` block (lines 213–228) with:
+3e. Add the CSS fade wrapper. Replace the component's final `return (...)` block with:
 
 ```tsx
   const reducedMotion = usePrefersReducedMotion()
@@ -895,19 +932,6 @@ import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
       : focus.kind === 'override-item'
         ? `override-item:${focus.itemId}`
         : 'imminent'
-
-  const [fadeKey, setFadeKey] = useState(focusKey)
-  const [visible, setVisible] = useState(true)
-  const prev = useRef(focusKey)
-
-  useEffect(() => {
-    if (prev.current === focusKey) return
-    prev.current = focusKey
-    if (reducedMotion) { setFadeKey(focusKey); return }
-    setVisible(false)
-    const t = setTimeout(() => { setFadeKey(focusKey); setVisible(true) }, 220)
-    return () => clearTimeout(t)
-  }, [focusKey, reducedMotion])
 
   return (
     <div className="rounded-2xl bg-gradient-to-br from-emerald-900 to-teal-900 p-7 text-white flex flex-col gap-3 h-full shadow-lg overflow-hidden">
@@ -923,9 +947,8 @@ import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
         </button>
       </div>
       <div
-        key={fadeKey}
-        className="flex-1 min-h-0 flex flex-col transition-opacity duration-200"
-        style={{ opacity: visible || reducedMotion ? 1 : 0 }}
+        key={focusKey}
+        className={`flex-1 min-h-0 flex flex-col ${reducedMotion ? '' : 'wall-now-fade-in'}`}
       >
         {renderContent()}
       </div>
@@ -933,7 +956,7 @@ import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
   )
 ```
 
-> The 220ms fade-out + 200ms fade-in ≈ the spec's 400–500ms total. `reducedMotion` makes the swap instant (opacity stays 1, key flips immediately).
+> Incoming content fades in over 450ms via a CSS keyframe on the keyed wrapper; prefers-reduced-motion (and the hook) disable it. No JS timers.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -1066,7 +1089,7 @@ cross-fade smooth on mode change, reduced-motion instant."
 - Refinement 1 (visual 3-line cap + no scroll) → Task 3 ('slice(0,3)'); builder returns full bounded list (MAX_DATA_LINES) so the expand overlay (Task 5) shows everything.
 - Refinement 2 (Family = prompt only, no Jax/photo footer) → Task 2 `buildFamilyQuestion` emits no footer/lines.
 - Refinement 3 (Pending neutral, color on line only) → Task 2 (`tag` per line, headline neutral), Task 3 (`neutral` variant bg, tag styling on `<li>` only).
-- Refinement 4 (400–500ms cross-fade, reduced-motion instant, no surrounding shift) → Task 1 + Task 6 (keyed fade wrapper inside the card; chrome/right column untouched).
+- Refinement 4 (incoming fades in ~450ms, reduced-motion disables, no surrounding shift) → Task 1 + Task 6 (CSS keyframe on keyed wrapper inside the card; chrome/right column untouched).
 - Refinement 5 (quadrants tappable, expand) → Tasks 3/4 (`onTap`), Task 5 (`WallQuadrantExpand`), Task 7 (wiring). **Deviation:** Pending → uniform expand, not triage overlay — flagged in header.
 - Active modes unchanged → Task 6 guard returns grid ONLY for `mode-default` + `day` + `dayGrid`; every other branch falls through to existing renderers.
 - Out-of-scope items (no resolver change, no right column/rhythm bar change, fixed quadrants) → respected; no task touches `nowFocus.ts`, `WallRightColumn`, or `WallRhythmBar`.

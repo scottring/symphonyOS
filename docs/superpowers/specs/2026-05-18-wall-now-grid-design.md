@@ -78,7 +78,7 @@ When any priority row 1–5 becomes active — or the clock enters Morning / Aft
 
 ### Refinement 4 — Soft transition between grid and hero
 
-On a desktop a layout swap is instant and fine. On a wall you walk past mid-transition, and an abrupt 2×2 → single-hero jump (or the reverse at 3 PM) is jarring at room scale. The Now Card region cross-fades on mode/priority change: outgoing layout fades out and incoming fades in over **400–500ms**, with no layout shift in the surrounding chrome or right column. This applies to grid↔hero and hero↔hero transitions. Respect `prefers-reduced-motion` (instant swap if set).
+On a desktop a layout swap is instant and fine. On a wall you walk past mid-transition, and an abrupt 2×2 → single-hero jump (or the reverse at 3 PM) is jarring at room scale. On focus/mode change the incoming Now Card content fades in over ~450ms (a CSS keyframe on the keyed content wrapper). There is no separate fade-out; replacement is immediate then fades in, which reads as a smooth dissolve at room scale without the abrupt jump. No layout shift in the surrounding chrome or right column. Respects `prefers-reduced-motion` (no animation).
 
 ---
 
