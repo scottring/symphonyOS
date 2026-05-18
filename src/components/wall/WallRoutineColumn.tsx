@@ -1,5 +1,6 @@
 import { useCallback, useState, useRef } from 'react'
 import type { TimelineItem } from '@/types/timeline'
+import { isEverydayRoutine } from '@/lib/routineUtils'
 import confetti from 'canvas-confetti'
 
 interface WallRoutineColumnProps {
@@ -51,9 +52,10 @@ function formatItemTime(item: TimelineItem): string | null {
 }
 
 export function WallRoutineColumn({ choreItems, onComplete }: WallRoutineColumnProps) {
-  // Split into specials (non-daily) vs daily chores
-  const specials = choreItems.filter(i => i.recurrencePattern?.type && i.recurrencePattern.type !== 'daily')
-  const dailies = choreItems.filter(i => !i.recurrencePattern?.type || i.recurrencePattern.type === 'daily')
+  // Split into specials (genuinely occasional) vs everyday chores. A weekly
+  // routine that covers every weekday is everyday in practice, not a special.
+  const specials = choreItems.filter(i => !isEverydayRoutine(i.recurrencePattern) && i.recurrencePattern?.type)
+  const dailies = choreItems.filter(i => isEverydayRoutine(i.recurrencePattern) || !i.recurrencePattern?.type)
 
   const incompleteSpecials = specials.filter(i => !i.completed)
   const completedSpecials = specials.filter(i => i.completed)

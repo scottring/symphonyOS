@@ -1,4 +1,26 @@
-import type { Routine } from '@/types/actionable'
+import type { Routine, RecurrencePattern } from '@/types/actionable'
+
+const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const
+
+/**
+ * True when a routine effectively recurs every weekday — either a plain
+ * `daily` routine, or a `weekly` routine whose selected days cover all five
+ * weekdays (Mon–Fri, optionally plus weekends).
+ *
+ * The wall uses this to treat background everyday routines (brush teeth,
+ * morning standup) differently from genuinely occasional ones (soccer
+ * Tue/Thu). A weekly routine listing every weekday is everyday in practice,
+ * so it must not leak into the "specials" / look-ahead surfaces.
+ */
+export function isEverydayRoutine(rp?: RecurrencePattern | null): boolean {
+  if (!rp) return false
+  if (rp.type === 'daily') return true
+  if (rp.type === 'weekly' && rp.days) {
+    const set = new Set(rp.days.map(d => d.toLowerCase()))
+    return WEEKDAYS.every(d => set.has(d))
+  }
+  return false
+}
 
 /**
  * Format a date as YYYY-MM-DD in local timezone.

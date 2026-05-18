@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Routine, RecurrencePattern } from '@/types/actionable'
-import { matchesRecurrenceForDate, getRoutinesForDatePure } from './routineUtils'
+import { matchesRecurrenceForDate, getRoutinesForDatePure, isEverydayRoutine } from './routineUtils'
 
 function makeRoutine(pattern: RecurrencePattern, overrides: Partial<Routine> = {}): Routine {
   return {
@@ -100,5 +100,49 @@ describe('getRoutinesForDatePure with since_last', () => {
     const today = new Date(2026, 4, 17)
     const result = getRoutinesForDatePure([haircut], today)
     expect(result.map(r => r.id)).toEqual(['haircut'])
+  })
+})
+
+describe('isEverydayRoutine', () => {
+  it('treats a plain daily routine as everyday', () => {
+    expect(isEverydayRoutine({ type: 'daily' })).toBe(true)
+  })
+
+  it('treats a weekly routine covering all five weekdays as everyday', () => {
+    expect(isEverydayRoutine({ type: 'weekly', days: ['mon', 'tue', 'wed', 'thu', 'fri'] })).toBe(true)
+  })
+
+  it('treats a weekly routine covering all seven days as everyday', () => {
+    expect(
+      isEverydayRoutine({ type: 'weekly', days: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] }),
+    ).toBe(true)
+  })
+
+  it('is case-insensitive on day strings', () => {
+    expect(isEverydayRoutine({ type: 'weekly', days: ['MON', 'Tue', 'wed', 'THU', 'Fri'] })).toBe(true)
+  })
+
+  it('does NOT treat an occasional weekly routine (e.g. soccer Tue/Thu) as everyday', () => {
+    expect(isEverydayRoutine({ type: 'weekly', days: ['tue', 'thu'] })).toBe(false)
+  })
+
+  it('does NOT treat a weekday-missing weekly routine as everyday', () => {
+    // Mon–Thu only — missing Fri, so not "every weekday"
+    expect(isEverydayRoutine({ type: 'weekly', days: ['mon', 'tue', 'wed', 'thu'] })).toBe(false)
+  })
+
+  it('returns false for monthly / specific_days / since_last patterns', () => {
+    expect(isEverydayRoutine({ type: 'monthly', day_of_month: 1 })).toBe(false)
+    expect(isEverydayRoutine({ type: 'specific_days', dates: ['2026-07-04'] })).toBe(false)
+    expect(isEverydayRoutine({ type: 'since_last', interval: 6, unit: 'weeks' })).toBe(false)
+  })
+
+  it('returns false for missing / undefined pattern', () => {
+    expect(isEverydayRoutine(undefined)).toBe(false)
+    expect(isEverydayRoutine(null)).toBe(false)
+  })
+
+  it('returns false for a weekly routine with no days array', () => {
+    expect(isEverydayRoutine({ type: 'weekly' })).toBe(false)
   })
 })

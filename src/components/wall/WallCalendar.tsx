@@ -10,6 +10,7 @@ import { WallItemDetail } from './WallItemDetail'
 import { findDinnerEvent, getMealIcon } from './WallDinnerWidget'
 import { WallRecipeViewer } from './WallRecipeViewer'
 import { extractRecipeNameHint, detectRecipeUrl } from '@/lib/recipeDetection'
+import { isEverydayRoutine } from '@/lib/routineUtils'
 import { useContextEngine, ContextOverlay } from './contexts'
 import type { ContextEvalData } from './contexts'
 import { useWeather } from '@/hooks/useWeather'
@@ -268,8 +269,7 @@ export function WallCalendar() {
         if (item.type === 'task') {
           tasks.push(item)
         } else if (item.type === 'routine') {
-          const isDaily = item.recurrencePattern?.type === 'daily'
-          if (isDaily) dailyChores.push(item)
+          if (isEverydayRoutine(item.recurrencePattern)) dailyChores.push(item)
         }
       }
     }
