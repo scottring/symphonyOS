@@ -6,15 +6,19 @@ import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useDomain } from '@/hooks/useDomain'
 import { useInboxMode } from '@/hooks/useInboxMode'
 import { useProjects } from '@/hooks/useProjects'
+import { useNotes } from '@/hooks/useNotes'
+import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { HomeNeedsDetailsSection } from '@/apps/home/inbox/HomeNeedsDetailsSection'
+import { NotePicker, type NotePickerSelection } from '@/components/notes/NotePicker'
+import { formatInboxBullet } from '@/lib/inboxBullet'
 import { DenseInboxRow, type QuickAction } from './DenseInboxRow'
 import { FocusInboxCard } from './FocusInboxCard'
 import { InboxModeToggle } from './InboxModeToggle'
 import { InboxUndoToast } from './InboxUndoToast'
 
 const INBOX_ACTIONS: QuickAction[] = [
-  { kind: 'today' }, { kind: 'week' }, { kind: 'month' }, { kind: 'someday' }, { kind: 'delete' }
+  { kind: 'today' }, { kind: 'week' }, { kind: 'month' }, { kind: 'someday' }, { kind: 'note' }, { kind: 'delete' }
 ]
 
 const BUCKET_LABELS: Record<'week' | 'month' | 'quarter', string> = {
@@ -52,8 +56,12 @@ export function InboxView({
   } = useScheduleActionsContext()
 
   const { addProject, deleteProject } = useProjects()
+  const { notes, addNote, updateNote, deleteNote } = useNotes()
+  const { addTask } = useSupabaseTasks()
 
   const { currentDomain } = useDomain()
+
+  const [notePickerTaskId, setNotePickerTaskId] = useState<string | null>(null)
   const [mode, setMode] = useInboxMode()
 
   const makeOnCreateProject = useCallback(
@@ -77,6 +85,87 @@ export function InboxView({
     },
     [addProject, deleteProject, onUpdateTask],
   )
+
+  const handleNoteSelect = useCallback(async (task: Task, selection: NotePickerSelection) => {
+    const now = new Date()
+    const bullet = formatInboxBullet({ title: task.title, notes: task.notes }, now)
+    const taskSnapshot = { ...task }
+
+    if (selection.kind === 'existing') {
+      const target = notes.find((n) => n.id === selection.noteId)
+      if (!target) {
+        setNotePickerTaskId(null)
+        return
+      }
+      const previousContent = target.content
+      const newContent = previousContent + '\n' + bullet
+      await updateNote(target.id, { content: newContent })
+      if (onDeleteTask) onDeleteTask(task.id)
+      setUndo({
+        taskId: task.id,
+        message: `Sent to '${target.title ?? 'note'}'`,
+        previous: {},
+        undoable: true,
+        onUndoExtra: async () => {
+          await updateNote(target.id, { content: previousContent })
+          await addTask(
+            taskSnapshot.title,
+            taskSnapshot.contactId,
+            taskSnapshot.projectId,
+            taskSnapshot.scheduledFor,
+            {
+              context: taskSnapshot.context,
+              assignedTo: taskSnapshot.assignedTo ?? null,
+              assignedToAll: taskSnapshot.assignedToAll,
+              category: taskSnapshot.category,
+              isAllDay: taskSnapshot.isAllDay,
+              location: taskSnapshot.location,
+              locationPlaceId: taskSnapshot.locationPlaceId,
+            },
+          )
+        },
+      })
+    } else {
+      // kind === 'new'
+      const created = await addNote({
+        title: selection.title,
+        content: bullet,
+        type: 'general',
+        source: 'inbox_triage',
+        context: taskSnapshot.context ?? (currentDomain !== 'universal' ? currentDomain : undefined),
+      })
+      if (!created) {
+        setNotePickerTaskId(null)
+        return
+      }
+      if (onDeleteTask) onDeleteTask(task.id)
+      setUndo({
+        taskId: task.id,
+        message: `Created '${created.title ?? selection.title}'`,
+        previous: {},
+        undoable: true,
+        onUndoExtra: async () => {
+          await deleteNote(created.id)
+          await addTask(
+            taskSnapshot.title,
+            taskSnapshot.contactId,
+            taskSnapshot.projectId,
+            taskSnapshot.scheduledFor,
+            {
+              context: taskSnapshot.context,
+              assignedTo: taskSnapshot.assignedTo ?? null,
+              assignedToAll: taskSnapshot.assignedToAll,
+              category: taskSnapshot.category,
+              isAllDay: taskSnapshot.isAllDay,
+              location: taskSnapshot.location,
+              locationPlaceId: taskSnapshot.locationPlaceId,
+            },
+          )
+        },
+      })
+    }
+    setNotePickerTaskId(null)
+  }, [notes, updateNote, deleteNote, addNote, addTask, onDeleteTask, currentDomain])
 
   // Domain + privacy filter
   const filteredByDomain = useMemo(() => {
@@ -170,8 +259,11 @@ export function InboxView({
   }, [onPushTask, onDeleteTask])
 
   const handleUndo = useCallback(async () => {
-    if (!undo || !onUpdateTask) { setUndo(null); return }
-    onUpdateTask(undo.taskId, undo.previous)
+    if (!undo) { setUndo(null); return }
+    // Only call onUpdateTask if there are actual fields to restore
+    if (onUpdateTask && Object.keys(undo.previous).length > 0) {
+      onUpdateTask(undo.taskId, undo.previous)
+    }
     if (undo.onUndoExtra) await undo.onUndoExtra()
     setUndo(null)
   }, [undo, onUpdateTask])
@@ -195,22 +287,38 @@ export function InboxView({
   const renderRow = (task: Task) => {
     const project = projects.find((p) => p.id === task.projectId)
     return (
-      <DenseInboxRow
-        key={task.id}
-        task={task}
-        project={project}
-        projects={projects}
-        familyMembers={familyMembers}
-        quickActions={INBOX_ACTIONS}
-        isLeaving={leavingIds.has(task.id)}
-        onQuickAction={(action) => applyTriage(task, action)}
-        onToggleComplete={() => onToggleTask?.(task.id)}
-        onUpdate={(updates) => onUpdateTask?.(task.id, updates)}
-        onSelect={() => handleSelect(task.id)}
-        onOpenProject={onOpenProject}
-        onAssign={onAssignTaskAll ? (memberIds) => onAssignTaskAll(task.id, memberIds) : undefined}
-        onCreateProject={makeOnCreateProject(task.id)}
-      />
+      <div key={task.id} className="relative">
+        <DenseInboxRow
+          task={task}
+          project={project}
+          projects={projects}
+          familyMembers={familyMembers}
+          quickActions={INBOX_ACTIONS}
+          isLeaving={leavingIds.has(task.id)}
+          onQuickAction={(action) => {
+            if (action.kind === 'note') {
+              setNotePickerTaskId(task.id)
+              return
+            }
+            applyTriage(task, action)
+          }}
+          onToggleComplete={() => onToggleTask?.(task.id)}
+          onUpdate={(updates) => onUpdateTask?.(task.id, updates)}
+          onSelect={() => handleSelect(task.id)}
+          onOpenProject={onOpenProject}
+          onAssign={onAssignTaskAll ? (memberIds) => onAssignTaskAll(task.id, memberIds) : undefined}
+          onCreateProject={makeOnCreateProject(task.id)}
+        />
+        {notePickerTaskId === task.id && (
+          <NotePicker
+            task={task}
+            notes={notes}
+            domain={currentDomain}
+            onSelect={(sel) => handleNoteSelect(task, sel)}
+            onClose={() => setNotePickerTaskId(null)}
+          />
+        )}
+      </div>
     )
   }
 
