@@ -66,7 +66,11 @@ export function createRetryingImport<T>(
  * Drop-in replacement for React.lazy that survives post-deploy stale
  * chunks. Use exactly like `lazy(() => import('./X').then(...))`.
  */
-export function lazyWithRetry<T extends ComponentType<unknown>>(
+// Mirrors React.lazy's own signature (ComponentType<any>) so components
+// with specific required props stay assignable — a stricter constraint
+// like ComponentType<unknown> rejects them at the call site.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function lazyWithRetry<T extends ComponentType<any>>(
   factory: () => Promise<{ default: T }>
 ) {
   return lazy(createRetryingImport(factory))
