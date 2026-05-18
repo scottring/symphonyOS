@@ -4,6 +4,7 @@ import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
+import { isEverydayRoutine } from '@/lib/routineUtils'
 import type { ScheduleContextItem } from '@/components/triage'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import type { TimelineItem } from '@/types/timeline'
@@ -797,15 +798,17 @@ export function TodaySchedule({
 
   // Filter to only routines that should show on timeline.
   // - Per-routine `show_on_timeline` flag is always honored.
-  // - "Hide daily activities" toggle hides DAILY routines only; weekly/
-  //   monthly/etc. stay visible because they're rare-enough signal that
-  //   hiding them defeats the point of opening Today. Routines without
-  //   a recurrence_pattern default to visible (don't hide what we can't
+  // - "Hide daily activities" toggle hides every-day routines: plain daily
+  //   AND weekly routines that cover every weekday (e.g. "walk kids to
+  //   school" Mon–Fri). Genuinely occasional routines (weekly Tue/Thu,
+  //   monthly, etc.) stay visible — they're rare-enough signal that hiding
+  //   them defeats the point of opening Today. Routines without a
+  //   recurrence_pattern default to visible (don't hide what we can't
   //   classify).
   const visibleRoutines = useMemo(() => {
     const showable = routines.filter(r => r.show_on_timeline !== false)
     if (!hideRoutines) return showable
-    return showable.filter(r => r.recurrence_pattern?.type !== 'daily')
+    return showable.filter(r => !isEverydayRoutine(r.recurrence_pattern))
   }, [routines, hideRoutines])
 
   // Build instance status map for events
