@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { WallNowCard } from './WallNowCard'
+import type { DayGridData } from './now/buildDayGrid'
 
 describe('WallNowCard', () => {
   it('renders imminent event title for imminent focus', () => {
@@ -63,5 +64,40 @@ describe('WallNowCard', () => {
       />
     )
     expect(screen.queryByText(/question of the day/i)).not.toBeInTheDocument()
+  })
+
+  const sampleGrid: DayGridData = {
+    upNext: { eyebrow: 'UP NEXT', headline: 'Soccer practice', lines: [], tap: { quadrant: 'upNext', itemId: 'e1' } },
+    today: { eyebrow: 'TODAY', headline: 'A quiet afternoon', lines: [], tap: { quadrant: 'today' } },
+    pending: { eyebrow: "WHILE IT'S QUIET", headline: 'All caught up', lines: [], tap: { quadrant: 'pending' } },
+    familyQuestion: { eyebrow: "TONIGHT'S QUESTION", headline: '"Best part?"', lines: [], tap: { quadrant: 'familyQuestion' } },
+  }
+
+  it('renders the 2x2 grid for Day mode-default when dayGrid is supplied', () => {
+    render(
+      <WallNowCard
+        focus={{ kind: 'mode-default', mode: 'day' }}
+        pinned={false}
+        onPinToggle={() => {}}
+        familyPrompt={null}
+        dayGrid={sampleGrid}
+        onQuadrantTap={() => {}}
+      />
+    )
+    expect(screen.getByText('Soccer practice')).toBeInTheDocument()
+    expect(screen.getByText('"Best part?"')).toBeInTheDocument()
+  })
+
+  it('still renders the single list for Day mode when no dayGrid supplied', () => {
+    render(
+      <WallNowCard
+        focus={{ kind: 'mode-default', mode: 'day' }}
+        pinned={false}
+        onPinToggle={() => {}}
+        familyPrompt={null}
+        todayItems={[]}
+      />
+    )
+    expect(screen.getByText('All clear')).toBeInTheDocument()
   })
 })
