@@ -14,6 +14,7 @@ export type QuickAction =
   | { kind: 'month' }
   | { kind: 'someday' }
   | { kind: 'next-week' }
+  | { kind: 'note' }
   | { kind: 'delete' }
 
 const ACTION_LABELS: Record<QuickAction['kind'], string> = {
@@ -22,6 +23,7 @@ const ACTION_LABELS: Record<QuickAction['kind'], string> = {
   month: 'Month',
   someday: 'Someday',
   'next-week': 'Next Week',
+  note: 'Note',
   delete: 'Delete',
 }
 
@@ -165,6 +167,19 @@ export const DenseInboxRow = memo(function DenseInboxRow({
       <div className="flex items-center gap-1 shrink-0 mt-0.5">
         {quickActions.map((action) => {
           const label = ACTION_LABELS[action.kind]
+          if (action.kind === 'note') {
+            return (
+              <button
+                key="note"
+                type="button"
+                aria-label="Send to note"
+                onClick={() => onQuickAction(action)}
+                className="text-xs px-2.5 py-1 rounded-md font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
+              >
+                📝 Note
+              </button>
+            )
+          }
           if (action.kind === 'delete') {
             return (
               <button
