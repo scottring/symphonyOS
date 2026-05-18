@@ -39,4 +39,24 @@ describe('WallNowQuadrant', () => {
     fireEvent.click(screen.getByRole('button', { name: /today/i }))
     expect(onTap).toHaveBeenCalledTimes(1)
   })
+
+  it('renders the "Soon" tag for an urgent line', () => {
+    const content: QuadrantContent = {
+      ...base,
+      lines: [{ text: 'Leave soon', tag: 'urgent' }],
+    }
+    render(<WallNowQuadrant content={content} onTap={() => {}} variant="event" />)
+    expect(screen.getByText('Soon')).toBeInTheDocument()
+  })
+
+  it('renders no list when there are no lines', () => {
+    render(
+      <WallNowQuadrant
+        content={{ ...base, lines: [] }}
+        onTap={() => {}}
+        variant="family"
+      />
+    )
+    expect(screen.queryByRole('list')).not.toBeInTheDocument()
+  })
 })

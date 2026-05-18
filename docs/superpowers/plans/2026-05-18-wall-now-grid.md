@@ -464,6 +464,26 @@ describe('WallNowQuadrant', () => {
     fireEvent.click(screen.getByRole('button', { name: /today/i }))
     expect(onTap).toHaveBeenCalledTimes(1)
   })
+
+  it('renders the "Soon" tag for an urgent line', () => {
+    const content: QuadrantContent = {
+      ...base,
+      lines: [{ text: 'Leave soon', tag: 'urgent' }],
+    }
+    render(<WallNowQuadrant content={content} onTap={() => {}} variant="event" />)
+    expect(screen.getByText('Soon')).toBeInTheDocument()
+  })
+
+  it('renders no list when there are no lines', () => {
+    render(
+      <WallNowQuadrant
+        content={{ ...base, lines: [] }}
+        onTap={() => {}}
+        variant="family"
+      />
+    )
+    expect(screen.queryByRole('list')).not.toBeInTheDocument()
+  })
 })
 ```
 
@@ -497,7 +517,7 @@ export function WallNowQuadrant({ content, onTap, variant }: WallNowQuadrantProp
   return (
     <button
       type="button"
-      aria-label={content.eyebrow}
+      aria-label={`${content.eyebrow}: ${content.headline}`}
       onClick={onTap}
       className={`text-left rounded-2xl p-6 flex flex-col h-full min-h-0 ${VARIANT_BG[variant]}`}
     >
@@ -508,9 +528,9 @@ export function WallNowQuadrant({ content, onTap, variant }: WallNowQuadrantProp
         {content.headline}
       </h3>
       {lines.length > 0 && (
-        <ul className="mt-4 space-y-1.5 text-white/75 text-base">
+        <div role="list" className="mt-4 space-y-1.5 text-white/75 text-base">
           {lines.map((line, i) => (
-            <li key={i} className="truncate">
+            <div role="listitem" key={i} className="truncate">
               {line.text}
               {line.tag === 'overdue' && (
                 <span className="ml-2 text-[10px] uppercase tracking-[0.1em] text-red-400 border border-red-400/40 rounded px-1.5 py-0.5">
@@ -522,9 +542,9 @@ export function WallNowQuadrant({ content, onTap, variant }: WallNowQuadrantProp
                   Soon
                 </span>
               )}
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
       {content.footer && (
         <div className="mt-auto pt-3 text-xs text-white/45">{content.footer}</div>
@@ -705,9 +725,9 @@ export function WallQuadrantExpand({ content, onClose }: WallQuadrantExpandProps
         {content.headline}
       </h2>
       {content.lines.length > 0 && (
-        <ul className="mt-10 space-y-4 text-2xl text-white/80">
+        <div role="list" className="mt-10 space-y-4 text-2xl text-white/80">
           {content.lines.map((line, i) => (
-            <li key={i}>
+            <div role="listitem" key={i}>
               {line.text}
               {line.tag === 'overdue' && (
                 <span className="ml-3 text-base uppercase tracking-[0.1em] text-red-400">Overdue</span>
@@ -715,9 +735,9 @@ export function WallQuadrantExpand({ content, onClose }: WallQuadrantExpandProps
               {line.tag === 'urgent' && (
                 <span className="ml-3 text-base uppercase tracking-[0.1em] text-amber-400">Soon</span>
               )}
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
       <div className="mt-12 text-white/40 text-sm">Tap anywhere to close</div>
     </button>
