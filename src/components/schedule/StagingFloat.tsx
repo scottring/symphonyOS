@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { CalendarRange } from 'lucide-react'
-import type { Task } from '@/types/task'
+import type { Task, TaskContext } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
+import { useProjects } from '@/hooks/useProjects'
 import { DenseInboxRow, type QuickAction } from './DenseInboxRow'
 import { InboxUndoToast } from './InboxUndoToast'
 
@@ -30,6 +31,8 @@ type UndoEntry = {
   message: string
   previous: Partial<Task>
   undoable: boolean
+  /** Optional extra async side-effect to run alongside the task update on undo */
+  onUndoExtra?: () => Promise<void>
 }
 
 const GROUP_MODE_KEY = 'symphony.thisweek.group'
@@ -54,6 +57,24 @@ export function StagingFloat({
   const [leavingIds, setLeavingIds] = useState<Set<string>>(new Set())
   const [undo, setUndo] = useState<UndoEntry | null>(null)
   const [groupMode, setGroupModeState] = useState<GroupMode>(() => loadGroupMode())
+
+  const { addProject, deleteProject } = useProjects()
+
+  const makeOnCreateProject = useCallback(
+    (taskId: string) => async (name: string, context: TaskContext | null) => {
+      const project = await addProject({ name, context: context ?? undefined })
+      if (!project) return
+      await onUpdateTask?.(taskId, { projectId: project.id })
+      setUndo({
+        taskId,
+        message: `Attached to '${project.name}'`,
+        previous: { projectId: undefined },
+        undoable: true,
+        onUndoExtra: () => deleteProject(project.id),
+      })
+    },
+    [addProject, deleteProject, onUpdateTask],
+  )
 
   const setGroupMode = useCallback((mode: GroupMode) => {
     setGroupModeState(mode)
@@ -128,6 +149,7 @@ export function StagingFloat({
   const handleUndo = useCallback(() => {
     if (!undo || !onUpdateTask) { setUndo(null); return }
     onUpdateTask(undo.taskId, undo.previous)
+    if (undo.onUndoExtra) undo.onUndoExtra()
     setUndo(null)
   }, [undo, onUpdateTask])
 
@@ -218,6 +240,7 @@ export function StagingFloat({
                           onToggleComplete={() => onCompleteTask?.(task.id)}
                           onUpdate={(updates) => onUpdateTask?.(task.id, updates)}
                           onSelect={() => { onSelectTask(task.id); setOpen(false) }}
+                          onCreateProject={makeOnCreateProject(task.id)}
                         />
                       )
                     })}
@@ -242,6 +265,7 @@ export function StagingFloat({
                     onToggleComplete={() => onCompleteTask?.(task.id)}
                     onUpdate={(updates) => onUpdateTask?.(task.id, updates)}
                     onSelect={() => { onSelectTask(task.id); setOpen(false) }}
+                    onCreateProject={makeOnCreateProject(task.id)}
                   />
                 )
               })}

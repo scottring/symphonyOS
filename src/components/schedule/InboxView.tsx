@@ -1,10 +1,11 @@
 // src/components/schedule/InboxView.tsx
 import { useMemo, useCallback, useState } from 'react'
-import type { Task } from '@/types/task'
+import type { Task, TaskContext } from '@/types/task'
 import type { Project } from '@/types/project'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useDomain } from '@/hooks/useDomain'
 import { useInboxMode } from '@/hooks/useInboxMode'
+import { useProjects } from '@/hooks/useProjects'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { HomeNeedsDetailsSection } from '@/apps/home/inbox/HomeNeedsDetailsSection'
 import { DenseInboxRow, type QuickAction } from './DenseInboxRow'
@@ -27,6 +28,8 @@ type UndoEntry = {
   message: string
   previous: Partial<Task>
   undoable: boolean
+  /** Optional extra async side-effect to run alongside the task update on undo */
+  onUndoExtra?: () => Promise<void>
 }
 
 interface InboxViewProps {
@@ -48,8 +51,26 @@ export function InboxView({
     onAssignTaskAll, familyMembers = [], onOpenProject, onToggleTask,
   } = useScheduleActionsContext()
 
+  const { addProject, deleteProject } = useProjects()
+
   const { currentDomain } = useDomain()
   const [mode, setMode] = useInboxMode()
+
+  const makeOnCreateProject = useCallback(
+    (taskId: string) => async (name: string, context: TaskContext | null) => {
+      const project = await addProject({ name, context: context ?? undefined })
+      if (!project) return
+      await onUpdateTask?.(taskId, { projectId: project.id })
+      setUndo({
+        taskId,
+        message: `Attached to '${project.name}'`,
+        previous: { projectId: undefined },
+        undoable: true,
+        onUndoExtra: () => deleteProject(project.id),
+      })
+    },
+    [addProject, deleteProject, onUpdateTask],
+  )
 
   // Domain + privacy filter
   const filteredByDomain = useMemo(() => {
@@ -145,6 +166,7 @@ export function InboxView({
   const handleUndo = useCallback(() => {
     if (!undo || !onUpdateTask) { setUndo(null); return }
     onUpdateTask(undo.taskId, undo.previous)
+    if (undo.onUndoExtra) undo.onUndoExtra()
     setUndo(null)
   }, [undo, onUpdateTask])
 
@@ -181,6 +203,7 @@ export function InboxView({
         onSelect={() => handleSelect(task.id)}
         onOpenProject={onOpenProject}
         onAssign={onAssignTaskAll ? (memberIds) => onAssignTaskAll(task.id, memberIds) : undefined}
+        onCreateProject={makeOnCreateProject(task.id)}
       />
     )
   }

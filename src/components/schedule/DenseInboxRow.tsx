@@ -37,6 +37,9 @@ interface DenseInboxRowProps {
   onSelect: () => void
   onOpenProject?: (projectId: string) => void
   onAssign?: (memberIds: string[]) => void
+  /** Called when the user creates a new project from the inline form.
+   *  Should create the project and assign it to this task. */
+  onCreateProject?: (name: string, context: TaskContext | null) => void
   isLeaving?: boolean
 }
 
@@ -59,6 +62,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
   onSelect,
   onOpenProject,
   onAssign,
+  onCreateProject,
   isLeaving,
 }: DenseInboxRowProps) {
   const [contextOpen, setContextOpen] = useState(false)
@@ -140,6 +144,8 @@ export const DenseInboxRow = memo(function DenseInboxRow({
         onOpenProject={onOpenProject}
         onAssign={(projectId) => onUpdate({ projectId })}
         onClear={() => onUpdate({ projectId: undefined })}
+        onCreate={onCreateProject}
+        defaultNewName={task.title}
       />
 
 

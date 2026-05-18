@@ -7,6 +7,23 @@ vi.mock('@/hooks/useGooglePlaces', () => ({
   useGooglePlaces: () => ({ results: [], loading: false, searchPlaces: vi.fn(), getPlaceDetails: vi.fn(), clearResults: vi.fn() }),
 }))
 
+vi.mock('@/hooks/useProjects', () => ({
+  useProjects: () => ({
+    projects: [],
+    projectsMap: new Map(),
+    activeProjects: [],
+    loading: false,
+    error: null,
+    addProject: vi.fn().mockResolvedValue(null),
+    updateProject: vi.fn(),
+    deleteProject: vi.fn(),
+    searchProjects: vi.fn().mockReturnValue([]),
+    getProjectById: vi.fn(),
+    getChildProjects: vi.fn().mockReturnValue([]),
+    recalculateProjectStatus: vi.fn(),
+  }),
+}))
+
 describe('StagingFloat', () => {
   const baseProps = {
     weekTasks: [
