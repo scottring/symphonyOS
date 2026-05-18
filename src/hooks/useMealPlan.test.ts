@@ -34,6 +34,19 @@ vi.mock('@/lib/supabase', () => {
 
 import { __mockFrom } from '@/lib/supabase'
 
+// The skipped suite below renders useMealPlan without GeneratePlanProvider.
+// This block mocks the context so the hook runs, letting us assert that
+// clearWeek propagates to other consumers (e.g. the Today timeline).
+const { mockBump } = vi.hoisted(() => ({ mockBump: vi.fn() }))
+vi.mock('@/contexts/GeneratePlanContext', () => ({
+  useGeneratePlanContext: () => ({
+    refreshSignal: 0,
+    bumpRefreshSignal: mockBump,
+    lastUndoToken: null,
+    setLastUndoToken: vi.fn(),
+  }),
+}))
+
 // FIXME(pre-existing-from-main): see docs/superpowers/specs/2026-05-05-symphony-shell-apps-and-job-app.md "Pre-existing test carve-out"
 // useMealPlan now consumes useGeneratePlanContext (lifted state); these tests render the hook
 // without wrapping it in GeneratePlanProvider, so the context throws on every test.
@@ -132,5 +145,40 @@ describe.skip('useMealPlan', () => {
       await result.current.addMeal({ dayOfWeek: 1, slot: 'dinner', recipeId: 'r1', preparedByFamilyMemberId: 'fm-iris' })
     })
     expect(lastInsertPayload?.prepared_by_family_member_id).toBe('fm-iris')
+  })
+})
+
+describe('useMealPlan clearWeek cross-consumer propagation', () => {
+  beforeEach(() => {
+    vi.mocked(__mockFrom as any).mockReset()
+    mockBump.mockReset()
+  })
+
+  // Regression: clearing the week only refreshed the local hook instance, so
+  // the Today timeline (a separate useMealPlan instance in App.tsx) kept the
+  // cleared meals on screen. Generate/undo bump the shared refresh signal;
+  // clearWeek must do the same so every consumer refetches.
+  it('bumps the shared refresh signal after clearing the week', async () => {
+    const planRow = { id: 'p1', user_id: 'u1', week_start: '2026-04-27', parameter: null, created_at: '2026-04-27T00:00:00Z', updated_at: '2026-04-27T00:00:00Z' }
+    const priorEntry = { id: 'e1', meal_plan_id: 'p1', day_of_week: 1, slot: 'dinner', recipe_id: 'r1', ad_hoc_title: null, notes: null, leftover_from: null, created_at: '2026-04-27T00:00:00Z' }
+    const tokenRow = { id: 'tok-1' }
+
+    vi.mocked(__mockFrom as any).mockImplementation((table: string) => {
+      if (table === 'meal_plans') return makeQueryMock([planRow], planRow)
+      if (table === 'ai_undo_tokens') return makeQueryMock([tokenRow], tokenRow)
+      return makeQueryMock([priorEntry], priorEntry)
+    })
+
+    const { supabase } = await import('@/lib/supabase')
+    ;(supabase as any).rpc = vi.fn(() => Promise.resolve({ data: { inserted_ids: [] }, error: null }))
+
+    const { result } = renderHook(() => useMealPlan(new Date('2026-04-27')))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await act(async () => {
+      await result.current.clearWeek()
+    })
+
+    expect(mockBump).toHaveBeenCalled()
   })
 })

@@ -38,7 +38,7 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const weekStartIso = toIsoDate(weekStart)
-  const { refreshSignal } = useGeneratePlanContext()
+  const { refreshSignal, bumpRefreshSignal } = useGeneratePlanContext()
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -178,12 +178,16 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
       expires_at: expiresAt,
     }).select('id').single()
     await refresh()
+    // The wipe is a server-side mutation like generate/undo: bump the shared
+    // signal so every other useMealPlan consumer (the Today timeline in
+    // App.tsx, the wall, etc.) refetches instead of showing cleared meals.
+    bumpRefreshSignal()
     if (tokenErr) {
       // Wipe succeeded but undo token didn't — surface as ok-but-no-undo
       return { ok: true }
     }
     return { ok: true, tokenId: tokenRow?.id }
-  }, [plan, refresh, weekStartIso])
+  }, [plan, refresh, weekStartIso, bumpRefreshSignal])
 
   // Refetch on mount, when the week changes, and after a server-side
   // generate/undo bumps the shared refresh signal.
