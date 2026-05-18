@@ -36,6 +36,13 @@ deno.lock
 
 # Git worktrees
 .worktrees/
+.claude/worktrees/
+
+# Local clone scratch dir
+.clone/
+
+# Playwright artifacts
+playwright-report/
 
 # Brainstorming visual companion
 .superpowers/
