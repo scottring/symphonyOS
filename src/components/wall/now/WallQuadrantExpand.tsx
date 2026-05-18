@@ -11,7 +11,7 @@ export function WallQuadrantExpand({ content, onClose }: WallQuadrantExpandProps
       type="button"
       aria-label="Close expanded view"
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-neutral-950/95 flex flex-col items-center justify-center p-16 text-center"
+      className="fixed inset-0 z-[100] bg-neutral-950/95 flex flex-col items-center justify-center p-16 text-center"
     >
       <div className="text-sm uppercase tracking-[0.25em] text-white/50 mb-4">
         {content.eyebrow}

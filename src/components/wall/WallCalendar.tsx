@@ -189,6 +189,8 @@ export function WallCalendar() {
     return null
   }, [wallData.days])
 
+  // Rebuilds each clock tick (currentTime dep) so "Up Next" stays minute-fresh;
+  // buildDayGrid is a cheap pure object build — same cadence as imminentEntity.
   const dayGrid = useMemo(() => buildDayGrid({
     days: wallData.days,
     now: currentTime,
@@ -210,6 +212,8 @@ export function WallCalendar() {
     }
     setExpandedQuadrant(map[target.quadrant])
   }, [dayGrid])
+
+  const handleCloseExpanded = useCallback(() => setExpandedQuadrant(null), [])
 
   // ─── Action handlers ───
   const handleCheckItem = useCallback(async (id: string, completed: boolean) => {
@@ -505,7 +509,7 @@ export function WallCalendar() {
       {expandedQuadrant && (
         <WallQuadrantExpand
           content={expandedQuadrant}
-          onClose={() => setExpandedQuadrant(null)}
+          onClose={handleCloseExpanded}
         />
       )}
 
