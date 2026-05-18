@@ -1,6 +1,6 @@
 // Note type constants
 export type NoteType = 'quick_capture' | 'meeting_note' | 'transcript' | 'voice_memo' | 'general' | 'task_note' | 'vault_note'
-export type NoteSource = 'manual' | 'fathom' | 'voice' | 'import' | 'task' | 'vault'
+export type NoteSource = 'manual' | 'fathom' | 'voice' | 'import' | 'task' | 'vault' | 'inbox_triage'
 export type NoteLinkType = 'related' | 'primary' | 'mentioned'
 export type NoteEntityType = 'event' | 'project' | 'contact' | 'task' | 'routine'
 
@@ -111,6 +111,7 @@ export interface CreateNoteInput {
   type?: NoteType
   source?: NoteSource
   topicId?: string
+  context?: 'work' | 'family' | 'personal'
 }
 
 export interface UpdateNoteInput {

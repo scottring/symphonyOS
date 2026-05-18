@@ -1,19 +1,24 @@
 // src/components/schedule/InboxView.tsx
 import { useMemo, useCallback, useState } from 'react'
-import type { Task } from '@/types/task'
+import type { Task, TaskContext } from '@/types/task'
 import type { Project } from '@/types/project'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useDomain } from '@/hooks/useDomain'
 import { useInboxMode } from '@/hooks/useInboxMode'
+import { useProjects } from '@/hooks/useProjects'
+import { useNotes } from '@/hooks/useNotes'
+import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { HomeNeedsDetailsSection } from '@/apps/home/inbox/HomeNeedsDetailsSection'
+import { NotePicker, type NotePickerSelection } from '@/components/notes/NotePicker'
+import { formatInboxBullet } from '@/lib/inboxBullet'
 import { DenseInboxRow, type QuickAction } from './DenseInboxRow'
 import { FocusInboxCard } from './FocusInboxCard'
 import { InboxModeToggle } from './InboxModeToggle'
 import { InboxUndoToast } from './InboxUndoToast'
 
 const INBOX_ACTIONS: QuickAction[] = [
-  { kind: 'today' }, { kind: 'week' }, { kind: 'month' }, { kind: 'someday' }, { kind: 'delete' }
+  { kind: 'today' }, { kind: 'week' }, { kind: 'month' }, { kind: 'someday' }, { kind: 'note' }, { kind: 'delete' }
 ]
 
 const BUCKET_LABELS: Record<'week' | 'month' | 'quarter', string> = {
@@ -27,6 +32,8 @@ type UndoEntry = {
   message: string
   previous: Partial<Task>
   undoable: boolean
+  /** Optional extra async side-effect to run alongside the task update on undo */
+  onUndoExtra?: () => Promise<void>
 }
 
 interface InboxViewProps {
@@ -48,8 +55,134 @@ export function InboxView({
     onAssignTaskAll, familyMembers = [], onOpenProject, onToggleTask,
   } = useScheduleActionsContext()
 
+  const { addProject, deleteProject } = useProjects()
+  const { notes, addNote, updateNote, deleteNote } = useNotes()
+  const { addTask, updateTask } = useSupabaseTasks()
+
   const { currentDomain } = useDomain()
+
+  const [notePickerTaskId, setNotePickerTaskId] = useState<string | null>(null)
   const [mode, setMode] = useInboxMode()
+
+  const makeOnCreateProject = useCallback(
+    (taskId: string) => async (name: string, context: TaskContext | null) => {
+      const project = await addProject({ name, context: context ?? undefined })
+      if (!project) return
+      try {
+        await onUpdateTask?.(taskId, { projectId: project.id })
+      } catch (err) {
+        console.error('Failed to attach project to task:', err)
+        await deleteProject(project.id)
+        return
+      }
+      setUndo({
+        taskId,
+        message: `Attached to '${project.name}'`,
+        previous: { projectId: undefined },
+        undoable: true,
+        onUndoExtra: () => deleteProject(project.id),
+      })
+    },
+    [addProject, deleteProject, onUpdateTask],
+  )
+
+  // Restore a task snapshot after a note-route deletion — two-step to preserve rich fields
+  const restoreTask = useCallback(async (snapshot: Task) => {
+    const newId = await addTask(
+      snapshot.title,
+      snapshot.contactId,
+      snapshot.projectId,
+      snapshot.scheduledFor,
+      {
+        context: snapshot.context,
+        assignedTo: snapshot.assignedTo ?? null,
+        assignedToAll: snapshot.assignedToAll,
+        category: snapshot.category,
+        isAllDay: snapshot.isAllDay,
+        location: snapshot.location,
+        locationPlaceId: snapshot.locationPlaceId,
+      },
+    )
+    if (!newId) return
+    await updateTask(newId, {
+      notes: snapshot.notes,
+      links: snapshot.links,
+      phoneNumber: snapshot.phoneNumber,
+      needsDiscussion: snapshot.needsDiscussion,
+      discussionNote: snapshot.discussionNote,
+      bucket: snapshot.bucket,
+    })
+  }, [addTask, updateTask])
+
+  const handleNoteSelect = useCallback(async (task: Task, selection: NotePickerSelection) => {
+    const now = new Date()
+    const bullet = formatInboxBullet({ title: task.title, notes: task.notes }, now)
+    const taskSnapshot = { ...task }
+
+    if (selection.kind === 'existing') {
+      const target = notes.find((n) => n.id === selection.noteId)
+      if (!target) {
+        setNotePickerTaskId(null)
+        return
+      }
+      const previousContent = target.content
+
+      let appendOk = false
+      try {
+        await updateNote(target.id, { content: previousContent + '\n' + bullet })
+        appendOk = true
+      } catch (err) {
+        console.error('Failed to append to note:', err)
+      }
+      if (!appendOk) {
+        setNotePickerTaskId(null)
+        return
+      }
+
+      if (onDeleteTask) onDeleteTask(task.id)
+      setUndo({
+        taskId: task.id,
+        message: `Sent to '${target.title ?? 'note'}'`,
+        previous: {},
+        undoable: true,
+        onUndoExtra: async () => {
+          await updateNote(target.id, { content: previousContent })
+          await restoreTask(taskSnapshot)
+        },
+      })
+    } else {
+      // kind === 'new'
+      let created: Awaited<ReturnType<typeof addNote>> | null = null
+      try {
+        created = await addNote({
+          title: selection.title,
+          content: bullet,
+          type: 'general',
+          source: 'inbox_triage',
+          context: taskSnapshot.context ?? (currentDomain !== 'universal' ? currentDomain : undefined),
+        })
+      } catch (err) {
+        console.error('Failed to create note:', err)
+      }
+      if (!created) {
+        setNotePickerTaskId(null)
+        return
+      }
+
+      if (onDeleteTask) onDeleteTask(task.id)
+      setUndo({
+        taskId: task.id,
+        message: `Created '${created.title ?? selection.title}'`,
+        previous: {},
+        undoable: true,
+        onUndoExtra: async () => {
+          await deleteNote(created.id)
+          await restoreTask(taskSnapshot)
+        },
+      })
+    }
+    setNotePickerTaskId(null)
+  }, [notes, updateNote, deleteNote, addNote, restoreTask, onDeleteTask, currentDomain])
 
   // Domain + privacy filter
   const filteredByDomain = useMemo(() => {
@@ -142,9 +275,13 @@ export function InboxView({
     }, 220)
   }, [onPushTask, onDeleteTask])
 
-  const handleUndo = useCallback(() => {
-    if (!undo || !onUpdateTask) { setUndo(null); return }
-    onUpdateTask(undo.taskId, undo.previous)
+  const handleUndo = useCallback(async () => {
+    if (!undo) { setUndo(null); return }
+    // Only call onUpdateTask if there are actual fields to restore
+    if (onUpdateTask && Object.keys(undo.previous).length > 0) {
+      onUpdateTask(undo.taskId, undo.previous)
+    }
+    if (undo.onUndoExtra) await undo.onUndoExtra()
     setUndo(null)
   }, [undo, onUpdateTask])
 
@@ -167,21 +304,38 @@ export function InboxView({
   const renderRow = (task: Task) => {
     const project = projects.find((p) => p.id === task.projectId)
     return (
-      <DenseInboxRow
-        key={task.id}
-        task={task}
-        project={project}
-        projects={projects}
-        familyMembers={familyMembers}
-        quickActions={INBOX_ACTIONS}
-        isLeaving={leavingIds.has(task.id)}
-        onQuickAction={(action) => applyTriage(task, action)}
-        onToggleComplete={() => onToggleTask?.(task.id)}
-        onUpdate={(updates) => onUpdateTask?.(task.id, updates)}
-        onSelect={() => handleSelect(task.id)}
-        onOpenProject={onOpenProject}
-        onAssign={onAssignTaskAll ? (memberIds) => onAssignTaskAll(task.id, memberIds) : undefined}
-      />
+      <div key={task.id} className="relative">
+        <DenseInboxRow
+          task={task}
+          project={project}
+          projects={projects}
+          familyMembers={familyMembers}
+          quickActions={INBOX_ACTIONS}
+          isLeaving={leavingIds.has(task.id)}
+          onQuickAction={(action) => {
+            if (action.kind === 'note') {
+              setNotePickerTaskId(task.id)
+              return
+            }
+            applyTriage(task, action)
+          }}
+          onToggleComplete={() => onToggleTask?.(task.id)}
+          onUpdate={(updates) => onUpdateTask?.(task.id, updates)}
+          onSelect={() => handleSelect(task.id)}
+          onOpenProject={onOpenProject}
+          onAssign={onAssignTaskAll ? (memberIds) => onAssignTaskAll(task.id, memberIds) : undefined}
+          onCreateProject={makeOnCreateProject(task.id)}
+        />
+        {notePickerTaskId === task.id && (
+          <NotePicker
+            task={task}
+            notes={notes}
+            domain={currentDomain}
+            onSelect={(sel) => handleNoteSelect(task, sel)}
+            onClose={() => setNotePickerTaskId(null)}
+          />
+        )}
+      </div>
     )
   }
 

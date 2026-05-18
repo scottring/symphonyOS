@@ -1,9 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { CalendarRange } from 'lucide-react'
-import type { Task } from '@/types/task'
+import type { Task, TaskContext } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
+import { useProjects } from '@/hooks/useProjects'
+import { useNotes } from '@/hooks/useNotes'
+import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
+import { useDomain } from '@/hooks/useDomain'
+import { NotePicker, type NotePickerSelection } from '@/components/notes/NotePicker'
+import { formatInboxBullet } from '@/lib/inboxBullet'
 import { DenseInboxRow, type QuickAction } from './DenseInboxRow'
 import { InboxUndoToast } from './InboxUndoToast'
 
@@ -22,7 +28,7 @@ interface StagingFloatProps {
 }
 
 const WEEK_ACTIONS: QuickAction[] = [
-  { kind: 'today' }, { kind: 'next-week' }, { kind: 'someday' }, { kind: 'delete' }
+  { kind: 'today' }, { kind: 'next-week' }, { kind: 'someday' }, { kind: 'note' }, { kind: 'delete' }
 ]
 
 type UndoEntry = {
@@ -30,6 +36,8 @@ type UndoEntry = {
   message: string
   previous: Partial<Task>
   undoable: boolean
+  /** Optional extra async side-effect to run alongside the task update on undo */
+  onUndoExtra?: () => Promise<void>
 }
 
 const GROUP_MODE_KEY = 'symphony.thisweek.group'
@@ -54,6 +62,132 @@ export function StagingFloat({
   const [leavingIds, setLeavingIds] = useState<Set<string>>(new Set())
   const [undo, setUndo] = useState<UndoEntry | null>(null)
   const [groupMode, setGroupModeState] = useState<GroupMode>(() => loadGroupMode())
+  const [notePickerTaskId, setNotePickerTaskId] = useState<string | null>(null)
+
+  const { addProject, deleteProject } = useProjects()
+  const { notes, addNote, updateNote, deleteNote } = useNotes()
+  const { addTask, updateTask } = useSupabaseTasks()
+  const { currentDomain } = useDomain()
+
+  // Restore a task snapshot after a note-route deletion — two-step to preserve rich fields
+  const restoreTask = useCallback(async (snapshot: Task) => {
+    const newId = await addTask(
+      snapshot.title,
+      snapshot.contactId,
+      snapshot.projectId,
+      snapshot.scheduledFor,
+      {
+        context: snapshot.context,
+        assignedTo: snapshot.assignedTo ?? null,
+        assignedToAll: snapshot.assignedToAll,
+        category: snapshot.category,
+        isAllDay: snapshot.isAllDay,
+        location: snapshot.location,
+        locationPlaceId: snapshot.locationPlaceId,
+      },
+    )
+    if (!newId) return
+    await updateTask(newId, {
+      notes: snapshot.notes,
+      links: snapshot.links,
+      phoneNumber: snapshot.phoneNumber,
+      needsDiscussion: snapshot.needsDiscussion,
+      discussionNote: snapshot.discussionNote,
+      bucket: snapshot.bucket,
+    })
+  }, [addTask, updateTask])
+
+  const handleNoteSelect = useCallback(async (task: Task, selection: NotePickerSelection) => {
+    const now = new Date()
+    const bullet = formatInboxBullet({ title: task.title, notes: task.notes }, now)
+    const taskSnapshot = { ...task }
+
+    if (selection.kind === 'existing') {
+      const target = notes.find((n) => n.id === selection.noteId)
+      if (!target) {
+        setNotePickerTaskId(null)
+        return
+      }
+      const previousContent = target.content
+
+      let appendOk = false
+      try {
+        await updateNote(target.id, { content: previousContent + '\n' + bullet })
+        appendOk = true
+      } catch (err) {
+        console.error('Failed to append to note:', err)
+      }
+      if (!appendOk) {
+        setNotePickerTaskId(null)
+        return
+      }
+
+      if (onDeleteTask) onDeleteTask(task.id)
+      setUndo({
+        taskId: task.id,
+        message: `Sent to '${target.title ?? 'note'}'`,
+        previous: {},
+        undoable: true,
+        onUndoExtra: async () => {
+          await updateNote(target.id, { content: previousContent })
+          await restoreTask(taskSnapshot)
+        },
+      })
+    } else {
+      // kind === 'new'
+      let created: Awaited<ReturnType<typeof addNote>> | null = null
+      try {
+        created = await addNote({
+          title: selection.title,
+          content: bullet,
+          type: 'general',
+          source: 'inbox_triage',
+          context: taskSnapshot.context ?? (currentDomain !== 'universal' ? currentDomain : undefined),
+        })
+      } catch (err) {
+        console.error('Failed to create note:', err)
+      }
+      if (!created) {
+        setNotePickerTaskId(null)
+        return
+      }
+
+      if (onDeleteTask) onDeleteTask(task.id)
+      setUndo({
+        taskId: task.id,
+        message: `Created '${created.title ?? selection.title}'`,
+        previous: {},
+        undoable: true,
+        onUndoExtra: async () => {
+          await deleteNote(created.id)
+          await restoreTask(taskSnapshot)
+        },
+      })
+    }
+    setNotePickerTaskId(null)
+  }, [notes, updateNote, deleteNote, addNote, restoreTask, onDeleteTask, currentDomain])
+
+  const makeOnCreateProject = useCallback(
+    (taskId: string) => async (name: string, context: TaskContext | null) => {
+      const project = await addProject({ name, context: context ?? undefined })
+      if (!project) return
+      try {
+        await onUpdateTask?.(taskId, { projectId: project.id })
+      } catch (err) {
+        console.error('Failed to attach project to task:', err)
+        await deleteProject(project.id)
+        return
+      }
+      setUndo({
+        taskId,
+        message: `Attached to '${project.name}'`,
+        previous: { projectId: undefined },
+        undoable: true,
+        onUndoExtra: () => deleteProject(project.id),
+      })
+    },
+    [addProject, deleteProject, onUpdateTask],
+  )
 
   const setGroupMode = useCallback((mode: GroupMode) => {
     setGroupModeState(mode)
@@ -97,6 +231,11 @@ export function StagingFloat({
   })
 
   const applyAction = useCallback((task: Task, action: QuickAction) => {
+    if (action.kind === 'note') {
+      setNotePickerTaskId(task.id)
+      return  // commit happens after user picks in the picker
+    }
+
     const previous: Partial<Task> = {
       bucket: task.bucket,
       scheduledFor: task.scheduledFor,
@@ -125,9 +264,10 @@ export function StagingFloat({
     }, 220)
   }, [onPullToToday, onDeferTask, onDeleteTask, onUpdateTask])
 
-  const handleUndo = useCallback(() => {
+  const handleUndo = useCallback(async () => {
     if (!undo || !onUpdateTask) { setUndo(null); return }
     onUpdateTask(undo.taskId, undo.previous)
+    if (undo.onUndoExtra) await undo.onUndoExtra()
     setUndo(null)
   }, [undo, onUpdateTask])
 
@@ -206,19 +346,30 @@ export function StagingFloat({
                     {tasks.map((task) => {
                       const project = projects.find((p) => p.id === task.projectId)
                       return (
-                        <DenseInboxRow
-                          key={task.id}
-                          task={task}
-                          project={project}
-                          projects={projects}
-                          familyMembers={familyMembers}
-                          quickActions={WEEK_ACTIONS}
-                          isLeaving={leavingIds.has(task.id)}
-                          onQuickAction={(action) => applyAction(task, action)}
-                          onToggleComplete={() => onCompleteTask?.(task.id)}
-                          onUpdate={(updates) => onUpdateTask?.(task.id, updates)}
-                          onSelect={() => { onSelectTask(task.id); setOpen(false) }}
-                        />
+                        <div key={task.id} className="relative">
+                          <DenseInboxRow
+                            task={task}
+                            project={project}
+                            projects={projects}
+                            familyMembers={familyMembers}
+                            quickActions={WEEK_ACTIONS}
+                            isLeaving={leavingIds.has(task.id)}
+                            onQuickAction={(action) => applyAction(task, action)}
+                            onToggleComplete={() => onCompleteTask?.(task.id)}
+                            onUpdate={(updates) => onUpdateTask?.(task.id, updates)}
+                            onSelect={() => { onSelectTask(task.id); setOpen(false) }}
+                            onCreateProject={makeOnCreateProject(task.id)}
+                          />
+                          {notePickerTaskId === task.id && (
+                            <NotePicker
+                              task={task}
+                              notes={notes}
+                              domain={currentDomain}
+                              onSelect={(sel) => handleNoteSelect(task, sel)}
+                              onClose={() => setNotePickerTaskId(null)}
+                            />
+                          )}
+                        </div>
                       )
                     })}
                   </div>
@@ -230,19 +381,30 @@ export function StagingFloat({
               {sorted.map((task) => {
                 const project = projects.find((p) => p.id === task.projectId)
                 return (
-                  <DenseInboxRow
-                    key={task.id}
-                    task={task}
-                    project={project}
-                    projects={projects}
-                    familyMembers={familyMembers}
-                    quickActions={WEEK_ACTIONS}
-                    isLeaving={leavingIds.has(task.id)}
-                    onQuickAction={(action) => applyAction(task, action)}
-                    onToggleComplete={() => onCompleteTask?.(task.id)}
-                    onUpdate={(updates) => onUpdateTask?.(task.id, updates)}
-                    onSelect={() => { onSelectTask(task.id); setOpen(false) }}
-                  />
+                  <div key={task.id} className="relative">
+                    <DenseInboxRow
+                      task={task}
+                      project={project}
+                      projects={projects}
+                      familyMembers={familyMembers}
+                      quickActions={WEEK_ACTIONS}
+                      isLeaving={leavingIds.has(task.id)}
+                      onQuickAction={(action) => applyAction(task, action)}
+                      onToggleComplete={() => onCompleteTask?.(task.id)}
+                      onUpdate={(updates) => onUpdateTask?.(task.id, updates)}
+                      onSelect={() => { onSelectTask(task.id); setOpen(false) }}
+                      onCreateProject={makeOnCreateProject(task.id)}
+                    />
+                    {notePickerTaskId === task.id && (
+                      <NotePicker
+                        task={task}
+                        notes={notes}
+                        domain={currentDomain}
+                        onSelect={(sel) => handleNoteSelect(task, sel)}
+                        onClose={() => setNotePickerTaskId(null)}
+                      />
+                    )}
+                  </div>
                 )
               })}
             </div>
