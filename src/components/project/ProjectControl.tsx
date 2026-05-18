@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, FolderPlus } from 'lucide-react'
 import type { Project } from '@/types/project'
+import type { TaskContext } from '@/types/task'
 
 interface ProjectControlProps {
   project?: Project
@@ -8,10 +9,17 @@ interface ProjectControlProps {
   onOpenProject?: (projectId: string) => void
   onAssign: (projectId: string) => void
   onClear: () => void
+  /** When provided, the dropdown shows a "+ Create new project…" entry. */
+  onCreate?: (name: string, context: TaskContext | null) => void
+  /** Prefilled value for the create-new name input (e.g., the inbox task's title). */
+  defaultNewName?: string
 }
 
-function ProjectControl({ project, projects, onOpenProject, onAssign, onClear }: ProjectControlProps) {
+function ProjectControl({ project, projects, onOpenProject, onAssign, onClear, onCreate, defaultNewName }: ProjectControlProps) {
   const [open, setOpen] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [newName, setNewName] = useState(defaultNewName ?? '')
+  const [newContext, setNewContext] = useState<TaskContext | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -27,6 +35,22 @@ function ProjectControl({ project, projects, onOpenProject, onAssign, onClear }:
       document.removeEventListener('keydown', handleEsc)
     }
   }, [open])
+
+  useEffect(() => {
+    // Reset the form whenever the dropdown closes
+    if (!open) {
+      setCreating(false)
+      setNewName(defaultNewName ?? '')
+      setNewContext(null)
+    }
+  }, [open, defaultNewName])
+
+  const handleCreateSubmit = () => {
+    const trimmed = newName.trim()
+    if (!trimmed || !onCreate) return
+    onCreate(trimmed, newContext)
+    setOpen(false)
+  }
 
   if (project) {
     return (
@@ -54,7 +78,8 @@ function ProjectControl({ project, projects, onOpenProject, onAssign, onClear }:
     (p) => p.status !== 'completed' && p.status !== 'on_hold',
   )
 
-  if (activeProjects.length === 0) return null
+  // Only render the button if there are projects to show OR if onCreate is provided
+  if (activeProjects.length === 0 && !onCreate) return null
 
   return (
     <div ref={containerRef} className="relative hidden md:block shrink-0">
@@ -80,6 +105,65 @@ function ProjectControl({ project, projects, onOpenProject, onAssign, onClear }:
               {p.name}
             </button>
           ))}
+          {onCreate && (
+            <>
+              <div className="border-t border-neutral-100 my-1" />
+              {!creating ? (
+                <button
+                  type="button"
+                  onClick={() => setCreating(true)}
+                  className="block w-full text-left px-3 py-1.5 text-sm text-primary-700 hover:bg-primary-50"
+                >
+                  + Create new project…
+                </button>
+              ) : (
+                <div className="px-3 py-2 space-y-2">
+                  <label className="block text-xs text-neutral-500" htmlFor="new-project-name">
+                    Project name
+                  </label>
+                  <input
+                    id="new-project-name"
+                    type="text"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="Project name"
+                    className="w-full px-2 py-1 text-sm border border-neutral-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    autoFocus
+                  />
+                  <div className="flex gap-1 flex-wrap">
+                    {([
+                      { value: 'work', label: 'Work' },
+                      { value: 'family', label: 'Family' },
+                      { value: 'personal', label: 'Personal' },
+                      { value: null, label: 'None' },
+                    ] as const).map(({ value, label }) => (
+                      <button
+                        key={label}
+                        type="button"
+                        aria-label={`Context: ${label}`}
+                        onClick={() => setNewContext(value)}
+                        className={`text-xs px-2 py-0.5 rounded-full transition-colors ${
+                          newContext === value
+                            ? 'bg-primary-100 text-primary-700'
+                            : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCreateSubmit}
+                    disabled={!newName.trim()}
+                    className="w-full px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded hover:bg-primary-700 disabled:bg-neutral-300 disabled:cursor-not-allowed"
+                  >
+                    Create
+                  </button>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>
