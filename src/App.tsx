@@ -59,6 +59,7 @@ import { useMeetingNotes } from '@/hooks/useMeetingNotes'
 import {
   TapContextPanel,
   TapEventPanel,
+  TapMealPanel,
   SURFACE_PANEL_ENABLED,
 } from '@/components/surface'
 
@@ -1489,6 +1490,11 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
                 const next: TaskLink[] = [...(t.links ?? []), { url }]
                 updateTask(t.id, { links: next })
               }}
+            />
+          ) : selectedItem.type === 'event' && selectedItem.originalEvent && selectedItem.originalEvent.id.startsWith('meal:') ? (
+            <TapMealPanel
+              event={selectedItem.originalEvent}
+              onClose={() => setSelectedItemId(null)}
             />
           ) : selectedItem.type === 'event' && selectedItem.originalEvent ? (
             <TapEventPanel
