@@ -1225,6 +1225,26 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
         isAllDay: true,
       })
     },
+    onCreateTaskAt: async (when: Date | null) => {
+      const title = window.prompt('New task')?.trim()
+      if (!title) return
+      await addTask(title, undefined, undefined, when ?? undefined, {
+        isAllDay: !when,
+        context: currentDomain !== 'universal' ? currentDomain : undefined,
+        assignedTo: getCurrentUserMember()?.id,
+      })
+    },
+    onCreateEventAt: async (when: Date | null) => {
+      const title = window.prompt('New event')?.trim()
+      if (!title || !when) return
+      await createEvent({ title, startTime: when, endTime: new Date(when.getTime() + 30 * 60_000) })
+    },
+    onCreateRoutineAt: async (when: Date | null) => {
+      const name = window.prompt('New routine')?.trim()
+      if (!name) return
+      const hhmm = when ? `${String(when.getHours()).padStart(2,'0')}:${String(when.getMinutes()).padStart(2,'0')}` : undefined
+      await addRoutine({ name, time_of_day: hhmm, recurrence_pattern: { type: 'daily' } })
+    },
     onCreateFollowUp: handleCreateFollowUp,
 
     // Assignment actions
