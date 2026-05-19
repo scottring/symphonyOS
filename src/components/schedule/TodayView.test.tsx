@@ -38,4 +38,9 @@ describe('TodayView', () => {
     renderView()
     expect(screen.getByText(/your day is clear|nothing scheduled/i)).toBeInTheDocument()
   })
+  it('renders NO Day/Week/Month control inside TodayView (HomeViewSwitcher owns it)', () => {
+    renderView()
+    expect(screen.queryByRole('button', { name: 'Week' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Month' })).not.toBeInTheDocument()
+  })
 })

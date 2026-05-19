@@ -7,7 +7,7 @@
  *
  * NOT wired to the route yet — that happens in R4.
  */
-import { createElement, useMemo, useState, useCallback } from 'react'
+import { createElement, useMemo, useCallback } from 'react'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -22,7 +22,7 @@ import { useProactiveSuggestions } from '@/hooks/useProactiveSuggestions'
 import { useRoutineStats } from '@/hooks/useRoutineStats'
 import { useRecurringEventDetection } from '@/hooks/useRecurringEventDetection'
 
-import { TodayHeader, type TodayMode } from './TodayHeader'
+import { TodayHeader } from './TodayHeader'
 import { StatsRow } from './StatsRow'
 import { TodaysFocusCard } from './TodaysFocusCard'
 import { WeatherCard } from './WeatherCard'
@@ -135,9 +135,6 @@ export function TodayView({
   const { getStats: getRoutineStats } = useRoutineStats()
   const { isPromotionSuggested } = useRecurringEventDetection(events, eventNotesMap)
 
-  // ── Mode ─────────────────────────────────────────────────────────────────────
-  const [mode, setMode] = useState<TodayMode>('day')
-
   // ── Clarity label ─────────────────────────────────────────────────────────────
   const clarityLabel = (
     { excellent: 'Excellent', good: 'Good', fair: 'Fair', needsAttention: 'Needs attention' } as const
@@ -182,8 +179,6 @@ export function TodayView({
       <TodayHeader
         viewedDate={viewedDate}
         onDateChange={onDateChange}
-        mode={mode}
-        onModeChange={(m) => setMode(m)}
       />
 
       {/* Stats row */}
