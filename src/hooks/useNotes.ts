@@ -301,12 +301,12 @@ export function useNotes() {
   const appendToNote = useCallback(async (id: string, block: string, anchor: Date | null) => {
     const existing = notes.find(n => n.id === id)
     if (!existing) return null
-    const stamp = new Date().toLocaleString()
+    const stamp = new Date().toISOString()
     const content = `${existing.content}\n\n— ${stamp} —\n${block}`
     const patch: Record<string, unknown> = { content }
     if (anchor) patch.timeline_at = anchor.toISOString()  // append-also-anchors
     const { error } = await supabase.from('notes').update(patch).eq('id', id)
-    if (error) return null
+    if (error) { setError(error.message); return null }
     setNotes(prev => prev.map(n => n.id === id
       ? { ...n, content, timelineAt: anchor ?? n.timelineAt } : n))
     return id
