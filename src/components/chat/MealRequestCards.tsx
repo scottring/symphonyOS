@@ -1,16 +1,19 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { sundayOfWeek } from '@/lib/weekHelpers'
 import { fetchMealSuggestions } from '@/lib/askSymphonyMeal'
 import { useApplyMealSuggestion } from '@/hooks/useApplyMealSuggestion'
 import type { AskSymphonySuggestion } from '@/hooks/useAskSymphony'
 
 export function MealRequestCards({ request }: { request: string }) {
-  const weekStart = sundayOfWeek(new Date())
+  const weekStart = useMemo(() => sundayOfWeek(new Date()), [])
   const { applySuggestion } = useApplyMealSuggestion(weekStart)
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [text, setText] = useState('')
   const [cards, setCards] = useState<AskSymphonySuggestion[]>([])
   const [appliedIdx, setAppliedIdx] = useState<Set<number>>(new Set())
+
+  const mountedRef = useRef(true)
+  useEffect(() => () => { mountedRef.current = false }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -29,8 +32,7 @@ export function MealRequestCards({ request }: { request: string }) {
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [request])
+  }, [request, weekStart])
 
   if (state === 'loading') {
     return (
@@ -73,9 +75,10 @@ export function MealRequestCards({ request }: { request: string }) {
               <span className="text-xs text-emerald-700 font-medium">✓ Applied</span>
             ) : (
               <button
+                type="button"
                 onClick={async () => {
                   await applySuggestion(c)
-                  setAppliedIdx(prev => new Set([...prev, i]))
+                  if (mountedRef.current) setAppliedIdx(prev => new Set([...prev, i]))
                 }}
                 className="text-xs px-3 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 font-medium transition-colors"
               >
