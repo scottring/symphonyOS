@@ -23,6 +23,8 @@ export interface NotesContextValue {
   error: string | null
   // CRUD
   addNote: (input: CreateNoteInput) => Promise<Note | null>
+  appendToNote: (id: string, block: string, anchor: Date | null) => Promise<string | null>
+
   updateNote: (id: string, updates: UpdateNoteInput) => Promise<void>
   deleteNote: (id: string) => Promise<void>
   // Entity links
@@ -53,6 +55,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     loading,
     error,
     addNote,
+    appendToNote,
     updateNote,
     deleteNote,
     addEntityLink,
@@ -82,6 +85,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         loading,
         error,
         addNote,
+        appendToNote,
         updateNote,
         deleteNote,
         addEntityLink,

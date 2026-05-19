@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
-import { useNotes } from './useNotes'
+import { useNotes, mapDbNote } from './useNotes'
 import type { DbNote } from '@/types/note'
 
 // Module-level state for mocking
@@ -523,6 +523,17 @@ describe('useNotes', () => {
     const untaggedNotes = result.current.getNotesByTopic(null)
     expect(untaggedNotes).toHaveLength(1)
     expect(untaggedNotes[0].title).toBe('Untagged')
+  })
+
+  it('mapDbNote surfaces timeline_at as a Date', () => {
+    const note = mapDbNote({
+      id: 'n1', user_id: 'u', title: null, content: 'x', type: 'general', source: 'manual',
+      topic_id: null, audio_url: null, external_id: null, external_url: null,
+      vault_path: null, vault_domain: null, vault_frontmatter: null, vault_last_commit_sha: null,
+      context: null, created_at: '2026-05-18T00:00:00Z', updated_at: '2026-05-18T00:00:00Z',
+      timeline_at: '2026-05-18T18:15:00Z',
+    } as any)
+    expect(note.timelineAt?.getUTCHours()).toBe(18)
   })
 
   it('filters notes by type', async () => {

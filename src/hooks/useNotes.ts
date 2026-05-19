@@ -23,7 +23,7 @@ import type { Task } from '@/types/task'
 // ============================================================================
 // Converters
 // ============================================================================
-function dbNoteToNote(dbNote: DbNote): Note {
+export function mapDbNote(dbNote: DbNote): Note {
   return {
     id: dbNote.id,
     title: dbNote.title ?? undefined,
@@ -39,6 +39,7 @@ function dbNoteToNote(dbNote: DbNote): Note {
     vaultFrontmatter: dbNote.vault_frontmatter ?? undefined,
     context: dbNote.context as Note['context'] ?? undefined,
     readonly: dbNote.source === 'vault',
+    timelineAt: dbNote.timeline_at ? new Date(dbNote.timeline_at) : undefined,
     createdAt: new Date(dbNote.created_at),
     updatedAt: new Date(dbNote.updated_at),
   }
@@ -144,7 +145,7 @@ export function useNotes() {
 
       // Filter out Supabase vault notes — Open Brain is now the source of truth
       const supabaseNotes = (notesData as DbNote[])
-        .map(dbNoteToNote)
+        .map(mapDbNote)
         .filter(n => n.source !== 'vault')
 
       const taskNotesConverted = (tasksData || []).map((task: any) =>
@@ -194,6 +195,7 @@ export function useNotes() {
         source: input.source ?? 'manual',
         topicId: input.topicId,
         context: input.context,
+        timelineAt: input.timelineAt,
         createdAt: new Date(),
         updatedAt: new Date(),
       }
@@ -209,6 +211,7 @@ export function useNotes() {
           source: input.source ?? 'manual',
           topic_id: input.topicId ?? null,
           context: input.context ?? null,
+          timeline_at: input.timelineAt?.toISOString() ?? null,
         })
         .select()
         .single()
@@ -221,7 +224,7 @@ export function useNotes() {
       }
 
       // Replace optimistic note with real one
-      const realNote = dbNoteToNote(data as DbNote)
+      const realNote = mapDbNote(data as DbNote)
       setNotes((prev) => prev.map((n) => (n.id === tempId ? realNote : n)))
 
       // Dual-write: also capture to vault via Open Brain (fire-and-forget)
@@ -294,6 +297,20 @@ export function useNotes() {
     },
     [notes]
   )
+
+  const appendToNote = useCallback(async (id: string, block: string, anchor: Date | null) => {
+    const existing = notes.find(n => n.id === id)
+    if (!existing) return null
+    const stamp = new Date().toISOString()
+    const content = `${existing.content}\n\n— ${stamp} —\n${block}`
+    const patch: Record<string, unknown> = { content }
+    if (anchor) patch.timeline_at = anchor.toISOString()  // append-also-anchors
+    const { error } = await supabase.from('notes').update(patch).eq('id', id)
+    if (error) { setError(error.message); return null }
+    setNotes(prev => prev.map(n => n.id === id
+      ? { ...n, content, timelineAt: anchor ?? n.timelineAt } : n))
+    return id
+  }, [notes])
 
   // ============================================================================
   // Entity Links
@@ -371,7 +388,7 @@ export function useNotes() {
         return []
       }
 
-      return (notesData as DbNote[]).map(dbNoteToNote)
+      return (notesData as DbNote[]).map(mapDbNote)
     },
     []
   )
@@ -532,6 +549,7 @@ export function useNotes() {
     addNote,
     updateNote,
     deleteNote,
+    appendToNote,
     // Entity links
     addEntityLink,
     removeEntityLink,
