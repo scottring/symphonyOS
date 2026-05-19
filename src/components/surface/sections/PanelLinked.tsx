@@ -1,6 +1,7 @@
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
+import { ConceptIcon } from '@/lib/conceptIcons'
 
 interface PanelLinkedProps {
   project?: Project
@@ -29,7 +30,7 @@ export function PanelLinked({ project, linkedEvent, siblingTasks, onOpenProject,
           onClick={() => onOpenProject(project.id)}
           className="flex items-center gap-2 w-full text-left mb-1 py-1.5 px-2 rounded-md bg-white shadow-[inset_0_0_0_1px_#e5e7eb] hover:bg-neutral-50"
         >
-          <span className="w-6 h-6 flex items-center justify-center rounded-md bg-violet-100">📁</span>
+          <span className="w-6 h-6 flex items-center justify-center rounded-md bg-violet-100"><ConceptIcon name="project" decorative /></span>
           <span className="text-sm text-neutral-800 flex-1">{project.name}</span>
         </button>
       )}
@@ -38,7 +39,7 @@ export function PanelLinked({ project, linkedEvent, siblingTasks, onOpenProject,
           onClick={() => onOpenEvent(linkedEvent.id)}
           className="flex items-center gap-2 w-full text-left mb-1 py-1.5 px-2 rounded-md bg-white shadow-[inset_0_0_0_1px_#e5e7eb] hover:bg-neutral-50"
         >
-          <span className="w-6 h-6 flex items-center justify-center rounded-md bg-amber-100">📅</span>
+          <span className="w-6 h-6 flex items-center justify-center rounded-md bg-amber-100"><ConceptIcon name="when" decorative /></span>
           <span className="text-sm text-neutral-800 flex-1">
             <div>{linkedEvent.title}</div>
             <div className="text-xs text-neutral-500">{formatEventTime((linkedEvent as { start_time?: string; startTime?: string }).start_time || (linkedEvent as { start_time?: string; startTime?: string }).startTime)}</div>
@@ -51,7 +52,7 @@ export function PanelLinked({ project, linkedEvent, siblingTasks, onOpenProject,
           onClick={() => onOpenTask(t.id)}
           className="flex items-center gap-2 w-full text-left mb-1 py-1.5 px-2 rounded-md bg-white shadow-[inset_0_0_0_1px_#e5e7eb] hover:bg-neutral-50"
         >
-          <span className="w-6 h-6 flex items-center justify-center rounded-md bg-neutral-100">📋</span>
+          <span className="w-6 h-6 flex items-center justify-center rounded-md bg-neutral-100"><ConceptIcon name="list" decorative /></span>
           <span className="text-sm text-neutral-800 flex-1">{t.title}</span>
         </button>
       ))}

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Task } from '@/types/task'
+import { ConceptIcon } from '@/lib/conceptIcons'
 
 interface PanelSubtasksProps {
   subtasks: Task[]
@@ -31,10 +32,10 @@ export function PanelSubtasks({ subtasks, onToggleSubtask, onAddSubtask }: Panel
             aria-label={`Mark ${sub.title} ${sub.completed ? 'incomplete' : 'complete'}`}
             className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100/60 text-left"
           >
-            <span className={`w-4 h-4 rounded-full border flex items-center justify-center text-[10px] flex-shrink-0
+            <span className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0
               ${sub.completed ? 'bg-primary-600 border-primary-600 text-white' : 'border-neutral-300 text-transparent'}`}
             >
-              ✓
+              <ConceptIcon name="done" decorative size={10} />
             </span>
             <span className={`text-sm flex-1 ${sub.completed ? 'line-through text-neutral-400' : 'text-neutral-700'}`}>
               {sub.title}

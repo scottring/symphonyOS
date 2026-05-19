@@ -1,5 +1,6 @@
 import { SchedulePopover } from '@/components/triage/SchedulePopover'
 import { PanelMoreMenu } from './PanelMoreMenu'
+import { ConceptIcon } from '@/lib/conceptIcons'
 
 interface PanelActionsProps {
   completed: boolean
@@ -32,14 +33,14 @@ export function PanelActions({
         onClick={onToggleComplete}
         className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-primary-600 text-white hover:bg-primary-700 transition-colors"
       >
-        {completed ? '↺ Reopen' : '✓ Done'}
+        {completed ? '↺ Reopen' : <><ConceptIcon name="done" decorative /> Done</>}
       </button>
       {phoneNumber && (
         <a
           href={`tel:${phoneNumber}`}
           className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
         >
-          📞 {phoneNumber}
+          <ConceptIcon name="call" decorative /> {phoneNumber}
         </a>
       )}
       <SchedulePopover
@@ -49,7 +50,7 @@ export function PanelActions({
         onClear={onClearSchedule}
         trigger={
           <button className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors">
-            📅 Schedule
+            <ConceptIcon name="when" decorative /> Schedule
           </button>
         }
       />

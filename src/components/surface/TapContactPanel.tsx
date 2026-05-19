@@ -11,6 +11,7 @@ import { PanelFooter } from './sections/PanelFooter'
 import { useEntityRelations } from './hooks/useEntityRelations'
 import { getCategoryLabel } from '@/types/contact'
 import type { MightBeRelevantItem } from './types'
+import { ConceptIcon } from '@/lib/conceptIcons'
 
 interface TapContactPanelProps {
   contact: Contact
@@ -59,7 +60,7 @@ export function TapContactPanel(props: TapContactPanelProps) {
             href={`tel:${contact.phone}`}
             className="px-3 py-1.5 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 transition-colors"
           >
-            📞 {contact.phone}
+            <ConceptIcon name="call" decorative /> {contact.phone}
           </a>
         )}
         {contact.email && (
@@ -67,7 +68,7 @@ export function TapContactPanel(props: TapContactPanelProps) {
             href={`mailto:${contact.email}`}
             className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
           >
-            ✉️ {contact.email}
+            <ConceptIcon name="email" decorative /> {contact.email}
           </a>
         )}
         <button
@@ -95,7 +96,7 @@ export function TapContactPanel(props: TapContactPanelProps) {
               onClick={() => props.onOpenTask(t.id)}
               className="flex items-center gap-2 w-full text-left mb-1 py-1.5 px-2 rounded-md bg-white shadow-[inset_0_0_0_1px_#e5e7eb] hover:bg-neutral-50"
             >
-              <span className="w-6 h-6 flex items-center justify-center rounded-md bg-neutral-100">📋</span>
+              <span className="w-6 h-6 flex items-center justify-center rounded-md bg-neutral-100"><ConceptIcon name="list" decorative /></span>
               <span className="text-sm text-neutral-800 flex-1">{t.title}</span>
             </button>
           ))}
