@@ -19,8 +19,8 @@ const innerContent = (headline: string, subline: string) => (
       <Leaf className="w-4 h-4" />
     </span>
     <div className="min-w-0">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-400">
-        Today's Focus
+      <p className="text-[11px] uppercase tracking-wide text-neutral-400">
+        TODAY'S FOCUS
       </p>
       <p className="font-display text-lg text-neutral-800 leading-snug">{headline}</p>
       <p className="mt-0.5 text-[13px] text-neutral-500">{subline}</p>

@@ -1,8 +1,5 @@
 import { useState, useCallback, useMemo } from 'react'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
-import { PanelHeader } from './sections/PanelHeader'
-import { PanelMetaRow } from './sections/PanelMetaRow'
-import { PanelActions } from './sections/PanelActions'
 import { PanelWhy } from './sections/PanelWhy'
 import { PanelWhatToBring } from './sections/PanelWhatToBring'
 import { PanelIngredients } from './sections/PanelIngredients'
@@ -23,12 +20,6 @@ interface TapMealPanelProps {
 type AnyEvent = { start_time?: string; startTime?: string }
 function getStartTime(e: CalendarEvent): string | undefined {
   return (e as AnyEvent).start_time || (e as AnyEvent).startTime
-}
-function formatTime(iso?: string): string {
-  if (!iso) return ''
-  return new Date(iso).toLocaleString('en-US', {
-    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-  })
 }
 
 /** Meal-aware detail panel. Resolves the synthesized meal event back to its
@@ -68,35 +59,79 @@ export function TapMealPanel({ event, onClose }: TapMealPanelProps) {
     onClose()
   }, [entry, removeMeal, onClose])
 
-  return (
-    <article className="bg-bg-elevated rounded-2xl p-5 max-w-md w-full">
-      <PanelHeader
-        title={event.title}
-        onTitleChange={() => { /* meal title derives from recipe/ad-hoc */ }}
-        onClose={onClose}
-      />
-      <PanelMetaRow bucket={formatTime(startIso)} />
+  const timeDisplay = startIso
+    ? new Date(startIso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) +
+      ' • ' +
+      new Date(startIso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    : ''
 
-      <PanelActions
-        completed={false}
-        scheduledFor={startIso ? new Date(startIso) : undefined}
-        isAllDay={false}
-        isPinned={false}
-        onToggleComplete={() => { /* meals have no complete path here (spec §6/§11) — inert */ }}
-        onSchedule={() => { /* meal time derives from the plan slot; reschedule via Change recipe */ }}
-        onTogglePin={() => { /* meals are not pinnable */ }}
-        onDelete={handleRemove}
-      />
-      <button
-        onClick={() => setPickerOpen(true)}
-        className="text-xs px-3 py-1.5 rounded-lg font-medium bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors mb-4"
-      >
-        Change recipe
-      </button>
+  return (
+    <article className="bg-bg-elevated rounded-2xl p-6 max-w-md w-full">
+      {/* Header: title + close */}
+      <div className="flex items-start justify-between gap-3 mb-1">
+        <h2 className="font-display text-2xl text-neutral-900 leading-snug flex-1">{event.title}</h2>
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          className="text-neutral-400 hover:text-neutral-700 text-xl leading-none mt-1 shrink-0"
+        >
+          ×
+        </button>
+      </div>
+      {/* Date + time meta */}
+      {timeDisplay && (
+        <p className="text-[13px] text-neutral-500 mb-2">{timeDisplay}</p>
+      )}
+      {/* Meal chip */}
+      <span className="inline-block text-[11px] px-2 py-0.5 rounded bg-neutral-100 text-neutral-500 mb-4">
+        Meal
+      </span>
+
+      {/* Action row */}
+      <div className="flex items-center justify-around pb-4 mb-4 border-b border-neutral-200">
+        <button
+          onClick={() => { /* meals: inert */ }}
+          className="flex flex-col items-center gap-1 text-[11px] text-neutral-500 hover:text-neutral-700"
+        >
+          <svg className="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+          </svg>
+          Complete
+        </button>
+        <button
+          onClick={() => setPickerOpen(true)}
+          className="flex flex-col items-center gap-1 text-[11px] text-neutral-500 hover:text-neutral-700"
+        >
+          <svg className="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+          </svg>
+          Edit
+        </button>
+        <button
+          onClick={() => { /* meal reschedule: inert */ }}
+          className="flex flex-col items-center gap-1 text-[11px] text-neutral-500 hover:text-neutral-700"
+        >
+          <svg className="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+          </svg>
+          Move
+        </button>
+        <button
+          onClick={handleRemove}
+          className="flex flex-col items-center gap-1 text-[11px] text-neutral-500 hover:text-red-600"
+        >
+          <svg className="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
+          </svg>
+          More
+        </button>
+      </div>
+
       <PanelWhy
         key={entry?.id ?? event.id}
         notes={recipe?.title ? `Recipe: ${recipe.title}` : entry?.adHocTitle}
         onChange={() => { /* ABOUT derives from the recipe; read-only here */ }}
+        label="ABOUT"
       />
       <PanelWhatToBring notes={entry?.notes} />
       <PanelIngredients ingredients={recipe?.ingredients} />

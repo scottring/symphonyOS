@@ -14,27 +14,40 @@ export function TodayHeader({ viewedDate, onDateChange, onToggleWeather }: Today
   const label = viewedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
   return (
     <header className="flex items-center justify-between gap-4 mb-6">
-      <div className="flex items-center gap-3 min-w-0">
-        <h1 className="font-display text-3xl md:text-4xl text-neutral-900 tracking-tight truncate">{label}</h1>
-        <div className="flex items-center gap-1 shrink-0">
-          <button aria-label="Previous day" onClick={() => onDateChange(shift(viewedDate, -1))}
-            className="p-1.5 rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100">
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button aria-label="Next day" onClick={() => onDateChange(shift(viewedDate, 1))}
-            className="p-1.5 rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100">
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
+      {/* Left: prev/next + date */}
+      <div className="flex items-center gap-2 min-w-0">
+        <button
+          aria-label="Previous day"
+          onClick={() => onDateChange(shift(viewedDate, -1))}
+          className="p-1.5 rounded text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors shrink-0"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <button
+          aria-label="Next day"
+          onClick={() => onDateChange(shift(viewedDate, 1))}
+          className="p-1.5 rounded text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors shrink-0"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+        <h1 className="font-display text-[32px] leading-tight text-neutral-900 truncate">{label}</h1>
       </div>
-      {onToggleWeather && (
-        <div className="flex items-center gap-2 shrink-0">
-          <button aria-label="Toggle weather" onClick={onToggleWeather}
-            className="p-1.5 rounded-md text-amber-400 hover:bg-amber-50">
-            <Sun className="w-4 h-4" />
-          </button>
+
+      {/* Right: D/W/M segmented pill + sun toggle */}
+      <div className="flex items-center gap-2 shrink-0">
+        <div className="inline-flex rounded-full bg-neutral-100 p-1">
+          <span className="bg-primary-600 text-white rounded-full px-4 py-1.5 text-sm font-medium">Day</span>
+          <span className="text-neutral-500 px-4 py-1.5 text-sm cursor-default">Week</span>
+          <span className="text-neutral-500 px-4 py-1.5 text-sm cursor-default">Month</span>
         </div>
-      )}
+        <button
+          aria-label="Toggle weather"
+          onClick={onToggleWeather}
+          className="w-9 h-9 rounded-full border border-neutral-200 grid place-items-center text-amber-400 hover:bg-amber-50 transition-colors"
+        >
+          <Sun className="w-4 h-4" />
+        </button>
+      </div>
     </header>
   )
 }

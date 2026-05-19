@@ -320,7 +320,7 @@ export function TodayView({
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-3xl mx-auto px-6 py-10">
+    <div className="max-w-[860px] mx-auto px-8 py-8">
       {/* Header */}
       <TodayHeader
         viewedDate={viewedDate}
@@ -372,7 +372,7 @@ export function TodayView({
 
       {/* Two-up: Focus card + Weather — only shown when there is something to focus on */}
       {data.counts.totalItems > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr] gap-4 mb-6">
+        <div className="grid grid-cols-[1.6fr_1fr] gap-4 mb-7 mt-6">
           <TodaysFocusCard
             headline={focusHeadline(health.healthColor)}
             priorities={focusPriorities}
@@ -384,8 +384,8 @@ export function TodayView({
         </div>
       )}
 
-      {/* Task list card */}
-      <div ref={listRef} className="card p-4">
+      {/* Task list card — single outer card wraps all sections */}
+      <div ref={listRef} className="card rounded-2xl border border-neutral-200/70 px-5 py-4">
         {data.counts.totalItems === 0 ? (
           <div className="text-center py-16">
             <p className="font-display text-xl text-neutral-700">Your day is clear</p>
@@ -439,11 +439,11 @@ export function TodayView({
               const meta = daySectionMeta(section)
               return (
                 <section key={section}>
-                  <h3 className="time-group-header mb-3 flex items-center gap-2">
+                  <h3 className="flex items-center gap-2 text-[11px] uppercase tracking-wider font-semibold text-neutral-400 mb-3">
                     {createElement(meta.Icon, { className: 'w-4 h-4 text-amber-500 shrink-0' })}
                     <span>{meta.label}</span>
                     {meta.range && (
-                      <span className="text-[11px] font-normal tracking-normal text-neutral-400 normal-case">
+                      <span className="text-neutral-300 normal-case font-normal">
                         {meta.range}
                       </span>
                     )}
@@ -661,7 +661,7 @@ export function TodayView({
       </div>
 
       {/* AI banner */}
-      <div className="mt-6">
+      <div className="mt-5">
         <AiSuggestionBanner />
       </div>
 

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, createElement } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { PinnedSection } from '@/components/pins'
 import { useDomain } from '@/hooks/useDomain'
@@ -15,36 +15,27 @@ import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { Routine } from '@/types/routine'
 import { ConceptIcon } from '@/lib/conceptIcons'
+import {
+  Sun,
+  CalendarRange,
+  UtensilsCrossed,
+  Users,
+  FolderKanban,
+  Home,
+  Inbox,
+  Calendar,
+  FileText,
+  Users2,
+  List,
+  Settings,
+  LogOut,
+} from 'lucide-react'
 
 // Feature flags for in-progress features
 const FEATURES = {
-  notes: true, // Notes feature enabled - entity linking in progress
-  lists: true, // Lists feature enabled - reference lists for books, movies, ideas, etc.
+  notes: true,
+  lists: true,
 }
-
-// Subtle domain theming (module-level to avoid re-creation each render)
-const DOMAIN_THEME = {
-  universal: {
-    bg: 'bg-bg-elevated/80',
-    border: '',
-    glow: '',
-  },
-  work: {
-    bg: 'bg-bg-elevated/80',
-    border: 'border-l-2 border-blue-200/30',
-    glow: 'shadow-[inset_4px_0_12px_-8px_rgba(59,130,246,0.15)]',
-  },
-  family: {
-    bg: 'bg-bg-elevated/80',
-    border: 'border-l-2 border-amber-200/30',
-    glow: 'shadow-[inset_4px_0_12px_-8px_rgba(251,191,36,0.15)]',
-  },
-  personal: {
-    bg: 'bg-bg-elevated/80',
-    border: 'border-l-2 border-purple-200/30',
-    glow: 'shadow-[inset_4px_0_12px_-8px_rgba(168,85,247,0.15)]',
-  },
-} as const
 
 export type ViewType = 'agent' | 'home' | 'home-app' | 'today' | 'inbox' | 'goals' | 'projects' | 'routines' | 'lists' | 'notes' | 'contacts' | 'history' | 'task-detail' | 'contact-detail' | 'settings' | 'meals' | 'morning' | 'bedtime'
 
@@ -75,6 +66,13 @@ interface SidebarProps {
   onPinRefreshStale?: (id: string) => void
 }
 
+function getGreetingWord(): string {
+  const h = new Date().getHours()
+  if (h < 12) return 'morning'
+  if (h < 18) return 'afternoon'
+  return 'evening'
+}
+
 export function Sidebar({
   collapsed,
   onToggle,
@@ -95,26 +93,23 @@ export function Sidebar({
   const navigate = useNavigate()
   const location = useLocation()
   const { currentDomain } = useDomain()
-  const theme = DOMAIN_THEME[currentDomain]
+  // currentDomain used for future domain-aware logic; suppress unused warning
+  void currentDomain
 
   const { state: groupState, toggle: toggleGroup, setOpen: openGroup } = useSidebarGroupState()
 
-  // Force a group open when the user is viewing one of its children.
   const planActive = activeView === 'projects' || activeView === 'routines' || activeView === 'goals'
   const libraryActive =
     activeView === 'notes' || activeView === 'lists' ||
     activeView === 'contacts' || activeView === 'contact-detail' || activeView === 'history'
   const spacesActive = activeView === 'home-app' || activeView === 'meals'
 
-  // When the user lands on a child via URL, persist that group as open
-  // so it stays open after they navigate elsewhere.
   useEffect(() => {
     if (planActive) openGroup('plan')
     if (libraryActive) openGroup('library')
     if (spacesActive) openGroup('spaces')
   }, [planActive, libraryActive, spacesActive, openGroup])
 
-  // Inline contextual children — only fetch when the relevant view is active
   const homeAppActive = activeView === 'home-app'
   const listsActive = activeView === 'lists'
 
@@ -131,21 +126,33 @@ export function Sidebar({
     : []
   const moreListsCount = listsActive ? Math.max(0, allLists.length - 5) : 0
 
+  const firstName = (userName || userEmail || '').split(/[\s@]/)[0] || 'there'
+  const greetingWord = getGreetingWord()
+
+  // Nav item helper
+  function navItemClass(active: boolean): string {
+    return `w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-[15px] ${
+      active
+        ? 'bg-primary-50 text-primary-700 font-medium'
+        : 'text-neutral-600 hover:bg-neutral-100/70'
+    } ${collapsed ? 'justify-center' : ''}`
+  }
+
   return (
     <aside
       className={`
-        h-full ${theme.bg} ${theme.border} ${theme.glow} backdrop-blur-sm
+        h-full bg-bg-base border-r border-neutral-200/60
         flex flex-col
         transition-all duration-500
-        ${collapsed ? 'w-[68px]' : 'w-60'}
+        ${collapsed ? 'w-[68px]' : 'w-64'}
       `}
     >
-      {/* Header */}
-      <div className="p-4 flex items-center justify-between">
+      {/* Header: logo + name */}
+      <div className="p-5 flex items-center justify-between">
         <div className={`flex items-center gap-2 ${collapsed ? 'justify-center w-full' : ''}`}>
-          <img src="/symphony-logo.jpg" alt="Symphony" className="w-8 h-8 rounded-full object-cover" />
+          <img src="/symphony-logo.jpg" alt="Symphony" className="w-7 h-7 rounded-full object-cover shrink-0" />
           {!collapsed && (
-            <span className="font-display text-2xl font-semibold tracking-wide text-neutral-800">Symphony</span>
+            <span className="font-display text-2xl font-semibold text-neutral-900">Symphony</span>
           )}
         </div>
         {!collapsed && (
@@ -174,86 +181,62 @@ export function Sidebar({
         </button>
       )}
 
-      {/* Search + launcher icons */}
-      <div className="px-3 mt-4 flex items-center gap-1">
+      {/* Greeting block */}
+      {!collapsed && (
+        <div className="px-5 pb-3 flex items-center gap-3">
+          <img src="/symphony-logo.jpg" alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
+          <div className="min-w-0">
+            <p className="text-xs text-neutral-500">Good {greetingWord},</p>
+            <p className="font-display text-base text-neutral-900 leading-tight">
+              {firstName}
+              <Sun className="w-3.5 h-3.5 text-amber-500 inline ml-1" />
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Search + AI/Wall launcher — compact row */}
+      <div className={`px-3 mt-1 flex items-center gap-1 ${collapsed ? 'flex-col' : ''}`}>
         {onOpenSearch && (
           <button
             onClick={onOpenSearch}
             className={`
-              flex-1 flex items-center gap-3 px-3.5 py-3 rounded-lg
-              text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100/80
-              transition-all duration-200
-              ${collapsed ? 'justify-center' : ''}
+              flex-1 flex items-center gap-2 px-3 py-2 rounded-lg
+              text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100/70
+              transition-all duration-200 text-[13px]
+              ${collapsed ? 'justify-center flex-none' : ''}
             `}
             aria-label="Search"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
             </svg>
-            {!collapsed && (
-              <>
-                <span className="flex-1 text-left text-[15px]">Search</span>
-                <kbd className="hidden lg:inline text-[11px] text-neutral-400 font-medium">⌘/</kbd>
-              </>
-            )}
+            {!collapsed && <span className="flex-1 text-left">Search</span>}
           </button>
         )}
-
-        {!collapsed && (
-          <>
-            {onOpenChat && (
-              <button
-                onClick={onOpenChat}
-                className="p-2 rounded-lg text-primary-600 hover:bg-primary-50/80 hover:text-primary-700 transition-colors"
-                aria-label="Open AI chat"
-                title="AI chat"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
-                </svg>
-              </button>
-            )}
-            <button
-              onClick={() => window.open('/wall', '_blank')}
-              className="p-2 rounded-lg text-neutral-500 hover:bg-neutral-100/80 hover:text-neutral-700 transition-colors"
-              aria-label="Open Wall in new tab"
-              title="Wall"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clipRule="evenodd" />
-              </svg>
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* AI/Wall icons stacked when sidebar collapsed */}
-      {collapsed && (
-        <div className="px-3 mt-2 flex flex-col items-center gap-1">
-          {onOpenChat && (
-            <button
-              onClick={onOpenChat}
-              className="p-2 rounded-lg text-primary-600 hover:bg-primary-50/80 hover:text-primary-700 transition-colors"
-              aria-label="Open AI chat"
-              title="AI"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
-              </svg>
-            </button>
-          )}
+        {onOpenChat && (
           <button
-            onClick={() => window.open('/wall', '_blank')}
-            className="p-2 rounded-lg text-neutral-500 hover:bg-neutral-100/80 hover:text-neutral-700 transition-colors"
-            aria-label="Open Wall in new tab"
-            title="Wall"
+            onClick={onOpenChat}
+            className="p-2 rounded-lg text-primary-500 hover:bg-primary-50/80 hover:text-primary-700 transition-colors"
+            aria-label="Open AI chat"
+            title="AI chat"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clipRule="evenodd" />
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
             </svg>
           </button>
-        </div>
-      )}
+        )}
+        <button
+          onClick={() => window.open('/wall', '_blank')}
+          className="p-2 rounded-lg text-neutral-400 hover:bg-neutral-100/70 hover:text-neutral-600 transition-colors"
+          aria-label="Open Wall in new tab"
+          title="Wall"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clipRule="evenodd" />
+          </svg>
+        </button>
+      </div>
 
       {/* Pinned Section */}
       {pins.length > 0 && entities && onPinNavigate && onPinMarkAccessed && onPinRefreshStale && (
@@ -267,43 +250,105 @@ export function Sidebar({
         />
       )}
 
-      {/* Navigation */}
-      <nav className="flex-1 px-3 mt-6 space-y-1 overflow-y-auto">
-        {/* Do — always visible (no group header) */}
+      {/* Navigation — flat list per mockup */}
+      <nav className="flex-1 px-3 mt-4 space-y-0.5 overflow-y-auto">
+        {/* Today */}
         <button
           onClick={() => onViewChange('today')}
-          className={`
-            w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
-            ${activeView === 'today'
-              ? 'text-primary-700 bg-primary-50/80 font-medium'
-              : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
-            }
-            ${collapsed ? 'justify-center' : ''}
-          `}
+          className={navItemClass(activeView === 'today')}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-          </svg>
-          {!collapsed && <span className="text-[15px]">Today</span>}
+          {createElement(Sun, { className: 'w-5 h-5 shrink-0' })}
+          {!collapsed && <span>Today</span>}
         </button>
 
+        {/* This Week */}
+        <button
+          onClick={() => onViewChange('today')}
+          className={navItemClass(false)}
+        >
+          {createElement(CalendarRange, { className: 'w-5 h-5 shrink-0' })}
+          {!collapsed && <span>This Week</span>}
+        </button>
+
+        {/* Meals */}
+        <button
+          onClick={() => onViewChange('meals')}
+          className={navItemClass(activeView === 'meals')}
+        >
+          {createElement(UtensilsCrossed, { className: 'w-5 h-5 shrink-0' })}
+          {!collapsed && <span>Meals</span>}
+        </button>
+        {!collapsed && activeView === 'meals' && (
+          <>
+            <button
+              onClick={() => navigate('/meals/shelf')}
+              className={`w-full flex items-center gap-3 pl-9 pr-3.5 py-2 rounded-lg transition-all duration-200 ${location.pathname.startsWith('/meals/shelf') ? 'text-primary-700 bg-primary-50/60 font-medium' : 'text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700'}`}
+            >
+              <span className="text-[14px]">Shelf</span>
+            </button>
+            <button
+              onClick={() => navigate('/meals/habits')}
+              className={`w-full flex items-center gap-3 pl-9 pr-3.5 py-2 rounded-lg transition-all duration-200 ${location.pathname.startsWith('/meals/habits') ? 'text-primary-700 bg-primary-50/60 font-medium' : 'text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700'}`}
+            >
+              <span className="text-[14px]">Habits</span>
+            </button>
+          </>
+        )}
+
+        {/* Family */}
+        <button
+          onClick={() => onViewChange('home-app')}
+          className={navItemClass(activeView === 'home-app')}
+        >
+          {createElement(Users, { className: 'w-5 h-5 shrink-0' })}
+          {!collapsed && <span>Family</span>}
+        </button>
+
+        {/* Projects */}
+        <button
+          onClick={() => onViewChange('projects')}
+          className={navItemClass(activeView === 'projects')}
+        >
+          {createElement(FolderKanban, { className: 'w-5 h-5 shrink-0' })}
+          {!collapsed && <span>Projects</span>}
+        </button>
+
+        {/* Home */}
+        <button
+          onClick={() => onViewChange('home-app')}
+          className={navItemClass(false)}
+          aria-label="Home"
+        >
+          {createElement(Home, { className: 'w-5 h-5 shrink-0' })}
+          {!collapsed && <span>Home</span>}
+        </button>
+        {!collapsed && homeAppActive && inlineRooms.map((r) => (
+          <button
+            key={r.id}
+            onClick={() => navigate(`/home/space/${r.id}`)}
+            className={`w-full flex items-center gap-3 pl-9 pr-3.5 py-2 rounded-lg transition-all duration-200 ${location.pathname === `/home/space/${r.id}` ? 'text-primary-700 bg-primary-50/60 font-medium' : 'text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700'}`}
+          >
+            <span className="text-[14px] truncate">{r.name}</span>
+          </button>
+        ))}
+        {!collapsed && homeAppActive && moreRoomsCount > 0 && (
+          <button
+            onClick={() => navigate('/home')}
+            className="w-full flex items-center gap-3 pl-9 pr-3.5 py-1.5 text-[13px] text-neutral-400 hover:text-neutral-600"
+          >
+            All rooms ({rooms.length}) →
+          </button>
+        )}
+
+        {/* Inbox */}
         <button
           onClick={() => onViewChange('inbox')}
-          className={`
-            w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
-            ${activeView === 'inbox'
-              ? 'text-primary-700 bg-primary-50/80 font-medium'
-              : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
-            }
-            ${collapsed ? 'justify-center' : ''}
-          `}
+          className={navItemClass(activeView === 'inbox')}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 2h10v7h-2l-1 2H8l-1-2H5V5z" clipRule="evenodd" />
-          </svg>
+          {createElement(Inbox, { className: 'w-5 h-5 shrink-0' })}
           {!collapsed && (
             <>
-              <span className="text-[15px] flex-1 text-left">Inbox</span>
+              <span className="flex-1 text-left">Inbox</span>
               {typeof inboxCount === 'number' && inboxCount > 0 && (
                 <span className="text-[11px] tabular-nums px-1.5 py-0.5 rounded-md bg-neutral-200/70 text-neutral-600">
                   {inboxCount}
@@ -313,266 +358,69 @@ export function Sidebar({
           )}
         </button>
 
-        {/* Plan group */}
-        <SidebarGroup
-          label="Plan"
-          open={groupState.plan}
-          forceOpen={planActive}
-          onToggle={() => toggleGroup('plan')}
-          collapsed={collapsed}
+        {/* Divider */}
+        <div className="border-t border-neutral-200/60 my-3" />
+
+        {/* Calendar */}
+        <button
+          onClick={() => onViewChange('today')}
+          className={navItemClass(false)}
         >
-          <button
-            onClick={() => onViewChange('projects')}
-            className={`
-              w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
-              ${activeView === 'projects'
-                ? 'text-primary-700 bg-primary-50/80 font-medium'
-                : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
-              }
-              ${collapsed ? 'justify-center' : ''}
-            `}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-            </svg>
-            {!collapsed && <span className="text-[15px]">Projects</span>}
-          </button>
+          {createElement(Calendar, { className: 'w-5 h-5 shrink-0' })}
+          {!collapsed && <span>Calendar</span>}
+        </button>
 
+        {/* Notes */}
+        {FEATURES.notes && (
           <button
-            onClick={() => onViewChange('routines')}
-            className={`
-              w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
-              ${activeView === 'routines'
-                ? 'text-primary-700 bg-primary-50/80 font-medium'
-                : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
-              }
-              ${collapsed ? 'justify-center' : ''}
-            `}
+            onClick={() => onViewChange('notes')}
+            className={navItemClass(activeView === 'notes')}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
-            </svg>
-            {!collapsed && <span className="text-[15px]">Routines</span>}
+            {createElement(FileText, { className: 'w-5 h-5 shrink-0' })}
+            {!collapsed && <span>Notes</span>}
           </button>
+        )}
 
-          <button
-            onClick={() => onViewChange('goals')}
-            className={`
-              w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
-              ${activeView === 'goals'
-                ? 'text-primary-700 bg-primary-50/80 font-medium'
-                : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
-              }
-              ${collapsed ? 'justify-center' : ''}
-            `}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clipRule="evenodd" />
-            </svg>
-            {!collapsed && <span className="text-[15px]">Goals</span>}
-          </button>
-        </SidebarGroup>
-
-        {/* Library group */}
-        <SidebarGroup
-          label="Library"
-          open={groupState.library}
-          forceOpen={libraryActive}
-          onToggle={() => toggleGroup('library')}
-          collapsed={collapsed}
+        {/* Contacts */}
+        <button
+          onClick={() => onViewChange('contacts')}
+          className={navItemClass(activeView === 'contacts' || activeView === 'contact-detail')}
         >
-          {FEATURES.notes && (
+          {createElement(Users2, { className: 'w-5 h-5 shrink-0' })}
+          {!collapsed && <span>Contacts</span>}
+        </button>
+
+        {/* Lists */}
+        {FEATURES.lists && (
+          <>
             <button
-              onClick={() => onViewChange('notes')}
-              className={`
-                w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
-                ${activeView === 'notes'
-                  ? 'text-primary-700 bg-primary-50/80 font-medium'
-                  : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
-                }
-                ${collapsed ? 'justify-center' : ''}
-              `}
+              onClick={() => onViewChange('lists')}
+              className={navItemClass(activeView === 'lists')}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M9 2a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V6.414A2 2 0 0016.414 5L14 2.586A2 2 0 0012.586 2H9z" />
-                <path d="M3 8a1 1 0 011-1h1v10H4a1 1 0 01-1-1V8z" />
-              </svg>
-              {!collapsed && <span className="text-[15px]">Notes</span>}
+              {createElement(List, { className: 'w-5 h-5 shrink-0' })}
+              {!collapsed && <span>Lists</span>}
             </button>
-          )}
-
-          {FEATURES.lists && (
-            <>
+            {!collapsed && listsActive && inlineLists.map((l) => (
+              <button
+                key={l.id}
+                onClick={() => onViewChange('lists')}
+                className="w-full flex items-center gap-3 pl-9 pr-3.5 py-2 rounded-lg text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700 transition-all duration-200"
+              >
+                <span className="text-[14px] truncate">{l.icon ? l.icon : <ConceptIcon name="list" size={14} decorative />} {l.title}</span>
+              </button>
+            ))}
+            {!collapsed && listsActive && moreListsCount > 0 && (
               <button
                 onClick={() => onViewChange('lists')}
-                className={`
-                  w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
-                  ${activeView === 'lists'
-                    ? 'text-primary-700 bg-primary-50/80 font-medium'
-                    : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
-                  }
-                  ${collapsed ? 'justify-center' : ''}
-                `}
+                className="w-full flex items-center gap-3 pl-9 pr-3.5 py-1.5 text-[13px] text-neutral-400 hover:text-neutral-600"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-                </svg>
-                {!collapsed && <span className="text-[15px]">Lists</span>}
+                All lists ({allLists.length}) →
               </button>
-              {!collapsed && listsActive && inlineLists.map((l) => (
-                <button
-                  key={l.id}
-                  onClick={() => onViewChange('lists')}
-                  className="w-full flex items-center gap-3 pl-9 pr-3.5 py-2 rounded-lg text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700 transition-all duration-200"
-                >
-                  <span className="text-[14px] truncate">{l.icon ? l.icon : <ConceptIcon name="list" size={14} decorative />} {l.title}</span>
-                </button>
-              ))}
-              {!collapsed && listsActive && moreListsCount > 0 && (
-                <button
-                  onClick={() => onViewChange('lists')}
-                  className="w-full flex items-center gap-3 pl-9 pr-3.5 py-1.5 text-[13px] text-neutral-400 hover:text-neutral-600"
-                >
-                  All lists ({allLists.length}) →
-                </button>
-              )}
-            </>
-          )}
+            )}
+          </>
+        )}
 
-          <button
-            onClick={() => onViewChange('contacts')}
-            className={`
-              w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
-              ${activeView === 'contacts' || activeView === 'contact-detail'
-                ? 'text-primary-700 bg-primary-50/80 font-medium'
-                : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
-              }
-              ${collapsed ? 'justify-center' : ''}
-            `}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
-            </svg>
-            {!collapsed && <span className="text-[15px]">Contacts</span>}
-          </button>
-
-          <button
-            onClick={() => onViewChange('history')}
-            className={`
-              w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
-              ${activeView === 'history'
-                ? 'text-primary-700 bg-primary-50/80 font-medium'
-                : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
-              }
-              ${collapsed ? 'justify-center' : ''}
-            `}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-            </svg>
-            {!collapsed && <span className="text-[15px]">History</span>}
-          </button>
-        </SidebarGroup>
-
-        {/* Spaces group */}
-        <SidebarGroup
-          label="Spaces"
-          open={groupState.spaces}
-          forceOpen={spacesActive}
-          onToggle={() => toggleGroup('spaces')}
-          collapsed={collapsed}
-        >
-          {/* Home (Phase 1A — physical home registry) */}
-          <button
-            onClick={() => onViewChange('home-app')}
-            className={`
-              w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
-              ${activeView === 'home-app'
-                ? 'text-primary-700 bg-primary-50/80 font-medium'
-                : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
-              }
-              ${collapsed ? 'justify-center' : ''}
-            `}
-            aria-label="Home"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
-            </svg>
-            {!collapsed && <span className="text-[15px]">Home</span>}
-          </button>
-
-          {!collapsed && homeAppActive && inlineRooms.map((r) => (
-            <button
-              key={r.id}
-              onClick={() => navigate(`/home/space/${r.id}`)}
-              className={`
-                w-full flex items-center gap-3 pl-9 pr-3.5 py-2 rounded-lg transition-all duration-200
-                ${location.pathname === `/home/space/${r.id}`
-                  ? 'text-primary-700 bg-primary-50/60 font-medium'
-                  : 'text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700'
-                }
-              `}
-            >
-              <span className="text-[14px] truncate">{r.name}</span>
-            </button>
-          ))}
-          {!collapsed && homeAppActive && moreRoomsCount > 0 && (
-            <button
-              onClick={() => navigate('/home')}
-              className="w-full flex items-center gap-3 pl-9 pr-3.5 py-1.5 text-[13px] text-neutral-400 hover:text-neutral-600"
-            >
-              All rooms ({rooms.length}) →
-            </button>
-          )}
-
-          <button
-            onClick={() => onViewChange('meals')}
-            className={`
-              w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
-              ${activeView === 'meals'
-                ? 'text-primary-700 bg-primary-50/80 font-medium'
-                : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
-              }
-              ${collapsed ? 'justify-center' : ''}
-            `}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M3 2a1 1 0 011 1v5a2 2 0 002 2h.5a.5.5 0 01.5.5V17a1 1 0 11-2 0v-6H5a4 4 0 01-4-4V3a1 1 0 011-1h1zm6 0a1 1 0 011 1v4a3 3 0 01-2 2.83V17a1 1 0 11-2 0V9.83A3 3 0 015 7V3a1 1 0 112 0v4a1 1 0 102 0V3a1 1 0 011-1zm6 0a3 3 0 013 3v6.5a.5.5 0 01-.5.5H16v5a1 1 0 11-2 0V3a1 1 0 011-1z" />
-            </svg>
-            {!collapsed && <span className="text-[15px]">Meals</span>}
-          </button>
-
-          {!collapsed && activeView === 'meals' && (
-            <>
-              <button
-                onClick={() => navigate('/meals/shelf')}
-                className={`
-                  w-full flex items-center gap-3 pl-9 pr-3.5 py-2 rounded-lg transition-all duration-200
-                  ${location.pathname.startsWith('/meals/shelf')
-                    ? 'text-primary-700 bg-primary-50/60 font-medium'
-                    : 'text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700'
-                  }
-                `}
-              >
-                <span className="text-[14px]">Shelf</span>
-              </button>
-              <button
-                onClick={() => navigate('/meals/habits')}
-                className={`
-                  w-full flex items-center gap-3 pl-9 pr-3.5 py-2 rounded-lg transition-all duration-200
-                  ${location.pathname.startsWith('/meals/habits')
-                    ? 'text-primary-700 bg-primary-50/60 font-medium'
-                    : 'text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700'
-                  }
-                `}
-              >
-                <span className="text-[14px]">Habits</span>
-              </button>
-            </>
-          )}
-        </SidebarGroup>
-
-        {/* Apps group (registry-driven) */}
+        {/* Apps (registry-driven) */}
         {(() => {
           const registryEntries = appRegistry
             .filter((a) => a.sidebar)
@@ -593,16 +441,16 @@ export function Sidebar({
                     key={app.id}
                     onClick={() => navigate(app.route)}
                     className={`
-                      w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all duration-200
+                      w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-[15px]
                       ${isActive
-                        ? 'text-primary-700 bg-primary-50/80 font-medium'
-                        : 'text-neutral-600 hover:bg-neutral-100/60 hover:text-neutral-800'
+                        ? 'bg-primary-50 text-primary-700 font-medium'
+                        : 'text-neutral-600 hover:bg-neutral-100/70'
                       }
                       ${collapsed ? 'justify-center' : ''}
                     `}
                   >
                     <Icon className="w-5 h-5 shrink-0" />
-                    {!collapsed && <span className="text-[15px]">{app.sidebar!.label}</span>}
+                    {!collapsed && <span>{app.sidebar!.label}</span>}
                   </button>
                 )
               })}
@@ -611,62 +459,76 @@ export function Sidebar({
         })()}
       </nav>
 
-      {/* User section */}
-      {(userEmail || userName || onSignOut) && (
-        <div className={`p-3 border-t border-neutral-100 ${collapsed ? 'text-center' : ''}`}>
+      {/* Footer: Settings + Sign out + illustration + tagline */}
+      <div className={`p-3 border-t border-neutral-100 ${collapsed ? 'text-center' : ''}`}>
+        <button
+          onClick={() => onViewChange('settings')}
+          className={`
+            flex items-center gap-3 px-3 py-2.5 rounded-lg w-full transition-all duration-200 text-[15px]
+            ${activeView === 'settings'
+              ? 'bg-primary-50 text-primary-700 font-medium'
+              : 'text-neutral-600 hover:bg-neutral-100/70'
+            }
+            ${collapsed ? 'justify-center' : ''}
+          `}
+        >
+          <Settings className="w-5 h-5 shrink-0" />
+          {!collapsed && <span>Settings</span>}
+        </button>
+        {onSignOut && (
           <button
-            onClick={() => onViewChange('settings')}
+            onClick={onSignOut}
             className={`
-              flex items-center gap-3 px-3.5 py-3 rounded-lg w-full transition-all duration-200
-              ${activeView === 'settings'
-                ? 'text-primary-700 bg-primary-50/80 font-medium'
-                : 'text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100/60'
-              }
+              flex items-center gap-3 px-3 py-2.5 rounded-lg w-full
+              text-neutral-600 hover:bg-neutral-100/70
+              transition-all duration-200 text-[15px]
               ${collapsed ? 'justify-center' : ''}
             `}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
-            </svg>
-            {!collapsed && <span className="text-[15px]">Settings</span>}
+            <LogOut className="w-5 h-5 shrink-0" />
+            {!collapsed && <span>Sign out</span>}
           </button>
-          {onSignOut && (
-            <button
-              onClick={onSignOut}
-              className={`
-                flex items-center gap-3 px-3.5 py-3 rounded-lg w-full
-                text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100/60
-                transition-all duration-200
-                ${collapsed ? 'justify-center' : ''}
-              `}
+        )}
+
+        {/* Illustration + tagline */}
+        {!collapsed && (
+          <div className="mt-4 flex flex-col items-center">
+            <svg
+              viewBox="0 0 112 64"
+              className="w-28 opacity-90"
+              aria-hidden="true"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V4a1 1 0 00-1-1H3zm11 4a1 1 0 10-2 0v4a1 1 0 102 0V7z" clipRule="evenodd" />
-                <path d="M7 10a1 1 0 011-1h2a1 1 0 110 2H8a1 1 0 01-1-1z" />
-              </svg>
-              {!collapsed && <span className="text-[15px]">Sign out</span>}
-            </button>
-          )}
-          {!collapsed && (userName || userEmail) && (
-            <div className="mt-3 px-3 pt-3 border-t border-neutral-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-5 h-5 rounded-full bg-primary-500 flex items-center justify-center text-white text-[10px] font-medium shrink-0">
-                  {(userName || userEmail || 'U').charAt(0).toUpperCase()}
-                </div>
-                <p className="text-[13px] text-neutral-500 truncate">
-                  {(() => {
-                    const hour = new Date().getHours()
-                    const firstName = (userName || userEmail || '').split(' ')[0]
-                    if (hour < 12) return `Good morning, ${firstName}`
-                    if (hour < 18) return `Good afternoon, ${firstName}`
-                    return `Good evening, ${firstName}`
-                  })()}
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+              {/* Sky */}
+              <rect width="112" height="64" rx="8" fill="#F5F0E8" />
+              {/* Ground */}
+              <ellipse cx="56" cy="58" rx="52" ry="10" fill="#D4E8C2" />
+              {/* House body */}
+              <rect x="38" y="34" width="36" height="24" rx="2" fill="#8FBF7F" />
+              {/* Roof */}
+              <polygon points="34,36 56,18 78,36" fill="#5A8F4F" />
+              {/* Door */}
+              <rect x="50" y="46" width="12" height="12" rx="2" fill="#4A7540" />
+              {/* Window left */}
+              <rect x="41" y="38" width="8" height="7" rx="1.5" fill="#C8E6B4" />
+              {/* Window right */}
+              <rect x="63" y="38" width="8" height="7" rx="1.5" fill="#C8E6B4" />
+              {/* Tree left */}
+              <ellipse cx="20" cy="44" rx="9" ry="10" fill="#7AB568" />
+              <rect x="18" y="52" width="4" height="7" rx="1" fill="#5A8F4F" />
+              {/* Tree right */}
+              <ellipse cx="93" cy="46" rx="8" ry="9" fill="#7AB568" />
+              <rect x="91" y="53" width="4" height="6" rx="1" fill="#5A8F4F" />
+              {/* Sun */}
+              <circle cx="88" cy="18" r="7" fill="#F6C94E" opacity="0.85" />
+            </svg>
+            <p className="text-xs text-neutral-400 text-center mt-2 px-6 leading-relaxed">
+              Everything in one place, so life flows better.
+            </p>
+          </div>
+        )}
+      </div>
     </aside>
   )
 }
