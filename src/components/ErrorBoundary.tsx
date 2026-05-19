@@ -7,8 +7,11 @@ interface Props {
 export function ErrorBoundary({ children }: Props) {
   return (
     <Sentry.ErrorBoundary
-      fallback={(errorData) => {
-        const error = errorData.error as Error
+      onError={(error: unknown, componentStack: string, eventId: string) => {
+        console.error('[ErrorBoundary]', error, '\nComponent stack:', componentStack, '\neventId:', eventId)
+      }}
+      fallback={({ error, componentStack, eventId: _eventId, resetError }) => {
+        const err = error as Error
         return (
           <div className="min-h-screen bg-bg-base flex items-center justify-center p-4">
             <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 text-center">
@@ -23,11 +26,14 @@ export function ErrorBoundary({ children }: Props) {
               <p className="text-neutral-600 mb-6">
                 We've been notified and are working on a fix. Try refreshing the page.
               </p>
-              {import.meta.env.DEV && error && (
+              {import.meta.env.DEV && err && (
                 <div className="mb-6 p-4 bg-neutral-50 rounded-lg text-left">
                   <p className="text-xs font-mono text-red-600 break-all">
-                    {error.message}
+                    {err.message}
                   </p>
+                  {componentStack && (
+                    <pre className="mt-2 text-[10px] font-mono text-neutral-500 max-h-40 overflow-auto whitespace-pre-wrap">{componentStack}</pre>
+                  )}
                 </div>
               )}
               <div className="flex gap-3 justify-center">
@@ -39,7 +45,7 @@ export function ErrorBoundary({ children }: Props) {
                 </button>
                 {import.meta.env.DEV && (
                   <button
-                    onClick={errorData.resetError}
+                    onClick={resetError}
                     className="px-6 py-3 border border-neutral-200 text-neutral-600 rounded-lg font-medium hover:bg-neutral-50 transition-colors"
                   >
                     Try Again
