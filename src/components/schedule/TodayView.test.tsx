@@ -51,8 +51,10 @@ describe('TodayView', () => {
     expect(screen.getByText(/Tuesday, May 19, 2026/)).toBeInTheDocument()
   })
   it('renders exactly one stats row (regression guard vs the duplicate-row defect)', () => {
+    // "tasks total" was removed by the Today redesign; use "done today" — always
+    // rendered by StatsRow and unique to it — as the duplicate-row sentinel.
     renderView()
-    expect(screen.getAllByText(/tasks? total/i)).toHaveLength(1)
+    expect(screen.getAllByText(/\d+ of \d+ done today/i)).toHaveLength(1)
   })
   it('shows the empty state when there are no items', () => {
     renderView()

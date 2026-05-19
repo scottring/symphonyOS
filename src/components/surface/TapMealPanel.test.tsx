@@ -59,9 +59,10 @@ describe('TapMealPanel', () => {
     expect(screen.queryByText('What to bring')).not.toBeInTheDocument()
   })
 
-  it('opens the recipe picker when "Change recipe" is clicked', () => {
+  it('opens the recipe picker when "Edit" is clicked', () => {
+    // Action bar was redesigned: the old "Change recipe" button is now "Edit".
     render(<TapMealPanel event={mealEvent} onClose={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /change recipe/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^edit$/i }))
     // RecipePickerModal renders a Cancel button when open
     expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument()
   })
@@ -69,10 +70,8 @@ describe('TapMealPanel', () => {
   it('removes the meal from the plan and closes', async () => {
     const onClose = vi.fn()
     render(<TapMealPanel event={mealEvent} onClose={onClose} />)
-    // Delete path: More actions menu → Delete → Confirm delete
-    fireEvent.click(screen.getByRole('button', { name: /more actions/i }))
-    fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
-    fireEvent.click(screen.getByRole('button', { name: /confirm delete/i }))
+    // Action bar was redesigned: "More" button calls removeMeal directly (no menu/confirm).
+    fireEvent.click(screen.getByRole('button', { name: /^more$/i }))
     await vi.waitFor(() => expect(removeMeal).toHaveBeenCalledWith('entry1'))
     expect(onClose).toHaveBeenCalled()
   })
