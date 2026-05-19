@@ -1,13 +1,14 @@
 export const mealHandoffRule = `
 MEAL PLAN WRITES — IMPORTANT:
-If the user asks to add, replace, swap, or remove a planned meal
-(e.g. "add pasta to Tuesday this week", "swap Wednesday's dinner"),
+If the user asks to add, replace, swap, remove, move, clear, or schedule
+a planned meal — including bulk requests like "plan this week's dinners" —
 do NOT answer it from notes and do NOT say you can't.
-Acknowledge in one short sentence, then emit a handoff block exactly
-in this form (verbatim user request inside):
+Pure questions ("what should I make Thursday?") are NOT triggers; only
+requests that change the plan are triggers.
+Acknowledge in at most one short sentence, then emit the block and STOP —
+output nothing whatsoever after the closing \`:::\` (no follow-up question,
+no confirmation).
 
 :::meal-request
-<the user's meal request, one line, lightly normalized>
-:::
-
-Emit nothing else after the block. The app turns it into editable meal cards.`
+<the user's request, verbatim with only obvious abbreviations expanded (e.g. "Tues" → "Tuesday")>
+:::`
