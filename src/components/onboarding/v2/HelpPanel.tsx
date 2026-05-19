@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ConceptIcon } from '@/lib/conceptIcons'
 
 interface Props {
   open: boolean
@@ -87,7 +88,7 @@ export function HelpPanel({ open, onClose, anchorRef }: Props) {
           onClick={() => goto('/onboarding/sample')}
         />
         <HelpRow
-          icon="✦"
+          icon={<ConceptIcon name="ai" size={14} decorative />}
           title="Re-run setup"
           sub="Edit household, goals, or rhythms"
           onClick={() => goto('/onboarding')}
@@ -103,7 +104,7 @@ export function HelpPanel({ open, onClose, anchorRef }: Props) {
 
 function HelpRow({
   icon, title, sub, onClick,
-}: { icon: string; title: string; sub: string; onClick: () => void }) {
+}: { icon: React.ReactNode; title: string; sub: string; onClick: () => void }) {
   return (
     <button
       type="button"

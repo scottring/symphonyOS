@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { ConceptIcon } from '@/lib/conceptIcons'
 import type { KioskCard } from '@/hooks/useKioskCards'
 
 interface AgentInsightsSectionProps {
@@ -177,7 +178,7 @@ function FlightInsightCard({ card, onDismiss }: { card: KioskCard; onDismiss: ()
       <div className="px-4 py-3 flex items-center gap-3">
         <span className="text-lg">✈️</span>
         <span className="text-sm text-neutral-500">No flights matched your criteria</span>
-        <button onClick={onDismiss} className="ml-auto text-neutral-300 hover:text-neutral-500 text-xs">✕</button>
+        <button onClick={onDismiss} className="ml-auto text-neutral-300 hover:text-neutral-500 text-xs" aria-label="Dismiss"><ConceptIcon name="close" size={12} decorative /></button>
       </div>
     )
   }
@@ -207,7 +208,7 @@ function FlightInsightCard({ card, onDismiss }: { card: KioskCard; onDismiss: ()
         >
           Book
         </button>
-        <button onClick={(e) => { e.stopPropagation(); onDismiss() }} className="text-neutral-300 hover:text-neutral-500 text-xs p-1">✕</button>
+        <button onClick={(e) => { e.stopPropagation(); onDismiss() }} className="text-neutral-300 hover:text-neutral-500 text-xs p-1" aria-label="Dismiss"><ConceptIcon name="close" size={12} decorative /></button>
         <svg
           className={`w-4 h-4 text-neutral-400 transition-transform ${expanded ? '' : '-rotate-90'}`}
           viewBox="0 0 20 20" fill="currentColor"
@@ -267,14 +268,14 @@ function FlightInsightCard({ card, onDismiss }: { card: KioskCard; onDismiss: ()
 function GenericInsightCard({ card, onDismiss }: { card: KioskCard; onDismiss: () => void }) {
   return (
     <div className="px-4 py-3 flex items-center gap-3">
-      <span className="text-lg">{card.icon || '💡'}</span>
+      {card.icon ? <span className="text-lg">{card.icon}</span> : <ConceptIcon name="idea" size={18} decorative />}
       <div className="flex-1 min-w-0">
         <span className="text-sm font-medium text-neutral-800">{card.title}</span>
         {card.subtitle && (
           <span className="block text-xs text-neutral-500">{card.subtitle}</span>
         )}
       </div>
-      <button onClick={onDismiss} className="text-neutral-300 hover:text-neutral-500 text-xs p-1">✕</button>
+      <button onClick={onDismiss} className="text-neutral-300 hover:text-neutral-500 text-xs p-1" aria-label="Dismiss"><ConceptIcon name="close" size={12} decorative /></button>
     </div>
   )
 }

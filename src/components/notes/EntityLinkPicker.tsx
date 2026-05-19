@@ -3,6 +3,7 @@ import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { NoteEntityType } from '@/types/note'
+import { ConceptIcon, type ConceptName } from '@/lib/conceptIcons'
 
 interface EntityLinkPickerProps {
   tasks: Task[]
@@ -17,7 +18,7 @@ type EntityOption = {
   type: NoteEntityType
   id: string
   name: string
-  icon: string
+  icon: ConceptName
 }
 
 export function EntityLinkPicker({
@@ -47,7 +48,7 @@ export function EntityLinkPicker({
           type: 'task',
           id: task.id,
           name: task.title,
-          icon: '📋',
+          icon: 'list',
         })
       }
     }
@@ -58,7 +59,7 @@ export function EntityLinkPicker({
           type: 'project',
           id: project.id,
           name: project.name,
-          icon: '📁',
+          icon: 'project',
         })
       }
     }
@@ -69,7 +70,7 @@ export function EntityLinkPicker({
           type: 'contact',
           id: contact.id,
           name: contact.name,
-          icon: '👤',
+          icon: 'person',
         })
       }
     }
@@ -126,7 +127,7 @@ export function EntityLinkPicker({
               }
             `}
           >
-            {tab === 'all' ? 'All' : tab === 'task' ? '📋 Tasks' : tab === 'project' ? '📁 Projects' : '👤 Contacts'}
+            {tab === 'all' ? 'All' : tab === 'task' ? <><ConceptIcon name="list" size={12} decorative /> Tasks</> : tab === 'project' ? <><ConceptIcon name="project" size={12} decorative /> Projects</> : <><ConceptIcon name="person" size={12} decorative /> Contacts</>}
           </button>
         ))}
       </div>
@@ -145,7 +146,7 @@ export function EntityLinkPicker({
                   onClick={() => handleSelect(entity)}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-neutral-50 transition-colors"
                 >
-                  <span className="text-base">{entity.icon}</span>
+                  <ConceptIcon name={entity.icon} size={16} decorative />
                   <span className="flex-1 text-sm text-neutral-700 truncate">{entity.name}</span>
                   <span className="text-xs text-neutral-400 capitalize">{entity.type}</span>
                 </button>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { ConceptIcon, type ConceptName } from '@/lib/conceptIcons'
 import type { Note, NoteTopic, NoteEntityLink, NoteEntityType, UpdateNoteInput } from '@/types/note'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
@@ -154,19 +155,19 @@ export function NoteModal({
   )
 
   // Create lookup map for entity names
-  const getEntityInfo = useCallback((entityType: NoteEntityType, entityId: string) => {
+  const getEntityInfo = useCallback((entityType: NoteEntityType, entityId: string): { name: string; icon: ConceptName } | null => {
     switch (entityType) {
       case 'task': {
         const task = tasks.find((t) => t.id === entityId)
-        return task ? { name: task.title, icon: '📋' } : null
+        return task ? { name: task.title, icon: 'list' } : null
       }
       case 'project': {
         const project = projects.find((p) => p.id === entityId)
-        return project ? { name: project.name, icon: '📁' } : null
+        return project ? { name: project.name, icon: 'project' } : null
       }
       case 'contact': {
         const contact = contacts.find((c) => c.id === entityId)
-        return contact ? { name: contact.name, icon: '👤' } : null
+        return contact ? { name: contact.name, icon: 'person' } : null
       }
       default:
         return null
@@ -291,7 +292,7 @@ export function NoteModal({
                         ${isRemoving ? 'opacity-50' : ''}
                       `}
                     >
-                      <span className="text-sm">{entityInfo?.icon || '📄'}</span>
+                      <ConceptIcon name={entityInfo?.icon ?? 'note'} size={14} decorative />
                       <span className="text-sm text-neutral-700">
                         {entityInfo?.name || `${link.entityType}: ${link.entityId.substring(0, 8)}...`}
                       </span>

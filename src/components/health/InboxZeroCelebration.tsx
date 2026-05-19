@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { ConceptIcon } from '@/lib/conceptIcons'
 
 interface InboxZeroCelebrationProps {
   isOpen: boolean
@@ -54,12 +55,12 @@ export function InboxZeroCelebration({
       >
         {/* Decorative sparkles */}
         <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-3xl animate-bounce">
-          ✨
+          <ConceptIcon name="ai" size={32} decorative />
         </div>
 
-        {/* Celebration emoji */}
-        <div className="text-5xl mb-4 animate-bounce" style={{ animationDelay: '100ms' }}>
-          🎉
+        {/* Celebration icon */}
+        <div className="text-5xl mb-4 animate-bounce flex justify-center" style={{ animationDelay: '100ms' }}>
+          <ConceptIcon name="celebration" size={48} decorative />
         </div>
 
         {/* Title */}
@@ -77,7 +78,7 @@ export function InboxZeroCelebration({
         {/* Streak indicator */}
         {currentStreak > 0 && (
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-50 rounded-full">
-            <span className="text-xl">🔥</span>
+            <ConceptIcon name="streak" size={20} className="text-amber-500" aria-label="Streak" />
             <span className="text-sm font-medium text-amber-700">
               {currentStreak} day streak
             </span>

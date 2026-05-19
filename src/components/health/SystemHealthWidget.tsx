@@ -5,6 +5,7 @@ import {
   getHealthTextClasses,
   getHealthMessage,
 } from '@/hooks/useSystemHealth'
+import { ConceptIcon } from '@/lib/conceptIcons'
 
 interface ClarityWidgetProps {
   tasks: Task[]
@@ -62,9 +63,7 @@ export function SystemHealthWidget({
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-neutral-600">Clarity</span>
             {metrics.isInboxZero && metrics.score >= 85 && (
-              <span className="text-base" role="img" aria-label="Star">
-                ⭐
-              </span>
+              <ConceptIcon name="ai" size={16} aria-label="Inbox zero achieved" />
             )}
           </div>
           <span className={`text-xs ${textClasses}`}>
@@ -154,7 +153,7 @@ export function SystemHealthWidget({
             <div className="flex items-center gap-4 pt-3 border-t border-neutral-100">
               {inboxZeroStreak > 0 && (
                 <div className="flex items-center gap-1.5 text-sm">
-                  <span role="img" aria-label="Fire">🔥</span>
+                  <ConceptIcon name="streak" size={16} aria-label="Inbox zero streak" />
                   <span className="text-neutral-600">
                     Inbox Zero: <strong className="text-neutral-800">{inboxZeroStreak} day{inboxZeroStreak !== 1 ? 's' : ''}</strong>
                   </span>
@@ -162,7 +161,7 @@ export function SystemHealthWidget({
               )}
               {weeklyReviewStreak > 0 && (
                 <div className="flex items-center gap-1.5 text-sm">
-                  <span role="img" aria-label="Calendar">📋</span>
+                  <ConceptIcon name="list" size={16} aria-label="Weekly review streak" />
                   <span className="text-neutral-600">
                     Weekly Review: <strong className="text-neutral-800">{weeklyReviewStreak} week{weeklyReviewStreak !== 1 ? 's' : ''}</strong>
                   </span>
