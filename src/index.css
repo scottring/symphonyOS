@@ -863,6 +863,14 @@ body {
   scrollbar-color: var(--color-neutral-300) transparent;
 }
 
+/* Opt-in: hide scrollbar but keep scrolling (Today main column) */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 /* =============================================================================
    DECORATIVE ELEMENTS
    ============================================================================= */

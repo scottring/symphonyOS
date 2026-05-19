@@ -234,7 +234,7 @@ export function AppShell({
       <main
         ref={mainRef}
         className={`
-          relative flex-1 overflow-auto overflow-x-hidden
+          relative flex-1 overflow-auto overflow-x-hidden scrollbar-none
           transition-all duration-300 ease-in-out
           ${isMobile ? 'pb-14' : ''}
         `}
