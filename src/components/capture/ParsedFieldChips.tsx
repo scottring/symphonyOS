@@ -44,9 +44,9 @@ function formatDate(date: Date) {
 
 /**
  * Renders the parsed-field chips (project, date/time, contact, category,
- * applied context) with their × clear affordances. Extracted verbatim from
- * QuickCapture's preview block — markup is byte-identical so the QuickCapture
- * regression suite passes unmodified.
+ * applied context) with their × clear affordances. Behaviorally equivalent to
+ * QuickCapture's original chip rendering, with aria-labels added to the clear (×) buttons
+ * for accessibility. Extracted to support regression testing without markup changes.
  */
 export function ParsedFieldChips({
   parsed,

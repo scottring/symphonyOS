@@ -341,7 +341,7 @@ export function QuickCapture({
                     </>
                   )}
 
-                  {/* Parsed-field chips: project, date/time, contact, category, applied context */}
+                  {/* Parsed-field chips: project, date/time, contact, category, applied context; assignment/priority/suggested-context chips follow inline after this group */}
                   <ParsedFieldChips
                     parsed={effectiveParsed}
                     projectName={projectName}
