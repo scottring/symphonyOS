@@ -4,6 +4,7 @@ import type { TaskCategory, TaskContext } from '@/types/task'
 
 type Domain = 'work' | 'family' | 'personal' | 'universal'
 
+// Tri-state per field: null = explicitly cleared by user, absent/undefined = fall back to parsed value.
 interface Overrides {
   projectId?: string | null
   contactId?: string | null
@@ -13,6 +14,13 @@ interface Overrides {
   assignedMemberIds?: string[] | null
 }
 
+/**
+ * Parse a quick-capture title into structured fields, with per-field user overrides.
+ *
+ * `ctx` MUST be referentially stable / memoized by the caller. Its identity is a
+ * dependency of the parse memo — an inline object literal will cause a full re-parse
+ * on every render.
+ */
 export function useQuickParse(title: string, ctx: ParserContext, currentDomain: Domain) {
   const [overrides, setOverrides] = useState<Overrides>({})
 
@@ -47,7 +55,6 @@ export function useQuickParse(title: string, ctx: ParserContext, currentDomain: 
     hasFields,
     projectName,
     contactName,
-    setOverride: (patch: Overrides) => setOverrides(prev => ({ ...prev, ...patch })),
     resetOverrides: () => setOverrides({}),
     clearProject: () => setOverrides(prev => ({ ...prev, projectId: null })),
     clearContact: () => setOverrides(prev => ({ ...prev, contactId: null })),
