@@ -34,7 +34,7 @@ Fixed 2×2 layout. Reading order: top-left → top-right → bottom-left → bot
 |---|---|---|---|
 | Top-left | **Up Next** | The next timed thing, anywhere this week — never "nothing today" | `useWallData` events, first future timed item |
 | Top-right | **Today** | A calm summary of what today still holds | today's remaining timed items (max 3) |
-| Bottom-left | **Pending** | What's quietly waiting while there's time to act | overdue tasks + inbox + email count |
+| Bottom-left | **Pending** | What's quietly waiting while there's time to act | overdue tasks + inbox count (no email — the wall is email-free) |
 | Bottom-right | **Family Question** | The day's dinner-table conversation prompt | `familyDiscussionPrompts.ts` (parent spec) |
 
 Each quadrant always has content because each falls back to a wider window:
@@ -109,10 +109,10 @@ Fits inside the existing main-grid left column (65% width, ~880px tall) from the
 │  🚗 Leave 5:10 · Riverside  │   6:45p  clean kitchen      │
 ├─────────────────────────────┼─────────────────────────────┤
 │  WHILE IT'S QUIET           │  TONIGHT'S QUESTION         │
-│  3 things waiting           │  "What's one good thing     │
-│   • Reply to Caitlin        │   about today?"             │
-│   • Pay water bill OVERDUE  │                             │
-│   • 8 emails waiting        │                             │
+│  2 things waiting           │  "What's one good thing     │
+│   • Pay water bill OVERDUE  │   about today?"             │
+│   • 3 inbox items           │                             │
+│                             │                             │
 └─────────────────────────────┴─────────────────────────────┘
 ```
 

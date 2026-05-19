@@ -38,7 +38,6 @@ export interface BuildDayGridInput {
   todayItems: TodayItem[]
   overdueTasks: TimelineItem[]
   inboxCount: number
-  emailCount: number
   familyPrompt: string | null
 }
 
@@ -98,10 +97,7 @@ function buildPending(input: BuildDayGridInput): QuadrantContent {
   if (lines.length < MAX_DATA_LINES && input.inboxCount > 0) {
     lines.push({ text: `${input.inboxCount} inbox item${input.inboxCount === 1 ? '' : 's'}` })
   }
-  if (lines.length < MAX_DATA_LINES && input.emailCount > 0) {
-    lines.push({ text: `${input.emailCount} email${input.emailCount === 1 ? '' : 's'} waiting` })
-  }
-  const total = input.overdueTasks.length + (input.inboxCount > 0 ? 1 : 0) + (input.emailCount > 0 ? 1 : 0)
+  const total = input.overdueTasks.length + (input.inboxCount > 0 ? 1 : 0)
   return {
     eyebrow: "WHILE IT'S QUIET",
     headline: lines.length === 0 ? 'All caught up' : `${total} thing${total === 1 ? '' : 's'} waiting`,

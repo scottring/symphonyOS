@@ -39,7 +39,6 @@ function baseInput(overrides: Partial<BuildDayGridInput> = {}): BuildDayGridInpu
     todayItems: [],
     overdueTasks: [],
     inboxCount: 0,
-    emailCount: 0,
     familyPrompt: 'What was the best part of today?',
     ...overrides,
   }
@@ -93,17 +92,16 @@ describe('buildDayGrid', () => {
     expect(grid.pending.lines.every(l => l.tag === 'overdue')).toBe(true)
   })
 
-  it('Pending is neutral by default and tags only overdue lines', () => {
+  it('Pending is neutral by default, tags only overdue, and excludes email', () => {
     const grid = buildDayGrid(baseInput({
       overdueTasks: [timeline('o1', 'Pay water bill', 9, -1)],
       inboxCount: 2,
-      emailCount: 8,
     }))
-    expect(grid.pending.headline).toBe('3 things waiting')
-    expect(grid.pending.lines).toHaveLength(3)
+    expect(grid.pending.headline).toBe('2 things waiting')
+    expect(grid.pending.lines).toHaveLength(2)
     expect(grid.pending.lines[0]).toEqual({ text: 'Pay water bill', tag: 'overdue' })
-    expect(grid.pending.lines[1].tag).toBeUndefined()
-    expect(grid.pending.lines[2].tag).toBeUndefined()
+    expect(grid.pending.lines[1]).toEqual({ text: '2 inbox items' })
+    expect(grid.pending.lines.some(l => /email/i.test(l.text))).toBe(false)
   })
 
   it('Pending shows a calm caught-up state with no lines when nothing waits', () => {

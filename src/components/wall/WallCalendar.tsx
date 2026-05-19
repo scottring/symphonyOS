@@ -198,9 +198,8 @@ export function WallCalendar() {
     todayItems: todayItemsForList,
     overdueTasks: wallData.overdueTasks,
     inboxCount: wallData.inboxCount,
-    emailCount: emailItems.length,
     familyPrompt: promptDismissed ? null : prompt,
-  }), [wallData.days, wallData.overdueTasks, wallData.inboxCount, currentTime, todayItemsForList, emailItems.length, promptDismissed, prompt])
+  }), [wallData.days, wallData.overdueTasks, wallData.inboxCount, currentTime, todayItemsForList, promptDismissed, prompt])
 
   const [expandedQuadrant, setExpandedQuadrant] = useState<QuadrantContent | null>(null)
 
