@@ -33,6 +33,8 @@ import { SearchModal } from '@/components/search/SearchModal'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 import { Toast, ConfirmationToast, type ConfirmationToastMessage } from '@/components/toast'
 import { UndoToast } from '@/components/undo/UndoToast'
+import { InboxUndoToast } from '@/components/schedule/InboxUndoToast'
+import { type TimelineCaptureResult } from '@/components/schedule/TimelineQuickInput'
 import {
   RecipeViewer,
   AuthForm,
@@ -217,6 +219,9 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   const [chatOpen, setChatOpen] = useState(false)
   const [activePanelTab, setActivePanelTab] = useState<PanelTab>('details')
   const [confirmationToast, setConfirmationToast] = useState<ConfirmationToastMessage | null>(null)
+  const [tlUndo, setTlUndo] = useState<{ message: string; onUndo: () => void } | null>(null)
+  const dismissTlUndo = useCallback(() => setTlUndo(null), [])
+  const runTlUndo = useCallback(() => { setTlUndo(prev => { prev?.onUndo(); return null }) }, [])
 
   const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, updateEventAssignmentAll, updateRecipeUrl, updateEventProject, getNote, getEventNotesForProject, updateEventContext, notes: eventNotesMap } = useEventNotes()
   const { contacts, contactsMap, addContact, updateContact, deleteContact, searchContacts } = useContacts()
@@ -242,7 +247,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
 
   // From contexts
   const { lists, listsByCategory, setSelectedListId, addList } = useListsContext()
-  const { notes, addNote, updateNote: updateNoteContent, addEntityLink, getNotesForEntity, activeTopics, addTopic } = useNotesContext()
+  const { notes, addNote, deleteNote, appendToNote, updateNote: updateNoteContent, addEntityLink, getNotesForEntity, activeTopics, addTopic } = useNotesContext()
 
   // Event context overrides: extract from event notes map
   const eventContextOverrides = useMemo(() => {
@@ -1208,9 +1213,12 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     })
   }, [deleteEvent, removeEventLocal, restoreEventLocal, undo, showToast])
 
+  const fmtT = useCallback((d: Date | null) => d ? d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'inbox', [])
+
   // Bundle schedule actions + reference data into context to eliminate prop drilling
   // Defined before early returns to satisfy rules-of-hooks
-  const scheduleActionsValue: ScheduleActionsValue = useMemo(() => ({
+  // Type annotation removed temporarily; ScheduleActionsValue updated in Task 7
+  const scheduleActionsValue = useMemo(() => ({
     // Task actions
     onToggleTask: handleToggleTask,
     onToggleWaiting: toggleWaiting,
@@ -1226,6 +1234,42 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
         isAllDay: true,
       })
     },
+    onCreateTaskAt: async (r: TimelineCaptureResult) => {
+      const when = r.scheduledFor
+      const id = await addTask(r.title, r.contactId, r.projectId, when ?? undefined, {
+        isAllDay: !when,
+        category: r.category,
+        context: r.category ? undefined : (currentDomain !== 'universal' ? currentDomain : undefined),
+        assignedTo: r.assignedMemberIds?.[0] ?? getCurrentUserMember()?.id,
+      })
+      if (id) setTlUndo({ message: `Task added · ${fmtT(when)}`, onUndo: () => { void deleteTask(id) } })
+      else showToast("Couldn't add task", 'warning')
+    },
+    onCreateEventAt: async (r: TimelineCaptureResult) => {
+      const when = r.scheduledFor
+      if (!when) { showToast('Event needs a time', 'warning'); return }
+      try {
+        const ev = await createEvent({ title: r.title, startTime: when, endTime: new Date(when.getTime() + 30 * 60_000) })
+        setTlUndo({ message: `Event added · ${fmtT(when)}`, onUndo: () => { void deleteEvent({ eventId: ev.id }) } })
+      } catch { showToast("Couldn't add event", 'warning') }
+    },
+    onCreateRoutineAt: async (r: TimelineCaptureResult) => {
+      const when = r.scheduledFor
+      const hhmm = when ? `${String(when.getHours()).padStart(2,'0')}:${String(when.getMinutes()).padStart(2,'0')}` : undefined
+      const routine = await addRoutine({ name: r.title, time_of_day: hhmm, recurrence_pattern: { type: 'daily' } })
+      if (routine) setTlUndo({ message: `Routine added · ${fmtT(when)}`, onUndo: () => { void deleteRoutine(routine.id) } })
+      else showToast("Couldn't add routine", 'warning')
+    },
+    onCreateNoteAt: async (c: string, a: Date | null) => {
+      const note = await addNote({ content: c, type: 'general', timelineAt: a ?? undefined, context: currentDomain !== 'universal' ? currentDomain : undefined })
+      if (note) setTlUndo({ message: `Note added · ${fmtT(a)}`, onUndo: () => { void deleteNote(note.id) } })
+      else showToast("Couldn't add note", 'warning')
+    },
+    onAppendNoteAt: appendToNote,
+    onLinkNote: () => {}, // Phase 1: no generic note→timeline link helper; append covers the primary use
+    timelineNotes: notes
+      .filter(n => n.timelineAt)
+      .map(n => ({ id: n.id, title: n.title, content: n.content, timelineAt: n.timelineAt })),
     onCreateFollowUp: handleCreateFollowUp,
 
     // Assignment actions
@@ -1280,6 +1324,9 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     onUpdateEventProject: updateEventProject,
   }), [
     handleToggleTask, toggleWaiting, handleUpdateTaskWithToast, pushTask, deleteTask, addTask, getCurrentUserMember, currentDomain, handleCreateFollowUp,
+    addNote, deleteNote, appendToNote, notes,
+    addRoutine, deleteRoutine, createEvent, deleteEvent,
+    fmtT, setTlUndo, showToast,
     scheduleActions, updateRoutine, updateEventContext, hideEvent,
     contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
     eventNotesMap, eventContextOverrides,
@@ -1795,6 +1842,13 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
           onUndo={undo.executeUndo}
           onDismiss={undo.dismiss}
         />
+        {tlUndo && (
+          <InboxUndoToast
+            message={tlUndo.message}
+            onUndo={runTlUndo}
+            onDismiss={dismissTlUndo}
+          />
+        )}
 
         {/* Offline banner */}
         {!isOnline && (

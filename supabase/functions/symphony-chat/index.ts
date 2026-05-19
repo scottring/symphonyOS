@@ -1,4 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { mealHandoffRule } from './mealHandoff.ts'
+export { mealHandoffRule }
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -386,7 +388,9 @@ You have access to the user's vault notes (personal knowledge base) and Symphony
 - The user has Parkinson's disease. Keep responses focused and easy to act on.
 - Today's date is ${todayLabel} (US Eastern time).
 
-${contextBlock}`
+${contextBlock}
+
+${mealHandoffRule}`
 
     const anthropicMessages = messages.map(m => ({
       role: m.role,

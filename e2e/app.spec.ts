@@ -22,4 +22,11 @@ test.describe('App', () => {
     // Can switch to sign up mode
     await expect(page.getByText("Don't have an account?")).toBeVisible()
   })
+
+  test.skip('insert a task between two timeline items via the radial wheel', async ({ page: _page }) => {
+    // Unskip when the Playwright auth fixture lands (see MEMORY: followup_e2e_auth_fixture).
+    // 1. log in (fixture) 2. open Today 3. hover gap between two items
+    // 4. click "Add between items" 5. click "Task" 6. type title + enter
+    // 7. assert the task row appears at the midpoint time
+  })
 })

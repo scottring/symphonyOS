@@ -7,10 +7,14 @@ import type { Routine, ActionableInstance } from '@/types/actionable'
 import { isEverydayRoutine } from '@/lib/routineUtils'
 import type { ScheduleContextItem } from '@/components/triage'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
+import { useDomain } from '@/hooks/useDomain'
+import { computeAnchorTime } from '@/lib/timelineAnchor'
+import type { ParserContext } from '@/lib/quickInputParser'
+import type { TimelineCaptureResult } from '@/components/schedule/TimelineQuickInput'
 import type { TimelineItem } from '@/types/timeline'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 // import { ScanMyDay } from './ScanMyDay'
-import { groupByDaySection, type DaySection } from '@/lib/timeUtils'
+import { groupByDaySection, formatTime, getTimeOfDay, type DaySection } from '@/lib/timeUtils'
 import { useMobile } from '@/hooks/useMobile'
 import { TimeGroup } from './TimeGroup'
 import { ScheduleItem } from './ScheduleItem'
@@ -22,6 +26,10 @@ import { StagingFloat } from './StagingFloat'
 import { TodayAddInput } from './TodayAddInput'
 import { OverdueSection } from './OverdueSection'
 import { EmailActionsBanner } from './EmailActionsBanner'
+import { TimelineInsertPoint } from './TimelineInsertPoint'
+import { TimelineNoteComposer } from './TimelineNoteComposer'
+import { TimelineNoteCard } from './TimelineNoteCard'
+import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 // import { DailyBriefing } from './DailyBriefing'
 // import { ProactiveSuggestionChips } from './ProactiveSuggestionChips'
 import { useProactiveSuggestions } from '@/hooks/useProactiveSuggestions'
@@ -393,6 +401,14 @@ interface TodayScheduleProps {
   onClosePanel?: () => void
   // Bulk actions (managed by HomeView)
   onUpdateTasksBulk?: (taskIds: string[], updates: Partial<Task>) => Promise<void>
+  // Timeline insert points (radial wheel → create flows). Fall back to context if not passed.
+  onCreateTaskAt?: (r: TimelineCaptureResult) => void
+  onCreateEventAt?: (r: TimelineCaptureResult) => void
+  onCreateRoutineAt?: (r: TimelineCaptureResult) => void
+  onCreateNoteAt?: (content: string, anchor: Date | null) => void
+  onAppendNoteAt?: (id: string, block: string, anchor: Date | null) => void
+  onLinkNote?: (id: string) => void
+  timelineNotes?: { id: string; title?: string; content: string; timelineAt?: Date }[]
 }
 
 function LoadingSkeleton() {
@@ -448,6 +464,13 @@ export function TodaySchedule({
   bothPanelsOpen,
   onClosePanel,
   onUpdateTasksBulk: _onUpdateTasksBulk,
+  onCreateTaskAt: onCreateTaskAtProp,
+  onCreateEventAt: onCreateEventAtProp,
+  onCreateRoutineAt: onCreateRoutineAtProp,
+  onCreateNoteAt: onCreateNoteAtProp,
+  onAppendNoteAt: onAppendNoteAtProp,
+  onLinkNote: onLinkNoteProp,
+  timelineNotes: timelineNotesProp,
 }: TodayScheduleProps) {
   // Get actions + reference data from context
   const {
@@ -463,12 +486,56 @@ export function TodaySchedule({
     getDomainForCalendar, eventContextOverrides,
     onOpenChat,
     onOpenGuidedChat,
+    onCreateTaskAt: onCreateTaskAtCtx,
+    onCreateEventAt: onCreateEventAtCtx,
+    onCreateRoutineAt: onCreateRoutineAtCtx,
+    onCreateNoteAt: onCreateNoteAtCtx,
+    onAppendNoteAt: onAppendNoteAtCtx,
+    onLinkNote: onLinkNoteCtx,
+    timelineNotes: timelineNotesCtx,
   } = useScheduleActionsContext()
+
+  // Props take precedence; fall back to context (TodaySchedule reads actions from context)
+  const onCreateTaskAt = onCreateTaskAtProp ?? onCreateTaskAtCtx
+  const onCreateEventAt = onCreateEventAtProp ?? onCreateEventAtCtx
+  const onCreateRoutineAt = onCreateRoutineAtProp ?? onCreateRoutineAtCtx
+  const onCreateNoteAt = onCreateNoteAtProp ?? onCreateNoteAtCtx
+  const onAppendNoteAt = onAppendNoteAtProp ?? onAppendNoteAtCtx
+  const onLinkNote = onLinkNoteProp ?? onLinkNoteCtx
+  const timelineNotes = timelineNotesProp ?? timelineNotesCtx
 
   const emailActions = useEmailActionItems()
   const proactive = useProactiveSuggestions()
   const { getStats: getRoutineStats } = useRoutineStats()
   const isMobile = useMobile()
+
+  // Timeline insert points: radial wheel pick → note composer (task/event/routine
+  // are handled inline by TimelineInsertPoint via onCreate)
+  const insert = useTimelineInsert()
+
+  // Current life domain (work/family/personal/universal) for inline quick-capture
+  const { currentDomain } = useDomain()
+
+  // Referentially-stable parser context for inline timeline quick-capture.
+  // useQuickParse keys its parse memo on ctx identity, so this MUST stay stable
+  // across renders unless the underlying data actually changes.
+  const parserContacts = useMemo(
+    () => Array.from(contactsMap?.values() ?? []).map(c => ({ id: c.id, name: c.name })),
+    [contactsMap],
+  )
+  const parserProjects = useMemo(
+    () => projects.map(p => ({ id: p.id, name: p.name })),
+    [projects],
+  )
+  const parserFamilyMembers = useMemo(
+    () => familyMembers.map(m => ({ id: m.id, name: m.name })),
+    [familyMembers],
+  )
+  const parserContext = useMemo<ParserContext>(() => ({
+    projects: parserProjects,
+    contacts: parserContacts,
+    familyMembers: parserFamilyMembers,
+  }), [parserProjects, parserContacts, parserFamilyMembers])
 
   // Detect recurring events without linked projects for promotion suggestions
   const { isPromotionSuggested } = useRecurringEventDetection(events, eventNotesMap)
@@ -952,6 +1019,24 @@ export function TodaySchedule({
 
   const sections: DaySection[] = ['allday', 'morning', 'afternoon', 'evening', 'unscheduled']
 
+  // Timeline-anchored notes for the viewed date, grouped into day-sections by anchor time.
+  // Rendered at the top of their section (items keep their existing sort/dedup/subtask logic).
+  const notesBySection = useMemo(() => {
+    const groups: Record<DaySection, { id: string; title?: string; content: string; timelineAt?: Date }[]> = {
+      allday: [], morning: [], afternoon: [], evening: [], unscheduled: [],
+    }
+    const day = viewedDate.toDateString()
+    for (const n of timelineNotes ?? []) {
+      if (!n.timelineAt) continue
+      if (n.timelineAt.toDateString() !== day) continue
+      groups[getTimeOfDay(n.timelineAt)].push(n)
+    }
+    for (const key of Object.keys(groups) as DaySection[]) {
+      groups[key].sort((a, b) => (a.timelineAt?.getTime() ?? 0) - (b.timelineAt?.getTime() ?? 0))
+    }
+    return groups
+  }, [timelineNotes, viewedDate])
+
   const formatDate = () => {
     return viewedDate.toLocaleDateString('en-US', {
       weekday: 'long',
@@ -1309,8 +1394,16 @@ export function TodaySchedule({
 
           {sections.map((section) => {
             const items = grouped[section]
+            const hasAnchoredNotes = notesBySection[section].length > 0
             return (
-              <TimeGroup key={section} section={section} isEmpty={items.length === 0}>
+              <TimeGroup key={section} section={section} isEmpty={items.length === 0 && !hasAnchoredNotes}>
+                {notesBySection[section].map((n) => (
+                  <TimelineNoteCard
+                    key={`note-${n.id}`}
+                    title={n.title || n.content.slice(0, 40)}
+                    timeLabel={n.timelineAt ? formatTime(n.timelineAt) : undefined}
+                  />
+                ))}
                 {items.map((item, itemIndex) => {
                   // Time deduplication: hide time if same as previous item
                   const timeKey = item.startTime ? `${item.startTime.getHours()}:${item.startTime.getMinutes()}` : item.allDay ? 'allday' : ''
@@ -1329,10 +1422,36 @@ export function TodaySchedule({
                     : false
 
                   // Use SwipeableCard on mobile for better touch interactions
+                  // Insert point before this item (rendered in BOTH mobile + desktop branches)
+                  const prevItemForInsert = itemIndex > 0 ? items[itemIndex - 1] : null
+                  const insertCtxBefore = {
+                    before: prevItemForInsert?.startTime ?? null,
+                    after: item.startTime ?? null,
+                    section,
+                    date: viewedDate,
+                  }
+                  const insertBefore = (
+                    <TimelineInsertPoint
+                      onPick={(k) => insert.handlePick(insertCtxBefore, k)}
+                      onCreate={(kind, r) => {
+                        if (kind === 'task') onCreateTaskAt?.(r)
+                        else if (kind === 'event') onCreateEventAt?.(r)
+                        else onCreateRoutineAt?.(r)
+                      }}
+                      quickInput={{
+                        anchorTime: computeAnchorTime(insertCtxBefore),
+                        parserContext,
+                        currentDomain,
+                      }}
+                    />
+                  )
+
                   if (isMobile) {
                     const sourceTask = taskId ? tasksMap.get(taskId) : undefined
                     return (
-                      <div key={item.id} className={parentVisibleInSection ? 'ml-6 border-l-2 border-neutral-200 pl-2' : ''}>
+                      <div key={item.id}>
+                      {insertBefore}
+                      <div className={parentVisibleInSection ? 'ml-6 border-l-2 border-neutral-200 pl-2' : ''}>
                         <SwipeableCard
                           item={item}
                           selected={selectedItemId === item.id}
@@ -1386,12 +1505,15 @@ export function TodaySchedule({
                           />
                         )}
                       </div>
+                      </div>
                     )
                   }
 
                   const sourceTaskForFollowUp = taskId ? tasksMap.get(taskId) : undefined
                   return (
-                    <div key={item.id} className={parentVisibleInSection ? 'ml-6 border-l-2 border-neutral-200 pl-2' : ''}>
+                    <div key={item.id}>
+                    {insertBefore}
+                    <div className={parentVisibleInSection ? 'ml-6 border-l-2 border-neutral-200 pl-2' : ''}>
                     <ScheduleItem
                       item={item}
                       selected={selectedItemId === item.id}
@@ -1508,8 +1630,33 @@ export function TodaySchedule({
                       />
                     )}
                     </div>
+                    </div>
                   )
                 })}
+                {/* Trailing insert point: after the last item, or the only one for an empty-but-visible section */}
+                {(() => {
+                  const insertCtxTrailing = {
+                    before: items.length > 0 ? (items[items.length - 1].startTime ?? null) : null,
+                    after: null,
+                    section,
+                    date: viewedDate,
+                  }
+                  return (
+                    <TimelineInsertPoint
+                      onPick={(k) => insert.handlePick(insertCtxTrailing, k)}
+                      onCreate={(kind, r) => {
+                        if (kind === 'task') onCreateTaskAt?.(r)
+                        else if (kind === 'event') onCreateEventAt?.(r)
+                        else onCreateRoutineAt?.(r)
+                      }}
+                      quickInput={{
+                        anchorTime: computeAnchorTime(insertCtxTrailing),
+                        parserContext,
+                        currentDomain,
+                      }}
+                    />
+                  )
+                })()}
               </TimeGroup>
             )
           })}
@@ -1577,6 +1724,18 @@ export function TodaySchedule({
           title={flyingPill.title}
           sourceRect={flyingPill.sourceRect}
           targetRef={organizeButtonRef}
+        />
+      )}
+
+      {/* Timeline note composer (radial wheel → "Note" pick) */}
+      {insert.noteComposer && (
+        <TimelineNoteComposer
+          anchor={insert.noteComposer.anchor}
+          existingNotes={(timelineNotes ?? []).map(n => ({ id: n.id, title: n.title, content: n.content }))}
+          onCreateNew={(c, a) => onCreateNoteAt?.(c, a)}
+          onAppendExisting={(id, b, a) => onAppendNoteAt?.(id, b, a)}
+          onLinkExisting={(id) => onLinkNote?.(id)}
+          onClose={insert.closeNoteComposer}
         />
       )}
     </div>

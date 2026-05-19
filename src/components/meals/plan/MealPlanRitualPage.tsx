@@ -7,6 +7,7 @@ import { useWeeklyBrief } from '@/hooks/useWeeklyBrief'
 import { useStandingHabits } from '@/hooks/useStandingHabits'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useGeneratePlanContext } from '@/contexts/GeneratePlanContext'
+import { useApplyMealSuggestion } from '@/hooks/useApplyMealSuggestion'
 import { sundayOfWeek, dateForDayOfWeek, isToday as isTodayHelper, formatDateMonthDay, dayLabelFor, toIsoDate } from '@/lib/weekHelpers'
 import { DayCard } from './DayCard'
 import { CollapseSection } from './PlanDocSections'
@@ -54,6 +55,7 @@ export function MealPlanRitualPage() {
   const { brief } = useWeeklyBrief(weekStart)
   const { habits, toggleWeekPause } = useStandingHabits()
   const { members: familyMembers } = useFamilyMembers()
+  const { applySuggestion } = useApplyMealSuggestion(weekStart, familyMembers)
   const [picker, setPicker] = useState<{ dayOfWeek: number; slot: MealSlot; familyMemberId?: string; replaceEntryId?: string } | null>(null)
   const [chatOpen, setChatOpen] = useState(false)
   const [previewedDay, setPreviewedDay] = useState<number | null>(null)
@@ -206,68 +208,6 @@ export function MealPlanRitualPage() {
       adHocTitle: shared.adHocTitle,
       familyMemberId: null,
     })
-  }
-
-  /** Apply an Ask-Symphony suggestion card to the plan. The card's `apply`
-   *  payload is shaped per `kind` — see ask-symphony-meal/index.ts. */
-  const onApplySuggestion = async (s: Suggestion) => {
-    console.log('[onApplySuggestion] applying card', s)
-    try {
-      if (s.kind === 'add') {
-        const apply = s.apply as {
-          dayOfWeek?: number; slot?: MealSlot
-          recipeId?: string | null; adHocTitle?: string | null
-          familyMemberId?: string | null
-        }
-        if (typeof apply.dayOfWeek !== 'number' || !apply.slot) {
-          throw new Error(`add card missing dayOfWeek/slot: ${JSON.stringify(apply)}`)
-        }
-        // Defensive: if model emitted a name like "Iris" instead of a UUID,
-        // resolve it; otherwise null (treat as family-default).
-        let familyMemberId: string | null = apply.familyMemberId ?? null
-        if (familyMemberId && !familyMembers.find(m => m.id === familyMemberId)) {
-          const byName = familyMembers.find(m => m.name?.toLowerCase() === String(familyMemberId).toLowerCase())
-          familyMemberId = byName?.id ?? null
-          if (!byName) console.warn('[onApplySuggestion] unknown familyMemberId, fell back to family-default:', apply.familyMemberId)
-        }
-        await addMeal({
-          dayOfWeek: apply.dayOfWeek,
-          slot: apply.slot,
-          recipeId: apply.recipeId ?? undefined,
-          adHocTitle: apply.adHocTitle ?? undefined,
-          familyMemberId,
-        })
-      } else if (s.kind === 'swap') {
-        if (s.originalEntryId) await removeMeal(s.originalEntryId)
-        const apply = s.apply as {
-          dayOfWeek?: number; slot?: MealSlot
-          recipeId?: string | null; adHocTitle?: string | null
-          familyMemberId?: string | null
-        }
-        if (typeof apply.dayOfWeek !== 'number' || !apply.slot) {
-          throw new Error(`swap card missing dayOfWeek/slot: ${JSON.stringify(apply)}`)
-        }
-        let familyMemberId: string | null = apply.familyMemberId ?? null
-        if (familyMemberId && !familyMembers.find(m => m.id === familyMemberId)) {
-          const byName = familyMembers.find(m => m.name?.toLowerCase() === String(familyMemberId).toLowerCase())
-          familyMemberId = byName?.id ?? null
-        }
-        await addMeal({
-          dayOfWeek: apply.dayOfWeek,
-          slot: apply.slot,
-          recipeId: apply.recipeId ?? undefined,
-          adHocTitle: apply.adHocTitle ?? undefined,
-          familyMemberId,
-        })
-      } else if (s.kind === 'remove') {
-        const apply = s.apply as { entryId?: string }
-        if (apply.entryId) await removeMeal(apply.entryId)
-      }
-      console.log('[onApplySuggestion] applied OK')
-    } catch (e) {
-      console.error('[onApplySuggestion] failed:', e)
-      alert(`Couldn't apply: ${e instanceof Error ? e.message : String(e)}`)
-    }
   }
 
   /** Preview a suggestion by scrolling to and pulse-highlighting the affected day. */
@@ -598,7 +538,7 @@ export function MealPlanRitualPage() {
         isOpen={chatOpen}
         weekStart={weekStart}
         onClose={() => setChatOpen(false)}
-        onApplySuggestion={onApplySuggestion}
+        onApplySuggestion={applySuggestion}
         onPreviewSuggestion={onPreviewSuggestion}
       />
 
