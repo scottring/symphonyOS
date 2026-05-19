@@ -13,6 +13,7 @@ export interface ChatMessage {
   content: string
   sources?: { id: string; title: string; vaultPath?: string }[]
   vaultDraft?: VaultDraft
+  mealRequest?: string
   timestamp: Date
 }
 
@@ -25,6 +26,15 @@ function parseVaultDraft(text: string): { content: string; draft: VaultDraft | u
   // Remove the vault-draft block from the visible message
   const cleanContent = text.replace(/:::vault-draft\s*\n[\s\S]*?:::/, '').trim()
   return { content: cleanContent, draft: { title, content: draftContent } }
+}
+
+/** Parse :::meal-request fenced blocks from AI response */
+export function parseMealRequest(text: string): { content: string; mealRequest: string | undefined } {
+  const match = text.match(/:::meal-request\s*\n([\s\S]*?):::/)
+  const body = match?.[1]?.trim()
+  if (!body) return { content: text, mealRequest: undefined }
+  const cleanContent = text.replace(/:::meal-request\s*\n[\s\S]*?:::/, '').trim()
+  return { content: cleanContent, mealRequest: body }
 }
 
 export interface EntityContext {
@@ -98,13 +108,15 @@ export function useChat() {
 
         const data = await response.json()
 
-        const { content: parsedContent, draft } = parseVaultDraft(data.message)
+        const { content: vaultStripped, draft } = parseVaultDraft(data.message)
+        const { content: parsedContent, mealRequest } = parseMealRequest(vaultStripped)
         const assistantMessage: ChatMessage = {
           id: crypto.randomUUID(),
           role: 'assistant',
           content: parsedContent,
           sources: data.sources,
           vaultDraft: draft,
+          mealRequest,
           timestamp: new Date(),
         }
         setMessages((prev) => [...prev, assistantMessage])
