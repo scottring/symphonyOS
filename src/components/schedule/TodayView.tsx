@@ -41,6 +41,9 @@ import { AiSuggestionBanner } from './AiSuggestionBanner'
 import { EveningMealCard } from './EveningMealCard'
 import { ScheduleItem } from './ScheduleItem'
 import { OverdueSection } from './OverdueSection'
+import { EmailActionsBanner } from './EmailActionsBanner'
+
+import { useEmailActionItems } from '@/hooks/useEmailActionItems'
 
 import { focusHeadline } from '@/lib/focusHeadline'
 import { daySectionMeta } from '@/lib/daySectionMeta'
@@ -158,6 +161,7 @@ export function TodayView({
   const data = useTodayData(todayInput)
   const health = useSystemHealth({ tasks, projects, projectsWithLinkedEvents: new Set() })
   const proactive = useProactiveSuggestions()
+  const emailActions = useEmailActionItems()
   const { getStats: getRoutineStats } = useRoutineStats()
   const { isPromotionSuggested } = useRecurringEventDetection(events, eventNotesMap)
 
@@ -405,6 +409,16 @@ export function TodayView({
                   onOpenGuidedChat={onOpenGuidedChat}
                 />
               </div>
+            )}
+
+            {/* Email action items - from Gmail scanner */}
+            {data.isToday && (
+              <EmailActionsBanner
+                items={emailActions.items}
+                onAcknowledge={emailActions.acknowledge}
+                onDismiss={emailActions.dismiss}
+                onSnooze={emailActions.snooze}
+              />
             )}
 
             {/* Sections */}
