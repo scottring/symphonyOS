@@ -37,11 +37,11 @@ export function TimelineInsertPoint({ onPick }: Props) {
         type="button"
         aria-label="Add between items"
         onClick={() => setOpen(v => !v)}
-        className="relative z-10 w-7 h-7 min-w-[28px] rounded-full bg-primary-500 text-white text-base leading-none flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100 md:opacity-0 max-md:opacity-100 transition-opacity"
+        className="relative z-10 w-7 h-7 min-w-[28px] rounded-full bg-primary-500 text-white text-base leading-none flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100 max-md:opacity-100 transition-opacity"
       >+</button>
 
       {open && (
-        <div role="menu" className="absolute z-20 bottom-8 flex gap-2 bg-white border border-neutral-200 rounded-2xl shadow-lg px-3 py-2">
+        <div className="absolute z-20 bottom-8 flex gap-2 bg-white border border-neutral-200 rounded-2xl shadow-lg px-3 py-2">
           {SEGMENTS.map(s => (
             <button
               key={s.kind}
