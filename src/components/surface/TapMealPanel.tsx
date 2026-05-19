@@ -37,6 +37,7 @@ export function TapMealPanel({ event, onClose }: TapMealPanelProps) {
   const { recipes } = useRecipes()
   const { members: familyMembers } = useFamilyMembers()
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
 
   const entry = plan?.entries.find(e => e.id === entryId)
   const recipe = entry?.recipeId ? recipes.find(r => r.id === entry.recipeId) : undefined
@@ -116,15 +117,44 @@ export function TapMealPanel({ event, onClose }: TapMealPanelProps) {
           </svg>
           Move
         </button>
-        <button
-          onClick={handleRemove}
-          className="flex flex-col items-center gap-1 text-[11px] text-neutral-500 hover:text-red-600"
-        >
-          <svg className="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
-          </svg>
-          More
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setMoreOpen(o => !o)}
+            aria-haspopup="menu"
+            aria-expanded={moreOpen}
+            className="flex flex-col items-center gap-1 text-[11px] text-neutral-500 hover:text-neutral-700"
+          >
+            <svg className="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
+            </svg>
+            More
+          </button>
+          {moreOpen && (
+            <>
+              <button
+                type="button"
+                aria-label="Close menu"
+                className="fixed inset-0 z-10 cursor-default"
+                onClick={() => setMoreOpen(false)}
+              />
+              <div
+                role="menu"
+                className="absolute right-0 bottom-full mb-2 z-20 min-w-[180px] rounded-xl border border-neutral-200 bg-bg-elevated shadow-lg py-1"
+              >
+                <button
+                  role="menuitem"
+                  onClick={() => { setMoreOpen(false); handleRemove() }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-red-600 hover:bg-red-50 text-left"
+                >
+                  <svg className="w-4 h-4 shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  Remove from plan
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       <PanelWhy

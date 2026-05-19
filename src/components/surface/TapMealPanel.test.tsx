@@ -70,8 +70,10 @@ describe('TapMealPanel', () => {
   it('removes the meal from the plan and closes', async () => {
     const onClose = vi.fn()
     render(<TapMealPanel event={mealEvent} onClose={onClose} />)
-    // Action bar was redesigned: "More" button calls removeMeal directly (no menu/confirm).
+    // "More" opens an overflow menu; the destructive action is the
+    // clearly-labeled "Remove from plan" item inside it.
     fireEvent.click(screen.getByRole('button', { name: /^more$/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /remove from plan/i }))
     await vi.waitFor(() => expect(removeMeal).toHaveBeenCalledWith('entry1'))
     expect(onClose).toHaveBeenCalled()
   })
