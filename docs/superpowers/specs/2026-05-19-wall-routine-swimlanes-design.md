@@ -47,7 +47,7 @@ Owned groups copy `color`/`initials` from the matched `FamilyMember`. The traili
 
 Replace the current `grid-cols-2` plain columns with swimlane C. Per group, a column containing:
 
-- A 4px rounded left rail in `group.color` (a neutral white/20 rail when `color` is null).
+- A 6px (`w-1.5`) rounded left rail in `group.color` (a neutral white/20 rail when `color` is null) — widened from the original 4px for legibility at 8-foot viewing.
 - A header row: a 22px avatar chip — `group.initials` on a `group.color` background (neutral circle, no initials, when null) — then `group.label`, then a right-aligned `done/total` progress (`steps.filter(completed).length` / `steps.length`).
 - The existing `RoutineStepRow` checklist for `group.steps`, unchanged (same `aria-label`, `onCheckItem(id, !completed)`, completed styling).
 
