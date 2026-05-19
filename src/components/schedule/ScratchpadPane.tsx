@@ -89,7 +89,7 @@ export function ScratchpadPane() {
       <textarea
         id="scratchpad-textarea"
         aria-label="Scratchpad"
-        className="flex-1 w-full resize-none bg-transparent text-[15px] text-neutral-800 leading-relaxed placeholder:text-neutral-400 focus:outline-none"
+        className="flex-1 w-full resize-none bg-transparent text-[15px] text-neutral-800 leading-relaxed placeholder:text-neutral-400 focus:outline-none focus-visible:outline-none"
         placeholder="Jot anything down — saved automatically."
         value={text}
         onChange={handleChange}
