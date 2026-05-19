@@ -51,7 +51,7 @@ export function MealPlanRitualPage() {
   const weekStart = useMemo(() => sundayOfWeek(new Date()), [])
   const { plan, loading, error, addMeal, removeMeal, setParameter, clearWeek, updateMealPreparer } = useMealPlan(weekStart)
   const { setLastUndoToken } = useGeneratePlanContext()
-  const { recipes } = useRecipes()
+  const { recipes, refresh: refreshRecipes } = useRecipes()
   const status = useGroceryStatus(plan, recipes)
   const { brief } = useWeeklyBrief(weekStart)
   const { habits, toggleWeekPause } = useStandingHabits()
@@ -119,6 +119,10 @@ export function MealPlanRitualPage() {
       recipeId,
       familyMemberId,
     })
+    // The picker has its own useRecipes instance and can add recipes that the
+    // page's instance never fetched. Refresh so recipesById can resolve the
+    // chosen recipe's title instead of falling back to "(unnamed)".
+    await refreshRecipes()
     setPicker(null)
   }
 
