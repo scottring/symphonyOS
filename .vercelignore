@@ -1,0 +1,12 @@
+# Non-source artifacts excluded from the Vercel upload.
+# These accumulate in the working tree and pushed the file count past
+# Vercel's 15,000-file upload limit (deploy failed 2026-05-19).
+# None of these are needed to `npm run build`.
+
+.claude/
+.superpowers/
+.clone/
+.worktrees/
+playwright-report/
+test-results/
+coverage/
