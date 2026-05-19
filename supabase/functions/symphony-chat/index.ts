@@ -376,7 +376,9 @@ Include a brief message before the fence like "Here's what I heard — take a lo
 - Today's date is ${todayLabel} (US Eastern time).
 
 ${contextBlock}`
-      : `You are Symphony's contextual AI assistant. You help the user manage work, life, and family by surfacing the right information at the right moment.
+      : `${mealHandoffRule}
+
+You are Symphony's contextual AI assistant. You help the user manage work, life, and family by surfacing the right information at the right moment.
 
 You have access to the user's vault notes (personal knowledge base) and Symphony data (tasks, contacts, projects, calendar events). When answering:
 
@@ -388,9 +390,7 @@ You have access to the user's vault notes (personal knowledge base) and Symphony
 - The user has Parkinson's disease. Keep responses focused and easy to act on.
 - Today's date is ${todayLabel} (US Eastern time).
 
-${contextBlock}
-
-${mealHandoffRule}`
+${contextBlock}`
 
     const anthropicMessages = messages.map(m => ({
       role: m.role,
