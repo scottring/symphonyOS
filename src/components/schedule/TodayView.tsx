@@ -14,6 +14,7 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
 import type { TimelineCaptureResult } from '@/components/schedule/TimelineQuickInput'
+import type { ParserContext } from '@/lib/quickInputParser'
 
 import { useTodayData } from '@/hooks/useTodayData'
 import { useSystemHealth } from '@/hooks/useSystemHealth'
@@ -21,10 +22,15 @@ import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useProactiveSuggestions } from '@/hooks/useProactiveSuggestions'
 import { useRoutineStats } from '@/hooks/useRoutineStats'
 import { useRecurringEventDetection } from '@/hooks/useRecurringEventDetection'
+import { useTimelineInsert } from '@/hooks/useTimelineInsert'
+import { useDomain } from '@/hooks/useDomain'
+import { computeAnchorTime } from '@/lib/timelineAnchor'
 
 import { Eye, EyeOff } from 'lucide-react'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
+import { TodayAddInput } from './TodayAddInput'
+import { TimelineInsertPoint } from './TimelineInsertPoint'
 import { TodayHeader } from './TodayHeader'
 import { StatsRow } from './StatsRow'
 import { ClarityIndicator } from './ClarityIndicator'
@@ -153,6 +159,37 @@ export function TodayView({
   const proactive = useProactiveSuggestions()
   const { getStats: getRoutineStats } = useRoutineStats()
   const { isPromotionSuggested } = useRecurringEventDetection(events, eventNotesMap)
+
+  // Timeline insert points: radial wheel pick → note composer (task/event/routine
+  // are handled inline by TimelineInsertPoint via onCreate)
+  const insert = useTimelineInsert()
+
+  // Current life domain (work/family/personal/universal) for inline quick-capture
+  const { currentDomain } = useDomain()
+
+  // Referentially-stable parser context for inline timeline quick-capture.
+  const parserContacts = useMemo(
+    () => Array.from(contactsMap?.values() ?? []).map(c => ({ id: c.id, name: c.name })),
+    [contactsMap],
+  )
+  const parserProjectsList = useMemo(
+    () => projects.map(p => ({ id: p.id, name: p.name })),
+    [projects],
+  )
+  const parserFamilyMembersList = useMemo(
+    () => familyMembers.map(m => ({ id: m.id, name: m.name })),
+    [familyMembers],
+  )
+  const parserContext = useMemo<ParserContext>(() => ({
+    projects: parserProjectsList,
+    contacts: parserContacts,
+    familyMembers: parserFamilyMembersList,
+  }), [parserProjectsList, parserContacts, parserFamilyMembersList])
+
+  // Create-at handlers: props take precedence, fall back to context
+  const onCreateTaskAt = ctx.onCreateTaskAt
+  const onCreateEventAt = ctx.onCreateEventAt
+  const onCreateRoutineAt = ctx.onCreateRoutineAt
 
   // ── Clarity label ─────────────────────────────────────────────────────────────
   const clarityLabel = (
@@ -285,6 +322,13 @@ export function TodayView({
         </button>
       </div>
 
+      {/* Inline "Add to today" — desktop-only, today-only, when onCreateTask is wired */}
+      {data.isToday && ctx.onCreateTask && (
+        <div className="mb-4">
+          <TodayAddInput onAdd={ctx.onCreateTask} />
+        </div>
+      )}
+
       {/* Two-up: Focus card + Weather — only shown when there is something to focus on */}
       {data.counts.totalItems > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr] gap-4 mb-6">
@@ -378,13 +422,37 @@ export function TodayView({
                   </h3>
 
                   <div className="space-y-1">
-                    {items.map((item) => {
+                    {items.map((item, itemIndex) => {
                       const taskId = item.id.startsWith('task-') ? item.id.replace('task-', '') : null
                       const contactName = item.contactId && contactsMap?.get(item.contactId)?.name || undefined
                       const projectName = item.projectId && projectsMap?.get(item.projectId)?.name || undefined
                       const parentTaskId = item.parentTaskId
                       const parentTaskName = parentTaskId ? tasksMap.get(parentTaskId)?.title : undefined
                       const isFirstItem = item.id === firstSectionItemId
+
+                      // Insert point before this item (rendered unconditionally when totalItems>0)
+                      const prevItemForInsert = itemIndex > 0 ? items[itemIndex - 1] : null
+                      const insertCtxBefore = {
+                        before: prevItemForInsert?.startTime ?? null,
+                        after: item.startTime ?? null,
+                        section,
+                        date: viewedDate,
+                      }
+                      const insertBefore = (
+                        <TimelineInsertPoint
+                          onPick={(k) => insert.handlePick(insertCtxBefore, k)}
+                          onCreate={(kind, r) => {
+                            if (kind === 'task') onCreateTaskAt?.(r)
+                            else if (kind === 'event') onCreateEventAt?.(r)
+                            else onCreateRoutineAt?.(r)
+                          }}
+                          quickInput={{
+                            anchorTime: computeAnchorTime(insertCtxBefore),
+                            parserContext,
+                            currentDomain,
+                          }}
+                        />
+                      )
 
                       // Evening meal gets a special card
                       if (
@@ -398,19 +466,24 @@ export function TodayView({
                             })
                           : ''
                         return (
-                          <div key={item.id} {...(isFirstItem ? { 'data-today-first': '' } : {})}>
-                            <EveningMealCard
-                              title={item.title}
-                              timeLabel={timeLabel}
-                              onSelect={() => onSelectItem(item.id)}
-                            />
+                          <div key={item.id}>
+                            {insertBefore}
+                            <div {...(isFirstItem ? { 'data-today-first': '' } : {})}>
+                              <EveningMealCard
+                                title={item.title}
+                                timeLabel={timeLabel}
+                                onSelect={() => onSelectItem(item.id)}
+                              />
+                            </div>
                           </div>
                         )
                       }
 
                       // Standard schedule item — mirror TodaySchedule wiring
                       return (
-                        <div key={item.id} {...(isFirstItem ? { 'data-today-first': '' } : {})}>
+                        <div key={item.id}>
+                        {insertBefore}
+                        <div {...(isFirstItem ? { 'data-today-first': '' } : {})}>
                         <ScheduleItem
                           item={item}
                           selected={selectedItemId === item.id}
@@ -524,8 +597,33 @@ export function TodayView({
                           onOpenGuidedChat={onOpenGuidedChat}
                         />
                         </div>
+                        </div>
                       )
                     })}
+                    {/* Trailing insert point: after the last item per section */}
+                    {(() => {
+                      const insertCtxTrailing = {
+                        before: items.length > 0 ? (items[items.length - 1].startTime ?? null) : null,
+                        after: null,
+                        section,
+                        date: viewedDate,
+                      }
+                      return (
+                        <TimelineInsertPoint
+                          onPick={(k) => insert.handlePick(insertCtxTrailing, k)}
+                          onCreate={(kind, r) => {
+                            if (kind === 'task') onCreateTaskAt?.(r)
+                            else if (kind === 'event') onCreateEventAt?.(r)
+                            else onCreateRoutineAt?.(r)
+                          }}
+                          quickInput={{
+                            anchorTime: computeAnchorTime(insertCtxTrailing),
+                            parserContext,
+                            currentDomain,
+                          }}
+                        />
+                      )
+                    })()}
                   </div>
                 </section>
               )

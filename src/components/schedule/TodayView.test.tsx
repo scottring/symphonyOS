@@ -18,9 +18,9 @@ vi.mock('@/hooks/useDomain.tsx', async (importOriginal) => {
 
 const ctxValue = { onToggleTask: vi.fn(), projects: [], contacts: [], familyMembers: [], lists: [] }
 
-function renderView(props: Record<string, unknown> = {}) {
+function renderView(props: Record<string, unknown> = {}, ctxOverrides: Record<string, unknown> = {}) {
   return render(
-    <ScheduleActionsProvider value={ctxValue as never}>
+    <ScheduleActionsProvider value={{ ...ctxValue, ...ctxOverrides } as never}>
       <TodayView
         tasks={[]} events={[]} routines={[]} dateInstances={[]}
         selectedItemId={null} onSelectItem={vi.fn()} onToggleTask={vi.fn()}
@@ -85,5 +85,39 @@ describe('TodayView', () => {
     const toggle = screen.getByRole('button', { name: /hide daily/i })
     await user.click(toggle)
     expect(screen.getByRole('button', { name: /show daily/i })).toBeInTheDocument()
+  })
+
+  it('renders the inline "Add to today" input and submitting fires onCreateTask', async () => {
+    const onCreateTask = vi.fn()
+    const { user } = renderView({}, { onCreateTask })
+    const input = screen.getByPlaceholderText(/add to today/i)
+    await user.type(input, 'New thing{Enter}')
+    expect(onCreateTask).toHaveBeenCalledWith('New thing')
+  })
+
+  it('renders timeline insert (+) slots when create-at handlers are available', () => {
+    const today = new Date('2026-05-19T09:00:00')
+    renderView(
+      {
+        tasks: [
+          {
+            id: 'task-1',
+            title: 'Test task',
+            completed: false,
+            createdAt: today,
+            updatedAt: today,
+            bucket: 'timed' as const,
+            scheduledFor: today,
+          },
+        ],
+      } as never,
+      {
+        onCreateTaskAt: vi.fn(),
+        onCreateEventAt: vi.fn(),
+        onCreateRoutineAt: vi.fn(),
+      },
+    )
+    // TimelineInsertPoint renders a button with aria-label "Add between items"
+    expect(screen.getAllByRole('button', { name: /add between items/i }).length).toBeGreaterThan(0)
   })
 })
