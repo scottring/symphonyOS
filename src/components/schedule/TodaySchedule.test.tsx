@@ -537,4 +537,27 @@ describe.skip('TodaySchedule', () => {
       expect(progressContainer?.textContent).toContain('1')
     })
   })
+
+  describe('timeline insert points', () => {
+    it('opens the radial wheel with Note/Task/Event/Routine when an insert point is clicked', () => {
+      const tasks = [
+        createMockTask({ id: '1', title: 'Task A', bucket: 'timed', scheduledFor: new Date('2024-01-15T10:00:00Z') }),
+        createMockTask({ id: '2', title: 'Task B', bucket: 'timed', scheduledFor: new Date('2024-01-15T11:00:00Z') }),
+      ]
+
+      render(<TodaySchedule {...defaultProps} tasks={tasks} />)
+
+      // Insert points render between/around items in the timeline
+      const inserts = screen.getAllByRole('button', { name: 'Add between items' })
+      expect(inserts.length).toBeGreaterThan(0)
+
+      // Clicking one opens the radial wheel with the four create options
+      fireEvent.click(inserts[0])
+
+      expect(screen.getByRole('button', { name: 'Note' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Task' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Event' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Routine' })).toBeInTheDocument()
+    })
+  })
 })

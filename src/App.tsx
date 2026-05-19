@@ -241,7 +241,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
 
   // From contexts
   const { lists, listsByCategory, setSelectedListId, addList } = useListsContext()
-  const { notes, addNote, updateNote: updateNoteContent, addEntityLink, getNotesForEntity, activeTopics, addTopic } = useNotesContext()
+  const { notes, addNote, appendToNote, updateNote: updateNoteContent, addEntityLink, getNotesForEntity, activeTopics, addTopic } = useNotesContext()
 
   // Event context overrides: extract from event notes map
   const eventContextOverrides = useMemo(() => {
@@ -1245,6 +1245,19 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       const hhmm = when ? `${String(when.getHours()).padStart(2,'0')}:${String(when.getMinutes()).padStart(2,'0')}` : undefined
       await addRoutine({ name, time_of_day: hhmm, recurrence_pattern: { type: 'daily' } })
     },
+    onCreateNoteAt: (c: string, a: Date | null) => {
+      void addNote({
+        content: c,
+        type: 'general',
+        timelineAt: a ?? undefined,
+        context: currentDomain !== 'universal' ? currentDomain : undefined,
+      })
+    },
+    onAppendNoteAt: appendToNote,
+    onLinkNote: () => {}, // Phase 1: no generic note→timeline link helper; append covers the primary use
+    timelineNotes: notes
+      .filter(n => n.timelineAt)
+      .map(n => ({ id: n.id, title: n.title, content: n.content, timelineAt: n.timelineAt })),
     onCreateFollowUp: handleCreateFollowUp,
 
     // Assignment actions
@@ -1299,6 +1312,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     onUpdateEventProject: updateEventProject,
   }), [
     handleToggleTask, toggleWaiting, handleUpdateTaskWithToast, pushTask, deleteTask, addTask, getCurrentUserMember, currentDomain, handleCreateFollowUp,
+    addNote, appendToNote, notes,
     scheduleActions, updateRoutine, updateEventContext, hideEvent,
     contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
     eventNotesMap, eventContextOverrides,

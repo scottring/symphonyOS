@@ -17,6 +17,15 @@ export interface ScheduleActionsValue {
   onDeleteTask?: (id: string) => void
   onCreateTask?: (title: string) => void
   onCreateFollowUp?: (title: string, sourceTaskId: string) => void
+
+  // Timeline insert-point create flows (radial wheel picks)
+  onCreateTaskAt?: (when: Date | null) => void
+  onCreateEventAt?: (when: Date | null) => void
+  onCreateRoutineAt?: (when: Date | null) => void
+  onCreateNoteAt?: (content: string, anchor: Date | null) => void
+  onAppendNoteAt?: (id: string, block: string, anchor: Date | null) => void
+  onLinkNote?: (id: string) => void
+  timelineNotes?: { id: string; title?: string; content: string; timelineAt?: Date }[]
   onUpdateTasksBulk?: (taskIds: string[], updates: Partial<Task>) => Promise<void>
   onOpenTask?: (taskId: string) => void
 
