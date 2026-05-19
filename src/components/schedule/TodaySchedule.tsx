@@ -26,7 +26,6 @@ import { StagingFloat } from './StagingFloat'
 import { TodayAddInput } from './TodayAddInput'
 import { OverdueSection } from './OverdueSection'
 import { EmailActionsBanner } from './EmailActionsBanner'
-import { KidRoutineSummaryCard } from './KidRoutineSummaryCard'
 import { TimelineInsertPoint } from './TimelineInsertPoint'
 import { TimelineNoteComposer } from './TimelineNoteComposer'
 import { TimelineNoteCard } from './TimelineNoteCard'
@@ -1395,16 +1394,9 @@ export function TodaySchedule({
 
           {sections.map((section) => {
             const items = grouped[section]
-            const showKidSummary = isToday && (section === 'morning' || section === 'evening')
             const hasAnchoredNotes = notesBySection[section].length > 0
             return (
-              <TimeGroup key={section} section={section} isEmpty={items.length === 0 && !showKidSummary && !hasAnchoredNotes}>
-                {showKidSummary && (
-                  <KidRoutineSummaryCard
-                    section={section as 'morning' | 'evening'}
-                    familyMembers={familyMembers}
-                  />
-                )}
+              <TimeGroup key={section} section={section} isEmpty={items.length === 0 && !hasAnchoredNotes}>
                 {notesBySection[section].map((n) => (
                   <TimelineNoteCard
                     key={`note-${n.id}`}
