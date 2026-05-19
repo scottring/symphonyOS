@@ -5,7 +5,6 @@ import type { Project } from '@/types/project'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useDomain } from '@/hooks/useDomain'
 import { useInboxMode } from '@/hooks/useInboxMode'
-import { useProjects } from '@/hooks/useProjects'
 import { useNotes } from '@/hooks/useNotes'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
@@ -53,9 +52,8 @@ export function InboxView({
   const {
     onUpdateTask, onPushTask, onDeleteTask,
     onAssignTaskAll, familyMembers = [], onOpenProject, onToggleTask,
+    onAddProject, onDeleteProject,
   } = useScheduleActionsContext()
-
-  const { addProject, deleteProject } = useProjects()
   const { notes, addNote, updateNote, deleteNote } = useNotes()
   const { addTask, updateTask } = useSupabaseTasks()
 
@@ -66,13 +64,16 @@ export function InboxView({
 
   const makeOnCreateProject = useCallback(
     (taskId: string) => async (name: string, context: TaskContext | null) => {
-      const project = await addProject({ name, context: context ?? undefined })
+      if (!onAddProject) return
+      const project = await onAddProject({ name, context: context ?? undefined })
       if (!project) return
+      const removeCreatedProject = (): Promise<void> =>
+        onDeleteProject ? onDeleteProject(project.id) : Promise.resolve()
       try {
         await onUpdateTask?.(taskId, { projectId: project.id })
       } catch (err) {
         console.error('Failed to attach project to task:', err)
-        await deleteProject(project.id)
+        await removeCreatedProject()
         return
       }
       setUndo({
@@ -80,10 +81,10 @@ export function InboxView({
         message: `Attached to '${project.name}'`,
         previous: { projectId: undefined },
         undoable: true,
-        onUndoExtra: () => deleteProject(project.id),
+        onUndoExtra: removeCreatedProject,
       })
     },
-    [addProject, deleteProject, onUpdateTask],
+    [onAddProject, onDeleteProject, onUpdateTask],
   )
 
   // Restore a task snapshot after a note-route deletion — two-step to preserve rich fields
@@ -340,8 +341,8 @@ export function InboxView({
   }
 
   return (
-    <div className="h-full overflow-y-auto px-4 md:px-6 py-6">
-      <div className="max-w-4xl mx-auto">
+    <div className="h-full overflow-y-auto">
+      <div className="max-w-[940px] w-full pl-10 pr-8 py-8">
       <header className="mb-6 flex items-start justify-between">
         <div>
           <h1 className="font-display text-2xl font-semibold text-neutral-800">Inbox</h1>

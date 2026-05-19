@@ -28,7 +28,7 @@ export function InboxViewContainer() {
   const { events } = useGoogleCalendar();
   const { notes: eventNotesMap, updateEventAssignment, updateEventAssignmentAll, updateEventContext, updateEventProject } = useEventNotes();
   const { contacts, contactsMap, addContact, searchContacts } = useContacts();
-  const { projects, projectsMap, addProject } = useProjects();
+  const { projects, projectsMap, addProject, deleteProject } = useProjects();
   const { routines: allRoutines, updateRoutine } = useRoutines();
   const { markDone, undoDone, skip, reschedule } = useActionableInstances();
   const { members: familyMembers, getCurrentUserMember } = useFamilyMembers();
@@ -143,6 +143,7 @@ export function InboxViewContainer() {
       eventContextOverrides,
 
       onAddProject: addProject,
+      onDeleteProject: deleteProject,
       onSearchContacts: searchContacts,
       onAddContact: (name, details) => addContact({ name, ...details }),
 
@@ -156,7 +157,7 @@ export function InboxViewContainer() {
       scheduleActions, updateRoutine, updateEventContext, hideEvent,
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
       eventNotesMap, eventContextOverrides,
-      addProject, searchContacts, addContact, getDomainForCalendar,
+      addProject, deleteProject, searchContacts, addContact, getDomainForCalendar,
       updateEventProject,
     ],
   );

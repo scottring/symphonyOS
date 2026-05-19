@@ -66,6 +66,7 @@ export interface ScheduleActionsValue {
   onSendToList?: (taskId: string, listId: string) => void
   onCreateList?: (title: string, category: ListCategory) => Promise<string | null>
   onAddProject?: (project: { name: string; notes?: string; context?: 'work' | 'family' | 'personal' }) => Promise<Project | null>
+  onDeleteProject?: (id: string) => Promise<void>
   onSearchContacts?: (query: string) => Contact[]
   onAddContact?: (name: string, details?: { phone?: string; category?: ContactCategory }) => Promise<Contact | null>
   onOpenProject?: (projectId: string) => void
