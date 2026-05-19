@@ -40,6 +40,7 @@ import { WeatherCard } from './WeatherCard'
 import { AiSuggestionBanner } from './AiSuggestionBanner'
 import { EveningMealCard } from './EveningMealCard'
 import { ScheduleItem } from './ScheduleItem'
+import { OverdueSection } from './OverdueSection'
 
 import { focusHeadline } from '@/lib/focusHeadline'
 import { daySectionMeta } from '@/lib/daySectionMeta'
@@ -122,7 +123,7 @@ export function TodayView({
     onAssignRoutine, onAssignRoutineAll,
     onSkipRoutine, onPushRoutine, onUpdateRoutine,
     onSkipEvent, onPushEvent, onUpdateEventContext,
-    onOpenTask, onOpenGuidedChat,
+    onOpenTask, onOpenGuidedChat, onCreateFollowUp,
     contactsMap, projectsMap, familyMembers = [],
     eventNotesMap,
   } = ctx
@@ -252,6 +253,31 @@ export function TodayView({
     return map
   }, [tasks])
 
+  // ── Follow-up task state: tracks which task just got completed → show follow-up input ──
+  const [followUpTaskId, setFollowUpTaskId] = useState<string | null>(null)
+
+  // Handle task toggle with follow-up support
+  const handleToggleTaskWithFollowUp = useCallback((taskId: string, wasCompleted: boolean) => {
+    onToggleTask(taskId)
+    // Only show follow-up when completing (not uncompleting)
+    if (!wasCompleted && onCreateFollowUp) {
+      setFollowUpTaskId(taskId)
+    }
+  }, [onToggleTask, onCreateFollowUp])
+
+  // Handle follow-up submission
+  const handleFollowUpSubmit = useCallback((title: string, sourceTaskId: string) => {
+    if (onCreateFollowUp) {
+      onCreateFollowUp(title, sourceTaskId)
+    }
+    setFollowUpTaskId(null)
+  }, [onCreateFollowUp])
+
+  // Dismiss follow-up input
+  const handleFollowUpDismiss = useCallback(() => {
+    setFollowUpTaskId(null)
+  }, [])
+
   // ── Handler stubs ─────────────────────────────────────────────────────────────
   const handleSelectItem = useCallback((id: string | null) => {
     onSelectItem(id)
@@ -353,55 +379,32 @@ export function TodayView({
           <div className="space-y-6">
             {/* Overdue section — gets data-today-first marker when it renders */}
             {data.isToday && data.overdueTasks.length > 0 && (
-              <section data-today-first="" className="mb-4">
-                <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">
-                  Overdue
-                </div>
-                {data.overdueTasks.map((task) => {
-                  const itemId = `task-${task.id}`
-                  return (
-                    <ScheduleItem
-                      key={itemId}
-                      item={{
-                        id: itemId,
-                        type: 'task',
-                        title: task.title,
-                        completed: task.completed,
-                        startTime: task.scheduledFor ? new Date(task.scheduledFor) : null,
-                        endTime: null,
-                        allDay: task.isAllDay,
-                        projectId: task.projectId ?? undefined,
-                        contactId: task.contactId ?? undefined,
-                        assignedTo: task.assignedTo ?? undefined,
-                        originalTask: task,
-                      }}
-                      isOverdue
-                      selected={selectedItemId === itemId}
-                      onSelect={() => handleSelectItem(itemId)}
-                      onToggleComplete={() => onToggleTask(task.id)}
-                      onToggleWaiting={onToggleWaiting ? () => onToggleWaiting(task.id) : undefined}
-                      onPush={onPushTask ? (target) => onPushTask(task.id, target) : undefined}
-                      onSchedule={onUpdateTask
-                        ? (date, isAllDay) => onUpdateTask(task.id, { bucket: 'timed', scheduledFor: date, isAllDay })
-                        : undefined}
-                      contactName={task.contactId && contactsMap?.get(task.contactId)?.name || undefined}
-                      projectName={task.projectId && projectsMap?.get(task.projectId)?.name || undefined}
-                      projectId={task.projectId ?? undefined}
-                      familyMembers={familyMembers}
-                      assignedTo={task.assignedTo ?? undefined}
-                      onAssign={onAssignTask ? (memberId) => onAssignTask(task.id, memberId) : undefined}
-                      assignedToAll={task.assignedToAll ?? []}
-                      onAssignAll={onAssignTaskAll ? (memberIds) => onAssignTaskAll(task.id, memberIds) : undefined}
-                      onContextChange={onUpdateTask
-                        ? (context) => onUpdateTask(task.id, { context })
-                        : undefined}
-                      onOpenParentTask={onOpenTask}
-                      panelOpen={panelOpen}
-                      onClosePanel={onClosePanel}
-                    />
-                  )
-                })}
-              </section>
+              <div data-today-first="">
+                <OverdueSection
+                  tasks={data.overdueTasks}
+                  selectedItemId={selectedItemId}
+                  onSelectTask={onSelectItem}
+                  onToggleTask={onToggleTask}
+                  onToggleWaiting={onToggleWaiting}
+                  onPushTask={ctx.onPushTask}
+                  onUpdateTask={ctx.onUpdateTask}
+                  contactsMap={ctx.contactsMap}
+                  projectsMap={ctx.projectsMap}
+                  familyMembers={ctx.familyMembers}
+                  onAssignTask={ctx.onAssignTask}
+                  followUpTaskId={followUpTaskId}
+                  onToggleWithFollowUp={handleToggleTaskWithFollowUp}
+                  onFollowUpSubmit={onCreateFollowUp ? handleFollowUpSubmit : undefined}
+                  onFollowUpDismiss={handleFollowUpDismiss}
+                  panelOpen={panelOpen}
+                  onClosePanel={onClosePanel}
+                  onDeleteTask={ctx.onDeleteTask}
+                  suggestionsForTask={proactive.suggestionsForEntity}
+                  onActSuggestion={proactive.actOnSuggestion}
+                  onDismissSuggestion={proactive.dismissSuggestion}
+                  onOpenGuidedChat={onOpenGuidedChat}
+                />
+              </div>
             )}
 
             {/* Sections */}
