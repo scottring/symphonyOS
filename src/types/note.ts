@@ -53,6 +53,7 @@ export interface Note {
   vaultFrontmatter?: Record<string, unknown>
   context?: 'work' | 'family' | 'personal'
   readonly?: boolean  // true for vault notes (source of truth is the vault)
+  timelineAt?: Date
   createdAt: Date
   updatedAt: Date
   // Populated from joins
@@ -77,6 +78,7 @@ export interface DbNote {
   vault_frontmatter: Record<string, unknown> | null
   vault_last_commit_sha: string | null
   context: string | null
+  timeline_at: string | null
   created_at: string
   updated_at: string
 }
@@ -112,6 +114,7 @@ export interface CreateNoteInput {
   source?: NoteSource
   topicId?: string
   context?: 'work' | 'family' | 'personal'
+  timelineAt?: Date
 }
 
 export interface UpdateNoteInput {
