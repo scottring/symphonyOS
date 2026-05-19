@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { ConceptIcon } from '@/lib/conceptIcons'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
@@ -106,7 +107,7 @@ export function FocusInboxCard({
           )}
           {project && (
             <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs">
-              📁 {project.name}
+              <ConceptIcon name="project" decorative /> {project.name}
             </span>
           )}
         </div>

@@ -10,6 +10,7 @@ import { PanelFooter } from './sections/PanelFooter'
 import { useEntityRelations } from './hooks/useEntityRelations'
 import type { MightBeRelevantItem } from './types'
 import { DirectionsBuilder } from '@/components/directions'
+import { ConceptIcon } from '@/lib/conceptIcons'
 
 interface TapEventPanelProps {
   event: CalendarEvent
@@ -75,7 +76,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
             aria-expanded={showDirections}
             className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
           >
-            📍 Directions {showDirections ? '▾' : '▸'}
+            <ConceptIcon name="location" decorative /> Directions {showDirections ? '▾' : '▸'}
           </button>
         )}
         <button
@@ -117,7 +118,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
               onClick={() => props.onOpenTask(t.id)}
               className="flex items-center gap-2 w-full text-left mb-1 py-1.5 px-2 rounded-md bg-white shadow-[inset_0_0_0_1px_#e5e7eb] hover:bg-neutral-50"
             >
-              <span className="w-6 h-6 flex items-center justify-center rounded-md bg-amber-100">📋</span>
+              <span className="w-6 h-6 flex items-center justify-center rounded-md bg-amber-100"><ConceptIcon name="list" decorative /></span>
               <span className="text-sm text-neutral-800 flex-1">{t.title}</span>
             </button>
           ))}

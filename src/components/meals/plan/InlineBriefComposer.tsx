@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useWeeklyBrief } from '@/hooks/useWeeklyBrief'
 import { useGeneratePlan } from '@/hooks/useGeneratePlan'
 import { useGeneratePlanContext } from '@/contexts/GeneratePlanContext'
+import { ConceptIcon } from '@/lib/conceptIcons'
 
 const PLACEHOLDER = `800g challenge · No stir fry this week · Bittman shrimp — finally!`
 const HINT = 'Add more thoughts, goals, exclusions, cravings, experiments…'
@@ -94,7 +95,7 @@ export function InlineBriefComposer({ weekStart }: Props) {
             <span className="font-display italic">Drafting your week…</span>
           ) : (
             <>
-              <span className="text-[15px]">✦</span>
+              <ConceptIcon name="ai" size={15} decorative />
               <span className="text-[10px] uppercase tracking-[0.18em] mr-1 px-1.5 py-0.5 rounded
                                bg-white/15 font-bold">Enter</span>
               Generate plan

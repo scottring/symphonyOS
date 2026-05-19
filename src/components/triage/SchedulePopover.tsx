@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo, cloneElement, isValidElement } from 'react'
 import { createPortal } from 'react-dom'
 import { CalendarPlus, ChevronLeft, Sun, Sunrise, CalendarDays, Calendar } from 'lucide-react'
+import { ConceptIcon } from '@/lib/conceptIcons'
 import {
   getBaseDate,
   getNextWeekend,
@@ -652,7 +653,7 @@ export function SchedulePopover({
                     transition-all duration-150
                   "
                 >
-                  <span className="text-base">🌤️</span>
+                  <ConceptIcon name="when" size={16} decorative />
                   <span>All Day</span>
                 </button>
               )}

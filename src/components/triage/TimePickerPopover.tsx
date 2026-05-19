@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { ChevronLeft, Clock } from 'lucide-react'
 import { formatTimeCompact, formatDateLabel } from '@/lib/dateHelpers'
+import { ConceptIcon } from '@/lib/conceptIcons'
 
 // Minimal schedule item for display
 export interface ScheduleContextItem {
@@ -256,7 +257,7 @@ export function TimePickerPopover({
                   text-neutral-600 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
                   transition-all duration-150"
               >
-                <span className="text-base">🌤️</span>
+                <ConceptIcon name="when" size={16} decorative />
                 <span>All Day</span>
               </button>
 

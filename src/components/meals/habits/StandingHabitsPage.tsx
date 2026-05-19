@@ -4,6 +4,7 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { MealsTabs } from '../MealsTabs'
 import { HabitRow } from './HabitRow'
 import { RestrictionsSection } from './RestrictionsSection'
+import { ConceptIcon } from '@/lib/conceptIcons'
 import type { StandingHabit } from '@/types/meal-planner'
 import type { FamilyMember } from '@/types/family'
 
@@ -138,7 +139,7 @@ function NewHabitRow({
           <option key={m.id} value={m.id}>{m.name}</option>
         ))}
       </select>
-      <button onClick={submit} className="text-primary-500 hover:text-primary-600 text-[14px]">✓</button>
+      <button onClick={submit} aria-label="Save habit" className="text-primary-500 hover:text-primary-600 text-[14px]"><ConceptIcon name="done" size={14} decorative /></button>
     </div>
   )
 }

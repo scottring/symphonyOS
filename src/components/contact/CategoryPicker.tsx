@@ -1,6 +1,20 @@
 import { useState, useRef, useEffect } from 'react'
 import type { ContactCategory } from '@/types/contact'
-import { getCategoryLabel, getCategoryIcon } from '@/types/contact'
+import { getCategoryLabel } from '@/types/contact'
+import { ConceptIcon, type ConceptName } from '@/lib/conceptIcons'
+
+/** Map contact category to the closest ConceptName icon. */
+function getCategoryConceptName(category: ContactCategory): ConceptName {
+  switch (category) {
+    case 'family': return 'person'
+    case 'friend': return 'person'
+    case 'service_provider': return 'chore'
+    case 'professional': return 'task'
+    case 'school': return 'note'
+    case 'medical': return 'call'
+    case 'other': return 'person'
+  }
+}
 
 interface CategoryPickerProps {
   value: ContactCategory | undefined
@@ -67,7 +81,7 @@ export function CategoryPicker({ value, onChange }: CategoryPickerProps) {
           }
         `}
       >
-        <span className="text-base">{value ? getCategoryIcon(value) : '🏷️'}</span>
+        <ConceptIcon name={value ? getCategoryConceptName(value) : 'context'} size={16} decorative />
         <span className="text-sm font-medium flex-1 text-left">
           {value ? getCategoryLabel(value) : 'Add category'}
         </span>
@@ -90,7 +104,7 @@ export function CategoryPicker({ value, onChange }: CategoryPickerProps) {
                 onClick={() => handleSelect(undefined)}
                 className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-neutral-50 transition-colors text-left"
               >
-                <span className="text-base text-neutral-400">✕</span>
+                <ConceptIcon name="close" size={16} className="text-neutral-400" decorative />
                 <span className="text-sm text-neutral-500">Remove category</span>
               </button>
               <div className="border-t border-neutral-100 my-1" />
@@ -106,7 +120,7 @@ export function CategoryPicker({ value, onChange }: CategoryPickerProps) {
                 ${value === category ? 'bg-primary-50' : ''}
               `}
             >
-              <span className="text-base">{getCategoryIcon(category)}</span>
+              <ConceptIcon name={getCategoryConceptName(category)} size={16} decorative />
               <span className={`text-sm ${value === category ? 'text-primary-700 font-medium' : 'text-neutral-700'}`}>
                 {getCategoryLabel(category)}
               </span>

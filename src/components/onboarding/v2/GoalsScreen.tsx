@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { OnboardingShell, OnboardingCta } from './OnboardingShell'
 import { useOnboarding, GOAL_PRESETS, type GoalKey } from '@/contexts/OnboardingContext'
+import { ConceptIcon } from '@/lib/conceptIcons'
 
 const GOAL_SUBS: Record<GoalKey, string> = {
   eight_hundred_g:       'fruit + veg by weight',
@@ -70,7 +71,7 @@ export function GoalsScreen({ onBack, onContinue }: Props) {
               >
                 {selected && (
                   <span className="absolute top-3 right-3 w-[18px] h-[18px] rounded-full bg-accent-500 text-white grid place-items-center text-[11px]">
-                    ✓
+                    <ConceptIcon name="done" size={11} decorative />
                   </span>
                 )}
                 <div className="font-display text-[22px] text-neutral-800 leading-[1.2]">{g.label}</div>

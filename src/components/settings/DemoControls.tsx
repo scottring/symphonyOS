@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { resetDemo, loadDemoData, clearDemoData } from '@/lib/demoData'
+import { ConceptIcon } from '@/lib/conceptIcons'
 
 export function DemoControls() {
   const [isResetting, setIsResetting] = useState(false)
@@ -18,7 +19,7 @@ export function DemoControls() {
     setIsResetting(false)
 
     if (result.success) {
-      setMessage({ type: 'success', text: '✓ Demo reset complete! Ready to present.' })
+      setMessage({ type: 'success', text: 'Demo reset complete! Ready to present.' })
       setTimeout(() => setMessage(null), 5000)
     } else {
       setMessage({ type: 'error', text: `Error: ${result.message}` })
@@ -34,7 +35,7 @@ export function DemoControls() {
     setIsLoading(false)
 
     if (result.success) {
-      setMessage({ type: 'success', text: '✓ Demo data loaded successfully' })
+      setMessage({ type: 'success', text: 'Demo data loaded successfully' })
       setTimeout(() => setMessage(null), 5000)
     } else {
       setMessage({ type: 'error', text: `Error: ${result.message}` })
@@ -51,7 +52,7 @@ export function DemoControls() {
     setIsClearing(false)
 
     if (result.success) {
-      setMessage({ type: 'success', text: '✓ Demo data cleared' })
+      setMessage({ type: 'success', text: 'Demo data cleared' })
       setTimeout(() => setMessage(null), 5000)
     } else {
       setMessage({ type: 'error', text: `Error: ${result.message}` })
@@ -61,7 +62,7 @@ export function DemoControls() {
   return (
     <div className="space-y-4">
       <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-        <h3 className="text-sm font-semibold text-amber-800 mb-2">⚠️ Demo Account Setup</h3>
+        <h3 className="text-sm font-semibold text-amber-800 mb-2 flex items-center gap-1.5"><ConceptIcon name="warning" size={14} decorative /> Demo Account Setup</h3>
         <div className="text-sm text-amber-700 space-y-2">
           <p>
             <strong>Demo persona:</strong> Alex Chen, freelance consultant with 2 kids
@@ -78,12 +79,13 @@ export function DemoControls() {
       {/* Message banner */}
       {message && (
         <div
-          className={`p-4 rounded-lg border ${
+          className={`p-4 rounded-lg border flex items-center gap-2 ${
             message.type === 'success'
               ? 'bg-green-50 border-green-200 text-green-800'
               : 'bg-red-50 border-red-200 text-red-800'
           }`}
         >
+          {message.type === 'success' && <ConceptIcon name="done" size={14} decorative />}
           {message.text}
         </div>
       )}
@@ -106,7 +108,7 @@ export function DemoControls() {
           disabled={isResetting || isLoading || isClearing}
           className="w-full px-4 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isResetting ? 'Resetting demo...' : '🔄 Reset Demo (Clear + Reload)'}
+          {isResetting ? 'Resetting demo...' : <><ConceptIcon name="routine" size={14} decorative /> Reset Demo (Clear + Reload)</>}
         </button>
 
         <div className="grid grid-cols-2 gap-3">
@@ -130,7 +132,7 @@ export function DemoControls() {
 
       {/* Demo Script Quick Reference */}
       <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h4 className="font-semibold text-blue-800 mb-3">📋 Quick Demo Script</h4>
+        <h4 className="font-semibold text-blue-800 mb-3 flex items-center gap-1.5"><ConceptIcon name="list" size={14} decorative /> Quick Demo Script</h4>
         <div className="text-sm text-blue-700 space-y-2">
           <p><strong>1. Show domain switching:</strong> Universal → Work → Family → Personal</p>
           <p><strong>2. Brain dump 5 tasks:</strong> (they'll auto-tag via context)</p>

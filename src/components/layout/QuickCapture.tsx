@@ -4,6 +4,7 @@ import type { TaskCategory, TaskContext } from '@/types/task'
 import { useDomain } from '@/hooks/useDomain'
 import { useQuickParse } from '@/hooks/useQuickParse'
 import { ParsedFieldChips } from '@/components/capture/ParsedFieldChips'
+import { ConceptIcon } from '@/lib/conceptIcons'
 
 interface QuickCaptureProps {
   onAdd: (title: string) => void
@@ -317,7 +318,7 @@ export function QuickCapture({
                   {effectiveParsed.isNote ? (
                     <>
                       <div className="flex items-center gap-2 text-neutral-800">
-                        <span className="text-base">📝</span>
+                        <span className="text-base"><ConceptIcon name="note" size={18} decorative /></span>
                         <span className="font-medium">Note</span>
                       </div>
                       <div className="text-sm text-neutral-600 pl-6">
@@ -335,7 +336,7 @@ export function QuickCapture({
                     <>
                       {/* Title row */}
                       <div className="flex items-center gap-2 text-neutral-800">
-                        <span className="text-base">📋</span>
+                        <span className="text-base"><ConceptIcon name="list" size={18} decorative /></span>
                         <span className="font-medium">"{effectiveParsed.title}"</span>
                       </div>
                     </>
@@ -356,7 +357,7 @@ export function QuickCapture({
                   {/* Assignment chip(s) */}
                   {!effectiveParsed.isNote && assignedNames.length > 0 && (
                     <div className="flex items-center gap-2">
-                      <span className="text-base">👤</span>
+                      <span className="text-base"><ConceptIcon name="person" size={18} decorative /></span>
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-50 text-green-700 rounded-full text-xs font-medium border border-green-100">
                         {assignedNames.join(', ')}
                         <button
@@ -373,7 +374,7 @@ export function QuickCapture({
                   {/* Priority chip */}
                   {!effectiveParsed.isNote && effectiveParsed.priority && (
                     <div className="flex items-center gap-2">
-                      <span className="text-base">🔥</span>
+                      <span className="text-base"><ConceptIcon name="streak" size={18} decorative /></span>
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${
                         effectiveParsed.priority === 'high'
                           ? 'bg-red-50 text-red-700 border-red-100'
@@ -387,7 +388,7 @@ export function QuickCapture({
                   {/* Suggested context chip - show when in a domain and context not yet applied */}
                   {!effectiveParsed.isNote && currentDomain !== 'universal' && !effectiveParsed.context && (
                     <div className="flex items-center gap-2">
-                      <span className="text-base">🏷️</span>
+                      <span className="text-base"><ConceptIcon name="context" size={18} decorative /></span>
                       <button
                         type="button"
                         onClick={() => applyContext(currentDomain as TaskContext)}

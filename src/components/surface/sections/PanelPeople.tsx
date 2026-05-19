@@ -1,5 +1,6 @@
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
+import { ConceptIcon } from '@/lib/conceptIcons'
 
 interface PanelPeopleProps {
   contact?: Contact
@@ -24,7 +25,7 @@ export function PanelPeople({ contact, assignee, onOpenContact, onOpenMember }: 
           </span>
           <span className="flex-1 text-sm">
             <div className="text-neutral-800">{contact.name}</div>
-            {contact.phone && <div className="text-xs text-neutral-500">📞 {contact.phone}</div>}
+            {contact.phone && <div className="text-xs text-neutral-500"><ConceptIcon name="call" decorative /> {contact.phone}</div>}
           </span>
         </button>
       )}

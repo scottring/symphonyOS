@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { ConceptIcon } from '@/lib/conceptIcons'
 
 export interface DiscoveredRecipe {
   title: string
@@ -66,7 +67,7 @@ export function RecipeDiscoverDialog({ isOpen, onClose, onSave }: Props) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/40 backdrop-blur-sm" onClick={close}>
       <div className="bg-bg-elevated rounded-3xl shadow-elevated max-w-2xl w-full mx-6 p-8 max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="text-[0.7rem] font-bold uppercase tracking-[0.25em] text-neutral-500 mb-2">
-          ✦ FIND A RECIPE
+          <ConceptIcon name="ai" size={11} decorative /> FIND A RECIPE
         </div>
         <h2 className="font-display text-3xl text-neutral-800 mb-5">
           What are you in the <span className="italic text-primary-500">mood for?</span>

@@ -1,3 +1,5 @@
+import { ConceptIcon } from '@/lib/conceptIcons'
+
 interface Props {
   hasBrief: boolean
   planDrafted: boolean
@@ -22,7 +24,7 @@ export function RitualStatus({ hasBrief, planDrafted, prepCount, missingGrocerie
           className={hasBrief ? 'text-neutral-800' : undefined}
         >
           Brief {hasBrief
-            ? <span className="text-primary-500">✓</span>
+            ? <ConceptIcon name="done" size={12} className="text-primary-500" decorative />
             : <span>—</span>}
         </a>
 
@@ -34,7 +36,7 @@ export function RitualStatus({ hasBrief, planDrafted, prepCount, missingGrocerie
           className={planDrafted ? 'text-neutral-800' : undefined}
         >
           Plan drafted {planDrafted
-            ? <span className="text-primary-500">✓</span>
+            ? <ConceptIcon name="done" size={12} className="text-primary-500" decorative />
             : <span>—</span>}
         </a>
 

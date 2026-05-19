@@ -159,8 +159,8 @@ describe('QuickCapture', () => {
 
       // Preview should show parsed title
       expect(screen.getByText('"buy milk"')).toBeInTheDocument()
-      // Should show date chip with temporal indicator (time emoji)
-      expect(screen.getByText(/🕐|📅/)).toBeInTheDocument()
+      // Should show date chip with temporal indicator (date text rendered in chip)
+      expect(screen.getByText(/Tomorrow|Today/)).toBeInTheDocument()
     })
 
     it('shows preview when project is parsed with #hashtag', async () => {

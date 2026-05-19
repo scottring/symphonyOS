@@ -3,6 +3,7 @@ import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
 import { AssigneeDropdown } from '@/components/family'
+import { ConceptIcon } from '@/lib/conceptIcons'
 
 interface SomedayViewProps {
   tasks: Task[]
@@ -75,7 +76,7 @@ export function SomedayView({
 
         <div className="text-center py-16">
           <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-neutral-100 flex items-center justify-center">
-            <span className="text-3xl">💭</span>
+            <ConceptIcon name="discussion" size={32} decorative />
           </div>
           <p className="font-display text-xl text-neutral-700 mb-2">No someday items</p>
           <p className="text-neutral-500">
@@ -193,7 +194,7 @@ function SomedayTaskCard({
       <div className="flex items-start gap-3">
         {/* Icon */}
         <div className="w-8 h-8 rounded-lg bg-sage-50 flex items-center justify-center shrink-0 mt-0.5">
-          <span className="text-lg">💭</span>
+          <ConceptIcon name="discussion" size={18} decorative />
         </div>
 
         {/* Content */}

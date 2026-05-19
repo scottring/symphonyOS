@@ -10,6 +10,7 @@ import { PanelMightBeRelevant } from './sections/PanelMightBeRelevant'
 import { PanelFooter } from './sections/PanelFooter'
 import { useEntityRelations } from './hooks/useEntityRelations'
 import type { MightBeRelevantItem } from './types'
+import { ConceptIcon } from '@/lib/conceptIcons'
 
 interface TapProjectPanelProps {
   project: Project
@@ -85,7 +86,7 @@ export function TapProjectPanel(props: TapProjectPanelProps) {
               onClick={() => props.onOpenTask(t.id)}
               className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md bg-white shadow-[inset_0_0_0_1px_#e5e7eb] hover:bg-neutral-50 text-left"
             >
-              <span className="w-6 h-6 flex items-center justify-center rounded-md bg-neutral-100">📋</span>
+              <span className="w-6 h-6 flex items-center justify-center rounded-md bg-neutral-100"><ConceptIcon name="list" decorative /></span>
               <span className="text-sm text-neutral-800 flex-1">{t.title}</span>
             </button>
           ))}

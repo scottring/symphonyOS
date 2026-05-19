@@ -8,6 +8,7 @@ import { getProjectColor } from '@/lib/projectUtils'
 import { PushDropdown, SchedulePopover, ContextPicker, DiscussionPicker, type ScheduleContextItem } from '@/components/triage'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
 import { Redo2, Video } from 'lucide-react'
+import { ConceptIcon, type ConceptName } from '@/lib/conceptIcons'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useMobile } from '@/hooks/useMobile'
 import { TaskCheckbox } from './TaskCheckbox'
@@ -143,6 +144,15 @@ interface ScheduleItemProps {
   onDismissSuggestion?: (suggestionId: string) => void
   onOpenGuidedChat?: (entityType: 'task' | 'contact' | 'project' | 'event', entityId: string, entityName: string, prompt?: string) => void
 }
+
+// Maps suggestion action types to ConceptIcon names (null = use text fallback)
+const ICON_CONCEPTS: Record<string, ConceptName | null> = {
+  call: 'call', text: 'discussion', email: 'email', open_link: null,
+  navigate: 'location', followup: null, guided_chat: 'discussion',
+  create_task: 'add', someday: 'time', stale: null, do_today: 'done',
+}
+
+const ICON_FALLBACKS: Record<string, string> = { open_link: '→', followup: '↻', stale: '?' }
 
 // Warm muted color tokens for overdue styling
 const overdueColors = {
@@ -471,16 +481,16 @@ export const ScheduleItem = memo(function ScheduleItem({
             {/* Routine streak badge */}
             {isRoutine && routineStreak != null && routineStreak > 0 && !item.completed && !item.skipped && (
               <span className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded text-xs font-medium" title={`${routineStreak}-day streak`}>
-                🔥 {routineStreak}
+                <ConceptIcon name="streak" decorative /> {routineStreak}
               </span>
             )}
             {/* Category chip - only show for non-task categories */}
             {item.category && item.category !== 'task' && (
               <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded text-xs font-medium">
-                {item.category === 'errand' && '🚗'}
-                {item.category === 'chore' && '🧹'}
-                {item.category === 'event' && '📅'}
-                {item.category === 'activity' && '⚽'}
+                {item.category === 'errand' && <ConceptIcon name="errand" decorative />}
+                {item.category === 'chore' && <ConceptIcon name="chore" decorative />}
+                {item.category === 'event' && <ConceptIcon name="when" decorative />}
+                {item.category === 'activity' && <ConceptIcon name="activity" decorative />}
                 <span className="hidden sm:inline">{item.category}</span>
               </span>
             )}
@@ -699,11 +709,6 @@ export const ScheduleItem = memo(function ScheduleItem({
         <ExpandingPanel open={isHovered && !isMobile} className="ml-[5.75rem]">
           <div className="flex gap-1.5 pt-1 pb-0.5 flex-wrap">
             {suggestions.map((s) => {
-              const icons: Record<string, string> = {
-                call: '\u260F', text: '\u{1F4AC}', email: '\u2709', open_link: '\u2192',
-                navigate: '\u{1F4CD}', followup: '\u21BB', guided_chat: '\u{1F4AD}',
-                create_task: '\u2795', someday: '\u23F3', stale: '?', do_today: '\u2714',
-              }
               const actionType = s.actionType || s.suggestionType
               return (
                 <button
@@ -763,7 +768,7 @@ export const ScheduleItem = memo(function ScheduleItem({
                   title={s.detail || s.title}
                   className="text-[10px] px-2 py-0.5 rounded-full border transition-colors bg-amber-50/80 border-amber-200/60 text-amber-700 hover:bg-amber-100 hover:border-amber-300"
                 >
-                  <span className="mr-0.5">{icons[actionType] || '\u2728'}</span>
+                  {(() => { const c = ICON_CONCEPTS[actionType]; const fb = ICON_FALLBACKS[actionType]; return c ? <ConceptIcon name={c} decorative className="mr-0.5" /> : fb ? <span className="mr-0.5">{fb}</span> : <ConceptIcon name="ai" decorative className="mr-0.5" /> })()}
                   {s.title}
                 </button>
               )

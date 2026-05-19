@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import DOMPurify from 'dompurify'
+import { ConceptIcon, type ConceptName } from '@/lib/conceptIcons'
 import type { Note, NoteTopic, NoteEntityLink, NoteEntityType, UpdateNoteInput } from '@/types/note'
 import { noteTypeLabels, noteTypeDotColors } from '@/types/note'
 import { formatRelativeTime } from '@/lib/timeUtils'
@@ -50,15 +51,15 @@ export function NoteDetail({
 
   // Create lookup maps for entity names
   const entityNameMap = useMemo(() => {
-    const map = new Map<string, { name: string; icon: string }>()
+    const map = new Map<string, { name: string; icon: ConceptName }>()
     for (const task of tasks) {
-      map.set(`task:${task.id}`, { name: task.title, icon: '📋' })
+      map.set(`task:${task.id}`, { name: task.title, icon: 'list' })
     }
     for (const project of projects) {
-      map.set(`project:${project.id}`, { name: project.name, icon: '📁' })
+      map.set(`project:${project.id}`, { name: project.name, icon: 'project' })
     }
     for (const contact of contacts) {
-      map.set(`contact:${contact.id}`, { name: contact.name, icon: '👤' })
+      map.set(`contact:${contact.id}`, { name: contact.name, icon: 'person' })
     }
     return map
   }, [tasks, projects, contacts])
@@ -307,7 +308,7 @@ export function NoteDetail({
                       ${isRemoving ? 'opacity-50' : ''}
                     `}
                   >
-                    <span className="text-base">{entityInfo?.icon || '📄'}</span>
+                    <ConceptIcon name={entityInfo?.icon ?? 'note'} size={16} decorative />
                     <span className="flex-1 text-sm text-neutral-700 truncate">
                       {entityInfo?.name || `${link.entityType}: ${link.entityId.substring(0, 8)}...`}
                     </span>
