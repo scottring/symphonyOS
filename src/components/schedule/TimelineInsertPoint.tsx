@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import type { ParserContext } from '@/lib/quickInputParser'
+import { TimelineQuickInput, type TimelineCaptureResult } from './TimelineQuickInput'
 
 export type InsertKind = 'note' | 'task' | 'event' | 'routine'
 
@@ -11,24 +13,34 @@ const SEGMENTS: { kind: InsertKind; label: string; icon: string }[] = [
 
 interface Props {
   onPick: (kind: InsertKind) => void
+  onCreate: (kind: 'task' | 'event' | 'routine', r: TimelineCaptureResult) => void
+  quickInput: {
+    anchorTime: Date | null
+    parserContext: ParserContext
+    currentDomain: 'work' | 'family' | 'personal' | 'universal'
+  }
 }
 
-export function TimelineInsertPoint({ onPick }: Props) {
-  const [open, setOpen] = useState(false)
+export function TimelineInsertPoint({ onPick, onCreate, quickInput }: Props) {
+  const [mode, setMode] = useState<'closed' | 'wheel' | 'input'>('closed')
+  const [inputKind, setInputKind] = useState<'task' | 'event' | 'routine'>('task')
   const rootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    if (mode === 'closed') return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMode('closed') }
     const onDocClick = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false)
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setMode('closed')
     }
     document.addEventListener('keydown', onKey)
     document.addEventListener('mousedown', onDocClick)
     return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', onDocClick) }
-  }, [open])
+  }, [mode])
 
-  const pick = useCallback((k: InsertKind) => { setOpen(false); onPick(k) }, [onPick])
+  const pick = useCallback((k: InsertKind) => {
+    if (k === 'note') { setMode('closed'); onPick('note'); return }
+    setInputKind(k); setMode('input')
+  }, [onPick])
 
   return (
     <div ref={rootRef} className="relative flex items-center justify-center h-6 group">
@@ -36,11 +48,11 @@ export function TimelineInsertPoint({ onPick }: Props) {
       <button
         type="button"
         aria-label="Add between items"
-        onClick={() => setOpen(v => !v)}
+        onClick={() => setMode(v => v === 'closed' ? 'wheel' : 'closed')}
         className="relative z-10 w-7 h-7 min-w-[28px] rounded-full bg-primary-500 text-white text-base leading-none flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100 max-md:opacity-100 transition-opacity"
       >+</button>
 
-      {open && (
+      {mode === 'wheel' && (
         <div className="absolute z-20 bottom-8 flex gap-2 bg-white border border-neutral-200 rounded-2xl shadow-lg px-3 py-2">
           {SEGMENTS.map(s => (
             <button
@@ -54,6 +66,17 @@ export function TimelineInsertPoint({ onPick }: Props) {
             </button>
           ))}
         </div>
+      )}
+
+      {mode === 'input' && (
+        <TimelineQuickInput
+          kind={inputKind}
+          anchorTime={quickInput.anchorTime}
+          parserContext={quickInput.parserContext}
+          currentDomain={quickInput.currentDomain}
+          onSubmit={(r) => { setMode('closed'); onCreate(inputKind, r) }}
+          onCancel={() => setMode('closed')}
+        />
       )}
     </div>
   )
