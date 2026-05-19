@@ -2,6 +2,25 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠️ Parallel sessions: never share the main worktree's HEAD
+
+Multiple Claude sessions run against this repo concurrently. The main worktree
+(`/Users/scottkaufman/Developer/Developer/symphonyOS`) **must stay on `main`.**
+
+- **Do NOT `git checkout`/`switch` a feature branch in the main worktree.** If two
+  sessions do this, they yank each other's HEAD mid-operation — commits land on
+  the wrong branch and cherry-picks/resets corrupt. This caused real lost-time
+  incidents (vite commit + meal fix stranded on wrong branches, May 2026).
+- **Each session does feature work in its own worktree:**
+  `git worktree add .worktrees/<task> -b <branch>` (or check out an existing
+  branch there). `.worktrees/` is gitignored.
+- **Race-safe ops** (fine from any worktree): `git push origin main:main`,
+  `git branch -D <name>`, `git worktree add`. **Never** run
+  `checkout`/`cherry-pick`/`reset` in the shared main worktree when another
+  session may be active.
+- If you find the main worktree on a non-`main` branch, that's the bug — surface
+  it, don't build on it.
+
 ## Personal memory lives in the vault, not here
 
 Scott Kaufman's life and work memory is in his Obsidian vault at `~/Documents/scotts-world`. That vault is the single source of truth across every project, every agent (Michael on Telegram, every Claude Code instance, this one), and every location (MacBook, Mac Mini, phone via Obsidian Mobile).
