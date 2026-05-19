@@ -7,4 +7,7 @@ Deno.test("mealHandoffRule instructs the meal-request block + no refusal", () =>
   assert(!/I (don't|do not) have access/i.test(mealHandoffRule))
   // block delimiters must be on their own lines
   assert(/:::meal-request\s*\n[\s\S]*\n:::/.test(mealHandoffRule), "block delimiters must be on their own lines")
+  // precedence framing: must explicitly override note-referencing + forbid note citation
+  assertStringIncludes(mealHandoffRule, "takes precedence over every other instruction")
+  assertStringIncludes(mealHandoffRule, "do NOT cite notes")
 })
