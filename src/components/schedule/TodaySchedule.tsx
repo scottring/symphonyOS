@@ -22,6 +22,7 @@ import { StagingFloat } from './StagingFloat'
 import { TodayAddInput } from './TodayAddInput'
 import { OverdueSection } from './OverdueSection'
 import { EmailActionsBanner } from './EmailActionsBanner'
+import { StatsRow } from './StatsRow'
 // import { DailyBriefing } from './DailyBriefing'
 // import { ProactiveSuggestionChips } from './ProactiveSuggestionChips'
 import { useProactiveSuggestions } from '@/hooks/useProactiveSuggestions'
@@ -1040,6 +1041,18 @@ export function TodaySchedule({
     return items
   }, [tasks, events, visibleRoutines, routineStatusMap])
 
+  // TODO(perf): lift health to page scope and pass into ClarityIndicator as a prop to avoid the duplicate useSystemHealth call (Layer 2 cleanup)
+  // StatsRow derived values
+  const health = useSystemHealth({ tasks, projects, projectsWithLinkedEvents })
+  const clarityLabel = {
+    excellent: 'Excellent',
+    good: 'Good',
+    fair: 'Fair',
+    needsAttention: 'Needs attention',
+  }[health.healthColor]
+  const totalOpenTasks = tasks.filter(t => !t.completed).length
+  const aiAvailable = proactive.suggestions.length > 0
+
   return (
     <div className={`px-2 py-1 md:px-10 md:py-10 max-w-[680px] ${bothPanelsOpen ? 'ml-0 mr-auto' : 'mx-auto'}`}>
       {/* Header - Compact on mobile, editorial on desktop */}
@@ -1124,7 +1137,15 @@ export function TodaySchedule({
             </div>
 
             {/* Stats row: Progress, Staging, Assignee, Toggles, Clarity */}
-            <div className="flex items-center gap-4 pt-5 border-t border-neutral-200/60">
+            <div className="pt-5 border-t border-neutral-200/60 space-y-4">
+              <StatsRow
+                dueToday={actionableCount}
+                thisWeek={weekTasks.length}
+                total={totalOpenTasks}
+                clarityLabel={clarityLabel}
+                aiAvailable={aiAvailable}
+              />
+              <div className="flex items-center gap-4">
               {/* Progress */}
               {actionableCount > 0 && (
                 <ProgressIndicator
@@ -1226,6 +1247,7 @@ export function TodaySchedule({
                   <span className="text-xs font-medium">AI</span>
                 </button>
               )}
+            </div>
             </div>
           </>
         )}
