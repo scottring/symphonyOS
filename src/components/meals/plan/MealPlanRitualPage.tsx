@@ -55,7 +55,7 @@ export function MealPlanRitualPage() {
   const { brief } = useWeeklyBrief(weekStart)
   const { habits, toggleWeekPause } = useStandingHabits()
   const { members: familyMembers } = useFamilyMembers()
-  const { applySuggestion } = useApplyMealSuggestion(weekStart)
+  const { applySuggestion } = useApplyMealSuggestion(weekStart, familyMembers)
   const [picker, setPicker] = useState<{ dayOfWeek: number; slot: MealSlot; familyMemberId?: string; replaceEntryId?: string } | null>(null)
   const [chatOpen, setChatOpen] = useState(false)
   const [previewedDay, setPreviewedDay] = useState<number | null>(null)

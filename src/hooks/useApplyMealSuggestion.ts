@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import type { MealSlot } from '@/types/meal-planner'
+import type { FamilyMember } from '@/types/family'
 import type { AskSymphonySuggestion } from '@/hooks/useAskSymphony'
 import { useMealPlan } from '@/hooks/useMealPlan'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
@@ -10,12 +11,25 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
  *  general assistant and the meal rail both call identical logic — no divergence
  *  bugs.  Reproduces the per-kind branching, the name→id fallback, and the
  *  console.warn/log traces from the original inline handler.
+ *
+ *  @param familyMembersOverride  When the caller already holds a fetched
+ *    members array (e.g. MealPlanRitualPage), pass it here so the resolution
+ *    logic uses that array instead of the hook's own fetch — keeping the two
+ *    in sync and avoiding a divergence where the hook and the page see
+ *    different snapshots.  Standalone consumers (Task 5 MealRequestCards) can
+ *    omit this; the hook falls back to its own useFamilyMembers call.
+ *    Note: useFamilyMembers() is always called unconditionally (React hooks
+ *    rules); the override only controls which array the resolution logic uses.
  */
-export function useApplyMealSuggestion(weekStart: Date): {
+export function useApplyMealSuggestion(
+  weekStart: Date,
+  familyMembersOverride?: FamilyMember[],
+): {
   applySuggestion: (s: AskSymphonySuggestion) => Promise<void>
 } {
   const { addMeal, removeMeal } = useMealPlan(weekStart)
-  const { members: familyMembers } = useFamilyMembers()
+  const { members: ownMembers } = useFamilyMembers()
+  const familyMembers = familyMembersOverride ?? ownMembers
 
   const applySuggestion = useCallback(async (s: AskSymphonySuggestion) => {
     console.log('[onApplySuggestion] applying card', s)

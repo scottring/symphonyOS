@@ -107,4 +107,25 @@ describe('useApplyMealSuggestion', () => {
     expect(mockRemoveMeal).toHaveBeenCalledWith('entry-remove-me')
     expect(mockAddMeal).not.toHaveBeenCalled()
   })
+
+  it('(d) add: resolves name "Iris" to id "fm1" when model emits a name instead of UUID', async () => {
+    // familyMemberId 'Iris' is not a UUID — the hook should look up by name
+    // and resolve it to 'fm1' (the id of the mocked member with name 'Iris').
+    const { result } = renderHook(() => useApplyMealSuggestion(weekStart))
+
+    await act(async () => {
+      await result.current.applySuggestion({
+        kind: 'add',
+        kicker: '',
+        title: '',
+        why: '',
+        apply: { dayOfWeek: 2, slot: 'dinner', adHocTitle: 'X', familyMemberId: 'Iris' },
+      })
+    })
+
+    expect(mockAddMeal).toHaveBeenCalledOnce()
+    expect(mockAddMeal).toHaveBeenCalledWith(
+      expect.objectContaining({ familyMemberId: 'fm1' }),
+    )
+  })
 })
