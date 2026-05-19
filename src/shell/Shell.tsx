@@ -8,6 +8,9 @@ import { DetailPanel } from './DetailPanel';
 import { LegacyDetailPanelHost } from './LegacyDetailPanelHost';
 import { appRegistry } from './appRegistry';
 import { ShellLayout as DefaultShellLayout } from './ShellLayout';
+import { ScratchpadPane } from '@/components/schedule/ScratchpadPane';
+import { useSelection } from './providers/SelectionProvider';
+import { useMobile } from '@/hooks/useMobile';
 
 interface Props {
   /** Optional override for tests. Defaults to the live appRegistry. */
@@ -24,6 +27,35 @@ interface Props {
    * yet know about chromeless apps).
    */
   layout?: (children: ReactNode) => ReactNode;
+}
+
+// TODAY paths handled by TasksApp (both legacy parallel and cutover)
+const TODAY_PATHS = new Set(['/', '/today', '/tasks-new/today', '/tasks-new']);
+
+/**
+ * Renders the quick scratchpad in the right rail when:
+ * - desktop (not mobile)
+ * - on a Today path
+ * - no item is currently selected (detail pane not open)
+ *
+ * Must be rendered inside <SelectionProvider>.
+ */
+function ShellScratchpadHost() {
+  const { selection } = useSelection();
+  const { pathname } = useLocation();
+  const isMobile = useMobile();
+
+  const isToday = TODAY_PATHS.has(pathname);
+  if (isMobile || !isToday || selection !== null) return null;
+
+  return (
+    <aside
+      className="fixed top-0 bottom-0 right-0 w-[480px] bg-bg-base border-l border-neutral-200/80 z-10 p-4"
+      aria-label="Scratchpad"
+    >
+      <ScratchpadPane />
+    </aside>
+  );
 }
 
 /**
@@ -50,6 +82,7 @@ export function Shell({ registry = appRegistry, Layout = DefaultShellLayout, lay
       <ShellRoutes registry={registry} />
       <DetailPanel registry={registry} />
       <LegacyDetailPanelHost registry={registry} />
+      <ShellScratchpadHost />
     </>
   );
 

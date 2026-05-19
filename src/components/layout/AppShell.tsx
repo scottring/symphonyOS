@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, Suspense, type ReactNode } from 'react'
+import { ScratchpadPane } from '@/components/schedule/ScratchpadPane'
 import { Sidebar, type ViewType } from './Sidebar'
 import { SidebarKinetic } from './SidebarKinetic'
 import { MoreSheet } from './MoreSheet'
@@ -167,6 +168,8 @@ export function AppShell({
   // Whether the right panel column is visible (detail or chat or both active)
   const rightPanelVisible = panelOpen || chatOpen
   const bothPanelsActive = panelOpen && chatOpen
+  // Scratchpad fills the right rail on Today when no detail/chat panel is open (desktop only)
+  const scratchpadVisible = !isMobile && !rightPanelVisible && activeView === 'today'
   // Wide screen: show both panels side-by-side. Narrow: tabbed in single column.
   const useThreePanelLayout = isWideScreen && bothPanelsActive
   // Show tabs only when both are active AND screen is too narrow for side-by-side
@@ -238,6 +241,7 @@ export function AppShell({
                 : rightPanelVisible && focusModeOpen ? '840px'
                 : focusModeOpen ? '420px'
                 : rightPanelVisible ? '420px'
+                : scratchpadVisible ? '420px'
                 : '0'
             }
         }
@@ -504,6 +508,16 @@ export function AppShell({
               />
             </div>
           )}
+        </aside>
+      )}
+
+      {/* Scratchpad — right rail on Today when no detail/chat panel is open */}
+      {scratchpadVisible && (
+        <aside
+          className="fixed top-0 bottom-0 right-0 w-[420px] bg-bg-base border-l border-neutral-200/80 z-10 p-4"
+          aria-label="Scratchpad"
+        >
+          <ScratchpadPane />
         </aside>
       )}
 
