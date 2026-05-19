@@ -1,8 +1,11 @@
 import { useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { Sun } from 'lucide-react'
 import { PinnedSection } from '@/components/pins'
 import { useDomain } from '@/hooks/useDomain'
 import { appRegistry } from '@/shell/appRegistry'
+import { HouseIllustration } from './HouseIllustration'
+import { greetingForHour } from '@/lib/greeting'
 import { SidebarGroup } from './SidebarGroup'
 import { useSidebarGroupState } from '@/hooks/useSidebarGroupState'
 import { useHomes } from '@/hooks/useHomes'
@@ -159,6 +162,21 @@ export function Sidebar({
           </button>
         )}
       </div>
+
+      {/* Greeting */}
+      {!collapsed && (userName || userEmail) && (
+        <div className="px-4 pb-2 flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-full bg-primary-500 flex items-center justify-center text-white text-[11px] font-medium shrink-0">
+            {(userName || userEmail || 'U').charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <p className="text-[13px] text-neutral-500 leading-tight flex items-center gap-1">
+              {greetingForHour(new Date().getHours(), userName || userEmail || '')}
+              <Sun className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Expand button when collapsed */}
       {collapsed && (
@@ -610,6 +628,16 @@ export function Sidebar({
         })()}
       </nav>
 
+      {/* Brand foot */}
+      {!collapsed && (
+        <div className="px-6 pb-4 pt-2 flex flex-col items-center text-center">
+          <HouseIllustration className="w-28 h-auto opacity-90" />
+          <p className="mt-2 text-[12px] leading-snug text-neutral-400">
+            Everything in one place, so life flows better.
+          </p>
+        </div>
+      )}
+
       {/* User section */}
       {(userEmail || userName || onSignOut) && (
         <div className={`p-3 border-t border-neutral-100 ${collapsed ? 'text-center' : ''}`}>
@@ -645,24 +673,6 @@ export function Sidebar({
               </svg>
               {!collapsed && <span className="text-[15px]">Sign out</span>}
             </button>
-          )}
-          {!collapsed && (userName || userEmail) && (
-            <div className="mt-3 px-3 pt-3 border-t border-neutral-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-5 h-5 rounded-full bg-primary-500 flex items-center justify-center text-white text-[10px] font-medium shrink-0">
-                  {(userName || userEmail || 'U').charAt(0).toUpperCase()}
-                </div>
-                <p className="text-[13px] text-neutral-500 truncate">
-                  {(() => {
-                    const hour = new Date().getHours()
-                    const firstName = (userName || userEmail || '').split(' ')[0]
-                    if (hour < 12) return `Good morning, ${firstName}`
-                    if (hour < 18) return `Good afternoon, ${firstName}`
-                    return `Good evening, ${firstName}`
-                  })()}
-                </p>
-              </div>
-            </div>
           )}
         </div>
       )}
