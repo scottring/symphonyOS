@@ -212,6 +212,56 @@ export function TodayView({
     { excellent: 'Excellent', good: 'Good', fair: 'Fair', needsAttention: 'Needs attention' } as const
   )[health.healthColor]
 
+  // Build clarity ring trigger — reuse ClarityIndicator's ring logic inline so
+  // the trigger shows: small ring (22 px) + stacked "Clarity" / status label.
+  // ClarityIndicator receives this as `trigger` and wraps it in its click button.
+  const clarityRingColorClass = (
+    { excellent: 'text-primary-500', good: 'text-sage-500', fair: 'text-amber-500', needsAttention: 'text-orange-500' } as const
+  )[health.healthColor]
+  const clarityStatusColorClass = (
+    { excellent: 'text-primary-600', good: 'text-sage-600', fair: 'text-amber-600', needsAttention: 'text-amber-600' } as const
+  )[health.healthColor]
+  const clarityRingSize = 22
+  const clarityStroke = 2.5
+  const clarityRadius = (clarityRingSize - clarityStroke) / 2
+  const clarityCircumference = 2 * Math.PI * clarityRadius
+  const clarityOffset = clarityCircumference - (health.score / 100) * clarityCircumference
+
+  const clarityRingTrigger = (
+    <span className="inline-flex items-center gap-1.5 cursor-pointer">
+      {/* Mini ring — same geometry as ClarityIndicator's 32px ring, scaled to 22px */}
+      <span className="relative shrink-0" style={{ width: clarityRingSize, height: clarityRingSize }}>
+        <svg width={clarityRingSize} height={clarityRingSize} className="transform -rotate-90" aria-hidden="true">
+          <circle
+            cx={clarityRingSize / 2}
+            cy={clarityRingSize / 2}
+            r={clarityRadius}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={clarityStroke}
+            className="text-neutral-100"
+          />
+          <circle
+            cx={clarityRingSize / 2}
+            cy={clarityRingSize / 2}
+            r={clarityRadius}
+            fill="none"
+            strokeWidth={clarityStroke}
+            strokeLinecap="round"
+            strokeDasharray={clarityCircumference}
+            strokeDashoffset={clarityOffset}
+            className={`${clarityRingColorClass} transition-all duration-500`}
+          />
+        </svg>
+      </span>
+      {/* Stacked label */}
+      <span className="flex flex-col items-start leading-none">
+        <span className="text-[13px] text-neutral-600 font-medium">Clarity</span>
+        <span className={`text-[11px] ${clarityStatusColorClass}`}>{clarityLabel}</span>
+      </span>
+    </span>
+  )
+
   const clarityTrigger = (
     <ClarityIndicator
       tasks={tasks}
@@ -219,7 +269,7 @@ export function TodayView({
       familyMembers={familyMembers}
       onOpenProject={ctx.onOpenProject}
       onAssignTaskAll={ctx.onAssignTaskAll}
-      trigger={<span className="cursor-pointer">Clarity <span className="text-neutral-400">{clarityLabel}</span></span>}
+      trigger={clarityRingTrigger}
     />
   )
 
@@ -327,7 +377,7 @@ export function TodayView({
         onDateChange={onDateChange}
       />
 
-      {/* Stats row */}
+      {/* Stats + function bar — single consolidated row */}
       <div className="mb-6">
         <StatsRow
           dueToday={data.counts.actionableCount}
@@ -338,29 +388,29 @@ export function TodayView({
           aiAvailable={false}
           clarityTrigger={clarityTrigger}
           weekTrigger={weekTrigger}
+          endControls={
+            <>
+              {onSelectAssignee && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
+                <AssigneeFilter
+                  selectedAssignees={selectedAssignee ? [selectedAssignee] : []}
+                  onSelectAssignees={(ids) => onSelectAssignee(ids.length > 0 ? ids[0] : null)}
+                  assigneesWithTasks={assigneesWithTasks ?? []}
+                  hasUnassignedTasks={!!hasUnassignedTasks}
+                />
+              )}
+              <button
+                type="button"
+                onClick={toggleHideRoutines}
+                title={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
+                aria-label={hideRoutines ? 'Show daily' : 'Hide daily'}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm transition-all ${hideRoutines ? 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100' : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100'}`}
+              >
+                {createElement(hideRoutines ? EyeOff : Eye, { className: 'w-4 h-4' })}
+                <span>{hideRoutines ? 'Show daily' : 'Hide daily'}</span>
+              </button>
+            </>
+          }
         />
-      </div>
-
-      {/* Filter row: assignee filter + routine show/hide toggle */}
-      <div className="flex items-center justify-end gap-2 mb-4">
-        {onSelectAssignee && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
-          <AssigneeFilter
-            selectedAssignees={selectedAssignee ? [selectedAssignee] : []}
-            onSelectAssignees={(ids) => onSelectAssignee(ids.length > 0 ? ids[0] : null)}
-            assigneesWithTasks={assigneesWithTasks ?? []}
-            hasUnassignedTasks={!!hasUnassignedTasks}
-          />
-        )}
-        <button
-          type="button"
-          onClick={toggleHideRoutines}
-          title={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
-          aria-label={hideRoutines ? 'Show daily' : 'Hide daily'}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm transition-all ${hideRoutines ? 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100' : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100'}`}
-        >
-          {createElement(hideRoutines ? EyeOff : Eye, { className: 'w-4 h-4' })}
-          <span>{hideRoutines ? 'Show daily' : 'Hide daily'}</span>
-        </button>
       </div>
 
       {/* Inline "Add to today" — desktop-only, today-only, when onCreateTask is wired */}

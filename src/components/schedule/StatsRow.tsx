@@ -1,50 +1,46 @@
 // src/components/schedule/StatsRow.tsx
-import { CheckCircle2, CalendarRange, Circle, Sparkles } from 'lucide-react'
+import { CheckCircle2 } from 'lucide-react'
 
 interface StatsRowProps {
   dueToday: number
   doneToday: number
   thisWeek: number
-  total: number
-  clarityLabel: string
-  aiAvailable: boolean
+  total?: number          // kept in interface to avoid churn at call sites; not rendered
+  clarityLabel?: string   // kept in interface; not rendered (clarityTrigger used instead)
+  aiAvailable?: boolean   // kept in interface; not rendered
   clarityTrigger?: React.ReactNode
   weekTrigger?: React.ReactNode
+  /** Rendered at the trailing end of the bar (assignee filter + show-daily toggle) */
+  endControls?: React.ReactNode
 }
 
-function plural(n: number) {
-  return n === 1 ? 'task' : 'tasks'
-}
-
-export function StatsRow({ dueToday, doneToday, thisWeek, total, clarityLabel, aiAvailable, clarityTrigger, weekTrigger }: StatsRowProps) {
+export function StatsRow({ dueToday, doneToday, weekTrigger, thisWeek, clarityTrigger, endControls }: StatsRowProps) {
   return (
-    <div className="flex items-center flex-wrap gap-x-6 gap-y-2 text-[13px] text-neutral-500">
+    <div className="flex items-center flex-wrap gap-x-5 gap-y-2 text-[13px] text-neutral-500">
+      {/* Done today */}
       <span className="inline-flex items-center gap-1.5">
         <CheckCircle2 className="w-4 h-4 text-primary-500" />
         {doneToday} of {dueToday} done today
       </span>
+
+      {/* This week — StagingFloat trigger owns the icon; no extra CalendarRange here */}
       <span className="inline-flex items-center gap-1.5">
-        <CalendarRange className="w-4 h-4 text-neutral-400" />
-        {weekTrigger ?? <>{thisWeek} {plural(thisWeek)} this week</>}
+        {weekTrigger ?? <>{thisWeek} {thisWeek === 1 ? 'task' : 'tasks'} this week</>}
       </span>
-      <span className="inline-flex items-center gap-1.5">
-        <Circle className="w-4 h-4 text-neutral-300" />
-        {total} {plural(total)} total
-      </span>
-      <span className="inline-flex items-center gap-1.5">
-        <Sparkles className="w-4 h-4 text-amber-400" />
-        {clarityTrigger ?? (
-          <>
-            <span className="text-neutral-600 font-medium">Clarity</span>
-            <span className="text-neutral-400">{clarityLabel}</span>
-          </>
-        )}
-      </span>
-      <span className="inline-flex items-center gap-1.5">
-        <span className={`w-2 h-2 rounded-full ${aiAvailable ? 'bg-primary-500' : 'bg-neutral-300'}`} />
-        <span className="text-neutral-600 font-medium">AI</span>
-        <span className="text-neutral-400">{aiAvailable ? 'Suggestions available' : 'No suggestions'}</span>
-      </span>
+
+      {/* Clarity — ring + stacked label from ClarityIndicator trigger */}
+      {clarityTrigger && (
+        <span className="inline-flex items-center gap-1.5">
+          {clarityTrigger}
+        </span>
+      )}
+
+      {/* End controls: assignee filter + show-daily toggle */}
+      {endControls && (
+        <span className="inline-flex items-center gap-2 ml-auto">
+          {endControls}
+        </span>
+      )}
     </div>
   )
 }
