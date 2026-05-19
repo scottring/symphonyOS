@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildTodayItems } from './todayItem'
 import type { TimelineItem } from '@/types/timeline'
+import type { DaySection } from '@/lib/timeUtils'
 
 const mkItem = (overrides: Partial<TimelineItem> = {}): TimelineItem => ({
   id: 'x',
@@ -11,6 +12,17 @@ const mkItem = (overrides: Partial<TimelineItem> = {}): TimelineItem => ({
   completed: false,
   ...overrides,
 })
+
+function sections(items: TimelineItem[]): Record<DaySection, TimelineItem[]> {
+  return { allday: [], morning: items, afternoon: [], evening: [], unscheduled: [] }
+}
+
+function tl(over: Partial<TimelineItem>): TimelineItem {
+  return {
+    id: 'x', title: 'x', type: 'routine', completed: false,
+    startTime: new Date('2026-05-19T06:00:00'), ...over,
+  } as unknown as TimelineItem
+}
 
 describe('buildTodayItems', () => {
   it('returns empty for empty input', () => {
@@ -101,5 +113,30 @@ describe('buildTodayItems', () => {
       'm1',
     )
     expect(items.map(i => i.id).sort()).toEqual(['a', 'b'])
+  })
+})
+
+describe('buildTodayItems isEverydayRoutine flag', () => {
+  it('flags a daily routine step as everyday', () => {
+    const items = buildTodayItems(sections([
+      tl({ id: 'r1', title: 'Brush teeth', type: 'routine', recurrencePattern: { type: 'daily' } as never }),
+    ]))
+    expect(items[0].kind).toBe('routine-step')
+    expect(items[0].isEverydayRoutine).toBe(true)
+  })
+
+  it('does not flag a weekly Tue/Thu routine as everyday', () => {
+    const items = buildTodayItems(sections([
+      tl({ id: 'r2', title: 'Soccer', type: 'routine', recurrencePattern: { type: 'weekly', days: ['tue', 'thu'] } as never }),
+    ]))
+    expect(items[0].isEverydayRoutine).toBe(false)
+  })
+
+  it('leaves non-routine items undefined', () => {
+    const items = buildTodayItems(sections([
+      tl({ id: 't1', title: 'Pay bill', type: 'task', recurrencePattern: undefined }),
+    ]))
+    expect(items[0].kind).toBe('task')
+    expect(items[0].isEverydayRoutine).toBeUndefined()
   })
 })

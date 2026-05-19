@@ -1,5 +1,6 @@
 import type { TimelineItem } from '@/types/timeline'
 import type { DaySection } from '@/lib/timeUtils'
+import { isEverydayRoutine } from '@/lib/routineUtils'
 
 export type TodayItemKind = 'task' | 'chore' | 'routine-step' | 'event'
 
@@ -13,6 +14,8 @@ export interface TodayItem {
   sourceId: string
   needsDiscussion?: boolean
   discussionNote?: string
+  /** True when this is a routine-step whose routine recurs every weekday. */
+  isEverydayRoutine?: boolean
 }
 
 function kindFor(item: TimelineItem): TodayItemKind {
@@ -37,9 +40,10 @@ export function buildTodayItems(
       if (section === 'unscheduled' && item.type !== 'routine') continue
       const owner = item.assignedTo ?? null
       if (ownerFilter && owner && owner !== ownerFilter) continue
+      const kind = kindFor(item)
       all.push({
         id: item.id,
-        kind: kindFor(item),
+        kind,
         title: item.title,
         completed: item.completed,
         ownerId: owner,
@@ -47,6 +51,10 @@ export function buildTodayItems(
         sourceId: item.id,
         needsDiscussion: item.needsDiscussion,
         discussionNote: item.discussionNote,
+        isEverydayRoutine:
+          kind === 'routine-step'
+            ? isEverydayRoutine(item.recurrencePattern)
+            : undefined,
       })
     }
   }
