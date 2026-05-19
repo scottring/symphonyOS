@@ -495,44 +495,13 @@ export function Sidebar({
         {/* Illustration + tagline */}
         {!collapsed && (
           <div className="mt-4 flex flex-col items-center">
-            {/* Nordic-watercolor-style house vignette */}
-            <div className="w-32 h-28 mx-auto flex items-center justify-center">
-              <svg
-                viewBox="0 0 128 112"
-                className="w-full h-full"
-                aria-hidden="true"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                {/* Soft vignette background */}
-                <ellipse cx="64" cy="60" rx="58" ry="46" fill="hsl(150 25% 92%)" opacity="0.7" />
-                {/* Ground ellipse */}
-                <ellipse cx="64" cy="92" rx="44" ry="8" fill="hsl(140 22% 86%)" />
-                {/* Left tree canopy */}
-                <ellipse cx="22" cy="72" rx="13" ry="16" fill="hsl(150 28% 70%)" />
-                <ellipse cx="22" cy="68" rx="10" ry="12" fill="hsl(150 25% 78%)" />
-                {/* Right tree canopy */}
-                <ellipse cx="106" cy="74" rx="12" ry="14" fill="hsl(150 28% 70%)" />
-                <ellipse cx="106" cy="70" rx="9" ry="11" fill="hsl(150 25% 78%)" />
-                {/* House walls */}
-                <rect x="40" y="62" width="48" height="32" rx="2" fill="hsl(38 45% 90%)" />
-                {/* Roof */}
-                <polygon points="34,64 64,38 94,64" fill="hsl(14 40% 60%)" opacity="0.85" />
-                {/* Roof ridge highlight */}
-                <polygon points="34,64 64,38 94,64" fill="none" stroke="hsl(14 35% 72%)" strokeWidth="0.5" />
-                {/* Door */}
-                <rect x="56" y="76" width="16" height="18" rx="3" fill="hsl(150 30% 48%)" opacity="0.75" />
-                {/* Door knob */}
-                <circle cx="70" cy="86" r="1.5" fill="hsl(38 40% 78%)" />
-                {/* Window left */}
-                <rect x="43" y="67" width="11" height="9" rx="1.5" fill="hsl(200 30% 88%)" opacity="0.8" />
-                {/* Window right */}
-                <rect x="74" y="67" width="11" height="9" rx="1.5" fill="hsl(200 30% 88%)" opacity="0.8" />
-                {/* Soft sun */}
-                <circle cx="98" cy="30" r="10" fill="hsl(45 70% 80%)" opacity="0.55" />
-                <circle cx="98" cy="30" r="6" fill="hsl(45 70% 82%)" opacity="0.65" />
-              </svg>
-            </div>
+            {/* Exact mockup house illustration */}
+            <img
+              src="/house-illustration.png"
+              alt=""
+              aria-hidden="true"
+              className="w-32 h-auto mx-auto select-none pointer-events-none"
+            />
             <p className="text-xs text-neutral-400 text-center mt-2 px-6 leading-relaxed">
               Everything in one place, so life flows better.
             </p>
