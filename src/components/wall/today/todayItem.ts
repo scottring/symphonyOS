@@ -14,7 +14,7 @@ export interface TodayItem {
   sourceId: string
   needsDiscussion?: boolean
   discussionNote?: string
-  /** True when this is a routine-step whose routine recurs every weekday. */
+  /** True when this routine-step recurs daily or on all five weekdays. */
   isEverydayRoutine?: boolean
 }
 
