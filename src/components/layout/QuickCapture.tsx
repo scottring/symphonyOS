@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { parseQuickInput, hasParsedFields, type ParsedQuickInput } from '@/lib/quickInputParser'
+import { hasParsedFields } from '@/lib/quickInputParser'
 import type { TaskCategory, TaskContext } from '@/types/task'
 import { useDomain } from '@/hooks/useDomain'
+import { useQuickParse } from '@/hooks/useQuickParse'
 
 interface QuickCaptureProps {
   onAdd: (title: string) => void
@@ -55,15 +56,27 @@ export function QuickCapture({
   // Get current domain for smart context defaulting
   const { currentDomain } = useDomain()
 
-  // Overrides for when user clicks × on a parsed field or applies suggestions
-  const [overrides, setOverrides] = useState<{
-    projectId?: string | null
-    contactId?: string | null
-    dueDate?: Date | null
-    category?: TaskCategory | null
-    context?: TaskContext | null
-    assignedMemberIds?: string[] | null
-  }>({})
+  // Parser context — memoized so useQuickParse's parse memo stays stable
+  const parserCtx = useMemo(
+    () => ({ projects, contacts, familyMembers }),
+    [projects, contacts, familyMembers],
+  )
+
+  // Parsing + override state lives in useQuickParse
+  const qp = useQuickParse(title, parserCtx, currentDomain)
+  const {
+    effectiveParsed,
+    projectName,
+    contactName,
+    resetOverrides,
+    clearProject,
+    clearContact,
+    clearDate,
+    clearCategory,
+    clearContext,
+    clearAssignment,
+    applyContext,
+  } = qp
 
   const clearAutoCloseTimer = () => {
     if (autoCloseTimerRef.current) {
@@ -88,7 +101,7 @@ export function QuickCapture({
     // Wait for fade-out animation to complete before actually closing
     setTimeout(() => {
       setTitle('')
-      setOverrides({})
+      resetOverrides()
       setIsClosing(false)
       if (onClose) {
         onClose()
@@ -103,7 +116,7 @@ export function QuickCapture({
     if (isOpen) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting on modal open is valid
       setTitle('')
-      setOverrides({})
+      resetOverrides()
       setTimeout(() => inputRef.current?.focus(), 50)
     }
   }, [isOpen])
@@ -129,36 +142,7 @@ export function QuickCapture({
   }, [isOpen, title]) // eslint-disable-line react-hooks/exhaustive-deps
   // Note: handleClose is intentionally not in deps to avoid recreating timer unnecessarily
 
-  // Parse input live
-  const parsed = useMemo<ParsedQuickInput>(() => {
-    return parseQuickInput(title, { projects, contacts, familyMembers })
-  }, [title, projects, contacts, familyMembers])
-
-  // Apply overrides to determine final parsed result
-  const effectiveParsed = useMemo(() => {
-    return {
-      ...parsed,
-      projectId: overrides.projectId === null ? undefined : (overrides.projectId ?? parsed.projectId),
-      contactId: overrides.contactId === null ? undefined : (overrides.contactId ?? parsed.contactId),
-      dueDate: overrides.dueDate === null ? undefined : (overrides.dueDate ?? parsed.dueDate),
-      category: overrides.category === null ? undefined : (overrides.category ?? parsed.category),
-      context: overrides.context === null ? undefined : (overrides.context ?? (currentDomain !== 'universal' ? currentDomain as TaskContext : undefined)),
-      assignedMemberIds: overrides.assignedMemberIds === null ? undefined : (overrides.assignedMemberIds ?? parsed.assignedMemberIds),
-    }
-  }, [parsed, overrides])
-
-  const showPreview = hasParsedFields(effectiveParsed) || !!effectiveParsed.context
-
-  // Get display names for parsed fields
-  const projectName = useMemo(() => {
-    if (!effectiveParsed.projectId) return null
-    return projects.find(p => p.id === effectiveParsed.projectId)?.name ?? null
-  }, [effectiveParsed.projectId, projects])
-
-  const contactName = useMemo(() => {
-    if (!effectiveParsed.contactId) return null
-    return contacts.find(c => c.id === effectiveParsed.contactId)?.name ?? null
-  }, [effectiveParsed.contactId, contacts])
+  const showPreview = qp.hasFields
 
   const assignedNames = useMemo(() => {
     if (!effectiveParsed.assignedMemberIds?.length) return []
@@ -215,7 +199,7 @@ export function QuickCapture({
       })
       // Reset and refocus for rapid entry
       setTitle('')
-      setOverrides({})
+      resetOverrides()
       inputRef.current?.focus()
       return
     }
@@ -265,7 +249,7 @@ export function QuickCapture({
 
     // Reset and refocus for rapid entry
     setTitle('')
-    setOverrides({})
+    resetOverrides()
     inputRef.current?.focus()
   }
 
@@ -283,14 +267,6 @@ export function QuickCapture({
       }
     }
   }
-
-  const clearProject = () => setOverrides(prev => ({ ...prev, projectId: null }))
-  const clearContact = () => setOverrides(prev => ({ ...prev, contactId: null }))
-  const clearDate = () => setOverrides(prev => ({ ...prev, dueDate: null }))
-  const clearCategory = () => setOverrides(prev => ({ ...prev, category: null }))
-  const clearContext = () => setOverrides(prev => ({ ...prev, context: null }))
-  const clearAssignment = () => setOverrides(prev => ({ ...prev, assignedMemberIds: null }))
-  const applyContext = (context: TaskContext) => setOverrides(prev => ({ ...prev, context }))
 
   return (
     <>
