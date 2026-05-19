@@ -40,6 +40,25 @@ describe('wall dinner ⟵ structured meal plan', () => {
     expect(found!.title).toContain('Pasta e fagioli')
   })
 
+  it('carries the linked recipe URL onto the event description (for the recipe viewer)', () => {
+    const today = new Date()
+    const plan = {
+      id: 'mp3',
+      entries: [
+        { id: 'e2', dayOfWeek: today.getDay(), slot: 'dinner', recipeId: 'r1' },
+      ],
+    } as unknown as MealPlan
+    const recipes = [
+      { id: 'r1', title: 'Skillet Lasagna', sourceUrl: 'https://www.seriouseats.com/skillet-lasagna' },
+    ] as unknown as Parameters<typeof synthesizeMealEvents>[0]['recipes']
+
+    const [evt] = synthesizeMealEvents({
+      viewedDate: today, mealPlan: plan, recipes, familyMembers: [], currentMemberId: null,
+    })
+    expect(evt.title).toContain('Skillet Lasagna')
+    expect(evt.description).toBe('https://www.seriouseats.com/skillet-lasagna')
+  })
+
   it('returns null when there is no dinner entry that day', () => {
     const today = new Date()
     const plan = { id: 'mp2', entries: [] } as unknown as MealPlan
