@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { ConceptIcon } from '@/lib/conceptIcons'
 import type { MealPlanEntry, MealSlot } from '@/types/meal-planner'
 import type { FamilyMember } from '@/types/family'
 
@@ -169,7 +170,7 @@ export function DistributeLeftoversModal({
                           aria-label={`${r.label} ${d.label} — ${isSelected ? 'selected' : 'not selected'}`}
                           className={`h-7 w-7 rounded transition-colors ${isSelected ? 'bg-primary-500 text-white' : 'bg-neutral-100 text-neutral-300 hover:bg-neutral-200'}`}
                         >
-                          {isSelected ? '✓' : ''}
+                          {isSelected ? <ConceptIcon name="done" size={14} decorative /> : null}
                         </button>
                       </td>
                     )

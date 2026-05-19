@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ConceptIcon } from '@/lib/conceptIcons'
 import type { MealPlanEntry, Recipe, TrackingState } from '@/types/meal-planner'
 import { sumGramsInTags } from './grams'
 
@@ -114,7 +115,7 @@ export function MealStateRow({ entry, recipe, onConfirmAsPlanned, onSwap, onSkip
           <button onClick={() => setMenuOpen(o => !o)}
                   aria-label="Mark as planned, swap, or skip"
                   className="text-[16px] text-neutral-300 hover:text-primary-500 px-1">
-            ✓
+            <ConceptIcon name="done" size={16} decorative />
           </button>
         )}
         {state === 'swapped' && (
@@ -141,7 +142,7 @@ export function MealStateRow({ entry, recipe, onConfirmAsPlanned, onSwap, onSkip
           <div className="absolute right-0 top-full mt-1 z-10 min-w-[160px] rounded-xl border border-neutral-200 bg-bg-elevated shadow-card py-1">
             <button onClick={() => { onConfirmAsPlanned(entry.id); setMenuOpen(false) }}
                     className="w-full text-left px-3 py-1.5 text-[13px] hover:bg-primary-50 flex items-center gap-2">
-              <span className="text-primary-500">✓</span> Ate as planned
+              <ConceptIcon name="done" size={13} className="text-primary-500" decorative /> Ate as planned
             </button>
             <button onClick={startSwap}
                     className="w-full text-left px-3 py-1.5 text-[13px] hover:bg-primary-50 flex items-center gap-2">

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ConceptIcon } from '@/lib/conceptIcons'
 import { useMealPlan } from '@/hooks/useMealPlan'
 import { useRecipes } from '@/hooks/useRecipes'
 import { useGroceryStatus } from '@/hooks/useGroceryStatus'
@@ -302,7 +303,7 @@ export function MealPlanRitualPage() {
           <ParameterDropdown value={plan?.parameter} onChange={setParameter} />
           <button onClick={() => setChatOpen(true)}
                   className="px-3 py-1.5 rounded-full text-[12px] font-medium bg-primary-500 text-white shadow-primary hover:bg-primary-600 flex items-center gap-1.5">
-            <span>✦</span> Ask Symphony
+            <ConceptIcon name="ai" size={14} decorative /> Ask Symphony
           </button>
         </div>
       </div>

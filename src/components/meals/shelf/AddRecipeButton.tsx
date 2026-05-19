@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { ConceptIcon } from '@/lib/conceptIcons'
 
 interface Props {
   onPasteUrl: () => void
@@ -50,7 +51,7 @@ export function AddRecipeButton({ onPasteUrl, onManualEntry, onFindRecipe }: Pro
                 onClick={choose(onFindRecipe)}
                 className="w-full px-4 py-3 text-left flex items-start gap-3 hover:bg-primary-50 transition-colors"
               >
-                <span className="text-primary-500 text-[16px] leading-none mt-0.5">✦</span>
+                <ConceptIcon name="ai" size={16} className="text-primary-500 mt-0.5" decorative />
                 <div className="flex-1">
                   <div className="text-[14px] font-medium text-neutral-800">Find a recipe</div>
                   <div className="text-[12px] italic text-neutral-500 mt-0.5">Symphony AI suggests three</div>
@@ -77,7 +78,7 @@ export function AddRecipeButton({ onPasteUrl, onManualEntry, onFindRecipe }: Pro
             onClick={choose(onManualEntry)}
             className="w-full px-4 py-3 text-left flex items-start gap-3 hover:bg-neutral-50 transition-colors"
           >
-            <span className="text-neutral-500 text-[14px] leading-none mt-0.5">✎</span>
+            <ConceptIcon name="note" size={14} className="text-neutral-500 mt-0.5" decorative />
             <div className="flex-1">
               <div className="text-[14px] font-medium text-neutral-800">Manual entry</div>
               <div className="text-[12px] italic text-neutral-500 mt-0.5">Type it yourself</div>

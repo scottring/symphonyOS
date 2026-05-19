@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
+import { ConceptIcon } from '@/lib/conceptIcons'
 import { useMealPlan } from '@/hooks/useMealPlan'
 import { useRecipes } from '@/hooks/useRecipes'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
@@ -232,7 +233,7 @@ export function MealEventSection({ mealEventId, viewedDate }: Props) {
             disabled={marking}
             className="px-4 py-2 rounded-full border border-primary-200 text-primary-700 text-[12px] font-medium hover:bg-primary-50 disabled:opacity-50"
           >
-            {marking ? 'Saving…' : '✓ Mark as cooked'}
+            {marking ? 'Saving…' : <><ConceptIcon name="done" size={12} decorative /> Mark as cooked</>}
           </button>
         )}
         {!isSkipped && (

@@ -1,4 +1,6 @@
 import { useNavigate } from 'react-router-dom'
+import { ConceptIcon } from '@/lib/conceptIcons'
+import type { ConceptName } from '@/lib/conceptIcons'
 
 type TabKey = 'plan' | 'groceries' | 'habits'
 
@@ -9,8 +11,8 @@ interface MobileTabBarProps {
 interface TabItem {
   key: TabKey
   label: string
-  /** Glyph used in the read-only design system. */
-  glyph: string
+  /** ConceptIcon name for this tab. */
+  icon: ConceptName
   path: string
 }
 
@@ -18,9 +20,9 @@ interface TabItem {
 // groceries page yet. Swap to /meals/groceries (or a mobile-specific route) once
 // that surface ships.
 const TABS: TabItem[] = [
-  { key: 'plan',      label: 'Plan',      glyph: '◍', path: '/meals/plan'   },
-  { key: 'groceries', label: 'Groceries', glyph: '✓', path: '/meals/shelf'  },
-  { key: 'habits',    label: 'Habits',    glyph: '◐', path: '/meals/habits' },
+  { key: 'plan',      label: 'Plan',      icon: 'when',    path: '/meals/plan'   },
+  { key: 'groceries', label: 'Groceries', icon: 'list',    path: '/meals/shelf'  },
+  { key: 'habits',    label: 'Habits',    icon: 'routine', path: '/meals/habits' },
 ]
 
 /** Sticky bottom navigation for the mobile meals surfaces. */
@@ -47,9 +49,7 @@ export function MobileTabBar({ active }: MobileTabBarProps) {
                     : 'text-neutral-500 hover:text-neutral-700'
                 }`}
               >
-                <span aria-hidden="true" className="text-[18px] leading-none">
-                  {tab.glyph}
-                </span>
+                <ConceptIcon name={tab.icon} size={18} decorative />
                 <span className="text-[11px] font-medium uppercase tracking-[0.18em]">
                   {tab.label}
                 </span>

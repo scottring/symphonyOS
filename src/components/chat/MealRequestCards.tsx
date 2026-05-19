@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { sundayOfWeek } from '@/lib/weekHelpers'
 import { fetchMealSuggestions } from '@/lib/askSymphonyMeal'
 import { useApplyMealSuggestion } from '@/hooks/useApplyMealSuggestion'
+import { ConceptIcon } from '@/lib/conceptIcons'
 import type { AskSymphonySuggestion } from '@/hooks/useAskSymphony'
 
 export function MealRequestCards({ request }: { request: string }) {
@@ -72,7 +73,7 @@ export function MealRequestCards({ request }: { request: string }) {
           <div className="text-xs text-neutral-600 mt-0.5">{c.why}</div>
           <div className="flex justify-end mt-2">
             {appliedIdx.has(i) ? (
-              <span className="text-xs text-emerald-700 font-medium">✓ Applied</span>
+              <span className="text-xs text-emerald-700 font-medium flex items-center gap-1"><ConceptIcon name="done" size={12} decorative /> Applied</span>
             ) : (
               <button
                 type="button"
