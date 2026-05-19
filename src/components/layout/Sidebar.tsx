@@ -27,6 +27,7 @@ import {
   FileText,
   Users2,
   List,
+  History,
   Settings,
   LogOut,
 } from 'lucide-react'
@@ -141,7 +142,7 @@ export function Sidebar({
   return (
     <aside
       className={`
-        h-full bg-[hsl(145_16%_91%)] border-r border-neutral-200/60
+        h-full bg-[hsl(38_40%_96%)] border-r border-neutral-200/60
         flex flex-col
         transition-all duration-500
         ${collapsed ? 'w-[68px]' : 'w-64'}
@@ -421,6 +422,15 @@ export function Sidebar({
             )}
           </>
         )}
+
+        {/* History */}
+        <button
+          onClick={() => onViewChange('history')}
+          className={navItemClass(activeView === 'history')}
+        >
+          {createElement(History, { className: 'w-5 h-5 shrink-0' })}
+          {!collapsed && <span>History</span>}
+        </button>
 
         {/* Apps (registry-driven) */}
         {(() => {
