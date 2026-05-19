@@ -35,6 +35,7 @@ export async function collectMealStream(
       if (evt.type === 'text' && typeof evt.delta === 'string') text += evt.delta
       else if (evt.type === 'done') {
         cards = evt.cards ?? []
+        // fall back to accumulated deltas if server omits text
         if (typeof evt.text === 'string' && evt.text.length > 0) text = evt.text
       } else if (evt.type === 'error') error = evt.message ?? 'stream error'
     }

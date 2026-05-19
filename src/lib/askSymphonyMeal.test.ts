@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { collectMealStream } from './askSymphonyMeal'
+import { describe, it, expect, vi } from 'vitest'
+import { collectMealStream, fetchMealSuggestions } from './askSymphonyMeal'
 
 function sse(lines: string[]): ReadableStream<Uint8Array> {
   const enc = new TextEncoder()
@@ -26,5 +26,30 @@ describe('collectMealStream', () => {
     const res = await collectMealStream(stream)
     expect(res.cards).toEqual([])
     expect(res.error).toBe('boom')
+  })
+
+  it('handles SSE lines split across chunks', async () => {
+    const stream = sse([
+      'data: {"type":"text","del',
+      'ta":"Hi"}\n\n',
+      'data: {"type":"done","cards":[],"text":"Hi"}\n\n',
+    ])
+    const res = await collectMealStream(stream)
+    expect(res.text).toBe('Hi')
+  })
+})
+
+vi.mock('@/lib/supabase', () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+    },
+  },
+}))
+
+describe('fetchMealSuggestions', () => {
+  it('returns not-authenticated error when session is null', async () => {
+    const res = await fetchMealSuggestions('suggest meals', new Date())
+    expect(res).toEqual({ text: '', cards: [], error: 'not authenticated' })
   })
 })
