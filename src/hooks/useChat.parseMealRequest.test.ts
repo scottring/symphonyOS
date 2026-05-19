@@ -24,13 +24,45 @@ describe('parseMealRequest', () => {
     expect(r.content).toBe('Note saved.')
   })
 
-  it('bare ::: inside body does not truncate (newline before closing fence required)', () => {
-    const r = parseMealRequest(':::meal-request\nadd pasta ::: with cream\n:::')
-    expect(r.mealRequest).toBe('add pasta ::: with cream')
-  })
-
   it('preserves multiline body', () => {
     const r = parseMealRequest(':::meal-request\nadd pasta\nand salad\n:::')
     expect(r.mealRequest).toBe('add pasta\nand salad')
+  })
+
+  // ── Real-world LLM formatting tolerance (the production bug) ──────────────
+  // Models don't reproduce the exact 3-line fence reliably. The strict
+  // /\n:::/ requirement rejected real output and broke the whole feature.
+  // The parser must tolerate fence-whitespace variance.
+
+  it('tolerates NO newline before the closing fence', () => {
+    const r = parseMealRequest(':::meal-request\nadd a tofu stir fry to Wednesday this week:::')
+    expect(r.mealRequest).toBe('add a tofu stir fry to Wednesday this week')
+    expect(r.content).toBe('')
+  })
+
+  it('tolerates a single-line block (no newlines around the body)', () => {
+    const r = parseMealRequest(':::meal-request add a tofu stir fry to Wednesday this week :::')
+    expect(r.mealRequest).toBe('add a tofu stir fry to Wednesday this week')
+  })
+
+  it('handles the exact production-observed clean shape', () => {
+    const r = parseMealRequest(':::meal-request\nadd a tofu stir fry to Wednesday this week\n:::')
+    expect(r.mealRequest).toBe('add a tofu stir fry to Wednesday this week')
+    expect(r.content).toBe('')
+  })
+
+  it('tolerates a one-sentence ack before the block', () => {
+    const r = parseMealRequest('Got it — adding that.\n\n:::meal-request\nadd a tofu stir fry to Wednesday this week\n:::')
+    expect(r.mealRequest).toBe('add a tofu stir fry to Wednesday this week')
+    expect(r.content).toBe('Got it — adding that.')
+  })
+
+  // ACCEPTED TRADE-OFF: a literal ::: inside the request now truncates the
+  // body at the first :::. This is intentional — the handoff prompt
+  // normalizes the request and real meal requests never contain ":::".
+  // Common-case robustness >> protecting a pathological input.
+  it('truncates at a bare ::: inside the body (accepted trade-off)', () => {
+    const r = parseMealRequest(':::meal-request\nadd pasta ::: with cream\n:::')
+    expect(r.mealRequest).toBe('add pasta')
   })
 })
