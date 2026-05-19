@@ -23,6 +23,8 @@ import { TodayAddInput } from './TodayAddInput'
 import { OverdueSection } from './OverdueSection'
 import { EmailActionsBanner } from './EmailActionsBanner'
 import { StatsRow } from './StatsRow'
+import { TodaysFocusCard } from './TodaysFocusCard'
+import { focusHeadline } from '@/lib/focusHeadline'
 // import { DailyBriefing } from './DailyBriefing'
 // import { ProactiveSuggestionChips } from './ProactiveSuggestionChips'
 import { useProactiveSuggestions } from '@/hooks/useProactiveSuggestions'
@@ -1044,6 +1046,9 @@ export function TodaySchedule({
   // TODO(perf): lift health to page scope and pass into ClarityIndicator as a prop to avoid the duplicate useSystemHealth call (Layer 2 cleanup)
   // StatsRow derived values
   const health = useSystemHealth({ tasks, projects, projectsWithLinkedEvents })
+  const focusEventsCount = filteredEvents.length
+  const focusMealsCount = filteredEvents.filter(e => /breakfast|brunch|lunch|dinner|supper/i.test(e.title)).length
+  const focusPrioritiesCount = allFilteredTasks.filter(t => !t.completed).length
   const clarityLabel = {
     excellent: 'Excellent',
     good: 'Good',
@@ -1255,6 +1260,18 @@ export function TodaySchedule({
 
       {/* This week float — mobile: compact in header; desktop: inline in stats row */}
       {/* StagingFloat block removed from mobile — now lives in the header row */}
+
+      {/* Today's Focus card — desktop today only */}
+      {!isMobile && isToday && (
+        <div className="mb-6">
+          <TodaysFocusCard
+            headline={focusHeadline(health.healthColor)}
+            priorities={focusPrioritiesCount}
+            meals={focusMealsCount}
+            events={focusEventsCount}
+          />
+        </div>
+      )}
 
       {/* Inline add to today — desktop only (mobile uses QuickCapture FAB) */}
       {!isMobile && isToday && onCreateTask && (
