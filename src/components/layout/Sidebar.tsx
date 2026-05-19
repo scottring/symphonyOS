@@ -503,7 +503,7 @@ export function Sidebar({
               className="w-32 h-auto select-none pointer-events-none"
             />
             <p className="text-xs text-neutral-400 mt-2 leading-relaxed">
-              Everything in one place, so life flows better.
+              Everything in its Right Place
             </p>
           </div>
         )}
