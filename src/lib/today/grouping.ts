@@ -43,7 +43,7 @@ export function buildGroupedSections(input: GroupingInput): Record<DaySection, T
       } else if (getDomainForCalendar) {
         const calendarId = event.calendar_id || event.calendarId
         const calendarName = event.calendar_name || event.calendarName
-        const resolved = getDomainForCalendar(calendarId, calendarName)
+        const resolved = getDomainForCalendar(calendarId ?? undefined, calendarName ?? undefined)
         if (resolved) item.context = resolved
       }
       // Check if event is completed via actionable_instances
