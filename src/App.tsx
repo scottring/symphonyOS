@@ -219,6 +219,8 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   const [activePanelTab, setActivePanelTab] = useState<PanelTab>('details')
   const [confirmationToast, setConfirmationToast] = useState<ConfirmationToastMessage | null>(null)
   const [tlUndo, setTlUndo] = useState<{ message: string; onUndo: () => void } | null>(null)
+  const dismissTlUndo = useCallback(() => setTlUndo(null), [])
+  const runTlUndo = useCallback(() => { setTlUndo(prev => { prev?.onUndo(); return null }) }, [])
 
   const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, updateEventAssignmentAll, updateRecipeUrl, updateEventProject, getNote, getEventNotesForProject, updateEventContext, notes: eventNotesMap } = useEventNotes()
   const { contacts, contactsMap, addContact, updateContact, deleteContact, searchContacts } = useContacts()
@@ -1837,8 +1839,8 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
         {tlUndo && (
           <InboxUndoToast
             message={tlUndo.message}
-            onUndo={() => { tlUndo.onUndo(); setTlUndo(null) }}
-            onDismiss={() => setTlUndo(null)}
+            onUndo={runTlUndo}
+            onDismiss={dismissTlUndo}
           />
         )}
 
