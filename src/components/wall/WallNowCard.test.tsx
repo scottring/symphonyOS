@@ -245,6 +245,7 @@ describe('WallNowCard', () => {
     expect(screen.getByText('Anyone')).toBeInTheDocument()
     expect(screen.getByText('Lock door')).toBeInTheDocument()
     expect(screen.getByText('0/1')).toBeInTheDocument()
+    expect(screen.queryByText(/^[A-Z]{2}$/)).not.toBeInTheDocument()
   })
 
   it('falls back to the flat routine list when no routineGroups supplied', () => {

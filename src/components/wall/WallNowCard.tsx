@@ -89,7 +89,7 @@ function renderModeContent(props: ModeContentProps) {
                 return (
                   <div key={group.ownerId ?? 'anyone'} className="flex gap-3 min-w-0">
                     <div
-                      className="w-1 rounded-full shrink-0"
+                      className="w-1.5 rounded-full shrink-0"
                       style={{ background: group.color ?? 'rgba(255,255,255,0.2)' }}
                     />
                     <div className="flex-1 min-w-0">
