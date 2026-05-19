@@ -916,8 +916,13 @@ import './now/wallNowFade.css'
 3d. In `renderContent()`, immediately before the line `// Pinned mode, override mode, or default — all render mode content`, insert the Day-grid short-circuit:
 
 ```tsx
-    // Day mode-default with assembled grid → 2x2 grid instead of single list
-    if (focus.kind === 'mode-default' && focus.mode === 'day' && dayGrid) {
+    // Day grid → render whenever the resolved mode is Day (auto default,
+    // rhythm-bar override, or pinned) so tapping/pinning "Day" summons it.
+    if (
+      (focus.kind === 'mode-default' || focus.kind === 'override-mode' || focus.kind === 'pinned-mode') &&
+      focus.mode === 'day' &&
+      dayGrid
+    ) {
       return <WallNowGrid grid={dayGrid} onQuadrantTap={(t) => onQuadrantTap?.(t)} />
     }
 ```

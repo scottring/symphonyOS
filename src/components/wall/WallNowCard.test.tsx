@@ -88,6 +88,34 @@ describe('WallNowCard', () => {
     expect(screen.getByText('"Best part?"')).toBeInTheDocument()
   })
 
+  it('renders the 2x2 grid when Day is an active override (rhythm-bar tap)', () => {
+    render(
+      <WallNowCard
+        focus={{ kind: 'override-mode', mode: 'day' }}
+        pinned={false}
+        onPinToggle={() => {}}
+        familyPrompt={null}
+        dayGrid={sampleGrid}
+        onQuadrantTap={() => {}}
+      />
+    )
+    expect(screen.getByText('Soccer practice')).toBeInTheDocument()
+  })
+
+  it('renders the 2x2 grid when Day is pinned', () => {
+    render(
+      <WallNowCard
+        focus={{ kind: 'pinned-mode', mode: 'day' }}
+        pinned={true}
+        onPinToggle={() => {}}
+        familyPrompt={null}
+        dayGrid={sampleGrid}
+        onQuadrantTap={() => {}}
+      />
+    )
+    expect(screen.getByText('Soccer practice')).toBeInTheDocument()
+  })
+
   it('still renders the single list for Day mode when no dayGrid supplied', () => {
     render(
       <WallNowCard

@@ -189,8 +189,14 @@ export function WallNowCard({
       )
     }
 
-    // Day mode-default with assembled grid → 2x2 grid instead of single list
-    if (focus.kind === 'mode-default' && focus.mode === 'day' && dayGrid) {
+    // Day grid → render whenever the resolved mode is Day, whether that's the
+    // auto default, a rhythm-bar override, or pinned — so tapping/pinning
+    // "Day" summons it on demand, not only during the 9a–3p clock window.
+    if (
+      (focus.kind === 'mode-default' || focus.kind === 'override-mode' || focus.kind === 'pinned-mode') &&
+      focus.mode === 'day' &&
+      dayGrid
+    ) {
       return <WallNowGrid grid={dayGrid} onQuadrantTap={(t) => onQuadrantTap?.(t)} />
     }
 

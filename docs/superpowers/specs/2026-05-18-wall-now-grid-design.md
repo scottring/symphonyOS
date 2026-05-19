@@ -22,7 +22,7 @@ This is a layout problem specific to the **Day mode default**. Every other mode 
 
 During Day mode, when no higher-priority Now Card item is active (priority rows 1–5 from the parent spec all inactive), the Now Card renders as a **2×2 grid of four always-on quadrants** instead of a single focal card. Each quadrant owns one job and never becomes "the wall" on its own — so the surface never reads as empty, and no quadrant has to carry the whole screen.
 
-This changes **only priority row 6 for Day mode**. Rows 1–5 (pinned, override, active recipe, imminent event, active routine) and row 7 still behave exactly as the parent spec defines. All other modes keep their single-hero Now Card.
+The grid renders whenever the **resolved mode is Day** — whether reached as the auto default, a rhythm-bar override, or a pin — so tapping/pinning "Day" summons it on demand, not only during the 9a–3p clock window. Higher-priority focus still wins: a tapped Coming-Up item (`override-item`), an imminent event, an active recipe/routine, or a pinned/overridden *non-Day* mode all take precedence and render as the parent spec defines. All other modes keep their single-hero Now Card.
 
 ---
 
