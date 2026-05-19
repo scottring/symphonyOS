@@ -185,6 +185,7 @@ export function TodayView({
       <div className="mb-6">
         <StatsRow
           dueToday={data.counts.actionableCount}
+          doneToday={data.counts.completedCount}
           thisWeek={data.weekTasks.length}
           total={tasks.filter((t) => !t.completed).length}
           clarityLabel={clarityLabel}
