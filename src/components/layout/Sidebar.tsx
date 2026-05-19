@@ -14,6 +14,7 @@ import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { Routine } from '@/types/routine'
+import { ConceptIcon } from '@/lib/conceptIcons'
 
 // Feature flags for in-progress features
 const FEATURES = {
@@ -424,7 +425,7 @@ export function Sidebar({
                   onClick={() => onViewChange('lists')}
                   className="w-full flex items-center gap-3 pl-9 pr-3.5 py-2 rounded-lg text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700 transition-all duration-200"
                 >
-                  <span className="text-[14px] truncate">{l.icon ?? '📋'} {l.title}</span>
+                  <span className="text-[14px] truncate">{l.icon ? l.icon : <ConceptIcon name="list" size={14} decorative />} {l.title}</span>
                 </button>
               ))}
               {!collapsed && listsActive && moreListsCount > 0 && (

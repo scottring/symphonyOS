@@ -1,4 +1,5 @@
 import type { EffectiveParsed } from '@/hooks/useQuickParse'
+import { ConceptIcon } from '@/lib/conceptIcons'
 
 interface Props {
   parsed: EffectiveParsed
@@ -73,7 +74,7 @@ export function ParsedFieldChips({
       {/* Only show task-related fields if NOT a note */}
       {!parsed.isNote && parsed.projectId && projectName && (
         <div className="flex items-center gap-2">
-          <span className="text-base">📁</span>
+          <span className="text-base"><ConceptIcon name="project" size={18} decorative /></span>
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium border border-blue-100">
             {projectName}
             <button
@@ -93,7 +94,9 @@ export function ParsedFieldChips({
       {!parsed.isNote && parsed.dueDate && (
         <div className="flex items-center gap-2">
           <span className="text-base">
-            {parsed.dueDate.getHours() !== 0 || parsed.dueDate.getMinutes() !== 0 ? '🕐' : '📅'}
+            {parsed.dueDate.getHours() !== 0 || parsed.dueDate.getMinutes() !== 0
+              ? <ConceptIcon name="time" size={18} decorative />
+              : <ConceptIcon name="when" size={18} decorative />}
           </span>
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary-50 text-primary-700 rounded-full text-xs font-medium border border-primary-100">
             {formatDate(parsed.dueDate)}
@@ -113,7 +116,7 @@ export function ParsedFieldChips({
       {/* Contact chip */}
       {!parsed.isNote && parsed.contactId && contactName && (
         <div className="flex items-center gap-2">
-          <span className="text-base">👤</span>
+          <span className="text-base"><ConceptIcon name="person" size={18} decorative /></span>
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full text-xs font-medium border border-amber-100">
             {contactName}
             <button
@@ -133,10 +136,10 @@ export function ParsedFieldChips({
       {!parsed.isNote && parsed.category && parsed.category !== 'task' && (
         <div className="flex items-center gap-2">
           <span className="text-base">
-            {parsed.category === 'event' && '📅'}
-            {parsed.category === 'activity' && '⚽'}
-            {parsed.category === 'chore' && '🧹'}
-            {parsed.category === 'errand' && '🚗'}
+            {parsed.category === 'event' && <ConceptIcon name="when" size={18} decorative />}
+            {parsed.category === 'activity' && <ConceptIcon name="activity" size={18} decorative />}
+            {parsed.category === 'chore' && <ConceptIcon name="chore" size={18} decorative />}
+            {parsed.category === 'errand' && <ConceptIcon name="errand" size={18} decorative />}
           </span>
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-purple-50 text-purple-700 rounded-full text-xs font-medium border border-purple-100">
             {parsed.category.charAt(0).toUpperCase() + parsed.category.slice(1)}
@@ -156,7 +159,7 @@ export function ParsedFieldChips({
       {/* Applied context chip - show when context has been applied */}
       {!parsed.isNote && parsed.context && (
         <div className="flex items-center gap-2">
-          <span className="text-base">🏷️</span>
+          <span className="text-base"><ConceptIcon name="context" size={18} decorative /></span>
           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
             parsed.context === 'work'
               ? 'bg-blue-50 text-blue-700 border-blue-100'

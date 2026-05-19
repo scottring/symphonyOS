@@ -6,6 +6,8 @@ import { FAMILY_COLORS, type FamilyMemberColor } from '@/types/family'
 import { PlacesAutocomplete, type PlaceSelection } from '@/components/location/PlacesAutocomplete'
 import { useDirections } from '@/hooks/useDirections'
 import { CreateProjectFromTaskModal } from './CreateProjectFromTaskModal'
+import { ConceptIcon } from '@/lib/conceptIcons'
+import type { ConceptName } from '@/lib/conceptIcons'
 
 interface InboxTriageModalProps {
   task: Task
@@ -24,12 +26,12 @@ interface InboxTriageModalProps {
 type WhenOption = 'today' | 'tomorrow' | 'next-week' | 'pick-date' | 'someday' | null
 
 // Category configuration with icons and descriptions
-const CATEGORIES: { value: TaskCategory; label: string; icon: string; description: string; color: string }[] = [
-  { value: 'event', label: 'Event', icon: '📅', description: 'Calendar-blocked time', color: 'blue' },
-  { value: 'activity', label: 'Activity', icon: '⚽', description: 'Kid commitment', color: 'green' },
-  { value: 'chore', label: 'Chore', icon: '🧹', description: 'Recurring household', color: 'amber' },
-  { value: 'errand', label: 'Errand', icon: '🚗', description: 'Location-based', color: 'purple' },
-  { value: 'task', label: 'Task', icon: '✅', description: 'One-off action', color: 'neutral' },
+const CATEGORIES: { value: TaskCategory; label: string; icon: ConceptName; description: string; color: string }[] = [
+  { value: 'event', label: 'Event', icon: 'when', description: 'Calendar-blocked time', color: 'blue' },
+  { value: 'activity', label: 'Activity', icon: 'activity', description: 'Kid commitment', color: 'green' },
+  { value: 'chore', label: 'Chore', icon: 'chore', description: 'Recurring household', color: 'amber' },
+  { value: 'errand', label: 'Errand', icon: 'errand', description: 'Location-based', color: 'purple' },
+  { value: 'task', label: 'Task', icon: 'task', description: 'One-off action', color: 'neutral' },
 ]
 
 export function InboxTriageModal({
@@ -276,7 +278,7 @@ export function InboxTriageModal({
                         : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50'
                     }`}
                   >
-                    <span className="text-xl">{cat.icon}</span>
+                    <span className="text-xl"><ConceptIcon name={cat.icon} size={20} decorative /></span>
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm">{cat.label}</div>
                       <div className="text-xs text-neutral-500">{cat.description}</div>

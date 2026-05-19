@@ -18,8 +18,8 @@ describe('ParsedFieldChips', () => {
   it('renders a time chip when dueDate has a time', () => {
     const d = new Date(2026,4,19,18,15)
     render(<ParsedFieldChips parsed={{ rawText:'', title:'', dueDate:d }} projectName={null} contactName={null} {...base} />)
-    // The component renders both the 🕐 emoji and the formatted "6:15 PM" time,
-    // so the regex legitimately matches multiple nodes — assert at least one.
-    expect(screen.getAllByText(/6:15|18:15|🕐/).length).toBeGreaterThan(0)
+    // The component renders the formatted "6:15 PM" time text (icon is now a ConceptIcon, not emoji).
+    // Assert the time text is present.
+    expect(screen.getAllByText(/6:15|18:15/).length).toBeGreaterThan(0)
   })
 })
