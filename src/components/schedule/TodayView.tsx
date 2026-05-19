@@ -376,7 +376,7 @@ export function TodayView({
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-[860px] mx-auto px-8 py-8">
+    <div className="max-w-[940px] w-full pl-10 pr-8 py-8">
       {/* Header */}
       <TodayHeader
         viewedDate={viewedDate}

@@ -141,7 +141,7 @@ export function Sidebar({
   return (
     <aside
       className={`
-        h-full bg-bg-base border-r border-neutral-200/60
+        h-full bg-[hsl(42_18%_93%)] border-r border-neutral-200/60
         flex flex-col
         transition-all duration-500
         ${collapsed ? 'w-[68px]' : 'w-64'}
@@ -494,15 +494,15 @@ export function Sidebar({
 
         {/* Illustration + tagline */}
         {!collapsed && (
-          <div className="mt-4 flex flex-col items-center">
+          <div className="mt-4 px-3">
             {/* Exact mockup house illustration */}
             <img
               src="/house-illustration.png"
               alt=""
               aria-hidden="true"
-              className="w-32 h-auto mx-auto select-none pointer-events-none"
+              className="w-32 h-auto select-none pointer-events-none"
             />
-            <p className="text-xs text-neutral-400 text-center mt-2 px-6 leading-relaxed">
+            <p className="text-xs text-neutral-400 mt-2 leading-relaxed">
               Everything in one place, so life flows better.
             </p>
           </div>
