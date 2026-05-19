@@ -25,7 +25,7 @@ describe('groupRoutineStepsByOwner', () => {
     expect(groupRoutineStepsByOwner([], [KALEB, ELLA])).toEqual([])
   })
 
-  it('groups two kids’ identically-named steps into one group each, labeled by member name', () => {
+  it("groups two kids' identically-named steps into one group each, labeled by member name", () => {
     const steps = [
       step('k1', 'Get dressed', 'k', 6),
       step('e1', 'Get dressed', 'e', 6),
@@ -36,6 +36,10 @@ describe('groupRoutineStepsByOwner', () => {
     expect(groups.map(g => g.label)).toEqual(['Kaleb', 'Ella'])
     expect(groups[0].steps.map(s => s.id)).toEqual(['k1', 'k2'])
     expect(groups[1].steps.map(s => s.id)).toEqual(['e1', 'e2'])
+    expect(groups[0].color).toBe('blue')
+    expect(groups[0].initials).toBe('KA')
+    expect(groups[1].color).toBe('blue')
+    expect(groups[1].initials).toBe('EL')
   })
 
   it('orders groups by member display_order', () => {
@@ -62,6 +66,8 @@ describe('groupRoutineStepsByOwner', () => {
     expect(groups.map(g => g.label)).toEqual(['Kaleb', 'Anyone'])
     expect(groups[1].ownerId).toBeNull()
     expect(groups[1].steps.map(s => s.id)).toEqual(['x1', 'y1'])
+    expect(groups[1].color).toBeNull()
+    expect(groups[1].initials).toBeNull()
   })
 
   it('matches an owner by member.user_id when id does not match', () => {

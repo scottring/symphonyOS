@@ -6,6 +6,10 @@ export interface RoutineGroup {
   ownerId: string | null
   /** Display label — the member's name, or "Anyone" for unowned/unknown. */
   label: string
+  /** The member's color; null for the "Anyone" group. */
+  color: string | null
+  /** The member's initials; null for the "Anyone" group. */
+  initials: string | null
   steps: TodayItem[]
 }
 
@@ -69,6 +73,8 @@ export function groupRoutineStepsByOwner(
     .map(({ member, steps }) => ({
       ownerId: member.id,
       label: member.name,
+      color: member.color,
+      initials: member.initials,
       steps: [...steps].sort(byStartTime),
     }))
 
@@ -76,6 +82,8 @@ export function groupRoutineStepsByOwner(
     groups.push({
       ownerId: null,
       label: UNOWNED_LABEL,
+      color: null,
+      initials: null,
       steps: [...unowned].sort(byStartTime),
     })
   }
