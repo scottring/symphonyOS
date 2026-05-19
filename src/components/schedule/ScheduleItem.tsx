@@ -511,6 +511,18 @@ export const ScheduleItem = memo(function ScheduleItem({
                 {item.subtaskCompletedCount}/{item.subtaskCount}
               </span>
             )}
+            {/* Project chip — inline pill next to title */}
+            {projectName && (
+              <span
+                className="shrink-0 inline-flex items-center max-w-[200px] truncate text-[11px] font-medium px-2 py-0.5 rounded-md"
+                style={projectColor
+                  ? { backgroundColor: `color-mix(in srgb, ${projectColor} 14%, transparent)`, color: projectColor }
+                  : { backgroundColor: 'hsl(210 40% 96%)', color: 'hsl(210 50% 40%)' }}
+                title={projectName}
+              >
+                {projectName}
+              </span>
+            )}
           </div>
         </div>
 
@@ -643,9 +655,9 @@ export const ScheduleItem = memo(function ScheduleItem({
         </div>
       </div>
 
-      {/* Metadata row — location on hover, contact/project always compact */}
-      {(item.location || hasContactChip || parentTaskName || projectName) && (() => {
-        const onlyLocation = !hasContactChip && !parentTaskName && !projectName
+      {/* Metadata row — location on hover, contact/parentTask always compact */}
+      {(item.location || hasContactChip || parentTaskName) && (() => {
+        const onlyLocation = !hasContactChip && !parentTaskName
         const metadataContent = (
           <div className={`flex items-center gap-2 ml-[5.75rem] flex-wrap ${onlyLocation ? 'pt-1' : 'mt-1'}`}>
             {/* Location chip — hover-only for cleaner default view */}
@@ -678,8 +690,8 @@ export const ScheduleItem = memo(function ScheduleItem({
               </span>
             )}
 
-            {/* Parent task or project context */}
-            {parentTaskName && parentTaskId ? (
+            {/* Parent task context */}
+            {parentTaskName && parentTaskId && (
               <button
                 onClick={(e) => {
                   e.stopPropagation()
@@ -689,9 +701,7 @@ export const ScheduleItem = memo(function ScheduleItem({
               >
                 {parentTaskName}
               </button>
-            ) : projectName ? (
-              <span className="text-[11px] text-neutral-400 truncate max-w-[180px]">{projectName}</span>
-            ) : null}
+            )}
           </div>
         )
 
