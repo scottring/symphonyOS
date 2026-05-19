@@ -7,6 +7,7 @@ import type { List, ListCategory } from '@/types/list'
 import type { Routine } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
 import type { MeetingAttendee } from '@/hooks/useMeetingNotes'
+import type { TimelineCaptureResult } from '@/components/schedule/TimelineQuickInput'
 
 export interface ScheduleActionsValue {
   // Task actions
@@ -19,9 +20,9 @@ export interface ScheduleActionsValue {
   onCreateFollowUp?: (title: string, sourceTaskId: string) => void
 
   // Timeline insert-point create flows (radial wheel picks)
-  onCreateTaskAt?: (when: Date | null) => void
-  onCreateEventAt?: (when: Date | null) => void
-  onCreateRoutineAt?: (when: Date | null) => void
+  onCreateTaskAt?: (r: TimelineCaptureResult) => void
+  onCreateEventAt?: (r: TimelineCaptureResult) => void
+  onCreateRoutineAt?: (r: TimelineCaptureResult) => void
   onCreateNoteAt?: (content: string, anchor: Date | null) => void
   onAppendNoteAt?: (id: string, block: string, anchor: Date | null) => void
   onLinkNote?: (id: string) => void

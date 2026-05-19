@@ -7,6 +7,10 @@ import type { Routine, ActionableInstance } from '@/types/actionable'
 import { isEverydayRoutine } from '@/lib/routineUtils'
 import type { ScheduleContextItem } from '@/components/triage'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
+import { useDomain } from '@/hooks/useDomain'
+import { computeAnchorTime } from '@/lib/timelineAnchor'
+import type { ParserContext } from '@/lib/quickInputParser'
+import type { TimelineCaptureResult } from '@/components/schedule/TimelineQuickInput'
 import type { TimelineItem } from '@/types/timeline'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 // import { ScanMyDay } from './ScanMyDay'
@@ -399,9 +403,9 @@ interface TodayScheduleProps {
   // Bulk actions (managed by HomeView)
   onUpdateTasksBulk?: (taskIds: string[], updates: Partial<Task>) => Promise<void>
   // Timeline insert points (radial wheel → create flows). Fall back to context if not passed.
-  onCreateTaskAt?: (when: Date | null) => void
-  onCreateEventAt?: (when: Date | null) => void
-  onCreateRoutineAt?: (when: Date | null) => void
+  onCreateTaskAt?: (r: TimelineCaptureResult) => void
+  onCreateEventAt?: (r: TimelineCaptureResult) => void
+  onCreateRoutineAt?: (r: TimelineCaptureResult) => void
   onCreateNoteAt?: (content: string, anchor: Date | null) => void
   onAppendNoteAt?: (id: string, block: string, anchor: Date | null) => void
   onLinkNote?: (id: string) => void
@@ -506,12 +510,33 @@ export function TodaySchedule({
   const { getStats: getRoutineStats } = useRoutineStats()
   const isMobile = useMobile()
 
-  // Timeline insert points: radial wheel pick → create flow / note composer
-  const insert = useTimelineInsert({
-    onCreateTaskAt: onCreateTaskAt ?? (() => {}),
-    onCreateEventAt: onCreateEventAt ?? (() => {}),
-    onCreateRoutineAt: onCreateRoutineAt ?? (() => {}),
-  })
+  // Timeline insert points: radial wheel pick → note composer (task/event/routine
+  // are handled inline by TimelineInsertPoint via onCreate)
+  const insert = useTimelineInsert()
+
+  // Current life domain (work/family/personal/universal) for inline quick-capture
+  const { currentDomain } = useDomain()
+
+  // Referentially-stable parser context for inline timeline quick-capture.
+  // useQuickParse keys its parse memo on ctx identity, so this MUST stay stable
+  // across renders unless the underlying data actually changes.
+  const parserContacts = useMemo(
+    () => Array.from(contactsMap?.values() ?? []).map(c => ({ id: c.id, name: c.name })),
+    [contactsMap],
+  )
+  const parserProjects = useMemo(
+    () => projects.map(p => ({ id: p.id, name: p.name })),
+    [projects],
+  )
+  const parserFamilyMembers = useMemo(
+    () => familyMembers.map(m => ({ id: m.id, name: m.name })),
+    [familyMembers],
+  )
+  const parserContext = useMemo<ParserContext>(() => ({
+    projects: parserProjects,
+    contacts: parserContacts,
+    familyMembers: parserFamilyMembers,
+  }), [parserProjects, parserContacts, parserFamilyMembers])
 
   // Detect recurring events without linked projects for promotion suggestions
   const { isPromotionSuggested } = useRecurringEventDetection(events, eventNotesMap)
@@ -1414,7 +1439,19 @@ export function TodaySchedule({
                     date: viewedDate,
                   }
                   const insertBefore = (
-                    <TimelineInsertPoint onPick={(k) => insert.handlePick(insertCtxBefore, k)} />
+                    <TimelineInsertPoint
+                      onPick={(k) => insert.handlePick(insertCtxBefore, k)}
+                      onCreate={(kind, r) => {
+                        if (kind === 'task') onCreateTaskAt?.(r)
+                        else if (kind === 'event') onCreateEventAt?.(r)
+                        else onCreateRoutineAt?.(r)
+                      }}
+                      quickInput={{
+                        anchorTime: computeAnchorTime(insertCtxBefore),
+                        parserContext,
+                        currentDomain,
+                      }}
+                    />
                   )
 
                   if (isMobile) {
@@ -1605,17 +1642,29 @@ export function TodaySchedule({
                   )
                 })}
                 {/* Trailing insert point: after the last item, or the only one for an empty-but-visible section */}
-                <TimelineInsertPoint
-                  onPick={(k) => insert.handlePick(
-                    {
-                      before: items.length > 0 ? (items[items.length - 1].startTime ?? null) : null,
-                      after: null,
-                      section,
-                      date: viewedDate,
-                    },
-                    k,
-                  )}
-                />
+                {(() => {
+                  const insertCtxTrailing = {
+                    before: items.length > 0 ? (items[items.length - 1].startTime ?? null) : null,
+                    after: null,
+                    section,
+                    date: viewedDate,
+                  }
+                  return (
+                    <TimelineInsertPoint
+                      onPick={(k) => insert.handlePick(insertCtxTrailing, k)}
+                      onCreate={(kind, r) => {
+                        if (kind === 'task') onCreateTaskAt?.(r)
+                        else if (kind === 'event') onCreateEventAt?.(r)
+                        else onCreateRoutineAt?.(r)
+                      }}
+                      quickInput={{
+                        anchorTime: computeAnchorTime(insertCtxTrailing),
+                        parserContext,
+                        currentDomain,
+                      }}
+                    />
+                  )
+                })()}
               </TimeGroup>
             )
           })}
