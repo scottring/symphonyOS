@@ -8,6 +8,13 @@ vi.mock('@/hooks/useWeather', () => ({ useWeather: () => ({ weather: null, loadi
 vi.mock('@/hooks/useProactiveSuggestions', () => ({ useProactiveSuggestions: () => ({ suggestions: [], topSuggestions: [], suggestionsForEntity: () => [], actOnSuggestion: vi.fn(), dismissSuggestion: vi.fn(), isLoading: false }) }))
 vi.mock('@/hooks/useRoutineStats', () => ({ useRoutineStats: () => ({ getStats: () => undefined }) }))
 vi.mock('@/hooks/useRecurringEventDetection', () => ({ useRecurringEventDetection: () => ({ isPromotionSuggested: () => false }) }))
+vi.mock('@/hooks/useProjects', () => ({ useProjects: () => ({ projects: [], loading: false, addProject: vi.fn(), deleteProject: vi.fn(), updateProject: vi.fn() }) }))
+vi.mock('@/hooks/useNotes', () => ({ useNotes: () => ({ notes: [], loading: false, addNote: vi.fn(), updateNote: vi.fn(), deleteNote: vi.fn() }) }))
+vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ tasks: [], loading: false, addTask: vi.fn(), updateTask: vi.fn(), deleteTask: vi.fn() }) }))
+vi.mock('@/hooks/useDomain.tsx', async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, unknown>
+  return { ...actual, useDomain: () => ({ currentDomain: 'universal', setDomain: vi.fn() }) }
+})
 
 const ctxValue = { onToggleTask: vi.fn(), projects: [], contacts: [], familyMembers: [], lists: [] }
 
@@ -42,6 +49,10 @@ describe('TodayView', () => {
     renderView()
     expect(screen.queryByRole('button', { name: 'Week' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Month' })).not.toBeInTheDocument()
+  })
+  it('renders the This Week staging trigger', () => {
+    renderView()
+    expect(screen.getByRole('button', { name: /this week/i })).toBeInTheDocument()
   })
   it('focus card click scrolls the first item into view', async () => {
     const scrollSpy = vi.fn()

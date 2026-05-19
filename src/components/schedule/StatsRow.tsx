@@ -9,13 +9,14 @@ interface StatsRowProps {
   clarityLabel: string
   aiAvailable: boolean
   clarityTrigger?: React.ReactNode
+  weekTrigger?: React.ReactNode
 }
 
 function plural(n: number) {
   return n === 1 ? 'task' : 'tasks'
 }
 
-export function StatsRow({ dueToday, doneToday, thisWeek, total, clarityLabel, aiAvailable, clarityTrigger }: StatsRowProps) {
+export function StatsRow({ dueToday, doneToday, thisWeek, total, clarityLabel, aiAvailable, clarityTrigger, weekTrigger }: StatsRowProps) {
   return (
     <div className="flex items-center flex-wrap gap-x-6 gap-y-2 text-[13px] text-neutral-500">
       <span className="inline-flex items-center gap-1.5">
@@ -24,7 +25,7 @@ export function StatsRow({ dueToday, doneToday, thisWeek, total, clarityLabel, a
       </span>
       <span className="inline-flex items-center gap-1.5">
         <CalendarRange className="w-4 h-4 text-neutral-400" />
-        {thisWeek} {plural(thisWeek)} this week
+        {weekTrigger ?? <>{thisWeek} {plural(thisWeek)} this week</>}
       </span>
       <span className="inline-flex items-center gap-1.5">
         <Circle className="w-4 h-4 text-neutral-300" />

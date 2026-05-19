@@ -25,6 +25,7 @@ import { useRecurringEventDetection } from '@/hooks/useRecurringEventDetection'
 import { TodayHeader } from './TodayHeader'
 import { StatsRow } from './StatsRow'
 import { ClarityIndicator } from './ClarityIndicator'
+import { StagingFloat } from './StagingFloat'
 import { TodaysFocusCard } from './TodaysFocusCard'
 import { WeatherCard } from './WeatherCard'
 import { AiSuggestionBanner } from './AiSuggestionBanner'
@@ -152,6 +153,24 @@ export function TodayView({
     />
   )
 
+  const weekTrigger = (
+    <StagingFloat
+      weekTasks={data.weekTasks}
+      projects={projects ?? []}
+      familyMembers={familyMembers}
+      onPullToToday={(taskId) => {
+        const t = new Date(); t.setHours(0, 0, 0, 0)
+        ctx.onUpdateTask?.(taskId, { bucket: 'timed' as const, scheduledFor: t, isAllDay: true })
+      }}
+      onSelectTask={(taskId) => onSelectItem(`task-${taskId}`)}
+      onCompleteTask={ctx.onToggleTask}
+      onDeferTask={ctx.onPushTask ? (taskId, target: 'month' | 'quarter') => ctx.onPushTask!(taskId, target) : undefined}
+      onDeleteTask={ctx.onDeleteTask}
+      onUpdateTask={ctx.onUpdateTask}
+      inline
+    />
+  )
+
   // ── Focus card counts ─────────────────────────────────────────────────────────
   const { focusPriorities, focusMeals, focusEvents } = useMemo(() => {
     const allItems = Object.values(data.grouped).flat()
@@ -223,6 +242,7 @@ export function TodayView({
           clarityLabel={clarityLabel}
           aiAvailable={false}
           clarityTrigger={clarityTrigger}
+          weekTrigger={weekTrigger}
         />
       </div>
 
