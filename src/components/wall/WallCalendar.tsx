@@ -8,6 +8,7 @@ import type { Task } from '@/types/task'
 import { WallMicButton } from './WallMicButton'
 import { WallItemDetail } from './WallItemDetail'
 import { findDinnerEvent, getMealIcon } from './WallDinnerWidget'
+import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider'
 import { WallRecipeViewer } from './WallRecipeViewer'
 import { extractRecipeNameHint, detectRecipeUrl } from '@/lib/recipeDetection'
 import { isEverydayRoutine } from '@/lib/routineUtils'
@@ -381,9 +382,13 @@ export function WallCalendar() {
   }, [])
 
   // ═══ RECIPE ═══
+  // Structured meal-plan dinners (ad-hoc or recipe) are synthesized into
+  // calendar events here so the wall surfaces them — useWallData's feed is
+  // Google-calendar only and never saw the meal plan.
+  const mealEvents = useMealEventsForDate(currentTime)
   const dinnerEvent = useMemo(
-    () => findDinnerEvent(wallData.calendarEvents, currentTime),
-    [wallData.calendarEvents, currentTime]
+    () => findDinnerEvent([...wallData.calendarEvents, ...mealEvents], currentTime),
+    [wallData.calendarEvents, mealEvents, currentTime]
   )
   const dinnerMealName = dinnerEvent
     ? extractRecipeNameHint(dinnerEvent.title) || dinnerEvent.title
