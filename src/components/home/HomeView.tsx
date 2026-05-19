@@ -310,7 +310,8 @@ export function HomeView({
 
   return (
     <div className={`relative flex flex-col h-full transition-colors duration-500 ${DOMAIN_BG[currentDomain]}`}>
-      {!isMobile && (
+      {/* Today renders its own DomainSwitcher inside TodayHeader (left of D/W/M) */}
+      {!isMobile && currentView !== 'today' && (
         <div className="absolute top-4 right-6 z-20 flex items-center gap-3">
           <DomainSwitcher />
         </div>

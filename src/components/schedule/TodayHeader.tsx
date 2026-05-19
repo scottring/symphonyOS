@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, Sun } from 'lucide-react'
 import type { HomeViewType } from '@/types/homeView'
 import { HomeViewSwitcher } from '@/components/home/HomeViewSwitcher'
+import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
 
 interface TodayHeaderProps {
   viewedDate: Date
@@ -37,8 +38,9 @@ export function TodayHeader({ viewedDate, onDateChange, onToggleWeather, current
         <h1 className="font-display text-[32px] leading-tight text-neutral-900 truncate">{label}</h1>
       </div>
 
-      {/* Right: real D/W/M switcher + sun toggle */}
+      {/* Right: context (domain) chooser + D/W/M switcher + sun toggle */}
       <div className="flex items-center gap-2 shrink-0">
+        <DomainSwitcher />
         {currentHomeView !== undefined && onHomeViewChange !== undefined && (
           <HomeViewSwitcher
             currentView={currentHomeView}
