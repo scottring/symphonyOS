@@ -18,7 +18,7 @@ function shift(d: Date, days: number): Date {
 export function TodayHeader({ viewedDate, onDateChange, currentHomeView, onHomeViewChange }: TodayHeaderProps) {
   const label = viewedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
   return (
-    <header className="flex items-center justify-between gap-4 mb-6">
+    <header className="flex flex-col gap-3 mb-6 md:flex-row md:items-center md:justify-between md:gap-4">
       {/* Left: prev/next + date */}
       <div className="flex items-center gap-2 min-w-0">
         <button
@@ -35,11 +35,13 @@ export function TodayHeader({ viewedDate, onDateChange, currentHomeView, onHomeV
         >
           <ChevronRight className="w-4 h-4" />
         </button>
-        <h1 className="font-display text-[32px] leading-tight text-neutral-900 truncate">{label}</h1>
+        <h1 className="font-display text-2xl md:text-[32px] leading-tight text-neutral-900 truncate">{label}</h1>
       </div>
 
-      {/* Right: context (domain) chooser + D/W/M switcher + sun toggle */}
-      <div className="flex items-center gap-2 shrink-0">
+      {/* Right: context (domain) chooser + D/W/M switcher.
+          On mobile the cluster sits on its own row below the date, so it
+          gets full width to lay out naturally instead of overflowing. */}
+      <div className="flex items-center gap-2 flex-wrap md:shrink-0">
         <DomainSwitcher />
         {currentHomeView !== undefined && onHomeViewChange !== undefined && (
           <HomeViewSwitcher

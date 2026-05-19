@@ -376,7 +376,7 @@ export function TodayView({
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-[940px] w-full pl-10 pr-8 py-8">
+    <div className="max-w-[940px] w-full px-4 py-4 md:pl-10 md:pr-8 md:py-8">
       {/* Header */}
       <TodayHeader
         viewedDate={viewedDate}
@@ -430,7 +430,7 @@ export function TodayView({
 
       {/* Two-up: Focus card + Weather — only shown when there is something to focus on */}
       {data.counts.totalItems > 0 && (
-        <div className="grid grid-cols-[1.6fr_1fr] gap-4 mb-7 mt-6">
+        <div className="grid grid-cols-1 md:grid-cols-[1.6fr_1fr] gap-4 mb-7 mt-6">
           <TodaysFocusCard
             headline={focusHeadline(health.healthColor)}
             priorities={focusPriorities}
