@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ConceptIcon, type ConceptName } from '@/lib/conceptIcons'
 
 export type ActionOutcome = 'success' | 'voicemail' | 'no_answer' | 'pending' | 'sent'
 
@@ -8,17 +9,17 @@ interface OutcomePickerProps {
   onCancel: () => void
 }
 
-const OUTCOMES_BY_ACTION: Record<string, { value: ActionOutcome; label: string; icon: string }[]> = {
+const OUTCOMES_BY_ACTION: Record<string, { value: ActionOutcome; label: string; icon: ConceptName }[]> = {
   call: [
-    { value: 'success', label: 'Connected', icon: '✓' },
-    { value: 'voicemail', label: 'Voicemail', icon: '📨' },
-    { value: 'no_answer', label: 'No answer', icon: '✗' },
+    { value: 'success', label: 'Connected', icon: 'done' },
+    { value: 'voicemail', label: 'Voicemail', icon: 'email' },
+    { value: 'no_answer', label: 'No answer', icon: 'close' },
   ],
   text: [
-    { value: 'sent', label: 'Sent', icon: '✓' },
+    { value: 'sent', label: 'Sent', icon: 'done' },
   ],
   email: [
-    { value: 'sent', label: 'Sent', icon: '✓' },
+    { value: 'sent', label: 'Sent', icon: 'done' },
   ],
 }
 
@@ -41,7 +42,7 @@ export function OutcomePicker({ actionType, onSelect, onCancel }: OutcomePickerP
           onClick={() => onSelect(o.value)}
           className="text-xs px-2 py-1 rounded-full border transition-colors bg-white border-neutral-200 text-neutral-600 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700"
         >
-          <span className="mr-1">{o.icon}</span>
+          <ConceptIcon name={o.icon} decorative className="mr-1" />
           {o.label}
         </button>
       ))}

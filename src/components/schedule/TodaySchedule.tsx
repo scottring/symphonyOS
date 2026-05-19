@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
+import { ConceptIcon } from '@/lib/conceptIcons'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
@@ -184,7 +185,7 @@ function ClarityIndicator({
               {/* Scheduled items - positive indicator, no action needed */}
               {metrics.itemsWithHome > 0 && (
                 <div className="flex items-center gap-2 text-xs py-1.5 px-2 rounded-lg bg-white/50">
-                  <span className="text-primary-500">✓</span>
+                  <ConceptIcon name="done" decorative className="text-primary-500" />
                   <span className="flex-1 text-neutral-600">
                     {metrics.itemsWithHome} item{metrics.itemsWithHome !== 1 ? 's' : ''} scheduled
                   </span>
@@ -344,7 +345,7 @@ function ClarityIndicator({
               {/* All clear message */}
               {metrics.score >= 90 && metrics.freshInboxItems === 0 && metrics.agingItems === 0 && metrics.staleItems === 0 && (
                 <div className="flex items-center gap-2 text-xs py-2 px-2 rounded-lg bg-primary-50/50 text-primary-700">
-                  <span>✨</span>
+                  <ConceptIcon name="ai" decorative />
                   <span>Everything is organized. Nice work!</span>
                 </div>
               )}

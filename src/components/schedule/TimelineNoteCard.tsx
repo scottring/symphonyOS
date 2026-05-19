@@ -1,3 +1,5 @@
+import { ConceptIcon } from '@/lib/conceptIcons'
+
 interface Props {
   title: string
   timeLabel?: string
@@ -9,7 +11,7 @@ export function TimelineNoteCard({ title, timeLabel }: Props) {
       <span className="text-xs text-neutral-400 w-12 tabular-nums">
         {timeLabel ?? ''}
       </span>
-      <span className="text-base">📝</span>
+      <ConceptIcon name="note" size={18} decorative />
       <span className="font-medium text-neutral-800">{title}</span>
     </div>
   )

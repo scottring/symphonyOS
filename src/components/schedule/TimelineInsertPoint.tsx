@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { ParserContext } from '@/lib/quickInputParser'
+import { ConceptIcon, type ConceptName } from '@/lib/conceptIcons'
 import { TimelineQuickInput, type TimelineCaptureResult } from './TimelineQuickInput'
 
 export type InsertKind = 'note' | 'task' | 'event' | 'routine'
 
-const SEGMENTS: { kind: InsertKind; label: string; icon: string }[] = [
-  { kind: 'note', label: 'Note', icon: '📝' },
-  { kind: 'task', label: 'Task', icon: '✅' },
-  { kind: 'event', label: 'Event', icon: '📅' },
-  { kind: 'routine', label: 'Routine', icon: '🔁' },
+const SEGMENTS: { kind: InsertKind; label: string; concept: ConceptName }[] = [
+  { kind: 'note', label: 'Note', concept: 'note' },
+  { kind: 'task', label: 'Task', concept: 'task' },
+  { kind: 'event', label: 'Event', concept: 'when' },
+  { kind: 'routine', label: 'Routine', concept: 'routine' },
 ]
 
 interface Props {
@@ -62,7 +63,7 @@ export function TimelineInsertPoint({ onPick, onCreate, quickInput }: Props) {
               onClick={() => pick(s.kind)}
               className="w-16 h-16 min-w-[64px] rounded-xl border border-neutral-200 bg-white flex flex-col items-center justify-center gap-1 text-xs hover:bg-primary-50 active:scale-95 transition"
             >
-              <span className="text-xl">{s.icon}</span>{s.label}
+              <ConceptIcon name={s.concept} size={20} decorative />{s.label}
             </button>
           ))}
         </div>

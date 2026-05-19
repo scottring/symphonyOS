@@ -1,5 +1,6 @@
 import { memo, useState, useCallback } from 'react'
 import { Trash2 } from 'lucide-react'
+import { ConceptIcon } from '@/lib/conceptIcons'
 import type { Task, TaskContext } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
@@ -176,7 +177,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
                 onClick={() => onQuickAction(action)}
                 className="text-xs px-2.5 py-1 rounded-md font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
               >
-                📝 Note
+                <ConceptIcon name="note" decorative /> Note
               </button>
             )
           }

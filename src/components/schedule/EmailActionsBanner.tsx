@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { EmailActionItem } from '@/types/emailAction'
 import { CATEGORY_CONFIG } from '@/types/emailAction'
+import { ConceptIcon } from '@/lib/conceptIcons'
 
 interface EmailActionsBannerProps {
   items: EmailActionItem[]
@@ -43,7 +44,7 @@ export function EmailActionsBanner({
         onClick={() => setExpanded(!expanded)}
         className="time-group-header mb-3 flex items-center gap-2 hover:opacity-80 transition-opacity"
       >
-        <span className="text-base">&#128236;</span>
+        <ConceptIcon name="email" decorative />
         From Email
         <span className="text-neutral-400 font-normal">{activeItems.length}</span>
         {urgentCount > 0 && (
@@ -63,7 +64,7 @@ export function EmailActionsBanner({
               key={item.id}
               className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-50/60 border border-amber-200/60 group"
             >
-              <span className="text-lg flex-shrink-0">{cat?.icon ?? '📧'}</span>
+              <span className="text-lg flex-shrink-0 flex items-center"><ConceptIcon name="email" size={18} decorative /></span>
               <div className="flex flex-col min-w-0 flex-1">
                 <span className="text-sm font-medium text-neutral-800 truncate">
                   {item.title}
@@ -92,21 +93,21 @@ export function EmailActionsBanner({
                   className="text-xs px-2 py-1 rounded-md bg-primary-100 text-primary-700 hover:bg-primary-200 transition-colors"
                   title="Got it"
                 >
-                  &#10003;
+                  <ConceptIcon name="done" decorative />
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); onSnooze(item.id) }}
                   className="text-xs px-2 py-1 rounded-md bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-colors"
                   title="Snooze until tomorrow"
                 >
-                  &#128164;
+                  <ConceptIcon name="time" decorative />
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); onDismiss(item.id) }}
                   className="text-xs px-2 py-1 rounded-md bg-neutral-100 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-600 transition-colors"
                   title="Dismiss"
                 >
-                  &#10005;
+                  <ConceptIcon name="close" decorative />
                 </button>
               </div>
             </div>

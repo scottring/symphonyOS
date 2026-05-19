@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { ProactiveSuggestion } from '@/types/proactiveSuggestion'
+import { ConceptIcon, type ConceptName } from '@/lib/conceptIcons'
 import { OutcomePicker, type ActionOutcome } from './OutcomePicker'
 
 interface ProactiveSuggestionChipsProps {
@@ -14,18 +15,25 @@ interface ProactiveSuggestionChipsProps {
   onOpenGuidedChat?: (entityType: 'task' | 'contact' | 'project' | 'event', entityId: string, entityName: string, prompt?: string) => void
 }
 
-const ICONS: Record<string, string> = {
-  call: '\u260F',      // ☏
-  text: '\u{1F4AC}',   // 💬
-  email: '\u2709',     // ✉
-  open_link: '\u2192', // →
-  navigate: '\u{1F4CD}', // 📍
-  followup: '\u21BB',  // ↻
-  guided_chat: '\u{1F4AD}', // 💭
-  create_task: '\u2795', // ➕
-  someday: '\u23F3',   // ⏳
+// Maps action types to ConceptName (null = non-emoji, use text fallback)
+const ICON_CONCEPTS: Record<string, ConceptName | null> = {
+  call: 'call',
+  text: 'discussion',
+  email: 'email',
+  open_link: null,        // → arrow, not emoji
+  navigate: 'location',
+  followup: null,         // ↻ arrow, not emoji
+  guided_chat: 'discussion',
+  create_task: 'add',
+  someday: 'time',
+  stale: null,
+  do_today: 'done',
+}
+
+const ICON_FALLBACKS: Record<string, string> = {
+  open_link: '→',
+  followup: '↻',
   stale: '?',
-  do_today: '\u2714',  // ✔
 }
 
 export function ProactiveSuggestionChips({
@@ -146,7 +154,7 @@ export function ProactiveSuggestionChips({
               title={s.detail || s.title}
               className="text-xs px-2.5 py-1 rounded-full border transition-colors bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
             >
-              <span className="mr-1">{ICONS[s.actionType || s.suggestionType] || '\u2728'}</span>
+              {(() => { const concept = ICON_CONCEPTS[s.actionType || s.suggestionType]; const fallback = ICON_FALLBACKS[s.actionType || s.suggestionType]; return concept ? <ConceptIcon name={concept} decorative className="mr-1" /> : fallback ? <span className="mr-1">{fallback}</span> : <ConceptIcon name="ai" decorative className="mr-1" /> })()}
               {s.title}
             </button>
           ))}
