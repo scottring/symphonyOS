@@ -5,12 +5,15 @@
 // No props required — fully self-contained.
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { PanelRightClose } from 'lucide-react';
+import { useScratchpadHidden } from '@/hooks/useScratchpadHidden';
 
 const STORAGE_KEY = 'symphony-scratchpad';
 
 type SaveStatus = 'saved' | 'saving';
 
 export function ScratchpadPane() {
+  const { setHidden } = useScratchpadHidden();
   const [text, setText] = useState<string>(() => {
     try {
       return localStorage.getItem(STORAGE_KEY) ?? '';
@@ -65,9 +68,18 @@ export function ScratchpadPane() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4 shrink-0">
         <h2 className="font-display text-lg text-neutral-900">Scratchpad</h2>
-        <span className="text-[11px] text-neutral-400" aria-live="polite">
-          {saveStatus === 'saving' ? 'Saving…' : 'Saved'}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-neutral-400" aria-live="polite">
+            {saveStatus === 'saving' ? 'Saving…' : 'Saved'}
+          </span>
+          <button
+            onClick={() => setHidden(true)}
+            aria-label="Hide scratchpad"
+            className="text-neutral-400 hover:text-neutral-600 transition-colors"
+          >
+            <PanelRightClose size={16} />
+          </button>
+        </div>
       </div>
 
       {/* Textarea */}

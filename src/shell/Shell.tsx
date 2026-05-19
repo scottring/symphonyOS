@@ -1,6 +1,7 @@
 // src/shell/Shell.tsx
 import type { ComponentType, ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
+import { PanelRightOpen } from 'lucide-react';
 import { SelectionProvider } from './providers/SelectionProvider';
 import { MealEventsProvider } from './providers/MealEventsProvider';
 import { ShellRoutes } from './ShellRoutes';
@@ -9,6 +10,7 @@ import { LegacyDetailPanelHost } from './LegacyDetailPanelHost';
 import { appRegistry } from './appRegistry';
 import { ShellLayout as DefaultShellLayout } from './ShellLayout';
 import { ScratchpadPane } from '@/components/schedule/ScratchpadPane';
+import { useScratchpadHidden } from '@/hooks/useScratchpadHidden';
 import { useSelection } from './providers/SelectionProvider';
 import { useMobile } from '@/hooks/useMobile';
 
@@ -44,9 +46,25 @@ function ShellScratchpadHost() {
   const { selection } = useSelection();
   const { pathname } = useLocation();
   const isMobile = useMobile();
+  const { hidden, setHidden } = useScratchpadHidden();
 
   const isToday = TODAY_PATHS.has(pathname);
-  if (isMobile || !isToday || selection !== null) return null;
+  // Conditions for the scratchpad slot (desktop, today, no detail pane)
+  const scratchpadSlot = !isMobile && isToday && selection === null;
+
+  if (!scratchpadSlot) return null;
+
+  if (hidden) {
+    return (
+      <button
+        onClick={() => setHidden(false)}
+        aria-label="Show scratchpad"
+        className="fixed right-0 top-1/2 -translate-y-1/2 z-10 bg-bg-elevated border border-neutral-200 rounded-l-lg px-1.5 py-3 text-neutral-400 hover:text-neutral-600 shadow-card transition-colors"
+      >
+        <PanelRightOpen size={16} />
+      </button>
+    );
+  }
 
   return (
     <aside

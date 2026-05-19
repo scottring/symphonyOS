@@ -1,5 +1,7 @@
 import { useState, useCallback, useRef, useEffect, Suspense, type ReactNode } from 'react'
+import { PanelRightOpen } from 'lucide-react'
 import { ScratchpadPane } from '@/components/schedule/ScratchpadPane'
+import { useScratchpadHidden } from '@/hooks/useScratchpadHidden'
 import { Sidebar, type ViewType } from './Sidebar'
 import { SidebarKinetic } from './SidebarKinetic'
 import { MoreSheet } from './MoreSheet'
@@ -148,6 +150,7 @@ export function AppShell({
 }: AppShellProps) {
   const isMobile = useMobile()
   const { theme } = useTheme()
+  const { hidden: scratchpadHidden, setHidden: setScratchpadHidden } = useScratchpadHidden()
   const [moreSheetOpen, setMoreSheetOpen] = useState(false)
   const setChatOpen = (open: boolean) => onChatOpenChange?.(open)
   const mainRef = useRef<HTMLElement>(null)
@@ -169,7 +172,9 @@ export function AppShell({
   const rightPanelVisible = panelOpen || chatOpen
   const bothPanelsActive = panelOpen && chatOpen
   // Scratchpad fills the right rail on Today when no detail/chat panel is open (desktop only)
-  const scratchpadVisible = !isMobile && !rightPanelVisible && activeView === 'today'
+  // Also requires the user hasn't hidden it.
+  const scratchpadSlot = !isMobile && !rightPanelVisible && activeView === 'today'
+  const scratchpadVisible = scratchpadSlot && !scratchpadHidden
   // Wide screen: show both panels side-by-side. Narrow: tabbed in single column.
   const useThreePanelLayout = isWideScreen && bothPanelsActive
   // Show tabs only when both are active AND screen is too narrow for side-by-side
@@ -519,6 +524,17 @@ export function AppShell({
         >
           <ScratchpadPane />
         </aside>
+      )}
+
+      {/* Show-scratchpad tab — slim right-edge affordance when scratchpad is hidden */}
+      {scratchpadSlot && scratchpadHidden && (
+        <button
+          onClick={() => setScratchpadHidden(false)}
+          aria-label="Show scratchpad"
+          className="fixed right-0 top-1/2 -translate-y-1/2 z-10 bg-bg-elevated border border-neutral-200 rounded-l-lg px-1.5 py-3 text-neutral-400 hover:text-neutral-600 shadow-card transition-colors"
+        >
+          <PanelRightOpen size={16} />
+        </button>
       )}
 
       {/* Mobile bottom navigation — 4 tabs */}
