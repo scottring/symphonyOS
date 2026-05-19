@@ -4,6 +4,15 @@ import type { TaskCategory, TaskContext } from '@/types/task'
 
 type Domain = 'work' | 'family' | 'personal' | 'universal'
 
+/**
+ * Parsed quick-input merged with per-field user overrides. Adds `context`
+ * (auto-applied domain context) on top of the raw parser result.
+ */
+export type EffectiveParsed = ParsedQuickInput & {
+  category?: TaskCategory
+  context?: TaskContext
+}
+
 // Tri-state per field: null = explicitly cleared by user, absent/undefined = fall back to parsed value.
 interface Overrides {
   projectId?: string | null
