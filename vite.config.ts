@@ -17,6 +17,19 @@ export default defineConfig({
       disable: process.env.NODE_ENV !== 'production',
     }),
   ],
+  server: {
+    watch: {
+      // Don't watch sibling git worktrees / scratch dirs. Builds inside
+      // them otherwise spam full page reloads and, over a long-running
+      // session, accumulate Fast-Refresh failures that corrupt HMR state.
+      ignored: [
+        '**/.claude/worktrees/**',
+        '**/.worktrees/**',
+        '**/.clone/**',
+        '**/playwright-report/**',
+      ],
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
