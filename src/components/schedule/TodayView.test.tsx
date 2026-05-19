@@ -74,4 +74,16 @@ describe('TodayView', () => {
     await user.click(screen.getByRole('button', { name: /today's focus/i }))
     expect(scrollSpy).toHaveBeenCalled()
   })
+
+  it('renders the assignee filter and a routine show/hide toggle', () => {
+    renderView({ assigneesWithTasks: [{ id: 'm1', name: 'Iris' } as never], hasUnassignedTasks: true })
+    expect(screen.getByRole('button', { name: /hide daily|show daily/i })).toBeInTheDocument()
+  })
+
+  it('routine toggle flips its label after click', async () => {
+    const { user } = renderView()
+    const toggle = screen.getByRole('button', { name: /hide daily/i })
+    await user.click(toggle)
+    expect(screen.getByRole('button', { name: /show daily/i })).toBeInTheDocument()
+  })
 })

@@ -7,7 +7,7 @@
  *
  * NOT wired to the route yet — that happens in R4.
  */
-import { createElement, useMemo, useCallback, useRef } from 'react'
+import { createElement, useMemo, useCallback, useRef, useState } from 'react'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -21,6 +21,9 @@ import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useProactiveSuggestions } from '@/hooks/useProactiveSuggestions'
 import { useRoutineStats } from '@/hooks/useRoutineStats'
 import { useRecurringEventDetection } from '@/hooks/useRecurringEventDetection'
+
+import { Eye, EyeOff } from 'lucide-react'
+import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
 import { TodayHeader } from './TodayHeader'
 import { StatsRow } from './StatsRow'
@@ -99,6 +102,9 @@ export function TodayView({
   viewedDate,
   onDateChange,
   selectedAssignee,
+  onSelectAssignee,
+  assigneesWithTasks,
+  hasUnassignedTasks,
   panelOpen,
   onClosePanel,
 }: TodayViewProps) {
@@ -115,6 +121,17 @@ export function TodayView({
     eventNotesMap,
   } = ctx
 
+  // ── Hide-routines toggle (localStorage parity) ────────────────────────────────
+  const [hideRoutines, setHideRoutines] = useState<boolean>(() => {
+    try { return localStorage.getItem('symphony-hide-routines') === 'true' } catch { return false }
+  })
+  const toggleHideRoutines = useCallback(() => {
+    setHideRoutines((v) => {
+      try { localStorage.setItem('symphony-hide-routines', String(!v)) } catch { /* ignore */ }
+      return !v
+    })
+  }, [])
+
   // ── Derived data ─────────────────────────────────────────────────────────────
   const todayInput = useMemo(() => ({
     tasks,
@@ -123,12 +140,12 @@ export function TodayView({
     dateInstances,
     viewedDate,
     selectedAssignee: selectedAssignee ?? null,
-    hideRoutines: false,
+    hideRoutines,
     // Cast: EventNote.notes is string|null; TodayDataInput expects string|undefined — structurally compatible at runtime
     eventNotesMap: ctx.eventNotesMap as unknown as Map<string, { notes?: string; assignedTo?: string | null }> | undefined,
     eventContextOverrides: ctx.eventContextOverrides,
     getDomainForCalendar: ctx.getDomainForCalendar,
-  }), [tasks, events, routines, dateInstances, viewedDate, selectedAssignee,
+  }), [tasks, events, routines, dateInstances, viewedDate, selectedAssignee, hideRoutines,
       ctx.eventNotesMap, ctx.eventContextOverrides, ctx.getDomainForCalendar])
 
   const data = useTodayData(todayInput)
@@ -244,6 +261,28 @@ export function TodayView({
           clarityTrigger={clarityTrigger}
           weekTrigger={weekTrigger}
         />
+      </div>
+
+      {/* Filter row: assignee filter + routine show/hide toggle */}
+      <div className="flex items-center justify-end gap-2 mb-4">
+        {onSelectAssignee && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
+          <AssigneeFilter
+            selectedAssignees={selectedAssignee ? [selectedAssignee] : []}
+            onSelectAssignees={(ids) => onSelectAssignee(ids.length > 0 ? ids[0] : null)}
+            assigneesWithTasks={assigneesWithTasks ?? []}
+            hasUnassignedTasks={!!hasUnassignedTasks}
+          />
+        )}
+        <button
+          type="button"
+          onClick={toggleHideRoutines}
+          title={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
+          aria-label={hideRoutines ? 'Show daily' : 'Hide daily'}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm transition-all ${hideRoutines ? 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100' : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100'}`}
+        >
+          {createElement(hideRoutines ? EyeOff : Eye, { className: 'w-4 h-4' })}
+          <span>{hideRoutines ? 'Show daily' : 'Hide daily'}</span>
+        </button>
       </div>
 
       {/* Two-up: Focus card + Weather — only shown when there is something to focus on */}
