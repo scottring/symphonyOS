@@ -33,6 +33,7 @@ import { buildDayGrid, type DayGridTapTarget, type QuadrantContent } from './now
 import { WallQuadrantExpand } from './now/WallQuadrantExpand'
 import { buildTodayItems } from './today/todayItem'
 import { groupRoutineStepsByOwner } from './today/groupRoutineStepsByOwner'
+import { filterDailyRoutines } from './today/filterDailyRoutines'
 import { resolveNowFocus, type OverrideRef } from './nowFocus'
 import type { RhythmMode } from './rhythm/rhythmMode'
 import { useImminentEntity } from './now/useImminentEntity'
@@ -84,6 +85,16 @@ export function WallCalendar() {
   const [cameraEnabled, setCameraEnabled] = useState(() =>
     localStorage.getItem('wall-camera-enabled') !== 'false'
   )
+  const [hideDaily, setHideDaily] = useState(() =>
+    localStorage.getItem('wall-hide-daily') === 'true'
+  )
+  const toggleHideDaily = useCallback(() => {
+    setHideDaily(prev => {
+      const next = !prev
+      localStorage.setItem('wall-hide-daily', String(next))
+      return next
+    })
+  }, [])
 
   // ─── New layout state ───
   const rhythm = useWallRhythm()
@@ -129,6 +140,10 @@ export function WallCalendar() {
     [todayItems],
   )
   const discussItems = useMemo(() => todayItemsForList.filter(it => it.needsDiscussion), [todayItemsForList])
+  const visibleTodayItems = useMemo(
+    () => filterDailyRoutines(todayItemsForList, hideDaily),
+    [todayItemsForList, hideDaily],
+  )
   const upcomingDays = useMemo(() => wallData.days.filter(d => !d.isToday), [wallData.days])
 
   // Tasks for the imminent entity calculation
@@ -202,11 +217,11 @@ export function WallCalendar() {
   const dayGrid = useMemo(() => buildDayGrid({
     days: wallData.days,
     now: currentTime,
-    todayItems: todayItemsForList,
+    todayItems: visibleTodayItems,
     overdueTasks: wallData.overdueTasks,
     inboxCount: wallData.inboxCount,
     familyPrompt: promptDismissed ? null : prompt,
-  }), [wallData.days, wallData.overdueTasks, wallData.inboxCount, currentTime, todayItemsForList, promptDismissed, prompt])
+  }), [wallData.days, wallData.overdueTasks, wallData.inboxCount, currentTime, visibleTodayItems, promptDismissed, prompt])
 
   const [expandedQuadrant, setExpandedQuadrant] = useState<QuadrantContent | null>(null)
 
@@ -504,7 +519,7 @@ export function WallCalendar() {
           onQuadrantTap={handleQuadrantTap}
         />
         <WallRightColumn
-          todayItems={todayItemsForList}
+          todayItems={visibleTodayItems}
           discussItems={discussItems}
           upcomingDays={upcomingDays}
           members={wallData.familyMembers}
@@ -514,6 +529,8 @@ export function WallCalendar() {
           onTapEvent={handleTapEvent}
           onResolveDiscussion={handleResolveDiscussion}
           onTapUpcoming={(item) => setDetailItem(item)}
+          hideDaily={hideDaily}
+          onToggleHideDaily={toggleHideDaily}
         />
       </div>
 
