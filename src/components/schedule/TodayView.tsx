@@ -15,6 +15,7 @@ import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
 import type { TimelineCaptureResult } from '@/components/schedule/TimelineQuickInput'
 import type { ParserContext } from '@/lib/quickInputParser'
+import type { HomeViewType } from '@/types/homeView'
 
 import { useTodayData } from '@/hooks/useTodayData'
 import { useSystemHealth } from '@/hooks/useSystemHealth'
@@ -86,6 +87,9 @@ interface TodayViewProps {
   onAppendNoteAt?: (id: string, block: string, anchor: Date | null) => void
   onLinkNote?: (id: string) => void
   timelineNotes?: { id: string; title?: string; content: string; timelineAt?: Date }[]
+  // D/W/M view switcher — threaded from HomeView
+  currentHomeView?: HomeViewType
+  onHomeViewChange?: (view: HomeViewType) => void
 }
 
 // ─── Meal detection ────────────────────────────────────────────────────────────
@@ -122,6 +126,8 @@ export function TodayView({
   onAppendNoteAt: onAppendNoteAtProp,
   onLinkNote: onLinkNoteProp,
   timelineNotes: timelineNotesProp,
+  currentHomeView,
+  onHomeViewChange,
 }: TodayViewProps) {
   // ── Context ──────────────────────────────────────────────────────────────────
   const ctx = useScheduleActionsContext()
@@ -375,6 +381,8 @@ export function TodayView({
       <TodayHeader
         viewedDate={viewedDate}
         onDateChange={onDateChange}
+        currentHomeView={currentHomeView}
+        onHomeViewChange={onHomeViewChange}
       />
 
       {/* Stats + function bar — single consolidated row */}

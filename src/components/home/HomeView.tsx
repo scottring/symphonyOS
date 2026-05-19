@@ -8,7 +8,6 @@ import { useHomeView } from '@/hooks/useHomeView'
 import { useMobile } from '@/hooks/useMobile'
 import { useUndo } from '@/hooks/useUndo'
 import { useDomain, type Domain } from '@/hooks/useDomain'
-import { HomeViewSwitcher } from './HomeViewSwitcher'
 import { WeekView } from './WeekView'
 import { MonthView } from './MonthView'
 import { CascadingRiverView } from './CascadingRiverView'
@@ -295,6 +294,8 @@ export function HomeView({
         bothPanelsOpen={bothPanelsOpen}
         onClosePanel={() => onSelectItem(null)}
         onUpdateTasksBulk={handleUpdateTasksBulk}
+        currentHomeView={currentView}
+        onHomeViewChange={handleViewChange}
       />
     )
   }
@@ -312,10 +313,6 @@ export function HomeView({
       {!isMobile && (
         <div className="absolute top-4 right-6 z-20 flex items-center gap-3">
           <DomainSwitcher />
-          <HomeViewSwitcher
-            currentView={currentView}
-            onViewChange={handleViewChange}
-          />
         </div>
       )}
 

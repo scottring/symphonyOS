@@ -1,16 +1,20 @@
 import { ChevronLeft, ChevronRight, Sun } from 'lucide-react'
+import type { HomeViewType } from '@/types/homeView'
+import { HomeViewSwitcher } from '@/components/home/HomeViewSwitcher'
 
 interface TodayHeaderProps {
   viewedDate: Date
   onDateChange: (d: Date) => void
   onToggleWeather?: () => void
+  currentHomeView?: HomeViewType
+  onHomeViewChange?: (view: HomeViewType) => void
 }
 
 function shift(d: Date, days: number): Date {
   const n = new Date(d); n.setDate(n.getDate() + days); return n
 }
 
-export function TodayHeader({ viewedDate, onDateChange, onToggleWeather }: TodayHeaderProps) {
+export function TodayHeader({ viewedDate, onDateChange, onToggleWeather, currentHomeView, onHomeViewChange }: TodayHeaderProps) {
   const label = viewedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
   return (
     <header className="flex items-center justify-between gap-4 mb-6">
@@ -33,13 +37,14 @@ export function TodayHeader({ viewedDate, onDateChange, onToggleWeather }: Today
         <h1 className="font-display text-[32px] leading-tight text-neutral-900 truncate">{label}</h1>
       </div>
 
-      {/* Right: D/W/M segmented pill + sun toggle */}
+      {/* Right: real D/W/M switcher + sun toggle */}
       <div className="flex items-center gap-2 shrink-0">
-        <div className="inline-flex rounded-full bg-neutral-100 p-1">
-          <span className="bg-primary-600 text-white rounded-full px-4 py-1.5 text-sm font-medium">Day</span>
-          <span className="text-neutral-500 px-4 py-1.5 text-sm cursor-default">Week</span>
-          <span className="text-neutral-500 px-4 py-1.5 text-sm cursor-default">Month</span>
-        </div>
+        {currentHomeView !== undefined && onHomeViewChange !== undefined && (
+          <HomeViewSwitcher
+            currentView={currentHomeView}
+            onViewChange={onHomeViewChange}
+          />
+        )}
         <button
           aria-label="Toggle weather"
           onClick={onToggleWeather}
