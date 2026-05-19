@@ -17,6 +17,18 @@ vi.mock('@/hooks/useDomain.tsx', async (importOriginal) => {
   return { ...actual, useDomain: () => ({ currentDomain: 'universal', setDomain: vi.fn() }) }
 })
 
+// Mutable state for useTimelineInsert so individual tests can override noteComposer
+let mockNoteComposer: { anchor: Date | null } | null = null
+const mockCloseNoteComposer = vi.fn()
+const mockHandlePick = vi.fn()
+vi.mock('@/hooks/useTimelineInsert', () => ({
+  useTimelineInsert: () => ({
+    handlePick: mockHandlePick,
+    noteComposer: mockNoteComposer,
+    closeNoteComposer: mockCloseNoteComposer,
+  }),
+}))
+
 const ctxValue = { onToggleTask: vi.fn(), projects: [], contacts: [], familyMembers: [], lists: [] }
 
 function renderView(props: Record<string, unknown> = {}, ctxOverrides: Record<string, unknown> = {}) {
@@ -179,5 +191,23 @@ describe('TodayView', () => {
     )
     // TimelineInsertPoint renders a button with aria-label "Add between items"
     expect(screen.getAllByRole('button', { name: /add between items/i }).length).toBeGreaterThan(0)
+  })
+
+  it('renders TimelineNoteComposer when insert.noteComposer is set', () => {
+    // Activate the note composer by setting the module-level mock state
+    mockNoteComposer = { anchor: new Date('2026-05-19T10:00:00') }
+    try {
+      renderView({
+        onCreateNoteAt: vi.fn(),
+        onAppendNoteAt: vi.fn(),
+        onLinkNote: vi.fn(),
+        timelineNotes: [],
+      })
+      // TimelineNoteComposer renders "New note" / "Link existing" mode tabs
+      expect(screen.getByRole('button', { name: /new note/i })).toBeInTheDocument()
+    } finally {
+      // Reset so other tests are unaffected
+      mockNoteComposer = null
+    }
   })
 })

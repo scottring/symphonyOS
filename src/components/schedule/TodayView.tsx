@@ -42,6 +42,7 @@ import { EveningMealCard } from './EveningMealCard'
 import { ScheduleItem } from './ScheduleItem'
 import { OverdueSection } from './OverdueSection'
 import { EmailActionsBanner } from './EmailActionsBanner'
+import { TimelineNoteComposer } from './TimelineNoteComposer'
 
 import { useEmailActionItems } from '@/hooks/useEmailActionItems'
 
@@ -117,6 +118,10 @@ export function TodayView({
   hasUnassignedTasks,
   panelOpen,
   onClosePanel,
+  onCreateNoteAt: onCreateNoteAtProp,
+  onAppendNoteAt: onAppendNoteAtProp,
+  onLinkNote: onLinkNoteProp,
+  timelineNotes: timelineNotesProp,
 }: TodayViewProps) {
   // ── Context ──────────────────────────────────────────────────────────────────
   const ctx = useScheduleActionsContext()
@@ -195,6 +200,12 @@ export function TodayView({
   const onCreateTaskAt = ctx.onCreateTaskAt
   const onCreateEventAt = ctx.onCreateEventAt
   const onCreateRoutineAt = ctx.onCreateRoutineAt
+
+  // Note composer handlers: props take precedence, fall back to context (legacy prop??ctx pattern)
+  const onCreateNoteAt = onCreateNoteAtProp ?? ctx.onCreateNoteAt
+  const onAppendNoteAt = onAppendNoteAtProp ?? ctx.onAppendNoteAt
+  const onLinkNote = onLinkNoteProp ?? ctx.onLinkNote
+  const timelineNotes = timelineNotesProp ?? ctx.timelineNotes
 
   // ── Clarity label ─────────────────────────────────────────────────────────────
   const clarityLabel = (
@@ -653,6 +664,18 @@ export function TodayView({
       <div className="mt-6">
         <AiSuggestionBanner />
       </div>
+
+      {/* Timeline note composer (radial wheel → "Note" pick) */}
+      {insert.noteComposer && (
+        <TimelineNoteComposer
+          anchor={insert.noteComposer.anchor}
+          existingNotes={(timelineNotes ?? []).map(n => ({ id: n.id, title: n.title, content: n.content }))}
+          onCreateNew={(c, a) => onCreateNoteAt?.(c, a)}
+          onAppendExisting={(id, b, a) => onAppendNoteAt?.(id, b, a)}
+          onLinkExisting={(id) => onLinkNote?.(id)}
+          onClose={insert.closeNoteComposer}
+        />
+      )}
     </div>
   )
 }
