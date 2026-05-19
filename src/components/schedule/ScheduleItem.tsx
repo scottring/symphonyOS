@@ -145,6 +145,15 @@ interface ScheduleItemProps {
   onOpenGuidedChat?: (entityType: 'task' | 'contact' | 'project' | 'event', entityId: string, entityName: string, prompt?: string) => void
 }
 
+// Maps suggestion action types to ConceptIcon names (null = use text fallback)
+const ICON_CONCEPTS: Record<string, ConceptName | null> = {
+  call: 'call', text: 'discussion', email: 'email', open_link: null,
+  navigate: 'location', followup: null, guided_chat: 'discussion',
+  create_task: 'add', someday: 'time', stale: null, do_today: 'done',
+}
+
+const ICON_FALLBACKS: Record<string, string> = { open_link: '→', followup: '↻', stale: '?' }
+
 // Warm muted color tokens for overdue styling
 const overdueColors = {
   warning50: 'hsl(38 50% 96%)',
@@ -700,12 +709,6 @@ export const ScheduleItem = memo(function ScheduleItem({
         <ExpandingPanel open={isHovered && !isMobile} className="ml-[5.75rem]">
           <div className="flex gap-1.5 pt-1 pb-0.5 flex-wrap">
             {suggestions.map((s) => {
-              const iconConcepts: Record<string, ConceptName | null> = {
-                call: 'call', text: 'discussion', email: 'email', open_link: null,
-                navigate: 'location', followup: null, guided_chat: 'discussion',
-                create_task: 'add', someday: 'time', stale: null, do_today: 'done',
-              }
-              const iconFallbacks: Record<string, string> = { open_link: '→', followup: '↻', stale: '?' }
               const actionType = s.actionType || s.suggestionType
               return (
                 <button
@@ -765,7 +768,7 @@ export const ScheduleItem = memo(function ScheduleItem({
                   title={s.detail || s.title}
                   className="text-[10px] px-2 py-0.5 rounded-full border transition-colors bg-amber-50/80 border-amber-200/60 text-amber-700 hover:bg-amber-100 hover:border-amber-300"
                 >
-                  {(() => { const c = iconConcepts[actionType]; const fb = iconFallbacks[actionType]; return c ? <ConceptIcon name={c} decorative className="mr-0.5" /> : fb ? <span className="mr-0.5">{fb}</span> : <ConceptIcon name="ai" decorative className="mr-0.5" /> })()}
+                  {(() => { const c = ICON_CONCEPTS[actionType]; const fb = ICON_FALLBACKS[actionType]; return c ? <ConceptIcon name={c} decorative className="mr-0.5" /> : fb ? <span className="mr-0.5">{fb}</span> : <ConceptIcon name="ai" decorative className="mr-0.5" /> })()}
                   {s.title}
                 </button>
               )
