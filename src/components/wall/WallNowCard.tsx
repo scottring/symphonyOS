@@ -82,20 +82,42 @@ function renderModeContent(props: ModeContentProps) {
               {incomplete} step{incomplete !== 1 ? 's' : ''} left
             </h2>
             <div
-              className={`grid gap-x-10 gap-y-5 ${groups.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}
+              className={`grid gap-x-8 gap-y-5 ${groups.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}
             >
-              {groups.map(group => (
-                <div key={group.ownerId ?? 'anyone'}>
-                  <div className="text-xs uppercase tracking-widest text-white/40 mb-2">
-                    {group.label}
+              {groups.map(group => {
+                const done = group.steps.filter(s => s.completed).length
+                return (
+                  <div key={group.ownerId ?? 'anyone'} className="flex gap-3 min-w-0">
+                    <div
+                      className="w-1 rounded-full shrink-0"
+                      style={{ background: group.color ?? 'rgba(255,255,255,0.2)' }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        {group.initials && (
+                          <span
+                            className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                            style={{ background: group.color ?? 'rgba(255,255,255,0.25)' }}
+                          >
+                            {group.initials}
+                          </span>
+                        )}
+                        <span className="text-sm font-semibold tracking-wide text-white/90 truncate">
+                          {group.label}
+                        </span>
+                        <span className="ml-auto text-[11px] font-semibold tracking-widest text-white/45 shrink-0">
+                          {done}/{group.steps.length}
+                        </span>
+                      </div>
+                      <ul className="space-y-2">
+                        {group.steps.map(step => (
+                          <RoutineStepRow key={step.id} step={step} onCheckItem={props.onCheckItem} />
+                        ))}
+                      </ul>
+                    </div>
                   </div>
-                  <ul className="space-y-2">
-                    {group.steps.map(step => (
-                      <RoutineStepRow key={step.id} step={step} onCheckItem={props.onCheckItem} />
-                    ))}
-                  </ul>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </>
         )

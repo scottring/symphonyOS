@@ -173,10 +173,10 @@ describe('WallNowCard', () => {
         onPinToggle={() => {}}
         familyPrompt={null}
         routineGroups={[
-          { ownerId: 'k', label: 'Kaleb', steps: [
+          { ownerId: 'k', label: 'Kaleb', color: '#F59E0B', initials: 'KA', steps: [
             { id: 'k1', kind: 'routine-step', title: 'K dressed', completed: false, ownerId: 'k', startTime: new Date(), sourceId: 'k1' },
           ] },
-          { ownerId: 'e', label: 'Ella', steps: [
+          { ownerId: 'e', label: 'Ella', color: '#10B981', initials: 'EL', steps: [
             { id: 'e1', kind: 'routine-step', title: 'E dressed', completed: false, ownerId: 'e', startTime: new Date(), sourceId: 'e1' },
           ] },
         ]}
@@ -198,7 +198,7 @@ describe('WallNowCard', () => {
         familyPrompt={null}
         onCheckItem={onCheckItem}
         routineGroups={[
-          { ownerId: 'k', label: 'Kaleb', steps: [
+          { ownerId: 'k', label: 'Kaleb', color: '#F59E0B', initials: 'KA', steps: [
             { id: 'k1', kind: 'routine-step', title: 'K dressed', completed: false, ownerId: 'k', startTime: new Date(), sourceId: 'k1' },
           ] },
         ]}
@@ -206,6 +206,45 @@ describe('WallNowCard', () => {
     )
     fireEvent.click(screen.getByRole('button', { name: /check k dressed/i }))
     expect(onCheckItem).toHaveBeenCalledWith('k1', true)
+  })
+
+  it('renders a swimlane per child with avatar initials and done/total progress', () => {
+    render(
+      <WallNowCard
+        focus={{ kind: 'mode-default', mode: 'morning' }}
+        pinned={false}
+        onPinToggle={() => {}}
+        familyPrompt={null}
+        routineGroups={[
+          { ownerId: 'k', label: 'Kaleb', color: '#F59E0B', initials: 'KA', steps: [
+            { id: 'k1', kind: 'routine-step', title: 'K dressed', completed: true, ownerId: 'k', startTime: new Date(), sourceId: 'k1' },
+            { id: 'k2', kind: 'routine-step', title: 'K teeth', completed: false, ownerId: 'k', startTime: new Date(), sourceId: 'k2' },
+          ] },
+        ]}
+      />
+    )
+    expect(screen.getByText('KA')).toBeInTheDocument()
+    expect(screen.getByText('Kaleb')).toBeInTheDocument()
+    expect(screen.getByText('1/2')).toBeInTheDocument()
+  })
+
+  it('renders the "Anyone" group without an avatar/initials chip', () => {
+    render(
+      <WallNowCard
+        focus={{ kind: 'mode-default', mode: 'bedtime' }}
+        pinned={false}
+        onPinToggle={() => {}}
+        familyPrompt={null}
+        routineGroups={[
+          { ownerId: null, label: 'Anyone', color: null, initials: null, steps: [
+            { id: 'a1', kind: 'routine-step', title: 'Lock door', completed: false, ownerId: null, startTime: new Date(), sourceId: 'a1' },
+          ] },
+        ]}
+      />
+    )
+    expect(screen.getByText('Anyone')).toBeInTheDocument()
+    expect(screen.getByText('Lock door')).toBeInTheDocument()
+    expect(screen.getByText('0/1')).toBeInTheDocument()
   })
 
   it('falls back to the flat routine list when no routineGroups supplied', () => {
