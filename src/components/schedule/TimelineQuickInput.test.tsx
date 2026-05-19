@@ -18,6 +18,17 @@ describe('TimelineQuickInput', () => {
     fireEvent.keyDown(inp, { key: 'Enter' })
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ title: 'Call vet', scheduledFor: anchor }))
   })
+  it('a typed date overrides the anchor time', () => {
+    const onSubmit = vi.fn()
+    render(<TimelineQuickInput kind="task" anchorTime={new Date(2026,4,19,18,15)} parserContext={{ projects:[], contacts:[], familyMembers:[] }} currentDomain="universal" onSubmit={onSubmit} onCancel={vi.fn()} />)
+    const inp = screen.getByPlaceholderText(/new task ·/i)
+    fireEvent.change(inp, { target: { value: 'Call vet tomorrow' } })
+    fireEvent.keyDown(inp, { key: 'Enter' })
+    const r = onSubmit.mock.calls[0][0]
+    expect(r.scheduledFor).toBeInstanceOf(Date)
+    // parsed "tomorrow" must NOT equal the anchor (different day)
+    expect(r.scheduledFor.getTime()).not.toBe(new Date(2026,4,19,18,15).getTime())
+  })
   it('empty Enter does nothing; Esc cancels', () => {
     const onSubmit = vi.fn(); const onCancel = vi.fn()
     render(<TimelineQuickInput kind="event" anchorTime={anchor} parserContext={pc} currentDomain="universal" onSubmit={onSubmit} onCancel={onCancel} />)

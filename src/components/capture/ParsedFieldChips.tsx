@@ -78,6 +78,7 @@ export function ParsedFieldChips({
             {projectName}
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={onClearProject}
               aria-label="Clear project"
               className="ml-1 text-blue-400 hover:text-blue-600"
@@ -98,6 +99,7 @@ export function ParsedFieldChips({
             {formatDate(parsed.dueDate)}
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={onClearDate}
               aria-label="Clear date"
               className="ml-1 text-primary-400 hover:text-primary-600"
@@ -116,6 +118,7 @@ export function ParsedFieldChips({
             {contactName}
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={onClearContact}
               aria-label="Clear contact"
               className="ml-1 text-amber-400 hover:text-amber-600"
@@ -139,6 +142,7 @@ export function ParsedFieldChips({
             {parsed.category.charAt(0).toUpperCase() + parsed.category.slice(1)}
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={onClearCategory}
               aria-label="Clear category"
               className="ml-1 text-purple-400 hover:text-purple-600"
@@ -163,6 +167,7 @@ export function ParsedFieldChips({
             {parsed.context.charAt(0).toUpperCase() + parsed.context.slice(1)}
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={onClearContext}
               aria-label="Clear context"
               className={`ml-1 ${
