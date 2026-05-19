@@ -1385,7 +1385,6 @@ export function TodaySchedule({
                     key={`note-${n.id}`}
                     title={n.title || n.content.slice(0, 40)}
                     timeLabel={n.timelineAt ? formatTime(n.timelineAt) : undefined}
-                    onOpen={() => {}}
                   />
                 ))}
                 {items.map((item, itemIndex) => {

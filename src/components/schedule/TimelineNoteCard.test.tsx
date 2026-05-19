@@ -1,12 +1,11 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@/test/test-utils'
+import { describe, it, expect } from 'vitest'
+import { render, screen } from '@/test/test-utils'
 import { TimelineNoteCard } from './TimelineNoteCard'
 
-it('renders note title, no checkbox, opens on click', () => {
-  const onOpen = vi.fn()
-  render(<TimelineNoteCard title="Sprinklers" timeLabel="6:15" onOpen={onOpen} />)
+it('renders note title and time label; is not a button and has no click-to-open', () => {
+  render(<TimelineNoteCard title="Sprinklers" timeLabel="6:15" />)
   expect(screen.getByText('Sprinklers')).toBeInTheDocument()
+  expect(screen.getByText('6:15')).toBeInTheDocument()
+  expect(screen.queryByRole('button')).not.toBeInTheDocument()
   expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
-  fireEvent.click(screen.getByText('Sprinklers'))
-  expect(onOpen).toHaveBeenCalled()
 })

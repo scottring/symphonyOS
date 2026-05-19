@@ -77,7 +77,6 @@ export function TimelineNoteComposer({ anchor, existingNotes, onCreateNew, onApp
                   >
                     Append
                   </button>
-                  <button onClick={() => { onLinkExisting(selId); onClose() }}>Link only</button>
                 </div>
               </>
             )}
