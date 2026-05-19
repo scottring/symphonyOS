@@ -1260,6 +1260,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     onCreateNoteAt: async (c: string, a: Date | null) => {
       const note = await addNote({ content: c, type: 'general', timelineAt: a ?? undefined, context: currentDomain !== 'universal' ? currentDomain : undefined })
       if (note) setTlUndo({ message: `Note added · ${fmtT(a)}`, onUndo: () => { void deleteNote(note.id) } })
+      else showToast("Couldn't add note", 'warning')
     },
     onAppendNoteAt: appendToNote,
     onLinkNote: () => {}, // Phase 1: no generic note→timeline link helper; append covers the primary use
@@ -1753,7 +1754,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
           currentUserMemberId={getCurrentUserMember()?.id}
           bothPanelsOpen={(selectedItemId !== null || recipeUrl !== null) && chatOpen}
           isConnected={isConnected}
-          scheduleActionsValue={scheduleActionsValue as unknown as ScheduleActionsValue}
+          scheduleActionsValue={scheduleActionsValue}
           meetingNotes={meetingNotes}
           planningOpen={planningOpen}
           onClosePlanning={() => setPlanningOpen(false)}
