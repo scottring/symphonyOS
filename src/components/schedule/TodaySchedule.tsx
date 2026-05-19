@@ -22,7 +22,6 @@ import { StagingFloat } from './StagingFloat'
 import { TodayAddInput } from './TodayAddInput'
 import { OverdueSection } from './OverdueSection'
 import { EmailActionsBanner } from './EmailActionsBanner'
-import { KidRoutineSummaryCard } from './KidRoutineSummaryCard'
 // import { DailyBriefing } from './DailyBriefing'
 // import { ProactiveSuggestionChips } from './ProactiveSuggestionChips'
 import { useProactiveSuggestions } from '@/hooks/useProactiveSuggestions'
@@ -1310,15 +1309,8 @@ export function TodaySchedule({
 
           {sections.map((section) => {
             const items = grouped[section]
-            const showKidSummary = isToday && (section === 'morning' || section === 'evening')
             return (
-              <TimeGroup key={section} section={section} isEmpty={items.length === 0 && !showKidSummary}>
-                {showKidSummary && (
-                  <KidRoutineSummaryCard
-                    section={section as 'morning' | 'evening'}
-                    familyMembers={familyMembers}
-                  />
-                )}
+              <TimeGroup key={section} section={section} isEmpty={items.length === 0}>
                 {items.map((item, itemIndex) => {
                   // Time deduplication: hide time if same as previous item
                   const timeKey = item.startTime ? `${item.startTime.getHours()}:${item.startTime.getMinutes()}` : item.allDay ? 'allday' : ''
