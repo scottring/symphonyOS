@@ -24,6 +24,7 @@ import { useRecurringEventDetection } from '@/hooks/useRecurringEventDetection'
 
 import { TodayHeader } from './TodayHeader'
 import { StatsRow } from './StatsRow'
+import { ClarityIndicator } from './ClarityIndicator'
 import { TodaysFocusCard } from './TodaysFocusCard'
 import { WeatherCard } from './WeatherCard'
 import { AiSuggestionBanner } from './AiSuggestionBanner'
@@ -140,6 +141,17 @@ export function TodayView({
     { excellent: 'Excellent', good: 'Good', fair: 'Fair', needsAttention: 'Needs attention' } as const
   )[health.healthColor]
 
+  const clarityTrigger = (
+    <ClarityIndicator
+      tasks={tasks}
+      projects={projects ?? []}
+      familyMembers={familyMembers}
+      onOpenProject={ctx.onOpenProject}
+      onAssignTaskAll={ctx.onAssignTaskAll}
+      trigger={<span className="cursor-pointer">Clarity <span className="text-neutral-400">{clarityLabel}</span></span>}
+    />
+  )
+
   // ── Focus card counts ─────────────────────────────────────────────────────────
   const { focusPriorities, focusMeals, focusEvents } = useMemo(() => {
     const allItems = Object.values(data.grouped).flat()
@@ -210,6 +222,7 @@ export function TodayView({
           total={tasks.filter((t) => !t.completed).length}
           clarityLabel={clarityLabel}
           aiAvailable={false}
+          clarityTrigger={clarityTrigger}
         />
       </div>
 

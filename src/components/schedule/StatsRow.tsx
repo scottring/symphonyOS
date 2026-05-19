@@ -8,13 +8,14 @@ interface StatsRowProps {
   total: number
   clarityLabel: string
   aiAvailable: boolean
+  clarityTrigger?: React.ReactNode
 }
 
 function plural(n: number) {
   return n === 1 ? 'task' : 'tasks'
 }
 
-export function StatsRow({ dueToday, doneToday, thisWeek, total, clarityLabel, aiAvailable }: StatsRowProps) {
+export function StatsRow({ dueToday, doneToday, thisWeek, total, clarityLabel, aiAvailable, clarityTrigger }: StatsRowProps) {
   return (
     <div className="flex items-center flex-wrap gap-x-6 gap-y-2 text-[13px] text-neutral-500">
       <span className="inline-flex items-center gap-1.5">
@@ -31,8 +32,12 @@ export function StatsRow({ dueToday, doneToday, thisWeek, total, clarityLabel, a
       </span>
       <span className="inline-flex items-center gap-1.5">
         <Sparkles className="w-4 h-4 text-amber-400" />
-        <span className="text-neutral-600 font-medium">Clarity</span>
-        <span className="text-neutral-400">{clarityLabel}</span>
+        {clarityTrigger ?? (
+          <>
+            <span className="text-neutral-600 font-medium">Clarity</span>
+            <span className="text-neutral-400">{clarityLabel}</span>
+          </>
+        )}
       </span>
       <span className="inline-flex items-center gap-1.5">
         <span className={`w-2 h-2 rounded-full ${aiAvailable ? 'bg-primary-500' : 'bg-neutral-300'}`} />
