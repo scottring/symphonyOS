@@ -173,18 +173,17 @@ export function ViewRouter(props: ViewRouterProps) {
             />
           ) : (
             <>
-              {!props.isConnected && (
-                <div className="p-4 border-b border-neutral-100 shrink-0">
-                  <Suspense fallback={<LoadingFallback />}>
-                    <CalendarConnect />
-                  </Suspense>
-                </div>
-              )}
-
               <ScheduleActionsProvider value={props.scheduleActionsValue}>
                 <div className="px-4 pt-2 shrink-0">
                   <ActionQueueBar />
                 </div>
+                {!props.isConnected && (
+                  <div className="px-4 pt-1 shrink-0">
+                    <Suspense fallback={<LoadingFallback />}>
+                      <CalendarConnect />
+                    </Suspense>
+                  </div>
+                )}
                 <HomeView
                   tasks={props.tasks}
                   events={props.filteredEvents}

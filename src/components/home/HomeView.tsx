@@ -12,7 +12,7 @@ import { HomeViewSwitcher } from './HomeViewSwitcher'
 import { WeekView } from './WeekView'
 import { MonthView } from './MonthView'
 import { CascadingRiverView } from './CascadingRiverView'
-import { TodaySchedule } from '@/components/schedule/TodaySchedule'
+import { TodayView } from '@/components/schedule/TodayView'
 import { UndoToast } from '@/components/undo/UndoToast'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
 
@@ -271,9 +271,9 @@ export function HomeView({
       )
     }
 
-    // Today view uses TodaySchedule — it reads most props from context
+    // Today view uses TodayView — it reads most props from context
     return (
-      <TodaySchedule
+      <TodayView
         tasks={filteredTasks}
         events={filteredEvents}
         routines={filteredRoutines}
