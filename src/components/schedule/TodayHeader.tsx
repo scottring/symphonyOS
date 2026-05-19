@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Sun } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { HomeViewType } from '@/types/homeView'
 import { HomeViewSwitcher } from '@/components/home/HomeViewSwitcher'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
@@ -15,7 +15,7 @@ function shift(d: Date, days: number): Date {
   const n = new Date(d); n.setDate(n.getDate() + days); return n
 }
 
-export function TodayHeader({ viewedDate, onDateChange, onToggleWeather, currentHomeView, onHomeViewChange }: TodayHeaderProps) {
+export function TodayHeader({ viewedDate, onDateChange, currentHomeView, onHomeViewChange }: TodayHeaderProps) {
   const label = viewedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
   return (
     <header className="flex items-center justify-between gap-4 mb-6">
@@ -47,13 +47,6 @@ export function TodayHeader({ viewedDate, onDateChange, onToggleWeather, current
             onViewChange={onHomeViewChange}
           />
         )}
-        <button
-          aria-label="Toggle weather"
-          onClick={onToggleWeather}
-          className="w-9 h-9 rounded-full border border-neutral-200 grid place-items-center text-amber-400 hover:bg-amber-50 transition-colors"
-        >
-          <Sun className="w-4 h-4" />
-        </button>
       </div>
     </header>
   )
