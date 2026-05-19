@@ -7,13 +7,15 @@ import { formatTime, formatTimeRange, inferMealTime } from '@/lib/timeUtils'
 import { getProjectColor } from '@/lib/projectUtils'
 import { PushDropdown, SchedulePopover, ContextPicker, DiscussionPicker, type ScheduleContextItem } from '@/components/triage'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
-import { Redo2, Video } from 'lucide-react'
+import { Redo2, Video, FileText } from 'lucide-react'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useMobile } from '@/hooks/useMobile'
 import { TaskCheckbox } from './TaskCheckbox'
 import { PromoteToProjectButton } from './PromoteToProjectButton'
 import { ExpandingPanel } from './ExpandingPanel'
 import { DOMAIN_COLORS } from '@/lib/domainColors'
+import { categoryIcon } from '@/lib/categoryIcon'
+import { initialsFor } from '@/lib/initials'
 
 // Nordic Journal calendar icon - minimal, elegant design
 // Uses the event's context color (Work/Family/Personal) or falls back to primary teal-forest
@@ -301,6 +303,17 @@ export const ScheduleItem = memo(function ScheduleItem({
   // Get project color for left edge indicator
   const projectColor = projectId ? getProjectColor(projectId) : null
 
+  const isScheduledToday = (() => {
+    if (!item.startTime) return false
+    const d = new Date(item.startTime)
+    const n = new Date()
+    return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate()
+  })()
+  const hasNotes = typeof item.notes === 'string' && item.notes.trim().length > 0
+  const resolvedAssigneeId = assignedTo ?? item.assignedTo ?? null
+  const assigneeName = resolvedAssigneeId ? familyMembers.find(m => m.id === resolvedAssigneeId)?.name ?? '' : ''
+  const { Icon: CategoryGlyph, tint: categoryTint } = categoryIcon(item.category)
+
   return (
     <div
       data-selectable
@@ -474,16 +487,14 @@ export const ScheduleItem = memo(function ScheduleItem({
                 🔥 {routineStreak}
               </span>
             )}
-            {/* Category chip - only show for non-task categories */}
-            {item.category && item.category !== 'task' && (
-              <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded text-xs font-medium">
-                {item.category === 'errand' && '🚗'}
-                {item.category === 'chore' && '🧹'}
-                {item.category === 'event' && '📅'}
-                {item.category === 'activity' && '⚽'}
-                <span className="hidden sm:inline">{item.category}</span>
-              </span>
-            )}
+            {/* Category icon tile (lucide, no emoji) */}
+            <span
+              className={`shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-lg ${categoryTint}`}
+              title={item.category ?? 'task'}
+              aria-hidden="true"
+            >
+              <CategoryGlyph className="w-3.5 h-3.5" />
+            </span>
             {/* Coaching sparkle indicator */}
             {hasCoaching && (
               <span className="shrink-0 text-amber-400 opacity-60" title="Coaching tips available">
@@ -499,6 +510,16 @@ export const ScheduleItem = memo(function ScheduleItem({
                   <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
                 </svg>
                 {item.subtaskCompletedCount}/{item.subtaskCount}
+              </span>
+            )}
+            {isScheduledToday && (
+              <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full bg-primary-50 text-primary-600 text-[11px] font-medium">
+                Today
+              </span>
+            )}
+            {hasNotes && (
+              <span className="shrink-0 text-neutral-400" aria-label="Has notes" title="Has notes">
+                <FileText className="w-3.5 h-3.5" />
               </span>
             )}
           </div>
@@ -629,6 +650,14 @@ export const ScheduleItem = memo(function ScheduleItem({
                 size="sm"
               />
             </div>
+          )}
+          {assigneeName && (
+            <span
+              className="shrink-0 ml-0.5 inline-flex items-center justify-center w-6 h-6 rounded-full bg-neutral-100 text-neutral-600 text-[10px] font-semibold"
+              title={assigneeName}
+            >
+              {initialsFor(assigneeName)}
+            </span>
           )}
         </div>
       </div>
