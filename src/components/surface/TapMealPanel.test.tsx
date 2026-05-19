@@ -11,7 +11,7 @@ vi.mock('@/hooks/useMealPlan', () => ({
     plan: {
       id: 'mp1',
       entries: [
-        { id: 'entry1', dayOfWeek: 2, slot: 'dinner', adHocTitle: 'Pasta e fagioli + salad' },
+        { id: 'entry1', dayOfWeek: 2, slot: 'dinner', recipeId: 'r1', adHocTitle: 'Pasta e fagioli + salad' },
       ],
     },
     addMeal,
@@ -25,7 +25,14 @@ vi.mock('@/hooks/useMealPlan', () => ({
   }),
 }))
 vi.mock('@/hooks/useRecipes', () => ({
-  useRecipes: () => ({ recipes: [{ id: 'r1', title: 'Skillet Lasagna', sourceUrl: 'https://x.test/l' }] }),
+  useRecipes: () => ({
+    recipes: [{
+      id: 'r1',
+      title: 'Skillet Lasagna',
+      sourceUrl: 'https://x.test/l',
+      ingredients: ['pasta', 'tomatoes', 'cheese'],
+    }],
+  }),
 }))
 vi.mock('@/hooks/useFamilyMembers', () => ({
   useFamilyMembers: () => ({ members: [] }),
@@ -41,13 +48,14 @@ const mealEvent = {
 describe('TapMealPanel', () => {
   beforeEach(() => { removeMeal.mockClear(); addMeal.mockClear() })
 
-  it('renders the meal title and the ad-hoc text (not generic event chrome)', () => {
+  it('renders the meal title and recipe info (not generic event chrome)', () => {
     render(<TapMealPanel event={mealEvent} onClose={vi.fn()} />)
-    // The ad-hoc text shows in the Recipe section (exact, distinct from the
-    // "Dinner · …" header title)
-    expect(screen.getByText('Pasta e fagioli + salad')).toBeInTheDocument()
-    expect(screen.getByText('Recipe')).toBeInTheDocument()
+    // The event title shows in the header
+    expect(screen.getByText('Dinner · Pasta e fagioli + salad')).toBeInTheDocument()
+    // The WHY section surfaces the recipe title via PanelWhy notes prop
+    expect(screen.getByText('Recipe: Skillet Lasagna')).toBeInTheDocument()
     // Generic event panel labels must NOT appear for a meal
+    // (What to bring only renders when entry.notes has text or onChange is provided)
     expect(screen.queryByText('What to bring')).not.toBeInTheDocument()
   })
 
@@ -61,8 +69,20 @@ describe('TapMealPanel', () => {
   it('removes the meal from the plan and closes', async () => {
     const onClose = vi.fn()
     render(<TapMealPanel event={mealEvent} onClose={onClose} />)
-    fireEvent.click(screen.getByRole('button', { name: /remove from plan/i }))
+    // Delete path: More actions menu → Delete → Confirm delete
+    fireEvent.click(screen.getByRole('button', { name: /more actions/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /confirm delete/i }))
     await vi.waitFor(() => expect(removeMeal).toHaveBeenCalledWith('entry1'))
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('renders ABOUT, INGREDIENTS, LINKS & FILES, CREATED sections for a recipe-backed meal', async () => {
+    // reuses the file's existing mock harness (recipe with ingredients + sourceUrl)
+    render(<TapMealPanel event={mealEvent} onClose={vi.fn()} />)
+    expect(await screen.findByText(/ingredients/i)).toBeInTheDocument()
+    expect(screen.getByText('pasta')).toBeInTheDocument()           // an ingredient from the mock
+    expect(screen.getByText(/^links$/i)).toBeInTheDocument()         // PanelLinks eyebrow (recipe.sourceUrl present)
+    expect(screen.getByText(/created/i)).toBeInTheDocument()         // PanelFooter
   })
 })

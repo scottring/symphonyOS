@@ -2,6 +2,11 @@ import { useState, useCallback, useMemo } from 'react'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { PanelHeader } from './sections/PanelHeader'
 import { PanelMetaRow } from './sections/PanelMetaRow'
+import { PanelActions } from './sections/PanelActions'
+import { PanelWhy } from './sections/PanelWhy'
+import { PanelWhatToBring } from './sections/PanelWhatToBring'
+import { PanelIngredients } from './sections/PanelIngredients'
+import { PanelLinks } from './sections/PanelLinks'
 import { PanelFooter } from './sections/PanelFooter'
 import { sundayOfWeek } from '@/lib/weekHelpers'
 import { useMealPlan } from '@/hooks/useMealPlan'
@@ -72,44 +77,30 @@ export function TapMealPanel({ event, onClose }: TapMealPanelProps) {
       />
       <PanelMetaRow bucket={formatTime(startIso)} />
 
-      <section className="py-4 mb-4 border-b border-neutral-200">
-        <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">
-          Recipe
-        </div>
-        {recipe ? (
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-sm text-neutral-800">{recipe.title}</span>
-            {recipe.sourceUrl && (
-              <a
-                href={recipe.sourceUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs px-2.5 py-1 rounded-md bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
-              >
-                Open recipe ↗
-              </a>
-            )}
-          </div>
-        ) : (
-          <div className="text-sm text-neutral-600">
-            {entry?.adHocTitle || 'No recipe linked'}
-          </div>
-        )}
-        <div className="flex gap-2 mt-3">
-          <button
-            onClick={() => setPickerOpen(true)}
-            className="text-xs px-3 py-1.5 rounded-lg font-medium bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
-          >
-            Change recipe
-          </button>
-          <button
-            onClick={handleRemove}
-            className="text-xs px-3 py-1.5 rounded-lg font-medium bg-neutral-100 text-neutral-600 hover:bg-rose-50 hover:text-rose-600 transition-colors"
-          >
-            Remove from plan
-          </button>
-        </div>
-      </section>
+      <PanelActions
+        completed={false}
+        scheduledFor={startIso ? new Date(startIso) : undefined}
+        isAllDay={false}
+        isPinned={false}
+        onToggleComplete={() => { /* meals have no complete path here (spec §6/§11) — inert */ }}
+        onSchedule={() => { /* meal time derives from the plan slot; reschedule via Change recipe */ }}
+        onTogglePin={() => { /* meals are not pinnable */ }}
+        onDelete={handleRemove}
+      />
+      <button
+        onClick={() => setPickerOpen(true)}
+        className="text-xs px-3 py-1.5 rounded-lg font-medium bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors mb-4"
+      >
+        Change recipe
+      </button>
+      <PanelWhy
+        key={entry?.id ?? event.id}
+        notes={recipe?.title ? `Recipe: ${recipe.title}` : entry?.adHocTitle}
+        onChange={() => { /* ABOUT derives from the recipe; read-only here */ }}
+      />
+      <PanelWhatToBring notes={entry?.notes} />
+      <PanelIngredients ingredients={recipe?.ingredients} />
+      <PanelLinks links={recipe?.sourceUrl ? [{ url: recipe.sourceUrl, title: recipe.title }] : undefined} />
 
       <PanelFooter
         createdAt={baseDate}
