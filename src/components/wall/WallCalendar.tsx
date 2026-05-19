@@ -31,6 +31,7 @@ import { WallRightColumn } from './WallRightColumn'
 import { buildDayGrid, type DayGridTapTarget, type QuadrantContent } from './now/buildDayGrid'
 import { WallQuadrantExpand } from './now/WallQuadrantExpand'
 import { buildTodayItems } from './today/todayItem'
+import { groupRoutineStepsByOwner } from './today/groupRoutineStepsByOwner'
 import { resolveNowFocus, type OverrideRef } from './nowFocus'
 import type { RhythmMode } from './rhythm/rhythmMode'
 import { useImminentEntity } from './now/useImminentEntity'
@@ -178,6 +179,11 @@ export function WallCalendar() {
         : rhythm.mode
     return m === 'morning' ? morningRoutineSteps : m === 'bedtime' ? bedtimeRoutineSteps : []
   }, [focus, rhythm.mode, morningRoutineSteps, bedtimeRoutineSteps])
+
+  const routineGroups = useMemo(
+    () => groupRoutineStepsByOwner(activeRoutineSteps, wallData.familyMembers),
+    [activeRoutineSteps, wallData.familyMembers],
+  )
 
   // ─── Now Card data: tomorrow first item ───
   const tomorrowPreview = useMemo(() => {
@@ -485,6 +491,7 @@ export function WallCalendar() {
           familyPrompt={promptDismissed ? null : prompt}
           todayItems={todayItemsForList}
           routineSteps={activeRoutineSteps}
+          routineGroups={routineGroups}
           dinnerPlanTitle={dinnerEvent ? (extractRecipeNameHint(dinnerEvent.title) || dinnerEvent.title) : null}
           tomorrowPreview={tomorrowPreview}
           onCheckItem={handleCheckItem}

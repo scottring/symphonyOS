@@ -2,6 +2,7 @@ import { Pin } from 'lucide-react'
 import { RHYTHM_MODE_LABELS, type RhythmMode } from './rhythm/rhythmMode'
 import type { NowFocus } from './nowFocus'
 import type { TodayItem } from './today/todayItem'
+import type { RoutineGroup } from './today/groupRoutineStepsByOwner'
 import { WallNowGrid } from './now/WallNowGrid'
 import type { DayGridData, DayGridTapTarget } from './now/buildDayGrid'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
@@ -17,12 +18,41 @@ function formatRowTime(d: Date): string {
   return m === 0 ? `${dispH}${period}` : `${dispH}:${m.toString().padStart(2, '0')}${period}`
 }
 
+function RoutineStepRow({
+  step,
+  onCheckItem,
+}: {
+  step: TodayItem
+  onCheckItem?: (id: string, completed: boolean) => void
+}) {
+  return (
+    <li className="flex items-center gap-3 text-base">
+      <button
+        type="button"
+        aria-label={`Check ${step.title}`}
+        onClick={() => onCheckItem?.(step.id, !step.completed)}
+        className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-colors shrink-0 ${
+          step.completed
+            ? 'bg-emerald-700 border-emerald-700'
+            : 'border-white/30 hover:border-white/60'
+        }`}
+      >
+        {step.completed && <span className="text-white">✓</span>}
+      </button>
+      <span className={step.completed ? 'text-white/50 line-through' : 'text-white/90'}>
+        {step.title}
+      </span>
+    </li>
+  )
+}
+
 // ─── mode content renderers ───────────────────────────────────────
 
 interface ModeContentProps {
   mode: RhythmMode
   todayItems?: TodayItem[]
   routineSteps?: TodayItem[]
+  routineGroups?: RoutineGroup[]
   dinnerPlanTitle?: string | null
   tomorrowPreview?: { title: string; startTime: Date | null } | null
   familyPrompt: string | null
@@ -35,9 +65,44 @@ function renderModeContent(props: ModeContentProps) {
   switch (mode) {
     case 'morning':
     case 'bedtime': {
+      const label = mode === 'morning' ? 'Morning routine' : 'Bedtime routine'
+      const groups = props.routineGroups ?? []
+      // Grouped-by-child view: each child's routine as its own labeled
+      // section, so two kids' identically-named steps no longer read as
+      // duplicates. Falls back to the flat list when no groups are supplied.
+      if (groups.length > 0) {
+        const incomplete = groups.reduce(
+          (n, g) => n + g.steps.filter(s => !s.completed).length,
+          0,
+        )
+        return (
+          <>
+            <div className="text-xs uppercase tracking-widest text-white/60">{label}</div>
+            <h2 className="font-display text-2xl font-semibold mt-1 mb-4">
+              {incomplete} step{incomplete !== 1 ? 's' : ''} left
+            </h2>
+            <div
+              className={`grid gap-x-10 gap-y-5 ${groups.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}
+            >
+              {groups.map(group => (
+                <div key={group.ownerId ?? 'anyone'}>
+                  <div className="text-xs uppercase tracking-widest text-white/40 mb-2">
+                    {group.label}
+                  </div>
+                  <ul className="space-y-2">
+                    {group.steps.map(step => (
+                      <RoutineStepRow key={step.id} step={step} onCheckItem={props.onCheckItem} />
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </>
+        )
+      }
+
       const steps = (props.routineSteps ?? []).slice(0, 8)
       const incomplete = steps.filter(s => !s.completed)
-      const label = mode === 'morning' ? 'Morning routine' : 'Bedtime routine'
       return (
         <>
           <div className="text-xs uppercase tracking-widest text-white/60">{label}</div>
@@ -49,23 +114,7 @@ function renderModeContent(props: ModeContentProps) {
           ) : (
             <ul className="space-y-2">
               {steps.map(step => (
-                <li key={step.id} className="flex items-center gap-3 text-base">
-                  <button
-                    type="button"
-                    aria-label={`Check ${step.title}`}
-                    onClick={() => props.onCheckItem?.(step.id, !step.completed)}
-                    className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-colors shrink-0 ${
-                      step.completed
-                        ? 'bg-emerald-700 border-emerald-700'
-                        : 'border-white/30 hover:border-white/60'
-                    }`}
-                  >
-                    {step.completed && <span className="text-white">✓</span>}
-                  </button>
-                  <span className={step.completed ? 'text-white/50 line-through' : 'text-white/90'}>
-                    {step.title}
-                  </span>
-                </li>
+                <RoutineStepRow key={step.id} step={step} onCheckItem={props.onCheckItem} />
               ))}
             </ul>
           )}
@@ -146,6 +195,7 @@ interface WallNowCardProps {
   // data for mode-specific rendering
   todayItems?: TodayItem[]
   routineSteps?: TodayItem[]
+  routineGroups?: RoutineGroup[]
   dinnerPlanTitle?: string | null
   tomorrowPreview?: { title: string; startTime: Date | null } | null
   onCheckItem?: (id: string, completed: boolean) => void
@@ -160,6 +210,7 @@ export function WallNowCard({
   familyPrompt,
   todayItems,
   routineSteps,
+  routineGroups,
   dinnerPlanTitle,
   tomorrowPreview,
   onCheckItem,
@@ -220,6 +271,7 @@ export function WallNowCard({
           mode,
           todayItems,
           routineSteps,
+          routineGroups,
           dinnerPlanTitle,
           tomorrowPreview,
           familyPrompt,

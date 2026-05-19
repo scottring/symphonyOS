@@ -164,4 +164,62 @@ describe('WallNowCard', () => {
       window.matchMedia = original
     }
   })
+
+  it('groups Morning routine steps by child with labeled sections', () => {
+    render(
+      <WallNowCard
+        focus={{ kind: 'mode-default', mode: 'morning' }}
+        pinned={false}
+        onPinToggle={() => {}}
+        familyPrompt={null}
+        routineGroups={[
+          { ownerId: 'k', label: 'Kaleb', steps: [
+            { id: 'k1', kind: 'routine-step', title: 'K dressed', completed: false, ownerId: 'k', startTime: new Date(), sourceId: 'k1' },
+          ] },
+          { ownerId: 'e', label: 'Ella', steps: [
+            { id: 'e1', kind: 'routine-step', title: 'E dressed', completed: false, ownerId: 'e', startTime: new Date(), sourceId: 'e1' },
+          ] },
+        ]}
+      />
+    )
+    expect(screen.getByText('Kaleb')).toBeInTheDocument()
+    expect(screen.getByText('Ella')).toBeInTheDocument()
+    expect(screen.getByText('K dressed')).toBeInTheDocument()
+    expect(screen.getByText('E dressed')).toBeInTheDocument()
+  })
+
+  it('checking a grouped routine step calls onCheckItem with that step id', () => {
+    const onCheckItem = vi.fn()
+    render(
+      <WallNowCard
+        focus={{ kind: 'mode-default', mode: 'morning' }}
+        pinned={false}
+        onPinToggle={() => {}}
+        familyPrompt={null}
+        onCheckItem={onCheckItem}
+        routineGroups={[
+          { ownerId: 'k', label: 'Kaleb', steps: [
+            { id: 'k1', kind: 'routine-step', title: 'K dressed', completed: false, ownerId: 'k', startTime: new Date(), sourceId: 'k1' },
+          ] },
+        ]}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: /check k dressed/i }))
+    expect(onCheckItem).toHaveBeenCalledWith('k1', true)
+  })
+
+  it('falls back to the flat routine list when no routineGroups supplied', () => {
+    render(
+      <WallNowCard
+        focus={{ kind: 'mode-default', mode: 'morning' }}
+        pinned={false}
+        onPinToggle={() => {}}
+        familyPrompt={null}
+        routineSteps={[
+          { id: 'r1', kind: 'routine-step', title: 'Solo step', completed: false, ownerId: null, startTime: new Date(), sourceId: 'r1' },
+        ]}
+      />
+    )
+    expect(screen.getByText('Solo step')).toBeInTheDocument()
+  })
 })
