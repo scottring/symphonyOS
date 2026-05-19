@@ -42,7 +42,7 @@ export function TodaysFocusCard({ headline, priorities, meals, events, onActivat
         type="button"
         aria-label="Today's Focus"
         onClick={onActivate}
-        className="card flex items-start gap-3 px-5 py-4 w-full text-left"
+        className="card flex items-start gap-3 px-5 py-4 w-full text-left bg-[hsl(145_24%_95%)] border border-[hsl(145_20%_88%)]"
       >
         {innerContent(headline, subline)}
       </button>
@@ -50,7 +50,7 @@ export function TodaysFocusCard({ headline, priorities, meals, events, onActivat
   }
 
   return (
-    <div className="card flex items-start gap-3 px-5 py-4">
+    <div className="card flex items-start gap-3 px-5 py-4 bg-[hsl(145_24%_95%)] border border-[hsl(145_20%_88%)]">
       {innerContent(headline, subline)}
     </div>
   )

@@ -141,7 +141,7 @@ export function Sidebar({
   return (
     <aside
       className={`
-        h-full bg-[hsl(42_18%_93%)] border-r border-neutral-200/60
+        h-full bg-[hsl(145_16%_91%)] border-r border-neutral-200/60
         flex flex-col
         transition-all duration-500
         ${collapsed ? 'w-[68px]' : 'w-64'}

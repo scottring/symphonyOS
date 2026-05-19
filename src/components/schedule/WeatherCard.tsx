@@ -8,14 +8,14 @@ export function WeatherCard() {
 
   if (loading) {
     return (
-      <div className="card px-5 py-4" data-testid="weather-skeleton">
+      <div className="card px-5 py-4 bg-[hsl(145_24%_95%)] border border-[hsl(145_20%_88%)]" data-testid="weather-skeleton">
         <div className="h-9 w-24 rounded bg-neutral-100 animate-pulse" />
       </div>
     )
   }
   if (error || !weather) {
     return (
-      <div className="card px-5 py-4 text-[13px] text-neutral-400">
+      <div className="card px-5 py-4 text-[13px] text-neutral-400 bg-[hsl(145_24%_95%)] border border-[hsl(145_20%_88%)]">
         Weather unavailable
       </div>
     )
@@ -34,7 +34,7 @@ export function WeatherCard() {
   return createElement(
     cardElement,
     {
-      className: 'card px-5 py-4 flex flex-col gap-3 w-full text-left',
+      className: 'card px-5 py-4 flex flex-col gap-3 w-full text-left bg-[hsl(145_24%_95%)] border border-[hsl(145_20%_88%)]',
       ...cardProps,
     },
     <div className="flex items-center gap-4">
