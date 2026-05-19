@@ -28,12 +28,14 @@ function parseVaultDraft(text: string): { content: string; draft: VaultDraft | u
   return { content: cleanContent, draft: { title, content: draftContent } }
 }
 
+const MEAL_REQUEST_RE = /:::meal-request\s*\n([\s\S]*?)\n:::/
+
 /** Parse :::meal-request fenced blocks from AI response */
 export function parseMealRequest(text: string): { content: string; mealRequest: string | undefined } {
-  const match = text.match(/:::meal-request\s*\n([\s\S]*?):::/)
+  const match = text.match(MEAL_REQUEST_RE)
   const body = match?.[1]?.trim()
   if (!body) return { content: text, mealRequest: undefined }
-  const cleanContent = text.replace(/:::meal-request\s*\n[\s\S]*?:::/, '').trim()
+  const cleanContent = text.replace(MEAL_REQUEST_RE, '').trim()
   return { content: cleanContent, mealRequest: body }
 }
 

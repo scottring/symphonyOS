@@ -17,4 +17,20 @@ describe('parseMealRequest', () => {
     const r = parseMealRequest(':::meal-request\n\n:::')
     expect(r.mealRequest).toBeUndefined()
   })
+
+  it('extracts meal block cleanly when other content is present', () => {
+    const r = parseMealRequest('Note saved.\n:::meal-request\nadd pasta tuesday\n:::')
+    expect(r.mealRequest).toBe('add pasta tuesday')
+    expect(r.content).toBe('Note saved.')
+  })
+
+  it('bare ::: inside body does not truncate (newline before closing fence required)', () => {
+    const r = parseMealRequest(':::meal-request\nadd pasta ::: with cream\n:::')
+    expect(r.mealRequest).toBe('add pasta ::: with cream')
+  })
+
+  it('preserves multiline body', () => {
+    const r = parseMealRequest(':::meal-request\nadd pasta\nand salad\n:::')
+    expect(r.mealRequest).toBe('add pasta\nand salad')
+  })
 })
