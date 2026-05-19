@@ -64,7 +64,7 @@ export function ScratchpadPane() {
   }, []);
 
   return (
-    <div className="bg-bg-elevated rounded-2xl p-6 h-full w-full flex flex-col">
+    <div className="bg-bg-elevated rounded-2xl p-6 h-full w-full flex flex-col transition-shadow duration-200 focus-within:shadow-[0_12px_36px_-10px_rgba(60,50,30,0.22)]">
       {/* Header */}
       <div className="flex items-center justify-between mb-4 shrink-0">
         <h2 className="font-display text-lg text-neutral-900">Scratchpad</h2>
