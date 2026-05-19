@@ -43,4 +43,24 @@ describe('TodayView', () => {
     expect(screen.queryByRole('button', { name: 'Week' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Month' })).not.toBeInTheDocument()
   })
+  it('focus card click scrolls the first item into view', async () => {
+    const scrollSpy = vi.fn()
+    window.HTMLElement.prototype.scrollIntoView = scrollSpy
+    const today = new Date('2026-05-19T09:00:00')
+    const { user } = renderView({
+      tasks: [
+        {
+          id: 'task-1',
+          title: 'Test task',
+          completed: false,
+          createdAt: today,
+          updatedAt: today,
+          bucket: 'timed' as const,
+          scheduledFor: today,
+        },
+      ],
+    })
+    await user.click(screen.getByRole('button', { name: /today's focus/i }))
+    expect(scrollSpy).toHaveBeenCalled()
+  })
 })

@@ -5,6 +5,7 @@ interface TodaysFocusCardProps {
   priorities: number
   meals: number
   events: number
+  onActivate?: () => void
 }
 
 function segment(n: number, singular: string, plural: string): string | null {
@@ -12,7 +13,22 @@ function segment(n: number, singular: string, plural: string): string | null {
   return `${n} ${n === 1 ? singular : plural}`
 }
 
-export function TodaysFocusCard({ headline, priorities, meals, events }: TodaysFocusCardProps) {
+const innerContent = (headline: string, subline: string) => (
+  <>
+    <span className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-xl bg-primary-50 text-primary-600" aria-hidden="true">
+      <Leaf className="w-4 h-4" />
+    </span>
+    <div className="min-w-0">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-400">
+        Today's Focus
+      </p>
+      <p className="font-display text-lg text-neutral-800 leading-snug">{headline}</p>
+      <p className="mt-0.5 text-[13px] text-neutral-500">{subline}</p>
+    </div>
+  </>
+)
+
+export function TodaysFocusCard({ headline, priorities, meals, events, onActivate }: TodaysFocusCardProps) {
   const parts = [
     segment(priorities, 'priority', 'priorities'),
     segment(meals, 'meal', 'meals'),
@@ -20,18 +36,22 @@ export function TodaysFocusCard({ headline, priorities, meals, events }: TodaysF
   ].filter(Boolean) as string[]
   const subline = parts.length > 0 ? parts.join(' • ') : 'Nothing scheduled yet'
 
+  if (onActivate) {
+    return (
+      <button
+        type="button"
+        aria-label="Today's Focus"
+        onClick={onActivate}
+        className="card flex items-start gap-3 px-5 py-4 w-full text-left"
+      >
+        {innerContent(headline, subline)}
+      </button>
+    )
+  }
+
   return (
     <div className="card flex items-start gap-3 px-5 py-4">
-      <span className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-xl bg-primary-50 text-primary-600" aria-hidden="true">
-        <Leaf className="w-4 h-4" />
-      </span>
-      <div className="min-w-0">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-400">
-          Today's Focus
-        </p>
-        <p className="font-display text-lg text-neutral-800 leading-snug">{headline}</p>
-        <p className="mt-0.5 text-[13px] text-neutral-500">{subline}</p>
-      </div>
+      {innerContent(headline, subline)}
     </div>
   )
 }

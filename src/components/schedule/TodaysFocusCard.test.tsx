@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@/test/test-utils'
 import { TodaysFocusCard } from './TodaysFocusCard'
 
@@ -15,5 +15,15 @@ describe('TodaysFocusCard', () => {
   it('shows a gentle fallback when everything is zero', () => {
     render(<TodaysFocusCard headline="x" priorities={0} meals={0} events={0} />)
     expect(screen.getByText('Nothing scheduled yet')).toBeInTheDocument()
+  })
+  it('calls onActivate when clicked', async () => {
+    const onActivate = vi.fn()
+    const { user } = render(<TodaysFocusCard headline="x" priorities={1} meals={0} events={0} onActivate={onActivate} />)
+    await user.click(screen.getByRole('button', { name: /today's focus/i }))
+    expect(onActivate).toHaveBeenCalledTimes(1)
+  })
+  it('is a plain card (no button role) when onActivate is absent', () => {
+    render(<TodaysFocusCard headline="x" priorities={1} meals={0} events={0} />)
+    expect(screen.queryByRole('button', { name: /today's focus/i })).not.toBeInTheDocument()
   })
 })

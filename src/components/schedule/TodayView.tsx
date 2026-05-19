@@ -7,7 +7,7 @@
  *
  * NOT wired to the route yet — that happens in R4.
  */
-import { createElement, useMemo, useCallback } from 'react'
+import { createElement, useMemo, useCallback, useRef } from 'react'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -172,6 +172,26 @@ export function TodayView({
     onSelectItem(id)
   }, [onSelectItem])
 
+  const listRef = useRef<HTMLDivElement>(null)
+
+  const handleFocusActivate = useCallback(() => {
+    const el = listRef.current?.querySelector('[data-today-first]') as HTMLElement | null
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [])
+
+  // ── First-item marker (exactly one element gets data-today-first) ────────────
+  // Overdue section takes priority; otherwise the first item id of the first non-empty section.
+  const overdueWillRender = data.isToday && data.overdueTasks.length > 0
+  const firstSectionItemId: string | null = overdueWillRender
+    ? null
+    : (() => {
+        for (const section of data.sectionsOrder) {
+          const items = data.grouped[section]
+          if (items && items.length > 0) return items[0].id
+        }
+        return null
+      })()
+
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="max-w-3xl mx-auto px-6 py-10">
@@ -201,22 +221,23 @@ export function TodayView({
             priorities={focusPriorities}
             meals={focusMeals}
             events={focusEvents}
+            onActivate={handleFocusActivate}
           />
           <WeatherCard />
         </div>
       )}
 
       {/* Task list card */}
-      <div className="card p-4">
+      <div ref={listRef} className="card p-4">
         {data.counts.totalItems === 0 ? (
           <div className="text-center py-16">
             <p className="font-display text-xl text-neutral-700">Your day is clear</p>
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Overdue section */}
+            {/* Overdue section — gets data-today-first marker when it renders */}
             {data.isToday && data.overdueTasks.length > 0 && (
-              <section className="mb-4">
+              <section data-today-first="" className="mb-4">
                 <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">
                   Overdue
                 </div>
@@ -291,6 +312,7 @@ export function TodayView({
                       const projectName = item.projectId && projectsMap?.get(item.projectId)?.name || undefined
                       const parentTaskId = item.parentTaskId
                       const parentTaskName = parentTaskId ? tasksMap.get(parentTaskId)?.title : undefined
+                      const isFirstItem = item.id === firstSectionItemId
 
                       // Evening meal gets a special card
                       if (
@@ -304,19 +326,20 @@ export function TodayView({
                             })
                           : ''
                         return (
-                          <EveningMealCard
-                            key={item.id}
-                            title={item.title}
-                            timeLabel={timeLabel}
-                            onSelect={() => onSelectItem(item.id)}
-                          />
+                          <div key={item.id} {...(isFirstItem ? { 'data-today-first': '' } : {})}>
+                            <EveningMealCard
+                              title={item.title}
+                              timeLabel={timeLabel}
+                              onSelect={() => onSelectItem(item.id)}
+                            />
+                          </div>
                         )
                       }
 
                       // Standard schedule item — mirror TodaySchedule wiring
                       return (
+                        <div key={item.id} {...(isFirstItem ? { 'data-today-first': '' } : {})}>
                         <ScheduleItem
-                          key={item.id}
                           item={item}
                           selected={selectedItemId === item.id}
                           onSelect={() => handleSelectItem(item.id)}
@@ -428,6 +451,7 @@ export function TodayView({
                           onDismissSuggestion={proactive.dismissSuggestion}
                           onOpenGuidedChat={onOpenGuidedChat}
                         />
+                        </div>
                       )
                     })}
                   </div>
