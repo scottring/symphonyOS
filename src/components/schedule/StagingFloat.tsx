@@ -25,6 +25,10 @@ interface StagingFloatProps {
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void
   /** Render as a compact inline trigger (for desktop stats row) */
   inline?: boolean
+  /** All tasks (not just this-week) — used to compute overall project
+   *  progress in the By-project view header. Optional; falls back to
+   *  this-week-only progress when omitted. */
+  allTasks?: Task[]
 }
 
 const WEEK_ACTIONS: QuickAction[] = [
@@ -44,18 +48,44 @@ const GROUP_MODE_KEY = 'symphony.thisweek.group'
 type GroupMode = 'list' | 'project'
 
 function loadGroupMode(): GroupMode {
+  // Default to 'project' grouping — long flat lists of 15+ items repeat
+  // project context per row and feel cramped. Users can still toggle to
+  // 'list' (preference is persisted across sessions).
   try {
     const v = localStorage.getItem(GROUP_MODE_KEY)
-    return v === 'project' ? 'project' : 'list'
+    return v === 'list' ? 'list' : 'project'
   } catch {
-    return 'list'
+    return 'project'
   }
+}
+
+/**
+ * Progress % for a project group in the This Week dropdown. The `groupKey`
+ * is the project id, or the literal '__no_project__' (or similar) for the
+ * ungrouped/unattached bucket — the latter yields null so the header skips
+ * the progress bar entirely.
+ */
+function computeGroupProgress(args: { groupKey: string; scope: Task[] }): number | null {
+  const { groupKey, scope } = args
+  // The 'No project' bucket uses the synthetic key '__none__' — skip the bar
+  // for that group since it isn't a single project's progress.
+  if (!groupKey || groupKey === '__none__') return null
+  let total = 0
+  let done = 0
+  for (const t of scope) {
+    if (t.projectId !== groupKey) continue
+    total += 1
+    if (t.completed) done += 1
+  }
+  if (total === 0) return null
+  return Math.round((done / total) * 100)
 }
 
 export function StagingFloat({
   weekTasks, projects, familyMembers,
   onPullToToday, onSelectTask, onCompleteTask, onDeferTask, onDeleteTask, onUpdateTask,
   inline,
+  allTasks,
 }: StagingFloatProps) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
@@ -336,22 +366,49 @@ export function StagingFloat({
           {sorted.length === 0 ? (
             <p className="text-sm text-neutral-400 text-center py-6">Nothing scheduled this week.</p>
           ) : groupMode === 'project' ? (
-            <div className="space-y-4">
-              {groupTasksByProject(sorted, projects).map(({ key, label, tasks }) => (
-                <div key={key}>
-                  <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-1.5 px-1 flex items-center gap-2">
-                    <span>{label}</span>
-                    <span className="text-neutral-300 font-normal normal-case tracking-normal">·</span>
-                    <span className="text-neutral-400 font-normal normal-case tracking-normal">{tasks.length}</span>
-                  </div>
-                  <div className="space-y-1.5">
-                    {tasks.map((task) => {
-                      const project = projects.find((p) => p.id === task.projectId)
-                      return (
+            <div className="space-y-3">
+              {groupTasksByProject(sorted, projects).map(({ key, label, tasks }) => {
+                const groupProject = projects.find((p) => p.id === key)
+                // Progress = completed / total. Prefer all-task scope when
+                // provided (matches the right rail's ACTIVE PROJECTS panel);
+                // fall back to this-week scope so the bar is still meaningful.
+                const progress = computeGroupProgress({
+                  groupKey: key,
+                  scope: allTasks ?? sorted,
+                })
+                return (
+                  <section
+                    key={key}
+                    className="rounded-xl border border-neutral-200/80 bg-white overflow-hidden"
+                  >
+                    <header className="px-4 pt-3 pb-2 flex items-baseline gap-2">
+                      <h4 className="text-[13px] font-medium text-neutral-800 truncate flex-1 min-w-0">
+                        {label}
+                      </h4>
+                      {progress != null && (
+                        <span className="text-[11px] font-medium tabular-nums text-neutral-500 shrink-0">
+                          {progress}%
+                        </span>
+                      )}
+                      <span className="text-[11px] text-neutral-400 tabular-nums shrink-0">
+                        {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}
+                      </span>
+                    </header>
+                    {progress != null && (
+                      <div className="h-1 bg-neutral-100 mx-4">
+                        <div
+                          className="h-full bg-primary-500 transition-all"
+                          style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+                          aria-hidden
+                        />
+                      </div>
+                    )}
+                    <div className="px-2 pt-2 pb-2 space-y-1.5">
+                      {tasks.map((task) => (
                         <div key={task.id} className="relative">
                           <DenseInboxRow
                             task={task}
-                            project={project}
+                            project={groupProject}
                             projects={projects}
                             familyMembers={familyMembers}
                             quickActions={WEEK_ACTIONS}
@@ -361,6 +418,8 @@ export function StagingFloat({
                             onUpdate={(updates) => onUpdateTask?.(task.id, updates)}
                             onSelect={() => { onSelectTask(task.id); setOpen(false) }}
                             onCreateProject={makeOnCreateProject(task.id)}
+                            showProjectChip={false}
+                            hoverOnlyChrome
                           />
                           {notePickerTaskId === task.id && (
                             <NotePicker
@@ -372,11 +431,11 @@ export function StagingFloat({
                             />
                           )}
                         </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              ))}
+                      ))}
+                    </div>
+                  </section>
+                )
+              })}
             </div>
           ) : (
             <div className="space-y-1.5">
@@ -396,6 +455,7 @@ export function StagingFloat({
                       onUpdate={(updates) => onUpdateTask?.(task.id, updates)}
                       onSelect={() => { onSelectTask(task.id); setOpen(false) }}
                       onCreateProject={makeOnCreateProject(task.id)}
+                      hoverOnlyChrome
                     />
                     {notePickerTaskId === task.id && (
                       <NotePicker

@@ -44,6 +44,12 @@ interface DenseInboxRowProps {
    *  Should create the project and assign it to this task. */
   onCreateProject?: (name: string, context: TaskContext | null) => void
   isLeaving?: boolean
+  /** When false, hide the project chip (used inside project-grouped surfaces
+   *  where the project name lives in the group header). Default: true. */
+  showProjectChip?: boolean
+  /** When true, hide context dot + quick actions until the row is hovered or
+   *  contains focus. Reduces visual noise in long lists. Default: false. */
+  hoverOnlyChrome?: boolean
 }
 
 const CONTEXT_OPTIONS: Array<{ value: TaskContext | null; label: string }> = [
@@ -54,6 +60,8 @@ const CONTEXT_OPTIONS: Array<{ value: TaskContext | null; label: string }> = [
 ]
 
 export const DenseInboxRow = memo(function DenseInboxRow({
+  showProjectChip = true,
+  hoverOnlyChrome = false,
   task,
   project,
   projects,
@@ -97,8 +105,13 @@ export const DenseInboxRow = memo(function DenseInboxRow({
         />
       </div>
 
-      {/* Context dot button */}
-      <div className="relative shrink-0 mt-1.5">
+      {/* Context dot button — visually redundant with the colored checkbox ring,
+          so we hide it by default in hover-chrome rows and reveal on hover/focus. */}
+      <div
+        className={`relative shrink-0 mt-1.5 transition-opacity ${
+          hoverOnlyChrome ? 'opacity-0 group-hover:opacity-100 focus-within:opacity-100' : ''
+        }`}
+      >
         <button
           type="button"
           aria-label="Context"
@@ -140,16 +153,20 @@ export const DenseInboxRow = memo(function DenseInboxRow({
         {task.title}
       </button>
 
-      {/* Project chip (assigned) or picker (unassigned) */}
-      <ProjectControl
-        project={project}
-        projects={projects}
-        onOpenProject={onOpenProject}
-        onAssign={(projectId) => onUpdate({ projectId })}
-        onClear={() => onUpdate({ projectId: undefined })}
-        onCreate={onCreateProject}
-        defaultNewName={task.title}
-      />
+      {/* Project chip (assigned) or picker (unassigned). Hidden inside
+          project-grouped surfaces where the group header already names the
+          project. */}
+      {showProjectChip && (
+        <ProjectControl
+          project={project}
+          projects={projects}
+          onOpenProject={onOpenProject}
+          onAssign={(projectId) => onUpdate({ projectId })}
+          onClear={() => onUpdate({ projectId: undefined })}
+          onCreate={onCreateProject}
+          defaultNewName={task.title}
+        />
+      )}
 
 
       {/* Assignee avatar */}
@@ -164,8 +181,13 @@ export const DenseInboxRow = memo(function DenseInboxRow({
         </div>
       )}
 
-      {/* Quick action buttons */}
-      <div className="flex items-center gap-1 shrink-0 mt-0.5">
+      {/* Quick action buttons. In hover-chrome mode, hidden until row is
+          hovered/focused so the default view stays calm. */}
+      <div
+        className={`flex items-center gap-1 shrink-0 mt-0.5 transition-opacity ${
+          hoverOnlyChrome ? 'opacity-0 group-hover:opacity-100 focus-within:opacity-100' : ''
+        }`}
+      >
         {quickActions.map((action) => {
           const label = ACTION_LABELS[action.kind]
           if (action.kind === 'note') {

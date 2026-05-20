@@ -285,6 +285,7 @@ export function TodayView({
   const weekTrigger = (
     <StagingFloat
       weekTasks={data.weekTasks}
+      allTasks={tasks}
       projects={projects ?? []}
       familyMembers={familyMembers}
       onPullToToday={(taskId) => {
