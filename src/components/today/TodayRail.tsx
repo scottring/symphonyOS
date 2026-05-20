@@ -1,22 +1,31 @@
 import { useMemo } from 'react'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
+import type { FamilyMember } from '@/types/family'
 import { ScratchpadPane } from '@/components/schedule/ScratchpadPane'
 import { rankActiveProjects } from '@/lib/projectProgress'
+import { familySnapshot } from '@/lib/familySnapshot'
 import { AtAGlance } from './AtAGlance'
 import { ActiveProjects } from './ActiveProjects'
+import { FamilySnapshot } from './FamilySnapshot'
 
 interface TodayRailProps {
   /** All tasks from entities. Used to count open work and derive project progress. */
   tasks: Task[]
   /** All projects from entities. Used by ACTIVE PROJECTS. */
   projects: Project[]
+  /** Core + guest family members. Guests are filtered out for the snapshot panel. */
+  familyMembers: FamilyMember[]
   /** CTA for AT A GLANCE → opens fuller plan view (week, day detail). */
   onViewFullPlan: () => void
   /** Open a single project's detail view. */
   onSelectProject: (id: string) => void
   /** Navigate to the full projects list. */
   onViewAllProjects: () => void
+  /** Open a single family member's view. */
+  onSelectMember: (id: string) => void
+  /** Open the full family view. */
+  onViewAllFamily: () => void
 }
 
 /**
@@ -29,9 +38,12 @@ interface TodayRailProps {
 export function TodayRail({
   tasks,
   projects,
+  familyMembers,
   onViewFullPlan,
   onSelectProject,
   onViewAllProjects,
+  onSelectMember,
+  onViewAllFamily,
 }: TodayRailProps) {
   const openTaskCount = useMemo(() => {
     // "Still open" = scheduled, not completed, not in inbox.
@@ -44,6 +56,11 @@ export function TodayRail({
     [projects, tasks],
   )
 
+  const familyMembersSummary = useMemo(
+    () => familySnapshot(familyMembers, tasks),
+    [familyMembers, tasks],
+  )
+
   return (
     <div className="h-full flex flex-col gap-4 overflow-y-auto pr-1">
       <AtAGlance
@@ -51,6 +68,12 @@ export function TodayRail({
         eventsTodayCount={0}
         tomorrowFirstEvent={null}
         onViewFullPlan={onViewFullPlan}
+      />
+
+      <FamilySnapshot
+        members={familyMembersSummary}
+        onSelectMember={onSelectMember}
+        onViewAll={onViewAllFamily}
       />
 
       <ActiveProjects

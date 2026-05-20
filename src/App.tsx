@@ -1452,6 +1452,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       onOpenSearch={() => setSearchOpen(true)}
       pins={pinnedItems.pins}
       entities={pinnedEntities}
+      railFamilyMembers={familyMembers}
       onPinNavigate={handlePinNavigate}
       onPinMarkAccessed={pinnedItems.markAccessed}
       onPinRefreshStale={pinnedItems.refreshStale}

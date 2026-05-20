@@ -69,6 +69,9 @@ interface AppShellProps {
   // Pinned items props
   pins?: PinnedItem[]
   entities?: EntityData
+  /** Full FamilyMember[] for the Today rail's Family Snapshot panel.
+   *  Distinct from quickAddFamilyMembers (slim {id,name} version for QuickCapture). */
+  railFamilyMembers?: import('@/types/family').FamilyMember[]
   onPinNavigate?: (entityType: PinnableEntityType, entityId: string) => void
   onPinMarkAccessed?: (entityType: PinnableEntityType, entityId: string) => void
   onPinRefreshStale?: (id: string) => void
@@ -123,6 +126,7 @@ export function AppShell({
   onOpenSearch,
   pins,
   entities,
+  railFamilyMembers = [],
   onPinNavigate,
   onPinMarkAccessed,
   onPinRefreshStale,
@@ -526,6 +530,7 @@ export function AppShell({
           <TodayRail
             tasks={entities?.tasks ?? []}
             projects={entities?.projects ?? []}
+            familyMembers={railFamilyMembers}
             onViewFullPlan={() => {
               // No-op for now — there's no dedicated "week" view yet. When
               // Phase 2 lands a week view (or planning surface), wire here.
@@ -538,6 +543,13 @@ export function AppShell({
               void id
             }}
             onViewAllProjects={() => onViewChange('projects')}
+            onSelectMember={(id) => {
+              // Navigate to the family/home-app view; per-member deep link
+              // is a follow-up.
+              onViewChange('home-app')
+              void id
+            }}
+            onViewAllFamily={() => onViewChange('home-app')}
           />
         </aside>
       )}
