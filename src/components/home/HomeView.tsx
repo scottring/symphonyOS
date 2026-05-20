@@ -16,7 +16,13 @@ import { MonthView } from './MonthView'
 const WEEK_V2_FLAG = 'symphony-week-v2'
 function isWeekV2Enabled(): boolean {
   if (typeof window === 'undefined') return false
-  return localStorage.getItem(WEEK_V2_FLAG) !== 'off'
+  // Default OFF. Phase 4 ships with the existing WeekView still active for
+  // users; flip the flag to 'on' in the browser console to dogfood the new
+  // grid + drag/resize/auto-advance interactions:
+  //   localStorage.setItem('symphony-week-v2', 'on'); location.reload()
+  // Default flips to ON in a later commit once Phase 4b lands (undo/toast,
+  // nav arrows, mobile completeness, DragOverlay polish).
+  return localStorage.getItem(WEEK_V2_FLAG) === 'on'
 }
 import { CascadingRiverView } from './CascadingRiverView'
 import { TodayView } from '@/components/schedule/TodayView'
