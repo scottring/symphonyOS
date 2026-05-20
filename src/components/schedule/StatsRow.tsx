@@ -17,20 +17,20 @@ interface StatsRowProps {
 export function StatsRow({ dueToday, doneToday, weekTrigger, thisWeek, clarityTrigger, endControls }: StatsRowProps) {
   return (
     <div className="flex items-center flex-wrap gap-x-5 gap-y-2 text-[13px] text-neutral-500">
-      {/* Done today */}
-      <span className="inline-flex items-center gap-1.5">
+      {/* Done today — desktop only on mobile we just want the filters */}
+      <span className="hidden md:inline-flex items-center gap-1.5">
         <CheckCircle2 className="w-4 h-4 text-primary-500" />
         {doneToday} of {dueToday} done today
       </span>
 
-      {/* This week — StagingFloat trigger owns the icon; no extra CalendarRange here */}
-      <span className="inline-flex items-center gap-1.5">
+      {/* This week — desktop only */}
+      <span className="hidden md:inline-flex items-center gap-1.5">
         {weekTrigger ?? <>{thisWeek} {thisWeek === 1 ? 'task' : 'tasks'} this week</>}
       </span>
 
-      {/* Clarity — ring + stacked label from ClarityIndicator trigger */}
+      {/* Clarity — desktop only */}
       {clarityTrigger && (
-        <span className="inline-flex items-center gap-1.5">
+        <span className="hidden md:inline-flex items-center gap-1.5">
           {clarityTrigger}
         </span>
       )}

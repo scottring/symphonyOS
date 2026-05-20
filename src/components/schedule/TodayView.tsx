@@ -17,6 +17,7 @@ import type { TimelineCaptureResult } from '@/components/schedule/TimelineQuickI
 import type { ParserContext } from '@/lib/quickInputParser'
 import type { HomeViewType } from '@/types/homeView'
 
+import { useMobile } from '@/hooks/useMobile'
 import { useTodayData } from '@/hooks/useTodayData'
 import { useSystemHealth } from '@/hooks/useSystemHealth'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
@@ -130,6 +131,7 @@ export function TodayView({
   onHomeViewChange,
 }: TodayViewProps) {
   // ── Context ──────────────────────────────────────────────────────────────────
+  const isMobile = useMobile()
   const ctx = useScheduleActionsContext()
   const {
     onToggleWaiting, onUpdateTask, onPushTask,
@@ -442,8 +444,10 @@ export function TodayView({
         </div>
       )}
 
-      {/* Task list card — single outer card wraps all sections */}
-      <div ref={listRef} className="card rounded-2xl border border-neutral-200/70 px-5 py-4">
+      {/* Task list — wrapped in a card on desktop; on mobile the rows go
+          full-width (no card, no border, no inner padding) to match the
+          compact list the pre-redesign mobile had. */}
+      <div ref={listRef} className="md:card md:rounded-2xl md:border md:border-neutral-200/70 md:px-5 md:py-4">
         {data.counts.totalItems === 0 ? (
           <div className="text-center py-16">
             <p className="font-display text-xl text-neutral-700">Your day is clear</p>
@@ -540,8 +544,11 @@ export function TodayView({
                         />
                       )
 
-                      // Evening meal gets a special card
+                      // Evening meal gets a special card (desktop only — on
+                      // mobile we let meal items render as compact rows to
+                      // match the pre-redesign list).
                       if (
+                        !isMobile &&
                         section === 'evening' &&
                         isMealItem(item.id, item.type, item.title)
                       ) {

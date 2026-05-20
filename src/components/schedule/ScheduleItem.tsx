@@ -479,15 +479,15 @@ export const ScheduleItem = memo(function ScheduleItem({
                 <span className="ml-1.5 text-xs text-amber-500 not-italic font-normal">waiting</span>
               )}
             </span>
-            {/* Routine streak badge */}
+            {/* Routine streak badge — desktop only */}
             {isRoutine && routineStreak != null && routineStreak > 0 && !item.completed && !item.skipped && (
-              <span className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded text-xs font-medium" title={`${routineStreak}-day streak`}>
+              <span className="hidden md:inline-flex shrink-0 items-center gap-0.5 px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded text-xs font-medium" title={`${routineStreak}-day streak`}>
                 <ConceptIcon name="streak" decorative /> {routineStreak}
               </span>
             )}
-            {/* Category chip - only show for non-task categories */}
+            {/* Category chip — desktop only (non-task categories only) */}
             {item.category && item.category !== 'task' && (
-              <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded text-xs font-medium">
+              <span className="hidden md:inline-flex shrink-0 items-center gap-1 px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded text-xs font-medium">
                 {item.category === 'errand' && <ConceptIcon name="errand" decorative />}
                 {item.category === 'chore' && <ConceptIcon name="chore" decorative />}
                 {item.category === 'event' && <ConceptIcon name="when" decorative />}
@@ -495,27 +495,27 @@ export const ScheduleItem = memo(function ScheduleItem({
                 <span className="hidden sm:inline">{item.category}</span>
               </span>
             )}
-            {/* Coaching sparkle indicator */}
+            {/* Coaching sparkle indicator — desktop only */}
             {hasCoaching && (
-              <span className="shrink-0 text-amber-400 opacity-60" title="Coaching tips available">
+              <span className="hidden md:inline shrink-0 text-amber-400 opacity-60" title="Coaching tips available">
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
                 </svg>
               </span>
             )}
-            {/* Subtask indicator */}
+            {/* Subtask indicator — desktop only */}
             {hasSubtasks && (
-              <span className="shrink-0 inline-flex items-center gap-1 text-xs text-neutral-400">
+              <span className="hidden md:inline-flex shrink-0 items-center gap-1 text-xs text-neutral-400">
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
                 </svg>
                 {item.subtaskCompletedCount}/{item.subtaskCount}
               </span>
             )}
-            {/* Project chip — inline pill next to title */}
+            {/* Project chip — inline pill next to title (desktop only) */}
             {projectName && (
               <span
-                className="shrink-0 inline-flex items-center max-w-[200px] truncate text-[11px] font-medium px-2 py-0.5 rounded-md"
+                className="hidden md:inline-flex shrink-0 items-center max-w-[200px] truncate text-[11px] font-medium px-2 py-0.5 rounded-md"
                 style={projectColor
                   ? { backgroundColor: `color-mix(in srgb, ${projectColor} 14%, transparent)`, color: projectColor }
                   : { backgroundColor: 'hsl(210 40% 96%)', color: 'hsl(210 50% 40%)' }}
