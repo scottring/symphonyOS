@@ -276,38 +276,30 @@ export function AppShell({
                 className="w-7 h-7 rounded-full shrink-0 object-cover"
               />
 
-              <div className="flex-1 flex items-center justify-center gap-2 min-w-0">
-                {viewedDate && (
-                  <>
-                    <button
-                      aria-label="Previous day"
-                      onClick={() => {
-                        if (!onDateChange) return
-                        const n = new Date(viewedDate); n.setDate(n.getDate() - 1); onDateChange(n)
-                      }}
-                      className="p-2 rounded-xl text-neutral-700 hover:bg-neutral-100 active:bg-neutral-200 transition-colors shrink-0"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </button>
-                    <span className="font-display text-lg font-semibold text-neutral-900 whitespace-nowrap">
-                      {viewedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                    </span>
-                    <button
-                      aria-label="Next day"
-                      onClick={() => {
-                        if (!onDateChange) return
-                        const n = new Date(viewedDate); n.setDate(n.getDate() + 1); onDateChange(n)
-                      }}
-                      className="p-2 rounded-xl text-neutral-700 hover:bg-neutral-100 active:bg-neutral-200 transition-colors shrink-0"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </button>
-                  </>
-                )}
+              <div className="flex-1 flex items-center justify-center gap-3 min-w-0">
+                <button
+                  aria-label="Previous day"
+                  onClick={() => {
+                    if (!viewedDate || !onDateChange) return
+                    const n = new Date(viewedDate); n.setDate(n.getDate() - 1); onDateChange(n)
+                  }}
+                  className="text-2xl leading-none text-neutral-700 hover:text-neutral-900 px-2 py-1 shrink-0 select-none"
+                >
+                  ‹
+                </button>
+                <span className="font-display text-lg font-semibold text-neutral-900 whitespace-nowrap">
+                  {viewedDate ? viewedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : ''}
+                </span>
+                <button
+                  aria-label="Next day"
+                  onClick={() => {
+                    if (!viewedDate || !onDateChange) return
+                    const n = new Date(viewedDate); n.setDate(n.getDate() + 1); onDateChange(n)
+                  }}
+                  className="text-2xl leading-none text-neutral-700 hover:text-neutral-900 px-2 py-1 shrink-0 select-none"
+                >
+                  ›
+                </button>
               </div>
 
               <div className="flex items-center gap-0.5 shrink-0">
