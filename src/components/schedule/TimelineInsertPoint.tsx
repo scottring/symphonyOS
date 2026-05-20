@@ -44,13 +44,13 @@ export function TimelineInsertPoint({ onPick, onCreate, quickInput }: Props) {
   }, [onPick])
 
   return (
-    <div ref={rootRef} className="relative flex items-center justify-center h-6 group">
+    <div ref={rootRef} className="relative hidden md:flex items-center justify-center h-6 group">
       <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-neutral-200 opacity-40 group-hover:opacity-100 transition-opacity" />
       <button
         type="button"
         aria-label="Add between items"
         onClick={() => setMode(v => v === 'closed' ? 'wheel' : 'closed')}
-        className="relative z-10 w-7 h-7 min-w-[28px] rounded-full bg-primary-500 text-white text-base leading-none flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100 max-md:opacity-100 transition-opacity"
+        className="relative z-10 w-7 h-7 min-w-[28px] rounded-full bg-primary-500 text-white text-base leading-none flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
       >+</button>
 
       {mode === 'wheel' && (

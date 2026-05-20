@@ -462,6 +462,7 @@ export const ScheduleItem = memo(function ScheduleItem({
           <div className="flex items-center gap-2">
             <span
               className={`
+                flex-1 min-w-0
                 ${variant === 'minimal' ? 'text-sm' : 'text-base'} font-medium line-clamp-2 transition-colors
                 ${item.completed || item.skipped
                   ? 'line-through text-neutral-400'
