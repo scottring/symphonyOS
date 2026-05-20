@@ -2,15 +2,28 @@ import { useDraggable } from '@dnd-kit/core'
 import type { TimelineItem } from '@/types/timeline'
 import { colorFor } from '@/lib/weekColorMap'
 import { FIRST_HOUR, HOUR_ROW_HEIGHT, TIME_COL_WIDTH, COL_HEADER_HEIGHT } from './WeekGrid'
+import { useBlockResize } from './useBlockResize'
 
 interface WeekEventBlockProps {
   item: TimelineItem
   weekStart: Date
   onSelect: (id: string) => void
+  onResizeCommit?: (itemId: string, updates: { scheduledFor: Date; endTime: Date }) => void
 }
 
-export function WeekEventBlock({ item, weekStart, onSelect }: WeekEventBlockProps) {
+export function WeekEventBlock({ item, weekStart, onSelect, onResizeCommit }: WeekEventBlockProps) {
   const isRoutine = item.type === 'routine'
+
+  const resize = useBlockResize({
+    startTime: item.startTime ?? new Date(),
+    endTime: item.endTime ?? new Date((item.startTime ?? new Date()).getTime() + 30 * 60 * 1000),
+    pxPerMin: HOUR_ROW_HEIGHT / 60,
+    onCommit: (updates) => {
+      onResizeCommit?.(item.id, updates)
+    },
+  })
+
+  const isResizing = !!resize.preview
 
   // Routines are render-only (no drag). Use a distinct id prefix so dnd-kit
   // never confuses them with draggable task/event blocks.
@@ -23,7 +36,7 @@ export function WeekEventBlock({ item, weekStart, onSelect }: WeekEventBlockProp
   // takes effect and is safe to use for both tap-to-select and drag end.
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: dragId,
-    disabled: isRoutine,
+    disabled: isRoutine || isResizing,
     data: { kind: 'block', itemId: item.id, originStartIso: item.startTime?.toISOString() },
   })
 
@@ -32,6 +45,9 @@ export function WeekEventBlock({ item, weekStart, onSelect }: WeekEventBlockProp
 
   const { dayIdx, top, height } = placement
   const color = colorFor(item)
+
+  const previewTopOffset = (resize.preview?.topDelta ?? 0) * (HOUR_ROW_HEIGHT / 60)
+  const previewBottomOffset = (resize.preview?.bottomDelta ?? 0) * (HOUR_ROW_HEIGHT / 60)
 
   return (
     <div
@@ -53,12 +69,32 @@ export function WeekEventBlock({ item, weekStart, onSelect }: WeekEventBlockProp
         isRoutine ? 'cursor-default' : '',
       ].filter(Boolean).join(' ')}
       style={{
-        top,
+        top: top + previewTopOffset,
         left: `calc(${TIME_COL_WIDTH}px + (100% - ${TIME_COL_WIDTH}px) * ${dayIdx} / 7)`,
         width: `calc((100% - ${TIME_COL_WIDTH}px) / 7 - 4px)`,
-        height,
+        height: Math.max(HOUR_ROW_HEIGHT / 4, height - previewTopOffset + previewBottomOffset),
       }}
     >
+      {!isRoutine && (
+        <>
+          <div
+            onPointerDown={resize.handlers.onPointerDownTop}
+            onPointerMove={resize.handlers.onPointerMove}
+            onPointerUp={resize.handlers.onPointerUp}
+            onClick={(e) => e.stopPropagation()}
+            className="absolute top-0 left-0 right-0 h-1.5 cursor-ns-resize hover:bg-black/10"
+            aria-label="Resize start time"
+          />
+          <div
+            onPointerDown={resize.handlers.onPointerDownBottom}
+            onPointerMove={resize.handlers.onPointerMove}
+            onPointerUp={resize.handlers.onPointerUp}
+            onClick={(e) => e.stopPropagation()}
+            className="absolute bottom-0 left-0 right-0 h-1.5 cursor-ns-resize hover:bg-black/10"
+            aria-label="Resize end time"
+          />
+        </>
+      )}
       <div className="truncate font-medium">{item.title}</div>
     </div>
   )
