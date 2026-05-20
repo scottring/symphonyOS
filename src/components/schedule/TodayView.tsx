@@ -28,7 +28,7 @@ import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 import { computeAnchorTime } from '@/lib/timelineAnchor'
 
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, Repeat } from 'lucide-react'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
 import { TodayAddInput } from './TodayAddInput'
@@ -387,8 +387,9 @@ export function TodayView({
         onHomeViewChange={onHomeViewChange}
       />
 
-      {/* Stats + function bar — single consolidated row */}
-      <div className="mb-6">
+      {/* Stats + function bar — desktop only. Mobile combines the filters
+          into the Add-to-today row below to save vertical space. */}
+      <div className="hidden md:block mb-6">
         <StatsRow
           dueToday={data.counts.actionableCount}
           doneToday={data.counts.completedCount}
@@ -423,11 +424,41 @@ export function TodayView({
         />
       </div>
 
-      {/* Inline "Add to today" — desktop-only, today-only, when onCreateTask is wired */}
+      {/* Inline "Add to today" — today-only, when onCreateTask is wired.
+          Desktop: full-width add input. Mobile: same input but flanked by the
+          assignee + show-daily filters on the right, so the whole filter row
+          is folded into this one to save vertical space. */}
       {data.isToday && ctx.onCreateTask && (
-        <div className="mb-4">
-          <TodayAddInput onAdd={ctx.onCreateTask} />
-        </div>
+        <>
+          {/* Desktop: just the add input */}
+          <div className="hidden md:block mb-4">
+            <TodayAddInput onAdd={ctx.onCreateTask} />
+          </div>
+          {/* Mobile: combined add + filters */}
+          <div className="md:hidden mb-4 flex items-center gap-2">
+            <div className="flex-1 min-w-0">
+              <TodayAddInput onAdd={ctx.onCreateTask} />
+            </div>
+            {onSelectAssignee && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
+              <AssigneeFilter
+                selectedAssignees={selectedAssignee ? [selectedAssignee] : []}
+                onSelectAssignees={(ids) => onSelectAssignee(ids.length > 0 ? ids[0] : null)}
+                assigneesWithTasks={assigneesWithTasks ?? []}
+                hasUnassignedTasks={!!hasUnassignedTasks}
+              />
+            )}
+            <button
+              type="button"
+              onClick={toggleHideRoutines}
+              title={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
+              aria-label={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
+              aria-pressed={!hideRoutines}
+              className={`shrink-0 p-2 rounded-lg transition-colors ${hideRoutines ? 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100' : 'text-primary-600 hover:bg-primary-50'}`}
+            >
+              <Repeat className="w-4 h-4" />
+            </button>
+          </div>
+        </>
       )}
 
       {/* Two-up: Focus card + Weather — only shown when there is something to focus on */}
