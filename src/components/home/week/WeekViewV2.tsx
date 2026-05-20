@@ -47,6 +47,8 @@ interface WeekViewV2Props {
   onUpdateRoutine: (routineId: string, updates: Partial<Routine>) => Promise<void> | void
   /** Number of day columns. 5 = workweek (Mon-Fri), 7 = full week. Default 7. */
   dayCount?: 5 | 7
+  /** From HomeView's useUndo. Called after successful mutations to surface an undo toast. */
+  pushAction?: (message: string, undo: () => void) => void
 }
 
 export function WeekViewV2(props: WeekViewV2Props) {
@@ -61,6 +63,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     onUpdateEvent,
     onUpdateRoutine,
     dayCount = 7,
+    pushAction,
   } = props
 
   // Summary data
@@ -81,20 +84,30 @@ export function WeekViewV2(props: WeekViewV2Props) {
 
   // Create-gesture wiring
   const navigate = useNavigate()
-  const { addTask } = useSupabaseTasks()
-  const { createEvent } = useGoogleCalendar()
+  const { addTask, deleteTask } = useSupabaseTasks()
+  const { createEvent, deleteEvent } = useGoogleCalendar()
   const gridCreate = useGridCreate()
 
   const handleCreate = useCallback(
     async (params: { type: CreateType; title: string; startTime: Date; endTime: Date }) => {
       if (params.type === 'task') {
-        await addTask(params.title, undefined, undefined, params.startTime, { isAllDay: false })
+        const newId = await addTask(params.title, undefined, undefined, params.startTime, { isAllDay: false })
+        if (newId) {
+          pushAction?.(`Created "${params.title}"`, () => {
+            void deleteTask(newId)
+          })
+        }
       } else if (params.type === 'event') {
-        await createEvent({
+        const result = await createEvent({
           title: params.title,
           startTime: params.startTime,
           endTime: params.endTime,
         })
+        if (result?.id) {
+          pushAction?.(`Created "${params.title}"`, () => {
+            void deleteEvent({ eventId: result.id })
+          })
+        }
       } else if (params.type === 'routine') {
         // Routines need a recurrence pattern that doesn't fit the popover.
         // Build an NL string from the slot's title/weekday/time and navigate
@@ -116,7 +129,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
       }
       gridCreate.close()
     },
-    [addTask, createEvent, navigate, gridCreate],
+    [addTask, deleteTask, createEvent, deleteEvent, navigate, gridCreate, pushAction],
   )
 
   // Drag-drop wiring
@@ -130,6 +143,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     events,
     routines,
     dayCount,
+    pushAction,
   })
 
   // Sensor with activation constraint — disambiguates click vs drag.

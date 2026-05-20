@@ -19,6 +19,8 @@ interface UseWeekDragDropArgs {
   routines: Routine[]
   /** Number of days in the displayed week — controls cross-week auto-advance step. Default 7. */
   dayCount?: number
+  /** Optional. Called after a successful drag mutation to surface an undo toast. */
+  pushAction?: (message: string, undo: () => void) => void
 }
 
 interface UseWeekDragDropResult {
@@ -63,10 +65,21 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
     const newStart = parseSlotTime(overData.dayIso, overData.hour ?? 0, overData.minute ?? 0)
 
     if (activeData.kind === 'chip' && activeData.taskId) {
+      const task = tasks.find((t) => t.id === activeData.taskId)
+      const prevScheduledFor = task?.scheduledFor ?? null
+      const prevIsAllDay = task?.isAllDay ?? false
+      const prevEndTime = task?.endTime
       void onUpdateTask(activeData.taskId, {
         isAllDay: false,
         scheduledFor: newStart,
         endTime: new Date(newStart.getTime() + DEFAULT_DURATION_MS),
+      })
+      args.pushAction?.(`Scheduled "${task?.title ?? 'task'}"`, () => {
+        void onUpdateTask(activeData.taskId!, {
+          isAllDay: prevIsAllDay,
+          scheduledFor: prevScheduledFor as Date,
+          endTime: prevEndTime,
+        })
       })
       return
     }
@@ -86,6 +99,12 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
         void onUpdateTask(taskId, {
           scheduledFor: newStart,
           endTime: new Date(newStart.getTime() + duration),
+        })
+        args.pushAction?.(`Moved "${task.title}"`, () => {
+          void onUpdateTask(taskId, {
+            scheduledFor: oldStart,
+            endTime: oldEnd,
+          })
         })
         return
       }

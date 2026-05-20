@@ -254,6 +254,7 @@ export function HomeView({
             onUpdateTask={ctx.onUpdateTask ?? (() => {})}
             onUpdateRoutine={ctx.onUpdateRoutine ?? (() => {})}
             onUpdateEvent={() => {}}
+            pushAction={pushAction}
           />
           <WeekViewMobile
             tasks={filteredTasks}
@@ -303,6 +304,7 @@ export function HomeView({
             // onUpdateEvent is added to the context and wired to the Google
             // Calendar mutation hook.
             onUpdateEvent={() => {}}
+            pushAction={pushAction}
           />
           <WeekViewMobile
             tasks={filteredTasks}
