@@ -40,6 +40,7 @@ import { StagingFloat } from './StagingFloat'
 import { TodaysFocusCard } from './TodaysFocusCard'
 import { WeatherCard } from './WeatherCard'
 import { EveningMealCard } from './EveningMealCard'
+import { EndOfDayCard } from './EndOfDayCard'
 import { ScheduleItem } from './ScheduleItem'
 import { OverdueSection } from './OverdueSection'
 import { EmailActionsBanner } from './EmailActionsBanner'
@@ -756,6 +757,13 @@ export function TodayView({
             })}
           </div>
         )}
+      </div>
+
+      {/* End of day — closing chapter for the timeline. Desktop-only; mobile
+          keeps a tighter schedule-focused view. onOpenReview is a no-op until
+          Phase 2 wires the review flow (intentional handoff). */}
+      <div className="mt-5 hidden md:block">
+        <EndOfDayCard onOpenReview={() => {}} />
       </div>
 
       {/* Timeline note composer (radial wheel → "Note" pick) */}
