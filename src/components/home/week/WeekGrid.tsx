@@ -6,6 +6,11 @@ export const LAST_HOUR = 21       // 9 PM
 export const SLOTS_PER_HOUR = 4   // 15-min increments
 export const HOUR_ROW_HEIGHT = 60 // px
 
+export const TIME_COL_WIDTH = 60   // px — width of the time-label gutter column
+export const ALL_DAY_HEIGHT = 36   // px — min-height of the all-day events row
+export const DAY_HEADER_HEIGHT = 36 // px — height of the day-column header strip
+export const COL_HEADER_HEIGHT = DAY_HEADER_HEIGHT + ALL_DAY_HEIGHT // total offset from top of grid container to the start of hour rows
+
 interface WeekGridProps {
   weekStart: Date  // Sunday of the displayed week, 00:00 local
   children?: ReactNode  // Positioned <WeekEventBlock>s rendered absolutely on top
@@ -21,7 +26,10 @@ export function WeekGrid({ weekStart, children }: WeekGridProps) {
   return (
     <div className="relative border border-neutral-200 rounded-xl overflow-hidden bg-white">
       {/* Day-column headers */}
-      <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-neutral-200 bg-neutral-50/40">
+      <div
+        className="grid border-b border-neutral-200 bg-neutral-50/40"
+        style={{ gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(7, 1fr)` }}
+      >
         <div className="px-2 py-2 text-[10px] uppercase tracking-wide text-neutral-400">Time</div>
         {days.map((d, i) => (
           <div key={i} className="px-2 py-2 text-center border-l border-neutral-200/60">
@@ -34,7 +42,10 @@ export function WeekGrid({ weekStart, children }: WeekGridProps) {
       </div>
 
       {/* All-day row */}
-      <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-neutral-200 bg-neutral-50/20 min-h-[36px]">
+      <div
+        className="grid border-b border-neutral-200 bg-neutral-50/20"
+        style={{ gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(7, 1fr)`, minHeight: ALL_DAY_HEIGHT }}
+      >
         <div className="px-2 py-2 text-[10px] uppercase tracking-wide text-neutral-400">all-day</div>
         {days.map((d, i) => (
           <AllDaySlot key={i} day={d} />
@@ -48,8 +59,8 @@ export function WeekGrid({ weekStart, children }: WeekGridProps) {
           return (
             <div
               key={hour}
-              className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-neutral-100"
-              style={{ height: HOUR_ROW_HEIGHT }}
+              className="grid border-b border-neutral-100"
+              style={{ height: HOUR_ROW_HEIGHT, gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(7, 1fr)` }}
             >
               <div data-hour-label className="px-2 py-1 text-[10px] text-neutral-400">
                 {hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
@@ -61,9 +72,9 @@ export function WeekGrid({ weekStart, children }: WeekGridProps) {
           )
         })}
         {/* End-of-day boundary label at LAST_HOUR (9 PM) */}
-        <div className="grid grid-cols-[60px_repeat(7,1fr)]">
+        <div className="grid" style={{ gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(7, 1fr)` }}>
           <div className="px-2 py-1 text-[10px] text-neutral-400">
-            {LAST_HOUR === 12 ? '12 PM' : LAST_HOUR > 12 ? `${LAST_HOUR - 12} PM` : `${LAST_HOUR} AM`}
+            {(LAST_HOUR as number) === 12 ? '12 PM' : LAST_HOUR > 12 ? `${LAST_HOUR - 12} PM` : `${LAST_HOUR} AM`}
           </div>
           {days.map((_, i) => (
             <div key={i} className="border-l border-neutral-200/60" />
