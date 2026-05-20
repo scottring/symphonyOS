@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { MoreHorizontal } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { useMealPlan } from '@/hooks/useMealPlan'
@@ -92,6 +93,7 @@ export function MealPlanRitualPage() {
   const [picker, setPicker] = useState<{ dayOfWeek: number; slot: MealSlot; familyMemberId?: string; replaceEntryId?: string } | null>(null)
   const [chatOpen, setChatOpen] = useState(false)
   const [previewedDay, setPreviewedDay] = useState<number | null>(null)
+  const [showOverflow, setShowOverflow] = useState(false)
 
   const [tourMounted, setTourMounted] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -342,6 +344,31 @@ export function MealPlanRitualPage() {
                   className="px-3 py-1.5 rounded-full text-[12px] font-medium bg-primary-500 text-white shadow-primary hover:bg-primary-600 flex items-center gap-1.5">
             <ConceptIcon name="ai" size={14} decorative /> Ask Symphony
           </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowOverflow((v) => !v)}
+              aria-label="More options"
+              className="p-1.5 rounded-md text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+            {showOverflow && (
+              <div className="absolute right-0 top-full mt-1 z-30 bg-white border border-neutral-200 rounded-lg shadow-lg py-1 min-w-[160px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.removeItem('symphony_meal_tour_v1_completed')
+                    setTourMounted(true)
+                    setShowOverflow(false)
+                  }}
+                  className="block w-full text-left px-3 py-1.5 text-sm hover:bg-neutral-50"
+                >
+                  Restart tour
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -352,10 +379,6 @@ export function MealPlanRitualPage() {
           planDrafted={!!brief?.generatedAt || (plan?.entries.length ?? 0) > 0}
           prepCount={sundayPrep.length}
           missingGroceriesCount={status.missingItems.length}
-          onRestartTour={() => {
-            localStorage.removeItem('symphony_meal_tour_v1_completed')
-            setTourMounted(true)
-          }}
         />
       </section>
 

@@ -5,17 +5,15 @@ interface Props {
   planDrafted: boolean
   prepCount: number
   missingGroceriesCount: number
-  /** Called when user clicks "Restart tour" link in the overflow. */
-  onRestartTour?: () => void
 }
 
 /** Editorial-calm breadcrumb showing the user's progress through the Sunday
  *  ritual. Each segment links to its anchor on the page. */
-export function RitualStatus({ hasBrief, planDrafted, prepCount, missingGroceriesCount, onRestartTour }: Props) {
+export function RitualStatus({ hasBrief, planDrafted, prepCount, missingGroceriesCount }: Props) {
   const dot = <span className="mx-1.5 text-neutral-300">·</span>
 
   return (
-    <div className="flex items-center justify-between gap-4">
+    <div className="flex items-center gap-4">
       <div className="flex items-center flex-wrap gap-y-1 text-[12px] uppercase tracking-[0.18em] text-neutral-500">
 
         {/* Brief segment */}
@@ -61,15 +59,6 @@ export function RitualStatus({ hasBrief, planDrafted, prepCount, missingGrocerie
         )}
       </div>
 
-      {/* Restart tour link */}
-      {onRestartTour && (
-        <button
-          onClick={onRestartTour}
-          className="shrink-0 text-[11px] italic text-neutral-400 hover:text-primary-500 transition-colors"
-        >
-          Restart tour
-        </button>
-      )}
     </div>
   )
 }
