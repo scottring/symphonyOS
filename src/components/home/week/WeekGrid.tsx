@@ -11,12 +11,23 @@ export const ALL_DAY_HEIGHT = 36   // px — min-height of the all-day events ro
 export const DAY_HEADER_HEIGHT = 36 // px — height of the day-column header strip
 export const COL_HEADER_HEIGHT = DAY_HEADER_HEIGHT + ALL_DAY_HEIGHT // total offset from top of grid container to the start of hour rows
 
+interface CreateGestureHandlers {
+  onSlotPointerDown: (e: React.PointerEvent, slot: { dayIso: string; hour: number; minute: number }) => void
+  onSlotPointerMove: (slot: { dayIso: string; hour: number; minute: number } | null) => void
+  onSlotPointerUp: () => void
+}
+
 interface WeekGridProps {
   weekStart: Date  // Sunday of the displayed week, 00:00 local
   children?: ReactNode  // Positioned <WeekEventBlock>s rendered absolutely on top
+  /** Optional: handlers for drag-to-create on empty slots. When provided, sub-slots
+   *  emit pointerdown/move/up that the parent uses to drive useGridCreate. */
+  onCreateGesture?: CreateGestureHandlers
+  /** When a dnd-kit drag is active, suppress create gestures (slots are drop targets, not create starts). */
+  suppressCreate?: boolean
 }
 
-export function WeekGrid({ weekStart, children }: WeekGridProps) {
+export function WeekGrid({ weekStart, children, onCreateGesture, suppressCreate }: WeekGridProps) {
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(weekStart)
     d.setDate(d.getDate() + i)
@@ -66,7 +77,13 @@ export function WeekGrid({ weekStart, children }: WeekGridProps) {
                 {hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
               </div>
               {days.map((d, i) => (
-                <HourCell key={i} day={d} hour={hour} />
+                <HourCell
+                  key={i}
+                  day={d}
+                  hour={hour}
+                  onCreateGesture={onCreateGesture}
+                  suppressCreate={suppressCreate}
+                />
               ))}
             </div>
           )
@@ -103,27 +120,70 @@ function AllDaySlot({ day }: { day: Date }) {
   )
 }
 
-function HourCell({ day, hour }: { day: Date; hour: number }) {
+interface HourCellProps {
+  day: Date
+  hour: number
+  onCreateGesture?: CreateGestureHandlers
+  suppressCreate?: boolean
+}
+
+function HourCell({ day, hour, onCreateGesture, suppressCreate }: HourCellProps) {
   // Four droppable sub-slots inside one hour cell.
   return (
     <div className="border-l border-neutral-200/60 grid grid-rows-4">
       {Array.from({ length: SLOTS_PER_HOUR }, (_, i) => (
-        <SubSlot key={i} day={day} hour={hour} minute={i * 15} />
+        <SubSlot
+          key={i}
+          day={day}
+          hour={hour}
+          minute={i * 15}
+          onCreateGesture={onCreateGesture}
+          suppressCreate={suppressCreate}
+        />
       ))}
     </div>
   )
 }
 
-function SubSlot({ day, hour, minute }: { day: Date; hour: number; minute: number }) {
+interface SubSlotProps {
+  day: Date
+  hour: number
+  minute: number
+  onCreateGesture?: CreateGestureHandlers
+  suppressCreate?: boolean
+}
+
+function SubSlot({ day, hour, minute, onCreateGesture, suppressCreate }: SubSlotProps) {
   const id = `slot:${dayKey(day)}:${pad(hour)}:${pad(minute)}`
   const { setNodeRef, isOver } = useDroppable({
     id,
     data: { kind: 'timed', dayIso: dayKey(day), hour, minute },
   })
+
+  const slot = { dayIso: dayKey(day), hour, minute }
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (suppressCreate || !onCreateGesture) return
+    onCreateGesture.onSlotPointerDown(e, slot)
+  }
+
+  const handlePointerMove = () => {
+    if (suppressCreate || !onCreateGesture) return
+    onCreateGesture.onSlotPointerMove(slot)
+  }
+
+  const handlePointerUp = () => {
+    if (suppressCreate || !onCreateGesture) return
+    onCreateGesture.onSlotPointerUp()
+  }
+
   return (
     <div
       ref={setNodeRef}
-      className={`${isOver ? 'bg-primary-50/60' : 'hover:bg-neutral-50/40'}`}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      className={`${isOver ? 'bg-primary-50/60' : 'hover:bg-neutral-50/40'} ${onCreateGesture && !suppressCreate ? 'cursor-cell' : ''}`}
     />
   )
 }

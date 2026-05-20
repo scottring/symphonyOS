@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   DndContext,
   DragOverlay,
@@ -9,11 +10,13 @@ import {
 } from '@dnd-kit/core'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
+import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import { useMealPlan } from '@/hooks/useMealPlan'
 import { useRecipes } from '@/hooks/useRecipes'
 import { useGroceryStatus } from '@/hooks/useGroceryStatus'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
+import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { sundayOfWeek } from '@/lib/weekHelpers'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import { familyDinnerSummary, groceriesSummary, prepAheadSummary } from '@/lib/weekHighlights'
@@ -22,6 +25,8 @@ import { UnscheduledChipStrip } from './UnscheduledChipStrip'
 import { WeekGrid } from './WeekGrid'
 import { WeekEventBlock } from './WeekEventBlock'
 import { useWeekDragDrop } from './useWeekDragDrop'
+import { useGridCreate } from './useGridCreate'
+import { SlotQuickCreatePopover, type CreateType } from './SlotQuickCreatePopover'
 
 const EDGE_PX = 40
 
@@ -68,6 +73,31 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const prepAhead = useMemo(
     () => prepAheadSummary(plan, recipes, new Date()),
     [plan, recipes],
+  )
+
+  // Create-gesture wiring
+  const navigate = useNavigate()
+  const { addTask } = useSupabaseTasks()
+  const { createEvent } = useGoogleCalendar()
+  const gridCreate = useGridCreate()
+
+  const handleCreate = useCallback(
+    async (params: { type: CreateType; title: string; startTime: Date; endTime: Date }) => {
+      if (params.type === 'task') {
+        await addTask(params.title, undefined, undefined, params.startTime, { isAllDay: false })
+      } else if (params.type === 'event') {
+        await createEvent({
+          title: params.title,
+          startTime: params.startTime,
+          endTime: params.endTime,
+        })
+      } else if (params.type === 'routine') {
+        // Phase 4b.X: pre-fill RoutineForm modal with time; for now redirect to the page.
+        navigate('/routines')
+      }
+      gridCreate.close()
+    },
+    [addTask, createEvent, navigate, gridCreate],
   )
 
   // Drag-drop wiring
@@ -212,7 +242,19 @@ export function WeekViewV2(props: WeekViewV2Props) {
       >
         <UnscheduledChipStrip tasks={unscheduledTasks} />
 
-        <WeekGrid weekStart={weekStart}>
+        <WeekGrid
+          weekStart={weekStart}
+          onCreateGesture={
+            drag.activeDragId
+              ? undefined
+              : {
+                  onSlotPointerDown: gridCreate.onSlotPointerDown,
+                  onSlotPointerMove: gridCreate.onGridPointerMove,
+                  onSlotPointerUp: gridCreate.onSlotPointerUp,
+                }
+          }
+          suppressCreate={!!drag.activeDragId}
+        >
           {allBlocks.map((item) => (
             <WeekEventBlock
               key={item.id}
@@ -230,6 +272,19 @@ export function WeekViewV2(props: WeekViewV2Props) {
             />
           ))}
         </WeekGrid>
+
+        {gridCreate.state && (() => {
+          const { startTime, endTime } = gridCreate.toTimes(gridCreate.state)
+          return (
+            <SlotQuickCreatePopover
+              anchorRect={gridCreate.state.anchorRect}
+              startTime={startTime}
+              endTime={endTime}
+              onCreate={handleCreate}
+              onCancel={gridCreate.close}
+            />
+          )
+        })()}
 
         <DragOverlay>
           {drag.activeDragId ? <div className="opacity-80">·</div> : null}
