@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, Suspense, type ReactNode } from 'react'
-import { PanelRightOpen } from 'lucide-react'
+import { PanelRightOpen, ChevronLeft, ChevronRight } from 'lucide-react'
 import { TodayRail } from '@/components/today/TodayRail'
 import { useScratchpadHidden } from '@/hooks/useScratchpadHidden'
 import { Sidebar, type ViewType } from './Sidebar'
@@ -66,6 +66,10 @@ interface AppShellProps {
   activeView: ViewType
   onViewChange: (view: ViewType) => void
   onOpenSearch?: () => void
+  // Mobile header: when activeView is 'today', the date + prev/next arrows
+  // render in the app header (instead of the standalone TodayHeader on mobile).
+  viewedDate?: Date
+  onDateChange?: (d: Date) => void
   // Pinned items props
   pins?: PinnedItem[]
   entities?: EntityData
@@ -126,6 +130,8 @@ export function AppShell({
   activeView,
   onViewChange,
   onOpenSearch,
+  viewedDate,
+  onDateChange,
   pins,
   entities,
   railFamilyMembers = [],
@@ -258,19 +264,51 @@ export function AppShell({
         }
         onClick={!isMobile ? handleMainClick : undefined}
       >
-        {/* Mobile header */}
+        {/* Mobile header — three columns: tree logo / centered date with arrows / icon cluster.
+            On non-Today views, the center column stays empty so the icons still anchor right. */}
         {isMobile && (
-          <header className="sticky top-0 z-10 bg-bg-elevated/95 backdrop-blur-lg border-b border-neutral-200/50 px-4 py-1"
+          <header className="sticky top-0 z-10 bg-bg-elevated/95 backdrop-blur-lg border-b border-neutral-200/50 px-3 py-1"
                   style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="font-display text-base font-semibold text-neutral-900">Symphony</span>
+            <div className="flex items-center gap-2">
+              <img
+                src="/symphony-logo.jpg"
+                alt="Symphony"
+                className="w-7 h-7 rounded-full shrink-0 object-cover"
+              />
+
+              <div className="flex-1 min-w-0 flex items-center justify-center gap-0.5">
+                {activeView === 'today' && viewedDate && onDateChange && (
+                  <>
+                    <button
+                      aria-label="Previous day"
+                      onClick={() => {
+                        const n = new Date(viewedDate); n.setDate(n.getDate() - 1); onDateChange(n)
+                      }}
+                      className="p-1 rounded text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors shrink-0"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <span className="font-display text-[15px] font-medium text-neutral-900 truncate">
+                      {viewedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    </span>
+                    <button
+                      aria-label="Next day"
+                      onClick={() => {
+                        const n = new Date(viewedDate); n.setDate(n.getDate() + 1); onDateChange(n)
+                      }}
+                      className="p-1 rounded text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors shrink-0"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
               </div>
-              <div className="flex items-center gap-1">
+
+              <div className="flex items-center gap-0.5 shrink-0">
                 {onOpenSearch && (
                   <button
                     onClick={onOpenSearch}
-                    className="p-2.5 rounded-xl text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-all"
+                    className="p-2 rounded-xl text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-all"
                     aria-label="Search"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
@@ -281,7 +319,7 @@ export function AppShell({
                 <button
                   ref={helpButtonRef}
                   onClick={() => setHelpOpen(o => !o)}
-                  className={`p-2.5 rounded-xl text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-all font-display italic text-[15px] w-9 h-9 grid place-items-center ${
+                  className={`p-2 rounded-xl text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-all font-display italic text-[15px] w-9 h-9 grid place-items-center ${
                     helpOpen ? 'ring-2 ring-primary-500/30 text-primary-500' : ''
                   }`}
                   aria-label="Help"
@@ -289,7 +327,7 @@ export function AppShell({
                 {onSignOut && (
                   <button
                     onClick={onSignOut}
-                    className="p-2.5 rounded-xl text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-all"
+                    className="p-2 rounded-xl text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-all"
                     aria-label="Sign out"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">

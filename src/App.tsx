@@ -1345,6 +1345,8 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       userEmail={user.email ?? undefined}
       userName={getCurrentUserMember()?.name}
       onSignOut={signOut}
+      viewedDate={viewedDate}
+      onDateChange={setViewedDate}
       onQuickAdd={async (title) => {
         const taskId = await addTask(title, undefined, undefined, undefined, {
           assignedTo: getCurrentUserMember()?.id,

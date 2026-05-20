@@ -381,13 +381,15 @@ export function TodayView({
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="max-w-[940px] w-full px-0 py-6 md:pl-10 md:pr-8 md:py-8">
-      {/* Header */}
-      <TodayHeader
-        viewedDate={viewedDate}
-        onDateChange={onDateChange}
-        currentHomeView={currentHomeView}
-        onHomeViewChange={onHomeViewChange}
-      />
+      {/* Header — desktop only; mobile shows the date inline in the app header. */}
+      <div className="hidden md:block">
+        <TodayHeader
+          viewedDate={viewedDate}
+          onDateChange={onDateChange}
+          currentHomeView={currentHomeView}
+          onHomeViewChange={onHomeViewChange}
+        />
+      </div>
 
       {/* Stats + function bar — desktop only. Mobile combines the filters
           into the Add-to-today row below to save vertical space. */}
@@ -534,7 +536,7 @@ export function TodayView({
               const meta = daySectionMeta(section)
               return (
                 <section key={section}>
-                  <h3 className="flex items-center gap-2 text-[11px] uppercase tracking-wider font-semibold text-neutral-400 mb-3 px-3 md:px-0">
+                  <h3 className="hidden md:flex items-center gap-2 text-[11px] uppercase tracking-wider font-semibold text-neutral-400 mb-3 px-3 md:px-0">
                     {createElement(meta.Icon, { className: 'w-4 h-4 text-amber-500 shrink-0' })}
                     <span>{meta.label}</span>
                     {meta.range && (
