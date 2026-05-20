@@ -142,7 +142,7 @@ export function SidebarKinetic({
       <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto">
         <NavButton
           icon={Home}
-          label="Home"
+          label="House"
           active={activeView === 'home'}
           collapsed={collapsed}
           onClick={() => onViewChange('home')}
