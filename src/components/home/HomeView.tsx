@@ -23,6 +23,7 @@ function isWeekV2Enabled(): boolean {
   return localStorage.getItem(WEEK_V2_FLAG) !== 'off'
 }
 import { mondayOfWeek } from '@/lib/workweekHelpers'
+import { sundayOfWeek } from '@/lib/weekHelpers'
 import { CascadingRiverView } from './CascadingRiverView'
 import { TodayView } from '@/components/schedule/TodayView'
 import { UndoToast } from '@/components/undo/UndoToast'
@@ -248,7 +249,7 @@ export function HomeView({
             dateInstances={dateInstances}
             weekStart={mondayStart}
             dayCount={5}
-            onWeekChange={setWeekStart}
+            onWeekChange={(d) => setWeekStart(sundayOfWeek(d))}
             selectedAssignee={selectedAssigneeForSchedule}
             onSelectItem={onSelectItem}
             onUpdateTask={ctx.onUpdateTask ?? (() => {})}
@@ -293,7 +294,7 @@ export function HomeView({
             routines={filteredRoutines}
             dateInstances={dateInstances}
             weekStart={weekStart}
-            onWeekChange={setWeekStart}
+            onWeekChange={(d) => setWeekStart(sundayOfWeek(d))}
             selectedAssignee={selectedAssigneeForSchedule}
             onSelectItem={onSelectItem}
             onUpdateTask={ctx.onUpdateTask ?? (() => {})}
