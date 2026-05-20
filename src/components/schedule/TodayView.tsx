@@ -591,6 +591,23 @@ export function TodayView({
                             })
                           : ''
                         const parsed = parseMealTitle(item.title)
+                        // For synthesized meal events, MealEventsProvider stores
+                        // the recipe source URL in `description` → maps onto
+                        // `googleDescription` on the timeline item.
+                        const recipeUrl = item.googleDescription?.startsWith('http')
+                          ? item.googleDescription
+                          : undefined
+                        const fromPlan = String(item.id).startsWith('meal:')
+                        // Core members (guests excluded) act as default diners
+                        // until per-meal diner assignment lands. The first few
+                        // surface as small stacked avatars on the card.
+                        const coreMembers = familyMembers.filter((m) => m.member_type === 'core')
+                        const diners = coreMembers.map((m) => ({
+                          id: m.id,
+                          initials: m.initials,
+                          color: m.color,
+                        }))
+                        const servesCount = coreMembers.length > 0 ? coreMembers.length : undefined
                         return (
                           <div key={item.id}>
                             {insertBefore}
@@ -599,6 +616,10 @@ export function TodayView({
                                 title={parsed.title}
                                 sides={parsed.sides}
                                 timeLabel={timeLabel}
+                                recipeUrl={recipeUrl}
+                                fromPlan={fromPlan}
+                                servesCount={servesCount}
+                                diners={diners}
                                 onSelect={() => onSelectItem(item.id)}
                               />
                             </div>

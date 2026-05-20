@@ -1,15 +1,48 @@
 import { UtensilsCrossed } from 'lucide-react'
 
+/** Slim avatar shape passed to the dinner card — typically core family members. */
+export interface DinerAvatar {
+  id: string
+  initials: string
+  /** Tailwind-style color name from FamilyMember.color (blue/purple/etc) or a CSS color. */
+  color: string
+}
+
 interface EveningMealCardProps {
   title: string
   sides?: string
   timeLabel: string
   recipeUrl?: string
   imageUrl?: string
+  /** When set, renders a "Serves N" pill in the metadata row. */
+  servesCount?: number
+  /** When the meal originated from the meal plan (not ad-hoc). */
+  fromPlan?: boolean
+  /** Top-right cluster of small avatars showing intended diners. */
+  diners?: DinerAvatar[]
   onSelect: () => void
 }
 
-export function EveningMealCard({ title, sides, timeLabel, recipeUrl, imageUrl, onSelect }: EveningMealCardProps) {
+/**
+ * Evening dinner card. The intentional "atmosphere-first" surface on the Today
+ * timeline — warm peach background, serif title, image affordance, optional
+ * recipe link. Phase 2 added meta chips (serves count, "Meal plan") and a
+ * stacked avatar cluster for diners.
+ */
+export function EveningMealCard({
+  title,
+  sides,
+  timeLabel,
+  recipeUrl,
+  imageUrl,
+  servesCount,
+  fromPlan,
+  diners,
+  onSelect,
+}: EveningMealCardProps) {
+  const hasDiners = !!diners && diners.length > 0
+  const hasMeta = servesCount != null || fromPlan
+
   return (
     <div
       role="button"
@@ -29,7 +62,40 @@ export function EveningMealCard({ title, sides, timeLabel, recipeUrl, imageUrl, 
         </p>
         <p className="font-display text-lg text-neutral-800 leading-tight truncate">{title}</p>
         {sides && <p className="text-[13px] text-neutral-500 truncate">{sides}</p>}
+        {hasMeta && (
+          <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+            {fromPlan && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide bg-white/70 text-[hsl(14_40%_40%)]">
+                Meal plan
+              </span>
+            )}
+            {servesCount != null && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide bg-white/70 text-[hsl(14_40%_40%)]">
+                Serves {servesCount}
+              </span>
+            )}
+          </div>
+        )}
       </div>
+
+      {hasDiners && (
+        <div className="shrink-0 flex -space-x-1.5" aria-label="Diners">
+          {diners!.slice(0, 4).map((d) => (
+            <span
+              key={d.id}
+              className="inline-flex items-center justify-center w-6 h-6 rounded-full ring-2 ring-[hsl(28_55%_94%)] text-[9px] font-medium"
+              style={{
+                backgroundColor: dinerColor(d.color, 0.18),
+                color: dinerColor(d.color, 1),
+              }}
+              aria-hidden
+            >
+              {d.initials}
+            </span>
+          ))}
+        </div>
+      )}
+
       {recipeUrl && (
         <a
           href={recipeUrl}
@@ -43,4 +109,20 @@ export function EveningMealCard({ title, sides, timeLabel, recipeUrl, imageUrl, 
       )}
     </div>
   )
+}
+
+function dinerColor(name: string, alpha: number): string {
+  const base = (() => {
+    switch (name) {
+      case 'blue': return 'hsl(217 91% 60%)'
+      case 'purple': return 'hsl(271 81% 56%)'
+      case 'green': return 'hsl(142 71% 45%)'
+      case 'orange': return 'hsl(25 95% 53%)'
+      case 'pink': return 'hsl(330 81% 60%)'
+      case 'teal': return 'hsl(168 76% 42%)'
+      default: return 'hsl(168 45% 30%)'
+    }
+  })()
+  if (alpha >= 1) return base
+  return `color-mix(in srgb, ${base} ${Math.round(alpha * 100)}%, white)`
 }
