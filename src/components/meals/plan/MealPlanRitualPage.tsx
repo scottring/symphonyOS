@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react'
-import { MoreHorizontal } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { useMealPlan } from '@/hooks/useMealPlan'
@@ -20,8 +19,6 @@ import { ClearWeekButton } from './ClearWeekButton'
 import { AskSymphonyRail } from '../chat/AskSymphonyRail'
 import type { Suggestion } from '../chat/types'
 import { UndoToast } from './UndoToast'
-import { MealsRail } from '../rail/MealsRail'
-import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import { DistributeLeftoversModal } from './DistributeLeftoversModal'
 import { DAY_MEAL_SLOTS, MEAL_SLOT_LABEL } from '@/types/meal-planner'
 import type { MealPlanEntry, MealSlot, Recipe } from '@/types/meal-planner'
@@ -60,40 +57,9 @@ export function MealPlanRitualPage() {
   const { habits, toggleWeekPause } = useStandingHabits()
   const { members: familyMembers } = useFamilyMembers()
   const { applySuggestion } = useApplyMealSuggestion(weekStart, familyMembers)
-  const { events: calendarEvents } = useGoogleCalendar()
-
-  const nextUpEvents = useMemo(() => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const startOfTomorrow = new Date(today)
-    startOfTomorrow.setDate(startOfTomorrow.getDate() + 1)
-    return (calendarEvents ?? [])
-      .filter((e) => {
-        const start = (e as { start_time?: string; startTime?: string }).start_time
-          ?? (e as { start_time?: string; startTime?: string }).startTime
-        if (!start) return false
-        return new Date(start) >= startOfTomorrow
-      })
-      .slice(0, 3)
-      .map((e) => {
-        const start = (e as { start_time?: string; startTime?: string }).start_time
-          ?? (e as { start_time?: string; startTime?: string }).startTime!
-        const d = new Date(start)
-        const startOfDate = new Date(d)
-        startOfDate.setHours(0, 0, 0, 0)
-        const diffDays = Math.round((startOfDate.getTime() - today.getTime()) / 86400000)
-        let dayLabel: string
-        if (diffDays === 1) dayLabel = 'Tomorrow'
-        else if (diffDays <= 6) dayLabel = d.toLocaleDateString('en-US', { weekday: 'long' })
-        else dayLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-        return { id: e.id, dayLabel, title: e.title }
-      })
-  }, [calendarEvents])
-
   const [picker, setPicker] = useState<{ dayOfWeek: number; slot: MealSlot; familyMemberId?: string; replaceEntryId?: string } | null>(null)
   const [chatOpen, setChatOpen] = useState(false)
   const [previewedDay, setPreviewedDay] = useState<number | null>(null)
-  const [showOverflow, setShowOverflow] = useState(false)
 
   const [tourMounted, setTourMounted] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -313,8 +279,7 @@ export function MealPlanRitualPage() {
   const weekLabel = formatDateMonthDay(weekStart)
 
   return (
-    <div className="px-12 py-12 mx-auto max-w-[1280px] flex gap-8">
-    <div className="flex-1 min-w-0 max-w-3xl">
+    <div className="px-12 py-12 max-w-3xl mx-auto">
       <UndoToast />
       <MealsTabs />
 
@@ -344,31 +309,6 @@ export function MealPlanRitualPage() {
                   className="px-3 py-1.5 rounded-full text-[12px] font-medium bg-primary-500 text-white shadow-primary hover:bg-primary-600 flex items-center gap-1.5">
             <ConceptIcon name="ai" size={14} decorative /> Ask Symphony
           </button>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowOverflow((v) => !v)}
-              aria-label="More options"
-              className="p-1.5 rounded-md text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
-            >
-              <MoreHorizontal className="w-4 h-4" />
-            </button>
-            {showOverflow && (
-              <div className="absolute right-0 top-full mt-1 z-30 bg-white border border-neutral-200 rounded-lg shadow-lg py-1 min-w-[160px]">
-                <button
-                  type="button"
-                  onClick={() => {
-                    localStorage.removeItem('symphony_meal_tour_v1_completed')
-                    setTourMounted(true)
-                    setShowOverflow(false)
-                  }}
-                  className="block w-full text-left px-3 py-1.5 text-sm hover:bg-neutral-50"
-                >
-                  Restart tour
-                </button>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
@@ -379,6 +319,10 @@ export function MealPlanRitualPage() {
           planDrafted={!!brief?.generatedAt || (plan?.entries.length ?? 0) > 0}
           prepCount={sundayPrep.length}
           missingGroceriesCount={status.missingItems.length}
+          onRestartTour={() => {
+            localStorage.removeItem('symphony_meal_tour_v1_completed')
+            setTourMounted(true)
+          }}
         />
       </section>
 
@@ -642,21 +586,6 @@ export function MealPlanRitualPage() {
           onDismiss={() => setTourMounted(false)}
         />
       )}
-    </div>
-    <aside className="w-[340px] shrink-0 hidden lg:block">
-      <MealsRail
-        plan={plan}
-        recipes={recipes}
-        weekStart={weekStart}
-        missingItems={status.missingItems}
-        nextUpEvents={nextUpEvents}
-        onReviewGroceries={() => {
-          const el = document.getElementById('groceries')
-          if (el) el.scrollIntoView({ behavior: 'smooth' })
-        }}
-        onViewCalendar={() => navigate('/calendar')}
-      />
-    </aside>
     </div>
   )
 }
