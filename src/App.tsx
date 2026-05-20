@@ -1292,6 +1292,9 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     onPushEvent: scheduleActions.onPushEvent,
     onUpdateEventContext: updateEventContext,
     onHideEvent: hideEvent,
+    onUpdateEvent: async (eventId: string, { startTime, endTime }: { startTime: Date; endTime: Date }) => {
+      await updateEvent({ eventId, startTime, endTime })
+    },
 
     // Reference data
     contactsMap,
@@ -1327,7 +1330,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     addNote, deleteNote, appendToNote, notes,
     addRoutine, deleteRoutine, createEvent, deleteEvent,
     fmtT, setTlUndo, showToast,
-    scheduleActions, updateRoutine, updateEventContext, hideEvent,
+    scheduleActions, updateRoutine, updateEventContext, hideEvent, updateEvent,
     contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
     eventNotesMap, eventContextOverrides,
     handleSendToList, handleCreateListInTriage, addProject, searchContacts, addContact,

@@ -43,7 +43,7 @@ interface WeekViewV2Props {
   selectedAssignee?: string | null
   onSelectItem: (id: string | null) => void
   onUpdateTask: (taskId: string, updates: Partial<Task>) => Promise<void> | void
-  onUpdateEvent: (eventId: string, updates: Partial<CalendarEvent>) => Promise<void> | void
+  onUpdateEvent: (eventId: string, updates: { startTime: Date; endTime: Date }) => Promise<void> | void
   onUpdateRoutine: (routineId: string, updates: Partial<Routine>) => Promise<void> | void
   /** Number of day columns. 5 = workweek (Mon-Fri), 7 = full week. Default 7. */
   dayCount?: 5 | 7

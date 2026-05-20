@@ -253,7 +253,7 @@ export function HomeView({
             onSelectItem={onSelectItem}
             onUpdateTask={ctx.onUpdateTask ?? (() => {})}
             onUpdateRoutine={ctx.onUpdateRoutine ?? (() => {})}
-            onUpdateEvent={() => {}}
+            onUpdateEvent={ctx.onUpdateEvent ?? (() => {})}
             pushAction={pushAction}
           />
           <WeekViewMobile
@@ -298,12 +298,7 @@ export function HomeView({
             onSelectItem={onSelectItem}
             onUpdateTask={ctx.onUpdateTask ?? (() => {})}
             onUpdateRoutine={ctx.onUpdateRoutine ?? (() => {})}
-            // TODO: ScheduleActionsContext has no generic onUpdateEvent — only
-            // onUpdateEventContext (sets context tag) and onUpdateEventProject.
-            // Drag-to-reschedule on events will be a no-op until a full
-            // onUpdateEvent is added to the context and wired to the Google
-            // Calendar mutation hook.
-            onUpdateEvent={() => {}}
+            onUpdateEvent={ctx.onUpdateEvent ?? (() => {})}
             pushAction={pushAction}
           />
           <WeekViewMobile

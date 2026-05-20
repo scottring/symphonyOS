@@ -12,7 +12,7 @@ interface UseWeekDragDropArgs {
   weekStart: Date
   onWeekChange: (newWeekStart: Date) => void
   onUpdateTask: (taskId: string, updates: TaskUpdates) => Promise<void> | void
-  onUpdateEvent: (eventId: string, updates: Partial<CalendarEvent>) => Promise<void> | void
+  onUpdateEvent: (eventId: string, updates: { startTime: Date; endTime: Date }) => Promise<void> | void
   onUpdateRoutine: (routineId: string, updates: Partial<Routine>) => Promise<void> | void
   tasks: (Task & { endTime?: Date })[]
   events: CalendarEvent[]
@@ -109,8 +109,24 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
         return
       }
       if (itemId.startsWith('event-')) {
-        // Events drag: not yet wired — no-op. (Spec gap to be addressed later.)
-        void itemId
+        const eventId = itemId.slice('event-'.length)
+        const event = args.events.find((ev) => ev.id === eventId)
+        if (!event) return
+        const startStr =
+          (event as { start_time?: string }).start_time ??
+          (event as { startTime?: string }).startTime
+        const endStr =
+          (event as { end_time?: string }).end_time ??
+          (event as { endTime?: string }).endTime
+        if (!startStr || !endStr) return
+        const oldStart = new Date(startStr)
+        const oldEnd = new Date(endStr)
+        const duration = oldEnd.getTime() - oldStart.getTime()
+        const newEnd = new Date(newStart.getTime() + duration)
+        void args.onUpdateEvent(eventId, { startTime: newStart, endTime: newEnd })
+        args.pushAction?.(`Moved "${event.title}"`, () => {
+          void args.onUpdateEvent(eventId, { startTime: oldStart, endTime: oldEnd })
+        })
         return
       }
       // 'routine-...' shouldn't reach here (routines are non-draggable per spec).

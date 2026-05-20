@@ -85,6 +85,9 @@ export interface ScheduleActionsValue {
 
   // Event → Project promotion
   onUpdateEventProject?: (googleEventId: string, projectId: string | null, eventTitle?: string | null, eventStartTime?: Date | null) => void
+
+  /** Reschedule a Google Calendar event (drag-to-move). Accepts new start + end (durations preserved by caller). */
+  onUpdateEvent?: (eventId: string, updates: { startTime: Date; endTime: Date }) => Promise<void> | void
 }
 
 const ScheduleActionsContext = createContext<ScheduleActionsValue | null>(null)
