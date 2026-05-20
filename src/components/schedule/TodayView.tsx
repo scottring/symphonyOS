@@ -3,7 +3,7 @@
  *
  * Drop-in replacement for TodaySchedule (same TodayScheduleProps interface).
  * Composes: TodayHeader, StatsRow, TodaysFocusCard, WeatherCard,
- *           AiSuggestionBanner, EveningMealCard, ScheduleItem.
+ *           EveningMealCard, ScheduleItem.
  *
  * NOT wired to the route yet — that happens in R4.
  */
@@ -39,7 +39,6 @@ import { ClarityIndicator } from './ClarityIndicator'
 import { StagingFloat } from './StagingFloat'
 import { TodaysFocusCard } from './TodaysFocusCard'
 import { WeatherCard } from './WeatherCard'
-import { AiSuggestionBanner } from './AiSuggestionBanner'
 import { EveningMealCard } from './EveningMealCard'
 import { ScheduleItem } from './ScheduleItem'
 import { OverdueSection } from './OverdueSection'
@@ -757,11 +756,6 @@ export function TodayView({
             })}
           </div>
         )}
-      </div>
-
-      {/* AI banner — desktop-only; mobile keeps a tighter schedule-focused view */}
-      <div className="mt-5 hidden md:block">
-        <AiSuggestionBanner />
       </div>
 
       {/* Timeline note composer (radial wheel → "Note" pick) */}
