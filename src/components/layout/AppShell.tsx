@@ -171,7 +171,7 @@ export function AppShell({
   const helpButtonRef = useRef<HTMLButtonElement>(null)
 
   // Track window width for three-panel mode
-  // Breakpoint: sidebar(240) + min content(360) + detail(420) + chat(380) ≈ 1400px
+  // Breakpoint: sidebar(240) + min content(360) + detail(380) + chat(380) ≈ 1360px
   const [isWideScreen, setIsWideScreen] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth >= 1400 : false
   )
@@ -253,12 +253,12 @@ export function AppShell({
         style={isMobile
           ? { paddingBottom: 'calc(2.75rem + env(safe-area-inset-bottom, 0px))' }
           : {
-              marginRight: useThreePanelLayout && focusModeOpen ? '1220px'  // 420 + 380 + 420
-                : useThreePanelLayout ? '800px'                             // 420 + 380
-                : rightPanelVisible && focusModeOpen ? '840px'
-                : focusModeOpen ? '420px'
-                : rightPanelVisible ? '420px'
-                : scratchpadVisible ? '420px'
+              marginRight: useThreePanelLayout && focusModeOpen ? '1140px'  // 380 + 380 + 380
+                : useThreePanelLayout ? '760px'                             // 380 + 380
+                : rightPanelVisible && focusModeOpen ? '760px'
+                : focusModeOpen ? '380px'
+                : rightPanelVisible ? '380px'
+                : scratchpadVisible ? '380px'
                 : '0'
             }
         }
@@ -378,7 +378,7 @@ export function AppShell({
         />
       )}
 
-      {/* Right panel column — tabbed: Details + AI share one 420px column */}
+      {/* Right panel column — tabbed: Details + AI share one 380px column */}
       {isMobile ? (
         <>
           {/* Mobile: detail panel as full-screen overlay */}
@@ -430,13 +430,13 @@ export function AppShell({
           {/* Detail panel — left of pair */}
           <aside
             className={`
-              fixed top-0 bottom-0 w-[420px]
+              fixed top-0 bottom-0 w-[380px]
               bg-bg-elevated border-l border-neutral-200/80
               transition-transform duration-300 ease-out
               ${panelOpen ? 'translate-x-0' : 'translate-x-full'}
               shadow-xl z-20
             `}
-            style={{ right: (focusModeOpen ? 420 : 0) + 380 }}
+            style={{ right: (focusModeOpen ? 380 : 0) + 380 }}
           >
             {panel}
           </aside>
@@ -451,7 +451,7 @@ export function AppShell({
                 ${chatOpen ? 'translate-x-0' : 'translate-x-full'}
                 shadow-xl z-20
               `}
-              style={{ right: focusModeOpen ? 420 : 0 }}
+              style={{ right: focusModeOpen ? 380 : 0 }}
             >
               <ChatPanel
                 messages={chatMessages}
@@ -479,13 +479,13 @@ export function AppShell({
         /* Narrow screen or single panel: tabbed single column */
         <aside
           className={`
-            fixed top-0 bottom-0 w-[420px]
+            fixed top-0 bottom-0 w-[380px]
             bg-bg-elevated border-l border-neutral-200/80
             transition-transform duration-300 ease-out
             ${rightPanelVisible ? 'translate-x-0' : 'translate-x-full'}
             shadow-xl z-20 flex flex-col
           `}
-          style={{ right: focusModeOpen ? '420px' : '0' }}
+          style={{ right: focusModeOpen ? '380px' : '0' }}
         >
           {/* Tabs — shown when both detail and chat are active on narrow screens */}
           {showPanelTabs && (
@@ -557,7 +557,7 @@ export function AppShell({
           Projects) above the Scratchpad. */}
       {scratchpadVisible && (
         <aside
-          className="fixed top-0 bottom-0 right-0 w-[420px] bg-bg-base border-l border-neutral-200/80 z-10 p-4"
+          className="fixed top-0 bottom-0 right-0 w-[380px] bg-bg-base border-l border-neutral-200/80 z-10 p-4"
           aria-label="Today rail"
         >
           <TodayRail
