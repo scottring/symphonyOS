@@ -8,6 +8,8 @@ import {
   groupByTimeSection,
   formatTime,
   formatTimeRange,
+  formatTimeLong,
+  formatTimeRangeLong,
 } from './timeUtils'
 import type { TimelineItem } from '@/types/timeline'
 
@@ -275,5 +277,43 @@ describe('formatTimeRange', () => {
     const start = new Date('2024-01-15T00:00:00')
     const end = new Date('2024-01-16T00:00:00')
     expect(formatTimeRange(start, end, true)).toBe('All day')
+  })
+})
+
+describe('formatTimeLong', () => {
+  it('formats whole hour as "1:00 PM"', () => {
+    const d = new Date(2026, 4, 20, 13, 0)
+    expect(formatTimeLong(d)).toBe('1:00 PM')
+  })
+
+  it('formats minutes with leading zero', () => {
+    const d = new Date(2026, 4, 20, 17, 30)
+    expect(formatTimeLong(d)).toBe('5:30 PM')
+  })
+
+  it('formats midnight as "12:00 AM"', () => {
+    const d = new Date(2026, 4, 20, 0, 0)
+    expect(formatTimeLong(d)).toBe('12:00 AM')
+  })
+
+  it('formats noon as "12:00 PM"', () => {
+    const d = new Date(2026, 4, 20, 12, 0)
+    expect(formatTimeLong(d)).toBe('12:00 PM')
+  })
+
+  it('returns empty string for invalid date', () => {
+    expect(formatTimeLong(new Date('invalid'))).toBe('')
+  })
+})
+
+describe('formatTimeRangeLong', () => {
+  it('returns "All day" for allDay', () => {
+    expect(formatTimeRangeLong(new Date(), new Date(), true)).toBe('All day')
+  })
+
+  it('joins start and end with pipe', () => {
+    const start = new Date(2026, 4, 20, 13, 0)
+    const end = new Date(2026, 4, 20, 14, 0)
+    expect(formatTimeRangeLong(start, end)).toBe('1:00 PM|2:00 PM')
   })
 })

@@ -147,6 +147,30 @@ export function formatTimeRange(start: Date, end: Date, allDay?: boolean): strin
 }
 
 /**
+ * Format a time for display in long form: "1:00 PM" / "5:30 PM".
+ * Use for surfaces that want calm, calendar-app typography.
+ * For compact lists/badges, prefer `formatTime` ("1p" / "5:30p").
+ */
+export function formatTimeLong(date: Date): string {
+  if (!isValidDate(date)) return ''
+  const hours = date.getHours()
+  const minutes = date.getMinutes()
+  const period = hours >= 12 ? 'PM' : 'AM'
+  const displayHour = hours % 12 || 12
+  return `${displayHour}:${minutes.toString().padStart(2, '0')} ${period}`
+}
+
+/**
+ * Long-form range formatter. Returns "All day" / "1:00 PM|2:00 PM".
+ * The pipe separator matches `formatTimeRange` so callers can `.split('|')` identically.
+ */
+export function formatTimeRangeLong(start: Date, end: Date, allDay?: boolean): string {
+  if (allDay) return 'All day'
+  if (!isValidDate(start) || !isValidDate(end)) return ''
+  return `${formatTimeLong(start)}|${formatTimeLong(end)}`
+}
+
+/**
  * Format a time range with date context for display.
  * Shows relative context like formatTimeWithDate but for ranges:
  * - "Today 1p|3p"
