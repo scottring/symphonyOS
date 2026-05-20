@@ -7,7 +7,7 @@ import { formatTime, formatTimeRange, inferMealTime } from '@/lib/timeUtils'
 import { getProjectColor } from '@/lib/projectUtils'
 import { PushDropdown, SchedulePopover, ContextPicker, DiscussionPicker, type ScheduleContextItem } from '@/components/triage'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
-import { Redo2, Video } from 'lucide-react'
+import { Redo2, Video, MoreHorizontal, Calendar, Car, UtensilsCrossed, Bath, Repeat, Tag } from 'lucide-react'
 import { ConceptIcon, type ConceptName } from '@/lib/conceptIcons'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useMobile } from '@/hooks/useMobile'
@@ -310,6 +310,151 @@ export const ScheduleItem = memo(function ScheduleItem({
 
   // Get project color for left edge indicator
   const projectColor = projectId ? getProjectColor(projectId) : null
+
+  // ── Mobile card render ────────────────────────────────────────────────────
+  // Matches the mockup: each row is a discrete card with a left time column,
+  // a tinted icon block, a title + small context line, and a right cluster
+  // (project tag, assignee, more). Desktop render falls through below.
+  if (isMobile) {
+    // Pick an activity icon. Prefer the most specific signal we have.
+    const titleLower = item.title.toLowerCase()
+    const ActivityIcon = /meal|breakfast|lunch|dinner|snack|recipe|cook/.test(titleLower)
+      ? UtensilsCrossed
+      : /pick\s*up|drop\s*off|drive|car/.test(titleLower)
+        ? Car
+        : /shower|bath/.test(titleLower)
+          ? Bath
+          : isEvent
+            ? Calendar
+            : isRoutine
+              ? Repeat
+              : Calendar
+
+    // Tint the icon block from the item's context color, with neutral peach
+    // as the default when there's no domain context set.
+    const tintHex = contextColor || '#F4A572'
+    const iconBg = `color-mix(in srgb, ${tintHex} 18%, transparent)`
+    const iconFg = tintHex
+
+    // Time displayed stacked: "1:00 / PM" for single times, with a hyphen row
+    // for ranges ("6:30 / – / 7:15 / PM").
+    const splitTime = (s: string) => {
+      const m = s.match(/^(.+?)\s?(AM|PM)$/i)
+      return m ? [m[1], m[2].toUpperCase()] : [s, '']
+    }
+    const renderStackedTime = () => {
+      if (!timeDisplay) return null
+      if (timeDisplay.type === 'allday') {
+        return <span className="text-[11px] font-medium text-neutral-400">All day</span>
+      }
+      if (timeDisplay.type === 'range') {
+        const [s1, p1] = splitTime(timeDisplay.start)
+        const [s2] = splitTime(timeDisplay.end)
+        return (
+          <>
+            <div>{s1}</div>
+            <div>–</div>
+            <div>{s2}</div>
+            <div>{p1}</div>
+          </>
+        )
+      }
+      const timeStr = timeDisplay.time ?? ''
+      const [hm, ap] = splitTime(timeStr)
+      return (
+        <>
+          <div>{hm}</div>
+          {ap && <div>{ap}</div>}
+        </>
+      )
+    }
+
+    // Small context line: prefer project name, then category, then location.
+    const contextLabel = projectName || (item.category && item.category !== 'task' ? item.category : null) || item.location || null
+    const dotColor = projectColor || contextColor || null
+
+    return (
+      <div
+        data-selectable
+        onClick={() => onSelect()}
+        onKeyDown={handleKeyDown}
+        tabIndex={0}
+        role="button"
+        aria-pressed={selected}
+        className={`
+          relative flex items-center gap-3 bg-bg-elevated rounded-xl border border-neutral-200/50
+          px-3 py-3 mb-2 cursor-pointer transition-shadow
+          ${selected ? 'ring-2 ring-primary-300' : ''}
+          ${item.completed || item.skipped ? 'opacity-60' : ''}
+        `}
+      >
+        {/* Left time column — stacked */}
+        <div className="w-12 shrink-0 text-[12px] font-medium text-neutral-500 leading-tight tabular-nums text-left">
+          {renderStackedTime()}
+        </div>
+
+        {/* Activity icon block — tinted rounded square, doubles as the
+            check-off control (tap to toggle completion). */}
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); handleCheckboxClick(e) }}
+          className="w-11 h-11 shrink-0 rounded-lg flex items-center justify-center transition-transform active:scale-95"
+          style={{ backgroundColor: iconBg, color: iconFg }}
+          aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
+        >
+          <ActivityIcon className="w-5 h-5" />
+        </button>
+
+        {/* Title + context line */}
+        <div className="flex-1 min-w-0">
+          <div className={`text-[15px] font-semibold leading-tight truncate ${item.completed || item.skipped ? 'line-through text-neutral-400' : 'text-neutral-800'}`}>
+            {item.title}
+          </div>
+          {contextLabel && (
+            <div className="flex items-center gap-1.5 text-[12px] text-neutral-500 mt-0.5 truncate">
+              {dotColor && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: dotColor }} />}
+              <span className="truncate">{contextLabel}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Right cluster — project tag + assignee + more */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {projectName && (
+            <Tag className="w-4 h-4 text-orange-400" style={projectColor ? { color: projectColor } : undefined} />
+          )}
+          {familyMembers.length > 0 && onAssignAll ? (
+            <div onClick={(e) => { e.stopPropagation(); if (panelOpen && onClosePanel) onClosePanel() }}>
+              <MultiAssigneeDropdown
+                members={familyMembers}
+                selectedIds={assignedToAll}
+                onSelect={onAssignAll}
+                size="sm"
+                label={item.type === 'event' ? "Who's attending?" : "Who's responsible?"}
+              />
+            </div>
+          ) : familyMembers.length > 0 && onAssign ? (
+            <div onClick={(e) => { e.stopPropagation(); if (panelOpen && onClosePanel) onClosePanel() }}>
+              <AssigneeDropdown
+                members={familyMembers}
+                selectedId={assignedTo}
+                onSelect={onAssign}
+                size="sm"
+              />
+            </div>
+          ) : null}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onSelect() }}
+            aria-label="More actions"
+            className="p-1 text-neutral-400 hover:text-neutral-600"
+          >
+            <MoreHorizontal className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div
