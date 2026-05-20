@@ -154,6 +154,14 @@ export function WeekViewV2(props: WeekViewV2Props) {
     [events, weekStart],
   )
 
+  // Respect the app-wide 'Hide daily activities' toggle (same localStorage key
+  // TodayView uses). When true, routines are omitted from the grid; tasks and
+  // events still render. Users toggle this from the Today view's stats row.
+  const hideRoutines = useMemo(() => {
+    try { return localStorage.getItem('symphony-hide-routines') === 'true' }
+    catch { return false }
+  }, [])
+
   // Convert to TimelineItems for grid rendering.
   // Routines are expanded into 7 day-instances (render-only; WeekEventBlock
   // sets disabled:true for isRoutine so they never become drag sources).
@@ -163,7 +171,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const allBlocks = useMemo(() => {
     const taskItems = scheduledTasks.map(taskToTimelineItem)
     const eventItems = weekEvents.map(eventToTimelineItem)
-    const routineItems = routines.flatMap((r) =>
+    const routineItems = hideRoutines ? [] : routines.flatMap((r) =>
       Array.from({ length: 7 }, (_, i) => {
         const d = new Date(weekStart)
         d.setDate(d.getDate() + i)
@@ -171,7 +179,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
       }),
     )
     return [...taskItems, ...eventItems, ...routineItems]
-  }, [scheduledTasks, weekEvents, routines, weekStart])
+  }, [scheduledTasks, weekEvents, routines, weekStart, hideRoutines])
 
   // WeekEventBlock.onSelect expects (id: string), but onSelectItem is
   // (id: string | null). Narrow here so TypeScript is satisfied; passing null

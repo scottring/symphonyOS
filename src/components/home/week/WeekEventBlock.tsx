@@ -28,12 +28,14 @@ export function WeekEventBlock({ item, weekStart, onSelect, onResizeCommit }: We
   // Routines are render-only (no drag). Use a distinct id prefix so dnd-kit
   // never confuses them with draggable task/event blocks.
   const dragId = isRoutine ? `block-routine:${item.id}` : `block:${item.id}`
-  // Click vs drag is handled at the DndContext level via PointerSensor
-  // activationConstraint: { distance: 8 } — see WeekViewV2 (Task 10).
-  // We use onPointerUp (not onClick) because without an activationConstraint,
-  // dnd-kit immediately activates on pointerdown and then blocks document-level
-  // click events via a capture listener. onPointerUp fires before that blocker
-  // takes effect and is safe to use for both tap-to-select and drag end.
+  // Click vs drag is disambiguated at the DndContext level via PointerSensor
+  // activationConstraint: { distance: 8 }. With the constraint active:
+  //   - A tap (no movement) → click fires normally
+  //   - A drag (≥8px movement) → dnd-kit activates and cancels the subsequent
+  //     click so onClick does NOT fire after a successful drop
+  // Using onClick (not onPointerUp) is essential here: dnd-kit captures the
+  // pointer during drag, and onPointerUp would still fire at drop time —
+  // opening the detail panel immediately after every successful move.
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: dragId,
     disabled: isRoutine || isResizing,
@@ -56,7 +58,7 @@ export function WeekEventBlock({ item, weekStart, onSelect, onResizeCommit }: We
       aria-label={isRoutine ? `Routine — view only: ${item.title}` : item.title}
       role="button"
       tabIndex={0}
-      onPointerUp={(e) => { e.stopPropagation(); onSelect(item.id) }}
+      onClick={(e) => { e.stopPropagation(); onSelect(item.id) }}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(item.id) } }}
       className={[
         'absolute pointer-events-auto',
