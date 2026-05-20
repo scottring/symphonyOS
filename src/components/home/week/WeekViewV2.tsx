@@ -96,8 +96,23 @@ export function WeekViewV2(props: WeekViewV2Props) {
           endTime: params.endTime,
         })
       } else if (params.type === 'routine') {
-        // Phase 4b.X: pre-fill RoutineForm modal with time; for now redirect to the page.
-        navigate('/routines')
+        // Routines need a recurrence pattern that doesn't fit the popover.
+        // Build an NL string from the slot's title/weekday/time and navigate
+        // to /routines/new with it as initial input — parseRoutine handles
+        // the structured conversion. e.g., "Yoga every tuesday at 9:00am"
+        const weekday = params.startTime
+          .toLocaleDateString('en-US', { weekday: 'long' })
+          .toLowerCase()
+        const timeStr = params.startTime
+          .toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+          })
+          .toLowerCase()
+          .replace(/\s/g, '') // "9:00am" not "9:00 AM"
+        const initialNl = `${params.title} every ${weekday} at ${timeStr}`
+        navigate(`/routines/new?initial=${encodeURIComponent(initialNl)}`)
       }
       gridCreate.close()
     },

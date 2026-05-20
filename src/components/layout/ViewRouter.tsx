@@ -1,4 +1,4 @@
-import { Suspense } from 'react'
+import { Suspense, useMemo } from 'react'
 import { useLocation, useNavigate, useParams, Navigate } from 'react-router-dom'
 import { SectionErrorBoundary } from '@/components/SectionErrorBoundary'
 import { AgentHomeView } from '@/components/agent/AgentHomeView'
@@ -160,6 +160,10 @@ export interface ViewRouterProps {
 export function ViewRouter(props: ViewRouterProps) {
   const navigate = useNavigate()
   const location = useLocation()
+  const initialNlInput = useMemo(() => {
+    const params = new URLSearchParams(location.search)
+    return params.get('initial') ?? ''
+  }, [location.search])
 
   return (
     <SectionErrorBoundary sectionName="Content" onReset={() => props.onViewChange('today')}>
@@ -366,6 +370,7 @@ export function ViewRouter(props: ViewRouterProps) {
             <Suspense fallback={<LoadingFallback />}>
               <RoutineInput
                 contacts={props.contacts}
+                initialValue={initialNlInput}
                 onSave={async (input) => {
                   await props.onAddRoutine({ ...input, context: props.currentDomain !== 'universal' ? props.currentDomain : undefined })
                   navigate('/routines')

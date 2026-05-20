@@ -91,6 +91,23 @@ describe('SlotQuickCreatePopover', () => {
     expect(onCancel).toHaveBeenCalled()
   })
 
+  it('fires onCreate with type=routine when routine is selected and Create is clicked', async () => {
+    const onCreate = vi.fn()
+    const { user } = render(
+      <SlotQuickCreatePopover
+        anchorRect={{ top: 0, left: 0, width: 100, height: 60 }}
+        startTime={new Date(2026, 4, 19, 9, 0)}
+        endTime={new Date(2026, 4, 19, 9, 30)}
+        onCreate={onCreate}
+        onCancel={vi.fn()}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: /routine/i }))
+    await user.type(screen.getByPlaceholderText(/title/i), 'Yoga')
+    await user.click(screen.getByRole('button', { name: /^create$/i }))
+    expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ type: 'routine', title: 'Yoga' }))
+  })
+
   it('passes the correct startTime and endTime to onCreate', async () => {
     const onCreate = vi.fn()
     const start = new Date(2026, 4, 20, 14, 0)
