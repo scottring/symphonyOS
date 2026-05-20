@@ -17,6 +17,8 @@ interface UseWeekDragDropArgs {
   tasks: (Task & { endTime?: Date })[]
   events: CalendarEvent[]
   routines: Routine[]
+  /** Number of days in the displayed week — controls cross-week auto-advance step. Default 7. */
+  dayCount?: number
 }
 
 interface UseWeekDragDropResult {
@@ -111,7 +113,7 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
     if (cooldownRef.current) return
     if (advanceTimerRef.current) return // already armed
     advanceTimerRef.current = setTimeout(() => {
-      const direction = edge === 'right' ? 7 : -7
+      const direction = edge === 'right' ? (args.dayCount ?? 7) : -(args.dayCount ?? 7)
       const newStart = new Date(args.weekStart)
       newStart.setDate(newStart.getDate() + direction)
       args.onWeekChange(newStart)

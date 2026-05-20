@@ -44,6 +44,8 @@ interface WeekViewV2Props {
   onUpdateTask: (taskId: string, updates: Partial<Task>) => Promise<void> | void
   onUpdateEvent: (eventId: string, updates: Partial<CalendarEvent>) => Promise<void> | void
   onUpdateRoutine: (routineId: string, updates: Partial<Routine>) => Promise<void> | void
+  /** Number of day columns. 5 = workweek (Mon-Fri), 7 = full week. Default 7. */
+  dayCount?: 5 | 7
 }
 
 export function WeekViewV2(props: WeekViewV2Props) {
@@ -57,6 +59,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     onUpdateTask,
     onUpdateEvent,
     onUpdateRoutine,
+    dayCount = 7,
   } = props
 
   // Summary data
@@ -110,6 +113,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     tasks,
     events,
     routines,
+    dayCount,
   })
 
   // Sensor with activation constraint — disambiguates click vs drag.
@@ -149,12 +153,12 @@ export function WeekViewV2(props: WeekViewV2Props) {
     }
   }
 
-  // Week bounds: [weekStart, weekStart + 7 days)
+  // Week bounds: [weekStart, weekStart + dayCount days)
   const weekEnd = useMemo(() => {
     const e = new Date(weekStart)
-    e.setDate(e.getDate() + 7)
+    e.setDate(e.getDate() + dayCount)
     return e
-  }, [weekStart])
+  }, [weekStart, dayCount])
 
   const inWeek = (d: Date) => d >= weekStart && d < weekEnd
 
@@ -202,14 +206,14 @@ export function WeekViewV2(props: WeekViewV2Props) {
     const taskItems = scheduledTasks.map(taskToTimelineItem)
     const eventItems = weekEvents.map(eventToTimelineItem)
     const routineItems = hideRoutines ? [] : routines.flatMap((r) =>
-      Array.from({ length: 7 }, (_, i) => {
+      Array.from({ length: dayCount }, (_, i) => {
         const d = new Date(weekStart)
         d.setDate(d.getDate() + i)
         return { ...routineToTimelineItem(r, d), id: `routine-${r.id}-day${i}` }
       }),
     )
     return [...taskItems, ...eventItems, ...routineItems]
-  }, [scheduledTasks, weekEvents, routines, weekStart, hideRoutines])
+  }, [scheduledTasks, weekEvents, routines, weekStart, hideRoutines, dayCount])
 
   // WeekEventBlock.onSelect expects (id: string), but onSelectItem is
   // (id: string | null). Narrow here so TypeScript is satisfied; passing null
@@ -244,6 +248,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
 
         <WeekGrid
           weekStart={weekStart}
+          dayCount={dayCount}
           onCreateGesture={
             drag.activeDragId
               ? undefined
