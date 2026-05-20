@@ -380,7 +380,7 @@ export function TodayView({
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-[940px] w-full px-6 py-6 md:pl-10 md:pr-8 md:py-8">
+    <div className="max-w-[940px] w-full px-0 py-6 md:pl-10 md:pr-8 md:py-8">
       {/* Header */}
       <TodayHeader
         viewedDate={viewedDate}
@@ -437,7 +437,7 @@ export function TodayView({
             <TodayAddInput onAdd={ctx.onCreateTask} />
           </div>
           {/* Mobile: combined add + filters */}
-          <div className="md:hidden mb-4 flex items-center gap-2">
+          <div className="md:hidden mb-4 px-3 flex items-center gap-2">
             <div className="flex-1 min-w-0">
               <TodayAddInput onAdd={ctx.onCreateTask} />
             </div>
@@ -534,7 +534,7 @@ export function TodayView({
               const meta = daySectionMeta(section)
               return (
                 <section key={section}>
-                  <h3 className="flex items-center gap-2 text-[11px] uppercase tracking-wider font-semibold text-neutral-400 mb-3">
+                  <h3 className="flex items-center gap-2 text-[11px] uppercase tracking-wider font-semibold text-neutral-400 mb-3 px-3 md:px-0">
                     {createElement(meta.Icon, { className: 'w-4 h-4 text-amber-500 shrink-0' })}
                     <span>{meta.label}</span>
                     {meta.range && (
