@@ -75,6 +75,9 @@ interface CreateEventRequest {
 interface UpdateEventRequest {
   eventId: string  // Google Calendar event ID
   location?: string | null  // null to remove location
+  startTime?: string  // ISO 8601 datetime string
+  endTime?: string    // ISO 8601 datetime string
+  timeZone?: string   // IANA timezone (e.g., 'America/New_York')
   calendarId?: string  // Calendar ID (defaults to 'primary')
 }
 
@@ -106,7 +109,7 @@ serve(async (req) => {
     if (isUpdate) {
       // Handle update request
       const updateBody: UpdateEventRequest = body
-      const { eventId, location, calendarId = 'primary' } = updateBody
+      const { eventId, location, startTime, endTime, timeZone, calendarId = 'primary' } = updateBody
 
       if (!eventId) {
         return new Response(JSON.stringify({ error: 'Missing required field: eventId' }), {
@@ -159,23 +162,38 @@ serve(async (req) => {
         }
       }
 
-      // Update the event using PATCH
-      const updatePatchBody: { location?: string } = {}
+      // Build the patch body conditionally — only include fields that were provided
+      const updatePatchBody: Record<string, unknown> = {}
       if (location !== undefined) {
         updatePatchBody.location = location === null ? '' : location
+      }
+      if (startTime) {
+        updatePatchBody.start = { dateTime: startTime, timeZone: timeZone ?? 'UTC' }
+      }
+      if (endTime) {
+        updatePatchBody.end = { dateTime: endTime, timeZone: timeZone ?? 'UTC' }
+      }
+
+      if (Object.keys(updatePatchBody).length === 0) {
+        return new Response(JSON.stringify({ error: 'No fields to update' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
       }
 
       // Use the provided calendarId or default to 'primary'
       const targetCalendarId = calendarId || 'primary'
       const apiUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(targetCalendarId)}/events/${encodeURIComponent(eventId)}`
-      
+
       console.log('Updating Google Calendar event:', {
         calendarId: targetCalendarId,
         eventId,
         location: updatePatchBody.location,
+        startTime,
+        endTime,
         apiUrl,
       })
-      
+
       const updateResponse = await fetch(apiUrl, {
         method: 'PATCH',
         headers: {
@@ -189,7 +207,7 @@ serve(async (req) => {
         const errorText = await updateResponse.text()
         console.error('Google Calendar API error:', updateResponse.status, errorText)
         
-        let errorMessage = 'Failed to update event location'
+        let errorMessage = 'Failed to update event'
         try {
           const errorData = JSON.parse(errorText)
           errorMessage = errorData.error?.message || errorMessage

@@ -74,6 +74,10 @@ export interface DeleteEventParams {
 export interface UpdateEventParams {
   eventId: string
   location?: string | null
+  startTime?: Date
+  endTime?: Date
+  /** IANA timezone (e.g., 'America/New_York'). Defaults to browser tz. */
+  timeZone?: string
   calendarId?: string // Optional calendar ID (defaults to 'primary')
 }
 
@@ -424,11 +428,15 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
       throw new Error('Not connected to Google Calendar')
     }
 
+    const tz = params.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
+
     // Log the parameters being sent for debugging
-    logger.debug('Updating event location:', {
+    logger.debug('Updating event:', {
       eventId: params.eventId,
       calendarId: params.calendarId || 'primary',
       location: params.location,
+      startTime: params.startTime?.toISOString(),
+      endTime: params.endTime?.toISOString(),
     })
 
     // Use google-calendar-create-event which handles both create and update requests
@@ -437,6 +445,9 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
       body: {
         eventId: params.eventId,
         location: params.location,
+        startTime: params.startTime?.toISOString(),
+        endTime: params.endTime?.toISOString(),
+        timeZone: tz,
         calendarId: params.calendarId || 'primary', // Default to primary if not specified
       },
     })
@@ -451,11 +462,6 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     if (data?.error) {
       const errorMessage = data.error
       console.error('Function returned error:', errorMessage, 'Status:', data.statusCode)
-      console.error('Request parameters were:', {
-        eventId: params.eventId,
-        calendarId: params.calendarId || 'primary',
-        location: params.location,
-      })
       
       const isAuthError =
         errorMessage.includes('Unauthorized') ||
