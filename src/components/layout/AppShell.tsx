@@ -276,7 +276,7 @@ export function AppShell({
                 className="w-7 h-7 rounded-full shrink-0 object-cover"
               />
 
-              <div className="flex-1 flex items-center justify-center gap-1.5 min-w-0">
+              <div className="flex-1 flex items-center justify-center gap-2 min-w-0">
                 {viewedDate && (
                   <>
                     <button
@@ -285,9 +285,9 @@ export function AppShell({
                         if (!onDateChange) return
                         const n = new Date(viewedDate); n.setDate(n.getDate() - 1); onDateChange(n)
                       }}
-                      className="p-1.5 rounded-md text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-colors shrink-0"
+                      className="w-8 h-8 grid place-items-center rounded-full bg-neutral-100 text-neutral-900 active:bg-neutral-200 transition-colors shrink-0"
                     >
-                      <ChevronLeft className="w-5 h-5" />
+                      <ChevronLeft className="w-5 h-5" strokeWidth={2.5} />
                     </button>
                     <span className="font-display text-lg font-semibold text-neutral-900 whitespace-nowrap">
                       {viewedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
@@ -298,9 +298,9 @@ export function AppShell({
                         if (!onDateChange) return
                         const n = new Date(viewedDate); n.setDate(n.getDate() + 1); onDateChange(n)
                       }}
-                      className="p-1.5 rounded-md text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-colors shrink-0"
+                      className="w-8 h-8 grid place-items-center rounded-full bg-neutral-100 text-neutral-900 active:bg-neutral-200 transition-colors shrink-0"
                     >
-                      <ChevronRight className="w-5 h-5" />
+                      <ChevronRight className="w-5 h-5" strokeWidth={2.5} />
                     </button>
                   </>
                 )}
