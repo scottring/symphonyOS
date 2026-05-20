@@ -7,7 +7,7 @@
  *
  * NOT wired to the route yet — that happens in R4.
  */
-import { createElement, useMemo, useCallback, useRef, useState } from 'react'
+import { createElement, useMemo, useCallback, useRef, useState, useEffect } from 'react'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -51,6 +51,7 @@ import { useEmailActionItems } from '@/hooks/useEmailActionItems'
 import { focusHeadline } from '@/lib/focusHeadline'
 import { daySectionMeta } from '@/lib/daySectionMeta'
 import { parseMealTitle } from '@/lib/mealTitle'
+import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 
 // ─── Props: identical to TodayScheduleProps ───────────────────────────────────
 
@@ -146,13 +147,15 @@ export function TodayView({
   } = ctx
 
   // ── Hide-routines toggle (localStorage parity) ────────────────────────────────
-  const [hideRoutines, setHideRoutines] = useState<boolean>(() => {
-    try { return localStorage.getItem('symphony-hide-routines') === 'true' } catch { return false }
-  })
+  const [hideRoutines, setHideRoutines] = useState<boolean>(() => readHideRoutines())
+
+  useEffect(() => onHideRoutinesChange(setHideRoutines), [])
+
   const toggleHideRoutines = useCallback(() => {
     setHideRoutines((v) => {
-      try { localStorage.setItem('symphony-hide-routines', String(!v)) } catch { /* ignore */ }
-      return !v
+      const next = !v
+      writeHideRoutines(next)
+      return next
     })
   }, [])
 

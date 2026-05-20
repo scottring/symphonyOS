@@ -27,7 +27,8 @@ import { WeekEventBlock } from './WeekEventBlock'
 import { useWeekDragDrop } from './useWeekDragDrop'
 import { useGridCreate } from './useGridCreate'
 import { SlotQuickCreatePopover, type CreateType } from './SlotQuickCreatePopover'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Eye, EyeOff } from 'lucide-react'
+import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 
 const EDGE_PX = 40
 
@@ -220,11 +221,10 @@ export function WeekViewV2(props: WeekViewV2Props) {
 
   // Respect the app-wide 'Hide daily activities' toggle (same localStorage key
   // TodayView uses). When true, routines are omitted from the grid; tasks and
-  // events still render. Users toggle this from the Today view's stats row.
-  const hideRoutines = useMemo(() => {
-    try { return localStorage.getItem('symphony-hide-routines') === 'true' }
-    catch { return false }
-  }, [])
+  // events still render. Reactive via in-tab custom event + cross-tab storage event.
+  const [hideRoutines, setHideRoutines] = useState<boolean>(() => readHideRoutines())
+
+  useEffect(() => onHideRoutinesChange(setHideRoutines), [])
 
   // Convert to TimelineItems for grid rendering.
   // Routines are expanded into 7 day-instances (render-only; WeekEventBlock
@@ -315,6 +315,17 @@ export function WeekViewV2(props: WeekViewV2Props) {
       >
         <ChevronRight className="w-4 h-4 text-neutral-600" />
       </button>
+      <div className="flex items-center justify-end mb-2">
+        <button
+          type="button"
+          onClick={() => writeHideRoutines(!hideRoutines)}
+          title={hideRoutines ? 'Show routines' : 'Hide routines'}
+          aria-label={hideRoutines ? 'Show routines' : 'Hide routines'}
+          className="p-1.5 rounded-md hover:bg-neutral-100 text-neutral-500"
+        >
+          {hideRoutines ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        </button>
+      </div>
       <WeekSummaryRow
         familyDinner={familyDinner}
         groceries={groceries}
