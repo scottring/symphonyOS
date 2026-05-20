@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, Suspense, type ReactNode } from 'react'
-import { PanelRightOpen, ChevronLeft, ChevronRight } from 'lucide-react'
+import { PanelRightOpen } from 'lucide-react'
 import { TodayRail } from '@/components/today/TodayRail'
 import { useScratchpadHidden } from '@/hooks/useScratchpadHidden'
 import { Sidebar, type ViewType } from './Sidebar'
@@ -285,9 +285,11 @@ export function AppShell({
                         if (!onDateChange) return
                         const n = new Date(viewedDate); n.setDate(n.getDate() - 1); onDateChange(n)
                       }}
-                      className="w-8 h-8 grid place-items-center rounded-full bg-neutral-100 text-neutral-900 active:bg-neutral-200 transition-colors shrink-0"
+                      className="p-2 rounded-xl text-neutral-700 hover:bg-neutral-100 active:bg-neutral-200 transition-colors shrink-0"
                     >
-                      <ChevronLeft className="w-5 h-5" strokeWidth={2.5} />
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
                     </button>
                     <span className="font-display text-lg font-semibold text-neutral-900 whitespace-nowrap">
                       {viewedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
@@ -298,9 +300,11 @@ export function AppShell({
                         if (!onDateChange) return
                         const n = new Date(viewedDate); n.setDate(n.getDate() + 1); onDateChange(n)
                       }}
-                      className="w-8 h-8 grid place-items-center rounded-full bg-neutral-100 text-neutral-900 active:bg-neutral-200 transition-colors shrink-0"
+                      className="p-2 rounded-xl text-neutral-700 hover:bg-neutral-100 active:bg-neutral-200 transition-colors shrink-0"
                     >
-                      <ChevronRight className="w-5 h-5" strokeWidth={2.5} />
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                      </svg>
                     </button>
                   </>
                 )}
