@@ -1,0 +1,78 @@
+// src/components/wall-v2/WallV2Timeline.tsx
+//
+// TODAY'S PLAN — sectioned vertical timeline. Each section has a label rail
+// on the left (icon + Afternoon/Evening/Night) connected by a thin guide
+// line, and a stack of event cards on the right.
+
+import { CalendarDays } from 'lucide-react';
+import { TINTS } from './tints';
+import { WallV2EventCard } from './WallV2EventCard';
+import type { WallV2TimelineSection } from './types';
+
+interface Props {
+  sections: WallV2TimelineSection[];
+  onTapEvent?: (id: string) => void;
+  onTapFullDay?: () => void;
+}
+
+export function WallV2Timeline({ sections, onTapEvent, onTapFullDay }: Props) {
+  return (
+    <div className="bg-white/70 border border-stone-200/70 rounded-3xl p-5 flex flex-col gap-4">
+      <div className="text-[0.72rem] font-bold uppercase tracking-[0.22em] text-stone-500">
+        Today's plan
+      </div>
+
+      <div className="flex flex-col gap-4 relative">
+        {sections.map((section, idx) => {
+          const tint = TINTS[section.tint];
+          const Icon = section.icon;
+          const isLast = idx === sections.length - 1;
+
+          return (
+            <div key={section.id} className="grid grid-cols-[6rem_1fr] gap-4">
+              {/* Rail */}
+              <div className="relative flex flex-col items-center pt-1">
+                <div
+                  className={`grid place-items-center w-10 h-10 rounded-xl ${tint.bg} ${tint.fg}`}
+                >
+                  <Icon className="w-5 h-5" />
+                </div>
+                <div className="text-[0.62rem] font-bold uppercase tracking-[0.18em] text-stone-500 mt-1.5">
+                  {section.label}
+                </div>
+                {!isLast && (
+                  <div
+                    className="absolute top-12 bottom-[-1rem] left-1/2 -translate-x-1/2 w-px bg-stone-200"
+                    aria-hidden
+                  />
+                )}
+              </div>
+
+              {/* Events */}
+              <div className="flex flex-col gap-2">
+                {section.events.map((event) => (
+                  <WallV2EventCard
+                    key={event.id}
+                    event={event}
+                    onTap={onTapEvent}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {onTapFullDay && (
+        <button
+          type="button"
+          onClick={onTapFullDay}
+          className="self-center mt-1 inline-flex items-center gap-2 px-4 py-2 text-stone-600 hover:text-stone-900 text-[0.9rem] font-bold"
+        >
+          <CalendarDays className="w-4 h-4" />
+          View full day
+        </button>
+      )}
+    </div>
+  );
+}

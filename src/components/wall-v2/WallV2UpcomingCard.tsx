@@ -1,0 +1,42 @@
+// src/components/wall-v2/WallV2UpcomingCard.tsx
+//
+// Right-column UPCOMING widget — colored dot + day label + detail line per
+// upcoming item.
+
+import { TINTS } from './tints';
+import type { WallV2UpcomingItem } from './types';
+
+interface Props {
+  items: WallV2UpcomingItem[];
+}
+
+export function WallV2UpcomingCard({ items }: Props) {
+  return (
+    <div className="bg-white/85 border border-stone-200/70 rounded-2xl p-4">
+      <div className="text-[0.7rem] font-bold uppercase tracking-[0.22em] text-stone-500 mb-2.5">
+        Upcoming
+      </div>
+      <ul className="flex flex-col gap-2.5">
+        {items.map((item) => {
+          const tint = TINTS[item.tint];
+          return (
+            <li key={item.id} className="flex items-start gap-3 leading-tight">
+              <span
+                className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${tint.dot}`}
+                aria-hidden
+              />
+              <div className="min-w-0">
+                <div className="text-[0.95rem] font-bold text-stone-800 truncate">
+                  {item.label}
+                </div>
+                <div className="text-[0.82rem] text-stone-500 truncate">
+                  {item.detail}
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}

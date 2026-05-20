@@ -123,6 +123,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/contacts" element={<App />} />
               <Route path="/contacts/:contactId" element={<App />} />
               <Route path="/wall/*" element={<Shell />} />
+              <Route path="/wall-v2/*" element={<Shell />} />
               <Route path="/jobs/*" element={<Shell />} />
               <Route path="/tasks-new/*" element={<Shell />} />
               <Route path="/morning" element={<App />} />

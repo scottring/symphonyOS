@@ -1,0 +1,337 @@
+// src/components/wall-v2/wallV2Adapter.ts
+//
+// Pure adapters: turn live data (TimelineItems, WeatherData, FamilyMembers,
+// meal events) into the view-shape types in `types.ts`. Each adapter accepts
+// already-fetched data and returns the same view shape the static mock uses,
+// so the WallV2Shell render path stays identical whether we're showing live
+// data or the design payload.
+//
+// Why pure functions? They're trivially testable and they keep the shell
+// component free of branching/transform logic.
+
+import {
+  Backpack, Bath, Briefcase, Calendar, Car, Check, ChefHat, ClipboardList,
+  Coffee, Heart, Moon, Music, Plane, Plug, RotateCw, ShoppingBag, Sparkles,
+  Sun, Sunrise, Trophy, Users, UtensilsCrossed,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+
+import type { WeatherData } from '@/hooks/useWeather';
+import type { TimelineItem } from '@/types/timeline';
+import type { FamilyMember } from '@/types/family';
+import type { CalendarEvent } from '@/hooks/useGoogleCalendar';
+import type { WallDayData } from '@/hooks/useWallData';
+import { extractRecipeNameHint, detectRecipeUrl } from '@/lib/recipeDetection';
+
+import type {
+  WallV2MemberBubble,
+  WallV2TimelineEvent,
+  WallV2TimelineSection,
+  WallV2Tint,
+  WallV2UpcomingItem,
+  WallV2WeatherData,
+} from './types';
+
+// ────────────────────────────────────────────────────────────────────────────
+// Family member → avatar/tint helpers
+// ────────────────────────────────────────────────────────────────────────────
+
+const COLOR_TO_TINT: Record<string, WallV2Tint> = {
+  blue: 'sky',
+  purple: 'lavender',
+  green: 'sage',
+  orange: 'peach',
+  pink: 'rose',
+  teal: 'mint',
+};
+
+function memberTint(m: FamilyMember | undefined): WallV2Tint {
+  if (!m) return 'sand';
+  return COLOR_TO_TINT[m.color] ?? 'sand';
+}
+
+function memberBubble(m: FamilyMember): WallV2MemberBubble {
+  return {
+    id: m.id,
+    initials: m.initials,
+    tint: memberTint(m),
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Weather
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Pick a lucide icon to match a WMO weather code. Falls back to Sun for clear
+ * conditions and a soft default for everything else.
+ */
+function weatherIconForCode(code: number): LucideIcon {
+  if (code === 0) return Sun;
+  if (code <= 3) return Sun; // partly cloudy → still bright
+  if (code <= 48) return Sun; // foggy — no perfect lucide; lean bright
+  if (code <= 65) return Sun; // rain — could swap CloudRain
+  if (code <= 86) return Sun; // snow — could swap Snowflake
+  return Sun;
+}
+
+export function adaptWeather(w: WeatherData | null): WallV2WeatherData | null {
+  if (!w) return null;
+  return {
+    temp: w.currentTemp,
+    high: w.highTemp,
+    low: w.lowTemp,
+    condition: w.condition,
+    rainChance: 0, // useWeather doesn't surface precip probability yet
+    sentence: undefined,
+    icon: weatherIconForCode(w.weatherCode),
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Timeline items → event cards
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Pick an icon + tint for a TimelineItem based on its title and type. The
+ * matchers are intentionally light — they cover the common keywords visible
+ * in the mockup; fall-through items get a sensible default.
+ */
+function iconForItem(item: TimelineItem): { icon: LucideIcon; tint: WallV2Tint } {
+  const t = item.title.toLowerCase();
+
+  // Strong keyword matches (most specific first)
+  if (/dinner|breakfast|lunch|meal|stir.?fry|recipe/.test(t)) {
+    return { icon: UtensilsCrossed, tint: 'peach' };
+  }
+  if (/shower|bath|hygiene/.test(t)) return { icon: Bath, tint: 'sky' };
+  if (/pickup|pick up|drop off|drive|drop\s+off/.test(t)) {
+    return { icon: Car, tint: 'peach' };
+  }
+  if (/soccer|practice|game|tournament/.test(t)) {
+    return { icon: Trophy, tint: 'sky' };
+  }
+  if (/therapy|appointment|doctor|dentist|caitlin/.test(t)) {
+    return { icon: Calendar, tint: 'sage' };
+  }
+  if (/school|field trip|class/.test(t)) {
+    return { icon: Backpack, tint: 'sage' };
+  }
+  if (/work|meeting|standup|sync/.test(t)) {
+    return { icon: Briefcase, tint: 'sky' };
+  }
+  if (/cook|prep|chef/.test(t)) return { icon: ChefHat, tint: 'peach' };
+  if (/wind down|read|bedtime|sleep/.test(t)) {
+    return { icon: Moon, tint: 'lavender' };
+  }
+  if (/morning|wake|coffee/.test(t)) return { icon: Coffee, tint: 'honey' };
+  if (/flight|travel|trip/.test(t)) return { icon: Plane, tint: 'lavender' };
+  if (/music|piano|practice/.test(t)) return { icon: Music, tint: 'lavender' };
+
+  // By type
+  if (item.type === 'event') return { icon: Calendar, tint: 'sage' };
+  if (item.type === 'routine') return { icon: RotateCw, tint: 'mint' };
+  if (item.category === 'errand') return { icon: ShoppingBag, tint: 'peach' };
+
+  return { icon: Check, tint: 'sand' };
+}
+
+function durationMeta(item: TimelineItem): string | undefined {
+  if (!item.startTime || !item.endTime) return undefined;
+  const minutes = Math.round(
+    (item.endTime.getTime() - item.startTime.getTime()) / 60_000,
+  );
+  if (minutes <= 0) return undefined;
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rem = minutes % 60;
+  return rem === 0 ? `${hours}h` : `${hours}h ${rem}m`;
+}
+
+export function adaptTimelineEvent(
+  item: TimelineItem,
+  members: FamilyMember[],
+): WallV2TimelineEvent {
+  const { icon, tint } = iconForItem(item);
+  const assigned = item.assignedTo
+    ? members.find((m) => m.id === item.assignedTo)
+    : undefined;
+  const memberBubbles = assigned ? [memberBubble(assigned)] : undefined;
+  return {
+    id: item.id,
+    icon,
+    tint,
+    title: item.title,
+    subtitle: item.location || (item.type === 'routine' ? 'Routine' : item.type === 'event' ? 'Event' : 'Task'),
+    meta: durationMeta(item),
+    members: memberBubbles,
+  };
+}
+
+/**
+ * Split today's items into Afternoon / Evening / Night sections. We re-use
+ * the existing `morning|afternoon|evening` buckets from useWallData and
+ * carve "Night" out of evening items starting at or after 9 PM.
+ */
+export function adaptTimelineSections(
+  today: WallDayData | undefined,
+  members: FamilyMember[],
+  now: Date,
+  dinnerEvent: CalendarEvent | null,
+): WallV2TimelineSection[] {
+  if (!today) return [];
+
+  const afternoonItems = today.items.afternoon ?? [];
+  const eveningItemsRaw = today.items.evening ?? [];
+
+  const eveningItems: TimelineItem[] = [];
+  const nightItems: TimelineItem[] = [];
+  for (const item of eveningItemsRaw) {
+    const h = item.startTime?.getHours() ?? 0;
+    if (h >= 21) nightItems.push(item);
+    else eveningItems.push(item);
+  }
+
+  const sections: WallV2TimelineSection[] = [];
+
+  // Filter past items so the timeline stays forward-looking, except keep
+  // anything happening within the last 30 minutes so context lingers.
+  const recencyCutoff = new Date(now.getTime() - 30 * 60_000);
+  const isForward = (i: TimelineItem) =>
+    !i.startTime || i.startTime >= recencyCutoff;
+
+  const afternoonFwd = afternoonItems.filter(isForward).map((i) => adaptTimelineEvent(i, members));
+  const eveningFwd = eveningItems.filter(isForward).map((i) => adaptTimelineEvent(i, members));
+  const nightFwd = nightItems.filter(isForward).map((i) => adaptTimelineEvent(i, members));
+
+  // If we have a structured dinner event (from meal plan), promote it into
+  // the Evening section with the recipe URL + all family avatars.
+  if (dinnerEvent) {
+    const mealTitle = extractRecipeNameHint(dinnerEvent.title) || dinnerEvent.title;
+    const recipeUrl = detectRecipeUrl(dinnerEvent.description);
+    const dinnerCard: WallV2TimelineEvent = {
+      id: `dinner-${dinnerEvent.id}`,
+      icon: UtensilsCrossed,
+      tint: 'peach',
+      title: 'Family dinner',
+      subtitle: mealTitle,
+      highlight: 'peach',
+      members: members.slice(0, 4).map(memberBubble),
+      recipeUrl,
+    };
+    // Avoid duplicate if the dinner event also appeared in the bucketed feed.
+    const filtered = eveningFwd.filter((e) => !e.title.toLowerCase().includes('dinner'));
+    filtered.unshift(dinnerCard);
+    eveningFwd.length = 0;
+    eveningFwd.push(...filtered);
+  }
+
+  if (afternoonFwd.length > 0) {
+    sections.push({ id: 'afternoon', label: 'Afternoon', icon: Sun, tint: 'honey', events: afternoonFwd });
+  }
+  if (eveningFwd.length > 0) {
+    sections.push({ id: 'evening', label: 'Evening', icon: Moon, tint: 'lavender', events: eveningFwd });
+  }
+  if (nightFwd.length > 0) {
+    sections.push({ id: 'night', label: 'Night', icon: Moon, tint: 'sand', events: nightFwd });
+  }
+  return sections;
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Upcoming days → upcoming list
+// ────────────────────────────────────────────────────────────────────────────
+
+const UPCOMING_TINTS: WallV2Tint[] = ['sage', 'honey', 'sky', 'lavender'];
+
+function dayLabel(d: Date, today: Date): string {
+  const oneDay = 24 * 60 * 60_000;
+  const diffDays = Math.round(
+    (new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+      - new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime())
+    / oneDay,
+  );
+  if (diffDays === 1) return 'Tomorrow';
+  if (diffDays >= 2 && diffDays <= 6) {
+    return d.toLocaleDateString('en-US', { weekday: 'long' });
+  }
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function firstUpcomingItem(day: WallDayData): TimelineItem | null {
+  for (const section of ['morning', 'afternoon', 'evening', 'allday'] as const) {
+    const items = day.items[section] ?? [];
+    if (items.length > 0) return items[0];
+  }
+  return null;
+}
+
+export function adaptUpcoming(
+  days: WallDayData[],
+  today: Date,
+  limit = 2,
+): WallV2UpcomingItem[] {
+  const upcoming = days.filter((d) => !d.isToday).slice(0, limit);
+  const out: WallV2UpcomingItem[] = [];
+  upcoming.forEach((day, idx) => {
+    const item = firstUpcomingItem(day);
+    if (!item) return;
+    out.push({
+      id: day.date.toISOString(),
+      label: dayLabel(day.date, today),
+      detail: item.title,
+      tint: UPCOMING_TINTS[idx % UPCOMING_TINTS.length],
+    });
+  });
+  return out;
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Glance cards
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Build a per-member "next thing today" glance card. Falls back to a generic
+ * "All set" line if the member has no upcoming item.
+ */
+export function adaptGlanceForMember(
+  member: FamilyMember,
+  today: WallDayData | undefined,
+  now: Date,
+) {
+  if (!today) return null;
+  let next: TimelineItem | null = null;
+  for (const section of ['morning', 'afternoon', 'evening', 'allday'] as const) {
+    for (const item of today.items[section] ?? []) {
+      if (item.assignedTo !== member.id) continue;
+      if (item.startTime && item.startTime < now) continue;
+      if (!next || (item.startTime && next.startTime && item.startTime < next.startTime)) {
+        next = item;
+      }
+    }
+  }
+  if (!next) return null;
+
+  const { icon, tint } = iconForItem(next);
+  const time = next.startTime?.toLocaleTimeString('en-US', {
+    hour: 'numeric', minute: '2-digit',
+  });
+
+  return {
+    id: `glance-${member.id}`,
+    icon,
+    tint,
+    title: member.name,
+    primary: next.title,
+    secondary: time,
+  };
+}
+
+// Decorative export so adapter consumers can hint the AI Insight card with a
+// fresh sparkle when surfaced (kept here so the icon import lives in one place).
+export const INSIGHT_ICON: LucideIcon = Sparkles;
+export const PLUG_ICON: LucideIcon = Plug;
+export const HEART_ICON: LucideIcon = Heart;
+export const CHECKLIST_ICON: LucideIcon = ClipboardList;
+export const SUNRISE_ICON: LucideIcon = Sunrise;
+export const USERS_ICON: LucideIcon = Users;
