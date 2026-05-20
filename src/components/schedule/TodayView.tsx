@@ -376,7 +376,7 @@ export function TodayView({
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-[940px] w-full px-4 py-4 md:pl-10 md:pr-8 md:py-8">
+    <div className="max-w-[940px] w-full px-6 py-6 md:pl-10 md:pr-8 md:py-8">
       {/* Header */}
       <TodayHeader
         viewedDate={viewedDate}
@@ -430,7 +430,7 @@ export function TodayView({
 
       {/* Two-up: Focus card + Weather — only shown when there is something to focus on */}
       {data.counts.totalItems > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-[1.6fr_1fr] gap-4 mb-7 mt-6">
+        <div className="hidden md:grid grid-cols-1 md:grid-cols-[1.6fr_1fr] gap-4 mb-7 mt-6">
           <TodaysFocusCard
             headline={focusHeadline(health.healthColor)}
             priorities={focusPriorities}
@@ -452,7 +452,7 @@ export function TodayView({
           <div className="space-y-6">
             {/* Overdue section — gets data-today-first marker when it renders */}
             {data.isToday && data.overdueTasks.length > 0 && (
-              <div data-today-first="">
+              <div data-today-first="" className="hidden md:block">
                 <OverdueSection
                   tasks={data.overdueTasks}
                   selectedItemId={selectedItemId}
@@ -718,8 +718,8 @@ export function TodayView({
         )}
       </div>
 
-      {/* AI banner */}
-      <div className="mt-5">
+      {/* AI banner — desktop-only; mobile keeps a tighter schedule-focused view */}
+      <div className="mt-5 hidden md:block">
         <AiSuggestionBanner />
       </div>
 

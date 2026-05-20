@@ -39,9 +39,9 @@ export function TodayHeader({ viewedDate, onDateChange, currentHomeView, onHomeV
       </div>
 
       {/* Right: context (domain) chooser + D/W/M switcher.
-          On mobile the cluster sits on its own row below the date, so it
-          gets full width to lay out naturally instead of overflowing. */}
-      <div className="flex items-center gap-2 flex-wrap md:shrink-0">
+          Hidden on mobile to match the pre-redesign behaviour — last week's
+          working mobile didn't render either of these in the header. */}
+      <div className="hidden md:flex items-center gap-2 md:shrink-0">
         <DomainSwitcher />
         {currentHomeView !== undefined && onHomeViewChange !== undefined && (
           <HomeViewSwitcher

@@ -338,7 +338,7 @@ export function AppShell({
           isOpen={quickAddOpen}
           onOpen={onOpenQuickAdd}
           onClose={onCloseQuickAdd}
-          showFab={!panelOpen}
+          showFab={!panelOpen && !(isMobile && activeView === 'today')}
         />
       )}
 
