@@ -72,6 +72,8 @@ interface AppShellProps {
   /** Full FamilyMember[] for the Today rail's Family Snapshot panel.
    *  Distinct from quickAddFamilyMembers (slim {id,name} version for QuickCapture). */
   railFamilyMembers?: import('@/types/family').FamilyMember[]
+  /** Opens a task's detail view — used by the rail's For Discussion panel. */
+  onRailSelectTask?: (taskId: string) => void
   onPinNavigate?: (entityType: PinnableEntityType, entityId: string) => void
   onPinMarkAccessed?: (entityType: PinnableEntityType, entityId: string) => void
   onPinRefreshStale?: (id: string) => void
@@ -127,6 +129,7 @@ export function AppShell({
   pins,
   entities,
   railFamilyMembers = [],
+  onRailSelectTask,
   onPinNavigate,
   onPinMarkAccessed,
   onPinRefreshStale,
@@ -550,6 +553,7 @@ export function AppShell({
               void id
             }}
             onViewAllFamily={() => onViewChange('home-app')}
+            onSelectTask={(id) => onRailSelectTask?.(id)}
           />
         </aside>
       )}

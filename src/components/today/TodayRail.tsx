@@ -5,9 +5,11 @@ import type { FamilyMember } from '@/types/family'
 import { ScratchpadPane } from '@/components/schedule/ScratchpadPane'
 import { rankActiveProjects } from '@/lib/projectProgress'
 import { familySnapshot } from '@/lib/familySnapshot'
+import { discussionItems } from '@/lib/discussionItems'
 import { AtAGlance } from './AtAGlance'
 import { ActiveProjects } from './ActiveProjects'
 import { FamilySnapshot } from './FamilySnapshot'
+import { ForDiscussion } from './ForDiscussion'
 
 interface TodayRailProps {
   /** All tasks from entities. Used to count open work and derive project progress. */
@@ -26,6 +28,8 @@ interface TodayRailProps {
   onSelectMember: (id: string) => void
   /** Open the full family view. */
   onViewAllFamily: () => void
+  /** Open a task's detail view (from For Discussion). */
+  onSelectTask: (id: string) => void
 }
 
 /**
@@ -44,6 +48,7 @@ export function TodayRail({
   onViewAllProjects,
   onSelectMember,
   onViewAllFamily,
+  onSelectTask,
 }: TodayRailProps) {
   const openTaskCount = useMemo(() => {
     // "Still open" = scheduled, not completed, not in inbox.
@@ -61,6 +66,8 @@ export function TodayRail({
     [familyMembers, tasks],
   )
 
+  const flaggedItems = useMemo(() => discussionItems(tasks, 5), [tasks])
+
   return (
     <div className="h-full flex flex-col gap-4 overflow-y-auto pr-1">
       <AtAGlance
@@ -69,6 +76,8 @@ export function TodayRail({
         tomorrowFirstEvent={null}
         onViewFullPlan={onViewFullPlan}
       />
+
+      <ForDiscussion items={flaggedItems} onSelectItem={onSelectTask} />
 
       <FamilySnapshot
         members={familyMembersSummary}
