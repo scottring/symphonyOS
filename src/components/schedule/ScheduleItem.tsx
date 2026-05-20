@@ -367,12 +367,10 @@ export const ScheduleItem = memo(function ScheduleItem({
         onEditSwipe={onSelect}
         cardClassName={`
           relative flex items-center gap-3 bg-bg-elevated rounded-xl border border-neutral-200/50
-          px-3 py-3 cursor-pointer
+          px-3 py-3
           ${selected ? 'ring-2 ring-primary-300' : ''}
           ${item.completed || item.skipped ? 'opacity-60' : ''}
         `}
-        onClickCard={() => onSelect()}
-        onKeyDown={handleKeyDown}
         ariaPressed={selected}
       >
         {/* Left time column — stacked */}
@@ -917,8 +915,6 @@ interface ScheduleItemMobileCardProps {
   swipeMaxPx: number
   onCompleteSwipe: () => void
   onEditSwipe: () => void
-  onClickCard: () => void
-  onKeyDown?: (e: React.KeyboardEvent) => void
   ariaPressed?: boolean
   cardClassName: string
   children: React.ReactNode
@@ -929,8 +925,6 @@ function ScheduleItemMobileCard({
   swipeMaxPx,
   onCompleteSwipe,
   onEditSwipe,
-  onClickCard,
-  onKeyDown,
   ariaPressed,
   cardClassName,
   children,
@@ -940,10 +934,6 @@ function ScheduleItemMobileCard({
   const startX = useRef(0)
   const startY = useRef(0)
   const decided = useRef<'horizontal' | 'vertical' | null>(null)
-  // Bridges a touch sequence to the synthetic click that follows; if we
-  // committed a swipe (or moved horizontally enough to be a non-tap), we
-  // suppress the click so the row doesn't ALSO open the detail panel.
-  const suppressNextClick = useRef(false)
 
   const onTouchStart = (e: React.TouchEvent) => {
     const t = e.touches[0]
@@ -970,9 +960,6 @@ function ScheduleItemMobileCard({
   const onTouchEnd = () => {
     setDragging(false)
     if (decided.current === 'horizontal') {
-      // Any meaningful horizontal travel is a swipe, not a tap — suppress the
-      // synthetic click that iOS Safari will fire after touchend.
-      if (Math.abs(dx) > 6) suppressNextClick.current = true
       if (dx >= swipeCommitPx) {
         onCompleteSwipe()
       } else if (dx <= -swipeCommitPx) {
@@ -1011,17 +998,6 @@ function ScheduleItemMobileCard({
 
       <div
         data-selectable
-        onClick={(e) => {
-          if (suppressNextClick.current) {
-            suppressNextClick.current = false
-            e.preventDefault()
-            return
-          }
-          onClickCard()
-        }}
-        onKeyDown={onKeyDown}
-        tabIndex={0}
-        role="button"
         aria-pressed={ariaPressed}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
