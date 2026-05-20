@@ -9,7 +9,15 @@ import { useMobile } from '@/hooks/useMobile'
 import { useUndo } from '@/hooks/useUndo'
 import { useDomain, type Domain } from '@/hooks/useDomain'
 import { WeekView } from './WeekView'
+import { WeekViewV2 } from './week/WeekViewV2'
+import { WeekViewMobile } from './week/WeekViewMobile'
 import { MonthView } from './MonthView'
+
+const WEEK_V2_FLAG = 'symphony-week-v2'
+function isWeekV2Enabled(): boolean {
+  if (typeof window === 'undefined') return false
+  return localStorage.getItem(WEEK_V2_FLAG) !== 'off'
+}
 import { CascadingRiverView } from './CascadingRiverView'
 import { TodayView } from '@/components/schedule/TodayView'
 import { UndoToast } from '@/components/undo/UndoToast'
@@ -221,18 +229,50 @@ export function HomeView({
     }
 
     if (currentView === 'week') {
+      const useV2 = isWeekV2Enabled()
+      if (!useV2) {
+        return (
+          <WeekView
+            tasks={filteredTasks}
+            events={filteredEvents}
+            routines={filteredRoutines}
+            dateInstances={dateInstances}
+            weekStart={weekStart}
+            onWeekChange={setWeekStart}
+            onSelectDay={handleSelectDay}
+            selectedAssignee={selectedAssigneeForSchedule}
+            eventNotesMap={ctx.eventNotesMap}
+          />
+        )
+      }
       return (
-        <WeekView
-          tasks={filteredTasks}
-          events={filteredEvents}
-          routines={filteredRoutines}
-          dateInstances={dateInstances}
-          weekStart={weekStart}
-          onWeekChange={setWeekStart}
-          onSelectDay={handleSelectDay}
-          selectedAssignee={selectedAssigneeForSchedule}
-          eventNotesMap={ctx.eventNotesMap}
-        />
+        <>
+          <WeekViewV2
+            tasks={filteredTasks}
+            events={filteredEvents}
+            routines={filteredRoutines}
+            dateInstances={dateInstances}
+            weekStart={weekStart}
+            onWeekChange={setWeekStart}
+            selectedAssignee={selectedAssigneeForSchedule}
+            onSelectItem={onSelectItem}
+            onUpdateTask={ctx.onUpdateTask ?? (() => {})}
+            onUpdateRoutine={ctx.onUpdateRoutine ?? (() => {})}
+            // TODO: ScheduleActionsContext has no generic onUpdateEvent — only
+            // onUpdateEventContext (sets context tag) and onUpdateEventProject.
+            // Drag-to-reschedule on events will be a no-op until a full
+            // onUpdateEvent is added to the context and wired to the Google
+            // Calendar mutation hook.
+            onUpdateEvent={() => {}}
+          />
+          <WeekViewMobile
+            tasks={filteredTasks}
+            events={filteredEvents}
+            routines={filteredRoutines}
+            weekStart={weekStart}
+            onSelectItem={onSelectItem}
+          />
+        </>
       )
     }
 
