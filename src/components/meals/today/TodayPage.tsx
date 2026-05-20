@@ -1,13 +1,16 @@
 import { useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useMealPlan } from '@/hooks/useMealPlan'
 import { useRecipes } from '@/hooks/useRecipes'
+import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useMealDayLog, useWeekGramsTrend } from '@/hooks/useMealDayLog'
 import { useMealTracking } from '@/hooks/useMealTracking'
 import { useMobile } from '@/hooks/useMobile'
 import { useStandingHabits } from '@/hooks/useStandingHabits'
 import { sundayOfWeek, isToday } from '@/lib/weekHelpers'
 import { TodayHeader } from './TodayHeader'
+import { TodayMealCard } from './TodayMealCard'
 import { HabitPills } from './HabitPills'
 import { MealStateRow } from './MealStateRow'
 import { AddItemRow } from './AddItemRow'
@@ -25,9 +28,11 @@ export function TodayPage() {
   const weekStart = useMemo(() => sundayOfWeek(today), [today])
   const dayOfWeek = today.getDay()
 
+  const navigate = useNavigate()
   const isMobile = useMobile()
   const { plan, loading, error, refresh, removeMeal } = useMealPlan(weekStart)
   const { recipes } = useRecipes()
+  const { members: familyMembers } = useFamilyMembers()
   const { log, loading: logLoading, update, toggleHabit } = useMealDayLog(today)
   const tracking = useMealTracking(refresh)
   const { days: weekDays } = useWeekGramsTrend(weekStart)
@@ -38,6 +43,43 @@ export function TodayPage() {
     recipes.forEach(r => m.set(r.id, r))
     return m
   }, [recipes])
+
+  // --- TodayMealCard derivations ---
+  const todayDinner = useMemo(() => {
+    if (!plan) return null
+    const dow = today.getDay() // 0=Sun..6=Sat
+    return plan.entries.find(
+      (e) => e.dayOfWeek === dow && e.slot === 'dinner',
+    ) ?? null
+  }, [plan, today])
+
+  const todayRecipe = useMemo(() => {
+    if (!todayDinner?.recipeId) return null
+    return recipes.find((r) => r.id === todayDinner.recipeId) ?? null
+  }, [todayDinner, recipes])
+
+  const cardState: 'empty' | 'drafted' | 'cooked' = todayDinner ? 'drafted' : 'empty'
+
+  const cardDiners = useMemo(() =>
+    familyMembers
+      .filter((m) => m.member_type === 'core')
+      .slice(0, 5)
+      .map((m) => ({
+        id: m.id,
+        initials: m.initials,
+        color: (m.color as 'blue' | 'purple' | 'green' | 'orange' | 'pink' | 'teal') ?? 'teal',
+      })),
+    [familyMembers],
+  )
+
+  const prepLabel = (() => {
+    const mins = todayRecipe?.prepMinutes ?? null
+    if (mins == null) return undefined
+    if (mins <= 20) return 'Quick prep' as const
+    if (mins <= 45) return 'Medium prep' as const
+    return 'Long prep' as const
+  })()
+  // --- end TodayMealCard derivations ---
 
   // Canonical meal-of-day order. Anything not in the list (e.g. legacy
   // 'lunch_iris' / 'kid_alternate' / 'prep') goes last.
@@ -158,6 +200,28 @@ export function TodayPage() {
         habits={log?.habits ?? {}}
         variant={isMobile ? 'mobile' : 'desktop'}
       />
+
+      {/* Tonight hero card */}
+      <div className="mt-6">
+        <TodayMealCard
+          dayLabel={today.toLocaleDateString('en-US', { weekday: 'long' })}
+          title={todayRecipe?.title ?? todayDinner?.adHocTitle ?? 'No meal planned'}
+          sides={undefined /* MVP: no separate sides field; future iteration */}
+          methodLabel={undefined /* MVP: not derived yet — Phase 3a stops here */}
+          methodBody={todayRecipe?.instructions?.[0] ?? undefined}
+          kidsLine={undefined /* MVP: no kids-line in data model yet */}
+          servesCount={cardDiners.length > 0 ? cardDiners.length : undefined}
+          prepLabel={prepLabel}
+          nutritionLabel={undefined}
+          diners={cardDiners}
+          state={cardState}
+          onGeneratePlan={() => navigate('/meals/plan')}
+          onRegenerate={() => navigate('/meals/plan')}
+          onViewRecipe={() => {
+            if (todayRecipe?.sourceUrl) window.open(todayRecipe.sourceUrl, '_blank')
+          }}
+        />
+      </div>
 
       {/* Day card body */}
       <div className={`mt-6 ${isMobile ? '' : 'p-1'}`}>
