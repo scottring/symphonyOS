@@ -19,6 +19,8 @@ import { ClearWeekButton } from './ClearWeekButton'
 import { AskSymphonyRail } from '../chat/AskSymphonyRail'
 import type { Suggestion } from '../chat/types'
 import { UndoToast } from './UndoToast'
+import { MealsRail } from '../rail/MealsRail'
+import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import { DistributeLeftoversModal } from './DistributeLeftoversModal'
 import { DAY_MEAL_SLOTS, MEAL_SLOT_LABEL } from '@/types/meal-planner'
 import type { MealPlanEntry, MealSlot, Recipe } from '@/types/meal-planner'
@@ -57,6 +59,36 @@ export function MealPlanRitualPage() {
   const { habits, toggleWeekPause } = useStandingHabits()
   const { members: familyMembers } = useFamilyMembers()
   const { applySuggestion } = useApplyMealSuggestion(weekStart, familyMembers)
+  const { events: calendarEvents } = useGoogleCalendar()
+
+  const nextUpEvents = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const startOfTomorrow = new Date(today)
+    startOfTomorrow.setDate(startOfTomorrow.getDate() + 1)
+    return (calendarEvents ?? [])
+      .filter((e) => {
+        const start = (e as { start_time?: string; startTime?: string }).start_time
+          ?? (e as { start_time?: string; startTime?: string }).startTime
+        if (!start) return false
+        return new Date(start) >= startOfTomorrow
+      })
+      .slice(0, 3)
+      .map((e) => {
+        const start = (e as { start_time?: string; startTime?: string }).start_time
+          ?? (e as { start_time?: string; startTime?: string }).startTime!
+        const d = new Date(start)
+        const startOfDate = new Date(d)
+        startOfDate.setHours(0, 0, 0, 0)
+        const diffDays = Math.round((startOfDate.getTime() - today.getTime()) / 86400000)
+        let dayLabel: string
+        if (diffDays === 1) dayLabel = 'Tomorrow'
+        else if (diffDays <= 6) dayLabel = d.toLocaleDateString('en-US', { weekday: 'long' })
+        else dayLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        return { id: e.id, dayLabel, title: e.title }
+      })
+  }, [calendarEvents])
+
   const [picker, setPicker] = useState<{ dayOfWeek: number; slot: MealSlot; familyMemberId?: string; replaceEntryId?: string } | null>(null)
   const [chatOpen, setChatOpen] = useState(false)
   const [previewedDay, setPreviewedDay] = useState<number | null>(null)
@@ -279,7 +311,8 @@ export function MealPlanRitualPage() {
   const weekLabel = formatDateMonthDay(weekStart)
 
   return (
-    <div className="px-12 py-12 max-w-3xl mx-auto">
+    <div className="px-12 py-12 mx-auto max-w-[1280px] flex gap-8">
+    <div className="flex-1 min-w-0 max-w-3xl">
       <UndoToast />
       <MealsTabs />
 
@@ -586,6 +619,21 @@ export function MealPlanRitualPage() {
           onDismiss={() => setTourMounted(false)}
         />
       )}
+    </div>
+    <aside className="w-[340px] shrink-0 hidden lg:block">
+      <MealsRail
+        plan={plan}
+        recipes={recipes}
+        weekStart={weekStart}
+        missingItems={status.missingItems}
+        nextUpEvents={nextUpEvents}
+        onReviewGroceries={() => {
+          const el = document.getElementById('groceries')
+          if (el) el.scrollIntoView({ behavior: 'smooth' })
+        }}
+        onViewCalendar={() => navigate('/calendar')}
+      />
+    </aside>
     </div>
   )
 }
