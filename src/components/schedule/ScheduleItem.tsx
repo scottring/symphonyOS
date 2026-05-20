@@ -3,7 +3,7 @@ import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
 import type { TaskContext } from '@/types/task'
 import type { ProactiveSuggestion } from '@/types/proactiveSuggestion'
-import { formatTime, formatTimeRange, inferMealTime } from '@/lib/timeUtils'
+import { formatTimeLong, formatTimeRangeLong, inferMealTime } from '@/lib/timeUtils'
 import { getProjectColor } from '@/lib/projectUtils'
 import { PushDropdown, SchedulePopover, ContextPicker, DiscussionPicker, type ScheduleContextItem } from '@/components/triage'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
@@ -280,10 +280,10 @@ export const ScheduleItem = memo(function ScheduleItem({
     if (item.allDay) {
       const inferred = inferMealTime(item.title)
       if (inferred && item.startTime) {
-        // Show inferred time for meal events (e.g., "6:30p" for dinner)
+        // Show inferred time for meal events (e.g., "6:30 PM" for dinner)
         const inferredDate = new Date(item.startTime)
         inferredDate.setHours(inferred.hour, inferred.minute, 0, 0)
-        return { type: 'single' as const, time: formatTime(inferredDate) }
+        return { type: 'single' as const, time: formatTimeLong(inferredDate) }
       }
       return { type: 'allday' as const }
     }
@@ -291,7 +291,7 @@ export const ScheduleItem = memo(function ScheduleItem({
     if (!item.startTime) return null
 
     if (item.endTime) {
-      const rangeStr = formatTimeRange(item.startTime, item.endTime, item.allDay)
+      const rangeStr = formatTimeRangeLong(item.startTime, item.endTime, item.allDay)
       if (rangeStr === 'All day') {
         return { type: 'allday' as const }
       }
@@ -299,7 +299,7 @@ export const ScheduleItem = memo(function ScheduleItem({
       return { type: 'range' as const, start, end }
     }
 
-    return { type: 'single' as const, time: formatTime(item.startTime) }
+    return { type: 'single' as const, time: formatTimeLong(item.startTime) }
   }
 
   const timeDisplay = getTimeDisplay()
@@ -459,10 +459,10 @@ export const ScheduleItem = memo(function ScheduleItem({
       <div className="relative flex items-center gap-3">
         {/* Time column - fixed width for alignment */}
         {hideTime ? (
-          <div className="w-12 shrink-0" />
+          <div className="w-16 shrink-0" />
         ) : (isTask && onSchedule) || ((isRoutine || item.type === 'event') && onPush) ? (
           <div
-            className="w-12 shrink-0 relative"
+            className="w-16 shrink-0 relative"
             onClick={(e) => {
               e.stopPropagation()
               if (panelOpen && onClosePanel) {
@@ -514,7 +514,7 @@ export const ScheduleItem = memo(function ScheduleItem({
             />
           </div>
         ) : (
-          <div className="w-12 shrink-0 text-xs font-medium tabular-nums">
+          <div className="w-16 shrink-0 text-xs font-medium tabular-nums">
             {isOverdue && overdueLabel ? (
               <span style={{ color: overdueColors.warning600 }}>
                 {overdueLabel}
