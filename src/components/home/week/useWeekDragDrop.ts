@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -26,6 +26,8 @@ interface UseWeekDragDropResult {
     onDragCancel: () => void
   }
   activeDragId: string | null
+  /** Call when the dragged pointer enters/leaves an edge zone. Null clears. */
+  notifyEdge: (edge: 'left' | 'right' | null) => void
 }
 
 const DEFAULT_DURATION_MS = 30 * 60 * 1000
@@ -81,9 +83,34 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
     }
   }, [tasks, onUpdateTask])
 
+  const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const cooldownRef = useRef<boolean>(false)
+
+  const notifyEdge = useCallback((edge: 'left' | 'right' | null) => {
+    if (edge === null) {
+      if (advanceTimerRef.current) {
+        clearTimeout(advanceTimerRef.current)
+        advanceTimerRef.current = null
+      }
+      return
+    }
+    if (cooldownRef.current) return
+    if (advanceTimerRef.current) return // already armed
+    advanceTimerRef.current = setTimeout(() => {
+      const direction = edge === 'right' ? 7 : -7
+      const newStart = new Date(args.weekStart)
+      newStart.setDate(newStart.getDate() + direction)
+      args.onWeekChange(newStart)
+      advanceTimerRef.current = null
+      cooldownRef.current = true
+      setTimeout(() => { cooldownRef.current = false }, 300)
+    }, 500)
+  }, [args])
+
   return {
     dndHandlers: { onDragStart, onDragEnd, onDragCancel },
     activeDragId,
+    notifyEdge,
   }
 }
 

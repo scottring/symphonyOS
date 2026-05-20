@@ -84,3 +84,61 @@ describe('useWeekDragDrop', () => {
     expect(onUpdateTask).not.toHaveBeenCalled()
   })
 })
+
+describe('useWeekDragDrop — cross-week auto-advance', () => {
+  it('fires onWeekChange forward when right-edge hover persists ≥500ms', () => {
+    vi.useFakeTimers()
+    const onWeekChange = vi.fn()
+    const { result } = renderHook(() => useWeekDragDrop({
+      weekStart: new Date(2026, 4, 17),
+      onWeekChange,
+      onUpdateTask: vi.fn(), onUpdateEvent: vi.fn(), onUpdateRoutine: vi.fn(),
+      tasks: [], events: [], routines: [],
+    }))
+
+    act(() => result.current.notifyEdge('right'))
+    act(() => { vi.advanceTimersByTime(500) })
+
+    expect(onWeekChange).toHaveBeenCalledTimes(1)
+    const newStart = onWeekChange.mock.calls[0][0]
+    expect(newStart.getDate()).toBe(24)
+    vi.useRealTimers()
+  })
+
+  it('fires onWeekChange backward when left-edge hover persists ≥500ms', () => {
+    vi.useFakeTimers()
+    const onWeekChange = vi.fn()
+    const { result } = renderHook(() => useWeekDragDrop({
+      weekStart: new Date(2026, 4, 17),
+      onWeekChange,
+      onUpdateTask: vi.fn(), onUpdateEvent: vi.fn(), onUpdateRoutine: vi.fn(),
+      tasks: [], events: [], routines: [],
+    }))
+
+    act(() => result.current.notifyEdge('left'))
+    act(() => { vi.advanceTimersByTime(500) })
+
+    expect(onWeekChange).toHaveBeenCalledTimes(1)
+    expect(onWeekChange.mock.calls[0][0].getDate()).toBe(10)
+    vi.useRealTimers()
+  })
+
+  it('cancels auto-advance when edge state clears before 500ms', () => {
+    vi.useFakeTimers()
+    const onWeekChange = vi.fn()
+    const { result } = renderHook(() => useWeekDragDrop({
+      weekStart: new Date(2026, 4, 17),
+      onWeekChange,
+      onUpdateTask: vi.fn(), onUpdateEvent: vi.fn(), onUpdateRoutine: vi.fn(),
+      tasks: [], events: [], routines: [],
+    }))
+
+    act(() => result.current.notifyEdge('right'))
+    act(() => { vi.advanceTimersByTime(300) })
+    act(() => result.current.notifyEdge(null))
+    act(() => { vi.advanceTimersByTime(300) })
+
+    expect(onWeekChange).not.toHaveBeenCalled()
+    vi.useRealTimers()
+  })
+})
