@@ -8,6 +8,8 @@ import { useMealDayLog, useWeekGramsTrend } from '@/hooks/useMealDayLog'
 import { useMealTracking } from '@/hooks/useMealTracking'
 import { useMobile } from '@/hooks/useMobile'
 import { useStandingHabits } from '@/hooks/useStandingHabits'
+import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
+import { useGroceryStatus } from '@/hooks/useGroceryStatus'
 import { sundayOfWeek, isToday } from '@/lib/weekHelpers'
 import { TodayHeader } from './TodayHeader'
 import { TodayMealCard } from './TodayMealCard'
@@ -18,8 +20,20 @@ import { NotesField } from './NotesField'
 import { WeightExtras } from './WeightExtras'
 import { WeekTrendStrip } from './WeekTrendStrip'
 import { MealsTabs } from '../MealsTabs'
+import { MealsRail } from '../rail/MealsRail'
 import { gramsTargetFor, sumActualGrams, sumPlannedKcal } from './grams'
 import type { Recipe } from '@/types/meal-planner'
+
+function dayLabel(d: Date, today: Date): string {
+  const startOfToday = new Date(today)
+  startOfToday.setHours(0, 0, 0, 0)
+  const startOfDate = new Date(d)
+  startOfDate.setHours(0, 0, 0, 0)
+  const diffDays = Math.round((startOfDate.getTime() - startOfToday.getTime()) / 86400000)
+  if (diffDays === 1) return 'Tomorrow'
+  if (diffDays >= 2 && diffDays <= 6) return d.toLocaleDateString('en-US', { weekday: 'long' })
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
 
 /** S12 · Today — Diet Tracking. The day card in "actual" mode. Plan-first
  *  tracker: most days you ate the plan; you only mark deviations. */
@@ -37,6 +51,23 @@ export function TodayPage() {
   const tracking = useMealTracking(refresh)
   const { days: weekDays } = useWeekGramsTrend(weekStart)
   const { habits: standingHabits } = useStandingHabits()
+  const { events: calendarEvents } = useGoogleCalendar()
+  const status = useGroceryStatus(plan, recipes)
+
+  const nextUpEvents = useMemo(() => {
+    // Show the next 3 family-calendar events strictly after today.
+    const startOfTomorrow = new Date(today)
+    startOfTomorrow.setDate(startOfTomorrow.getDate() + 1)
+    startOfTomorrow.setHours(0, 0, 0, 0)
+    return (calendarEvents ?? [])
+      .filter((e) => new Date(e.start_time ?? e.startTime ?? '') >= startOfTomorrow)
+      .slice(0, 3)
+      .map((e) => ({
+        id: e.id,
+        dayLabel: dayLabel(new Date(e.start_time ?? e.startTime ?? ''), today),
+        title: e.title,
+      }))
+  }, [calendarEvents, today])
 
   const recipesById = useMemo(() => {
     const m = new Map<string, Recipe>()
@@ -171,102 +202,120 @@ export function TodayPage() {
 
   // Body — same content for both variants, header changes shape.
   return (
-    <div className={`${isMobile ? 'px-5 py-5' : 'px-12 py-12'} ${isMobile ? '' : 'max-w-3xl mx-auto'}`}>
-      {!isMobile && <MealsTabs />}
-      {/* Header */}
-      <div className="mb-6">
-        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-neutral-500">
-          {dateKicker}{isToday(today) && ' · TODAY'}
+    <div className={`${isMobile ? 'px-5 py-5' : 'px-12 py-12 mx-auto max-w-[1280px] flex gap-8'}`}>
+      {/* Left column — main day content */}
+      <div className={isMobile ? undefined : 'flex-1 min-w-0'}>
+        {!isMobile && <MealsTabs />}
+        {/* Header */}
+        <div className="mb-6">
+          <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-neutral-500">
+            {dateKicker}{isToday(today) && ' · TODAY'}
+          </div>
+          <h1 className={`font-display ${isMobile ? 'text-[2rem]' : 'text-[3rem]'} leading-[1.05] text-neutral-800 mt-1`}>
+            {isMobile ? `${headerDate.split(', ')[0]}, ${headerDate.split(', ')[1]}` : 'Today.'}
+          </h1>
+          {!isMobile && (
+            <p className="font-display italic text-[1.15rem] text-neutral-500 mt-2">{headerDate}</p>
+          )}
         </div>
-        <h1 className={`font-display ${isMobile ? 'text-[2rem]' : 'text-[3rem]'} leading-[1.05] text-neutral-800 mt-1`}>
-          {isMobile ? `${headerDate.split(', ')[0]}, ${headerDate.split(', ')[1]}` : 'Today.'}
-        </h1>
-        {!isMobile && (
-          <p className="font-display italic text-[1.15rem] text-neutral-500 mt-2">{headerDate}</p>
-        )}
-      </div>
 
-      {/* Habit pill row */}
-      <div className="mb-5">
-        <HabitPills habitDefs={habitDefs} habits={log?.habits ?? {}} onToggle={k => void toggleHabit(k)} />
-      </div>
+        {/* Habit pill row */}
+        <div className="mb-5">
+          <HabitPills habitDefs={habitDefs} habits={log?.habits ?? {}} onToggle={k => void toggleHabit(k)} />
+        </div>
 
-      {/* Header metrics */}
-      <TodayHeader
-        habitDefs={habitDefs}
-        gramsActual={gramsActual}
-        gramsTarget={gramsTarget}
-        kcalPlanned={kcalPlanned}
-        habits={log?.habits ?? {}}
-        variant={isMobile ? 'mobile' : 'desktop'}
-      />
-
-      {/* Tonight hero card */}
-      <div className="mt-6">
-        <TodayMealCard
-          dayLabel={today.toLocaleDateString('en-US', { weekday: 'long' })}
-          title={todayRecipe?.title ?? todayDinner?.adHocTitle ?? 'No meal planned'}
-          sides={undefined /* MVP: no separate sides field; future iteration */}
-          methodLabel={undefined /* MVP: not derived yet — Phase 3a stops here */}
-          methodBody={todayRecipe?.instructions?.[0] ?? undefined}
-          kidsLine={undefined /* MVP: no kids-line in data model yet */}
-          servesCount={cardDiners.length > 0 ? cardDiners.length : undefined}
-          prepLabel={prepLabel}
-          nutritionLabel={undefined}
-          diners={cardDiners}
-          state={cardState}
-          onGeneratePlan={() => navigate('/meals/plan')}
-          onRegenerate={() => navigate('/meals/plan')}
-          onViewRecipe={() => {
-            if (todayRecipe?.sourceUrl) window.open(todayRecipe.sourceUrl, '_blank')
-          }}
+        {/* Header metrics */}
+        <TodayHeader
+          habitDefs={habitDefs}
+          gramsActual={gramsActual}
+          gramsTarget={gramsTarget}
+          kcalPlanned={kcalPlanned}
+          habits={log?.habits ?? {}}
+          variant={isMobile ? 'mobile' : 'desktop'}
         />
-      </div>
 
-      {/* Day card body */}
-      <div className={`mt-6 ${isMobile ? '' : 'p-1'}`}>
-        {todayEntries.length === 0 ? (
-          <div className="py-6 font-display italic text-[1.05rem] text-neutral-400">
-            Nothing planned for today. Tap below to log something you ate.
-          </div>
-        ) : (
-          <div>
-            {todayEntries.map(entry => (
-              <MealStateRow
-                key={entry.id}
-                entry={entry}
-                recipe={entry.recipeId ? recipesById.get(entry.recipeId) : undefined}
-                onConfirmAsPlanned={handleConfirm}
-                onSwap={handleSwap}
-                onSkip={handleSkip}
-                onUndo={handleUndo}
-                onRemove={(id) => removeMeal(id)}
-              />
-            ))}
-          </div>
-        )}
+        {/* Tonight hero card */}
+        <div className="mt-6">
+          <TodayMealCard
+            dayLabel={today.toLocaleDateString('en-US', { weekday: 'long' })}
+            title={todayRecipe?.title ?? todayDinner?.adHocTitle ?? 'No meal planned'}
+            sides={undefined /* MVP: no separate sides field; future iteration */}
+            methodLabel={undefined /* MVP: not derived yet — Phase 3a stops here */}
+            methodBody={todayRecipe?.instructions?.[0] ?? undefined}
+            kidsLine={undefined /* MVP: no kids-line in data model yet */}
+            servesCount={cardDiners.length > 0 ? cardDiners.length : undefined}
+            prepLabel={prepLabel}
+            nutritionLabel={undefined}
+            diners={cardDiners}
+            state={cardState}
+            onGeneratePlan={() => navigate('/meals/plan')}
+            onRegenerate={() => navigate('/meals/plan')}
+            onViewRecipe={() => {
+              if (todayRecipe?.sourceUrl) window.open(todayRecipe.sourceUrl, '_blank')
+            }}
+          />
+        </div>
 
-        <AddItemRow onAdd={handleAdd} />
-      </div>
+        {/* Day card body */}
+        <div className={`mt-6 ${isMobile ? '' : 'p-1'}`}>
+          {todayEntries.length === 0 ? (
+            <div className="py-6 font-display italic text-[1.05rem] text-neutral-400">
+              Nothing planned for today. Tap below to log something you ate.
+            </div>
+          ) : (
+            <div>
+              {todayEntries.map(entry => (
+                <MealStateRow
+                  key={entry.id}
+                  entry={entry}
+                  recipe={entry.recipeId ? recipesById.get(entry.recipeId) : undefined}
+                  onConfirmAsPlanned={handleConfirm}
+                  onSwap={handleSwap}
+                  onSkip={handleSkip}
+                  onUndo={handleUndo}
+                  onRemove={(id) => removeMeal(id)}
+                />
+              ))}
+            </div>
+          )}
 
-      {/* Notes */}
-      <div className="mt-6">
-        <NotesField
-          value={log?.notes}
-          onChange={(next) => void update({ notes: next })}
+          <AddItemRow onAdd={handleAdd} />
+        </div>
+
+        {/* Notes */}
+        <div className="mt-6">
+          <NotesField
+            value={log?.notes}
+            onChange={(next) => void update({ notes: next })}
+          />
+        </div>
+
+        {/* Weight & extras (hidden by default) */}
+        <WeightExtras
+          weightLb={log?.weightLb}
+          weightNote={log?.weightNote}
+          recentWeights={recentWeights}
+          onChange={(input) => void update(input)}
         />
+
+        {/* Week trend strip */}
+        <WeekTrendStrip days={weekDays} weekStart={weekStart} />
       </div>
 
-      {/* Weight & extras (hidden by default) */}
-      <WeightExtras
-        weightLb={log?.weightLb}
-        weightNote={log?.weightNote}
-        recentWeights={recentWeights}
-        onChange={(input) => void update(input)}
-      />
-
-      {/* Week trend strip */}
-      <WeekTrendStrip days={weekDays} weekStart={weekStart} />
+      {/* Right rail — hidden on mobile, shown at lg breakpoint and above */}
+      {!isMobile && (
+        <aside className="w-[340px] shrink-0 hidden lg:block">
+          <MealsRail
+            plan={plan}
+            recipes={recipes}
+            weekStart={weekStart}
+            missingItems={status.missingItems}
+            nextUpEvents={nextUpEvents}
+            onReviewGroceries={() => navigate('/meals/plan#groceries')}
+            onViewCalendar={() => navigate('/calendar')}
+          />
+        </aside>
+      )}
     </div>
   )
 }
