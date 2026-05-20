@@ -7,10 +7,11 @@ describe('HomeViewSwitcher', () => {
     const onViewChange = vi.fn()
     render(<HomeViewSwitcher currentView="today" onViewChange={onViewChange} />)
 
-    // Three text buttons: Day, Week, Month
+    // Four text buttons: Day, Workweek, Week, Month
     const buttons = screen.getAllByRole('button')
-    expect(buttons).toHaveLength(3)
+    expect(buttons).toHaveLength(4)
     expect(screen.getByRole('button', { name: 'Day' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Workweek' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Week' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Month' })).toBeInTheDocument()
   })
@@ -63,5 +64,15 @@ describe('HomeViewSwitcher', () => {
 
     // Should still call onViewChange even if same view
     expect(onViewChange).toHaveBeenCalledWith('today')
+  })
+
+  it('renders Workweek option and fires onChange with workweek', async () => {
+    const onViewChange = vi.fn()
+    const { user } = render(
+      <HomeViewSwitcher currentView="today" onViewChange={onViewChange} />
+    )
+    const btn = screen.getByRole('button', { name: 'Workweek' })
+    await user.click(btn)
+    expect(onViewChange).toHaveBeenCalledWith('workweek')
   })
 })

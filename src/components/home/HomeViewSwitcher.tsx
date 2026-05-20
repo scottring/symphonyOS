@@ -7,6 +7,7 @@ interface HomeViewSwitcherProps {
 
 const views: { value: HomeViewType; label: string }[] = [
   { value: 'today', label: 'Day' },
+  { value: 'workweek', label: 'Workweek' },
   { value: 'week', label: 'Week' },
   { value: 'month', label: 'Month' },
 ]

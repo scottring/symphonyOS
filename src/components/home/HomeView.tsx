@@ -232,7 +232,8 @@ export function HomeView({
       )
     }
 
-    if (currentView === 'week') {
+    if (currentView === 'workweek' || currentView === 'week') {
+      // TODO(Task 5): Separate workweek rendering (5-day grid) from week (7-day grid)
       const useV2 = isWeekV2Enabled()
       if (!useV2) {
         return (
