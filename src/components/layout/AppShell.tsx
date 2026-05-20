@@ -283,9 +283,10 @@ export function AppShell({
                     if (!viewedDate || !onDateChange) return
                     const n = new Date(viewedDate); n.setDate(n.getDate() - 1); onDateChange(n)
                   }}
-                  className="text-2xl leading-none text-neutral-700 hover:text-neutral-900 px-2 py-1 shrink-0 select-none"
+                  className="text-xl font-semibold leading-none text-neutral-700 hover:text-neutral-900 px-2 py-1 shrink-0 select-none"
+                  style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}
                 >
-                  ‹
+                  {'<'}
                 </button>
                 <span className="font-display text-lg font-semibold text-neutral-900 whitespace-nowrap">
                   {viewedDate ? viewedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : ''}
@@ -296,9 +297,10 @@ export function AppShell({
                     if (!viewedDate || !onDateChange) return
                     const n = new Date(viewedDate); n.setDate(n.getDate() + 1); onDateChange(n)
                   }}
-                  className="text-2xl leading-none text-neutral-700 hover:text-neutral-900 px-2 py-1 shrink-0 select-none"
+                  className="text-xl font-semibold leading-none text-neutral-700 hover:text-neutral-900 px-2 py-1 shrink-0 select-none"
+                  style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}
                 >
-                  ›
+                  {'>'}
                 </button>
               </div>
 
