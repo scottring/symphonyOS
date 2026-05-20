@@ -534,10 +534,6 @@ export function AppShell({
             tasks={entities?.tasks ?? []}
             projects={entities?.projects ?? []}
             familyMembers={railFamilyMembers}
-            onViewFullPlan={() => {
-              // No-op for now — there's no dedicated "week" view yet. When
-              // Phase 2 lands a week view (or planning surface), wire here.
-            }}
             onSelectProject={(id) => {
               // Navigate to projects view; opening a specific project detail
               // is the projects-list responsibility. A future iteration can

@@ -18,8 +18,6 @@ interface TodayRailProps {
   projects: Project[]
   /** Core + guest family members. Guests are filtered out for the snapshot panel. */
   familyMembers: FamilyMember[]
-  /** CTA for AT A GLANCE → opens fuller plan view (week, day detail). */
-  onViewFullPlan: () => void
   /** Open a single project's detail view. */
   onSelectProject: (id: string) => void
   /** Navigate to the full projects list. */
@@ -43,7 +41,6 @@ export function TodayRail({
   tasks,
   projects,
   familyMembers,
-  onViewFullPlan,
   onSelectProject,
   onViewAllProjects,
   onSelectMember,
@@ -70,12 +67,7 @@ export function TodayRail({
 
   return (
     <div className="h-full flex flex-col gap-4 overflow-y-auto pr-1">
-      <AtAGlance
-        openTaskCount={openTaskCount}
-        eventsTodayCount={0}
-        tomorrowFirstEvent={null}
-        onViewFullPlan={onViewFullPlan}
-      />
+      <AtAGlance openTaskCount={openTaskCount} />
 
       <ForDiscussion items={flaggedItems} onSelectItem={onSelectTask} />
 
