@@ -7,8 +7,10 @@ const mkOver = (slotId: string) => ({
   over: { id: slotId, data: { current: { kind: 'timed', dayIso: '2026-05-20', hour: 13, minute: 30 } } },
 })
 
+// itemId uses the TimelineItem.id format (prefixed): 'task-<uuid>'.
+// The hook must strip the prefix before calling onUpdateTask with the raw DB id.
 const mkBlockOver = (slotId: string) => ({
-  active: { id: 'block:t1', data: { current: { kind: 'block', itemId: 't1', originStartIso: '2026-05-20T10:00:00' } } },
+  active: { id: 'block:task-t1', data: { current: { kind: 'block', itemId: 'task-t1', originStartIso: '2026-05-20T10:00:00' } } },
   over: { id: slotId, data: { current: { kind: 'timed', dayIso: '2026-05-21', hour: 14, minute: 0 } } },
 })
 

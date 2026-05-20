@@ -70,15 +70,29 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
     }
 
     if (activeData.kind === 'block' && activeData.itemId) {
-      const task = tasks.find((t) => t.id === activeData.itemId)
-      if (!task?.scheduledFor) return
-      const oldStart = task.scheduledFor
-      const oldEnd = task.endTime ?? new Date(oldStart.getTime() + DEFAULT_DURATION_MS)
-      const duration = oldEnd.getTime() - oldStart.getTime()
-      void onUpdateTask(activeData.itemId, {
-        scheduledFor: newStart,
-        endTime: new Date(newStart.getTime() + duration),
-      })
+      const itemId = String(activeData.itemId)
+      // Strip the type prefix to get the raw DB id, then route to the correct
+      // mutator. TimelineItem.id is prefixed ('task-xyz', 'event-xyz', etc.);
+      // the DB update functions expect the raw uuid.
+      if (itemId.startsWith('task-')) {
+        const taskId = itemId.slice('task-'.length)
+        const task = tasks.find((t) => t.id === taskId)
+        if (!task?.scheduledFor) return
+        const oldStart = task.scheduledFor
+        const oldEnd = task.endTime ?? new Date(oldStart.getTime() + DEFAULT_DURATION_MS)
+        const duration = oldEnd.getTime() - oldStart.getTime()
+        void onUpdateTask(taskId, {
+          scheduledFor: newStart,
+          endTime: new Date(newStart.getTime() + duration),
+        })
+        return
+      }
+      if (itemId.startsWith('event-')) {
+        // Events drag: not yet wired — no-op. (Spec gap to be addressed later.)
+        void itemId
+        return
+      }
+      // 'routine-...' shouldn't reach here (routines are non-draggable per spec).
       return
     }
   }, [tasks, onUpdateTask])

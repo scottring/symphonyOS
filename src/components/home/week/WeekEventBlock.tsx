@@ -1,7 +1,7 @@
 import { useDraggable } from '@dnd-kit/core'
 import type { TimelineItem } from '@/types/timeline'
 import { colorFor } from '@/lib/weekColorMap'
-import { FIRST_HOUR, HOUR_ROW_HEIGHT, TIME_COL_WIDTH, COL_HEADER_HEIGHT } from './WeekGrid'
+import { FIRST_HOUR, HOUR_ROW_HEIGHT, TIME_COL_WIDTH } from './WeekGrid'
 import { useBlockResize } from './useBlockResize'
 
 interface WeekEventBlockProps {
@@ -119,9 +119,11 @@ function computePlacement(item: TimelineItem, weekStart: Date): Placement | null
   const firstMinute = FIRST_HOUR * 60
   const pxPerMin = HOUR_ROW_HEIGHT / 60
 
-  // Top is relative to the top of the hour-rows region, plus the header+all-day offset
-  // so blocks line up correctly with hour cells inside WeekGrid's relative container.
-  const top = Math.max(0, (startMins - firstMinute) * pxPerMin) + COL_HEADER_HEIGHT
+  // Top is relative to the top of the hour-rows region. WeekEventBlock is
+  // rendered inside WeekGrid's inner <div className="absolute inset-0"> which
+  // already sits flush with the hour rows — adding COL_HEADER_HEIGHT here would
+  // double-count the header offset and push every block 72px (72 mins) too low.
+  const top = Math.max(0, (startMins - firstMinute) * pxPerMin)
   const height = Math.max(HOUR_ROW_HEIGHT / 4, (endMins - startMins) * pxPerMin) // min 15-min slot
 
   return { dayIdx, top, height }

@@ -176,7 +176,16 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // WeekEventBlock.onSelect expects (id: string), but onSelectItem is
   // (id: string | null). Narrow here so TypeScript is satisfied; passing null
   // is only needed for deselection, which happens elsewhere.
-  const handleSelectBlock = (id: string) => onSelectItem(id)
+  // Routine items get a synthetic '-dayN' suffix for React key uniqueness;
+  // strip it before forwarding so the detail panel's id-resolution matches the
+  // actual routine id stored in the DB.
+  const handleSelectBlock = (id: string) => {
+    if (id.startsWith('routine-')) {
+      onSelectItem(id.replace(/-day\d+$/, ''))
+      return
+    }
+    onSelectItem(id)
+  }
 
   return (
     <div data-week-bounds className="hidden lg:block">
@@ -203,7 +212,12 @@ export function WeekViewV2(props: WeekViewV2Props) {
               weekStart={weekStart}
               onSelect={handleSelectBlock}
               onResizeCommit={(itemId, updates) => {
-                void onUpdateTask(itemId, updates as Partial<Task>)
+                // itemId from WeekEventBlock is the TimelineItem.id (prefixed).
+                // Strip before persisting so the DB update targets the real uuid.
+                if (itemId.startsWith('task-')) {
+                  void onUpdateTask(itemId.slice('task-'.length), updates as Partial<Task>)
+                }
+                // Events resize: not wired. Routines: not resizable (disabled in WeekEventBlock).
               }}
             />
           ))}
