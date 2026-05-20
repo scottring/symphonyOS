@@ -525,10 +525,19 @@ export function AppShell({
         >
           <TodayRail
             tasks={entities?.tasks ?? []}
+            projects={entities?.projects ?? []}
             onViewFullPlan={() => {
               // No-op for now — there's no dedicated "week" view yet. When
               // Phase 2 lands a week view (or planning surface), wire here.
             }}
+            onSelectProject={(id) => {
+              // Navigate to projects view; opening a specific project detail
+              // is the projects-list responsibility. A future iteration can
+              // pin-deep-link via pin/navigate handlers.
+              onViewChange('projects')
+              void id
+            }}
+            onViewAllProjects={() => onViewChange('projects')}
           />
         </aside>
       )}
