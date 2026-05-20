@@ -42,4 +42,20 @@ describe('WeekGrid', () => {
     )
     expect(screen.getByTestId('positioned-block')).toBeInTheDocument()
   })
+
+  it('renders 5 day-column headers when dayCount=5', () => {
+    // 2026-05-18 is a Monday
+    const monday = new Date(2026, 4, 18)
+    renderWithDnd(<WeekGrid weekStart={monday} dayCount={5} />)
+    const headerCells = screen.getAllByText(/^(mon|tue|wed|thu|fri|sat|sun)$/i)
+    expect(headerCells).toHaveLength(5)
+  })
+
+  it('defaults to 7 day columns when dayCount is omitted', () => {
+    // 2026-05-17 is a Sunday
+    const sunday = new Date(2026, 4, 17)
+    renderWithDnd(<WeekGrid weekStart={sunday} />)
+    const headerCells = screen.getAllByText(/^(mon|tue|wed|thu|fri|sat|sun)$/i)
+    expect(headerCells).toHaveLength(7)
+  })
 })

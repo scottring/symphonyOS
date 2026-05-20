@@ -18,7 +18,9 @@ interface CreateGestureHandlers {
 }
 
 interface WeekGridProps {
-  weekStart: Date  // Sunday of the displayed week, 00:00 local
+  weekStart: Date  // First day of the displayed range, 00:00 local
+  /** Number of day columns to render. 5 = Mon-Fri (workweek), 7 = full week. Default 7. */
+  dayCount?: 5 | 7
   children?: ReactNode  // Positioned <WeekEventBlock>s rendered absolutely on top
   /** Optional: handlers for drag-to-create on empty slots. When provided, sub-slots
    *  emit pointerdown/move/up that the parent uses to drive useGridCreate. */
@@ -27,8 +29,8 @@ interface WeekGridProps {
   suppressCreate?: boolean
 }
 
-export function WeekGrid({ weekStart, children, onCreateGesture, suppressCreate }: WeekGridProps) {
-  const days = Array.from({ length: 7 }, (_, i) => {
+export function WeekGrid({ weekStart, dayCount = 7, children, onCreateGesture, suppressCreate }: WeekGridProps) {
+  const days = Array.from({ length: dayCount }, (_, i) => {
     const d = new Date(weekStart)
     d.setDate(d.getDate() + i)
     return d
@@ -39,7 +41,7 @@ export function WeekGrid({ weekStart, children, onCreateGesture, suppressCreate 
       {/* Day-column headers */}
       <div
         className="grid border-b border-neutral-200 bg-neutral-50/40"
-        style={{ gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(7, 1fr)` }}
+        style={{ gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(${dayCount}, 1fr)` }}
       >
         <div className="px-2 py-2 text-[10px] uppercase tracking-wide text-neutral-400">Time</div>
         {days.map((d, i) => (
@@ -55,7 +57,7 @@ export function WeekGrid({ weekStart, children, onCreateGesture, suppressCreate 
       {/* All-day row */}
       <div
         className="grid border-b border-neutral-200 bg-neutral-50/20"
-        style={{ gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(7, 1fr)`, minHeight: ALL_DAY_HEIGHT }}
+        style={{ gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(${dayCount}, 1fr)`, minHeight: ALL_DAY_HEIGHT }}
       >
         <div className="px-2 py-2 text-[10px] uppercase tracking-wide text-neutral-400">all-day</div>
         {days.map((d, i) => (
@@ -71,7 +73,7 @@ export function WeekGrid({ weekStart, children, onCreateGesture, suppressCreate 
             <div
               key={hour}
               className="grid border-b border-neutral-100"
-              style={{ height: HOUR_ROW_HEIGHT, gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(7, 1fr)` }}
+              style={{ height: HOUR_ROW_HEIGHT, gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(${dayCount}, 1fr)` }}
             >
               <div data-hour-label className="px-2 py-1 text-[10px] text-neutral-400">
                 {hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
@@ -89,7 +91,7 @@ export function WeekGrid({ weekStart, children, onCreateGesture, suppressCreate 
           )
         })}
         {/* End-of-day boundary label at LAST_HOUR (9 PM) */}
-        <div className="grid" style={{ gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(7, 1fr)` }}>
+        <div className="grid" style={{ gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(${dayCount}, 1fr)` }}>
           <div className="px-2 py-1 text-[10px] text-neutral-400">
             {(LAST_HOUR as number) === 12 ? '12 PM' : LAST_HOUR > 12 ? `${LAST_HOUR - 12} PM` : `${LAST_HOUR} AM`}
           </div>
