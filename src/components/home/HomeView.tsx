@@ -22,6 +22,7 @@ function isWeekV2Enabled(): boolean {
   // nav arrows, mobile events/routines rendering, DragOverlay block ghost.
   return localStorage.getItem(WEEK_V2_FLAG) !== 'off'
 }
+import { mondayOfWeek } from '@/lib/workweekHelpers'
 import { CascadingRiverView } from './CascadingRiverView'
 import { TodayView } from '@/components/schedule/TodayView'
 import { UndoToast } from '@/components/undo/UndoToast'
@@ -232,8 +233,41 @@ export function HomeView({
       )
     }
 
-    if (currentView === 'workweek' || currentView === 'week') {
-      // TODO(Task 5): Separate workweek rendering (5-day grid) from week (7-day grid)
+    if (currentView === 'workweek') {
+      // Workweek anchors weekStart to Monday (vs. Sunday for 7-day week).
+      // We compute the displayed start locally so it doesn't permanently
+      // shift the underlying weekStart state — switching back to Week keeps
+      // the prior Sunday anchor.
+      const mondayStart = mondayOfWeek(weekStart)
+      return (
+        <>
+          <WeekViewV2
+            tasks={filteredTasks}
+            events={filteredEvents}
+            routines={filteredRoutines}
+            dateInstances={dateInstances}
+            weekStart={mondayStart}
+            dayCount={5}
+            onWeekChange={setWeekStart}
+            selectedAssignee={selectedAssigneeForSchedule}
+            onSelectItem={onSelectItem}
+            onUpdateTask={ctx.onUpdateTask ?? (() => {})}
+            onUpdateRoutine={ctx.onUpdateRoutine ?? (() => {})}
+            onUpdateEvent={() => {}}
+          />
+          {/* TODO(Task 9): pass dayCount={5} to WeekViewMobile for Workweek */}
+          <WeekViewMobile
+            tasks={filteredTasks}
+            events={filteredEvents}
+            routines={filteredRoutines}
+            weekStart={mondayStart}
+            onSelectItem={onSelectItem}
+          />
+        </>
+      )
+    }
+
+    if (currentView === 'week') {
       const useV2 = isWeekV2Enabled()
       if (!useV2) {
         return (
