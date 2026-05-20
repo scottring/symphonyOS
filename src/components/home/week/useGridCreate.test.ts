@@ -109,6 +109,24 @@ describe('useGridCreate', () => {
     expect((endTime.getTime() - startTime.getTime()) / 60000).toBe(60)
   })
 
+  it('exposes liveGesture during a drag and clears it on pointerUp', () => {
+    const { result } = renderHook(() => useGridCreate())
+    const slot1 = { dayIso: '2026-05-18', hour: 9, minute: 0 }
+    const slot2 = { dayIso: '2026-05-18', hour: 9, minute: 30 }
+    const fakeEvent = {
+      currentTarget: { getBoundingClientRect: () => ({ top: 0, left: 0, width: 100, height: 15 }) },
+    } as unknown as React.PointerEvent
+
+    act(() => { result.current.onSlotPointerDown(fakeEvent, slot1) })
+    expect(result.current.liveGesture?.startSlot).toEqual(slot1)
+
+    act(() => { result.current.onGridPointerMove(slot2) })
+    expect(result.current.liveGesture?.endSlot).toEqual(slot2)
+
+    act(() => { result.current.onSlotPointerUp() })
+    expect(result.current.liveGesture).toBeNull()
+  })
+
   it('state is null before any gesture', () => {
     const { result } = renderHook(() => useGridCreate())
     expect(result.current.state).toBeNull()

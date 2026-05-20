@@ -291,6 +291,32 @@ export function WeekViewV2(props: WeekViewV2Props) {
           )
         })()}
 
+        {gridCreate.liveGesture && (() => {
+          const lg = gridCreate.liveGesture
+          // Compute outline rect from the live gesture. anchorRect is the start
+          // slot's rect (15-min sub-slot). The height = number-of-15min-slots
+          // between start and end, inclusive of the end slot itself.
+          const startMinutes = lg.startSlot.hour * 60 + lg.startSlot.minute
+          const endMinutes = lg.endSlot.hour * 60 + lg.endSlot.minute + 15
+          const minutesSpan = Math.max(15, endMinutes - startMinutes)
+          const heightPx = (minutesSpan / 15) * lg.anchorRect.height
+          const style: React.CSSProperties = {
+            position: 'fixed',
+            top: lg.anchorRect.top,
+            left: lg.anchorRect.left,
+            width: lg.anchorRect.width,
+            height: heightPx,
+            pointerEvents: 'none',
+            zIndex: 55,
+          }
+          return (
+            <div
+              style={style}
+              className="border-2 border-dashed border-primary-500/60 bg-primary-500/5 rounded-md"
+            />
+          )
+        })()}
+
         <DragOverlay dropAnimation={null}>
           {drag.activeDragId
             ? (() => {

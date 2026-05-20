@@ -25,6 +25,8 @@ export interface CreateState {
 interface UseGridCreateResult {
   /** Active create state — when non-null, render the SlotQuickCreatePopover. */
   state: CreateState | null
+  /** Live snapshot of the in-progress drag (null when no drag active). For outline render. */
+  liveGesture: { startSlot: SlotRef; endSlot: SlotRef; anchorRect: AnchorRect } | null
   /** Compute start/end Date objects from the saved slot info. */
   toTimes: (s: CreateState, defaultMinutes?: number) => { startTime: Date; endTime: Date }
   /** Pointerdown on a slot — starts the create gesture. */
@@ -39,6 +41,11 @@ interface UseGridCreateResult {
 
 export function useGridCreate(): UseGridCreateResult {
   const [state, setState] = useState<CreateState | null>(null)
+  const [liveGesture, setLiveGesture] = useState<{
+    startSlot: SlotRef
+    endSlot: SlotRef
+    anchorRect: AnchorRect
+  } | null>(null)
   const gestureRef = useRef<{
     startSlot: SlotRef
     endSlot: SlotRef
@@ -47,11 +54,13 @@ export function useGridCreate(): UseGridCreateResult {
 
   const onSlotPointerDown = useCallback((e: React.PointerEvent, slot: SlotRef) => {
     const rect = (e.currentTarget as Element).getBoundingClientRect()
-    gestureRef.current = {
+    const next = {
       startSlot: slot,
       endSlot: slot,
       anchorRect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
     }
+    gestureRef.current = next
+    setLiveGesture(next)
   }, [])
 
   const onGridPointerMove = useCallback((slot: SlotRef | null) => {
@@ -59,11 +68,13 @@ export function useGridCreate(): UseGridCreateResult {
     // Only update end slot if it's the same day (no cross-day drag-to-create for v1)
     if (slot.dayIso !== gestureRef.current.startSlot.dayIso) return
     gestureRef.current.endSlot = slot
+    setLiveGesture({ ...gestureRef.current })
   }, [])
 
   const onSlotPointerUp = useCallback(() => {
     const g = gestureRef.current
     gestureRef.current = null
+    setLiveGesture(null)
     if (!g) return
     setState({ startSlot: g.startSlot, endSlot: g.endSlot, anchorRect: g.anchorRect })
   }, [])
@@ -89,5 +100,5 @@ export function useGridCreate(): UseGridCreateResult {
     return { startTime, endTime }
   }, [])
 
-  return { state, toTimes, onSlotPointerDown, onGridPointerMove, onSlotPointerUp, close }
+  return { state, liveGesture, toTimes, onSlotPointerDown, onGridPointerMove, onSlotPointerUp, close }
 }
