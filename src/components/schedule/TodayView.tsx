@@ -50,6 +50,7 @@ import { useEmailActionItems } from '@/hooks/useEmailActionItems'
 
 import { focusHeadline } from '@/lib/focusHeadline'
 import { daySectionMeta } from '@/lib/daySectionMeta'
+import { parseMealTitle } from '@/lib/mealTitle'
 
 // ─── Props: identical to TodayScheduleProps ───────────────────────────────────
 
@@ -589,12 +590,14 @@ export function TodayView({
                               minute: '2-digit',
                             })
                           : ''
+                        const parsed = parseMealTitle(item.title)
                         return (
                           <div key={item.id}>
                             {insertBefore}
                             <div {...(isFirstItem ? { 'data-today-first': '' } : {})}>
                               <EveningMealCard
-                                title={item.title}
+                                title={parsed.title}
+                                sides={parsed.sides}
                                 timeLabel={timeLabel}
                                 onSelect={() => onSelectItem(item.id)}
                               />
