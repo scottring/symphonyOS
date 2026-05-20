@@ -19,7 +19,7 @@ export function TodayHeader({ viewedDate, onDateChange, currentHomeView, onHomeV
   const longLabel = viewedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
   const shortLabel = viewedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
   return (
-    <header className="flex flex-col gap-3 mb-6 md:flex-row md:items-center md:justify-between md:gap-4">
+    <header className="flex flex-col gap-3 mb-6 px-3 md:px-0 md:flex-row md:items-center md:justify-between md:gap-4">
       {/* Prev arrow, date, next arrow. Mobile centers the trio; desktop is left-aligned. */}
       <div className="flex items-center gap-2 min-w-0 justify-center md:justify-start">
         <button
