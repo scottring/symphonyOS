@@ -7,7 +7,7 @@ import { formatTimeLong, formatTimeRangeLong, inferMealTime } from '@/lib/timeUt
 import { getProjectColor } from '@/lib/projectUtils'
 import { PushDropdown, SchedulePopover, ContextPicker, DiscussionPicker, type ScheduleContextItem } from '@/components/triage'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
-import { Redo2, Video, Tag, Check, Pencil } from 'lucide-react'
+import { Redo2, Video, Tag, Check, Pencil, Link as LinkIcon } from 'lucide-react'
 import { ConceptIcon, type ConceptName } from '@/lib/conceptIcons'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useMobile } from '@/hooks/useMobile'
@@ -16,6 +16,7 @@ import { PromoteToProjectButton } from './PromoteToProjectButton'
 import { ExpandingPanel } from './ExpandingPanel'
 import { DOMAIN_COLORS } from '@/lib/domainColors'
 import { rowSubtitle } from '@/lib/rowSubtitle'
+import { locationLink } from '@/lib/locationLink'
 
 // Nordic Journal calendar icon - minimal, elegant design
 // Uses the event's context color (Work/Family/Personal) or falls back to primary teal-forest
@@ -773,25 +774,33 @@ export const ScheduleItem = memo(function ScheduleItem({
         const onlyLocation = !hasContactChip && !parentTaskName
         const metadataContent = (
           <div className={`flex items-center gap-2 ml-[5.75rem] flex-wrap ${onlyLocation ? 'pt-1' : 'mt-1'}`}>
-            {/* Location chip — hover-only for cleaner default view */}
-            {item.location && (
-              <a
-                href={`https://www.google.com/maps/dir/?api=1&destination=${
-                  item.locationPlaceId
-                    ? `place_id:${item.locationPlaceId}`
-                    : encodeURIComponent(item.location)
-                }`}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 text-primary-600 hover:text-primary-700 rounded text-[11px] font-medium transition-all opacity-0 group-hover:opacity-100 max-w-[220px]"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                </svg>
-                <span className="truncate">{item.location}</span>
-              </a>
-            )}
+            {/* Location chip — hover-only for cleaner default view.
+                URL-shaped locations (Zoom/Meet/Teams) open the meeting URL
+                directly; physical locations open Google Maps directions. */}
+            {item.location && (() => {
+              const link = locationLink(item.location, item.locationPlaceId)
+              if (link.kind === 'empty') return null
+              const isUrl = link.kind === 'url'
+              return (
+                <a
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-primary-600 hover:text-primary-700 rounded text-[11px] font-medium transition-all opacity-0 group-hover:opacity-100 max-w-[220px]"
+                  title={isUrl ? 'Open meeting link' : 'Get directions'}
+                >
+                  {isUrl ? (
+                    <Video className="w-3 h-3 shrink-0" aria-hidden />
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                  <span className="truncate">{isUrl ? 'Join meeting' : item.location}</span>
+                </a>
+              )
+            })()}
 
             {/* Contact chip - desktop only */}
             {hasContactChip && (
