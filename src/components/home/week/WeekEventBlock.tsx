@@ -4,6 +4,13 @@ import { colorFor } from '@/lib/weekColorMap'
 import { FIRST_HOUR, HOUR_ROW_HEIGHT, TIME_COL_WIDTH } from './WeekGrid'
 import { useBlockResize } from './useBlockResize'
 
+// Resize handles are hidden until `tasks.end_time` becomes a real DB
+// column. Today, drag-resizing an item works visually but the new
+// endTime is silently dropped on commit (no column to persist it to),
+// causing the block to revert to 30 min on next render. Re-enable by
+// setting VITE_WEEK_RESIZE_ENABLED=true once the schema lands.
+const RESIZE_ENABLED = import.meta.env.VITE_WEEK_RESIZE_ENABLED === 'true'
+
 interface WeekEventBlockProps {
   item: TimelineItem
   weekStart: Date
@@ -77,7 +84,7 @@ export function WeekEventBlock({ item, weekStart, onSelect, onResizeCommit }: We
         height: Math.max(HOUR_ROW_HEIGHT / 4, height - previewTopOffset + previewBottomOffset),
       }}
     >
-      {!isRoutine && (
+      {RESIZE_ENABLED && !isRoutine && (
         <>
           <div
             onPointerDown={resize.handlers.onPointerDownTop}
