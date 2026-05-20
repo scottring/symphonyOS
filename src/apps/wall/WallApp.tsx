@@ -1,20 +1,17 @@
 // src/apps/wall/WallApp.tsx
 //
-// Kitchen kiosk surface. As of the WallV2 ship, /wall renders the cream
-// Nordic-Journal design (WallV2Shell). The dark-mode WallCalendar code
-// remains in `src/components/wall/` for rollback and reference — none of
-// it is mounted by default anymore.
-//
-// The /wall-v2 alias points at the same component (see src/apps/wall-v2)
-// so existing bookmarks keep working.
+// Kitchen kiosk surface. Currently mounts the legacy WallCalendar (the
+// dark-mode design). The new cream/Nordic-Journal design (WallV2Shell)
+// is still available at /wall-v2 for iteration — flip the import below
+// when ready to promote it back to /wall.
 
 import { GeneratePlanProvider } from '@/contexts/GeneratePlanContext';
-import { WallV2Shell } from '@/components/wall-v2/WallV2Shell';
+import { WallCalendar } from '@/components/wall/WallCalendar';
 
 export function WallApp() {
   return (
     <GeneratePlanProvider>
-      <WallV2Shell />
+      <WallCalendar />
     </GeneratePlanProvider>
   );
 }
