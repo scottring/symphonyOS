@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { memo, useState, useRef } from 'react'
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
 import type { TaskContext } from '@/types/task'
@@ -7,7 +7,7 @@ import { formatTime, formatTimeRange, inferMealTime } from '@/lib/timeUtils'
 import { getProjectColor } from '@/lib/projectUtils'
 import { PushDropdown, SchedulePopover, ContextPicker, DiscussionPicker, type ScheduleContextItem } from '@/components/triage'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
-import { Redo2, Video, MoreHorizontal, Calendar, Car, UtensilsCrossed, Bath, Repeat, Tag } from 'lucide-react'
+import { Redo2, Video, Calendar, Car, UtensilsCrossed, Bath, Repeat, Tag, Check, Pencil } from 'lucide-react'
 import { ConceptIcon, type ConceptName } from '@/lib/conceptIcons'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useMobile } from '@/hooks/useMobile'
@@ -318,11 +318,11 @@ export const ScheduleItem = memo(function ScheduleItem({
   if (isMobile) {
     // Pick an activity icon. Prefer the most specific signal we have.
     const titleLower = item.title.toLowerCase()
-    const ActivityIcon = /meal|breakfast|lunch|dinner|snack|recipe|cook/.test(titleLower)
+    const ActivityIcon = /\b(meal|breakfast|lunch|dinner|snack|recipe|cook)\b/.test(titleLower)
       ? UtensilsCrossed
-      : /pick\s*up|drop\s*off|drive|car/.test(titleLower)
+      : /\b(pick|drop|drive|car|pickup|dropoff)\b/.test(titleLower)
         ? Car
-        : /shower|bath/.test(titleLower)
+        : /\b(shower|bath)\b/.test(titleLower)
           ? Bath
           : isEvent
             ? Calendar
@@ -373,20 +373,27 @@ export const ScheduleItem = memo(function ScheduleItem({
     const contextLabel = projectName || (item.category && item.category !== 'task' ? item.category : null) || item.location || null
     const dotColor = projectColor || contextColor || null
 
+    // Swipe gestures: right → complete, left → edit (open detail panel).
+    // The card translates with the finger; coloured action panels behind it
+    // reveal under the card. Past the commit threshold, releasing fires the
+    // action; otherwise the card snaps back.
+    const SWIPE_COMMIT_PX = 80
+    const SWIPE_MAX_PX = 140
     return (
-      <div
-        data-selectable
-        onClick={() => onSelect()}
-        onKeyDown={handleKeyDown}
-        tabIndex={0}
-        role="button"
-        aria-pressed={selected}
-        className={`
+      <ScheduleItemMobileCard
+        swipeMaxPx={SWIPE_MAX_PX}
+        swipeCommitPx={SWIPE_COMMIT_PX}
+        onCompleteSwipe={() => handleCheckboxClick({ stopPropagation: () => {} } as React.MouseEvent)}
+        onEditSwipe={onSelect}
+        cardClassName={`
           relative flex items-center gap-3 bg-bg-elevated rounded-xl border border-neutral-200/50
-          px-3 py-3 mb-2 cursor-pointer transition-shadow
+          px-3 py-3 cursor-pointer
           ${selected ? 'ring-2 ring-primary-300' : ''}
           ${item.completed || item.skipped ? 'opacity-60' : ''}
         `}
+        onClickCard={() => onSelect()}
+        onKeyDown={handleKeyDown}
+        ariaPressed={selected}
       >
         {/* Left time column — stacked */}
         <div className="w-12 shrink-0 text-[12px] font-medium text-neutral-500 leading-tight tabular-nums text-left">
@@ -418,7 +425,8 @@ export const ScheduleItem = memo(function ScheduleItem({
           )}
         </div>
 
-        {/* Right cluster — project tag + assignee + more */}
+        {/* Right cluster — project tag + assignee. Three-dot removed; swipe
+            now exposes the same actions (right→complete, left→edit). */}
         <div className="flex items-center gap-1.5 shrink-0">
           {projectName && (
             <Tag className="w-4 h-4 text-orange-400" style={projectColor ? { color: projectColor } : undefined} />
@@ -443,16 +451,8 @@ export const ScheduleItem = memo(function ScheduleItem({
               />
             </div>
           ) : null}
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onSelect() }}
-            aria-label="More actions"
-            className="p-1 text-neutral-400 hover:text-neutral-600"
-          >
-            <MoreHorizontal className="w-5 h-5" />
-          </button>
         </div>
-      </div>
+      </ScheduleItemMobileCard>
     )
   }
 
@@ -935,3 +935,129 @@ export const ScheduleItem = memo(function ScheduleItem({
     </div>
   )
 })
+
+// ─── ScheduleItemMobileCard ──────────────────────────────────────────────────
+// Wraps the mobile card with swipe gestures:
+//   • drag right past commit threshold → fire onCompleteSwipe (complete)
+//   • drag left past commit threshold  → fire onEditSwipe (open detail)
+// Coloured action panels reveal underneath as the card slides. Touches that
+// move primarily vertically don't engage the swipe (so page scroll still
+// works). A small tap (delta < 6px) falls through to onClickCard.
+
+interface ScheduleItemMobileCardProps {
+  swipeCommitPx: number
+  swipeMaxPx: number
+  onCompleteSwipe: () => void
+  onEditSwipe: () => void
+  onClickCard: () => void
+  onKeyDown?: (e: React.KeyboardEvent) => void
+  ariaPressed?: boolean
+  cardClassName: string
+  children: React.ReactNode
+}
+
+function ScheduleItemMobileCard({
+  swipeCommitPx,
+  swipeMaxPx,
+  onCompleteSwipe,
+  onEditSwipe,
+  onClickCard,
+  onKeyDown,
+  ariaPressed,
+  cardClassName,
+  children,
+}: ScheduleItemMobileCardProps) {
+  const [dx, setDx] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const startX = useRef(0)
+  const startY = useRef(0)
+  const decided = useRef<'horizontal' | 'vertical' | null>(null)
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0]
+    startX.current = t.clientX
+    startY.current = t.clientY
+    decided.current = null
+    setDragging(true)
+  }
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    const t = e.touches[0]
+    const ax = t.clientX - startX.current
+    const ay = t.clientY - startY.current
+    if (decided.current === null) {
+      if (Math.abs(ax) < 6 && Math.abs(ay) < 6) return
+      decided.current = Math.abs(ax) > Math.abs(ay) ? 'horizontal' : 'vertical'
+    }
+    if (decided.current === 'vertical') return // let the page scroll
+    // clamp the visible translation so it doesn't drag off-screen
+    const clamped = Math.max(-swipeMaxPx, Math.min(swipeMaxPx, ax))
+    setDx(clamped)
+  }
+
+  const onTouchEnd = () => {
+    setDragging(false)
+    if (decided.current === 'horizontal') {
+      if (dx >= swipeCommitPx) {
+        onCompleteSwipe()
+      } else if (dx <= -swipeCommitPx) {
+        onEditSwipe()
+      }
+    }
+    setDx(0)
+    decided.current = null
+  }
+
+  // Visibility of action panels — fade in proportionally with drag.
+  const rightActive = dx > 0
+  const leftActive = dx < 0
+  const intensity = Math.min(1, Math.abs(dx) / swipeCommitPx)
+
+  return (
+    <div className="relative mb-2 overflow-hidden rounded-xl">
+      {/* Complete action — revealed when swiping right (card moves right). */}
+      <div
+        aria-hidden
+        className={`absolute inset-y-0 left-0 w-1/2 flex items-center justify-start pl-5 rounded-l-xl bg-emerald-500 transition-opacity ${rightActive ? 'opacity-100' : 'opacity-0'}`}
+        style={{ opacity: rightActive ? intensity : 0 }}
+      >
+        <Check className="w-6 h-6 text-white" />
+        <span className="ml-2 text-white text-sm font-medium">Complete</span>
+      </div>
+      {/* Edit action — revealed when swiping left (card moves left). */}
+      <div
+        aria-hidden
+        className={`absolute inset-y-0 right-0 w-1/2 flex items-center justify-end pr-5 rounded-r-xl bg-sky-500 transition-opacity ${leftActive ? 'opacity-100' : 'opacity-0'}`}
+        style={{ opacity: leftActive ? intensity : 0 }}
+      >
+        <span className="mr-2 text-white text-sm font-medium">Edit</span>
+        <Pencil className="w-5 h-5 text-white" />
+      </div>
+
+      <div
+        data-selectable
+        onClick={(e) => {
+          // Ignore the click if the user actually swiped — only fire on taps.
+          if (Math.abs(dx) > 6) { e.preventDefault(); return }
+          onClickCard()
+        }}
+        onKeyDown={onKeyDown}
+        tabIndex={0}
+        role="button"
+        aria-pressed={ariaPressed}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onTouchCancel={onTouchEnd}
+        className={cardClassName}
+        style={{
+          transform: `translateX(${dx}px)`,
+          transition: dragging ? 'none' : 'transform 200ms ease-out',
+          touchAction: 'pan-y',
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  )
+}
