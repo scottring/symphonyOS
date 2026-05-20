@@ -1,4 +1,5 @@
 import { UtensilsCrossed } from 'lucide-react'
+import { dinerColor } from '@/components/meals/shared/avatarColors'
 
 /** Slim avatar shape passed to the dinner card — typically core family members. */
 export interface DinerAvatar {
@@ -111,18 +112,3 @@ export function EveningMealCard({
   )
 }
 
-function dinerColor(name: string, alpha: number): string {
-  const base = (() => {
-    switch (name) {
-      case 'blue': return 'hsl(217 91% 60%)'
-      case 'purple': return 'hsl(271 81% 56%)'
-      case 'green': return 'hsl(142 71% 45%)'
-      case 'orange': return 'hsl(25 95% 53%)'
-      case 'pink': return 'hsl(330 81% 60%)'
-      case 'teal': return 'hsl(168 76% 42%)'
-      default: return 'hsl(168 45% 30%)'
-    }
-  })()
-  if (alpha >= 1) return base
-  return `color-mix(in srgb, ${base} ${Math.round(alpha * 100)}%, white)`
-}
