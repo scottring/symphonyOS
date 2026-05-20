@@ -380,7 +380,7 @@ export function TodayView({
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-[940px] w-full px-0 py-6 md:pl-10 md:pr-8 md:py-8">
+    <div className="max-w-[940px] w-full px-0 py-2 md:pl-10 md:pr-8 md:py-8">
       {/* Header — desktop only; mobile shows the date inline in the app header. */}
       <div className="hidden md:block">
         <TodayHeader
@@ -439,7 +439,7 @@ export function TodayView({
             <TodayAddInput onAdd={ctx.onCreateTask} />
           </div>
           {/* Mobile: combined add + filters */}
-          <div className="md:hidden mb-4 px-3 flex items-center gap-2">
+          <div className="md:hidden mb-2 px-3 flex items-center gap-2">
             <div className="flex-1 min-w-0">
               <TodayAddInput onAdd={ctx.onCreateTask} />
             </div>
