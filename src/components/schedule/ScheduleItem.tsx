@@ -382,7 +382,7 @@ export const ScheduleItem = memo(function ScheduleItem({
 
         {/* Title + context line */}
         <div className="flex-1 min-w-0">
-          <div className={`text-[15px] font-semibold leading-tight truncate ${item.completed || item.skipped ? 'line-through text-neutral-400' : 'text-neutral-800'}`}>
+          <div className={`text-[15px] font-semibold leading-tight line-clamp-2 break-words ${item.completed || item.skipped ? 'line-through text-neutral-400' : 'text-neutral-800'}`}>
             {item.title}
           </div>
           {contextLabel && (
