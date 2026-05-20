@@ -4,13 +4,13 @@
 // right widgets) with a six-button action dock at the bottom.
 //
 // The shell pulls live data via the existing wall hooks (useWallData,
-// useWeather, useMealEventsForDate) and converts it to the WallV2 view shape
-// via the pure adapters in `wallV2Adapter.ts`. Where a live data source
-// doesn't exist yet (per-member glance cards, grocery list, AI insight) we
-// keep the original mock payload — those slots stay visually identical to the
-// design while remaining a single swap away from real data.
+// useWeather, useMealEventsForDate, useShoppingList) and converts it to the
+// WallV2 view shape via the pure adapters in `wallV2Adapter.ts`. Each surface
+// renders an empty state when its live source has no data — production never
+// shows the design-payload mock. The design payload now lives only in the
+// dev-only `/wall-design` preview (see `wallV2Mock.ts`).
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Sun } from 'lucide-react';
 import { TINTS } from './tints';
 import { WallV2DateColumn } from './WallV2DateColumn';
@@ -18,17 +18,9 @@ import { WallV2AtAGlance } from './WallV2AtAGlance';
 import { WallV2Timeline } from './WallV2Timeline';
 import { WallV2RightColumn } from './WallV2RightColumn';
 import { WallV2ActionDock } from './WallV2ActionDock';
+import { MOCK_ACTIONS, MOCK_TAGLINE } from './wallV2Mock';
 import {
-  MOCK_ACTIONS,
-  MOCK_GLANCE,
-  MOCK_GROCERY,
-  MOCK_INSIGHT,
-  MOCK_TAGLINE,
-  MOCK_TIMELINE,
-  MOCK_UPCOMING,
-  MOCK_WEATHER,
-} from './wallV2Mock';
-import {
+  adaptGlanceForMember,
   adaptTimelineSections,
   adaptUpcoming,
   adaptWeather,
@@ -42,7 +34,14 @@ import { WallMicButton } from '@/components/wall/WallMicButton';
 import { WallRecipeViewer } from '@/components/wall/WallRecipeViewer';
 import { WallDiscussionOverlay } from '@/components/wall/WallDiscussionOverlay';
 import { useFamilyDiscussionItems, type DiscussionItem } from '@/hooks/useFamilyDiscussionItems';
+import { QuickCapture } from '@/components/layout/QuickCapture';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
+import type {
+  WallV2GlanceCard,
+  WallV2GroceryData,
+  WallV2InsightData,
+} from './types';
 
 function formatDate(d: Date): { weekday: string; fullDate: string } {
   const weekday = d.toLocaleDateString('en-US', { weekday: 'long' });
@@ -54,7 +53,19 @@ function formatDate(d: Date): { weekday: string; fullDate: string } {
   return { weekday, fullDate };
 }
 
+// Right-column slots without a live source yet. They render as muted
+// placeholders rather than fake data, and are clearly aspirational.
+const PLACEHOLDER_GROCERY: WallV2GroceryData = {
+  count: 0,
+  items: ['Connect a list to see what is missing'],
+};
+const PLACEHOLDER_INSIGHT: WallV2InsightData = {
+  body: 'Insights will appear as Symphony learns your week.',
+};
+
 export function WallV2Shell() {
+  const { user } = useAuth();
+
   // Re-rendering each minute keeps the date, timeline filter, and time-aware
   // copy minute-fresh without thrashing the hooks below.
   const [now, setNow] = useState(() => new Date());
@@ -82,35 +93,52 @@ export function WallV2Shell() {
     [wallData.calendarEvents, mealEvents, now],
   );
 
-  const liveTimeline = useMemo(
+  const timeline = useMemo(
     () => adaptTimelineSections(todayData, wallData.familyMembers, now, dinnerEvent),
     [todayData, wallData.familyMembers, now, dinnerEvent],
   );
 
-  const liveUpcoming = useMemo(
+  const upcoming = useMemo(
     () => adaptUpcoming(wallData.days, now, 2),
     [wallData.days, now],
   );
 
-  // ─── Choose live or mock per surface ───
-  // Strategy: live data ONLY when the hook returned a non-empty payload.
-  // Empty arrays usually mean the user has no scheduled items today or the
-  // calendar hasn't loaded — neither is what the kiosk should render, so we
-  // fall back to the design-payload mock for visual fidelity in v1.
-  const weatherData = liveWeather ?? MOCK_WEATHER;
-  const timeline = liveTimeline.length > 0 ? liveTimeline : MOCK_TIMELINE;
-  const upcoming = liveUpcoming.length > 0 ? liveUpcoming : MOCK_UPCOMING;
+  // Per-member "next thing today" glance cards. Members with no upcoming item
+  // are skipped so the row collapses gracefully (1-4 cards depending on
+  // how many family members have something on their plate).
+  const glance: WallV2GlanceCard[] = useMemo(() => {
+    if (!todayData) return [];
+    const cards: WallV2GlanceCard[] = [];
+    for (const member of wallData.familyMembers) {
+      const card = adaptGlanceForMember(member, todayData, now);
+      if (card) cards.push(card);
+      if (cards.length >= 4) break;
+    }
+    return cards;
+  }, [wallData.familyMembers, todayData, now]);
 
-  // Surfaces without a live data source (yet) — keep the mock.
-  const glance = MOCK_GLANCE;
-  const grocery = MOCK_GROCERY;
-  const insight = MOCK_INSIGHT;
-  const actions = MOCK_ACTIONS;
-  const tagline = MOCK_TAGLINE;
+  // Weather has a sensible static fallback when the geolocation/API path
+  // hasn't resolved yet — it would otherwise leave the entire hero blank.
+  const weatherData = liveWeather ?? {
+    temp: 0, high: 0, low: 0, condition: 'Loading', rainChance: 0, icon: Sun,
+  };
 
-  // ─── Overlays state ───
+  // ─── Overlay state ───
   const [showRecipeViewer, setShowRecipeViewer] = useState(false);
   const [showDiscussion, setShowDiscussion] = useState(false);
+  const [showQuickCapture, setShowQuickCapture] = useState(false);
+  const [flashMessage, setFlashMessage] = useState<string | null>(null);
+  const flashTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const showFlash = useCallback((msg: string) => {
+    setFlashMessage(msg);
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = setTimeout(() => setFlashMessage(null), 2400);
+  }, []);
+
+  useEffect(() => () => {
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+  }, []);
 
   const { items: discussionItems, unflagEvent, updateTask } = useFamilyDiscussionItems();
 
@@ -131,23 +159,51 @@ export function WallV2Shell() {
     }
   }, [updateTask, unflagEvent]);
 
+  // Insert an unscheduled family task — same shape WallMicButton uses, so the
+  // wall capture surface stays consistent regardless of input method.
+  const handleQuickCaptureAdd = useCallback(async (title: string) => {
+    if (!user) return;
+    const trimmed = title.trim();
+    if (!trimmed) return;
+    const { error } = await supabase.from('tasks').insert({
+      user_id: user.id,
+      title: trimmed,
+      context: 'family',
+      scheduled_for: null,
+      completed: false,
+    });
+    if (error) {
+      console.error('[wall-v2] add task failed:', error);
+      showFlash('Save failed — try again');
+    } else {
+      showFlash(`Added: ${trimmed.length > 40 ? trimmed.slice(0, 40) + '…' : trimmed}`);
+      wallData.refetch();
+    }
+  }, [user, showFlash, wallData]);
+
   const handleAction = useCallback((id: string) => {
     switch (id) {
       case 'discuss':
         if (discussionItems.length > 0) setShowDiscussion(true);
+        else showFlash('Nothing flagged for discussion right now');
+        break;
+      case 'task':
+        setShowQuickCapture(true);
         break;
       case 'reminder':
-      case 'task':
+        showFlash('Tap the mic to capture a reminder by voice');
+        break;
       case 'grocery':
+        showFlash('Grocery capture is coming soon');
+        break;
       case 'event':
+        showFlash('Event capture is coming soon');
+        break;
       case 'photo':
-        // Stubs — real handlers ship in a follow-up. The dock still gives the
-        // user touch feedback via the button's :hover/:active states.
-        // eslint-disable-next-line no-console
-        console.log('[wall-v2] action (stub):', id);
+        showFlash('Photo capture is coming soon');
         break;
     }
-  }, [discussionItems.length]);
+  }, [discussionItems.length, showFlash]);
 
   const handleTapEvent = useCallback((id: string) => {
     // Dinner card → recipe viewer when the event has a recipe URL attached.
@@ -169,9 +225,15 @@ export function WallV2Shell() {
   // drains (without an effect that lint flags for cascading renders).
   const discussionVisible = showDiscussion && discussionItems.length > 0;
 
-  // Belt-and-suspenders: keep supabase import alive for the dinner refresh path
-  // we'll wire when the "complete dinner" action lands.
-  void supabase;
+  // Lightweight {id,name} projections so the QuickCapture parser keeps working
+  // when launched from the wall. Slim shapes avoid pulling the full contact
+  // model into the wall bundle.
+  const captureProjects = useMemo(() => [], []);
+  const captureContacts = useMemo(() => [], []);
+  const captureFamilyMembers = useMemo(
+    () => wallData.familyMembers.map((m) => ({ id: m.id, name: m.name })),
+    [wallData.familyMembers],
+  );
 
   return (
     <div className="h-screen w-screen bg-[var(--color-bg-base)] text-stone-800 overflow-hidden">
@@ -192,7 +254,7 @@ export function WallV2Shell() {
 
         {/* Row 1 — Center column (glance strip + timeline) */}
         <div className="row-span-1 col-start-2 flex flex-col gap-4 min-h-0">
-          <WallV2AtAGlance tagline={tagline} cards={glance} />
+          <WallV2AtAGlance tagline={MOCK_TAGLINE} cards={glance} />
           <div className="min-h-0 flex-1">
             <WallV2Timeline
               sections={timeline}
@@ -206,15 +268,23 @@ export function WallV2Shell() {
         <div className="row-span-1 col-start-3">
           <WallV2RightColumn
             weather={weatherData}
-            grocery={grocery}
+            grocery={PLACEHOLDER_GROCERY}
             upcoming={upcoming}
-            insight={insight}
+            insight={PLACEHOLDER_INSIGHT}
           />
         </div>
 
         {/* Row 2 — Full-width action dock */}
-        <div className="row-start-2 col-span-3">
-          <WallV2ActionDock actions={actions} onTap={handleAction} />
+        <div className="row-start-2 col-span-3 relative">
+          {flashMessage && (
+            <div
+              role="status"
+              className="absolute -top-9 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-stone-800/90 text-white text-[0.85rem] font-bold shadow-lg backdrop-blur-md whitespace-nowrap"
+            >
+              {flashMessage}
+            </div>
+          )}
+          <WallV2ActionDock actions={MOCK_ACTIONS} onTap={handleAction} />
         </div>
       </div>
 
@@ -235,6 +305,19 @@ export function WallV2Shell() {
           onClose={() => setShowDiscussion(false)}
         />
       )}
+
+      {/* QuickCapture overlay — controlled, no FAB; the wall dock owns the
+         entry point. Parser is given a slim family list for @mentions. */}
+      <QuickCapture
+        onAdd={handleQuickCaptureAdd}
+        projects={captureProjects}
+        contacts={captureContacts}
+        familyMembers={captureFamilyMembers}
+        isOpen={showQuickCapture}
+        onOpen={() => setShowQuickCapture(true)}
+        onClose={() => setShowQuickCapture(false)}
+        showFab={false}
+      />
 
       <WallMicButton />
     </div>

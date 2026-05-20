@@ -1,20 +1,20 @@
 // src/apps/wall/WallApp.tsx
-// Thin wrapper around the existing wall implementation.
-// Renders the same component tree currently used in main.tsx for /wall,
-// but as a self-contained app that fetches its own data via existing hooks.
 //
-// WallCalendar is fully self-contained: it takes no props, runs its own
-// auth check via useAuth(), and fetches its own data via useWallData() and
-// related hooks. The only required wrapper is GeneratePlanProvider (which
-// the legacy main.tsx mount also provided).
+// Kitchen kiosk surface. As of the WallV2 ship, /wall renders the cream
+// Nordic-Journal design (WallV2Shell). The dark-mode WallCalendar code
+// remains in `src/components/wall/` for rollback and reference — none of
+// it is mounted by default anymore.
+//
+// The /wall-v2 alias points at the same component (see src/apps/wall-v2)
+// so existing bookmarks keep working.
 
 import { GeneratePlanProvider } from '@/contexts/GeneratePlanContext';
-import { WallCalendar } from '@/components/wall/WallCalendar';
+import { WallV2Shell } from '@/components/wall-v2/WallV2Shell';
 
 export function WallApp() {
   return (
     <GeneratePlanProvider>
-      <WallCalendar />
+      <WallV2Shell />
     </GeneratePlanProvider>
   );
 }

@@ -12,6 +12,15 @@ interface Props {
 }
 
 export function WallV2AtAGlance({ tagline, cards }: Props) {
+  // Use the actual card count for the column grid so 1–4 cards each fill the
+  // row evenly. Anything beyond 4 wraps onto a second row at 4 per row.
+  const cols = Math.min(Math.max(cards.length, 1), 4);
+  const gridColsClass =
+    cols === 1 ? 'grid-cols-1'
+    : cols === 2 ? 'grid-cols-2'
+    : cols === 3 ? 'grid-cols-3'
+    : 'grid-cols-4';
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-6">
@@ -23,11 +32,17 @@ export function WallV2AtAGlance({ tagline, cards }: Props) {
         </div>
         <div className="w-[6rem]" aria-hidden />
       </div>
-      <div className="grid grid-cols-4 gap-3">
-        {cards.map((c) => (
-          <WallV2GlanceCard key={c.id} card={c} />
-        ))}
-      </div>
+      {cards.length > 0 ? (
+        <div className={`grid ${gridColsClass} gap-3`}>
+          {cards.map((c) => (
+            <WallV2GlanceCard key={c.id} card={c} />
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-2xl bg-white/60 border border-stone-200/60 px-4 py-3 text-[0.9rem] text-stone-500">
+          Everyone's set — no scheduled items right now.
+        </div>
+      )}
     </div>
   );
 }

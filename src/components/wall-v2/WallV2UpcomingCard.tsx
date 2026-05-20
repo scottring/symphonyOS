@@ -16,6 +16,11 @@ export function WallV2UpcomingCard({ items }: Props) {
       <div className="text-[0.7rem] font-bold uppercase tracking-[0.22em] text-stone-500 mb-2.5">
         Upcoming
       </div>
+      {items.length === 0 ? (
+        <div className="text-[0.85rem] text-stone-500">
+          Nothing on the calendar yet.
+        </div>
+      ) : (
       <ul className="flex flex-col gap-2.5">
         {items.map((item) => {
           const tint = TINTS[item.tint];
@@ -37,6 +42,7 @@ export function WallV2UpcomingCard({ items }: Props) {
           );
         })}
       </ul>
+      )}
     </div>
   );
 }

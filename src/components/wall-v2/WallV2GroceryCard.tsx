@@ -30,17 +30,26 @@ export function WallV2GroceryCard({ data, onTap }: Props) {
           <ShoppingBag className="w-6 h-6" />
         </div>
         <div className="flex-1 leading-tight">
-          <div className="text-[1rem] font-bold text-stone-800">
-            {data.count} ingredient{data.count === 1 ? '' : 's'} missing
-          </div>
-          <ul className="mt-1 text-[0.85rem] text-stone-600 space-y-0.5">
-            {data.items.slice(0, 3).map((item) => (
-              <li key={item} className="flex items-center gap-1.5">
-                <span className="w-1 h-1 rounded-full bg-stone-400 inline-block" aria-hidden />
-                {item}
-              </li>
-            ))}
-          </ul>
+          {data.count > 0 ? (
+            <>
+              <div className="text-[1rem] font-bold text-stone-800">
+                {data.count} ingredient{data.count === 1 ? '' : 's'} missing
+              </div>
+              <ul className="mt-1 text-[0.85rem] text-stone-600 space-y-0.5">
+                {data.items.slice(0, 3).map((item) => (
+                  <li key={item} className="flex items-center gap-1.5">
+                    <span className="w-1 h-1 rounded-full bg-stone-400 inline-block" aria-hidden />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <>
+              <div className="text-[1rem] font-bold text-stone-800">All set</div>
+              <div className="text-[0.85rem] text-stone-500">{data.items[0]}</div>
+            </>
+          )}
         </div>
         {onTap && (
           <ChevronRight className="w-5 h-5 text-stone-400 group-hover:text-stone-600" />

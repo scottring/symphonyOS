@@ -4,7 +4,7 @@
 // on the left (icon + Afternoon/Evening/Night) connected by a thin guide
 // line, and a stack of event cards on the right.
 
-import { CalendarDays } from 'lucide-react';
+import { CalendarDays, Coffee } from 'lucide-react';
 import { TINTS } from './tints';
 import { WallV2EventCard } from './WallV2EventCard';
 import type { WallV2TimelineSection } from './types';
@@ -22,6 +22,19 @@ export function WallV2Timeline({ sections, onTapEvent, onTapFullDay }: Props) {
         Today's plan
       </div>
 
+      {sections.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-2 py-10 text-stone-500">
+          <div className="grid place-items-center w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-700">
+            <Coffee className="w-6 h-6" />
+          </div>
+          <div className="font-display text-[1.4rem] text-stone-700 mt-1">
+            Nothing scheduled
+          </div>
+          <div className="text-[0.9rem] text-stone-500">
+            Enjoy the calm — or capture something below.
+          </div>
+        </div>
+      ) : (
       <div className="flex flex-col gap-4 relative">
         {sections.map((section, idx) => {
           const tint = TINTS[section.tint];
@@ -62,8 +75,9 @@ export function WallV2Timeline({ sections, onTapEvent, onTapFullDay }: Props) {
           );
         })}
       </div>
+      )}
 
-      {onTapFullDay && (
+      {onTapFullDay && sections.length > 0 && (
         <button
           type="button"
           onClick={onTapFullDay}
