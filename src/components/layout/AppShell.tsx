@@ -267,7 +267,7 @@ export function AppShell({
         {/* Mobile header — three columns: tree logo / centered date with arrows / icon cluster.
             On non-Today views, the center column stays empty so the icons still anchor right. */}
         {isMobile && (
-          <header className="sticky top-0 z-10 bg-bg-elevated/95 backdrop-blur-lg border-b border-neutral-200/50 px-3 py-1"
+          <header className="sticky top-0 z-10 bg-transparent px-3 py-1"
                   style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
             <div className="flex items-center gap-2">
               <img
