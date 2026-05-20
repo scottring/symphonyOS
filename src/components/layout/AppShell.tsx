@@ -276,30 +276,34 @@ export function AppShell({
                 className="w-7 h-7 rounded-full shrink-0 object-cover"
               />
 
-              <div className="flex-1 min-w-0 flex items-center justify-center gap-0.5">
-                {activeView === 'today' && viewedDate && onDateChange && (
+              <div className="flex-1 flex items-center justify-center gap-1 min-w-0">
+                {viewedDate && (
                   <>
-                    <button
-                      aria-label="Previous day"
-                      onClick={() => {
-                        const n = new Date(viewedDate); n.setDate(n.getDate() - 1); onDateChange(n)
-                      }}
-                      className="p-1 rounded text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors shrink-0"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <span className="font-display text-[15px] font-medium text-neutral-900 truncate">
+                    {onDateChange && (
+                      <button
+                        aria-label="Previous day"
+                        onClick={() => {
+                          const n = new Date(viewedDate); n.setDate(n.getDate() - 1); onDateChange(n)
+                        }}
+                        className="p-1 rounded text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors shrink-0"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                    )}
+                    <span className="font-display text-lg font-semibold text-neutral-900 whitespace-nowrap">
                       {viewedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                     </span>
-                    <button
-                      aria-label="Next day"
-                      onClick={() => {
-                        const n = new Date(viewedDate); n.setDate(n.getDate() + 1); onDateChange(n)
-                      }}
-                      className="p-1 rounded text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors shrink-0"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
+                    {onDateChange && (
+                      <button
+                        aria-label="Next day"
+                        onClick={() => {
+                          const n = new Date(viewedDate); n.setDate(n.getDate() + 1); onDateChange(n)
+                        }}
+                        className="p-1 rounded text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors shrink-0"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    )}
                   </>
                 )}
               </div>
