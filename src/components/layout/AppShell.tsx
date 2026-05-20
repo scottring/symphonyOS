@@ -318,14 +318,6 @@ export function AppShell({
                     </svg>
                   </button>
                 )}
-                <button
-                  ref={helpButtonRef}
-                  onClick={() => setHelpOpen(o => !o)}
-                  className={`p-2 rounded-xl text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-all font-display italic text-[15px] w-9 h-9 grid place-items-center ${
-                    helpOpen ? 'ring-2 ring-primary-500/30 text-primary-500' : ''
-                  }`}
-                  aria-label="Help"
-                >?</button>
                 {onSignOut && (
                   <button
                     onClick={onSignOut}
