@@ -291,8 +291,27 @@ export function WeekViewV2(props: WeekViewV2Props) {
           )
         })()}
 
-        <DragOverlay>
-          {drag.activeDragId ? <div className="opacity-80">·</div> : null}
+        <DragOverlay dropAnimation={null}>
+          {drag.activeDragId
+            ? (() => {
+                // Strip the dnd-kit drag prefix to recover the TimelineItem id.
+                // Routines use 'block-routine:', everything else uses 'block:'.
+                const itemId = drag.activeDragId.startsWith('block-routine:')
+                  ? drag.activeDragId.slice('block-routine:'.length)
+                  : drag.activeDragId.startsWith('block:')
+                  ? drag.activeDragId.slice('block:'.length)
+                  : drag.activeDragId
+                const item = allBlocks.find((b) => b.id === itemId)
+                if (!item) return null
+                return (
+                  <div className="opacity-60 pointer-events-none">
+                    <div className="px-2 py-1 rounded-md bg-primary-50 border border-primary-200 text-[12px] text-primary-900 shadow-md whitespace-nowrap">
+                      {item.title}
+                    </div>
+                  </div>
+                )
+              })()
+            : null}
         </DragOverlay>
       </DndContext>
     </div>
