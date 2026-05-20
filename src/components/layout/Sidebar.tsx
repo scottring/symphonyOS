@@ -17,6 +17,7 @@ import type { Routine } from '@/types/routine'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import {
   Sun,
+  CalendarRange,
   UtensilsCrossed,
   FolderKanban,
   Home,
@@ -29,6 +30,8 @@ import {
   Settings,
   LogOut,
 } from 'lucide-react'
+
+const HOME_VIEW_STORAGE_KEY = 'symphony-home-view'
 
 // Feature flags for in-progress features
 const FEATURES = {
@@ -237,6 +240,24 @@ export function Sidebar({
         >
           {createElement(Sun, { className: 'w-5 h-5 shrink-0' })}
           {!collapsed && <span>Today</span>}
+        </button>
+
+        {/* This Week — navigates to /today and forces HomeView D/W/M into 'week'. */}
+        <button
+          onClick={() => {
+            try {
+              localStorage.setItem(HOME_VIEW_STORAGE_KEY, 'week')
+              window.dispatchEvent(new StorageEvent('storage', {
+                key: HOME_VIEW_STORAGE_KEY,
+                newValue: 'week',
+              }))
+            } catch { /* ignore — falls back to next-mount read */ }
+            onViewChange('today')
+          }}
+          className={navItemClass(false)}
+        >
+          {createElement(CalendarRange, { className: 'w-5 h-5 shrink-0' })}
+          {!collapsed && <span>This Week</span>}
         </button>
 
         {/* Meals */}

@@ -11,7 +11,9 @@ import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { Routine } from '@/types/routine'
 import type { ViewType } from './Sidebar'
-import { Home, Flag, FolderKanban, RefreshCw, Clock, FileText, Search, Settings, LogOut, ChevronLeft, ChevronRight, UtensilsCrossed } from 'lucide-react'
+import { Home, Flag, FolderKanban, RefreshCw, Clock, FileText, Search, Settings, LogOut, ChevronLeft, ChevronRight, UtensilsCrossed, CalendarRange } from 'lucide-react'
+
+const HOME_VIEW_STORAGE_KEY = 'symphony-home-view'
 
 // Feature flags for in-progress features
 const FEATURES = {
@@ -147,6 +149,24 @@ export function SidebarKinetic({
           collapsed={collapsed}
           onClick={() => onViewChange('home')}
           gradient="from-electric-500 to-electric-600"
+        />
+
+        <NavButton
+          icon={CalendarRange}
+          label="This Week"
+          active={false}
+          collapsed={collapsed}
+          onClick={() => {
+            try {
+              localStorage.setItem(HOME_VIEW_STORAGE_KEY, 'week')
+              window.dispatchEvent(new StorageEvent('storage', {
+                key: HOME_VIEW_STORAGE_KEY,
+                newValue: 'week',
+              }))
+            } catch { /* ignore — falls back to next-mount read */ }
+            onViewChange('today')
+          }}
+          gradient="from-cyan-400 to-electric-500"
         />
 
         <NavButton
