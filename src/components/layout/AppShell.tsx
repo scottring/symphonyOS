@@ -569,13 +569,13 @@ export function AppShell({
       {isMobile && !panelOpen && (
         <nav className="fixed bottom-0 left-0 right-0 z-40 bg-bg-elevated/95 backdrop-blur-lg border-t border-neutral-200/50"
              style={{ paddingBottom: 'max(0px, calc(env(safe-area-inset-bottom, 0px) - 8px))' }}>
-          <div className="flex items-center justify-around px-4 py-0.5">
+          <div className="flex items-stretch px-1 py-0.5">
             {/* Agent — only visible to Scott */}
             {(userEmail === 'smkaufman@gmail.com' || userEmail === 'scott.kaufman@stacksdata.com') && (
               <button
                 onClick={() => onViewChange('agent')}
                 className={`
-                  flex flex-col items-center gap-0 px-4 py-1 rounded-lg transition-all
+                  flex-1 min-w-0 flex flex-col items-center gap-0 px-1 py-1 rounded-lg transition-all
                   ${activeView === 'agent'
                     ? 'text-primary-600'
                     : 'text-neutral-400 hover:text-neutral-600'
@@ -593,7 +593,7 @@ export function AppShell({
             <button
               onClick={() => onViewChange('today')}
               className={`
-                flex flex-col items-center gap-0 px-4 py-1 rounded-lg transition-all
+                flex-1 min-w-0 flex flex-col items-center gap-0 px-1 py-1 rounded-lg transition-all
                 ${activeView === 'today'
                   ? 'text-accent-600'
                   : 'text-neutral-400 hover:text-neutral-600'
@@ -610,7 +610,7 @@ export function AppShell({
             <button
               onClick={() => onViewChange('projects')}
               className={`
-                flex flex-col items-center gap-0 px-4 py-1 rounded-lg transition-all
+                flex-1 min-w-0 flex flex-col items-center gap-0 px-1 py-1 rounded-lg transition-all
                 ${activeView === 'projects'
                   ? 'text-blue-600'
                   : 'text-neutral-400 hover:text-neutral-600'
@@ -627,7 +627,7 @@ export function AppShell({
             <button
               onClick={() => setMoreSheetOpen(true)}
               className={`
-                relative flex flex-col items-center gap-0 px-4 py-1 rounded-lg transition-all
+                relative flex-1 min-w-0 flex flex-col items-center gap-0 px-1 py-1 rounded-lg transition-all
                 ${moreSheetOpen
                   ? 'text-neutral-700'
                   : 'text-neutral-400 hover:text-neutral-600'
