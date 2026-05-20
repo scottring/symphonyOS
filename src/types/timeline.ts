@@ -38,6 +38,8 @@ export interface TimelineItem {
   attendees?: { email: string; displayName?: string; responseStatus?: string; self?: boolean }[]
   // Routine-specific
   recurrencePattern?: RecurrencePattern
+  // Derived display state
+  isOverdue?: boolean // True when item is past-due and incomplete
   // Original data for actions
   originalTask?: Task
   originalEvent?: CalendarEvent
