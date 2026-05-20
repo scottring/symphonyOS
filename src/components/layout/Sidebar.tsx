@@ -17,9 +17,7 @@ import type { Routine } from '@/types/routine'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import {
   Sun,
-  CalendarRange,
   UtensilsCrossed,
-  Users,
   FolderKanban,
   Home,
   Inbox,
@@ -241,15 +239,6 @@ export function Sidebar({
           {!collapsed && <span>Today</span>}
         </button>
 
-        {/* This Week */}
-        <button
-          onClick={() => onViewChange('today')}
-          className={navItemClass(false)}
-        >
-          {createElement(CalendarRange, { className: 'w-5 h-5 shrink-0' })}
-          {!collapsed && <span>This Week</span>}
-        </button>
-
         {/* Meals */}
         <button
           onClick={() => onViewChange('meals')}
@@ -275,15 +264,6 @@ export function Sidebar({
           </>
         )}
 
-        {/* Family */}
-        <button
-          onClick={() => onViewChange('home-app')}
-          className={navItemClass(activeView === 'home-app')}
-        >
-          {createElement(Users, { className: 'w-5 h-5 shrink-0' })}
-          {!collapsed && <span>Family</span>}
-        </button>
-
         {/* Projects */}
         <button
           onClick={() => onViewChange('projects')}
@@ -293,14 +273,14 @@ export function Sidebar({
           {!collapsed && <span>Projects</span>}
         </button>
 
-        {/* Home */}
+        {/* House (was "Home" — renamed per Scott; same destination) */}
         <button
           onClick={() => onViewChange('home-app')}
-          className={navItemClass(false)}
-          aria-label="Home"
+          className={navItemClass(homeAppActive)}
+          aria-label="House"
         >
           {createElement(Home, { className: 'w-5 h-5 shrink-0' })}
-          {!collapsed && <span>Home</span>}
+          {!collapsed && <span>House</span>}
         </button>
         {!collapsed && homeAppActive && inlineRooms.map((r) => (
           <button
