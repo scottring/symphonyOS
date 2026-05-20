@@ -255,12 +255,12 @@ export function HomeView({
             onUpdateRoutine={ctx.onUpdateRoutine ?? (() => {})}
             onUpdateEvent={() => {}}
           />
-          {/* TODO(Task 9): pass dayCount={5} to WeekViewMobile for Workweek */}
           <WeekViewMobile
             tasks={filteredTasks}
             events={filteredEvents}
             routines={filteredRoutines}
             weekStart={mondayStart}
+            dayCount={5}
             onSelectItem={onSelectItem}
           />
         </>

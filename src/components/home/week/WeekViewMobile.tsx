@@ -8,47 +8,124 @@ interface WeekViewMobileProps {
   events: CalendarEvent[]
   routines: Routine[]
   weekStart: Date
+  /** Number of day sections to render. Default 7. */
+  dayCount?: 5 | 7
   onSelectItem: (id: string) => void
 }
 
-export function WeekViewMobile({ tasks, weekStart, onSelectItem }: WeekViewMobileProps) {
+interface DayItem {
+  id: string
+  kind: 'task' | 'event' | 'routine'
+  title: string
+  /** "HH:MM" for timed items, null for all-day. */
+  time: string | null
+}
+
+export function WeekViewMobile({
+  tasks,
+  events,
+  routines,
+  weekStart,
+  dayCount = 7,
+  onSelectItem,
+}: WeekViewMobileProps) {
   const weekEnd = useMemo(() => {
-    const e = new Date(weekStart); e.setDate(e.getDate() + 7); return e
-  }, [weekStart])
+    const e = new Date(weekStart)
+    e.setDate(e.getDate() + dayCount)
+    return e
+  }, [weekStart, dayCount])
 
   const inWeek = (d: Date) => d >= weekStart && d < weekEnd
 
-  const unscheduled = useMemo(() =>
-    tasks.filter(t => t.scheduledFor && inWeek(t.scheduledFor) && t.isAllDay),
+  const unscheduled = useMemo(
+    () => tasks.filter((t) => t.scheduledFor && inWeek(t.scheduledFor) && t.isAllDay),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tasks, weekStart])
+    [tasks, weekStart, dayCount],
+  )
 
-  const tasksByDay = useMemo(() => {
-    const buckets: Record<number, Task[]> = {}
-    for (let i = 0; i < 7; i++) buckets[i] = []
-    const weekStartMidnight = new Date(weekStart); weekStartMidnight.setHours(0, 0, 0, 0)
+  const itemsByDay = useMemo(() => {
+    const buckets: Record<number, DayItem[]> = {}
+    for (let i = 0; i < dayCount; i++) buckets[i] = []
+    const weekStartMidnight = new Date(weekStart)
+    weekStartMidnight.setHours(0, 0, 0, 0)
+
+    // Timed tasks
     for (const t of tasks) {
       if (!t.scheduledFor || !inWeek(t.scheduledFor) || t.isAllDay) continue
-      const taskMidnight = new Date(t.scheduledFor); taskMidnight.setHours(0, 0, 0, 0)
-      const dow = Math.round((taskMidnight.getTime() - weekStartMidnight.getTime()) / 86400000)
-      if (dow >= 0 && dow <= 6) buckets[dow].push(t)
+      const dow = dayIndex(t.scheduledFor, weekStartMidnight)
+      if (dow >= 0 && dow < dayCount) {
+        buckets[dow].push({ id: t.id, kind: 'task', title: t.title, time: hhmm(t.scheduledFor) })
+      }
     }
+
+    // Events
+    for (const ev of events) {
+      const startStr =
+        (ev as { start_time?: string }).start_time ??
+        (ev as { startTime?: string }).startTime
+      if (!startStr) continue
+      const start = new Date(startStr)
+      if (!inWeek(start)) continue
+      const dow = dayIndex(start, weekStartMidnight)
+      if (dow >= 0 && dow < dayCount) {
+        buckets[dow].push({ id: ev.id, kind: 'event', title: ev.title, time: hhmm(start) })
+      }
+    }
+
+    // Routines — appear on every day in the range. No recurrence-aware
+    // filtering yet; matches the desktop grid view's behavior.
+    for (let i = 0; i < dayCount; i++) {
+      for (const r of routines) {
+        const time = r.time_of_day ?? null
+        buckets[i].push({
+          id: `routine-${r.id}-day${i}`,
+          kind: 'routine',
+          title: r.name,
+          time,
+        })
+      }
+    }
+
+    // Sort each bucket: timed by time, then alphabetical
+    for (const i of Object.keys(buckets)) {
+      buckets[Number(i)].sort((a, b) => {
+        if (a.time && b.time) return a.time.localeCompare(b.time)
+        if (a.time) return -1
+        if (b.time) return 1
+        return a.title.localeCompare(b.title)
+      })
+    }
+
     return buckets
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, weekStart])
+  }, [tasks, events, routines, weekStart, dayCount])
 
   const dayName = (i: number) => {
-    const d = new Date(weekStart); d.setDate(d.getDate() + i)
+    const d = new Date(weekStart)
+    d.setDate(d.getDate() + i)
     return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+  }
+
+  const handleSelect = (item: DayItem) => {
+    // Routine ids in our buckets are 'routine-<rid>-day<i>'; strip both
+    // the prefix and the -dayN suffix to recover the real routine id
+    // before dispatching to onSelectItem (which expects DB ids).
+    const id =
+      item.kind === 'routine'
+        ? item.id.replace(/-day\d+$/, '').replace(/^routine-/, '')
+        : item.id
+    onSelectItem(id)
   }
 
   return (
     <div className="lg:hidden space-y-4">
       {unscheduled.length > 0 && (
         <section aria-label="Unscheduled this week">
-          <h3 className="text-[11px] uppercase tracking-wide text-neutral-500 mb-2">Unscheduled this week</h3>
+          <h3 className="text-[11px] uppercase tracking-wide text-neutral-500 mb-2">
+            Unscheduled this week
+          </h3>
           <ul className="space-y-1">
-            {unscheduled.map(t => (
+            {unscheduled.map((t) => (
               <li key={t.id}>
                 <button
                   onClick={() => onSelectItem(t.id)}
@@ -62,20 +139,25 @@ export function WeekViewMobile({ tasks, weekStart, onSelectItem }: WeekViewMobil
         </section>
       )}
 
-      {Array.from({ length: 7 }, (_, i) => (
+      {Array.from({ length: dayCount }, (_, i) => (
         <section key={i} aria-label={dayName(i)}>
           <h3 className="text-[13px] font-medium text-neutral-700 mb-1">{dayName(i)}</h3>
-          {tasksByDay[i].length === 0 ? (
+          {itemsByDay[i].length === 0 ? (
             <p className="text-[12px] text-neutral-400">No items.</p>
           ) : (
             <ul className="space-y-1">
-              {tasksByDay[i].map(t => (
-                <li key={t.id}>
+              {itemsByDay[i].map((item) => (
+                <li key={item.id}>
                   <button
-                    onClick={() => onSelectItem(t.id)}
-                    className="w-full text-left px-3 py-2 rounded-lg bg-bg-elevated border border-neutral-200/70 text-[13px]"
+                    onClick={() => handleSelect(item)}
+                    className="w-full text-left px-3 py-2 rounded-lg bg-bg-elevated border border-neutral-200/70 text-[13px] flex items-center gap-2"
                   >
-                    {t.title}
+                    {item.time && (
+                      <span className="text-[11px] text-neutral-400 tabular-nums w-12">
+                        {item.time}
+                      </span>
+                    )}
+                    <span>{item.title}</span>
                   </button>
                 </li>
               ))}
@@ -85,4 +167,16 @@ export function WeekViewMobile({ tasks, weekStart, onSelectItem }: WeekViewMobil
       ))}
     </div>
   )
+}
+
+function dayIndex(d: Date, weekStartMidnight: Date): number {
+  const m = new Date(d)
+  m.setHours(0, 0, 0, 0)
+  return Math.round((m.getTime() - weekStartMidnight.getTime()) / 86400000)
+}
+
+function hhmm(d: Date): string {
+  const h = d.getHours().toString().padStart(2, '0')
+  const m = d.getMinutes().toString().padStart(2, '0')
+  return `${h}:${m}`
 }
