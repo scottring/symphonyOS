@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, Suspense, type ReactNode } from 'react'
 import { PanelRightOpen } from 'lucide-react'
-import { ScratchpadPane } from '@/components/schedule/ScratchpadPane'
+import { TodayRail } from '@/components/today/TodayRail'
 import { useScratchpadHidden } from '@/hooks/useScratchpadHidden'
 import { Sidebar, type ViewType } from './Sidebar'
 import { SidebarKinetic } from './SidebarKinetic'
@@ -515,13 +515,21 @@ export function AppShell({
         </aside>
       )}
 
-      {/* Scratchpad — right rail on Today when no detail/chat panel is open */}
+      {/* Today rail — right rail on Today when no detail/chat panel is open.
+          Hosts ambient panels (At a Glance, future Family Snapshot + Active
+          Projects) above the Scratchpad. */}
       {scratchpadVisible && (
         <aside
           className="fixed top-0 bottom-0 right-0 w-[420px] bg-bg-base border-l border-neutral-200/80 z-10 p-4"
-          aria-label="Scratchpad"
+          aria-label="Today rail"
         >
-          <ScratchpadPane />
+          <TodayRail
+            tasks={entities?.tasks ?? []}
+            onViewFullPlan={() => {
+              // No-op for now — there's no dedicated "week" view yet. When
+              // Phase 2 lands a week view (or planning surface), wire here.
+            }}
+          />
         </aside>
       )}
 
