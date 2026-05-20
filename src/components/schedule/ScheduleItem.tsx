@@ -7,7 +7,7 @@ import { formatTime, formatTimeRange, inferMealTime } from '@/lib/timeUtils'
 import { getProjectColor } from '@/lib/projectUtils'
 import { PushDropdown, SchedulePopover, ContextPicker, DiscussionPicker, type ScheduleContextItem } from '@/components/triage'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
-import { Redo2, Video, Calendar, Car, UtensilsCrossed, Bath, Repeat, Tag, Check, Pencil } from 'lucide-react'
+import { Redo2, Video, Tag, Check, Pencil } from 'lucide-react'
 import { ConceptIcon, type ConceptName } from '@/lib/conceptIcons'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useMobile } from '@/hooks/useMobile'
@@ -316,26 +316,6 @@ export const ScheduleItem = memo(function ScheduleItem({
   // a tinted icon block, a title + small context line, and a right cluster
   // (project tag, assignee, more). Desktop render falls through below.
   if (isMobile) {
-    // Pick an activity icon. Prefer the most specific signal we have.
-    const titleLower = item.title.toLowerCase()
-    const ActivityIcon = /\b(meal|breakfast|lunch|dinner|snack|recipe|cook)\b/.test(titleLower)
-      ? UtensilsCrossed
-      : /\b(pick|drop|drive|car|pickup|dropoff)\b/.test(titleLower)
-        ? Car
-        : /\b(shower|bath)\b/.test(titleLower)
-          ? Bath
-          : isEvent
-            ? Calendar
-            : isRoutine
-              ? Repeat
-              : Calendar
-
-    // Tint the icon block from the item's context color, with neutral peach
-    // as the default when there's no domain context set.
-    const tintHex = contextColor || '#F4A572'
-    const iconBg = `color-mix(in srgb, ${tintHex} 18%, transparent)`
-    const iconFg = tintHex
-
     // Time displayed stacked: "1:00 / PM" for single times, with a hyphen row
     // for ranges ("6:30 / – / 7:15 / PM").
     const splitTime = (s: string) => {
@@ -399,18 +379,6 @@ export const ScheduleItem = memo(function ScheduleItem({
         <div className="w-12 shrink-0 text-[12px] font-medium text-neutral-500 leading-tight tabular-nums text-left">
           {renderStackedTime()}
         </div>
-
-        {/* Activity icon block — tinted rounded square, doubles as the
-            check-off control (tap to toggle completion). */}
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); handleCheckboxClick(e) }}
-          className="w-11 h-11 shrink-0 rounded-lg flex items-center justify-center transition-transform active:scale-95"
-          style={{ backgroundColor: iconBg, color: iconFg }}
-          aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
-        >
-          <ActivityIcon className="w-5 h-5" />
-        </button>
 
         {/* Title + context line */}
         <div className="flex-1 min-w-0">
@@ -972,6 +940,10 @@ function ScheduleItemMobileCard({
   const startX = useRef(0)
   const startY = useRef(0)
   const decided = useRef<'horizontal' | 'vertical' | null>(null)
+  // Bridges a touch sequence to the synthetic click that follows; if we
+  // committed a swipe (or moved horizontally enough to be a non-tap), we
+  // suppress the click so the row doesn't ALSO open the detail panel.
+  const suppressNextClick = useRef(false)
 
   const onTouchStart = (e: React.TouchEvent) => {
     const t = e.touches[0]
@@ -998,6 +970,9 @@ function ScheduleItemMobileCard({
   const onTouchEnd = () => {
     setDragging(false)
     if (decided.current === 'horizontal') {
+      // Any meaningful horizontal travel is a swipe, not a tap — suppress the
+      // synthetic click that iOS Safari will fire after touchend.
+      if (Math.abs(dx) > 6) suppressNextClick.current = true
       if (dx >= swipeCommitPx) {
         onCompleteSwipe()
       } else if (dx <= -swipeCommitPx) {
@@ -1037,8 +1012,11 @@ function ScheduleItemMobileCard({
       <div
         data-selectable
         onClick={(e) => {
-          // Ignore the click if the user actually swiped — only fire on taps.
-          if (Math.abs(dx) > 6) { e.preventDefault(); return }
+          if (suppressNextClick.current) {
+            suppressNextClick.current = false
+            e.preventDefault()
+            return
+          }
           onClickCard()
         }}
         onKeyDown={onKeyDown}
