@@ -57,7 +57,6 @@ interface SidebarProps {
   activeView: ViewType
   onViewChange: (view: ViewType) => void
   onOpenSearch?: () => void
-  onOpenChat?: () => void
   inboxCount?: number
   // Pinned items props
   pins?: PinnedItem[]
@@ -83,7 +82,6 @@ export function Sidebar({
   activeView,
   onViewChange,
   onOpenSearch,
-  onOpenChat,
   inboxCount,
   pins = [],
   entities,
@@ -198,7 +196,8 @@ export function Sidebar({
         </div>
       )}
 
-      {/* Search + AI/Wall launcher — compact row */}
+      {/* Search row. Chat + Wall icons removed in Phase 1 (sidebar restraint);
+          chat has its own surfaces and Wall is a rarely-used cross-tab action. */}
       <div className={`px-3 mt-1 flex items-center gap-1 ${collapsed ? 'flex-col' : ''}`}>
         {onOpenSearch && (
           <button
@@ -217,28 +216,6 @@ export function Sidebar({
             {!collapsed && <span className="flex-1 text-left">Search</span>}
           </button>
         )}
-        {onOpenChat && (
-          <button
-            onClick={onOpenChat}
-            className="p-2 rounded-lg text-primary-500 hover:bg-primary-50/80 hover:text-primary-700 transition-colors"
-            aria-label="Open AI chat"
-            title="AI chat"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
-            </svg>
-          </button>
-        )}
-        <button
-          onClick={() => window.open('/wall', '_blank')}
-          className="p-2 rounded-lg text-neutral-400 hover:bg-neutral-100/70 hover:text-neutral-600 transition-colors"
-          aria-label="Open Wall in new tab"
-          title="Wall"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clipRule="evenodd" />
-          </svg>
-        </button>
       </div>
 
       {/* Pinned Section */}
