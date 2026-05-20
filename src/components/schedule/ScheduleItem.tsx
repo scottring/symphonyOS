@@ -15,6 +15,7 @@ import { TaskCheckbox } from './TaskCheckbox'
 import { PromoteToProjectButton } from './PromoteToProjectButton'
 import { ExpandingPanel } from './ExpandingPanel'
 import { DOMAIN_COLORS } from '@/lib/domainColors'
+import { rowSubtitle } from '@/lib/rowSubtitle'
 
 // Nordic Journal calendar icon - minimal, elegant design
 // Uses the event's context color (Work/Family/Personal) or falls back to primary teal-forest
@@ -596,16 +597,6 @@ export const ScheduleItem = memo(function ScheduleItem({
                 <ConceptIcon name="streak" decorative /> {routineStreak}
               </span>
             )}
-            {/* Category chip — desktop only (non-task categories only) */}
-            {item.category && item.category !== 'task' && (
-              <span className="hidden md:inline-flex shrink-0 items-center gap-1 px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded text-xs font-medium">
-                {item.category === 'errand' && <ConceptIcon name="errand" decorative />}
-                {item.category === 'chore' && <ConceptIcon name="chore" decorative />}
-                {item.category === 'event' && <ConceptIcon name="when" decorative />}
-                {item.category === 'activity' && <ConceptIcon name="activity" decorative />}
-                <span className="hidden sm:inline">{item.category}</span>
-              </span>
-            )}
             {/* Coaching sparkle indicator — desktop only */}
             {hasCoaching && (
               <span className="hidden md:inline shrink-0 text-amber-400 opacity-60" title="Coaching tips available">
@@ -636,6 +627,16 @@ export const ScheduleItem = memo(function ScheduleItem({
               </span>
             )}
           </div>
+          {/* Subtitle: category + duration. Empty for plain tasks. */}
+          {(() => {
+            const subtitle = rowSubtitle(item)
+            if (!subtitle) return null
+            return (
+              <div className="hidden md:block text-[12px] text-neutral-500 leading-tight mt-0.5">
+                {subtitle}
+              </div>
+            )
+          })()}
         </div>
 
         {/* Start Meeting button - for timed events only, shows on hover */}
