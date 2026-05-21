@@ -1761,6 +1761,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
           events={eventsWithMeals}
           filteredEvents={filteredEvents}
           filteredRoutines={filteredRoutines}
+          activeRoutines={activeRoutines}
           projects={projects}
           dateInstances={dateInstances}
           selectedItemId={selectedItemId}

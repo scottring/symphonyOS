@@ -33,6 +33,7 @@ interface HomeViewProps {
   tasks: Task[]
   events: CalendarEvent[]
   routines: Routine[]
+  allActiveRoutines: Routine[]
   projects: Project[]
   dateInstances: ActionableInstance[]
   selectedItemId: string | null
@@ -48,6 +49,7 @@ export function HomeView({
   tasks,
   events,
   routines,
+  allActiveRoutines,
   projects,
   dateInstances,
   selectedItemId,
@@ -99,6 +101,14 @@ export function HomeView({
     if (currentDomain === 'universal') return routines
     return routines.filter(routine => routine.context === currentDomain)
   }, [routines, currentDomain])
+
+  // All active routines, domain-filtered — used by Week/Month which do their
+  // own per-day recurrence matching. filteredRoutines is today-filtered and
+  // unsuitable for multi-day views.
+  const filteredAllActiveRoutines = useMemo(() => {
+    if (currentDomain === 'universal') return allActiveRoutines
+    return allActiveRoutines.filter(routine => routine.context === currentDomain)
+  }, [allActiveRoutines, currentDomain])
 
   const filteredProjects = useMemo(() => {
     if (currentDomain === 'universal') return projects
@@ -223,7 +233,7 @@ export function HomeView({
         <MonthView
           tasks={filteredTasks}
           events={filteredEvents}
-          routines={filteredRoutines}
+          routines={filteredAllActiveRoutines}
           dateInstances={dateInstances}
           monthStart={monthStart}
           onMonthChange={setMonthStart}
@@ -245,7 +255,7 @@ export function HomeView({
           <WeekViewV2
             tasks={filteredTasks}
             events={filteredEvents}
-            routines={filteredRoutines}
+            routines={filteredAllActiveRoutines}
             dateInstances={dateInstances}
             weekStart={mondayStart}
             dayCount={5}
@@ -260,7 +270,7 @@ export function HomeView({
           <WeekViewMobile
             tasks={filteredTasks}
             events={filteredEvents}
-            routines={filteredRoutines}
+            routines={filteredAllActiveRoutines}
             weekStart={mondayStart}
             dayCount={5}
             onSelectItem={onSelectItem}
@@ -276,7 +286,7 @@ export function HomeView({
           <WeekView
             tasks={filteredTasks}
             events={filteredEvents}
-            routines={filteredRoutines}
+            routines={filteredAllActiveRoutines}
             dateInstances={dateInstances}
             weekStart={weekStart}
             onWeekChange={setWeekStart}
@@ -291,7 +301,7 @@ export function HomeView({
           <WeekViewV2
             tasks={filteredTasks}
             events={filteredEvents}
-            routines={filteredRoutines}
+            routines={filteredAllActiveRoutines}
             dateInstances={dateInstances}
             weekStart={weekStart}
             onWeekChange={(d) => setWeekStart(sundayOfWeek(d))}
@@ -305,7 +315,7 @@ export function HomeView({
           <WeekViewMobile
             tasks={filteredTasks}
             events={filteredEvents}
-            routines={filteredRoutines}
+            routines={filteredAllActiveRoutines}
             weekStart={weekStart}
             onSelectItem={onSelectItem}
           />
