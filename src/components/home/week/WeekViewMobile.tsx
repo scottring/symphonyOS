@@ -3,7 +3,7 @@ import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine } from '@/types/actionable'
 import { readHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
-import { isEverydayRoutine } from '@/lib/routineUtils'
+import { isEverydayRoutine, matchesRecurrenceForDate } from '@/lib/routineUtils'
 
 interface WeekViewMobileProps {
   tasks: Task[]
@@ -80,14 +80,21 @@ export function WeekViewMobile({
       }
     }
 
-    // Routines — appear on every day in the range. When hideRoutines is on,
-    // drop daily / weekdays / weekly-covering-all-weekdays patterns; less-
-    // frequent routines (weekends, weekly, biweekly, monthly…) always show.
+    // Routines mirror Today's visibility rules:
+    //   1. show_on_timeline === false → never render.
+    //   2. "Hide daily" toggle drops everyday-ish routines (daily, weekdays,
+    //      weekly-covering-all-5). Lower-frequency routines always show.
+    //   3. For each day, only render when matchesRecurrenceForDate is true —
+    //      so a Mon–Fri routine doesn't appear on Sat/Sun.
+    const showable = routines.filter((r) => r.show_on_timeline !== false)
     const visibleRoutines = hideRoutines
-      ? routines.filter((r) => !isEverydayRoutine(r.recurrence_pattern))
-      : routines
+      ? showable.filter((r) => !isEverydayRoutine(r.recurrence_pattern))
+      : showable
     for (let i = 0; i < dayCount; i++) {
+      const d = new Date(weekStartMidnight)
+      d.setDate(d.getDate() + i)
       for (const r of visibleRoutines) {
+        if (!matchesRecurrenceForDate(r, d)) continue
         const time = r.time_of_day ?? null
         buckets[i].push({
           id: `routine-${r.id}-day${i}`,

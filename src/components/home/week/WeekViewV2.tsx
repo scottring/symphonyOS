@@ -29,7 +29,7 @@ import { useGridCreate } from './useGridCreate'
 import { SlotQuickCreatePopover, type CreateType } from './SlotQuickCreatePopover'
 import { Eye, EyeOff } from 'lucide-react'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
-import { isEverydayRoutine } from '@/lib/routineUtils'
+import { isEverydayRoutine, matchesRecurrenceForDate } from '@/lib/routineUtils'
 
 const EDGE_PX = 40
 
@@ -236,18 +236,25 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const allBlocks = useMemo(() => {
     const taskItems = scheduledTasks.map(taskToTimelineItem)
     const eventItems = weekEvents.map(eventToTimelineItem)
-    // When "hide daily" is on, hide only routines that effectively recur
-    // every weekday (daily, weekdays, weekly-covering-all-5). Less-frequent
-    // routines (weekends, weekly, biweekly, monthly, etc.) always show.
+    // Routine visibility on the week grid mirrors Today:
+    //   1. show_on_timeline === false → never render (parity with TodayView).
+    //   2. "Hide daily" toggle drops routines that effectively recur every
+    //      weekday (daily, weekdays, weekly-covering-all-5). Lower-frequency
+    //      routines (weekends, weekly, biweekly, monthly, etc.) always show.
+    //   3. For each day in the visible range, only emit a block when the
+    //      routine's recurrence_pattern actually matches that date — without
+    //      this, e.g. a Mon–Fri "Walk kids to school" also rendered Sat/Sun.
+    const showable = routines.filter((r) => r.show_on_timeline !== false)
     const visibleRoutines = hideRoutines
-      ? routines.filter((r) => !isEverydayRoutine(r.recurrence_pattern))
-      : routines
+      ? showable.filter((r) => !isEverydayRoutine(r.recurrence_pattern))
+      : showable
     const routineItems = visibleRoutines.flatMap((r) =>
       Array.from({ length: dayCount }, (_, i) => {
         const d = new Date(weekStart)
         d.setDate(d.getDate() + i)
+        if (!matchesRecurrenceForDate(r, d)) return null
         return { ...routineToTimelineItem(r, d), id: `routine-${r.id}-day${i}` }
-      }),
+      }).filter((item): item is NonNullable<typeof item> => item !== null),
     )
 
     const blocks = [...taskItems, ...eventItems, ...routineItems]
