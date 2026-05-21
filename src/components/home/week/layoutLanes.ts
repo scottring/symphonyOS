@@ -51,13 +51,66 @@ export function layoutWeekLanes(
   const weekStartMidnight = new Date(weekStart)
   weekStartMidnight.setHours(0, 0, 0, 0)
 
-  const placed: PlacedItem[] = []
+  // Bucket valid items by day.
+  const byDay: Map<number, Array<{ item: TimelineItem; startMin: number; endMin: number }>> = new Map()
   for (const item of items) {
     if (!item.startTime) continue
     const dayIdx = daysBetween(weekStartMidnight, item.startTime)
     if (dayIdx < 0 || dayIdx >= dayCount) continue
-    placed.push({ item, dayIdx, laneIdx: 0, laneCount: 1 })
+    const startMin = item.startTime.getHours() * 60 + item.startTime.getMinutes()
+    const endMin = getEffectiveEndMin(item.startTime, item.endTime)
+    if (!byDay.has(dayIdx)) byDay.set(dayIdx, [])
+    byDay.get(dayIdx)!.push({ item, startMin, endMin })
   }
+
+  const placed: PlacedItem[] = []
+  // Stable day order: 0..dayCount-1.
+  for (let dayIdx = 0; dayIdx < dayCount; dayIdx++) {
+    const dayItems = byDay.get(dayIdx)
+    if (!dayItems) continue
+
+    // Sort by (startMin asc, endMin desc) so ties are broken by longer-first.
+    dayItems.sort((a, b) => a.startMin - b.startMin || b.endMin - a.endMin)
+
+    // Sweep to form clusters; assign lanes within each cluster.
+    let clusterStart = 0
+    let clusterMaxEnd = -Infinity
+    for (let i = 0; i <= dayItems.length; i++) {
+      const cur = dayItems[i]
+      if (i < dayItems.length && (clusterMaxEnd === -Infinity || cur.startMin < clusterMaxEnd)) {
+        // Extend (or open) current cluster.
+        clusterMaxEnd = Math.max(clusterMaxEnd, cur.endMin)
+        continue
+      }
+      // Close cluster [clusterStart, i): assign lanes.
+      const cluster = dayItems.slice(clusterStart, i)
+      const laneEnds: number[] = []
+      const laneIdxByItem: number[] = []
+      for (const entry of cluster) {
+        let lane = laneEnds.findIndex(e => e <= entry.startMin)
+        if (lane === -1) {
+          lane = laneEnds.length
+          laneEnds.push(entry.endMin)
+        } else {
+          laneEnds[lane] = entry.endMin
+        }
+        laneIdxByItem.push(lane)
+      }
+      const laneCount = laneEnds.length
+      for (let j = 0; j < cluster.length; j++) {
+        placed.push({
+          item: cluster[j].item,
+          dayIdx,
+          laneIdx: laneIdxByItem[j],
+          laneCount,
+        })
+      }
+      // Open next cluster starting at i.
+      clusterStart = i
+      clusterMaxEnd = cur ? cur.endMin : -Infinity
+    }
+  }
+
   return placed
 }
 
