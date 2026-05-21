@@ -32,5 +32,21 @@ export function layoutWeekLanes(
   weekStart: Date,
   dayCount: number,
 ): PlacedItem[] {
-  return []
+  const weekStartMidnight = new Date(weekStart)
+  weekStartMidnight.setHours(0, 0, 0, 0)
+
+  const placed: PlacedItem[] = []
+  for (const item of items) {
+    if (!item.startTime) continue
+    const dayIdx = daysBetween(weekStartMidnight, item.startTime)
+    if (dayIdx < 0 || dayIdx >= dayCount) continue
+    placed.push({ item, dayIdx, laneIdx: 0, laneCount: 1 })
+  }
+  return placed
+}
+
+function daysBetween(from: Date, to: Date): number {
+  const a = new Date(from); a.setHours(0, 0, 0, 0)
+  const b = new Date(to);   b.setHours(0, 0, 0, 0)
+  return Math.round((b.getTime() - a.getTime()) / 86400000)
 }
