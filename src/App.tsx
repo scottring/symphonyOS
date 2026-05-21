@@ -301,13 +301,15 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       breakfast: [7, 30], lunch: [12, 30], snack: [15, 30], dinner: [18, 30], prep: [16, 0],
       lunch_iris: [12, 30], lunch_scott: [12, 30], kid_alternate: [18, 30],
     }
-    const dow = viewedDate.getDay()
     const currentMemberId = getCurrentUserMember()?.id ?? null
     const memberById = new Map(familyMembers.map(m => [m.id, m]))
     const recipeTitleById = new Map(mealRecipesForEvents.map(r => [r.id, r.title]))
-    const groups = new Map<string, { slot: string; title: string; entryIds: string[] }>()
+    // Iterate all 7 days of the meal plan week so Week / Workweek views see
+    // meals on every day, not just viewedDate. weekStart is Sunday-anchored
+    // (sundayOfWeek of viewedDate) so dayOfWeek 0..6 maps directly to
+    // weekStart + dow days.
+    const groups = new Map<string, { dow: number; slot: string; title: string; entryIds: string[] }>()
     for (const e of mealPlanForEvents.entries) {
-      if (e.dayOfWeek !== dow) continue
       if (!SLOT_TIMES[e.slot]) continue
       // Per-user filter: show family-shared (null), self, or kids (members without auth_user_id).
       if (e.familyMemberId != null) {
@@ -317,15 +319,17 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
         if (!isCurrent && !isKid) continue
       }
       const title = e.recipeId ? (recipeTitleById.get(e.recipeId) ?? '(unnamed)') : (e.adHocTitle ?? '(unnamed)')
-      const key = `${e.slot}|${title}`
+      const key = `${e.dayOfWeek}|${e.slot}|${title}`
       const existing = groups.get(key)
       if (existing) existing.entryIds.push(e.id)
-      else groups.set(key, { slot: e.slot, title, entryIds: [e.id] })
+      else groups.set(key, { dow: e.dayOfWeek, slot: e.slot, title, entryIds: [e.id] })
     }
     const out: CalendarEvent[] = []
-    for (const [, { slot, title, entryIds }] of groups) {
+    for (const [, { dow, slot, title, entryIds }] of groups) {
       const [hh, mm] = SLOT_TIMES[slot]!
-      const start = new Date(viewedDate); start.setHours(hh, mm, 0, 0)
+      const dayDate = new Date(mealWeekStartForEvents)
+      dayDate.setDate(dayDate.getDate() + dow)
+      const start = new Date(dayDate); start.setHours(hh, mm, 0, 0)
       const end = new Date(start.getTime() + 45 * 60 * 1000)
       const slotLabel = slot.charAt(0).toUpperCase() + slot.slice(1)
       out.push({
@@ -339,7 +343,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       })
     }
     return out
-  }, [mealPlanForEvents, mealRecipesForEvents, viewedDate, familyMembers, getCurrentUserMember])
+  }, [mealPlanForEvents, mealRecipesForEvents, mealWeekStartForEvents, familyMembers, getCurrentUserMember])
   const eventsWithMeals = useMemo(() => [...events, ...mealEvents], [events, mealEvents])
 
   // Reset to today at midnight
