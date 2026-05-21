@@ -493,9 +493,8 @@ export function Sidebar({
         {/* Illustration + tagline */}
         {!collapsed && (
           <div className="mt-4 px-3">
-            {/* Exact mockup house illustration */}
             <img
-              src="/house-illustration.png"
+              src="/house-photo.jpg"
               alt=""
               aria-hidden="true"
               className="w-32 h-auto select-none pointer-events-none"
