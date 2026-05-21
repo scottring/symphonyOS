@@ -22,6 +22,7 @@ import type { FamilyMember } from '@/types/family';
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar';
 import type { WallDayData } from '@/hooks/useWallData';
 import { extractRecipeNameHint, detectRecipeUrl } from '@/lib/recipeDetection';
+import { isEverydayRoutine } from '@/lib/routineUtils';
 
 import type {
   WallV2MemberBubble,
@@ -215,11 +216,21 @@ export function adaptTimelineSections(
   members: FamilyMember[],
   now: Date,
   dinnerEvent: CalendarEvent | null,
+  hideDailyRoutines: boolean = false,
 ): WallV2TimelineSection[] {
   if (!today) return [];
 
-  const afternoonItems = today.items.afternoon ?? [];
-  const eveningItemsRaw = today.items.evening ?? [];
+  // "Hide daily" drops routines that effectively recur every weekday (daily +
+  // weekday-only weeklies). One-off routines (since-last, monthly, etc.) stay
+  // visible because they're never "noise."
+  const isVisible = (i: TimelineItem) => {
+    if (!hideDailyRoutines) return true;
+    if (i.type !== 'routine') return true;
+    return !isEverydayRoutine(i.recurrencePattern);
+  };
+
+  const afternoonItems = (today.items.afternoon ?? []).filter(isVisible);
+  const eveningItemsRaw = (today.items.evening ?? []).filter(isVisible);
 
   const eveningItems: TimelineItem[] = [];
   const nightItems: TimelineItem[] = [];

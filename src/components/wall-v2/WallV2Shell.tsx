@@ -11,7 +11,12 @@
 // dev-only `/wall-design` preview (see `wallV2Mock.ts`).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Moon, Sun } from 'lucide-react';
+import { Eye, EyeOff, Moon, Sun } from 'lucide-react';
+import {
+  readHideRoutines,
+  writeHideRoutines,
+  onHideRoutinesChange,
+} from '@/lib/hideRoutinesSignal';
 import { TINTS } from './tints';
 import { WallV2DateColumn } from './WallV2DateColumn';
 import { WallV2AtAGlance } from './WallV2AtAGlance';
@@ -85,6 +90,14 @@ export function WallV2Shell() {
     });
   }, []);
 
+  // Share the same hide-daily preference Today + Week views use, so the
+  // toggle stays consistent across surfaces.
+  const [hideRoutines, setHideRoutines] = useState<boolean>(() => readHideRoutines());
+  useEffect(() => onHideRoutinesChange(setHideRoutines), []);
+  const toggleHideRoutines = useCallback(() => {
+    writeHideRoutines(!hideRoutines);
+  }, [hideRoutines]);
+
   const { weekday, fullDate } = useMemo(() => formatDate(now), [now]);
 
   const wallData = useWallData();
@@ -105,8 +118,8 @@ export function WallV2Shell() {
   );
 
   const timeline = useMemo(
-    () => adaptTimelineSections(todayData, wallData.familyMembers, now, dinnerEvent),
-    [todayData, wallData.familyMembers, now, dinnerEvent],
+    () => adaptTimelineSections(todayData, wallData.familyMembers, now, dinnerEvent, hideRoutines),
+    [todayData, wallData.familyMembers, now, dinnerEvent, hideRoutines],
   );
 
   const upcoming = useMemo(
@@ -253,14 +266,25 @@ export function WallV2Shell() {
 
   return (
     <div className={`${isDark ? 'dark ' : ''}relative h-screen w-screen bg-[var(--color-bg-base)] dark:bg-stone-950 text-stone-800 dark:text-stone-100 overflow-hidden transition-colors`}>
-      <button
-        type="button"
-        onClick={toggleTheme}
-        aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-        className="absolute top-8 right-8 z-30 grid place-items-center w-14 h-14 rounded-full bg-white/80 dark:bg-stone-800/80 border border-stone-300/70 dark:border-stone-700/70 text-stone-700 dark:text-stone-200 backdrop-blur-md hover:bg-white dark:hover:bg-stone-800 transition-colors shadow-md"
-      >
-        {isDark ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
-      </button>
+      <div className="absolute top-8 right-8 z-30 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={toggleHideRoutines}
+          aria-label={hideRoutines ? 'Show daily routines' : 'Hide daily routines'}
+          title={hideRoutines ? 'Show daily routines' : 'Hide daily routines'}
+          className="grid place-items-center w-14 h-14 rounded-full bg-white/80 dark:bg-stone-800/80 border border-stone-300/70 dark:border-stone-700/70 text-stone-700 dark:text-stone-200 backdrop-blur-md hover:bg-white dark:hover:bg-stone-800 transition-colors shadow-md"
+        >
+          {hideRoutines ? <EyeOff className="w-6 h-6" /> : <Eye className="w-6 h-6" />}
+        </button>
+        <button
+          type="button"
+          onClick={toggleTheme}
+          aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+          className="grid place-items-center w-14 h-14 rounded-full bg-white/80 dark:bg-stone-800/80 border border-stone-300/70 dark:border-stone-700/70 text-stone-700 dark:text-stone-200 backdrop-blur-md hover:bg-white dark:hover:bg-stone-800 transition-colors shadow-md"
+        >
+          {isDark ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
+        </button>
+      </div>
       <div className="h-full w-full p-6 grid grid-cols-[280px_1fr_360px] grid-rows-[1fr_auto] gap-4">
         {/* Row 1 — Left rail */}
         <div className="row-span-1 col-start-1">
