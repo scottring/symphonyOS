@@ -82,7 +82,7 @@ export function HomeHeader(props: HomeHeaderProps) {
   }
 
   return (
-    <header className="flex flex-col gap-3 mb-6 px-3 md:px-0 md:flex-row md:items-center md:justify-between md:gap-4">
+    <header className="flex flex-col gap-3 mb-6 px-3 md:px-0 md:pr-16 md:flex-row md:items-center md:justify-between md:gap-4">
       <div className="flex items-center gap-2 min-w-0 justify-center md:justify-start">
         <button
           aria-label={prevLabel}
