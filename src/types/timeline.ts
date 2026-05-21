@@ -35,6 +35,7 @@ export interface TimelineItem {
   googleDescription?: string // Read-only description from Google Calendar
   calendarName?: string | null // Name of the source calendar (e.g., "Family", "Work")
   calendarColor?: string | null // Google Calendar color (hex)
+  meetingUrl?: string // Video join URL from Google Meet hangoutLink or conferenceData
   attendees?: { email: string; displayName?: string; responseStatus?: string; self?: boolean }[]
   // Routine-specific
   recurrencePattern?: RecurrencePattern
@@ -109,6 +110,7 @@ export function eventToTimelineItem(event: CalendarEvent): TimelineItem {
     allDay: allDay,
     calendarName: calendarName || undefined,
     calendarColor: calendarColor || undefined,
+    meetingUrl: event.meeting_url || event.meetingUrl || undefined,
     attendees: event.attendees,
     originalEvent: event,
   }

@@ -166,6 +166,17 @@ serve(async (req) => {
       end: { dateTime?: string; date?: string }
       attendees?: GoogleCalendarAttendee[]
       recurringEventId?: string
+      // Google Meet shortcut URL (populated when the event was created with a Meet link)
+      hangoutLink?: string
+      // Conference data covers all video providers (Zoom add-on, Webex, etc.). The
+      // 'video' entryPoint has the join URL; other entryPoints are phone/sip/more.
+      conferenceData?: {
+        entryPoints?: Array<{
+          entryPointType?: string
+          uri?: string
+          label?: string
+        }>
+      }
     }
 
     let calendars: GoogleCalendar[] = calendarListData.items || []
@@ -261,6 +272,14 @@ serve(async (req) => {
             ? `${event.end.date}T12:00:00.000Z`
             : event.end.dateTime!
 
+          // Extract the video join URL. Prefer hangoutLink (Google Meet, canonical
+          // for Google-managed video) and fall back to the first 'video' entryPoint
+          // for Zoom / Webex / Teams add-ons surfaced via conferenceData.
+          const videoEntryPoint = event.conferenceData?.entryPoints?.find(
+            (ep) => ep.entryPointType === 'video' && ep.uri,
+          )
+          const meetingUrl = event.hangoutLink || videoEntryPoint?.uri || null
+
           return {
             user_id: user.id,
             google_event_id: event.id,
@@ -270,6 +289,7 @@ serve(async (req) => {
             end_time: endTime,
             all_day: isAllDay,
             location: event.location || null,
+            meeting_url: meetingUrl,
             calendar_id: calendar.id,
             calendar_name: calendar.summary || null,
             calendar_color: calendar.backgroundColor || null, // Google Calendar color
