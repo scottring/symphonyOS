@@ -14,21 +14,22 @@ const RESIZE_ENABLED = import.meta.env.VITE_WEEK_RESIZE_ENABLED === 'true'
 const LANE_GAP_PX = 2
 
 /** Exported for unit testing — computes the lane-aware left/width calc strings. */
-export function laneCalcStrings(dayIdx: number, laneIdx: number, laneCount: number): { left: string; width: string } {
+export function laneCalcStrings(dayIdx: number, laneIdx: number, laneCount: number, dayCount = 7): { left: string; width: string } {
   return {
-    left: `calc(${TIME_COL_WIDTH}px + (100% - ${TIME_COL_WIDTH}px) * ${dayIdx} / 7 + ((100% - ${TIME_COL_WIDTH}px) / 7 - 4px) * ${laneIdx} / ${laneCount})`,
-    width: `calc(((100% - ${TIME_COL_WIDTH}px) / 7 - 4px) / ${laneCount} - ${LANE_GAP_PX}px)`,
+    left: `calc(${TIME_COL_WIDTH}px + (100% - ${TIME_COL_WIDTH}px) * ${dayIdx} / ${dayCount} + ((100% - ${TIME_COL_WIDTH}px) / ${dayCount} - 4px) * ${laneIdx} / ${laneCount})`,
+    width: `calc(((100% - ${TIME_COL_WIDTH}px) / ${dayCount} - 4px) / ${laneCount} - ${LANE_GAP_PX}px)`,
   }
 }
 
 interface WeekEventBlockProps {
   placedItem: PlacedItem
   weekStart: Date
+  dayCount?: number  // defaults to 7 for full Week view
   onSelect: (id: string) => void
   onResizeCommit?: (itemId: string, updates: { scheduledFor: Date; endTime: Date }) => void
 }
 
-export function WeekEventBlock({ placedItem, weekStart, onSelect, onResizeCommit }: WeekEventBlockProps) {
+export function WeekEventBlock({ placedItem, weekStart, dayCount = 7, onSelect, onResizeCommit }: WeekEventBlockProps) {
   const isRoutine = placedItem.item.type === 'routine'
 
   const resize = useBlockResize({
@@ -115,7 +116,7 @@ export function WeekEventBlock({ placedItem, weekStart, onSelect, onResizeCommit
       ].filter(Boolean).join(' ')}
       style={{
         top: top + previewTopOffset,
-        ...laneCalcStrings(dayIdx, laneIdx, laneCount),
+        ...laneCalcStrings(dayIdx, laneIdx, laneCount, dayCount),
         height: Math.max(HOUR_ROW_HEIGHT / 4, height - previewTopOffset + previewBottomOffset),
       }}
     >

@@ -84,4 +84,12 @@ describe('WeekEventBlock', () => {
     expect(width).toContain('/ 2')
     expect(left).toContain('+ ')
   })
+
+  it('uses dayCount=5 in the column divisor for Workweek', () => {
+    // Verify that passing dayCount=5 causes the calc strings to divide by 5
+    // instead of the default 7, enabling the Workweek (Mon–Fri) view.
+    const { left, width } = laneCalcStrings(0, 0, 1, 5)
+    expect(left).toContain('/ 5')
+    expect(width).toContain('/ 5')
+  })
 })
