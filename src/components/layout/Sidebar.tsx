@@ -233,9 +233,19 @@ export function Sidebar({
 
       {/* Navigation — flat list per mockup */}
       <nav className="flex-1 px-3 mt-4 space-y-0.5 overflow-y-auto">
-        {/* Today */}
+        {/* Today — also forces HomeView D/W/M back to 'today' so clicking
+            this link from Week/Workweek/Month returns the user to Day view. */}
         <button
-          onClick={() => onViewChange('today')}
+          onClick={() => {
+            try {
+              localStorage.setItem(HOME_VIEW_STORAGE_KEY, 'today')
+              window.dispatchEvent(new StorageEvent('storage', {
+                key: HOME_VIEW_STORAGE_KEY,
+                newValue: 'today',
+              }))
+            } catch { /* ignore — falls back to next-mount read */ }
+            onViewChange('today')
+          }}
           className={navItemClass(activeView === 'today')}
         >
           {createElement(Sun, { className: 'w-5 h-5 shrink-0' })}
