@@ -5,9 +5,10 @@ interface HomeViewSwitcherProps {
   onViewChange: (view: HomeViewType) => void
 }
 
+// Workweek is no longer exposed in the UI. The 'workweek' HomeViewType + its
+// helpers remain in place for now, but users only see Day / Week / Month.
 const views: { value: HomeViewType; label: string }[] = [
   { value: 'today', label: 'Day' },
-  { value: 'workweek', label: 'Workweek' },
   { value: 'week', label: 'Week' },
   { value: 'month', label: 'Month' },
 ]
