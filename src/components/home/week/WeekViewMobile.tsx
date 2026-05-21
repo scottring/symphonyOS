@@ -1,7 +1,9 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine } from '@/types/actionable'
+import { readHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
+import { isEverydayRoutine } from '@/lib/routineUtils'
 
 interface WeekViewMobileProps {
   tasks: Task[]
@@ -36,6 +38,12 @@ export function WeekViewMobile({
   }, [weekStart, dayCount])
 
   const inWeek = (d: Date) => d >= weekStart && d < weekEnd
+
+  // "Hide daily" applies to mobile too — uses the same signal as Today and
+  // the desktop Week view, so a single toggle anywhere keeps all surfaces
+  // in sync.
+  const [hideRoutines, setHideRoutines] = useState<boolean>(() => readHideRoutines())
+  useEffect(() => onHideRoutinesChange(setHideRoutines), [])
 
   const unscheduled = useMemo(
     () => tasks.filter((t) => t.scheduledFor && inWeek(t.scheduledFor) && t.isAllDay),
@@ -72,10 +80,14 @@ export function WeekViewMobile({
       }
     }
 
-    // Routines — appear on every day in the range. No recurrence-aware
-    // filtering yet; matches the desktop grid view's behavior.
+    // Routines — appear on every day in the range. When hideRoutines is on,
+    // drop daily / weekdays / weekly-covering-all-weekdays patterns; less-
+    // frequent routines (weekends, weekly, biweekly, monthly…) always show.
+    const visibleRoutines = hideRoutines
+      ? routines.filter((r) => !isEverydayRoutine(r.recurrence_pattern))
+      : routines
     for (let i = 0; i < dayCount; i++) {
-      for (const r of routines) {
+      for (const r of visibleRoutines) {
         const time = r.time_of_day ?? null
         buckets[i].push({
           id: `routine-${r.id}-day${i}`,
@@ -98,7 +110,7 @@ export function WeekViewMobile({
 
     return buckets
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, events, routines, weekStart, dayCount])
+  }, [tasks, events, routines, weekStart, dayCount, hideRoutines])
 
   const dayName = (i: number) => {
     const d = new Date(weekStart)

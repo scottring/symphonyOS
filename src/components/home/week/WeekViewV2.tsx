@@ -29,6 +29,7 @@ import { useGridCreate } from './useGridCreate'
 import { SlotQuickCreatePopover, type CreateType } from './SlotQuickCreatePopover'
 import { Eye, EyeOff } from 'lucide-react'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
+import { isEverydayRoutine } from '@/lib/routineUtils'
 
 const EDGE_PX = 40
 
@@ -235,7 +236,13 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const allBlocks = useMemo(() => {
     const taskItems = scheduledTasks.map(taskToTimelineItem)
     const eventItems = weekEvents.map(eventToTimelineItem)
-    const routineItems = hideRoutines ? [] : routines.flatMap((r) =>
+    // When "hide daily" is on, hide only routines that effectively recur
+    // every weekday (daily, weekdays, weekly-covering-all-5). Less-frequent
+    // routines (weekends, weekly, biweekly, monthly, etc.) always show.
+    const visibleRoutines = hideRoutines
+      ? routines.filter((r) => !isEverydayRoutine(r.recurrence_pattern))
+      : routines
+    const routineItems = visibleRoutines.flatMap((r) =>
       Array.from({ length: dayCount }, (_, i) => {
         const d = new Date(weekStart)
         d.setDate(d.getDate() + i)
@@ -319,8 +326,8 @@ export function WeekViewV2(props: WeekViewV2Props) {
         <button
           type="button"
           onClick={() => writeHideRoutines(!hideRoutines)}
-          title={hideRoutines ? 'Show routines' : 'Hide routines'}
-          aria-label={hideRoutines ? 'Show routines' : 'Hide routines'}
+          title={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
+          aria-label={hideRoutines ? 'Show daily' : 'Hide daily'}
           className="p-1.5 rounded-md hover:bg-neutral-100 text-neutral-500"
         >
           {hideRoutines ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}

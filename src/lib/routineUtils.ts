@@ -3,19 +3,23 @@ import type { Routine, RecurrencePattern } from '@/types/actionable'
 const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const
 
 /**
- * True when a routine effectively recurs every weekday — either a plain
- * `daily` routine, or a `weekly` routine whose selected days cover all five
- * weekdays (Mon–Fri, optionally plus weekends).
+ * True when a routine effectively recurs at least every weekday (>= 5x/week).
+ * Covers:
+ *   - `daily` (7x/week)
+ *   - `weekly` whose selected days cover all five weekdays (Mon–Fri),
+ *     which is how NL-parsed "weekdays" routines are persisted (`type:'weekly'`
+ *     + `days:['mon','tue','wed','thu','fri']`).
+ *   - `specific_days` whose days cover all five weekdays (defensive — same
+ *     practical frequency).
  *
- * The wall uses this to treat background everyday routines (brush teeth,
- * morning standup) differently from genuinely occasional ones (soccer
- * Tue/Thu). A weekly routine listing every weekday is everyday in practice,
- * so it must not leak into the "specials" / look-ahead surfaces.
+ * The visibility toggle (Show daily / Hide daily) controls these specifically;
+ * lower-frequency routines (weekend-only `weekly`, ordinary `weekly`,
+ * `monthly`, `quarterly`, etc.) are always visible.
  */
 export function isEverydayRoutine(rp?: RecurrencePattern | null): boolean {
   if (!rp) return false
   if (rp.type === 'daily') return true
-  if (rp.type === 'weekly' && rp.days) {
+  if ((rp.type === 'weekly' || rp.type === 'specific_days') && rp.days) {
     const set = new Set(rp.days.map(d => d.toLowerCase()))
     return WEEKDAYS.every(d => set.has(d))
   }
