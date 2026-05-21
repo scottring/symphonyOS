@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { Utensils, ShoppingBag, ChefHat } from 'lucide-react'
 import type { FamilyDinnerSummary, GroceriesSummary, PrepAheadSummary } from '@/lib/weekHighlights'
 
@@ -7,7 +8,11 @@ interface WeekSummaryRowProps {
   prepAhead: PrepAheadSummary | null
 }
 
+const CARD_CLASS =
+  'card flex items-center gap-3 px-4 py-3 bg-bg-elevated border border-neutral-200/70 flex-1 min-w-0 text-left transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40'
+
 export function WeekSummaryRow({ familyDinner, groceries, prepAhead }: WeekSummaryRowProps) {
+  const navigate = useNavigate()
   const showDinner = familyDinner.nights > 0
   const showGroceries = groceries.missingCount > 0
   const showPrep = !!prepAhead
@@ -16,7 +21,12 @@ export function WeekSummaryRow({ familyDinner, groceries, prepAhead }: WeekSumma
   return (
     <section aria-label="Week summary" className="flex items-stretch gap-3 mb-4">
       {showDinner && (
-        <div className="card flex items-center gap-3 px-4 py-3 bg-bg-elevated border border-neutral-200/70 flex-1 min-w-0">
+        <button
+          type="button"
+          onClick={() => navigate('/meals')}
+          aria-label={`Family dinner — ${familyDinner.nights} nights this week. Open meal plan.`}
+          className={CARD_CLASS}
+        >
           <Utensils className="w-5 h-5 text-amber-600 shrink-0" aria-hidden />
           <div className="min-w-0 flex-1">
             <p className="text-[13px] font-medium text-neutral-800 truncate">Family dinner</p>
@@ -35,27 +45,37 @@ export function WeekSummaryRow({ familyDinner, groceries, prepAhead }: WeekSumma
               ))}
             </div>
           )}
-        </div>
+        </button>
       )}
 
       {showGroceries && (
-        <div className="card flex items-center gap-3 px-4 py-3 bg-bg-elevated border border-neutral-200/70 flex-1 min-w-0">
+        <button
+          type="button"
+          onClick={() => navigate('/meals')}
+          aria-label={`Groceries — ${groceries.missingCount} items missing. Open meal plan.`}
+          className={CARD_CLASS}
+        >
           <ShoppingBag className="w-5 h-5 text-amber-500 shrink-0" aria-hidden />
           <div className="min-w-0 flex-1">
             <p className="text-[13px] font-medium text-neutral-800 truncate">Groceries</p>
             <p className="text-[11px] text-neutral-500">{groceries.missingCount} items missing</p>
           </div>
-        </div>
+        </button>
       )}
 
       {showPrep && (
-        <div className="card flex items-center gap-3 px-4 py-3 bg-bg-elevated border border-neutral-200/70 flex-1 min-w-0">
+        <button
+          type="button"
+          onClick={() => navigate('/meals')}
+          aria-label={`Prep ahead — ${prepAhead!.recipeName}. Open meal plan.`}
+          className={CARD_CLASS}
+        >
           <ChefHat className="w-5 h-5 text-primary-600 shrink-0" aria-hidden />
           <div className="min-w-0 flex-1">
             <p className="text-[13px] font-medium text-neutral-800 truncate">Prep ahead</p>
             <p className="text-[11px] text-neutral-500 truncate">Prep {prepAhead!.recipeName} tonight</p>
           </div>
-        </div>
+        </button>
       )}
     </section>
   )
