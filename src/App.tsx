@@ -484,14 +484,19 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     }
   }, [user, navigate])
 
-  // Fetch calendar events when connected or date changes
+  // Fetch calendar events when connected or date changes. Range is wider
+  // than a single day so Week / Workweek / Month views see events on every
+  // visible day, not just viewedDate. The Google Calendar fetch is cheap
+  // enough to cover ±7 days around viewedDate.
   useEffect(() => {
     if (isConnected) {
-      const startOfDay = new Date(viewedDate)
-      startOfDay.setHours(0, 0, 0, 0)
-      const endOfDay = new Date(viewedDate)
-      endOfDay.setHours(23, 59, 59, 999)
-      fetchEvents(startOfDay, endOfDay)
+      const rangeStart = new Date(viewedDate)
+      rangeStart.setHours(0, 0, 0, 0)
+      rangeStart.setDate(rangeStart.getDate() - 7)
+      const rangeEnd = new Date(viewedDate)
+      rangeEnd.setHours(23, 59, 59, 999)
+      rangeEnd.setDate(rangeEnd.getDate() + 7)
+      fetchEvents(rangeStart, rangeEnd)
     }
   }, [isConnected, viewedDate, fetchEvents])
 
