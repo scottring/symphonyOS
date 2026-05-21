@@ -1,5 +1,5 @@
 import { useDraggable } from '@dnd-kit/core'
-import type { TimelineItem } from '@/types/timeline'
+import type { PlacedItem } from './layoutLanes'
 import { colorFor } from '@/lib/weekColorMap'
 import { FIRST_HOUR, HOUR_ROW_HEIGHT, TIME_COL_WIDTH } from './WeekGrid'
 import { useBlockResize } from './useBlockResize'
@@ -11,22 +11,32 @@ import { useBlockResize } from './useBlockResize'
 // setting VITE_WEEK_RESIZE_ENABLED=true once the schema lands.
 const RESIZE_ENABLED = import.meta.env.VITE_WEEK_RESIZE_ENABLED === 'true'
 
+const LANE_GAP_PX = 2
+
+/** Exported for unit testing — computes the lane-aware left/width calc strings. */
+export function laneCalcStrings(dayIdx: number, laneIdx: number, laneCount: number): { left: string; width: string } {
+  return {
+    left: `calc(${TIME_COL_WIDTH}px + (100% - ${TIME_COL_WIDTH}px) * ${dayIdx} / 7 + ((100% - ${TIME_COL_WIDTH}px) / 7 - 4px) * ${laneIdx} / ${laneCount})`,
+    width: `calc(((100% - ${TIME_COL_WIDTH}px) / 7 - 4px) / ${laneCount} - ${LANE_GAP_PX}px)`,
+  }
+}
+
 interface WeekEventBlockProps {
-  item: TimelineItem
+  placedItem: PlacedItem
   weekStart: Date
   onSelect: (id: string) => void
   onResizeCommit?: (itemId: string, updates: { scheduledFor: Date; endTime: Date }) => void
 }
 
-export function WeekEventBlock({ item, weekStart, onSelect, onResizeCommit }: WeekEventBlockProps) {
-  const isRoutine = item.type === 'routine'
+export function WeekEventBlock({ placedItem, weekStart, onSelect, onResizeCommit }: WeekEventBlockProps) {
+  const isRoutine = placedItem.item.type === 'routine'
 
   const resize = useBlockResize({
-    startTime: item.startTime ?? new Date(),
-    endTime: item.endTime ?? new Date((item.startTime ?? new Date()).getTime() + 30 * 60 * 1000),
+    startTime: placedItem.item.startTime ?? new Date(),
+    endTime: placedItem.item.endTime ?? new Date((placedItem.item.startTime ?? new Date()).getTime() + 30 * 60 * 1000),
     pxPerMin: HOUR_ROW_HEIGHT / 60,
     onCommit: (updates) => {
-      onResizeCommit?.(item.id, updates)
+      onResizeCommit?.(placedItem.item.id, updates)
     },
   })
 
@@ -34,7 +44,7 @@ export function WeekEventBlock({ item, weekStart, onSelect, onResizeCommit }: We
 
   // Routines are render-only (no drag). Use a distinct id prefix so dnd-kit
   // never confuses them with draggable task/event blocks.
-  const dragId = isRoutine ? `block-routine:${item.id}` : `block:${item.id}`
+  const dragId = isRoutine ? `block-routine:${placedItem.item.id}` : `block:${placedItem.item.id}`
   // Click vs drag is disambiguated at the DndContext level via PointerSensor
   // activationConstraint: { distance: 8 }. With the constraint active:
   //   - A tap (no movement) → click fires normally
@@ -46,10 +56,10 @@ export function WeekEventBlock({ item, weekStart, onSelect, onResizeCommit }: We
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: dragId,
     disabled: isRoutine || isResizing,
-    data: { kind: 'block', itemId: item.id, originStartIso: item.startTime?.toISOString() },
+    data: { kind: 'block', itemId: placedItem.item.id, originStartIso: placedItem.item.startTime?.toISOString() },
   })
 
-  const placement = computePlacement(item, weekStart)
+  const placement = computePlacementFromLane(placedItem, weekStart)
   if (!placement) {
     // During an active drag, keep a hidden DOM node mounted so dnd-kit's
     // activator.target stays in the document — back-edge detection in
@@ -78,8 +88,8 @@ export function WeekEventBlock({ item, weekStart, onSelect, onResizeCommit }: We
     return null
   }
 
-  const { dayIdx, top, height } = placement
-  const color = colorFor(item)
+  const { dayIdx, laneIdx, laneCount, top, height } = placement
+  const color = colorFor(placedItem.item)
 
   const previewTopOffset = (resize.preview?.topDelta ?? 0) * (HOUR_ROW_HEIGHT / 60)
   const previewBottomOffset = (resize.preview?.bottomDelta ?? 0) * (HOUR_ROW_HEIGHT / 60)
@@ -88,11 +98,11 @@ export function WeekEventBlock({ item, weekStart, onSelect, onResizeCommit }: We
     <div
       ref={setNodeRef}
       {...(isRoutine ? {} : { ...attributes, ...listeners })}
-      aria-label={isRoutine ? `Routine — view only: ${item.title}` : item.title}
+      aria-label={isRoutine ? `Routine — view only: ${placedItem.item.title}` : placedItem.item.title}
       role="button"
       tabIndex={0}
-      onClick={(e) => { e.stopPropagation(); onSelect(item.id) }}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(item.id) } }}
+      onClick={(e) => { e.stopPropagation(); onSelect(placedItem.item.id) }}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(placedItem.item.id) } }}
       className={[
         'absolute pointer-events-auto',
         'rounded-md',
@@ -105,8 +115,7 @@ export function WeekEventBlock({ item, weekStart, onSelect, onResizeCommit }: We
       ].filter(Boolean).join(' ')}
       style={{
         top: top + previewTopOffset,
-        left: `calc(${TIME_COL_WIDTH}px + (100% - ${TIME_COL_WIDTH}px) * ${dayIdx} / 7)`,
-        width: `calc((100% - ${TIME_COL_WIDTH}px) / 7 - 4px)`,
+        ...laneCalcStrings(dayIdx, laneIdx, laneCount),
         height: Math.max(HOUR_ROW_HEIGHT / 4, height - previewTopOffset + previewBottomOffset),
       }}
     >
@@ -130,38 +139,43 @@ export function WeekEventBlock({ item, weekStart, onSelect, onResizeCommit }: We
           />
         </>
       )}
-      <div className="truncate font-medium">{item.title}</div>
+      <div className="truncate font-medium">{placedItem.item.title}</div>
     </div>
   )
 }
 
 interface Placement {
   dayIdx: number
+  laneIdx: number
+  laneCount: number
   top: number
   height: number
 }
 
-function computePlacement(item: TimelineItem, weekStart: Date): Placement | null {
+function computePlacementFromLane(placedItem: PlacedItem, weekStart: Date): Placement | null {
+  const item = placedItem.item
   if (!item.startTime) return null
   const start = item.startTime
-  const end = item.endTime ?? new Date(start.getTime() + 30 * 60 * 1000) // 30-min default
+  const end = item.endTime ?? new Date(start.getTime() + 30 * 60 * 1000)
 
   const dayIdx = daysBetween(weekStart, start)
-  if (dayIdx < 0 || dayIdx > 6) return null
+  if (dayIdx !== placedItem.dayIdx) return null // defensive: layout disagrees
 
   const startMins = start.getHours() * 60 + start.getMinutes()
   const endMins = end.getHours() * 60 + end.getMinutes()
   const firstMinute = FIRST_HOUR * 60
   const pxPerMin = HOUR_ROW_HEIGHT / 60
 
-  // Top is relative to the top of the hour-rows region. WeekEventBlock is
-  // rendered inside WeekGrid's inner <div className="absolute inset-0"> which
-  // already sits flush with the hour rows — adding COL_HEADER_HEIGHT here would
-  // double-count the header offset and push every block 72px (72 mins) too low.
   const top = Math.max(0, (startMins - firstMinute) * pxPerMin)
-  const height = Math.max(HOUR_ROW_HEIGHT / 4, (endMins - startMins) * pxPerMin) // min 15-min slot
+  const height = Math.max(HOUR_ROW_HEIGHT / 4, (endMins - startMins) * pxPerMin)
 
-  return { dayIdx, top, height }
+  return {
+    dayIdx,
+    laneIdx: placedItem.laneIdx,
+    laneCount: placedItem.laneCount,
+    top,
+    height,
+  }
 }
 
 function daysBetween(from: Date, to: Date): number {

@@ -3,8 +3,9 @@ import { screen } from '@testing-library/react'
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import type { ReactNode } from 'react'
 import { render } from '@/test/test-utils'
-import { WeekEventBlock } from './WeekEventBlock'
+import { WeekEventBlock, laneCalcStrings } from './WeekEventBlock'
 import type { TimelineItem } from '@/types/timeline'
+import type { PlacedItem } from './layoutLanes'
 
 // Wrap with the same sensor configuration as WeekViewV2 — an 8px activation
 // constraint so a click (no movement) fires normally and a drag (>8px) cancels
@@ -33,12 +34,23 @@ function mkItem(overrides: Partial<TimelineItem>): TimelineItem {
   } as TimelineItem
 }
 
+// mkItem creates items on May 20 (Wednesday); weekStart is May 17 (Sunday) → dayIdx = 3
+function mkPlaced(itemOverrides: Partial<TimelineItem> = {}, placed: Partial<Omit<PlacedItem, 'item'>> = {}): PlacedItem {
+  return {
+    item: mkItem(itemOverrides),
+    dayIdx: 3,
+    laneIdx: 0,
+    laneCount: 1,
+    ...placed,
+  }
+}
+
 describe('WeekEventBlock', () => {
   const weekStart = new Date(2026, 4, 17) // Sun May 17
 
   it('renders the title', () => {
     renderWithDnd(
-      <WeekEventBlock item={mkItem({})} weekStart={weekStart} onSelect={vi.fn()} />,
+      <WeekEventBlock placedItem={mkPlaced()} weekStart={weekStart} onSelect={vi.fn()} />,
     )
     expect(screen.getByText('Therapy appt')).toBeInTheDocument()
   })
@@ -46,7 +58,7 @@ describe('WeekEventBlock', () => {
   it('renders a "Routine — view only" hint when item is a routine', () => {
     renderWithDnd(
       <WeekEventBlock
-        item={mkItem({ type: 'routine', title: 'Brush teeth' })}
+        placedItem={mkPlaced({ type: 'routine', title: 'Brush teeth' })}
         weekStart={weekStart}
         onSelect={vi.fn()}
       />,
@@ -58,10 +70,18 @@ describe('WeekEventBlock', () => {
     const onSelect = vi.fn()
     const { user } = render(
       <DndWrapper>
-        <WeekEventBlock item={mkItem({})} weekStart={weekStart} onSelect={onSelect} />
+        <WeekEventBlock placedItem={mkPlaced()} weekStart={weekStart} onSelect={onSelect} />
       </DndWrapper>,
     )
     await user.click(screen.getByText('Therapy appt'))
     expect(onSelect).toHaveBeenCalledWith('t1')
+  })
+
+  it('halves the block width when laneCount is 2', () => {
+    // happy-dom silently drops calc() strings from inline styles, so we test
+    // the pure laneCalcStrings helper directly rather than inspecting the DOM.
+    const { left, width } = laneCalcStrings(0, 1, 2)
+    expect(width).toContain('/ 2')
+    expect(left).toContain('+ ')
   })
 })
