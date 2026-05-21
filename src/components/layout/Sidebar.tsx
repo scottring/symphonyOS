@@ -2,6 +2,7 @@ import { useEffect, createElement } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { PinnedSection } from '@/components/pins'
 import { useDomain } from '@/hooks/useDomain'
+import { useHomeView } from '@/hooks/useHomeView'
 import { appRegistry } from '@/shell/appRegistry'
 import { SidebarGroup } from './SidebarGroup'
 import { useSidebarGroupState } from '@/hooks/useSidebarGroupState'
@@ -93,6 +94,7 @@ export function Sidebar({
   const navigate = useNavigate()
   const location = useLocation()
   const { currentDomain } = useDomain()
+  const { currentView: homeCurrentView } = useHomeView()
   // currentDomain used for future domain-aware logic; suppress unused warning
   void currentDomain
 
@@ -246,7 +248,7 @@ export function Sidebar({
             } catch { /* ignore — falls back to next-mount read */ }
             onViewChange('today')
           }}
-          className={navItemClass(activeView === 'today')}
+          className={navItemClass(activeView === 'today' && homeCurrentView === 'today')}
         >
           {createElement(Sun, { className: 'w-5 h-5 shrink-0' })}
           {!collapsed && <span>Today</span>}
@@ -264,7 +266,7 @@ export function Sidebar({
             } catch { /* ignore — falls back to next-mount read */ }
             onViewChange('today')
           }}
-          className={navItemClass(false)}
+          className={navItemClass(activeView === 'today' && (homeCurrentView === 'week' || homeCurrentView === 'workweek'))}
         >
           {createElement(CalendarRange, { className: 'w-5 h-5 shrink-0' })}
           {!collapsed && <span>This Week</span>}
