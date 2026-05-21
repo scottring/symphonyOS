@@ -40,6 +40,7 @@ export function HomeViewContainer() {
   const { projects, projectsMap, addProject } = useProjects();
   const {
     routines: allRoutines,
+    activeRoutines,
     getRoutinesForDate,
     loading: routinesLoading,
     updateRoutine,
@@ -249,6 +250,7 @@ export function HomeViewContainer() {
         tasks={tasks}
         events={filteredEvents}
         routines={filteredRoutines}
+        allActiveRoutines={activeRoutines}
         projects={projects}
         dateInstances={dateInstances}
         selectedItemId={selectedItemId}
