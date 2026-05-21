@@ -81,6 +81,33 @@ describe('layoutWeekLanes', () => {
     expect(placed.find(p => p.item.id === 'a')!.laneCount).toBe(1)
     expect(placed.find(p => p.item.id === 'b')!.laneCount).toBe(1)
   })
+
+  it('produces 3 lanes when 3 items are concurrent', () => {
+    // All three active at 10:00–10:30.
+    const a = makeItem({ id: 'a', start: new Date('2026-05-18T09:00:00'), end: new Date('2026-05-18T11:00:00') })
+    const b = makeItem({ id: 'b', start: new Date('2026-05-18T09:30:00'), end: new Date('2026-05-18T10:30:00') })
+    const c = makeItem({ id: 'c', start: new Date('2026-05-18T10:00:00'), end: new Date('2026-05-18T10:45:00') })
+    const placed = layoutWeekLanes([a, b, c], weekStart, 7)
+    const counts = new Set(placed.map(p => p.laneCount))
+    expect(counts).toEqual(new Set([3]))
+    expect(placed.find(p => p.item.id === 'a')!.laneIdx).toBe(0)
+    expect(placed.find(p => p.item.id === 'b')!.laneIdx).toBe(1)
+    expect(placed.find(p => p.item.id === 'c')!.laneIdx).toBe(2)
+  })
+
+  it('compresses chain overlaps to fewer lanes when lanes free up', () => {
+    // a: 9–10, b: 9:30–10:30, c: 10:15–11. Max concurrent = 2.
+    // c can reuse lane 0 after a ends at 10:00.
+    const a = makeItem({ id: 'a', start: new Date('2026-05-18T09:00:00'), end: new Date('2026-05-18T10:00:00') })
+    const b = makeItem({ id: 'b', start: new Date('2026-05-18T09:30:00'), end: new Date('2026-05-18T10:30:00') })
+    const c = makeItem({ id: 'c', start: new Date('2026-05-18T10:15:00'), end: new Date('2026-05-18T11:00:00') })
+    const placed = layoutWeekLanes([a, b, c], weekStart, 7)
+    const counts = new Set(placed.map(p => p.laneCount))
+    expect(counts).toEqual(new Set([2]))
+    expect(placed.find(p => p.item.id === 'a')!.laneIdx).toBe(0)
+    expect(placed.find(p => p.item.id === 'b')!.laneIdx).toBe(1)
+    expect(placed.find(p => p.item.id === 'c')!.laneIdx).toBe(0) // reuses lane 0
+  })
 })
 
 describe('getEffectiveEndMin', () => {
