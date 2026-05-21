@@ -242,8 +242,41 @@ export function WeekViewV2(props: WeekViewV2Props) {
         return { ...routineToTimelineItem(r, d), id: `routine-${r.id}-day${i}` }
       }),
     )
-    return [...taskItems, ...eventItems, ...routineItems]
-  }, [scheduledTasks, weekEvents, routines, weekStart, hideRoutines, dayCount])
+
+    const blocks = [...taskItems, ...eventItems, ...routineItems]
+
+    // Keep the actively-dragged task/event mounted even if cross-week auto-
+    // advance moved its scheduledFor out of the visible range. Without this,
+    // dnd-kit loses the draggable's data registration and the drop is a no-op.
+    // WeekEventBlock calls useDraggable before its placement guard, so the
+    // drag data stays registered even when computePlacement returns null.
+    // WeekGrid's overflow-hidden clips the off-grid render; DragOverlay still
+    // shows the floating chip the user sees.
+    const activeId = drag.activeDragId
+    if (activeId) {
+      // Drag ids are 'block:<itemId>' for tasks/events, 'block-routine:<itemId>'
+      // for routines. Routines are not draggable, so only handle task/event.
+      if (activeId.startsWith('block:')) {
+        const itemId = activeId.slice('block:'.length)
+        if (!blocks.find((b) => b.id === itemId)) {
+          if (itemId.startsWith('task-')) {
+            const taskId = itemId.slice('task-'.length)
+            const task = tasks.find((t) => t.id === taskId)
+            if (task) blocks.push(taskToTimelineItem(task))
+          } else if (itemId.startsWith('event-')) {
+            const eventId = itemId.slice('event-'.length)
+            const event = events.find((ev) => {
+              const id = ev.google_event_id || ev.id
+              return `event-${id}` === itemId
+            })
+            if (event) blocks.push(eventToTimelineItem(event))
+          }
+        }
+      }
+    }
+
+    return blocks
+  }, [scheduledTasks, weekEvents, routines, weekStart, hideRoutines, dayCount, drag.activeDragId, tasks, events])
 
   // WeekEventBlock.onSelect expects (id: string), but onSelectItem is
   // (id: string | null). Narrow here so TypeScript is satisfied; passing null
