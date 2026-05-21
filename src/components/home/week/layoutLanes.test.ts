@@ -108,6 +108,36 @@ describe('layoutWeekLanes', () => {
     expect(placed.find(p => p.item.id === 'b')!.laneIdx).toBe(1)
     expect(placed.find(p => p.item.id === 'c')!.laneIdx).toBe(0) // reuses lane 0
   })
+
+  it('treats two routines at the same time as overlapping (30-min default)', () => {
+    // Both routines have endTime null → effective end = startMin + 30.
+    // Same startMin → overlap → lane 1 for the second.
+    const a = makeItem({
+      id: 'routine-a',
+      type: 'routine',
+      start: new Date('2026-05-18T19:00:00'),
+      end: null,
+    })
+    const b = makeItem({
+      id: 'routine-b',
+      type: 'routine',
+      start: new Date('2026-05-18T19:00:00'),
+      end: null,
+    })
+    const placed = layoutWeekLanes([a, b], weekStart, 7)
+    expect(placed).toHaveLength(2)
+    expect(new Set(placed.map(p => p.laneCount))).toEqual(new Set([2]))
+    expect(new Set(placed.map(p => p.laneIdx))).toEqual(new Set([0, 1]))
+  })
+
+  it('treats two routines 31 minutes apart as non-overlapping', () => {
+    // 19:00 → effective end 19:30. 19:31 starts after → separate cluster.
+    const a = makeItem({ id: 'a', type: 'routine', start: new Date('2026-05-18T19:00:00'), end: null })
+    const b = makeItem({ id: 'b', type: 'routine', start: new Date('2026-05-18T19:31:00'), end: null })
+    const placed = layoutWeekLanes([a, b], weekStart, 7)
+    expect(placed.find(p => p.item.id === 'a')!.laneCount).toBe(1)
+    expect(placed.find(p => p.item.id === 'b')!.laneCount).toBe(1)
+  })
 })
 
 describe('getEffectiveEndMin', () => {
