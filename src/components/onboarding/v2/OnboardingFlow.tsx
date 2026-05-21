@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { OnboardingProvider } from '@/contexts/OnboardingContext'
+import { GeneratePlanProvider } from '@/contexts/GeneratePlanContext'
 import { WelcomeScreen } from './WelcomeScreen'
 import { HouseholdScreen } from './HouseholdScreen'
 import { GoalsScreen } from './GoalsScreen'
@@ -35,7 +36,9 @@ export function OnboardingFlow() {
 
   return (
     <OnboardingProvider>
-      <FlowController />
+      <GeneratePlanProvider>
+        <FlowController />
+      </GeneratePlanProvider>
     </OnboardingProvider>
   )
 }
