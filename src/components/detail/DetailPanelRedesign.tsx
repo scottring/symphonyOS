@@ -821,7 +821,14 @@ export function DetailPanelRedesign({
   // Detect contextual actions
   const detectedActions = useMemo(() => {
     if (!item) return []
-    const descriptionForActions = item.type === 'event' ? item.googleDescription : item.notes
+    // For Google Calendar events, surface the conference URL (hangoutLink /
+    // conferenceData entry point) alongside the description so detectActions
+    // picks up Meet/Zoom/Teams joins even when the URL isn't in the body text.
+    const baseDescription = item.type === 'event' ? item.googleDescription : item.notes
+    const descriptionForActions =
+      item.type === 'event' && item.meetingUrl
+        ? [baseDescription, item.meetingUrl].filter(Boolean).join('\n')
+        : baseDescription
     const actions = detectActions(item.title, descriptionForActions, item.location, item.phoneNumber)
     // Filter out 'directions' action when location exists, since DirectionsBuilder handles it
     if (item.location) {

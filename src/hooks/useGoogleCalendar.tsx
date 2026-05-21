@@ -60,6 +60,10 @@ export interface CalendarEvent {
   calendarColor?: string | null
   recurringEventId?: string | null
   location?: string | null
+  // Video meeting join URL. Set from Google's hangoutLink (Meet) or the first
+  // 'video' entryPoint in conferenceData (Zoom / Webex / Teams via add-ons).
+  meeting_url?: string | null
+  meetingUrl?: string | null
   // Attendees (from Google Calendar API)
   attendees?: { email: string; displayName?: string; responseStatus?: string; self?: boolean }[]
 }
