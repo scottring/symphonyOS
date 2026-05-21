@@ -33,7 +33,6 @@ import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
 import { TodayAddInput } from './TodayAddInput'
 import { TimelineInsertPoint } from './TimelineInsertPoint'
-import { TodayHeader } from './TodayHeader'
 import { StatsRow } from './StatsRow'
 import { ClarityIndicator } from './ClarityIndicator'
 import { StagingFloat } from './StagingFloat'
@@ -384,16 +383,6 @@ export function TodayView({
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="max-w-[940px] w-full px-0 py-2 md:pl-10 md:pr-8 md:py-8">
-      {/* Header — desktop only; mobile shows the date inline in the app header. */}
-      <div className="hidden md:block">
-        <TodayHeader
-          viewedDate={viewedDate}
-          onDateChange={onDateChange}
-          currentHomeView={currentHomeView}
-          onHomeViewChange={onHomeViewChange}
-        />
-      </div>
-
       {/* Stats + function bar — desktop only. Mobile combines the filters
           into the Add-to-today row below to save vertical space. */}
       <div className="hidden md:block mb-6">

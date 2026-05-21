@@ -46,9 +46,12 @@ function renderView(props: Record<string, unknown> = {}, ctxOverrides: Record<st
 }
 
 describe('TodayView', () => {
-  it('renders the editorial header date', () => {
+  it('renders the stats row (HomeHeader date label is now in HomeView, not TodayView)', () => {
+    // The date label (e.g. "Tuesday, May 19, 2026") moved to HomeHeader which is
+    // rendered by HomeView — it is not in TodayView's subtree. TodayView's own
+    // stable landmark is the StatsRow ("N of N done today").
     renderView()
-    expect(screen.getByText(/Tuesday, May 19, 2026/)).toBeInTheDocument()
+    expect(screen.getByText(/\d+ of \d+ done today/i)).toBeInTheDocument()
   })
   it('renders exactly one stats row (regression guard vs the duplicate-row defect)', () => {
     // "tasks total" was removed by the Today redesign; use "done today" — always

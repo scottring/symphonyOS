@@ -27,7 +27,7 @@ import { WeekEventBlock } from './WeekEventBlock'
 import { useWeekDragDrop } from './useWeekDragDrop'
 import { useGridCreate } from './useGridCreate'
 import { SlotQuickCreatePopover, type CreateType } from './SlotQuickCreatePopover'
-import { ChevronLeft, ChevronRight, Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 
 const EDGE_PX = 40
@@ -282,39 +282,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
 
   return (
     <div data-week-bounds className="hidden lg:block relative">
-      {/* Hover-target prev/next-week scrollers. 24px-wide visible chips
-          that fade in on hover/focus. Step by dayCount so Workweek steps
-          5 days and Week steps 7. */}
-      <button
-        type="button"
-        aria-label="Previous week"
-        onClick={() => {
-          const next = new Date(weekStart)
-          next.setDate(next.getDate() - dayCount)
-          onWeekChange(next)
-        }}
-        className="absolute left-0 top-1/2 -translate-y-1/2 w-6 h-16 flex items-center justify-center
-                   bg-white/90 border border-neutral-200 rounded-r-md shadow-sm
-                   opacity-0 hover:opacity-100 focus-visible:opacity-100 transition-opacity
-                   z-30"
-      >
-        <ChevronLeft className="w-4 h-4 text-neutral-600" />
-      </button>
-      <button
-        type="button"
-        aria-label="Next week"
-        onClick={() => {
-          const next = new Date(weekStart)
-          next.setDate(next.getDate() + dayCount)
-          onWeekChange(next)
-        }}
-        className="absolute right-0 top-1/2 -translate-y-1/2 w-6 h-16 flex items-center justify-center
-                   bg-white/90 border border-neutral-200 rounded-l-md shadow-sm
-                   opacity-0 hover:opacity-100 focus-visible:opacity-100 transition-opacity
-                   z-30"
-      >
-        <ChevronRight className="w-4 h-4 text-neutral-600" />
-      </button>
       <div className="flex items-center justify-end mb-2">
         <button
           type="button"

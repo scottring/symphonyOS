@@ -27,7 +27,7 @@ import { sundayOfWeek } from '@/lib/weekHelpers'
 import { CascadingRiverView } from './CascadingRiverView'
 import { TodayView } from '@/components/schedule/TodayView'
 import { UndoToast } from '@/components/undo/UndoToast'
-import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
+import { HomeHeader } from '@/components/home/HomeHeader'
 
 interface HomeViewProps {
   tasks: Task[]
@@ -387,10 +387,18 @@ export function HomeView({
 
   return (
     <div className={`relative flex flex-col h-full transition-colors duration-500 ${DOMAIN_BG[currentDomain]}`}>
-      {/* Today renders its own DomainSwitcher inside TodayHeader (left of D/W/M) */}
-      {!isMobile && currentView !== 'today' && (
-        <div className="absolute top-4 right-6 z-20 flex items-center gap-3">
-          <DomainSwitcher />
+      {!isMobile && (
+        <div className="px-6 pt-4">
+          <HomeHeader
+            currentView={currentView}
+            onViewChange={handleViewChange}
+            viewedDate={viewedDate}
+            onDateChange={onDateChange}
+            weekStart={weekStart}
+            onWeekChange={setWeekStart}
+            monthStart={monthStart}
+            onMonthChange={setMonthStart}
+          />
         </div>
       )}
 
