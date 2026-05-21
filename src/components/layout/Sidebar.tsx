@@ -497,7 +497,7 @@ export function Sidebar({
               src="/house-photo.jpg"
               alt=""
               aria-hidden="true"
-              className="w-32 h-auto select-none pointer-events-none"
+              className="w-32 h-32 rounded-full object-cover select-none pointer-events-none"
             />
             <p className="text-xs text-neutral-400 mt-2 leading-relaxed">
               Everything in its Right Place
