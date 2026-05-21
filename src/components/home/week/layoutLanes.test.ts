@@ -43,6 +43,44 @@ describe('layoutWeekLanes', () => {
       laneCount: 1,
     })
   })
+
+  it('assigns two overlapping items to lanes 0 and 1 with laneCount 2', () => {
+    const a = makeItem({
+      id: 'a',
+      start: new Date('2026-05-18T09:00:00'),
+      end: new Date('2026-05-18T10:00:00'),
+    })
+    const b = makeItem({
+      id: 'b',
+      start: new Date('2026-05-18T09:30:00'),
+      end: new Date('2026-05-18T10:30:00'),
+    })
+    const placed = layoutWeekLanes([a, b], weekStart, 7)
+    expect(placed).toHaveLength(2)
+
+    const placedA = placed.find(p => p.item.id === 'a')!
+    const placedB = placed.find(p => p.item.id === 'b')!
+    expect(placedA.laneIdx).toBe(0)
+    expect(placedB.laneIdx).toBe(1)
+    expect(placedA.laneCount).toBe(2)
+    expect(placedB.laneCount).toBe(2)
+  })
+
+  it('keeps non-overlapping items at laneCount 1 (separate clusters)', () => {
+    const a = makeItem({
+      id: 'a',
+      start: new Date('2026-05-18T09:00:00'),
+      end: new Date('2026-05-18T10:00:00'),
+    })
+    const b = makeItem({
+      id: 'b',
+      start: new Date('2026-05-18T11:00:00'),
+      end: new Date('2026-05-18T12:00:00'),
+    })
+    const placed = layoutWeekLanes([a, b], weekStart, 7)
+    expect(placed.find(p => p.item.id === 'a')!.laneCount).toBe(1)
+    expect(placed.find(p => p.item.id === 'b')!.laneCount).toBe(1)
+  })
 })
 
 describe('getEffectiveEndMin', () => {
