@@ -1549,7 +1549,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
                 updateTask(t.id, { links: next })
               }}
             />
-          ) : selectedItem.type === 'event' && selectedItem.originalEvent && selectedItem.originalEvent.id.startsWith('meal:') ? (
+          ) : selectedItem.type === 'event' && selectedItem.originalEvent && (selectedItem.originalEvent.id ?? '').startsWith('meal:') ? (
             <TapMealPanel
               event={selectedItem.originalEvent}
               onClose={() => setSelectedItemId(null)}
