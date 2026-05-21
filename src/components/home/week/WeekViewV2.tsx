@@ -24,6 +24,7 @@ import { WeekSummaryRow } from './WeekSummaryRow'
 import { UnscheduledChipStrip } from './UnscheduledChipStrip'
 import { WeekGrid } from './WeekGrid'
 import { WeekEventBlock } from './WeekEventBlock'
+import { layoutWeekLanes, type PlacedItem } from './layoutLanes'
 import { useWeekDragDrop } from './useWeekDragDrop'
 import { useGridCreate } from './useGridCreate'
 import { SlotQuickCreatePopover, type CreateType } from './SlotQuickCreatePopover'
@@ -233,7 +234,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // Keys for routine day-instances are suffixed with the day-index to avoid
   // duplicate-key warnings from routineToTimelineItem returning the same id
   // for every day.
-  const allBlocks = useMemo(() => {
+  const allItems = useMemo(() => {
     const taskItems = scheduledTasks.map(taskToTimelineItem)
     const eventItems = weekEvents.map(eventToTimelineItem)
     // Routine visibility on the week grid mirrors Today:
@@ -291,6 +292,41 @@ export function WeekViewV2(props: WeekViewV2Props) {
 
     return blocks
   }, [scheduledTasks, weekEvents, routines, weekStart, hideRoutines, dayCount, drag.activeDragId, tasks, events])
+
+  // Run the lane-placement pass over allItems. Items with a startTime outside
+  // the visible week range are filtered out by layoutWeekLanes (dayIdx check).
+  // However, the drag-mount fallback above may have pushed an out-of-week item
+  // into allItems so dnd-kit's draggable registration stays live during cross-
+  // week auto-advance. Those items are filtered by layoutWeekLanes and won't
+  // appear in placedItems — WeekEventBlock would never mount, dnd-kit would
+  // lose registration, and the drop would be a no-op.
+  //
+  // Fix: after the layout pass, check if the active drag item is absent from
+  // placedItems. If so, inject a synthetic PlacedItem with dayIdx=0 / laneIdx=0
+  // / laneCount=1. computePlacementFromLane inside WeekEventBlock checks
+  // dayIdx === placedItem.dayIdx; since dayIdx from the real startTime != 0
+  // (it's outside the week), it returns null — triggering the hidden-stub branch
+  // (isDragging → 1×1 invisible div). This is exactly the mounting behaviour
+  // the original allBlocks code relied on.
+  const placedItems = useMemo<PlacedItem[]>(() => {
+    const placed = layoutWeekLanes(allItems, weekStart, dayCount)
+
+    const activeId = drag.activeDragId
+    if (activeId && activeId.startsWith('block:')) {
+      const itemId = activeId.slice('block:'.length)
+      const alreadyPlaced = placed.some((p) => p.item.id === itemId)
+      if (!alreadyPlaced) {
+        const fallback = allItems.find((b) => b.id === itemId)
+        if (fallback) {
+          // dayIdx=0 is intentionally wrong so computePlacementFromLane returns
+          // null, which triggers WeekEventBlock's hidden-stub mount path.
+          placed.push({ item: fallback, dayIdx: 0, laneIdx: 0, laneCount: 1 })
+        }
+      }
+    }
+
+    return placed
+  }, [allItems, weekStart, dayCount, drag.activeDragId])
 
   // WeekEventBlock.onSelect expects (id: string), but onSelectItem is
   // (id: string | null). Narrow here so TypeScript is satisfied; passing null
@@ -369,11 +405,12 @@ export function WeekViewV2(props: WeekViewV2Props) {
           }
           suppressCreate={!!drag.activeDragId}
         >
-          {allBlocks.map((item) => (
+          {placedItems.map((p) => (
             <WeekEventBlock
-              key={item.id}
-              item={item}
+              key={p.item.id}
+              placedItem={p}
               weekStart={weekStart}
+              dayCount={dayCount}
               onSelect={handleSelectBlock}
               onResizeCommit={(itemId, updates) => {
                 // itemId from WeekEventBlock is the TimelineItem.id (prefixed).
@@ -436,7 +473,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
                   : drag.activeDragId.startsWith('block:')
                   ? drag.activeDragId.slice('block:'.length)
                   : drag.activeDragId
-                const item = allBlocks.find((b) => b.id === itemId)
+                const item = placedItems.find((p) => p.item.id === itemId)?.item
                 if (!item) return null
                 return (
                   <div className="opacity-60 pointer-events-none">
