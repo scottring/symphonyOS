@@ -1,8 +1,9 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
 import type { HomeViewType } from '@/types/homeView'
 import { HomeViewSwitcher } from '@/components/home/HomeViewSwitcher'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
 import { mondayOfWeek } from '@/lib/workweekHelpers'
+import { useAppShellChrome } from '@/contexts/AppShellChromeContext'
 
 interface HomeHeaderProps {
   currentView: HomeViewType
@@ -35,6 +36,7 @@ function formatDayShort(d: Date): string {
 
 export function HomeHeader(props: HomeHeaderProps) {
   const { currentView, viewedDate, onDateChange, weekStart, onWeekChange, monthStart, onMonthChange, onViewChange } = props
+  const { chatOpen, onChatOpenChange, helpOpen, onHelpOpenChange, helpButtonRef } = useAppShellChrome()
 
   // Per-view label + chevron handlers
   let label: { short: string; long: string }
@@ -82,7 +84,7 @@ export function HomeHeader(props: HomeHeaderProps) {
   }
 
   return (
-    <header className="flex flex-col gap-3 mb-6 px-3 md:px-0 md:pr-16 md:flex-row md:items-center md:justify-between md:gap-4">
+    <header className="flex flex-col gap-3 mb-6 px-3 md:px-0 md:flex-row md:items-center md:justify-between md:gap-4">
       <div className="flex items-center gap-2 min-w-0 justify-center md:justify-start">
         <button
           aria-label={prevLabel}
@@ -107,6 +109,24 @@ export function HomeHeader(props: HomeHeaderProps) {
       <div className="hidden md:flex items-center gap-2 md:shrink-0">
         <DomainSwitcher />
         <HomeViewSwitcher currentView={currentView} onViewChange={onViewChange} />
+        <button
+          onClick={() => onChatOpenChange(!chatOpen)}
+          className={`w-9 h-9 rounded-full bg-bg-elevated border border-neutral-200 text-neutral-500 hover:text-primary-500 hover:border-primary-300 transition-all grid place-items-center shadow-card ${
+            chatOpen ? 'ring-2 ring-primary-500/30 text-primary-500 border-primary-500' : ''
+          }`}
+          aria-label="AI chat"
+          title="AI chat"
+        >
+          <Sparkles className="w-4 h-4" />
+        </button>
+        <button
+          ref={helpButtonRef}
+          onClick={() => onHelpOpenChange(!helpOpen)}
+          className={`w-9 h-9 rounded-full bg-bg-elevated border border-neutral-200 text-neutral-500 hover:text-primary-500 hover:border-primary-300 transition-all font-display italic text-[16px] grid place-items-center shadow-card ${
+            helpOpen ? 'ring-2 ring-primary-500/30 text-primary-500 border-primary-500' : ''
+          }`}
+          aria-label="Help"
+        >?</button>
       </div>
     </header>
   )

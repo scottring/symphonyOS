@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect, Suspense, type ReactNode } from 'react'
 import { PanelRightOpen, Sparkles } from 'lucide-react'
+import { AppShellChromeContext } from '@/contexts/AppShellChromeContext'
 import { TodayRail } from '@/components/today/TodayRail'
 import { useScratchpadHidden } from '@/hooks/useScratchpadHidden'
 import { Sidebar, type ViewType } from './Sidebar'
@@ -165,10 +166,11 @@ export function AppShell({
   const { theme } = useTheme()
   const { hidden: scratchpadHidden, setHidden: setScratchpadHidden } = useScratchpadHidden()
   const [moreSheetOpen, setMoreSheetOpen] = useState(false)
-  const setChatOpen = (open: boolean) => onChatOpenChange?.(open)
+  const setChatOpen = useCallback((open: boolean) => onChatOpenChange?.(open), [onChatOpenChange])
   const mainRef = useRef<HTMLElement>(null)
   const [helpOpen, setHelpOpen] = useState(false)
   const helpButtonRef = useRef<HTMLButtonElement>(null)
+  const handleHelpOpenChange = useCallback((open: boolean) => setHelpOpen(open), [])
 
   // Track window width for three-panel mode
   // Breakpoint: sidebar(240) + min content(360) + detail(380) + chat(380) ≈ 1360px
@@ -332,7 +334,7 @@ export function AppShell({
             </div>
           </header>
         )}
-        {/* Domain switcher on non-Today views (Today has its own in HomeView) */}
+        {/* Domain switcher + AI + help on non-Today views */}
         {!isMobile && activeView !== 'today' && (
           <div className="absolute top-4 right-6 z-20 flex items-center gap-2">
             <DomainSwitcher />
@@ -356,30 +358,17 @@ export function AppShell({
             >?</button>
           </div>
         )}
-        {/* Desktop ?-button on Today view (no DomainSwitcher) */}
-        {!isMobile && activeView === 'today' && (
-          <div className="absolute top-4 right-6 z-20 flex items-center gap-2">
-            <button
-              onClick={() => setChatOpen(!chatOpen)}
-              className={`w-9 h-9 rounded-full bg-bg-elevated border border-neutral-200 text-neutral-500 hover:text-primary-500 hover:border-primary-300 transition-all grid place-items-center shadow-card ${
-                chatOpen ? 'ring-2 ring-primary-500/30 text-primary-500 border-primary-500' : ''
-              }`}
-              aria-label="AI chat"
-              title="AI chat"
-            >
-              <Sparkles className="w-4 h-4" />
-            </button>
-            <button
-              ref={helpButtonRef}
-              onClick={() => setHelpOpen(o => !o)}
-              className={`w-9 h-9 rounded-full bg-bg-elevated border border-neutral-200 text-neutral-500 hover:text-primary-500 hover:border-primary-300 transition-all font-display italic text-[16px] grid place-items-center shadow-card ${
-                helpOpen ? 'ring-2 ring-primary-500/30 text-primary-500 border-primary-500' : ''
-              }`}
-              aria-label="Help"
-            >?</button>
-          </div>
-        )}
-        {children}
+        {/* On Today view, AI + help buttons are rendered inside HomeHeader (via AppShellChromeContext).
+            No absolute buttons needed here — HomeHeader's flex row handles alignment. */}
+        <AppShellChromeContext.Provider value={{
+          chatOpen,
+          onChatOpenChange: setChatOpen,
+          helpOpen,
+          onHelpOpenChange: handleHelpOpenChange,
+          helpButtonRef,
+        }}>
+          {children}
+        </AppShellChromeContext.Provider>
       </main>
 
       {/* Quick Capture - FAB shown on all pages when panel is closed (except agent view which has its own input) */}
