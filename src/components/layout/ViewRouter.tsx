@@ -62,6 +62,7 @@ export interface ViewRouterProps {
   events: CalendarEvent[]
   filteredEvents: CalendarEvent[]
   filteredRoutines: Routine[]
+  activeRoutines: Routine[]
   projects: Project[]
   dateInstances: ActionableInstance[]
   selectedItemId: string | null
@@ -192,6 +193,7 @@ export function ViewRouter(props: ViewRouterProps) {
                   tasks={props.tasks}
                   events={props.filteredEvents}
                   routines={props.filteredRoutines}
+                  allActiveRoutines={props.activeRoutines}
                   projects={props.projects}
                   dateInstances={props.dateInstances}
                   selectedItemId={props.selectedItemId}
