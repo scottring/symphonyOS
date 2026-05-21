@@ -50,7 +50,33 @@ export function WeekEventBlock({ item, weekStart, onSelect, onResizeCommit }: We
   })
 
   const placement = computePlacement(item, weekStart)
-  if (!placement) return null
+  if (!placement) {
+    // During an active drag, keep a hidden DOM node mounted so dnd-kit's
+    // activator.target stays in the document — back-edge detection in
+    // WeekViewV2.handleDragMove uses closest('[data-week-bounds]') on the
+    // activator's target node, which only works if the node is still in the
+    // tree. Without this, dragging back across the left edge after a forward
+    // cross-week advance wouldn't trigger navigation.
+    if (isDragging) {
+      return (
+        <div
+          ref={setNodeRef}
+          {...(isRoutine ? {} : { ...attributes, ...listeners })}
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: 1,
+            height: 1,
+            opacity: 0,
+            pointerEvents: 'none',
+          }}
+        />
+      )
+    }
+    return null
+  }
 
   const { dayIdx, top, height } = placement
   const color = colorFor(item)
