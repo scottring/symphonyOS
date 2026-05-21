@@ -189,6 +189,17 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
     return familyMembers.find(m => m.id === id)
   }
 
+  // Helper: resolve all assignees for a routine. Reads new `assigned_to_all`
+  // (multi) with a fallback to legacy single `assigned_to`.
+  const getRoutineMembers = (routine: Routine): FamilyMember[] => {
+    const ids = routine.assigned_to_all && routine.assigned_to_all.length > 0
+      ? routine.assigned_to_all
+      : (routine.assigned_to ? [routine.assigned_to] : [])
+    return ids
+      .map((id) => familyMembers.find((m) => m.id === id))
+      .filter((m): m is FamilyMember => Boolean(m))
+  }
+
   // Pause handlers
   const handlePauseRoutines = async (routineIds: string[], pausedUntil: string | null) => {
     for (const id of routineIds) {
@@ -373,7 +384,7 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
 
   // Render a single routine card
   const renderRoutineCard = (routine: Routine, index: number, isPaused = false) => {
-    const member = getMember(routine.assigned_to)
+    const members = getRoutineMembers(routine)
 
     return (
       <button
@@ -420,9 +431,18 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
           {renderRoutineContent(routine)}
         </div>
 
-        {/* Assignee Avatar */}
-        {member && (
-          <AssigneeAvatar member={member} size="sm" className="flex-shrink-0" />
+        {/* Assignee avatars — stacked when a routine is shared by multiple members */}
+        {members.length > 0 && (
+          <div className="flex -space-x-2 flex-shrink-0">
+            {members.map((m) => (
+              <AssigneeAvatar
+                key={m.id}
+                member={m}
+                size="sm"
+                className="ring-2 ring-white"
+              />
+            ))}
+          </div>
         )}
 
         {/* Chevron */}
