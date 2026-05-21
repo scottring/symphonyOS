@@ -105,14 +105,19 @@ export function WallMicButton() {
         cleanup()
         if (blob.size === 0) { setPhase('idle'); return }
         setPhase('transcribing')
-        const text = await transcribeVoice(blob)
-        if (!text) {
-          setErrorMsg('Transcription failed')
+        const result = await transcribeVoice(blob)
+        if (!result.ok) {
+          const msg = result.reason === 'timeout' ? 'Transcribe timed out'
+            : result.reason === 'network' ? "Can't reach transcribe service"
+            : result.reason === 'http' ? `Server error (${result.detail ?? 'unknown'})`
+            : result.reason === 'empty' ? 'Nothing heard'
+            : 'Transcribe unavailable'
+          setErrorMsg(msg)
           setPhase('error')
-          scheduleReset(2500)
+          scheduleReset(3000)
           return
         }
-        await saveTask(text)
+        await saveTask(result.text)
       }
       mr.onerror = () => {
         setErrorMsg('Recording failed')

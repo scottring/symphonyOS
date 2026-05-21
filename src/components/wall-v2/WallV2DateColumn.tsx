@@ -24,15 +24,15 @@ export function WallV2DateColumn({
 }: Props) {
   return (
     <div className="flex flex-col gap-5 pt-2 pl-1">
-      <div className="grid place-items-center w-12 h-12 rounded-full bg-emerald-50 text-emerald-700">
+      <div className="grid place-items-center w-12 h-12 rounded-full bg-emerald-50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-200">
         <Sprout className="w-5 h-5" />
       </div>
 
       <div className="leading-none">
-        <div className="font-display text-[3.5rem] text-stone-800 leading-[0.95] tracking-tight">
+        <div className="font-display text-[3.5rem] text-stone-800 dark:text-stone-100 leading-[0.95] tracking-tight">
           {weekday}
         </div>
-        <div className="mt-1.5 text-[1.05rem] font-bold text-emerald-800">
+        <div className="mt-1.5 text-[1.05rem] font-bold text-emerald-800 dark:text-emerald-300">
           {fullDate}
         </div>
       </div>
@@ -43,12 +43,12 @@ export function WallV2DateColumn({
         </div>
         <div className="leading-tight">
           <div className="flex items-baseline gap-1.5">
-            <span className="font-display text-[2.4rem] text-stone-800 leading-none">
+            <span className="font-display text-[2.4rem] text-stone-800 dark:text-stone-100 leading-none">
               {Math.round(temp)}°
             </span>
-            <span className="text-[0.95rem] text-stone-500">{condition}</span>
+            <span className="text-[0.95rem] text-stone-500 dark:text-stone-400">{condition}</span>
           </div>
-          <div className="text-[0.8rem] text-stone-500 mt-0.5">
+          <div className="text-[0.8rem] text-stone-500 dark:text-stone-400 mt-0.5">
             High {Math.round(high)}°  ·  Low {Math.round(low)}°
           </div>
         </div>

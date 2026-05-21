@@ -1,38 +1,33 @@
 // src/components/wall-v2/WallV2RightColumn.tsx
 //
-// Stacks the four right-column widgets in their fixed order. Each card sets
-// its own padding; the column just spaces them and lets the column flex to
-// match the timeline height.
+// Stacks the right-column widgets in their fixed order. Weather lives in the
+// left date column, so this rail stays focused on grocery, upcoming events,
+// and the family's "tonight's question" prompt.
 
-import { WallV2WeatherCard } from './WallV2WeatherCard';
 import { WallV2GroceryCard } from './WallV2GroceryCard';
 import { WallV2UpcomingCard } from './WallV2UpcomingCard';
-import { WallV2InsightCard } from './WallV2InsightCard';
+import { WallV2QuestionCard } from './WallV2QuestionCard';
 import type {
   WallV2GroceryData,
-  WallV2InsightData,
   WallV2UpcomingItem,
-  WallV2WeatherData,
 } from './types';
 
 interface Props {
-  weather: WallV2WeatherData;
   grocery: WallV2GroceryData;
   upcoming: WallV2UpcomingItem[];
-  insight: WallV2InsightData;
+  question: string | null;
   onTapGrocery?: () => void;
-  onTapInsight?: () => void;
+  onTapQuestion?: () => void;
 }
 
 export function WallV2RightColumn({
-  weather, grocery, upcoming, insight, onTapGrocery, onTapInsight,
+  grocery, upcoming, question, onTapGrocery, onTapQuestion,
 }: Props) {
   return (
     <div className="flex flex-col gap-3">
-      <WallV2WeatherCard data={weather} />
       <WallV2GroceryCard data={grocery} onTap={onTapGrocery} />
       <WallV2UpcomingCard items={upcoming} />
-      <WallV2InsightCard data={insight} onTap={onTapInsight} />
+      <WallV2QuestionCard question={question} onTap={onTapQuestion} />
     </div>
   );
 }

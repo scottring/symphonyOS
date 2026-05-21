@@ -11,7 +11,7 @@
 // dev-only `/wall-design` preview (see `wallV2Mock.ts`).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Sun } from 'lucide-react';
+import { Moon, Sun } from 'lucide-react';
 import { TINTS } from './tints';
 import { WallV2DateColumn } from './WallV2DateColumn';
 import { WallV2AtAGlance } from './WallV2AtAGlance';
@@ -36,11 +36,11 @@ import { WallDiscussionOverlay } from '@/components/wall/WallDiscussionOverlay';
 import { useFamilyDiscussionItems, type DiscussionItem } from '@/hooks/useFamilyDiscussionItems';
 import { QuickCapture } from '@/components/layout/QuickCapture';
 import { useAuth } from '@/hooks/useAuth';
+import { useDailyDiscussionPrompt } from '@/hooks/useDailyDiscussionPrompt';
 import { supabase } from '@/lib/supabase';
 import type {
   WallV2GlanceCard,
   WallV2GroceryData,
-  WallV2InsightData,
 } from './types';
 
 function formatDate(d: Date): { weekday: string; fullDate: string } {
@@ -53,15 +53,14 @@ function formatDate(d: Date): { weekday: string; fullDate: string } {
   return { weekday, fullDate };
 }
 
-// Right-column slots without a live source yet. They render as muted
-// placeholders rather than fake data, and are clearly aspirational.
+// Right-column slot without a live source yet. Renders as a muted
+// placeholder rather than fake data, and is clearly aspirational.
 const PLACEHOLDER_GROCERY: WallV2GroceryData = {
   count: 0,
   items: ['Connect a list to see what is missing'],
 };
-const PLACEHOLDER_INSIGHT: WallV2InsightData = {
-  body: 'Insights will appear as Symphony learns your week.',
-};
+
+const THEME_KEY = 'symphony-wall-theme';
 
 export function WallV2Shell() {
   const { user } = useAuth();
@@ -72,6 +71,18 @@ export function WallV2Shell() {
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60_000);
     return () => clearInterval(id);
+  }, []);
+
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem(THEME_KEY) === 'dark';
+  });
+  const toggleTheme = useCallback(() => {
+    setIsDark((d) => {
+      const next = !d;
+      try { localStorage.setItem(THEME_KEY, next ? 'dark' : 'light'); } catch { /* noop */ }
+      return next;
+    });
   }, []);
 
   const { weekday, fullDate } = useMemo(() => formatDate(now), [now]);
@@ -141,6 +152,8 @@ export function WallV2Shell() {
   }, []);
 
   const { items: discussionItems, unflagEvent, updateTask } = useFamilyDiscussionItems();
+  const { prompt: tonightPrompt, dismissed: tonightPromptDismissed } = useDailyDiscussionPrompt();
+  const tonightQuestion = tonightPromptDismissed ? null : tonightPrompt;
 
   const dinnerMealName = useMemo(
     () => dinnerEvent ? (extractRecipeNameHint(dinnerEvent.title) || dinnerEvent.title) : 'Dinner',
@@ -206,15 +219,18 @@ export function WallV2Shell() {
   }, [discussionItems.length, showFlash]);
 
   const handleTapEvent = useCallback((id: string) => {
-    // Dinner card → recipe viewer when the event has a recipe URL attached.
-    if (id.startsWith('dinner-') && recipeUrl) {
-      setShowRecipeViewer(true);
+    // Dinner card: open recipe viewer if a URL was detected, otherwise flash
+    // the meal name so the tap registers visibly even without a recipe.
+    if (id.startsWith('dinner-')) {
+      if (recipeUrl) setShowRecipeViewer(true);
+      else showFlash(`Tonight: ${dinnerMealName}`);
       return;
     }
-    // Other tap-throughs land in a follow-up (event detail panel).
-    // eslint-disable-next-line no-console
-    console.log('[wall-v2] event tap:', id);
-  }, [recipeUrl]);
+    // Other cards: surface the title as a flash so the tap registers and
+    // the user knows what they hit. A full detail panel comes in a later pass.
+    const tapped = timeline.flatMap((s) => s.events).find((e) => e.id === id);
+    if (tapped) showFlash(tapped.title);
+  }, [recipeUrl, dinnerMealName, timeline, showFlash]);
 
   const handleTapFullDay = useCallback(() => {
     // eslint-disable-next-line no-console
@@ -236,7 +252,15 @@ export function WallV2Shell() {
   );
 
   return (
-    <div className="h-screen w-screen bg-[var(--color-bg-base)] text-stone-800 overflow-hidden">
+    <div className={`${isDark ? 'dark ' : ''}relative h-screen w-screen bg-[var(--color-bg-base)] dark:bg-stone-950 text-stone-800 dark:text-stone-100 overflow-hidden transition-colors`}>
+      <button
+        type="button"
+        onClick={toggleTheme}
+        aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+        className="absolute top-8 right-8 z-30 grid place-items-center w-14 h-14 rounded-full bg-white/80 dark:bg-stone-800/80 border border-stone-300/70 dark:border-stone-700/70 text-stone-700 dark:text-stone-200 backdrop-blur-md hover:bg-white dark:hover:bg-stone-800 transition-colors shadow-md"
+      >
+        {isDark ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
+      </button>
       <div className="h-full w-full p-6 grid grid-cols-[280px_1fr_360px] grid-rows-[1fr_auto] gap-4">
         {/* Row 1 — Left rail */}
         <div className="row-span-1 col-start-1">
@@ -267,10 +291,9 @@ export function WallV2Shell() {
         {/* Row 1 — Right column (4 widgets) */}
         <div className="row-span-1 col-start-3">
           <WallV2RightColumn
-            weather={weatherData}
             grocery={PLACEHOLDER_GROCERY}
             upcoming={upcoming}
-            insight={PLACEHOLDER_INSIGHT}
+            question={tonightQuestion}
           />
         </div>
 
@@ -279,7 +302,7 @@ export function WallV2Shell() {
           {flashMessage && (
             <div
               role="status"
-              className="absolute -top-9 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-stone-800/90 text-white text-[0.85rem] font-bold shadow-lg backdrop-blur-md whitespace-nowrap"
+              className="absolute -top-9 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-stone-800/90 dark:bg-stone-200/90 text-white dark:text-stone-900 text-[0.85rem] font-bold shadow-lg backdrop-blur-md whitespace-nowrap"
             >
               {flashMessage}
             </div>

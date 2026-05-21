@@ -33,9 +33,9 @@ export function WallV2EventCard({ event, onTap }: Props) {
       className={[
         'group w-full text-left flex items-center gap-4 rounded-2xl px-4 py-3 border transition-colors',
         highlight
-          ? `${highlight.soft} border-stone-200/70`
-          : 'bg-white/85 border-stone-200/60',
-        tappable ? 'hover:bg-white cursor-pointer' : 'cursor-default',
+          ? `${highlight.soft} border-stone-200/70 dark:border-stone-700/60`
+          : 'bg-white/85 dark:bg-stone-900/70 border-stone-200/60 dark:border-stone-700/60',
+        tappable ? 'hover:bg-white dark:hover:bg-stone-900 cursor-pointer' : 'cursor-default',
       ].join(' ')}
     >
       <div
@@ -46,20 +46,20 @@ export function WallV2EventCard({ event, onTap }: Props) {
       </div>
 
       <div className="flex-1 min-w-0 leading-tight">
-        <div className="text-[1.05rem] font-bold text-stone-800 truncate">
+        <div className="text-[1.05rem] font-bold text-stone-800 dark:text-stone-100 truncate">
           {event.title}
         </div>
         {(event.subtitle || event.meta) && (
-          <div className="text-[0.85rem] text-stone-600 truncate">
+          <div className="text-[0.85rem] text-stone-600 dark:text-stone-300 truncate">
             {event.subtitle}
             {event.subtitle && event.meta && (
-              <span className="text-stone-400"> · </span>
+              <span className="text-stone-400 dark:text-stone-500"> · </span>
             )}
             {event.meta}
           </div>
         )}
         {event.detail && (
-          <div className="text-[0.8rem] text-stone-500 truncate">
+          <div className="text-[0.8rem] text-stone-500 dark:text-stone-400 truncate">
             {event.detail}
           </div>
         )}
@@ -72,7 +72,7 @@ export function WallV2EventCard({ event, onTap }: Props) {
             return (
               <div
                 key={m.id}
-                className={`grid place-items-center w-9 h-9 rounded-full ring-2 ring-white ${t.bg} ${t.fg} text-[0.72rem] font-bold`}
+                className={`grid place-items-center w-9 h-9 rounded-full ring-2 ring-white dark:ring-stone-900 ${t.bg} ${t.fg} text-[0.72rem] font-bold`}
                 title={m.initials}
               >
                 {m.initials}
@@ -101,7 +101,7 @@ export function WallV2EventCard({ event, onTap }: Props) {
       )}
 
       {tappable && (
-        <ChevronRight className="shrink-0 w-5 h-5 text-stone-400 group-hover:text-stone-600" />
+        <ChevronRight className="shrink-0 w-5 h-5 text-stone-400 dark:text-stone-500 group-hover:text-stone-600 dark:group-hover:text-stone-300" />
       )}
     </button>
   );

@@ -321,9 +321,19 @@ export async function fetchBriefing(): Promise<BriefingData> {
 // Voice Transcription
 // ============================================================================
 
-/** Transcribe audio via Groq Whisper on Open Brain */
-export async function transcribeVoice(audioBlob: Blob): Promise<string | null> {
-  if (!OPEN_BRAIN_URL) return null
+/** Discriminated result so callers can show a specific failure message. */
+export type TranscribeResult =
+  | { ok: true; text: string }
+  | { ok: false; reason: 'not-configured' | 'empty' | 'timeout' | 'network' | 'http'; detail?: string }
+
+/**
+ * Transcribe audio via Groq Whisper on Open Brain. Returns a discriminated
+ * result instead of null so the wall mic can surface a specific failure
+ * message (timeout vs. HTTP error vs. network drop) and log the cause.
+ */
+export async function transcribeVoice(audioBlob: Blob): Promise<TranscribeResult> {
+  if (!OPEN_BRAIN_URL) return { ok: false, reason: 'not-configured' }
+  if (audioBlob.size === 0) return { ok: false, reason: 'empty' }
 
   const formData = new FormData()
   formData.append('audio', audioBlob, 'recording.webm')
@@ -342,13 +352,26 @@ export async function transcribeVoice(audioBlob: Blob): Promise<string | null> {
     })
 
     clearTimeout(timeoutId)
-    if (!res.ok) return null
 
-    const data = await res.json() as { text: string }
-    return data.text
-  } catch {
+    if (!res.ok) {
+      let bodyHint = ''
+      try { bodyHint = (await res.text()).slice(0, 200) } catch { /* noop */ }
+      console.warn(`[transcribeVoice] HTTP ${res.status}`, bodyHint)
+      return { ok: false, reason: 'http', detail: `${res.status} ${res.statusText}` }
+    }
+
+    const data = await res.json() as { text?: string }
+    const text = (data.text ?? '').trim()
+    if (!text) return { ok: false, reason: 'empty' }
+    return { ok: true, text }
+  } catch (err) {
     clearTimeout(timeoutId)
-    return null
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      console.warn('[transcribeVoice] timed out after 30s')
+      return { ok: false, reason: 'timeout' }
+    }
+    console.warn('[transcribeVoice] network error:', err)
+    return { ok: false, reason: 'network', detail: err instanceof Error ? err.message : String(err) }
   }
 }
 

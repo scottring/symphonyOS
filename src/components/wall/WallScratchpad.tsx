@@ -179,16 +179,21 @@ export function WallScratchpad() {
         }
 
         setPhase('transcribing')
-        const text = await transcribeVoice(blob)
+        const result = await transcribeVoice(blob)
 
-        if (!text) {
-          setErrorMessage('Transcription failed')
+        if (!result.ok) {
+          const msg = result.reason === 'timeout' ? 'Transcribe timed out'
+            : result.reason === 'network' ? "Can't reach transcribe service"
+            : result.reason === 'http' ? `Server error (${result.detail ?? 'unknown'})`
+            : result.reason === 'empty' ? 'Nothing heard'
+            : 'Transcribe unavailable'
+          setErrorMessage(msg)
           setPhase('error')
           scheduleReset(3000)
           return
         }
 
-        await handleTranscribedText(text)
+        await handleTranscribedText(result.text)
       }
 
       mr.onerror = (e) => {

@@ -23,7 +23,7 @@ export function WallV2ActionDock({ actions, onTap }: Props) {
             key={a.id}
             type="button"
             onClick={() => onTap?.(a.id)}
-            className="group flex flex-col items-center gap-1.5 py-3 px-2 rounded-2xl bg-white/85 border border-stone-200/70 hover:bg-white transition-colors min-h-[7rem]"
+            className="group flex flex-col items-center gap-1.5 py-3 px-2 rounded-2xl bg-white/85 dark:bg-stone-900/70 border border-stone-200/70 dark:border-stone-700/60 hover:bg-white dark:hover:bg-stone-900 transition-colors min-h-[7rem]"
           >
             <div
               className={`grid place-items-center w-14 h-14 rounded-full ${tint.bg} ${tint.fg}`}
@@ -31,10 +31,10 @@ export function WallV2ActionDock({ actions, onTap }: Props) {
             >
               <Icon className="w-7 h-7" />
             </div>
-            <div className="text-[0.95rem] font-bold text-stone-800 leading-tight">
+            <div className="text-[0.95rem] font-bold text-stone-800 dark:text-stone-100 leading-tight">
               {a.label}
             </div>
-            <div className="text-[0.78rem] text-stone-500 leading-tight">
+            <div className="text-[0.78rem] text-stone-500 dark:text-stone-400 leading-tight">
               {a.caption}
             </div>
           </button>

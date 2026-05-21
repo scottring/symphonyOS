@@ -50,12 +50,17 @@ export function useVoiceInput() {
         chunksRef.current = []
 
         try {
-          const text = await transcribeVoice(blob)
+          const result = await transcribeVoice(blob)
           setTranscribing(false)
-          if (text) {
-            resolve(text)
+          if (result.ok) {
+            resolve(result.text)
           } else {
-            setError('Transcription failed. Is Open Brain online?')
+            const msg = result.reason === 'timeout' ? 'Transcribe timed out'
+              : result.reason === 'network' ? "Can't reach transcribe service"
+              : result.reason === 'http' ? `Server error (${result.detail ?? 'unknown'})`
+              : result.reason === 'empty' ? 'Nothing heard'
+              : 'Transcribe unavailable'
+            setError(msg)
             resolve(null)
           }
         } catch {

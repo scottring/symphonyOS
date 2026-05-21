@@ -89,6 +89,45 @@ describe('adaptTimelineSections', () => {
     expect(night.events.map((e) => e.title)).toEqual(['Wind down']);
   });
 
+  it('collapses identical routines into one card with merged avatars', () => {
+    const kaleb: FamilyMember = { id: 'k', name: 'Kaleb', initials: 'KA', color: 'blue' } as FamilyMember;
+    const ella: FamilyMember = { id: 'e', name: 'Ella', initials: 'EL', color: 'pink' } as FamilyMember;
+    const today = makeDay({
+      isToday: true,
+      items: {
+        allday: [], morning: [], afternoon: [],
+        evening: [
+          makeItem({ id: 'r1', type: 'routine', title: 'Get undressed', assignedTo: 'k', startTime: new Date(2026, 4, 20, 19, 0) }),
+          makeItem({ id: 'r2', type: 'routine', title: 'Get undressed', assignedTo: 'e', startTime: new Date(2026, 4, 20, 19, 0) }),
+          makeItem({ id: 'r3', type: 'routine', title: 'Brush teeth', assignedTo: 'k', startTime: new Date(2026, 4, 20, 19, 30) }),
+        ],
+        unscheduled: [],
+      },
+    });
+    const result = adaptTimelineSections(today, [kaleb, ella], now, null);
+    const evening = result.find((s) => s.label === 'Evening')!;
+    expect(evening.events.map((e) => e.title)).toEqual(['Get undressed', 'Brush teeth']);
+    const undressed = evening.events.find((e) => e.title === 'Get undressed')!;
+    expect(undressed.members?.map((m) => m.id).sort()).toEqual(['e', 'k']);
+  });
+
+  it('keeps non-routine items separate even if titles match', () => {
+    const today = makeDay({
+      isToday: true,
+      items: {
+        allday: [], morning: [], afternoon: [],
+        evening: [
+          makeItem({ id: 't1', type: 'task', title: 'Walk the dog', startTime: new Date(2026, 4, 20, 19, 0) }),
+          makeItem({ id: 't2', type: 'task', title: 'Walk the dog', startTime: new Date(2026, 4, 20, 20, 0) }),
+        ],
+        unscheduled: [],
+      },
+    });
+    const result = adaptTimelineSections(today, [], now, null);
+    const evening = result.find((s) => s.label === 'Evening')!;
+    expect(evening.events).toHaveLength(2);
+  });
+
   it('promotes a dinner event into Evening with recipe URL', () => {
     const today = makeDay({
       isToday: true,

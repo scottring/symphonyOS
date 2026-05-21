@@ -12,12 +12,12 @@ interface Props {
 
 export function WallV2UpcomingCard({ items }: Props) {
   return (
-    <div className="bg-white/85 border border-stone-200/70 rounded-2xl p-4">
-      <div className="text-[0.7rem] font-bold uppercase tracking-[0.22em] text-stone-500 mb-2.5">
+    <div className="bg-white/85 dark:bg-stone-900/70 border border-stone-200/70 dark:border-stone-700/60 rounded-2xl p-4">
+      <div className="text-[0.7rem] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400 mb-2.5">
         Upcoming
       </div>
       {items.length === 0 ? (
-        <div className="text-[0.85rem] text-stone-500">
+        <div className="text-[0.85rem] text-stone-500 dark:text-stone-400">
           Nothing on the calendar yet.
         </div>
       ) : (
@@ -31,10 +31,10 @@ export function WallV2UpcomingCard({ items }: Props) {
                 aria-hidden
               />
               <div className="min-w-0">
-                <div className="text-[0.95rem] font-bold text-stone-800 truncate">
+                <div className="text-[0.95rem] font-bold text-stone-800 dark:text-stone-100 truncate">
                   {item.label}
                 </div>
-                <div className="text-[0.82rem] text-stone-500 truncate">
+                <div className="text-[0.82rem] text-stone-500 dark:text-stone-400 truncate">
                   {item.detail}
                 </div>
               </div>

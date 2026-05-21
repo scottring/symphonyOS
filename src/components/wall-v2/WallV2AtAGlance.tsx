@@ -24,10 +24,10 @@ export function WallV2AtAGlance({ tagline, cards }: Props) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-6">
-        <div className="text-[0.72rem] font-bold uppercase tracking-[0.22em] text-stone-500">
+        <div className="text-[0.72rem] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">
           At a glance
         </div>
-        <div className="font-display italic text-[1.35rem] leading-tight text-stone-700 truncate">
+        <div className="font-display italic text-[1.35rem] leading-tight text-stone-700 dark:text-stone-200 truncate">
           {tagline}
         </div>
         <div className="w-[6rem]" aria-hidden />
@@ -39,7 +39,7 @@ export function WallV2AtAGlance({ tagline, cards }: Props) {
           ))}
         </div>
       ) : (
-        <div className="rounded-2xl bg-white/60 border border-stone-200/60 px-4 py-3 text-[0.9rem] text-stone-500">
+        <div className="rounded-2xl bg-white/60 dark:bg-stone-900/60 border border-stone-200/60 dark:border-stone-700/60 px-4 py-3 text-[0.9rem] text-stone-500 dark:text-stone-400">
           Everyone's set — no scheduled items right now.
         </div>
       )}

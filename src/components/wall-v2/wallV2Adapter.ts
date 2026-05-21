@@ -168,6 +168,43 @@ export function adaptTimelineEvent(
   };
 }
 
+// Two kids doing the same evening routine (e.g. "Get undressed", "Brush teeth")
+// produce one TimelineItem per kid. On the wall that reads as duplicates, so
+// we collapse identical routines into a single card with merged avatars.
+// Non-routine items stay separate even if their titles happen to match.
+function dedupeRoutines(
+  items: TimelineItem[],
+  members: FamilyMember[],
+): WallV2TimelineEvent[] {
+  const events: WallV2TimelineEvent[] = [];
+  const routineIndex = new Map<string, number>();
+
+  for (const item of items) {
+    const isRoutine = item.type === 'routine';
+    const key = isRoutine ? item.title.trim().toLowerCase() : null;
+
+    if (key !== null && routineIndex.has(key)) {
+      const card = events[routineIndex.get(key)!];
+      const assigned = item.assignedTo
+        ? members.find((m) => m.id === item.assignedTo)
+        : undefined;
+      if (!assigned) continue;
+      const next = memberBubble(assigned);
+      const existing = card.members ?? [];
+      if (!existing.some((b) => b.id === next.id)) {
+        card.members = [...existing, next];
+      }
+      continue;
+    }
+
+    const event = adaptTimelineEvent(item, members);
+    if (key !== null) routineIndex.set(key, events.length);
+    events.push(event);
+  }
+
+  return events;
+}
+
 /**
  * Split today's items into Afternoon / Evening / Night sections. We re-use
  * the existing `morning|afternoon|evening` buckets from useWallData and
@@ -200,9 +237,9 @@ export function adaptTimelineSections(
   const isForward = (i: TimelineItem) =>
     !i.startTime || i.startTime >= recencyCutoff;
 
-  const afternoonFwd = afternoonItems.filter(isForward).map((i) => adaptTimelineEvent(i, members));
-  const eveningFwd = eveningItems.filter(isForward).map((i) => adaptTimelineEvent(i, members));
-  const nightFwd = nightItems.filter(isForward).map((i) => adaptTimelineEvent(i, members));
+  const afternoonFwd = dedupeRoutines(afternoonItems.filter(isForward), members);
+  const eveningFwd = dedupeRoutines(eveningItems.filter(isForward), members);
+  const nightFwd = dedupeRoutines(nightItems.filter(isForward), members);
 
   // If we have a structured dinner event (from meal plan), promote it into
   // the Evening section with the recipe URL + all family avatars.
@@ -258,10 +295,14 @@ function dayLabel(d: Date, today: Date): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+// Find the first *calendar event* on a day. Routines and tasks are
+// intentionally skipped — the upcoming rail surfaces real plans (soccer,
+// appointments, trips), not the next morning's brush-teeth step.
 function firstUpcomingItem(day: WallDayData): TimelineItem | null {
-  for (const section of ['morning', 'afternoon', 'evening', 'allday'] as const) {
+  for (const section of ['allday', 'morning', 'afternoon', 'evening'] as const) {
     const items = day.items[section] ?? [];
-    if (items.length > 0) return items[0];
+    const event = items.find((i) => i.type === 'event');
+    if (event) return event;
   }
   return null;
 }
