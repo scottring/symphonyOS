@@ -1,5 +1,21 @@
 import type { TimelineItem } from '@/types/timeline'
 
+const ROUTINE_DEFAULT_DURATION_MIN = 30
+const ZERO_LENGTH_FLOOR_MIN = 15
+
+/**
+ * Effective end-minute for layout. Routines with endTime: null default to 30
+ * min (matches WeekEventBlock.computePlacement's existing default). Zero-
+ * length or inverted endTime falls back to a 15-min floor so layout is sane.
+ */
+export function getEffectiveEndMin(start: Date, end: Date | null): number {
+  const startMin = start.getHours() * 60 + start.getMinutes()
+  if (!end) return startMin + ROUTINE_DEFAULT_DURATION_MIN
+  const endMin = end.getHours() * 60 + end.getMinutes()
+  if (endMin <= startMin) return startMin + ZERO_LENGTH_FLOOR_MIN
+  return endMin
+}
+
 /**
  * One item placed in the week grid, with its assigned lane.
  *

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { layoutWeekLanes } from './layoutLanes'
+import { layoutWeekLanes, getEffectiveEndMin } from './layoutLanes'
 
 describe('layoutWeekLanes', () => {
   const weekStart = new Date('2026-05-18T00:00:00') // Monday
@@ -42,5 +42,30 @@ describe('layoutWeekLanes', () => {
       laneIdx: 0,
       laneCount: 1,
     })
+  })
+})
+
+describe('getEffectiveEndMin', () => {
+  it('returns startMin + 30 when endTime is null (routine default)', () => {
+    const start = new Date('2026-05-18T19:00:00')
+    expect(getEffectiveEndMin(start, null)).toBe(19 * 60 + 30)
+  })
+
+  it('returns endMin when endTime is a valid later Date', () => {
+    const start = new Date('2026-05-18T09:00:00')
+    const end = new Date('2026-05-18T10:30:00')
+    expect(getEffectiveEndMin(start, end)).toBe(10 * 60 + 30)
+  })
+
+  it('returns startMin + 15 when endTime is earlier than startTime (inverted)', () => {
+    const start = new Date('2026-05-18T09:00:00')
+    const end = new Date('2026-05-18T08:00:00')
+    expect(getEffectiveEndMin(start, end)).toBe(9 * 60 + 15)
+  })
+
+  it('returns startMin + 15 when endTime equals startTime (zero-length)', () => {
+    const start = new Date('2026-05-18T09:00:00')
+    const end = new Date('2026-05-18T09:00:00')
+    expect(getEffectiveEndMin(start, end)).toBe(9 * 60 + 15)
   })
 })
