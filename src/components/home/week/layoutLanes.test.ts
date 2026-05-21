@@ -138,6 +138,34 @@ describe('layoutWeekLanes', () => {
     expect(placed.find(p => p.item.id === 'a')!.laneCount).toBe(1)
     expect(placed.find(p => p.item.id === 'b')!.laneCount).toBe(1)
   })
+
+  it('excludes items on day >= dayCount (workweek filters Sat/Sun)', () => {
+    // weekStart is Monday 2026-05-18. Saturday is dayIdx 5.
+    const monday = makeItem({
+      id: 'mon',
+      start: new Date('2026-05-18T09:00:00'),
+      end: new Date('2026-05-18T10:00:00'),
+    })
+    const saturday = makeItem({
+      id: 'sat',
+      start: new Date('2026-05-23T09:00:00'),
+      end: new Date('2026-05-23T10:00:00'),
+    })
+    const placed = layoutWeekLanes([monday, saturday], weekStart, 5)
+    expect(placed).toHaveLength(1)
+    expect(placed[0].item.id).toBe('mon')
+  })
+
+  it('includes Saturday when dayCount=7', () => {
+    const saturday = makeItem({
+      id: 'sat',
+      start: new Date('2026-05-23T09:00:00'),
+      end: new Date('2026-05-23T10:00:00'),
+    })
+    const placed = layoutWeekLanes([saturday], weekStart, 7)
+    expect(placed).toHaveLength(1)
+    expect(placed[0].dayIdx).toBe(5)
+  })
 })
 
 describe('getEffectiveEndMin', () => {
