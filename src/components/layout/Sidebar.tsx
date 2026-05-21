@@ -27,6 +27,7 @@ import {
   FileText,
   Users2,
   List,
+  Repeat,
   History,
   Settings,
   LogOut,
@@ -304,6 +305,15 @@ export function Sidebar({
         >
           {createElement(FolderKanban, { className: 'w-5 h-5 shrink-0' })}
           {!collapsed && <span>Projects</span>}
+        </button>
+
+        {/* Routines */}
+        <button
+          onClick={() => onViewChange('routines')}
+          className={navItemClass(activeView === 'routines')}
+        >
+          {createElement(Repeat, { className: 'w-5 h-5 shrink-0' })}
+          {!collapsed && <span>Routines</span>}
         </button>
 
         {/* House (was "Home" — renamed per Scott; same destination) */}

@@ -464,73 +464,94 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
             </label>
           </div>
 
-          {/* Assignment */}
-          {familyMembers.length > 0 && (
-            <div className="pt-4 border-t border-neutral-100">
-              <label className="block text-sm font-medium text-neutral-700 mb-3">
-                Assigned to
-              </label>
-              <div className="flex items-center gap-2">
-                {/* Unassigned option */}
-                <button
-                  type="button"
-                  onClick={() => onUpdate(routine.id, { assigned_to: null })}
-                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-                    !routine.assigned_to
-                      ? 'ring-2 ring-offset-2 ring-amber-500 bg-neutral-100 text-neutral-500'
-                      : 'bg-neutral-50 text-neutral-300 hover:bg-neutral-100'
-                  }`}
-                  title="Unassigned"
-                  aria-label="Unassigned"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    className="w-5 h-5"
+          {/* Assignment — multi-select; tap avatars to toggle assignees */}
+          {familyMembers.length > 0 && (() => {
+            const selectedIds = routine.assigned_to_all && routine.assigned_to_all.length > 0
+              ? routine.assigned_to_all
+              : (routine.assigned_to ? [routine.assigned_to] : [])
+
+            const writeAssignees = (memberIds: string[]) => {
+              onUpdate(routine.id, {
+                assigned_to_all: memberIds.length > 0 ? memberIds : null,
+                assigned_to: memberIds[0] ?? null,
+              })
+            }
+
+            const toggleMember = (id: string) => {
+              const next = selectedIds.includes(id)
+                ? selectedIds.filter((m) => m !== id)
+                : [...selectedIds, id]
+              writeAssignees(next)
+            }
+
+            return (
+              <div className="pt-4 border-t border-neutral-100">
+                <label className="block text-sm font-medium text-neutral-700 mb-3">
+                  Assigned to
+                </label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Unassigned option — clears all assignees */}
+                  <button
+                    type="button"
+                    onClick={() => writeAssignees([])}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                      selectedIds.length === 0
+                        ? 'ring-2 ring-offset-2 ring-amber-500 bg-neutral-100 text-neutral-500'
+                        : 'bg-neutral-50 text-neutral-300 hover:bg-neutral-100'
+                    }`}
+                    title="Unassigned"
+                    aria-label="Unassigned"
                   >
-                    <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clipRule="evenodd" />
-                  </svg>
-                </button>
-
-                {/* Family member avatars */}
-                {familyMembers.map((member) => {
-                  const isSelected = routine.assigned_to === member.id
-                  const colors = FAMILY_COLORS[member.color as FamilyMemberColor] || FAMILY_COLORS.blue
-
-                  return (
-                    <button
-                      key={member.id}
-                      type="button"
-                      onClick={() => onUpdate(routine.id, { assigned_to: member.id })}
-                      className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all ${
-                        colors.bg
-                      } ${colors.text} ${
-                        isSelected
-                          ? `ring-2 ring-offset-2 ring-amber-500`
-                          : 'hover:ring-2 hover:ring-offset-1 ' + colors.ring
-                      }`}
-                      title={member.name}
-                      aria-label={`Assign to ${member.name}`}
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      className="w-5 h-5"
                     >
-                      {member.avatar_url ? (
-                        <img
-                          src={member.avatar_url}
-                          alt={member.name}
-                          className="w-full h-full rounded-full object-cover"
-                        />
-                      ) : (
-                        member.initials
-                      )}
-                    </button>
-                  )
-                })}
+                      <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+
+                  {/* Family member avatars — tap to toggle */}
+                  {familyMembers.map((member) => {
+                    const isSelected = selectedIds.includes(member.id)
+                    const colors = FAMILY_COLORS[member.color as FamilyMemberColor] || FAMILY_COLORS.blue
+
+                    return (
+                      <button
+                        key={member.id}
+                        type="button"
+                        onClick={() => toggleMember(member.id)}
+                        aria-pressed={isSelected}
+                        className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all ${
+                          colors.bg
+                        } ${colors.text} ${
+                          isSelected
+                            ? `ring-2 ring-offset-2 ring-amber-500`
+                            : 'hover:ring-2 hover:ring-offset-1 ' + colors.ring
+                        }`}
+                        title={member.name}
+                        aria-label={`Assign to ${member.name}`}
+                      >
+                        {member.avatar_url ? (
+                          <img
+                            src={member.avatar_url}
+                            alt={member.name}
+                            className="w-full h-full rounded-full object-cover"
+                          />
+                        ) : (
+                          member.initials
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="text-xs text-neutral-500 mt-2">
+                  Tap to add or remove. Multiple people can share a routine.
+                </p>
               </div>
-              <p className="text-xs text-neutral-500 mt-2">
-                Who is responsible for this routine by default
-              </p>
-            </div>
-          )}
+            )
+          })()}
 
           {/* Save button */}
           {hasChanges() && (

@@ -308,18 +308,61 @@ describe('RoutineForm', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Assign to Scott' }))
 
-      expect(mockOnUpdate).toHaveBeenCalledWith(routine.id, { assigned_to: 'member-1' })
+      expect(mockOnUpdate).toHaveBeenCalledWith(routine.id, {
+        assigned_to_all: ['member-1'],
+        assigned_to: 'member-1',
+      })
+    })
+
+    it('adds a second assignee without dropping the first', async () => {
+      const routine = createMockRoutine({ assigned_to: 'member-1', assigned_to_all: ['member-1'] })
+      const familyMembers = [
+        createMockFamilyMember({ id: 'member-1', name: 'Scott' }),
+        createMockFamilyMember({ id: 'member-2', name: 'Iris' }),
+      ]
+
+      renderForm(routine, { familyMembers })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Assign to Iris' }))
+
+      expect(mockOnUpdate).toHaveBeenCalledWith(routine.id, {
+        assigned_to_all: ['member-1', 'member-2'],
+        assigned_to: 'member-1',
+      })
+    })
+
+    it('toggles a selected assignee off when tapped again', async () => {
+      const routine = createMockRoutine({
+        assigned_to: 'member-1',
+        assigned_to_all: ['member-1', 'member-2'],
+      })
+      const familyMembers = [
+        createMockFamilyMember({ id: 'member-1', name: 'Scott' }),
+        createMockFamilyMember({ id: 'member-2', name: 'Iris' }),
+      ]
+
+      renderForm(routine, { familyMembers })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Assign to Scott' }))
+
+      expect(mockOnUpdate).toHaveBeenCalledWith(routine.id, {
+        assigned_to_all: ['member-2'],
+        assigned_to: 'member-2',
+      })
     })
 
     it('calls onUpdate when unassigning', async () => {
-      const routine = createMockRoutine({ assigned_to: 'member-1' })
+      const routine = createMockRoutine({ assigned_to: 'member-1', assigned_to_all: ['member-1'] })
       const familyMembers = [createMockFamilyMember({ id: 'member-1', name: 'Scott' })]
 
       renderForm(routine, { familyMembers })
 
       fireEvent.click(screen.getByRole('button', { name: 'Unassigned' }))
 
-      expect(mockOnUpdate).toHaveBeenCalledWith(routine.id, { assigned_to: null })
+      expect(mockOnUpdate).toHaveBeenCalledWith(routine.id, {
+        assigned_to_all: null,
+        assigned_to: null,
+      })
     })
   })
 
