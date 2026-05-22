@@ -13,6 +13,7 @@ import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useMobile } from '@/hooks/useMobile'
 import { TaskCheckbox } from './TaskCheckbox'
 import { PromoteToProjectButton } from './PromoteToProjectButton'
+import { PromoteTaskToProjectButton } from './PromoteTaskToProjectButton'
 import { ExpandingPanel } from './ExpandingPanel'
 import { DOMAIN_COLORS } from '@/lib/domainColors'
 import { rowSubtitle } from '@/lib/rowSubtitle'
@@ -648,6 +649,11 @@ export const ScheduleItem = memo(function ScheduleItem({
         {/* Promote to Project button - for events */}
         {isEvent && !item.completed && !item.skipped && (
           <PromoteToProjectButton item={item} isSuggestedPromotion={isSuggestedPromotion} />
+        )}
+
+        {/* Convert to Project button - for tasks */}
+        {isTask && !item.completed && (
+          <PromoteTaskToProjectButton item={item} />
         )}
 
         {/* Skip button - for routines and events, hidden by default, shows on hover */}
