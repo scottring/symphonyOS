@@ -148,7 +148,7 @@ function ConvertTaskModal({ item, onClose }: ConvertTaskModalProps) {
         className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden animate-slide-in-up"
         role="dialog"
         aria-modal="true"
-        aria-label="Add task to project"
+        aria-labelledby="convert-task-modal-title"
       >
         {/* Header */}
         <div className="bg-primary-50 border-b border-primary-100 px-5 py-4">
@@ -168,7 +168,7 @@ function ConvertTaskModal({ item, onClose }: ConvertTaskModalProps) {
               </div>
             )}
             <div>
-              <h2 className="font-display text-lg font-semibold text-neutral-800">
+              <h2 id="convert-task-modal-title" className="font-display text-lg font-semibold text-neutral-800">
                 {view === 'create' ? 'Create Project' : 'Add to Project'}
               </h2>
               <p className="text-sm text-neutral-500">
