@@ -1018,6 +1018,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     await deleteTask(taskId)
   }, [deleteTask])
 
+  // Convert a task into a project: subtasks become the project's tasks, parent task is deleted, then open the new project
   const handleConvertTaskToProject = useCallback(async (
     taskId: string,
     details: { name: string; notes?: string; context?: TaskContext },

@@ -65,6 +65,7 @@ export interface ScheduleActionsValue {
   // List actions
   onSendToList?: (taskId: string, listId: string) => void
   onCreateList?: (title: string, category: ListCategory) => Promise<string | null>
+  // links/phoneNumber widen this so convertTaskToProject can carry a task's context onto the new project
   onAddProject?: (project: { name: string; notes?: string; context?: 'work' | 'family' | 'personal'; links?: TaskLink[]; phoneNumber?: string }) => Promise<Project | null>
   /** Convert a task into a project: subtasks become the project's tasks, the parent task is deleted. */
   onConvertTaskToProject?: (taskId: string, details: { name: string; notes?: string; context?: TaskContext }) => Promise<Project | null>
