@@ -1,5 +1,5 @@
 import { createContext, useContext, type ReactNode } from 'react'
-import type { Task, TaskContext } from '@/types/task'
+import type { Task, TaskContext, TaskLink } from '@/types/task'
 import type { Contact, ContactCategory } from '@/types/contact'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
@@ -65,7 +65,9 @@ export interface ScheduleActionsValue {
   // List actions
   onSendToList?: (taskId: string, listId: string) => void
   onCreateList?: (title: string, category: ListCategory) => Promise<string | null>
-  onAddProject?: (project: { name: string; notes?: string; context?: 'work' | 'family' | 'personal' }) => Promise<Project | null>
+  onAddProject?: (project: { name: string; notes?: string; context?: 'work' | 'family' | 'personal'; links?: TaskLink[]; phoneNumber?: string }) => Promise<Project | null>
+  /** Convert a task into a project: subtasks become the project's tasks, the parent task is deleted. */
+  onConvertTaskToProject?: (taskId: string, details: { name: string; notes?: string; context?: TaskContext }) => Promise<Project | null>
   onDeleteProject?: (id: string) => Promise<void>
   onSearchContacts?: (query: string) => Contact[]
   onAddContact?: (name: string, details?: { phone?: string; category?: ContactCategory }) => Promise<Contact | null>
