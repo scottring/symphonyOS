@@ -118,9 +118,11 @@ export interface ViewRouterProps {
   onDeleteContact: (id: string) => Promise<void>
   onUpdateContact: (id: string, updates: Partial<Contact>) => Promise<void>
 
-  // Contact detail view
+  // Family member detail view
   selectedMember: FamilyMember | null
   onEditMemberInSettings: () => void
+
+  // Contact detail view
   selectedContactForView: Contact | null
   selectedContactId: string | null
   onSelectTaskFromContact: (taskId: string) => void
@@ -340,7 +342,7 @@ export function ViewRouter(props: ViewRouterProps) {
           member={props.selectedMember}
           tasks={props.tasks}
           onBack={() => navigate('/')}
-          onSelectTask={props.onSelectItem}
+          onSelectTask={(taskId) => props.onSelectItem(`task-${taskId}`)}
           onEditInSettings={props.onEditMemberInSettings}
         />
       )}
