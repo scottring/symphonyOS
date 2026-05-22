@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { screen } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { ActiveProjects } from './ActiveProjects'
@@ -6,6 +6,10 @@ import { ActiveProjects } from './ActiveProjects'
 const onSelectProject = vi.fn()
 const onViewAll = vi.fn()
 const onTogglePin = vi.fn()
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('ActiveProjects', () => {
   it('renders an empty state when there are no active projects', () => {
@@ -77,8 +81,6 @@ describe('ActiveProjects', () => {
   })
 
   it('calls onTogglePin (not onSelectProject) when the pin button is clicked', async () => {
-    onSelectProject.mockClear()
-    onTogglePin.mockClear()
     const { user } = render(
       <ActiveProjects
         projects={[{ id: 'p1', name: 'Backyard upgrades', progress: 60, totalTasks: 5, pinned: false }]}
