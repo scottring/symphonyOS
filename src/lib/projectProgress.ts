@@ -51,11 +51,13 @@ export function rankActiveProjects(
       agg.done += 1
     } else {
       // Only incomplete tasks drive the due-date / bucket sort.
-      if (t.bucket === 'timed' && t.scheduledFor) {
-        agg.dueMs = Math.min(agg.dueMs, t.scheduledFor.getTime())
+      if (t.bucket === 'timed') {
+        // Timed tasks carry a real date; they drive dueMs, not bucketRank.
+        if (t.scheduledFor) agg.dueMs = Math.min(agg.dueMs, t.scheduledFor.getTime())
+      } else {
+        const rank = t.bucket ? (BUCKET_RANK[t.bucket] ?? 4) : 4
+        agg.bucketRank = Math.min(agg.bucketRank, rank)
       }
-      const rank = t.bucket ? (BUCKET_RANK[t.bucket] ?? 4) : 4
-      agg.bucketRank = Math.min(agg.bucketRank, rank)
     }
     byProject.set(t.projectId, agg)
   }

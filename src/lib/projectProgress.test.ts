@@ -81,7 +81,7 @@ describe('rankActiveProjects', () => {
     expect(result[0].progress).toBe(33)
   })
 
-  it('sorts active projects by recency (updatedAt desc)', () => {
+  it('falls back to updatedAt desc when no tasks exist', () => {
     const projects = [
       mkProject('a', 'Older', { updatedAt: new Date(2026, 0, 1) }),
       mkProject('b', 'Newer', { updatedAt: new Date(2026, 5, 1) }),
