@@ -6,6 +6,7 @@ import type { Routine } from '@/types/actionable'
 import { isoWeekId } from './weeklyPlanning'
 import { StepWeekAhead } from './StepWeekAhead'
 import { StepBuildTodos } from './StepBuildTodos'
+import { StepSchedule } from './StepSchedule'
 
 const STEPS = ['The week ahead', "This week's to-dos", 'Schedule them', 'Concerns & topics'] as const
 
@@ -27,7 +28,7 @@ export function WeeklyPlanningSession({
   events,
   routines,
   onUpdateTask,
-  onPushTask: _onPushTask,
+  onPushTask,
   onSavePlanToVault,
   onClose,
   initialDate,
@@ -111,7 +112,16 @@ export function WeeklyPlanningSession({
             onAddGoalAction={handleAddGoalAction}
           />
         )}
-        {step === 2 && <div data-testid="step-schedule">Schedule</div>}
+        {step === 2 && (
+          <StepSchedule
+            weekDate={initialDate ?? new Date()}
+            priorities={priorities}
+            events={events}
+            routines={routines}
+            onUpdateTask={onUpdateTask}
+            onPushTask={onPushTask}
+          />
+        )}
         {step === 3 && <div data-testid="step-concerns">Concerns</div>}
       </div>
 
