@@ -14,7 +14,12 @@ function mkProject(id: string, name: string, overrides: Partial<Project> = {}): 
   }
 }
 
-function mkTask(id: string, projectId: string | null, completed: boolean): Task {
+function mkTask(
+  id: string,
+  projectId: string | null,
+  completed: boolean,
+  overrides: Partial<Task> = {},
+): Task {
   return {
     id,
     title: `t-${id}`,
@@ -27,6 +32,7 @@ function mkTask(id: string, projectId: string | null, completed: boolean): Task 
     bucket: 'today',
     createdAt: new Date(),
     updatedAt: new Date(),
+    ...overrides,
   } as Task
 }
 
@@ -94,5 +100,65 @@ describe('rankActiveProjects', () => {
   it('exposes the project name', () => {
     const result = rankActiveProjects([mkProject('a', 'Backyard upgrades')], [])
     expect(result[0].name).toBe('Backyard upgrades')
+  })
+
+  it('marks pinned projects and orders them first by pin order', () => {
+    const projects = [
+      mkProject('a', 'A'),
+      mkProject('b', 'B'),
+      mkProject('c', 'C'),
+    ]
+    const result = rankActiveProjects(projects, [], 5, ['c', 'a'])
+    expect(result.map((p) => p.id)).toEqual(['c', 'a', 'b'])
+    expect(result.find((p) => p.id === 'c')!.pinned).toBe(true)
+    expect(result.find((p) => p.id === 'a')!.pinned).toBe(true)
+    expect(result.find((p) => p.id === 'b')!.pinned).toBe(false)
+  })
+
+  it('sorts unpinned projects by earliest incomplete timed task date', () => {
+    const projects = [mkProject('a', 'A'), mkProject('b', 'B'), mkProject('c', 'C')]
+    const tasks = [
+      mkTask('1', 'a', false, { bucket: 'timed', scheduledFor: new Date(2026, 5, 10) }),
+      mkTask('2', 'b', false, { bucket: 'timed', scheduledFor: new Date(2026, 5, 1) }),
+      mkTask('3', 'c', false, { bucket: 'timed', scheduledFor: new Date(2026, 5, 20) }),
+    ]
+    const result = rankActiveProjects(projects, tasks)
+    expect(result.map((p) => p.id)).toEqual(['b', 'a', 'c'])
+  })
+
+  it('uses only the earliest incomplete timed task and ignores completed ones', () => {
+    const projects = [mkProject('a', 'A'), mkProject('b', 'B')]
+    const tasks = [
+      mkTask('1', 'a', true, { bucket: 'timed', scheduledFor: new Date(2026, 0, 1) }),
+      mkTask('2', 'a', false, { bucket: 'timed', scheduledFor: new Date(2026, 6, 1) }),
+      mkTask('3', 'b', false, { bucket: 'timed', scheduledFor: new Date(2026, 3, 1) }),
+    ]
+    const result = rankActiveProjects(projects, tasks)
+    expect(result.map((p) => p.id)).toEqual(['b', 'a'])
+  })
+
+  it('sinks projects with no dated tasks below dated ones, bucket-ranked', () => {
+    const projects = [
+      mkProject('dated', 'Dated'),
+      mkProject('week', 'Weekly'),
+      mkProject('quarter', 'Quarterly'),
+    ]
+    const tasks = [
+      mkTask('1', 'dated', false, { bucket: 'timed', scheduledFor: new Date(2026, 5, 1) }),
+      mkTask('2', 'week', false, { bucket: 'week' }),
+      mkTask('3', 'quarter', false, { bucket: 'quarter' }),
+    ]
+    const result = rankActiveProjects(projects, tasks)
+    expect(result.map((p) => p.id)).toEqual(['dated', 'week', 'quarter'])
+  })
+
+  it('keeps pinned projects on top even when an unpinned one is due sooner', () => {
+    const projects = [mkProject('soon', 'Soon'), mkProject('pinned', 'Pinned')]
+    const tasks = [
+      mkTask('1', 'soon', false, { bucket: 'timed', scheduledFor: new Date(2026, 0, 1) }),
+      mkTask('2', 'pinned', false, { bucket: 'timed', scheduledFor: new Date(2026, 11, 1) }),
+    ]
+    const result = rankActiveProjects(projects, tasks, 5, ['pinned'])
+    expect(result.map((p) => p.id)).toEqual(['pinned', 'soon'])
   })
 })
