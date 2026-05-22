@@ -43,13 +43,17 @@ Give Scott and Iris a guided, ~1-hour Sunday flow that turns "what's coming + wh
 - Data: `useGoogleCalendar` (+ meals already render as events).
 
 ### Step 2 — Build the week's to-dos
-- Presents candidate to-dos from defined source buckets:
-  - **Inbox** — unscheduled tasks.
-  - **Carry-over** — incomplete tasks already flagged "this week."
+- Presents candidate to-dos from the existing task-bucket ladder
+  (`TaskBucket = inbox → week → month → quarter → timed`; the UI labels `quarter`
+  as "Someday"). Source buckets:
+  - **Inbox** — untriaged tasks (`bucket = inbox`).
+  - **Carry-over** — incomplete tasks still in the `week` (or `today`) bucket from the prior week.
+  - **This month (released)** — tasks designated `bucket = month`. This *is* the "released from monthly" source — it exists today; promoting a month task into the week is the core "release" action.
+  - **Someday / longer** — `bucket = quarter` ("Someday"), surfaced for optional promotion.
   - **Goal actions** — current-quarter goal actions (from the goals system).
-  - **Released from monthly/seasonal** — *defined but empty in v1*; populated once sub-projects C/D exist and "release" tasks into the active week. The bucket exists now so the source list and ordering UI don't change later.
-- User selects which candidates are "this week" and **drags to order by priority**.
-- Output: the chosen tasks are flagged for the week (and ordered).
+- User selects which candidates are "this week" (sets `bucket = week`) and **drags to order by priority**.
+- Output: chosen tasks moved to the `week` bucket and ordered.
+- Note: the monthly/seasonal *sessions* (sub-projects C/D) will later be the deliberate place to populate the `month`/`quarter` buckets, but the buckets and their tasks already exist, so this "release" works in v1 with no placeholder.
 
 ### Step 3 — Schedule them
 - The chosen to-dos + the week's events shown in a **week time-grid** (extend the existing day-planner `PlanningSession` from one day to the week).
@@ -82,7 +86,7 @@ Give Scott and Iris a guided, ~1-hour Sunday flow that turns "what's coming + wh
 |------|--------|
 | Surface/wizard shell | new `WeeklyPlanningSession` (new); register in `ViewRouter` + `Sidebar` |
 | 1 — review | `WeekView` / week-planning-view, `useGoogleCalendar` |
-| 2 — to-dos | `useSupabaseTasks` (inbox/carry-over), `GoalsContext` (goal actions) |
+| 2 — to-dos | `useSupabaseTasks` filtered by bucket (inbox / carry-over `week` / `month` / `quarter`), `GoalsContext` (goal actions) |
 | 3 — schedule | extend `PlanningSession` day-planner to a week (`PlanningGrid`/`PlanningColumn`) |
 | 4 — concerns | `TiptapEditor` + `useVaultWrite` |
 
