@@ -1,5 +1,5 @@
 import type { RankedProject } from '@/lib/projectProgress'
-import { FolderKanban } from 'lucide-react'
+import { FolderKanban, Pin } from 'lucide-react'
 
 interface ActiveProjectsProps {
   projects: RankedProject[]
@@ -7,14 +7,17 @@ interface ActiveProjectsProps {
   onSelectProject: (id: string) => void
   /** Navigate to the full projects list. */
   onViewAll: () => void
+  /** Toggle pinned state for a project. */
+  onTogglePin: (id: string) => void
 }
 
 /**
- * Right-rail "Active projects" panel. Lists up to ~5 in-progress projects with
- * a compact name + progress bar + percent. Click a row to open that project;
- * click View all for the full list.
+ * Right-rail "Active projects" panel. Lists up to ~5 projects with a compact
+ * name + progress bar + percent. Pinned projects sort to the top and show a
+ * filled pin; hovering any row reveals its pin toggle. Click a row to open the
+ * project; click View all for the full list.
  */
-export function ActiveProjects({ projects, onSelectProject, onViewAll }: ActiveProjectsProps) {
+export function ActiveProjects({ projects, onSelectProject, onViewAll, onTogglePin }: ActiveProjectsProps) {
   const isEmpty = projects.length === 0
 
   return (
@@ -37,11 +40,11 @@ export function ActiveProjects({ projects, onSelectProject, onViewAll }: ActiveP
       ) : (
         <ul className="space-y-2.5">
           {projects.map((p) => (
-            <li key={p.id}>
+            <li key={p.id} className="group flex items-start gap-1.5">
               <button
                 type="button"
                 onClick={() => onSelectProject(p.id)}
-                className="w-full text-left group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-300 rounded-md px-1 -mx-1 py-1"
+                className="flex-1 min-w-0 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-300 rounded-md px-1 -mx-1 py-1"
                 aria-label={p.name}
               >
                 <div className="flex items-baseline justify-between gap-3 mb-1">
@@ -59,6 +62,27 @@ export function ActiveProjects({ projects, onSelectProject, onViewAll }: ActiveP
                     aria-hidden
                   />
                 </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onTogglePin(p.id)
+                }}
+                className={`
+                  mt-0.5 shrink-0 p-1 rounded-md transition-all
+                  focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-300
+                  ${p.pinned
+                    ? 'text-primary-600 hover:text-primary-700 hover:bg-primary-50'
+                    : 'text-neutral-400 hover:text-primary-600 hover:bg-primary-50 opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+                  }
+                `}
+                aria-label={p.pinned ? `Unpin ${p.name}` : `Pin ${p.name}`}
+                aria-pressed={p.pinned}
+                title={p.pinned ? 'Unpin' : 'Pin to top'}
+              >
+                <Pin className={`w-3.5 h-3.5 ${p.pinned ? 'fill-current' : ''}`} aria-hidden />
               </button>
             </li>
           ))}
