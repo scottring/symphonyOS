@@ -47,6 +47,13 @@ export function useVaultWrite() {
         })
 
         if (fnError) {
+          // Surface the function's error body (status + reason) for debugging.
+          let serverBody = ''
+          try {
+            const ctx = (fnError as { context?: Response }).context
+            if (ctx && typeof ctx.text === 'function') serverBody = await ctx.clone().text()
+          } catch { /* ignore */ }
+          console.error('[vault-write] failed:', serverBody || fnError.message)
           setError(fnError.message)
           return null
         }

@@ -20,6 +20,13 @@ import type {
 } from '@/types/note'
 import type { Task } from '@/types/task'
 
+// Explicit column list for notes list queries. Excludes the heavy `embedding`
+// vector(1536) column (server-side only, ~2MB across all notes) — `select('*')`
+// serializes every vector to text and trips the Postgres statement timeout
+// (error 57014: "canceling statement due to statement timeout").
+const NOTE_COLUMNS =
+  'id,user_id,title,content,type,source,topic_id,audio_url,external_id,external_url,vault_path,vault_domain,vault_frontmatter,vault_last_commit_sha,context,timeline_at,created_at,updated_at'
+
 // ============================================================================
 // Converters
 // ============================================================================
@@ -118,7 +125,7 @@ export function useNotes() {
       // Fetch Second Brain notes
       const { data: notesData, error: notesError } = await supabase
         .from('notes')
-        .select('*')
+        .select(NOTE_COLUMNS)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
 
@@ -379,7 +386,7 @@ export function useNotes() {
       const noteIds = links.map((l) => l.note_id)
       const { data: notesData, error: notesError } = await supabase
         .from('notes')
-        .select('*')
+        .select(NOTE_COLUMNS)
         .in('id', noteIds)
         .order('created_at', { ascending: false })
 

@@ -48,7 +48,7 @@ import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings'
 import { useDetailPanelState } from '@/hooks/useDetailPanelState'
 import { useScheduleFiltering } from '@/hooks/useScheduleFiltering'
 import type { ViewType } from '@/components/layout/Sidebar'
-import type { LinkedActivityType, TaskLink } from '@/types/task'
+import type { LinkedActivityType, TaskLink, Task } from '@/types/task'
 import { type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
 import { useHiddenCalendarEvents } from '@/hooks/useHiddenCalendarEvents'
 import { useMealPlan } from '@/hooks/useMealPlan'
@@ -862,10 +862,9 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
 
   // "Save to vault": promote a task's notes into a persisting vault note (durable,
   // via GitHub), linked to the task so it survives the task being completed.
-  const handleSaveTaskNoteToVault = useCallback(
-    async (content: string): Promise<{ ok: boolean; url?: string }> => {
-      if (!selectedTask) return { ok: false }
-      const title = selectedTask.title?.trim() || 'Task note'
+  const saveTaskNoteToVault = useCallback(
+    async (task: Task, content: string): Promise<{ ok: boolean; url?: string }> => {
+      const title = task.title?.trim() || 'Task note'
       const slug =
         title
           .toLowerCase()
@@ -873,17 +872,25 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
           .replace(/\s+/g, '-')
           .replace(/-+/g, '-')
           .replace(/^-|-$/g, '') || 'task-note'
-      const path = `notes/${slug}-${selectedTask.id.slice(0, 8)}.md`
+      const path = `notes/${slug}-${task.id.slice(0, 8)}.md`
       const result = await vaultWrite.createVaultNote(
         { title, content, path },
         `Save task note to vault: ${title}`
       )
       if (!result?.success || !result.noteId) return { ok: false }
-      await addEntityLink(result.noteId, { entityType: 'task', entityId: selectedTask.id, linkType: 'primary' })
-      setSelectedTaskNotes(await getNotesForEntity('task', selectedTask.id))
+      await addEntityLink(result.noteId, { entityType: 'task', entityId: task.id, linkType: 'primary' })
+      setSelectedTaskNotes(await getNotesForEntity('task', task.id))
       return { ok: true, url: result.githubUrl }
     },
-    [selectedTask, vaultWrite, addEntityLink, getNotesForEntity]
+    [vaultWrite, addEntityLink, getNotesForEntity]
+  )
+
+  // Legacy desktop/panel paths bind to selectedTask; the surface panel binds to
+  // its own selectedItem.originalTask (see the TapContextPanel render below).
+  const handleSaveTaskNoteToVault = useCallback(
+    (content: string): Promise<{ ok: boolean; url?: string }> =>
+      selectedTask ? saveTaskNoteToVault(selectedTask, content) : Promise.resolve({ ok: false }),
+    [selectedTask, saveTaskNoteToVault]
   )
 
   // Handle search result selection
@@ -1542,6 +1549,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
               onClose={() => setSelectedItemId(null)}
               onTitleChange={(t) => updateTask(selectedItem.originalTask!.id, { title: t })}
               onNotesChange={(n) => updateTask(selectedItem.originalTask!.id, { notes: n })}
+              onSaveNoteToVault={(content) => saveTaskNoteToVault(selectedItem.originalTask!, content)}
               onToggleComplete={() => handleToggleTask(selectedItem.originalTask!.id)}
               onSchedule={(date, isAllDay) =>
                 updateTask(selectedItem.originalTask!.id, {
@@ -1611,6 +1619,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
                 onUpdate={updateTask}
                 onDelete={deleteTask}
                 onToggleComplete={handleToggleTask}
+                onSaveNoteToVault={handleSaveTaskNoteToVault}
                 onUpdateEventNote={updateNote}
                 onUpdateEventLocation={async (eventId: string, location: string | null, calendarId?: string) => {
                   try {
@@ -1703,6 +1712,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
               onUpdate={updateTask}
               onDelete={deleteTask}
               onToggleComplete={handleToggleTask}
+              onSaveNoteToVault={handleSaveTaskNoteToVault}
               onUpdateEventNote={updateNote}
               onUpdateEventLocation={async (eventId: string, location: string | null, calendarId?: string) => {
                 try {

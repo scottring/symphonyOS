@@ -30,7 +30,7 @@ import { MessageThread } from '@/components/messages/MessageThread'
 import { useMessages } from '@/hooks/useMessages'
 import { MealEventSection } from './MealEventSection'
 import { useEventDiscussionFlags } from '@/hooks/useEventDiscussionFlags'
-import { MessageCircle } from 'lucide-react'
+import { MessageCircle, CloudUpload, Check } from 'lucide-react'
 
 // Component to render text with clickable links (handles HTML links and plain URLs)
 function RichText({ text }: { text: string }) {
@@ -92,6 +92,8 @@ interface DetailPanelRedesignProps {
   onDelete?: (taskId: string) => void
   onToggleComplete?: (taskId: string) => void
   onUpdateEventNote?: (googleEventId: string, notes: string | null) => void
+  /** Promote the current task notes into a persisting vault note linked to the task. */
+  onSaveNoteToVault?: (content: string) => Promise<{ ok: boolean; url?: string }>
   onUpdateEventLocation?: (googleEventId: string, location: string | null, calendarId?: string) => void
   // Calendar list + move for reassigning events between calendars
   fetchCalendarList?: () => Promise<Array<{ id: string; summary: string; accessRole: 'owner' | 'writer' | 'reader'; primary: boolean; backgroundColor?: string }>>
@@ -598,6 +600,7 @@ export function DetailPanelRedesign({
   onDelete,
   onToggleComplete,
   onUpdateEventNote,
+  onSaveNoteToVault,
   onUpdateEventLocation,
   fetchCalendarList,
   onMoveEventToCalendar,
@@ -661,6 +664,16 @@ export function DetailPanelRedesign({
   const [notesHasChanges, setNotesHasChanges] = useState(false)
   const [notesSaving, setNotesSaving] = useState(false)
   const [notesSaved, setNotesSaved] = useState(false)
+  // "Save to vault": promote the current task notes into a persisting linked vault note.
+  const [vaultSaveStatus, setVaultSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const handleSaveToVault = async () => {
+    const content = (localNotes || '').replace(/<[^>]*>/g, '').trim()
+    if (!content || !onSaveNoteToVault) return
+    setVaultSaveStatus('saving')
+    const res = await onSaveNoteToVault(localNotes || '')
+    setVaultSaveStatus(res.ok ? 'saved' : 'error')
+    if (res.ok) setTimeout(() => setVaultSaveStatus('idle'), 4000)
+  }
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingSaveRef = useRef<(() => void) | null>(null)
   // Flag to track when we're syncing from external source (not user input)
@@ -1837,6 +1850,25 @@ export function DetailPanelRedesign({
                 )}
               </div>
               <div className="flex items-center gap-1">
+                {/* Save to vault — promote task notes into a persisting linked vault note */}
+                {item?.type === 'task' && onSaveNoteToVault && (
+                  <button
+                    onClick={handleSaveToVault}
+                    disabled={!(localNotes || '').replace(/<[^>]*>/g, '').trim() || vaultSaveStatus === 'saving'}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-neutral-600 hover:text-primary-700 hover:bg-neutral-100 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    title="Save these notes as a permanent note in your vault, linked to this task"
+                  >
+                    {vaultSaveStatus === 'saved' ? (
+                      <><Check className="w-3.5 h-3.5" /> Saved to vault</>
+                    ) : vaultSaveStatus === 'saving' ? (
+                      <><CloudUpload className="w-3.5 h-3.5 animate-pulse" /> Saving…</>
+                    ) : vaultSaveStatus === 'error' ? (
+                      <><CloudUpload className="w-3.5 h-3.5" /> Retry</>
+                    ) : (
+                      <><CloudUpload className="w-3.5 h-3.5" /> Save to vault</>
+                    )}
+                  </button>
+                )}
                 {/* Save button - shows when there are unsaved changes */}
                 {notesHasChanges && !notesSaving && (
                   <button

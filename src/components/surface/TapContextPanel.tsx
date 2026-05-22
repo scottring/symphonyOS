@@ -33,6 +33,8 @@ interface TapContextPanelProps {
   onClose: () => void
   onTitleChange: (next: string) => void
   onNotesChange: (next: string) => void
+  /** Promote the task's notes into a persisting vault note linked to the task. */
+  onSaveNoteToVault?: (content: string) => Promise<{ ok: boolean; url?: string }>
   onToggleComplete: () => void
   onSchedule: (date: Date, isAllDay: boolean) => void
   onClearSchedule?: () => void
@@ -93,7 +95,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
         onTogglePin={props.onTogglePin}
         onDelete={props.onDelete}
       />
-      <PanelWhy key={task.id} notes={task.notes} onChange={props.onNotesChange} />
+      <PanelWhy key={task.id} label="Notes" notes={task.notes} onChange={props.onNotesChange} onSaveToVault={props.onSaveNoteToVault} />
       <PanelSubtasks
         subtasks={task.subtasks ?? []}
         onToggleSubtask={props.onToggleSubtask}
