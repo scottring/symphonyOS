@@ -587,9 +587,7 @@ export function AppShell({
               if (onOpenMember) onOpenMember(id)
               else onViewChange('home-app')
             }}
-            {/* No standalone family-list view yet; Settings is the closest
-                place to see/manage family members. */}
-            onViewAllFamily={() => onViewChange('settings')}
+            onViewAllFamily={() => onViewChange('settings') /* no family-list view yet; Settings manages members */}
             onSelectTask={(id) => onRailSelectTask?.(id)}
           />
         </aside>
