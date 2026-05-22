@@ -168,7 +168,7 @@ export function StepBuildTodos({
             Check tasks on the left to add them to your week.
           </p>
         ) : (
-          <ol className="space-y-2">
+          <ol data-testid="priority-order" className="space-y-2">
             {selectedTasks.map((task, index) => (
               <li
                 key={task.id}

@@ -51,15 +51,11 @@ export function WeeklyPlanningSession({
 
   const handleToggle = useCallback(
     (task: Task) => {
-      setSelectedIds(ids => {
-        if (ids.includes(task.id)) {
-          return ids.filter(id => id !== task.id)
-        }
-        onUpdateTask(task.id, { bucket: 'week' })
-        return [...ids, task.id]
-      })
+      const isSelected = selectedIds.includes(task.id)
+      if (!isSelected) onUpdateTask(task.id, { bucket: 'week' })
+      setSelectedIds(ids => isSelected ? ids.filter(id => id !== task.id) : [...ids, task.id])
     },
-    [onUpdateTask],
+    [selectedIds, onUpdateTask],
   )
 
   const handleAddGoalAction = useCallback(

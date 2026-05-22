@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { StepBuildTodos } from './StepBuildTodos'
 import type { Task } from '@/types/task'
@@ -71,11 +71,9 @@ describe('StepBuildTodos', () => {
       />,
     )
 
-    // Both appear in the priority column (the <ol> is the ordered list)
-    const lists = screen.getAllByRole('list')
-    // The last list is the <ol> priority list
-    const priorityList = lists[lists.length - 1]
-    const items = priorityList.querySelectorAll('li')
+    // Both appear in the priority column (the <ol> has data-testid="priority-order")
+    const priorityList = screen.getByTestId('priority-order')
+    const items = within(priorityList).getAllByRole('listitem')
     expect(items).toHaveLength(2)
     expect(items[0]).toHaveTextContent('Inbox task')
     expect(items[1]).toHaveTextContent('Week task')
