@@ -33,6 +33,7 @@ interface PlanningSessionProps {
   onClose: () => void
   initialDate?: Date
   getRoutinesForDate?: (date: Date) => Routine[]
+  embedded?: boolean
 }
 
 // Time slot duration in minutes
@@ -58,6 +59,7 @@ export function PlanningSession({
   onClose,
   initialDate,
   getRoutinesForDate,
+  embedded = false,
 }: PlanningSessionProps) {
   // Date range state - start with the initial date if provided
   const [dateRange, setDateRange] = useState<Date[]>(() => {
@@ -291,7 +293,7 @@ export function PlanningSession({
   )
 
   return (
-    <div className="fixed inset-0 z-50 bg-bg-base flex flex-col">
+    <div className={embedded ? 'h-full bg-bg-base flex flex-col' : 'fixed inset-0 z-50 bg-bg-base flex flex-col'}>
       {/* Header */}
       <PlanningHeader
         dateRange={dateRange}
@@ -299,6 +301,7 @@ export function PlanningSession({
         onAddDay={handleAddDay}
         onRemoveDay={handleRemoveDay}
         onDateChange={handleDateChange}
+        showClose={!embedded}
       />
 
       {/* Main content */}

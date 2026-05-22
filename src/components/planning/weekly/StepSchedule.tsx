@@ -14,14 +14,17 @@ interface Props {
 
 export function StepSchedule({ weekDate, priorities, events, routines, onUpdateTask, onPushTask }: Props) {
   return (
-    <PlanningSession
-      tasks={priorities}
-      events={events}
-      routines={routines}
-      onUpdateTask={onUpdateTask}
-      onPushTask={onPushTask}
-      onClose={() => {}}
-      initialDate={weekDate}
-    />
+    <div className="h-full">
+      <PlanningSession
+        tasks={priorities}
+        events={events}
+        routines={routines}
+        onUpdateTask={onUpdateTask}
+        onPushTask={onPushTask}
+        onClose={() => {}}
+        initialDate={weekDate}
+        embedded
+      />
+    </div>
   )
 }
