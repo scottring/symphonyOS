@@ -29,7 +29,9 @@ describe('isChunkLoadError', () => {
     expect(isChunkLoadError(new Error('Loading chunk 42 failed.'))).toBe(true)
   })
 
-  it('does not match unrelated runtime errors', () => {
+  it('does not match unrelated runtime errors by message alone', () => {
+    // isChunkLoadError is purely message-based; the empty-module TypeError is
+    // recovered by createRetryingImport's instanceof check, not by this matcher.
     expect(
       isChunkLoadError(new TypeError("Cannot read properties of undefined (reading 'x')"))
     ).toBe(false)
@@ -50,7 +52,7 @@ describe('createRetryingImport', () => {
     expect(storage.getItem('symphony:chunk-reload')).toBeNull()
   })
 
-  it('reloads once on a stale-chunk failure and sets the guard', async () => {
+  it('reloads once on a recognized chunk-load rejection and sets the guard', async () => {
     const storage = fakeStorage()
     const reload = vi.fn()
     const run = createRetryingImport(
@@ -68,32 +70,71 @@ describe('createRetryingImport', () => {
     expect(storage.getItem('symphony:chunk-reload')).toBe('1')
   })
 
-  it('does NOT reload twice — rethrows if guard already set', async () => {
+  it('reloads once when a stale chunk resolves to an empty module (TypeError reading the export off undefined)', async () => {
+    // The exact production failure: the host serves index.html (text/html) for
+    // a now-missing hashed chunk, the import resolves empty, and the factory's
+    // `m.ProjectsListRedesign` throws this TypeError. It must trigger recovery,
+    // not dead-end at the error boundary.
+    const storage = fakeStorage()
+    const reload = vi.fn()
+    const run = createRetryingImport(
+      async () => {
+        throw new TypeError("Cannot read properties of undefined (reading 'ProjectsListRedesign')")
+      },
+      { reload, storage }
+    )
+
+    run()
+    await Promise.resolve()
+
+    expect(reload).toHaveBeenCalledTimes(1)
+    expect(storage.getItem('symphony:chunk-reload')).toBe('1')
+  })
+
+  it('also recovers from the Safari phrasing of an empty-module access', async () => {
+    const storage = fakeStorage()
+    const reload = vi.fn()
+    const run = createRetryingImport(
+      async () => {
+        throw new TypeError("undefined is not an object (evaluating 'm.ProjectsListRedesign')")
+      },
+      { reload, storage }
+    )
+
+    run()
+    await Promise.resolve()
+
+    expect(reload).toHaveBeenCalledTimes(1)
+  })
+
+  it('does NOT reload twice — rethrows if the guard is already set', async () => {
     const storage = fakeStorage()
     storage.setItem('symphony:chunk-reload', '1')
     const reload = vi.fn()
     const run = createRetryingImport(
       async () => {
-        throw new TypeError('Failed to fetch dynamically imported module: x.js')
+        throw new TypeError("Cannot read properties of undefined (reading 'X')")
       },
       { reload, storage }
     )
 
-    await expect(run()).rejects.toThrow(/dynamically imported module/)
+    await expect(run()).rejects.toThrow(TypeError)
     expect(reload).not.toHaveBeenCalled()
   })
 
-  it('rethrows non-chunk errors without reloading', async () => {
+  it('rethrows genuine non-chunk errors (non-TypeError) without reloading', async () => {
+    // A real top-level evaluation error in a module surfaces as a thrown Error
+    // (not a TypeError from an empty namespace) and must NOT trigger a reload.
     const storage = fakeStorage()
     const reload = vi.fn()
     const run = createRetryingImport(
       async () => {
-        throw new TypeError("Cannot read properties of undefined (reading 'map')")
+        throw new Error('deliberate module-eval failure')
       },
       { reload, storage }
     )
 
-    await expect(run()).rejects.toThrow(/Cannot read properties/)
+    await expect(run()).rejects.toThrow(/deliberate module-eval failure/)
     expect(reload).not.toHaveBeenCalled()
   })
 })

@@ -47,8 +47,16 @@ export function createRetryingImport<T>(
       deps.storage.removeItem(RELOAD_FLAG)
       return mod
     } catch (err) {
+      // A stale chunk fails in two shapes: (1) the import REJECTS with a
+      // recognizable load/MIME message, or (2) the host serves index.html
+      // (text/html) for the missing hashed chunk, the import RESOLVES empty,
+      // and the factory's `m.SomeExport` throws a TypeError ("Cannot read
+      // properties of undefined", Safari's "undefined is not an object", etc.).
+      // The factory only ever does `import().then(m => ({ default: m.X }))`, so
+      // any TypeError caught here means the module came back empty — recover it.
+      const isStaleChunk = isChunkLoadError(err) || err instanceof TypeError
       if (
-        isChunkLoadError(err) &&
+        isStaleChunk &&
         deps.storage.getItem(RELOAD_FLAG) !== '1'
       ) {
         deps.storage.setItem(RELOAD_FLAG, '1')
