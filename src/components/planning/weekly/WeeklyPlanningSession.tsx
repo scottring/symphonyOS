@@ -3,6 +3,7 @@ import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine } from '@/types/actionable'
 import { isoWeekId } from './weeklyPlanning'
+import { StepWeekAhead } from './StepWeekAhead'
 
 const STEPS = ['The week ahead', "This week's to-dos", 'Schedule them', 'Concerns & topics'] as const
 
@@ -19,8 +20,8 @@ interface Props {
 
 export function WeeklyPlanningSession({
   tasks,
-  events: _events,
-  routines: _routines,
+  events,
+  routines,
   onUpdateTask: _onUpdateTask,
   onPushTask: _onPushTask,
   onSavePlanToVault,
@@ -68,7 +69,14 @@ export function WeeklyPlanningSession({
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto px-6 py-4">
-        {step === 0 && <div data-testid="step-week-ahead">Week ahead</div>}
+        {step === 0 && (
+          <StepWeekAhead
+            weekDate={initialDate ?? new Date()}
+            tasks={tasks}
+            events={events}
+            routines={routines}
+          />
+        )}
         {step === 1 && <div data-testid="step-build-todos">Build to-dos</div>}
         {step === 2 && <div data-testid="step-schedule">Schedule</div>}
         {step === 3 && <div data-testid="step-concerns">Concerns</div>}
