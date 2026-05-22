@@ -1,8 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useCallback } from 'react'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
 import { ScratchpadPane } from '@/components/schedule/ScratchpadPane'
+import { usePinnedItems } from '@/hooks/usePinnedItems'
 import { rankActiveProjects } from '@/lib/projectProgress'
 import { familySnapshot } from '@/lib/familySnapshot'
 import { discussionItems } from '@/lib/discussionItems'
@@ -53,9 +54,31 @@ export function TodayRail({
     return tasks.filter((t) => !t.completed && t.bucket !== 'inbox').length
   }, [tasks])
 
+  const { pins, pin, unpin, isPinned } = usePinnedItems()
+
+  const pinnedProjectIds = useMemo(
+    () =>
+      pins
+        .filter((p) => p.entityType === 'project')
+        .sort((a, b) => a.displayOrder - b.displayOrder)
+        .map((p) => p.entityId),
+    [pins],
+  )
+
   const activeProjects = useMemo(
-    () => rankActiveProjects(projects, tasks, 5),
-    [projects, tasks],
+    () => rankActiveProjects(projects, tasks, 5, pinnedProjectIds),
+    [projects, tasks, pinnedProjectIds],
+  )
+
+  const onTogglePin = useCallback(
+    (projectId: string) => {
+      if (isPinned('project', projectId)) {
+        unpin('project', projectId)
+      } else {
+        pin('project', projectId)
+      }
+    },
+    [isPinned, unpin, pin],
   )
 
   const familyMembersSummary = useMemo(
@@ -81,6 +104,7 @@ export function TodayRail({
         projects={activeProjects}
         onSelectProject={onSelectProject}
         onViewAll={onViewAllProjects}
+        onTogglePin={onTogglePin}
       />
 
       <div className="flex-1 min-h-0">
