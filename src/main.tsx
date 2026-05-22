@@ -122,6 +122,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/routines/:routineId" element={<App />} />
               <Route path="/contacts" element={<App />} />
               <Route path="/contacts/:contactId" element={<App />} />
+              <Route path="/family/:memberId" element={<App />} />
               <Route path="/wall/*" element={<Shell />} />
               <Route path="/wall-v2/*" element={<Shell />} />
               <Route path="/jobs/*" element={<Shell />} />

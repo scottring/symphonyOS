@@ -79,6 +79,8 @@ interface AppShellProps {
   railFamilyMembers?: import('@/types/family').FamilyMember[]
   /** Opens a task's detail view — used by the rail's For Discussion panel. */
   onRailSelectTask?: (taskId: string) => void
+  /** Opens a family member's detail page — used by the rail's Family Snapshot. */
+  onOpenMember?: (id: string) => void
   onPinNavigate?: (entityType: PinnableEntityType, entityId: string) => void
   onPinMarkAccessed?: (entityType: PinnableEntityType, entityId: string) => void
   onPinRefreshStale?: (id: string) => void
@@ -137,6 +139,7 @@ export function AppShell({
   entities,
   railFamilyMembers = [],
   onRailSelectTask,
+  onOpenMember,
   onPinNavigate,
   onPinMarkAccessed,
   onPinRefreshStale,
@@ -581,12 +584,10 @@ export function AppShell({
             }}
             onViewAllProjects={() => onViewChange('projects')}
             onSelectMember={(id) => {
-              // Navigate to the family/home-app view; per-member deep link
-              // is a follow-up.
-              onViewChange('home-app')
-              void id
+              if (onOpenMember) onOpenMember(id)
+              else onViewChange('home-app')
             }}
-            onViewAllFamily={() => onViewChange('home-app')}
+            onViewAllFamily={() => onViewChange('settings') /* no family-list view yet; Settings manages members */}
             onSelectTask={(id) => onRailSelectTask?.(id)}
           />
         </aside>

@@ -375,7 +375,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   // URL-based navigation
   const navigate = useNavigate()
   const location = useLocation()
-  const params = useParams<{ projectId?: string; routineId?: string; contactId?: string }>()
+  const params = useParams<{ projectId?: string; routineId?: string; contactId?: string; memberId?: string }>()
 
   // State for non-URL-routed views
   const [stateView, setStateView] = useState<'agent' | 'today' | 'inbox' | 'lists' | 'notes' | 'history' | 'settings' | 'task-detail' | 'weekly-planning' | null>(null)
@@ -393,6 +393,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     if (path.startsWith('/routines')) return 'routines'
     if (path === '/contacts') return 'contacts'
     if (path.startsWith('/contacts/')) return 'contact-detail'
+    if (path.startsWith('/family/')) return 'family-member'
     if (path.startsWith('/meals')) return 'meals'
     if (path.startsWith('/home')) return 'home-app'
     if (path === '/morning') return 'morning'
@@ -428,6 +429,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       path.startsWith('/projects') ||
       path.startsWith('/routines') ||
       path.startsWith('/contacts') ||
+      path.startsWith('/family') ||
       path.startsWith('/meals') ||
       path.startsWith('/home') ||
       path === '/morning' ||
@@ -582,6 +584,12 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     return projectsMap.get(selectedProjectId) ?? null
   }, [selectedProjectId, projectsMap])
 
+  const selectedMember = useMemo(() => {
+    const memberId = params.memberId
+    if (!memberId) return null
+    return familyMembers.find((m) => m.id === memberId) ?? null
+  }, [params.memberId, familyMembers])
+
   // Linked event notes for selected project (stored with event metadata)
   const [linkedEventsForProject, setLinkedEventsForProject] = useState<EventNote[]>([])
 
@@ -662,6 +670,19 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     setRecipeUrl(null)
     navigate(`/contacts/${contactId}`)
   }, [navigate])
+
+  // Open a family member's detail page (self-click → today)
+  const handleOpenMember = useCallback((memberId: string) => {
+    if (memberId === getCurrentUserMember()?.id) {
+      setStateView(null)
+      navigate('/')
+      return
+    }
+    setSelectedItemId(null)
+    setSelectedTaskId(null)
+    setRecipeUrl(null)
+    navigate(`/family/${memberId}`)
+  }, [navigate, getCurrentUserMember])
 
   // Get contact for contact view
   const selectedContactForView = useMemo(() => {
@@ -1560,6 +1581,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
         // for tasks. Tasks in entities expose the bare uuid.
         setSelectedItemId(`task-${taskId}`)
       }}
+      onOpenMember={handleOpenMember}
       onPinNavigate={handlePinNavigate}
       onPinMarkAccessed={pinnedItems.markAccessed}
       onPinRefreshStale={pinnedItems.refreshStale}
@@ -1934,6 +1956,8 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
           weeklyGoalActions={weeklyGoalActions}
           onAddGoalActionToWeek={handleAddGoalActionToWeek}
           onOpenWeeklyPlanning={() => handleViewChange('weekly-planning')}
+          selectedMember={selectedMember}
+          onEditMemberInSettings={() => handleViewChange('settings')}
         />
 
         {/* Search Modal */}
