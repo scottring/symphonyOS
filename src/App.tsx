@@ -26,6 +26,7 @@ import type { PinnableEntityType } from '@/types/pin'
 import { supabase } from '@/lib/supabase'
 import { sundayOfWeek } from '@/lib/weekHelpers'
 import { detectContextSharingChange } from '@/lib/contextSharingToast'
+import { convertTaskToProject } from '@/lib/convertTaskToProject'
 import { DomainPageOutline } from '@/components/domain/DomainPageOutline'
 import { ViewRouter } from '@/components/layout/ViewRouter'
 import { AppShell, type PanelTab } from '@/components/layout/AppShell'
@@ -49,7 +50,7 @@ import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings'
 import { useDetailPanelState } from '@/hooks/useDetailPanelState'
 import { useScheduleFiltering } from '@/hooks/useScheduleFiltering'
 import type { ViewType } from '@/components/layout/Sidebar'
-import type { LinkedActivityType, TaskLink, Task } from '@/types/task'
+import type { LinkedActivityType, TaskLink, Task, TaskContext } from '@/types/task'
 import { type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
 import { useHiddenCalendarEvents } from '@/hooks/useHiddenCalendarEvents'
 import { useMealPlan } from '@/hooks/useMealPlan'
@@ -1053,6 +1054,18 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     await deleteTask(taskId)
   }, [deleteTask])
 
+  // Convert a task into a project: subtasks become the project's tasks, parent task is deleted, then open the new project
+  const handleConvertTaskToProject = useCallback(async (
+    taskId: string,
+    details: { name: string; notes?: string; context?: TaskContext },
+  ) => {
+    const task = tasks.find((t) => t.id === taskId)
+    if (!task) return null
+    const project = await convertTaskToProject(task, details, { addProject, updateTask, deleteTask })
+    if (project) handleOpenProject(project.id)
+    return project
+  }, [tasks, addProject, updateTask, deleteTask, handleOpenProject])
+
   // Wrapper for updateProject that auto-unpins when marked complete
   const handleUpdateProject = useCallback(async (id: string, updates: Partial<typeof projects[0]>) => {
     await updateProject(id, updates)
@@ -1394,6 +1407,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     onSendToList: handleSendToList,
     onCreateList: handleCreateListInTriage,
     onAddProject: addProject,
+    onConvertTaskToProject: handleConvertTaskToProject,
     onSearchContacts: searchContacts,
     onAddContact: (name: string, details?: { phone?: string; category?: import('@/types/contact').ContactCategory }) => addContact({ name, ...details }),
     onOpenProject: handleOpenProject,
@@ -1416,7 +1430,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     scheduleActions, updateRoutine, updateEventContext, hideEvent, updateEvent,
     contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
     eventNotesMap, eventContextOverrides,
-    handleSendToList, handleCreateListInTriage, addProject, searchContacts, addContact,
+    handleSendToList, handleCreateListInTriage, addProject, handleConvertTaskToProject, searchContacts, addContact,
     handleOpenProject, getDomainForCalendar,
     refreshDateInstances, meetingNotes.startMeeting, updateEventProject, handleChatOpenChange, handleOpenGuidedChat,
   ])

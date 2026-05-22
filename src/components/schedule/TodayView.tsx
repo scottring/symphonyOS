@@ -362,10 +362,49 @@ export function TodayView({
 
   const listRef = useRef<HTMLDivElement>(null)
 
+  // ── Today's top priority — the task the focus card jumps to ──────────────────
+  // Overdue tasks win (mirroring OverdueSection's sort: incomplete first, then
+  // earliest scheduledFor). Otherwise the first incomplete, non-meal task in
+  // schedule order. Meals and events are never "priorities". null = nothing to do.
+  const topPriorityId = useMemo<string | null>(() => {
+    if (data.isToday && data.overdueTasks.length > 0) {
+      const top = [...data.overdueTasks]
+        .filter((t) => !t.completed)
+        .sort((a, b) => {
+          const da = a.scheduledFor ? new Date(a.scheduledFor).getTime() : 0
+          const db = b.scheduledFor ? new Date(b.scheduledFor).getTime() : 0
+          return da - db
+        })[0]
+      if (top) return `task-${top.id}`
+    }
+    for (const section of data.sectionsOrder) {
+      const items = data.grouped[section]
+      if (!items) continue
+      for (const item of items) {
+        if (item.type === 'task' && !item.completed && !isMealItem(item.id, item.type, item.title)) {
+          return item.id
+        }
+      }
+    }
+    return null
+  }, [data.isToday, data.overdueTasks, data.sectionsOrder, data.grouped])
+
   const handleFocusActivate = useCallback(() => {
+    if (topPriorityId) {
+      // Scroll the task into view, then open its detail panel. Standard rows carry
+      // a data-item-id marker; overdue rows live inside OverdueSection (no marker),
+      // so fall back to that section's data-today-first wrapper.
+      const el =
+        (listRef.current?.querySelector(`[data-item-id="${topPriorityId}"]`) as HTMLElement | null) ??
+        (listRef.current?.querySelector('[data-today-first]') as HTMLElement | null)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      onSelectItem(topPriorityId)
+      return
+    }
+    // Only meals/events today — keep the old scroll-to-first behavior.
     const el = listRef.current?.querySelector('[data-today-first]') as HTMLElement | null
     el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }, [])
+  }, [topPriorityId, onSelectItem])
 
   // ── First-item marker (exactly one element gets data-today-first) ────────────
   // Overdue section takes priority; otherwise the first item id of the first non-empty section.
@@ -627,7 +666,7 @@ export function TodayView({
                       return (
                         <div key={item.id}>
                         {insertBefore}
-                        <div {...(isFirstItem ? { 'data-today-first': '' } : {})}>
+                        <div data-item-id={item.id} {...(isFirstItem ? { 'data-today-first': '' } : {})}>
                         <ScheduleItem
                           item={item}
                           selected={selectedItemId === item.id}

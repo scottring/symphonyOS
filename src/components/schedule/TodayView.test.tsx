@@ -72,14 +72,16 @@ describe('TodayView', () => {
     renderView()
     expect(screen.getByRole('button', { name: /this week/i })).toBeInTheDocument()
   })
-  it('focus card click scrolls the first item into view', async () => {
+  it('focus card click scrolls to AND opens the top-priority task', async () => {
     const scrollSpy = vi.fn()
     window.HTMLElement.prototype.scrollIntoView = scrollSpy
+    const onSelectItem = vi.fn()
     const today = new Date('2026-05-19T09:00:00')
     const { user } = renderView({
+      onSelectItem,
       tasks: [
         {
-          id: 'task-1',
+          id: 'abc',
           title: 'Test task',
           completed: false,
           createdAt: today,
@@ -91,6 +93,8 @@ describe('TodayView', () => {
     })
     await user.click(screen.getByRole('button', { name: /today's focus/i }))
     expect(scrollSpy).toHaveBeenCalled()
+    // The card no longer just scrolls — it opens the top priority's detail panel.
+    expect(onSelectItem).toHaveBeenCalledWith('task-abc')
   })
 
   it('renders the assignee filter and a routine show/hide toggle', () => {
