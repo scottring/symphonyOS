@@ -107,7 +107,7 @@ function ProfileRow({ label, value }: { label: string; value?: string | null }) 
   return (
     <div className="flex gap-3">
       <dt className="w-28 shrink-0 text-neutral-400">{label}</dt>
-      <dd className="text-neutral-800 capitalize">{value}</dd>
+      <dd className="text-neutral-800">{value}</dd>
     </div>
   )
 }

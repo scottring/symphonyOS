@@ -30,7 +30,7 @@ describe('MemberView', () => {
     const onSelectTask = vi.fn()
     const tasks = [makeTask({ id: 't1', title: 'Call dentist', assignedTo: 'm1' })]
     render(<MemberView member={makeMember()} tasks={tasks} onBack={vi.fn()} onSelectTask={onSelectTask} onEditInSettings={vi.fn()} />)
-    fireEvent.click(screen.getByText('Call dentist'))
+    fireEvent.click(screen.getByRole('button', { name: 'Call dentist' }))
     expect(onSelectTask).toHaveBeenCalledWith('t1')
   })
 
@@ -53,9 +53,18 @@ describe('MemberView', () => {
   it('fires onBack and onEditInSettings', () => {
     const onBack = vi.fn(); const onEditInSettings = vi.fn()
     render(<MemberView member={makeMember()} tasks={[]} onBack={onBack} onSelectTask={vi.fn()} onEditInSettings={onEditInSettings} />)
-    fireEvent.click(screen.getByText('Back'))
-    fireEvent.click(screen.getByText('Edit in Settings'))
+    fireEvent.click(screen.getByRole('button', { name: /back/i }))
+    fireEvent.click(screen.getByRole('button', { name: /edit in settings/i }))
     expect(onBack).toHaveBeenCalled()
     expect(onEditInSettings).toHaveBeenCalled()
+  })
+
+  it('renders the Upcoming section for future-scheduled tasks', () => {
+    const future = new Date()
+    future.setDate(future.getDate() + 3)
+    const tasks = [makeTask({ id: 'u1', title: 'Soccer practice', assignedTo: 'm1', scheduledFor: future })]
+    render(<MemberView member={makeMember()} tasks={tasks} onBack={vi.fn()} onSelectTask={vi.fn()} onEditInSettings={vi.fn()} />)
+    expect(screen.getByText('Upcoming')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /soccer practice/i })).toBeInTheDocument()
   })
 })
