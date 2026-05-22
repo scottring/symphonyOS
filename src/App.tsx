@@ -1581,6 +1581,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
         // for tasks. Tasks in entities expose the bare uuid.
         setSelectedItemId(`task-${taskId}`)
       }}
+      onOpenMember={handleOpenMember}
       onPinNavigate={handlePinNavigate}
       onPinMarkAccessed={pinnedItems.markAccessed}
       onPinRefreshStale={pinnedItems.refreshStale}
