@@ -25,6 +25,7 @@ interface OverdueSectionProps {
   projectsMap?: Map<string, Project>
   familyMembers?: FamilyMember[]
   onAssignTask?: (taskId: string, memberId: string | null) => void
+  onAssignTaskAll?: (taskId: string, memberIds: string[]) => void
   followUpTaskId?: string | null
   onToggleWithFollowUp?: (taskId: string, wasCompleted: boolean) => void
   onFollowUpSubmit?: (title: string, sourceTaskId: string) => void
@@ -51,6 +52,7 @@ export function OverdueSection({
   projectsMap,
   familyMembers = [],
   onAssignTask,
+  onAssignTaskAll,
   followUpTaskId,
   onToggleWithFollowUp,
   onFollowUpSubmit,
@@ -126,9 +128,10 @@ export function OverdueSection({
                   onDefer={onPushTask ? (target: Date | 'week' | 'month' | 'quarter') => onPushTask(taskId, target) : undefined}
                   familyMembers={familyMembers}
                   assignedTo={task.assignedTo}
-                  onAssign={
-                    onAssignTask
-                      ? (memberId) => onAssignTask(taskId, memberId)
+                  assignedToAll={task.assignedToAll ?? []}
+                  onAssignAll={
+                    onAssignTaskAll
+                      ? (memberIds) => onAssignTaskAll(taskId, memberIds)
                       : undefined
                   }
                   onOpenDetail={() => onSelectTask(`task-${task.id}`)}
@@ -176,9 +179,15 @@ export function OverdueSection({
                 projectId={task.projectId || undefined}
                 familyMembers={familyMembers}
                 assignedTo={task.assignedTo}
+                assignedToAll={task.assignedToAll ?? []}
                 onAssign={
                   onAssignTask
                     ? (memberId) => onAssignTask(taskId, memberId)
+                    : undefined
+                }
+                onAssignAll={
+                  onAssignTaskAll
+                    ? (memberIds) => onAssignTaskAll(taskId, memberIds)
                     : undefined
                 }
                 onContextChange={onUpdateTask ? (context) => onUpdateTask(taskId, { context }) : undefined}

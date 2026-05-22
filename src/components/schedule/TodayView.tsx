@@ -496,6 +496,7 @@ export function TodayView({
                   projectsMap={ctx.projectsMap}
                   familyMembers={ctx.familyMembers}
                   onAssignTask={ctx.onAssignTask}
+                  onAssignTaskAll={ctx.onAssignTaskAll}
                   followUpTaskId={followUpTaskId}
                   onToggleWithFollowUp={handleToggleTaskWithFollowUp}
                   onFollowUpSubmit={onCreateFollowUp ? handleFollowUpSubmit : undefined}

@@ -523,8 +523,8 @@ function LinkedTaskRow({ task, onToggle, onDelete, onUpdate, getScheduleItemsFor
             onUpdate(task.id, { context })
           }}
           familyMembers={familyMembers}
-          onAssign={(memberId) => {
-            onUpdate(task.id, { assignedTo: memberId ?? undefined })
+          onAssignAll={(memberIds) => {
+            onUpdate(task.id, { assignedToAll: memberIds, assignedTo: memberIds[0] ?? undefined })
           }}
           size="sm"
           className="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity"
@@ -1639,8 +1639,8 @@ export function DetailPanelRedesign({
                                 onUpdate(subtask.id, { context })
                               }}
                               familyMembers={familyMembers}
-                              onAssign={(memberId) => {
-                                onUpdate(subtask.id, { assignedTo: memberId ?? undefined })
+                              onAssignAll={(memberIds) => {
+                                onUpdate(subtask.id, { assignedToAll: memberIds, assignedTo: memberIds[0] ?? undefined })
                               }}
                               size="sm"
                               className="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity"

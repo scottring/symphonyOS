@@ -2,7 +2,7 @@ import type { Task, TaskContext } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
 import { SchedulePopover, type ScheduleContextItem } from './SchedulePopover'
 import { ContextPicker } from './ContextPicker'
-import { AssigneeDropdown } from '@/components/family'
+import { MultiAssigneeDropdown } from '@/components/family'
 
 interface TaskQuickActionsProps {
   task: Task
@@ -11,9 +11,9 @@ interface TaskQuickActionsProps {
   getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
   // Context action
   onContextChange?: (context: TaskContext | undefined) => void
-  // Assign action
+  // Assign action (multi-assignee)
   familyMembers?: FamilyMember[]
-  onAssign?: (memberId: string | null) => void
+  onAssignAll?: (memberIds: string[]) => void
   // Layout
   size?: 'sm' | 'md'
   className?: string
@@ -29,13 +29,13 @@ export function TaskQuickActions({
   getScheduleItemsForDate,
   onContextChange,
   familyMembers = [],
-  onAssign,
+  onAssignAll,
   size = 'sm',
   className = '',
 }: TaskQuickActionsProps) {
   const hasSchedule = !!onSchedule
   const hasContext = !!onContextChange
-  const hasAssign = familyMembers.length > 0 && !!onAssign
+  const hasAssign = familyMembers.length > 0 && !!onAssignAll
 
   // Don't render if no actions available
   if (!hasSchedule && !hasContext && !hasAssign) {
@@ -92,13 +92,14 @@ export function TaskQuickActions({
         />
       )}
 
-      {/* Assignee dropdown */}
+      {/* Assignee dropdown (multi-select) */}
       {hasAssign && (
-        <AssigneeDropdown
+        <MultiAssigneeDropdown
           members={familyMembers}
-          selectedId={task.assignedTo}
-          onSelect={onAssign}
+          selectedIds={task.assignedToAll ?? (task.assignedTo ? [task.assignedTo] : [])}
+          onSelect={onAssignAll}
           size={size}
+          label="Who's responsible?"
         />
       )}
     </div>

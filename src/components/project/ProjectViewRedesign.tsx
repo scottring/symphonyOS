@@ -494,8 +494,8 @@ export function ProjectViewRedesign({
                                 onUpdateTask(task.id, { context })
                               }}
                               familyMembers={familyMembers}
-                              onAssign={(memberId) => {
-                                onUpdateTask(task.id, { assignedTo: memberId ?? undefined })
+                              onAssignAll={(memberIds) => {
+                                onUpdateTask(task.id, { assignedToAll: memberIds, assignedTo: memberIds[0] ?? undefined })
                               }}
                               className="opacity-0 group-hover:opacity-100 transition-opacity"
                             />

@@ -5,7 +5,7 @@ import type { FamilyMember } from '@/types/family'
 import type { List, ListCategory } from '@/types/list'
 import { SchedulePopover, DeferPicker, type ScheduleContextItem } from '@/components/triage'
 import { ListPicker } from '@/components/triage/ListPicker'
-import { AssigneeDropdown } from '@/components/family'
+import { MultiAssigneeDropdown } from '@/components/family'
 import { AgeIndicator } from '@/components/health'
 
 interface TriageCardProps {
@@ -15,7 +15,6 @@ interface TriageCardProps {
   onCollapse: () => void
   projects?: Project[]
   familyMembers?: FamilyMember[]
-  onAssignTask?: (memberId: string | null) => void
   autoCollapseMs?: number
   // Schedule context for the schedule popover
   getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
@@ -33,7 +32,6 @@ export function TriageCard({
   onCollapse,
   projects = [],
   familyMembers = [],
-  onAssignTask,
   autoCollapseMs = 4000,
   getScheduleItemsForDate,
   lists = [],
@@ -152,12 +150,13 @@ export function TriageCard({
         <div className="flex-1" />
 
         {/* Assignee avatar */}
-        {familyMembers.length > 0 && onAssignTask && (
-          <AssigneeDropdown
+        {familyMembers.length > 0 && (
+          <MultiAssigneeDropdown
             members={familyMembers}
-            selectedId={task.assignedTo}
-            onSelect={onAssignTask}
+            selectedIds={task.assignedToAll ?? (task.assignedTo ? [task.assignedTo] : [])}
+            onSelect={(memberIds) => onUpdate({ assignedToAll: memberIds, assignedTo: memberIds[0] ?? undefined })}
             size="sm"
+            label="Who's responsible?"
           />
         )}
       </div>

@@ -5,7 +5,7 @@ import { formatTime } from '@/lib/timeUtils'
 import { getProjectColor } from '@/lib/projectUtils'
 import { DOMAIN_COLORS } from '@/lib/domainColors'
 import { TypeIcon } from './TypeIcon'
-import { AssigneeDropdown } from '@/components/family'
+import { MultiAssigneeDropdown } from '@/components/family'
 import { ArrowRightToLine, Redo2, MoreHorizontal, Clock, Video } from 'lucide-react'
 import { locationLink } from '@/lib/locationLink'
 
@@ -20,7 +20,8 @@ interface SwipeableCardProps {
   onOpenDetail?: () => void
   familyMembers?: FamilyMember[]
   assignedTo?: string | null
-  onAssign?: (memberId: string | null) => void
+  assignedToAll?: string[]
+  onAssignAll?: (memberIds: string[]) => void
 }
 
 // Swipe thresholds
@@ -38,7 +39,8 @@ export const SwipeableCard = memo(function SwipeableCard({
   onOpenDetail,
   familyMembers = [],
   assignedTo,
-  onAssign,
+  assignedToAll,
+  onAssignAll,
 }: SwipeableCardProps) {
   const cardRef = useRef<HTMLDivElement>(null)
   const [translateX, setTranslateX] = useState(0)
@@ -307,11 +309,12 @@ export const SwipeableCard = memo(function SwipeableCard({
               onTouchEnd={(e) => e.stopPropagation()}
               onTouchMove={(e) => e.stopPropagation()}
             >
-              <AssigneeDropdown
+              <MultiAssigneeDropdown
                 members={familyMembers}
-                selectedId={assignedTo}
-                onSelect={onAssign || (() => {})}
+                selectedIds={assignedToAll ?? (assignedTo ? [assignedTo] : [])}
+                onSelect={onAssignAll || (() => {})}
                 size="sm"
+                label="Who's responsible?"
               />
             </div>
           )}
