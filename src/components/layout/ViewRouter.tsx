@@ -109,6 +109,7 @@ export interface ViewRouterProps {
   selectedTaskNotes: Note[]
   selectedTaskNotesLoading: boolean
   onAddTaskNote: (content: string, entityType: NoteEntityType, entityId: string) => Promise<void>
+  onSaveTaskNoteToVault?: (content: string) => Promise<{ ok: boolean; url?: string }>
 
   // Contacts view
   onDeleteContact: (id: string) => Promise<void>
@@ -263,6 +264,7 @@ export function ViewRouter(props: ViewRouterProps) {
             entityNotes={props.selectedTaskNotes}
             entityNotesLoading={props.selectedTaskNotesLoading}
             onAddEntityNote={props.onAddTaskNote}
+            onSaveNoteToVault={props.onSaveTaskNoteToVault}
           />
         </Suspense>
       )}

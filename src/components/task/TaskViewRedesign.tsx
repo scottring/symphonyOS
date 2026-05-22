@@ -7,6 +7,7 @@ import { PushDropdown, ContextPicker } from '@/components/triage'
 import { DOMAIN_COLORS } from '@/lib/domainColors'
 import { EntityNotesSection } from '@/components/notes/EntityNotesSection'
 import { UnifiedNotesEditor } from '@/components/notes/UnifiedNotesEditor'
+import { CloudUpload, Check } from 'lucide-react'
 
 interface TaskViewProps {
   task: Task
@@ -32,6 +33,8 @@ interface TaskViewProps {
   entityNotesLoading?: boolean
   onAddEntityNote?: (content: string, entityType: NoteEntityType, entityId: string) => Promise<void>
   onNavigateToNote?: (noteId: string) => void
+  /** Promote the current task notes into a persisting vault note linked to this task. */
+  onSaveNoteToVault?: (content: string) => Promise<{ ok: boolean; url?: string }>
 }
 
 export function TaskViewRedesign({
@@ -56,6 +59,7 @@ export function TaskViewRedesign({
   entityNotesLoading = false,
   onAddEntityNote,
   onNavigateToNote,
+  onSaveNoteToVault,
 }: TaskViewProps) {
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -137,6 +141,17 @@ export function TaskViewRedesign({
   const handleNotesChange = useCallback((value: string | null) => {
     onUpdate(task.id, { notes: value || undefined })
   }, [task.id, onUpdate])
+
+  // "Save to vault" — promote the task's notes into a persisting linked vault note.
+  const [vaultSaveStatus, setVaultSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const handleSaveToVault = useCallback(async () => {
+    const content = task.notes?.trim()
+    if (!content || !onSaveNoteToVault) return
+    setVaultSaveStatus('saving')
+    const res = await onSaveNoteToVault(content)
+    setVaultSaveStatus(res.ok ? 'saved' : 'error')
+    if (res.ok) setTimeout(() => setVaultSaveStatus('idle'), 4000)
+  }, [task.notes, onSaveNoteToVault])
 
   const handleDelete = () => {
     onDelete(task.id)
@@ -512,7 +527,28 @@ export function TaskViewRedesign({
 
             {/* ========== NOTES - Rich text editor ========== */}
             <div className="pt-8 border-t border-neutral-200/60">
-              <h2 className="font-display text-lg font-medium text-neutral-800 mb-4">Notes</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-display text-lg font-medium text-neutral-800">Notes</h2>
+                {onSaveNoteToVault && (
+                  <button
+                    type="button"
+                    onClick={handleSaveToVault}
+                    disabled={!task.notes?.trim() || vaultSaveStatus === 'saving'}
+                    title="Save these notes as a permanent note in your vault, linked to this task"
+                    className="inline-flex items-center gap-1.5 text-sm text-neutral-600 hover:text-primary-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {vaultSaveStatus === 'saved' ? (
+                      <><Check className="w-4 h-4" /> Saved to vault</>
+                    ) : vaultSaveStatus === 'error' ? (
+                      <><CloudUpload className="w-4 h-4" /> Retry save</>
+                    ) : vaultSaveStatus === 'saving' ? (
+                      <><CloudUpload className="w-4 h-4 animate-pulse" /> Saving…</>
+                    ) : (
+                      <><CloudUpload className="w-4 h-4" /> Save to vault</>
+                    )}
+                  </button>
+                )}
+              </div>
               <UnifiedNotesEditor
                 value={task.notes}
                 onChange={handleNotesChange}

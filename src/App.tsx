@@ -860,6 +860,32 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     [addNote, addEntityLink, getNotesForEntity]
   )
 
+  // "Save to vault": promote a task's notes into a persisting vault note (durable,
+  // via GitHub), linked to the task so it survives the task being completed.
+  const handleSaveTaskNoteToVault = useCallback(
+    async (content: string): Promise<{ ok: boolean; url?: string }> => {
+      if (!selectedTask) return { ok: false }
+      const title = selectedTask.title?.trim() || 'Task note'
+      const slug =
+        title
+          .toLowerCase()
+          .replace(/[^a-z0-9\s-]/g, '')
+          .replace(/\s+/g, '-')
+          .replace(/-+/g, '-')
+          .replace(/^-|-$/g, '') || 'task-note'
+      const path = `notes/${slug}-${selectedTask.id.slice(0, 8)}.md`
+      const result = await vaultWrite.createVaultNote(
+        { title, content, path },
+        `Save task note to vault: ${title}`
+      )
+      if (!result?.success || !result.noteId) return { ok: false }
+      await addEntityLink(result.noteId, { entityType: 'task', entityId: selectedTask.id, linkType: 'primary' })
+      setSelectedTaskNotes(await getNotesForEntity('task', selectedTask.id))
+      return { ok: true, url: result.githubUrl }
+    },
+    [selectedTask, vaultWrite, addEntityLink, getNotesForEntity]
+  )
+
   // Handle search result selection
   const handleSearchSelect = useCallback((result: SearchResult) => {
     setSearchOpen(false)
@@ -1808,6 +1834,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
           selectedTaskNotes={selectedTaskNotes}
           selectedTaskNotesLoading={selectedTaskNotesLoading}
           onAddTaskNote={handleAddTaskNote}
+          onSaveTaskNoteToVault={handleSaveTaskNoteToVault}
           onDeleteContact={deleteContact}
           onUpdateContact={updateContact}
           selectedContactForView={selectedContactForView}

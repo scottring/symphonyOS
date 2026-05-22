@@ -15,6 +15,7 @@ import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useContacts } from '@/hooks/useContacts';
 import { useProjects } from '@/hooks/useProjects';
 import { useNotesContext } from '@/contexts/NotesContext';
+import { useVaultWrite } from '@/hooks/useVaultWrite';
 import { LoadingFallback } from '@/components/layout/LoadingFallback';
 import { TaskView } from '@/components/lazy';
 
@@ -29,6 +30,7 @@ export function TaskViewContainer({ taskId, onBack }: Props) {
   const { contacts, contactsMap, addContact, searchContacts } = useContacts();
   const { projects, projectsMap, addProject, searchProjects } = useProjects();
   const { addNote, addEntityLink, getNotesForEntity } = useNotesContext();
+  const { createVaultNote } = useVaultWrite();
   const navigate = useNavigate();
 
   const task = useMemo(() => tasks.find(t => t.id === taskId) ?? null, [tasks, taskId]);
@@ -59,6 +61,33 @@ export function TaskViewContainer({ taskId, onBack }: Props) {
       }
     },
     [addNote, addEntityLink, getNotesForEntity],
+  );
+
+  // "Save to vault": write the task's notes as a persisting markdown note in the
+  // vault (durable, via GitHub — no Mac Mini dependency), then link it to the task
+  // so it surfaces here and survives the task being completed/deleted.
+  const handleSaveNoteToVault = useCallback(
+    async (content: string): Promise<{ ok: boolean; url?: string }> => {
+      if (!task) return { ok: false };
+      const title = task.title?.trim() || 'Task note';
+      const slug =
+        title
+          .toLowerCase()
+          .replace(/[^a-z0-9\s-]/g, '')
+          .replace(/\s+/g, '-')
+          .replace(/-+/g, '-')
+          .replace(/^-|-$/g, '') || 'task-note';
+      const path = `notes/${slug}-${task.id.slice(0, 8)}.md`;
+      const result = await createVaultNote(
+        { title, content, path },
+        `Save task note to vault: ${title}`,
+      );
+      if (!result?.success || !result.noteId) return { ok: false };
+      await addEntityLink(result.noteId, { entityType: 'task', entityId: task.id, linkType: 'primary' });
+      setEntityNotes(await getNotesForEntity('task', task.id));
+      return { ok: true, url: result.githubUrl };
+    },
+    [task, createVaultNote, addEntityLink, getNotesForEntity],
   );
 
   const handleDelete = useCallback(
@@ -103,6 +132,7 @@ export function TaskViewContainer({ taskId, onBack }: Props) {
         entityNotes={entityNotes}
         entityNotesLoading={entityNotesLoading}
         onAddEntityNote={handleAddEntityNote}
+        onSaveNoteToVault={handleSaveNoteToVault}
       />
     </Suspense>
   );
