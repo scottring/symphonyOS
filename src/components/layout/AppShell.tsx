@@ -574,11 +574,10 @@ export function AppShell({
             projects={entities?.projects ?? []}
             familyMembers={railFamilyMembers}
             onSelectProject={(id) => {
-              // Navigate to projects view; opening a specific project detail
-              // is the projects-list responsibility. A future iteration can
-              // pin-deep-link via pin/navigate handlers.
-              onViewChange('projects')
-              void id
+              // Open the specific project. Falls back to the projects list
+              // if the deep-link handler isn't wired.
+              if (onPinNavigate) onPinNavigate('project', id)
+              else onViewChange('projects')
             }}
             onViewAllProjects={() => onViewChange('projects')}
             onSelectMember={(id) => {
