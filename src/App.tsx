@@ -1955,6 +1955,8 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
           weeklyGoalActions={weeklyGoalActions}
           onAddGoalActionToWeek={handleAddGoalActionToWeek}
           onOpenWeeklyPlanning={() => handleViewChange('weekly-planning')}
+          selectedMember={selectedMember}
+          onEditMemberInSettings={() => handleViewChange('settings')}
         />
 
         {/* Search Modal */}

@@ -8,6 +8,7 @@ import {
 } from '@/components/meals'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 import { HomeView } from '@/components/home'
+import { MemberView } from '@/components/family/MemberView'
 import { HomeApp } from '@/apps/home'
 import { MorningPage } from '@/pages/MorningPage'
 import { BedtimePage } from '@/pages/BedtimePage'
@@ -118,6 +119,8 @@ export interface ViewRouterProps {
   onUpdateContact: (id: string, updates: Partial<Contact>) => Promise<void>
 
   // Contact detail view
+  selectedMember: FamilyMember | null
+  onEditMemberInSettings: () => void
   selectedContactForView: Contact | null
   selectedContactId: string | null
   onSelectTaskFromContact: (taskId: string) => void
@@ -330,6 +333,16 @@ export function ViewRouter(props: ViewRouterProps) {
             onAddEntityNote={props.onAddContactNote}
           />
         </Suspense>
+      )}
+
+      {props.activeView === 'family-member' && props.selectedMember && (
+        <MemberView
+          member={props.selectedMember}
+          tasks={props.tasks}
+          onBack={() => navigate('/')}
+          onSelectTask={props.onSelectItem}
+          onEditInSettings={props.onEditMemberInSettings}
+        />
       )}
 
       {props.activeView === 'projects' && !props.selectedProjectId && (
