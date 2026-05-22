@@ -48,7 +48,6 @@ export function WeeklyPlanningSession({
     [selectedIds, tasks],
   )
 
-
   const handleToggle = useCallback(
     (task: Task) => {
       const isSelected = selectedIds.includes(task.id)
