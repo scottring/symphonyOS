@@ -17,8 +17,9 @@ describe('PanelWhy', () => {
   it('renders editor when clicked and onChange provided', async () => {
     const { user } = render(<PanelWhy notes="<p>hello</p>" onChange={vi.fn()} />)
     await user.click(screen.getByText(/hello/))
-    // After click, the trigger button is replaced by the editor wrapper
-    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    // After click, the click-to-edit trigger (the button showing the note text)
+    // is replaced by the editor. (A persistent expand button remains in the header.)
+    expect(screen.queryByRole('button', { name: /hello/ })).not.toBeInTheDocument()
   })
 
   it('does not switch to editor when read-only (no onChange)', async () => {
