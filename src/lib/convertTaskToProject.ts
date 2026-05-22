@@ -16,7 +16,9 @@ export interface ConvertTaskToProjectDeps {
 
 /**
  * Convert a task into a project: the task "expands" into a project.
- * - title/notes/context come from `details` (editable in the modal)
+ * - title/notes/context come from `details` and are authoritative — the modal
+ *   pre-fills them from the task, so callers must pass `details.notes` (and
+ *   context) to preserve the task's values; omitting them clears those fields.
  * - links/phoneNumber carry over from the source task
  * - each subtask is re-parented into the new project (parentTaskId cleared)
  * - the original parent task is deleted

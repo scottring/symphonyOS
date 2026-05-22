@@ -36,7 +36,7 @@ describe('convertTaskToProject', () => {
     const deps = makeDeps()
     const task = makeTask({
       notes: 'kickoff Q3',
-      links: [{ url: 'https://x.test', label: 'brief' } as any],
+      links: [{ url: 'https://x.test', title: 'brief' }],
       phoneNumber: '555-1212',
       context: 'work',
     })
@@ -52,7 +52,7 @@ describe('convertTaskToProject', () => {
       name: 'Plan Q3 launch',
       notes: 'kickoff Q3',
       context: 'work',
-      links: [{ url: 'https://x.test', label: 'brief' }],
+      links: [{ url: 'https://x.test', title: 'brief' }],
       phoneNumber: '555-1212',
     })
   })
