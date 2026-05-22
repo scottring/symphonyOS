@@ -10,7 +10,9 @@
 
 **Spec:** `docs/superpowers/specs/2026-05-22-weekly-planning-session-design.md`
 
-**Worktree:** Create one before executing — `git worktree add .worktrees/weekly-planning -b feat/weekly-planning` and `cp .env .worktrees/weekly-planning/.env`.
+**Worktree:** Already created at `.worktrees/weekly-planning` (branch `feat/weekly-planning`, `.env` copied, `node_modules` symlinked).
+
+> **▶ RESUME STATUS (2026-05-22):** Task 1 ✅ DONE & spec-reviewed — commit `4ba97d5` (`weeklyPlanning.ts` + tests, 4/4 pass). **Resume at Task 2.** Continue subagent-driven (fresh implementer subagent per task → spec review → code-quality review) in this worktree. Tasks 2–9 remain.
 
 ---
 
