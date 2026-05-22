@@ -12,7 +12,8 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import type { ListCategory } from '@/types/list'
 import type { Note, NoteEntityType } from '@/types/note'
-import { GoalsProvider } from '@/contexts/GoalsContext'
+import { GoalsProvider, useGoalsContext } from '@/contexts/GoalsContext'
+import type { GoalAction } from '@/types/goal'
 import { ListsProvider, useListsContext } from '@/contexts/ListsContext'
 import { NotesProvider, useNotesContext } from '@/contexts/NotesContext'
 import { GeneratePlanProvider } from '@/contexts/GeneratePlanContext'
@@ -205,7 +206,8 @@ function App() {
 }
 
 function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
-  const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask } = useSupabaseTasks()
+  const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask, setBucket } = useSupabaseTasks()
+  const { goals, getCurrentQuarter } = useGoalsContext()
   const { isConnected, events, fetchEvents, isFetching: eventsFetching, createEvent, updateEvent, moveEvent, deleteEvent, removeEventLocal, restoreEventLocal, fetchCalendarList, connect: connectCalendar } = useGoogleCalendar()
   const attachments = useAttachments()
   const { fetchAttachments } = attachments
@@ -375,7 +377,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   const params = useParams<{ projectId?: string; routineId?: string; contactId?: string }>()
 
   // State for non-URL-routed views
-  const [stateView, setStateView] = useState<'agent' | 'today' | 'inbox' | 'lists' | 'notes' | 'history' | 'settings' | 'task-detail' | null>(null)
+  const [stateView, setStateView] = useState<'agent' | 'today' | 'inbox' | 'lists' | 'notes' | 'history' | 'settings' | 'task-detail' | 'weekly-planning' | null>(null)
 
   // Derive view from URL path or state
   const activeView: ViewType = useMemo(() => {
@@ -635,6 +637,9 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     else if (view === 'agent' || view === 'inbox' || view === 'lists' || view === 'notes' || view === 'history' || view === 'settings' || view === 'task-detail') {
       setStateView(view)
       navigate('/') // Navigate to home URL but show state view
+    } else if (view === 'weekly-planning') {
+      setStateView('weekly-planning')
+      navigate('/')
     } else {
       setStateView(null)
       navigate('/') // fallback
@@ -889,6 +894,37 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     },
     [vaultWrite, addEntityLink, getNotesForEntity]
   )
+
+  // Current-quarter incomplete goal actions — surfaced in the weekly planning session
+  // so quarterly intentions can be pulled into the week.
+  const weeklyGoalActions = useMemo<GoalAction[]>(() => {
+    const q = getCurrentQuarter()
+    return goals.flatMap(g => g.actions).filter(a => a.quarter === q && !a.completed)
+  }, [goals, getCurrentQuarter])
+
+  // Persist a completed weekly planning session as a vault note.
+  const saveWeeklyPlanToVault = useCallback(
+    async ({ weekId, priorities, concerns }: { weekId: string; priorities: Task[]; concerns: string }): Promise<{ ok: boolean }> => {
+      const { formatWeeklyNote } = await import('@/components/planning/weekly/weeklyPlanning')
+      const scheduleSummary = priorities
+        .filter(t => t.scheduledFor)
+        .map(t => `- ${t.title} (${new Date(t.scheduledFor as Date).toLocaleDateString()})`)
+        .join('\n')
+      const note = formatWeeklyNote({ weekId, priorities, scheduleSummary, concerns })
+      const result = await vaultWrite.createVaultNote(
+        { title: note.title, content: note.content, path: note.path },
+        `Weekly plan: ${weekId}`,
+      )
+      return { ok: !!result?.success }
+    },
+    [vaultWrite],
+  )
+
+  // Pull a quarterly goal action into the week as a new 'week'-bucket task.
+  const handleAddGoalActionToWeek = useCallback(async (action: GoalAction) => {
+    const id = await addTask(action.description)
+    if (id) await setBucket(id, 'week')
+  }, [addTask, setBucket])
 
   // Legacy desktop/panel paths bind to selectedTask; the surface panel binds to
   // its own selectedItem.originalTask (see the TapContextPanel render below).
@@ -1880,6 +1916,10 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
           onToggleRoutineVisibility={toggleRoutineVisibility}
           projectsMap={projectsMap}
           refetchFamilyMembers={refetchFamilyMembers}
+          onSaveWeeklyPlanToVault={saveWeeklyPlanToVault}
+          weeklyGoalActions={weeklyGoalActions}
+          onAddGoalActionToWeek={handleAddGoalActionToWeek}
+          onOpenWeeklyPlanning={() => handleViewChange('weekly-planning')}
         />
 
         {/* Search Modal */}

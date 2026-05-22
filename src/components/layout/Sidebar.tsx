@@ -19,6 +19,7 @@ import { ConceptIcon } from '@/lib/conceptIcons'
 import {
   Sun,
   CalendarRange,
+  CalendarCheck,
   UtensilsCrossed,
   FolderKanban,
   Home,
@@ -41,7 +42,7 @@ const FEATURES = {
   lists: true,
 }
 
-export type ViewType = 'agent' | 'home' | 'home-app' | 'today' | 'inbox' | 'goals' | 'projects' | 'routines' | 'lists' | 'notes' | 'contacts' | 'history' | 'task-detail' | 'contact-detail' | 'settings' | 'meals' | 'morning' | 'bedtime'
+export type ViewType = 'agent' | 'home' | 'home-app' | 'today' | 'inbox' | 'goals' | 'projects' | 'routines' | 'lists' | 'notes' | 'contacts' | 'history' | 'task-detail' | 'contact-detail' | 'settings' | 'meals' | 'morning' | 'bedtime' | 'weekly-planning'
 
 interface EntityData {
   tasks: Task[]
@@ -271,6 +272,15 @@ export function Sidebar({
         >
           {createElement(CalendarRange, { className: 'w-5 h-5 shrink-0' })}
           {!collapsed && <span>This Week</span>}
+        </button>
+
+        {/* Plan the week — top-level weekly planning session view. */}
+        <button
+          onClick={() => onViewChange('weekly-planning')}
+          className={navItemClass(activeView === 'weekly-planning')}
+        >
+          {createElement(CalendarCheck, { className: 'w-5 h-5 shrink-0' })}
+          {!collapsed && <span>Plan the week</span>}
         </button>
 
         {/* Meals */}

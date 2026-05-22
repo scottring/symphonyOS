@@ -43,6 +43,7 @@ interface HomeViewProps {
   onDateChange: (date: Date) => void
   currentUserMemberId?: string
   bothPanelsOpen?: boolean
+  onOpenWeeklyPlanning?: () => void
 }
 
 export function HomeView({
@@ -59,6 +60,7 @@ export function HomeView({
   onDateChange,
   currentUserMemberId,
   bothPanelsOpen,
+  onOpenWeeklyPlanning,
 }: HomeViewProps) {
   const ctx = useScheduleActionsContext()
   const { currentView, setCurrentView } = useHomeView()
@@ -408,6 +410,7 @@ export function HomeView({
             onWeekChange={setWeekStart}
             monthStart={monthStart}
             onMonthChange={setMonthStart}
+            onOpenWeeklyPlanning={onOpenWeeklyPlanning}
           />
         </div>
       )}

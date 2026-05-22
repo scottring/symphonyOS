@@ -33,6 +33,7 @@ import {
   GoalView,
   GoalPlanningChat,
   PlanningSession,
+  WeeklyPlanningSession,
   ListsList,
   ListView,
   NotesPage,
@@ -52,6 +53,7 @@ import type { Note, NoteEntityType } from '@/types/note'
 import type { MeetingState } from '@/hooks/useMeetingNotes'
 import type { TaskLink } from '@/types/task'
 import type { PinnableEntityType } from '@/types/pin'
+import type { GoalAction } from '@/types/goal'
 
 export interface ViewRouterProps {
   activeView: ViewType
@@ -157,6 +159,12 @@ export interface ViewRouterProps {
 
   // Settings
   refetchFamilyMembers: () => void
+
+  // Weekly planning session
+  onSaveWeeklyPlanToVault: (input: { weekId: string; priorities: Task[]; concerns: string }) => Promise<{ ok: boolean }>
+  weeklyGoalActions: GoalAction[]
+  onAddGoalActionToWeek: (action: GoalAction) => void
+  onOpenWeeklyPlanning: () => void
 }
 
 export function ViewRouter(props: ViewRouterProps) {
@@ -204,6 +212,7 @@ export function ViewRouter(props: ViewRouterProps) {
                   onDateChange={props.onDateChange}
                   currentUserMemberId={props.currentUserMemberId}
                   bothPanelsOpen={props.bothPanelsOpen}
+                  onOpenWeeklyPlanning={props.onOpenWeeklyPlanning}
                 />
               </ScheduleActionsProvider>
             </>
@@ -237,6 +246,23 @@ export function ViewRouter(props: ViewRouterProps) {
             onPushTask={props.pushTask}
             familyMembers={props.familyMembers}
             eventNotesMap={props.eventNotesMap}
+          />
+        </Suspense>
+      )}
+
+      {props.activeView === 'weekly-planning' && (
+        <Suspense fallback={<LoadingFallback />}>
+          <WeeklyPlanningSession
+            tasks={props.tasks}
+            events={props.events}
+            routines={props.filteredRoutines}
+            initialDate={props.viewedDate}
+            onClose={() => props.onViewChange('today')}
+            onUpdateTask={props.onUpdateTask}
+            onPushTask={props.pushTask}
+            onSavePlanToVault={props.onSaveWeeklyPlanToVault}
+            goalActions={props.weeklyGoalActions}
+            onAddGoalAction={props.onAddGoalActionToWeek}
           />
         </Suspense>
       )}

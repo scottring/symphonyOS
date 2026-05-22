@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Sparkles, CalendarCheck } from 'lucide-react'
 import type { HomeViewType } from '@/types/homeView'
 import { HomeViewSwitcher } from '@/components/home/HomeViewSwitcher'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
@@ -20,6 +20,9 @@ interface HomeHeaderProps {
   /** For currentView === 'month' */
   monthStart: Date
   onMonthChange: (d: Date) => void
+
+  /** Launch the weekly planning session — shown only in week/workweek view. */
+  onOpenWeeklyPlanning?: () => void
 }
 
 function addDays(d: Date, days: number): Date {
@@ -35,7 +38,7 @@ function formatDayShort(d: Date): string {
 }
 
 export function HomeHeader(props: HomeHeaderProps) {
-  const { currentView, viewedDate, onDateChange, weekStart, onWeekChange, monthStart, onMonthChange, onViewChange } = props
+  const { currentView, viewedDate, onDateChange, weekStart, onWeekChange, monthStart, onMonthChange, onViewChange, onOpenWeeklyPlanning } = props
   const { chatOpen, onChatOpenChange, helpOpen, onHelpOpenChange, helpButtonRef } = useAppShellChrome()
 
   // Per-view label + chevron handlers
@@ -109,6 +112,17 @@ export function HomeHeader(props: HomeHeaderProps) {
       <div className="hidden md:flex items-center gap-2 md:shrink-0">
         <DomainSwitcher />
         <HomeViewSwitcher currentView={currentView} onViewChange={onViewChange} />
+        {onOpenWeeklyPlanning && (currentView === 'week' || currentView === 'workweek') && (
+          <button
+            onClick={onOpenWeeklyPlanning}
+            className="flex items-center gap-1.5 h-9 px-3 rounded-full bg-bg-elevated border border-neutral-200 text-neutral-600 hover:text-primary-600 hover:border-primary-300 transition-all text-sm font-medium shadow-card"
+            aria-label="Plan the week"
+            title="Plan the week"
+          >
+            <CalendarCheck className="w-4 h-4" />
+            <span>Plan the week</span>
+          </button>
+        )}
         <button
           onClick={() => onChatOpenChange(!chatOpen)}
           className={`w-9 h-9 rounded-full bg-bg-elevated border border-neutral-200 text-neutral-500 hover:text-primary-500 hover:border-primary-300 transition-all grid place-items-center shadow-card ${

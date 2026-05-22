@@ -83,6 +83,9 @@ export const FocusMode = lazy(() =>
 export const PlanningSession = lazy(() =>
   import('./planning/PlanningSession').then(m => ({ default: m.PlanningSession }))
 )
+export const WeeklyPlanningSession = lazy(() =>
+  import('./planning/weekly/WeeklyPlanningSession').then(m => ({ default: m.WeeklyPlanningSession }))
+)
 
 // Detail panel (only renders when an item is selected)
 export const DetailPanelRedesign = lazy(() =>
