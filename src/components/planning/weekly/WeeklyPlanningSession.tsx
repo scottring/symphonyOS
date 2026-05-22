@@ -1,9 +1,11 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import type { Task } from '@/types/task'
+import type { GoalAction } from '@/types/goal'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine } from '@/types/actionable'
 import { isoWeekId } from './weeklyPlanning'
 import { StepWeekAhead } from './StepWeekAhead'
+import { StepBuildTodos } from './StepBuildTodos'
 
 const STEPS = ['The week ahead', "This week's to-dos", 'Schedule them', 'Concerns & topics'] as const
 
@@ -16,22 +18,27 @@ interface Props {
   onSavePlanToVault: (input: { weekId: string; priorities: Task[]; concerns: string }) => Promise<{ ok: boolean }>
   onClose: () => void
   initialDate?: Date
+  goalActions?: GoalAction[]
+  onAddGoalAction?: (action: GoalAction) => void
 }
 
 export function WeeklyPlanningSession({
   tasks,
   events,
   routines,
-  onUpdateTask: _onUpdateTask,
+  onUpdateTask,
   onPushTask: _onPushTask,
   onSavePlanToVault,
   onClose,
   initialDate,
+  goalActions = [],
+  onAddGoalAction,
 }: Props) {
   const [step, setStep] = useState(0)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [concerns, setConcerns] = useState('')
   const [saving, setSaving] = useState(false)
+  const [addedGoalActionIds, setAddedGoalActionIds] = useState<string[]>([])
 
   const weekId = useMemo(() => isoWeekId(initialDate ?? new Date()), [initialDate])
   const priorities = useMemo(
@@ -39,9 +46,29 @@ export function WeeklyPlanningSession({
     [selectedIds, tasks],
   )
 
-  // setSelectedIds and setConcerns are wired in Tasks 3–6; suppress lint until then
-  void setSelectedIds
+  // setConcerns is wired in Task 6; suppress lint until then
   void setConcerns
+
+  const handleToggle = useCallback(
+    (task: Task) => {
+      setSelectedIds(ids => {
+        if (ids.includes(task.id)) {
+          return ids.filter(id => id !== task.id)
+        }
+        onUpdateTask(task.id, { bucket: 'week' })
+        return [...ids, task.id]
+      })
+    },
+    [onUpdateTask],
+  )
+
+  const handleAddGoalAction = useCallback(
+    (action: GoalAction) => {
+      onAddGoalAction?.(action)
+      setAddedGoalActionIds(ids => [...ids, action.id])
+    },
+    [onAddGoalAction],
+  )
 
   const isLast = step === STEPS.length - 1
 
@@ -77,7 +104,17 @@ export function WeeklyPlanningSession({
             routines={routines}
           />
         )}
-        {step === 1 && <div data-testid="step-build-todos">Build to-dos</div>}
+        {step === 1 && (
+          <StepBuildTodos
+            tasks={tasks}
+            selectedIds={selectedIds}
+            onToggle={handleToggle}
+            onReorder={setSelectedIds}
+            goalActions={goalActions}
+            addedGoalActionIds={addedGoalActionIds}
+            onAddGoalAction={handleAddGoalAction}
+          />
+        )}
         {step === 2 && <div data-testid="step-schedule">Schedule</div>}
         {step === 3 && <div data-testid="step-concerns">Concerns</div>}
       </div>
