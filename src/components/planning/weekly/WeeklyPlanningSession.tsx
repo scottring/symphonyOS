@@ -7,6 +7,7 @@ import { isoWeekId } from './weeklyPlanning'
 import { StepWeekAhead } from './StepWeekAhead'
 import { StepBuildTodos } from './StepBuildTodos'
 import { StepSchedule } from './StepSchedule'
+import { StepConcerns } from './StepConcerns'
 
 const STEPS = ['The week ahead', "This week's to-dos", 'Schedule them', 'Concerns & topics'] as const
 
@@ -47,8 +48,6 @@ export function WeeklyPlanningSession({
     [selectedIds, tasks],
   )
 
-  // setConcerns is wired in Task 6; suppress lint until then
-  void setConcerns
 
   const handleToggle = useCallback(
     (task: Task) => {
@@ -122,7 +121,7 @@ export function WeeklyPlanningSession({
             onPushTask={onPushTask}
           />
         )}
-        {step === 3 && <div data-testid="step-concerns">Concerns</div>}
+        {step === 3 && <StepConcerns value={concerns} onChange={setConcerns} />}
       </div>
 
       <footer className="flex items-center justify-between px-6 py-4 border-t border-neutral-200/70">
