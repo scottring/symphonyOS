@@ -272,9 +272,12 @@ Deno.serve(async (req) => {
         { 'family': 'family', 'stacks-data': 'work', 'symphony-os': 'work', 'ppvis': 'work', 'job-search': 'personal', 'health': 'personal', 'personal': 'personal' }[domain] ?? null
       ) : null
 
+      // Upsert (not insert) so re-saving the same vault_path updates the existing
+      // row and still returns its id — an insert would hit the unique
+      // (user_id, vault_path) constraint on every re-save and return no id.
       const { data: newNote, error: insertError } = await supabase
         .from('notes')
-        .insert({
+        .upsert({
           user_id: vaultUserId,
           title,
           content: body.content,
@@ -286,12 +289,12 @@ Deno.serve(async (req) => {
           context,
           external_url: htmlUrl,
           external_id: vaultPath,
-        })
+        }, { onConflict: 'user_id,vault_path' })
         .select('id')
         .single()
 
       if (insertError) {
-        console.error('DB insert error after successful GitHub push:', insertError)
+        console.error('DB upsert error after successful GitHub push:', insertError)
       }
 
       noteId = newNote?.id || null

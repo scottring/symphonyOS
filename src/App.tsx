@@ -877,9 +877,14 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
         { title, content, path },
         `Save task note to vault: ${title}`
       )
-      if (!result?.success || !result.noteId) return { ok: false }
-      await addEntityLink(result.noteId, { entityType: 'task', entityId: task.id, linkType: 'primary' })
-      setSelectedTaskNotes(await getNotesForEntity('task', task.id))
+      if (!result?.success) return { ok: false }
+      // First save returns the new note id → link it to the task. Re-saves of the
+      // same task update the existing (already-linked) vault file, so a null id is
+      // still success — the file was written.
+      if (result.noteId) {
+        await addEntityLink(result.noteId, { entityType: 'task', entityId: task.id, linkType: 'primary' })
+        setSelectedTaskNotes(await getNotesForEntity('task', task.id))
+      }
       return { ok: true, url: result.githubUrl }
     },
     [vaultWrite, addEntityLink, getNotesForEntity]
