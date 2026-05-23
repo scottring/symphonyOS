@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { Task, TaskContext } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
@@ -66,10 +66,13 @@ export function TapContextPanel(props: TapContextPanelProps) {
 
   const [showDirections, setShowDirections] = useState(false)
 
-  // Collapse the directions builder when switching to a different task.
-  useEffect(() => {
+  // Collapse the directions builder when switching to a different task
+  // (React-recommended "adjust state during render" pattern, not an effect).
+  const [prevTaskId, setPrevTaskId] = useState(task.id)
+  if (task.id !== prevTaskId) {
+    setPrevTaskId(task.id)
     setShowDirections(false)
-  }, [task.id])
+  }
 
   const linked = useLinkedEntities(task, {
     contacts: props.contacts,
