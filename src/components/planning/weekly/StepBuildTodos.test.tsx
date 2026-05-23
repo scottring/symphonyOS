@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { screen, within, fireEvent } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { StepBuildTodos } from './StepBuildTodos'
 import type { Task } from '@/types/task'
@@ -151,22 +151,26 @@ describe('StepBuildTodos', () => {
   })
 
   describe('routines this week', () => {
-    it('lists provided routines under a "Routines this week" group', () => {
+    it('lists provided routines as checkboxes; checking one calls onToggleRoutine', async () => {
+      const onToggleRoutine = vi.fn()
       const foodShopping = makeRoutine({ id: 'r1', name: 'Food shopping' })
       const foodPlanning = makeRoutine({ id: 'r2', name: 'Food planning' })
-      render(
+      const { user } = render(
         <StepBuildTodos
           tasks={allTasks}
           selectedIds={[]}
           onToggle={vi.fn()}
           onReorder={vi.fn()}
           routines={[foodShopping, foodPlanning]}
-          onScheduleRoutine={vi.fn()}
+          selectedRoutineIds={[]}
+          onToggleRoutine={onToggleRoutine}
         />,
       )
       expect(screen.getByText(/routines this week/i)).toBeInTheDocument()
-      expect(screen.getByText('Food shopping')).toBeInTheDocument()
-      expect(screen.getByText('Food planning')).toBeInTheDocument()
+      const checkbox = screen.getByRole('checkbox', { name: 'Food shopping' })
+      expect(checkbox).not.toBeChecked()
+      await user.click(checkbox)
+      expect(onToggleRoutine).toHaveBeenCalledWith(foodShopping)
     })
 
     it('does not render the routines group when none are provided', () => {
@@ -176,49 +180,22 @@ describe('StepBuildTodos', () => {
       expect(screen.queryByText(/routines this week/i)).not.toBeInTheDocument()
     })
 
-    it('schedules a routine onto a chosen day and time', async () => {
-      const onScheduleRoutine = vi.fn()
-      const r = makeRoutine({ id: 'r1', name: 'Food shopping' })
-      const { user } = render(
+    it('shows selected routines in the priority column and checks their boxes', () => {
+      const foodShopping = makeRoutine({ id: 'r1', name: 'Food shopping' })
+      render(
         <StepBuildTodos
           tasks={allTasks}
           selectedIds={[]}
           onToggle={vi.fn()}
           onReorder={vi.fn()}
-          routines={[r]}
-          onScheduleRoutine={onScheduleRoutine}
+          routines={[foodShopping]}
+          selectedRoutineIds={['r1']}
+          onToggleRoutine={vi.fn()}
         />,
       )
-
-      // Open the scheduling popover for this routine
-      await user.click(screen.getByRole('button', { name: /schedule food shopping/i }))
-      // Pick Saturday
-      await user.click(screen.getByRole('button', { name: 'Sat' }))
-      // Set a time
-      fireEvent.change(screen.getByLabelText(/time/i), { target: { value: '10:00' } })
-      // Apply
-      await user.click(screen.getByRole('button', { name: /apply/i }))
-
-      expect(onScheduleRoutine).toHaveBeenCalledWith('r1', 'sat', '10:00')
-    })
-
-    it('applies with no time when none is entered', async () => {
-      const onScheduleRoutine = vi.fn()
-      const r = makeRoutine({ id: 'r1', name: 'Water plants' })
-      const { user } = render(
-        <StepBuildTodos
-          tasks={allTasks}
-          selectedIds={[]}
-          onToggle={vi.fn()}
-          onReorder={vi.fn()}
-          routines={[r]}
-          onScheduleRoutine={onScheduleRoutine}
-        />,
-      )
-      await user.click(screen.getByRole('button', { name: /schedule water plants/i }))
-      await user.click(screen.getByRole('button', { name: 'Tue' }))
-      await user.click(screen.getByRole('button', { name: /apply/i }))
-      expect(onScheduleRoutine).toHaveBeenCalledWith('r1', 'tue', null)
+      expect(screen.getByRole('checkbox', { name: 'Food shopping' })).toBeChecked()
+      const priorityRoutines = screen.getByTestId('priority-routines')
+      expect(within(priorityRoutines).getByText('Food shopping')).toBeInTheDocument()
     })
   })
 })

@@ -4,7 +4,6 @@ import type { Task } from '@/types/task'
 import type { GoalAction } from '@/types/goal'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine } from '@/types/actionable'
-import type { UpdateRoutineInput } from '@/hooks/useRoutines'
 import { isEverydayRoutine } from '@/lib/routineUtils'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 import { isoWeekId } from './weeklyPlanning'
@@ -30,8 +29,6 @@ interface Props {
   onSelectDay?: (date: Date) => void
   /** Full active+reference routine set, used to list non-daily routines on step 2. */
   allRoutines?: Routine[]
-  /** Persist a routine's recurrence/time when scheduled on step 2. */
-  onUpdateRoutine?: (id: string, input: UpdateRoutineInput) => Promise<boolean>
 }
 
 export function WeeklyPlanningSession({
@@ -47,10 +44,10 @@ export function WeeklyPlanningSession({
   onAddGoalAction,
   onSelectDay,
   allRoutines,
-  onUpdateRoutine,
 }: Props) {
   const [step, setStep] = useState(0)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [selectedRoutineIds, setSelectedRoutineIds] = useState<string[]>([])
   const [concerns, setConcerns] = useState('')
   const [saving, setSaving] = useState(false)
   const [addedGoalActionIds, setAddedGoalActionIds] = useState<string[]>([])
@@ -79,16 +76,13 @@ export function WeeklyPlanningSession({
     [allRoutines, routines],
   )
 
-  const handleScheduleRoutine = useCallback(
-    (routineId: string, day: string, time: string | null) => {
-      const routine = (allRoutines ?? routines).find(r => r.id === routineId)
-      if (!routine || !onUpdateRoutine) return
-      onUpdateRoutine(routineId, {
-        recurrence_pattern: { ...routine.recurrence_pattern, type: 'weekly', days: [day] },
-        time_of_day: time,
-      })
+  const handleToggleRoutine = useCallback(
+    (routine: Routine) => {
+      setSelectedRoutineIds(ids =>
+        ids.includes(routine.id) ? ids.filter(id => id !== routine.id) : [...ids, routine.id],
+      )
     },
-    [allRoutines, routines, onUpdateRoutine],
+    [],
   )
 
   const weekId = useMemo(() => isoWeekId(initialDate ?? new Date()), [initialDate])
@@ -175,7 +169,8 @@ export function WeeklyPlanningSession({
             addedGoalActionIds={addedGoalActionIds}
             onAddGoalAction={handleAddGoalAction}
             routines={nonDailyRoutines}
-            onScheduleRoutine={onUpdateRoutine ? handleScheduleRoutine : undefined}
+            selectedRoutineIds={selectedRoutineIds}
+            onToggleRoutine={handleToggleRoutine}
           />
         )}
         {step === 2 && (

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { WeeklyPlanningSession } from './WeeklyPlanningSession'
 import { writeHideRoutines } from '@/lib/hideRoutinesSignal'
@@ -73,7 +73,7 @@ describe('WeeklyPlanningSession', () => {
       const timed = makeRoutine({ name: 'Morning walk', recurrence_pattern: { type: 'weekly', days: ['sat'] }, time_of_day: '09:00' })
       const reference = makeRoutine({ name: 'Old chore', recurrence_pattern: { type: 'weekly', days: ['sat'] }, time_of_day: null, visibility: 'reference' })
       const { user } = render(
-        <WeeklyPlanningSession {...baseProps} allRoutines={[untimed, everyday, timed, reference]} onUpdateRoutine={vi.fn()} />,
+        <WeeklyPlanningSession {...baseProps} allRoutines={[untimed, everyday, timed, reference]} />,
       )
       await user.click(screen.getByRole('button', { name: 'Next' })) // to step 2
       expect(screen.getByText(/routines this week/i)).toBeInTheDocument()
@@ -83,20 +83,18 @@ describe('WeeklyPlanningSession', () => {
       expect(screen.queryByText('Old chore')).not.toBeInTheDocument()
     })
 
-    it('scheduling a routine calls onUpdateRoutine with a weekly recurrence on the chosen day + time', async () => {
-      const onUpdateRoutine = vi.fn().mockResolvedValue(true)
-      const weekly = makeRoutine({ name: 'Food shopping', recurrence_pattern: { type: 'weekly', days: [] }, time_of_day: null })
+    it('selecting a routine adds it to this week’s priority list', async () => {
+      const weekly = makeRoutine({ name: 'Food shopping', recurrence_pattern: { type: 'weekly', days: ['sat'] }, time_of_day: null })
       const { user } = render(
-        <WeeklyPlanningSession {...baseProps} allRoutines={[weekly]} onUpdateRoutine={onUpdateRoutine} />,
+        <WeeklyPlanningSession {...baseProps} allRoutines={[weekly]} />,
       )
       await user.click(screen.getByRole('button', { name: 'Next' })) // step 2
-      await user.click(screen.getByRole('button', { name: /schedule food shopping/i }))
-      await user.click(screen.getByRole('button', { name: 'Sat' }))
-      await user.click(screen.getByRole('button', { name: /apply/i }))
-      expect(onUpdateRoutine).toHaveBeenCalledWith(weekly.id, {
-        recurrence_pattern: { type: 'weekly', days: ['sat'] },
-        time_of_day: null,
-      })
+      // Not in the priority list yet
+      expect(screen.queryByTestId('priority-routines')).not.toBeInTheDocument()
+      // Check it on the left
+      await user.click(screen.getByRole('checkbox', { name: 'Food shopping' }))
+      const priorityRoutines = screen.getByTestId('priority-routines')
+      expect(within(priorityRoutines).getByText('Food shopping')).toBeInTheDocument()
     })
   })
 

@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react'
-import { ChevronUp, ChevronDown, Plus, Check, CalendarClock } from 'lucide-react'
+import { useCallback } from 'react'
+import { ChevronUp, ChevronDown, Plus, Check, Repeat } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { GoalAction } from '@/types/goal'
 import type { Routine } from '@/types/actionable'
@@ -13,108 +13,12 @@ interface Props {
   goalActions?: GoalAction[]
   addedGoalActionIds?: string[]
   onAddGoalAction?: (action: GoalAction) => void
-  /** Non-daily routines to surface for scheduling this week. */
+  /** Non-daily, untimed routines to offer for this week's plan. */
   routines?: Routine[]
-  /** Pin a routine to a weekday (and optional HH:MM time) this week. */
-  onScheduleRoutine?: (routineId: string, day: string, time: string | null) => void
-}
-
-const ROUTINE_DAYS = [
-  { key: 'sun', label: 'Sun' },
-  { key: 'mon', label: 'Mon' },
-  { key: 'tue', label: 'Tue' },
-  { key: 'wed', label: 'Wed' },
-  { key: 'thu', label: 'Thu' },
-  { key: 'fri', label: 'Fri' },
-  { key: 'sat', label: 'Sat' },
-] as const
-
-function routineScheduleSummary(routine: Routine): string {
-  const days = routine.recurrence_pattern?.days ?? []
-  const dayLabels = ROUTINE_DAYS.filter(d => days.includes(d.key)).map(d => d.label)
-  const time = routine.time_of_day ? routine.time_of_day.slice(0, 5) : null
-  const parts = [dayLabels.join(', '), time].filter(Boolean)
-  return parts.length ? parts.join(' · ') : 'Unscheduled'
-}
-
-function RoutineScheduleRow({
-  routine,
-  onSchedule,
-}: {
-  routine: Routine
-  onSchedule: (routineId: string, day: string, time: string | null) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const [day, setDay] = useState<string | null>(routine.recurrence_pattern?.days?.[0] ?? null)
-  const [time, setTime] = useState<string>(routine.time_of_day?.slice(0, 5) ?? '')
-
-  const apply = () => {
-    if (!day) return
-    onSchedule(routine.id, day, time || null)
-    setOpen(false)
-  }
-
-  return (
-    <li className="text-sm">
-      <div className="flex items-center gap-2">
-        <span className="flex-1 text-neutral-700 leading-snug">{routine.name}</span>
-        <span className="text-xs text-neutral-400 shrink-0">{routineScheduleSummary(routine)}</span>
-        <button
-          type="button"
-          onClick={() => setOpen(o => !o)}
-          aria-label={`Schedule ${routine.name}`}
-          aria-expanded={open}
-          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-primary-700 hover:bg-primary-50 shrink-0 transition-colors"
-        >
-          <CalendarClock className="h-3 w-3" />
-          Schedule
-        </button>
-      </div>
-
-      {open && (
-        <div className="mt-2 rounded-lg border border-neutral-200 bg-bg-elevated p-3 space-y-2">
-          <div className="flex flex-wrap gap-1">
-            {ROUTINE_DAYS.map(({ key, label }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setDay(key)}
-                aria-pressed={day === key}
-                className={`w-9 h-9 rounded-full text-xs font-medium transition-colors ${
-                  day === key
-                    ? 'bg-primary-500 text-white'
-                    : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <label htmlFor={`routine-time-${routine.id}`} className="text-xs text-neutral-500">
-              Time
-            </label>
-            <input
-              id={`routine-time-${routine.id}`}
-              type="time"
-              step="300"
-              value={time}
-              onChange={e => setTime(e.target.value)}
-              className="input-base px-2 py-1 text-sm"
-            />
-            <button
-              type="button"
-              onClick={apply}
-              disabled={!day}
-              className="ml-auto px-3 py-1 rounded text-xs font-medium bg-primary-500 text-white disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Apply
-            </button>
-          </div>
-        </div>
-      )}
-    </li>
-  )
+  /** Ids of routines selected into this week's plan. */
+  selectedRoutineIds?: string[]
+  /** Toggle a routine into/out of this week's plan. */
+  onToggleRoutine?: (routine: Routine) => void
 }
 
 interface CandidateGroupProps {
@@ -164,7 +68,8 @@ export function StepBuildTodos({
   addedGoalActionIds = [],
   onAddGoalAction,
   routines = [],
-  onScheduleRoutine,
+  selectedRoutineIds = [],
+  onToggleRoutine,
 }: Props) {
   const candidates = selectWeeklyCandidates(tasks)
 
@@ -199,6 +104,8 @@ export function StepBuildTodos({
     .map(id => tasks.find(t => t.id === id))
     .filter(Boolean) as Task[]
 
+  const selectedRoutines = routines.filter(r => selectedRoutineIds.includes(r.id))
+
   const groups: [string, Task[]][] = [
     ['Inbox', candidates.inbox],
     ['Carry-over', candidates.carryover],
@@ -222,18 +129,28 @@ export function StepBuildTodos({
           />
         ))}
 
-        {routines.length > 0 && onScheduleRoutine && (
+        {routines.length > 0 && onToggleRoutine && (
           <div>
             <h3 className="text-xs uppercase tracking-wider text-neutral-400 mb-2">
               Routines this week
             </h3>
-            <ul className="space-y-2">
+            <ul className="space-y-1">
               {routines.map(routine => (
-                <RoutineScheduleRow
-                  key={routine.id}
-                  routine={routine}
-                  onSchedule={onScheduleRoutine}
-                />
+                <li key={routine.id} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id={`candidate-routine-${routine.id}`}
+                    checked={selectedRoutineIds.includes(routine.id)}
+                    onChange={() => onToggleRoutine(routine)}
+                    className="h-4 w-4 rounded border-neutral-300 text-primary-500 cursor-pointer"
+                  />
+                  <label
+                    htmlFor={`candidate-routine-${routine.id}`}
+                    className="text-sm text-neutral-700 cursor-pointer leading-snug"
+                  >
+                    {routine.name}
+                  </label>
+                </li>
               ))}
             </ul>
           </div>
@@ -285,11 +202,13 @@ export function StepBuildTodos({
       <div className="space-y-4 overflow-y-auto">
         <h2 className="font-display text-lg text-neutral-800">This week — priority order</h2>
 
-        {selectedTasks.length === 0 ? (
+        {selectedTasks.length === 0 && selectedRoutines.length === 0 && (
           <p className="text-sm text-neutral-400">
-            Check tasks on the left to add them to your week.
+            Check tasks or routines on the left to add them to your week.
           </p>
-        ) : (
+        )}
+
+        {selectedTasks.length > 0 && (
           <ol data-testid="priority-order" className="space-y-2">
             {selectedTasks.map((task, index) => (
               <li
@@ -321,6 +240,23 @@ export function StepBuildTodos({
               </li>
             ))}
           </ol>
+        )}
+
+        {selectedRoutines.length > 0 && (
+          <div>
+            <h3 className="text-xs uppercase tracking-wider text-neutral-400 mb-2">Routines</h3>
+            <ul data-testid="priority-routines" className="space-y-2">
+              {selectedRoutines.map(routine => (
+                <li
+                  key={routine.id}
+                  className="flex items-center gap-2 bg-bg-elevated rounded-lg px-3 py-2 shadow-sm"
+                >
+                  <Repeat className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
+                  <span className="flex-1 text-sm text-neutral-700 leading-snug">{routine.name}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
     </div>
