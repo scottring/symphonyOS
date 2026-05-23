@@ -21,6 +21,37 @@ Multiple Claude sessions run against this repo concurrently. The main worktree
 - If you find the main worktree on a non-`main` branch, that's the bug — surface
   it, don't build on it.
 
+### The main worktree is NOT a workspace — never commit or edit in it
+
+Editing/committing in the shared main worktree is what causes divergence and
+"fixed but not deployed" incidents (a fix committed there but never pushed never
+ships). Rules:
+
+- **All work happens in a feature worktree off `origin/main`.** The main worktree
+  is a clean reference only — no edits, no commits.
+- **`origin/main` is the only source of truth.** A commit that isn't on
+  `origin/main` is invisible to other sessions and to deploy. **Push the moment a
+  unit of work is done** (`git push origin HEAD:main` is race-safe; if it's
+  rejected as non-fast-forward, `git fetch && git rebase origin/main`, then push).
+- **Rebase onto `origin/main` before pushing, and often during long work.** Don't
+  let a worktree drift hundreds of commits behind.
+- **Remove a worktree when its work is merged** (`git worktree remove <path>`).
+  Stale worktrees accumulate uncommitted cruft and confusion.
+
+### Pushes to `main` auto-deploy to production
+
+`vercel.json` has `git.deploymentEnabled: true` — every push to `main` deploys to
+prod from exactly what's on `main`. Therefore:
+
+- **Only push finished, building, tested work to `main`.** Use feature branches
+  for anything in progress (they deploy as harmless previews).
+- A **`pre-push` hook** (`.githooks/pre-push`, wired via the `prepare` script's
+  `core.hooksPath=.githooks`) runs `tsc --noEmit` (blocking) and the unit tests
+  before any push to `main`. It does **not** gate other branches. Don't bypass it
+  with `--no-verify` on a `main` push.
+- Deploying manually (`vercel --prod`) from a working tree is no longer needed and
+  risks shipping uncommitted edits — prefer letting the push deploy.
+
 ## Personal memory lives in the vault, not here
 
 Scott Kaufman's life and work memory is in his Obsidian vault at `~/Documents/scotts-world`. That vault is the single source of truth across every project, every agent (Michael on Telegram, every Claude Code instance, this one), and every location (MacBook, Mac Mini, phone via Obsidian Mobile).

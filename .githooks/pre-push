@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+#
+# Pre-push gate for Symphony OS.
+#
+# Pushes to `main` auto-deploy to production (vercel git.deploymentEnabled=true),
+# so a broken push ships broken code. This hook runs the same checks the deploy
+# cares about BEFORE the push leaves your machine.
+#
+# - Only enforces for pushes whose target ref is refs/heads/main. Feature/WIP
+#   branch pushes (preview deploys) are never blocked.
+# - tsc --noEmit is BLOCKING (a type error fails the Vercel build anyway; catch
+#   it here in seconds instead of after a wasted deploy).
+# - Unit tests run and report. They are NON-blocking until the suite is green:
+#   set BLOCK_ON_TESTS=1 below once the 4 known-failing tests are fixed.
+#
+# Installed via `core.hooksPath=.githooks` (wired by the package.json "prepare"
+# script on npm install). Lives in the repo so every clone/worktree gets it.
+
+set -uo pipefail
+
+# Flip to 1 once `npx vitest run` is green on main to gate pushes on tests too.
+BLOCK_ON_TESTS=0
+
+# Node/npm live under nvm; a git hook doesn't inherit the interactive shell PATH.
+export PATH="$HOME/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:$PATH"
+
+pushing_to_main=0
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  if [ "$remote_ref" = "refs/heads/main" ]; then
+    pushing_to_main=1
+  fi
+done
+
+if [ "$pushing_to_main" -ne 1 ]; then
+  exit 0  # not a push to main — no gate (WIP/feature branches deploy as previews)
+fi
+
+echo "▶ pre-push: pushing to main (this auto-deploys to production) — running checks…"
+
+echo "▶ typecheck: npx tsc --noEmit"
+if ! npx tsc --noEmit; then
+  echo "✖ Type errors — push to main BLOCKED (would fail the Vercel build)."
+  echo "  Fix the errors above, or push to a feature branch instead."
+  exit 1
+fi
+echo "✓ typecheck passed"
+
+echo "▶ unit tests: npx vitest run"
+if npx vitest run; then
+  echo "✓ tests passed"
+else
+  if [ "$BLOCK_ON_TESTS" = "1" ]; then
+    echo "✖ Tests failed — push to main BLOCKED."
+    exit 1
+  fi
+  echo "⚠ Tests failed — NOT blocking (BLOCK_ON_TESTS=0)."
+  echo "  Fix the suite, then set BLOCK_ON_TESTS=1 in .githooks/pre-push to gate on tests."
+fi
+
+echo "✓ pre-push checks complete — pushing to main."
+exit 0
