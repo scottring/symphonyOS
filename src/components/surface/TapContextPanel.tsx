@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import type { Task, TaskContext } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
@@ -11,6 +12,7 @@ import { PanelSubtasks } from './sections/PanelSubtasks'
 import { PanelPeople } from './sections/PanelPeople'
 import { PanelLinked } from './sections/PanelLinked'
 import { PanelLinks } from './sections/PanelLinks'
+import { PanelLocation } from './sections/PanelLocation'
 import { PanelMightBeRelevant } from './sections/PanelMightBeRelevant'
 import { PanelFooter } from './sections/PanelFooter'
 import { useLinkedEntities } from './hooks/useLinkedEntities'
@@ -50,6 +52,8 @@ interface TapContextPanelProps {
   onToggleSubtask: (id: string) => void
   onAddSubtask: (title: string) => void
   onAddLink: (url: string) => void
+  onUpdateLocation: (location: string, placeId?: string) => void
+  onClearLocation: () => void
 }
 
 function contextToDomain(ctx: TaskContext | null | undefined): 'work' | 'family' | 'personal' | undefined {
@@ -59,6 +63,13 @@ function contextToDomain(ctx: TaskContext | null | undefined): 'work' | 'family'
 
 export function TapContextPanel(props: TapContextPanelProps) {
   const { task, allTasks, createdByName } = props
+
+  const [showDirections, setShowDirections] = useState(false)
+
+  // Collapse the directions builder when switching to a different task.
+  useEffect(() => {
+    setShowDirections(false)
+  }, [task.id])
 
   const linked = useLinkedEntities(task, {
     contacts: props.contacts,
@@ -86,6 +97,8 @@ export function TapContextPanel(props: TapContextPanelProps) {
       <PanelActions
         completed={task.completed}
         phoneNumber={task.phoneNumber || linked.contact?.phone}
+        location={task.location}
+        onShowDirections={() => setShowDirections((v) => !v)}
         scheduledFor={task.scheduledFor || undefined}
         isAllDay={task.isAllDay}
         isPinned={props.isPinned}
@@ -94,6 +107,14 @@ export function TapContextPanel(props: TapContextPanelProps) {
         onClearSchedule={props.onClearSchedule}
         onTogglePin={props.onTogglePin}
         onDelete={props.onDelete}
+      />
+      <PanelLocation
+        location={task.location}
+        locationPlaceId={task.locationPlaceId}
+        taskTitle={task.title}
+        showDirections={showDirections}
+        onUpdateLocation={props.onUpdateLocation}
+        onClearLocation={props.onClearLocation}
       />
       <PanelWhy key={task.id} label="Notes" notes={task.notes} onChange={props.onNotesChange} onSaveToVault={props.onSaveNoteToVault} />
       <PanelSubtasks
