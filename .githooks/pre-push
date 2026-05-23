@@ -37,8 +37,10 @@ fi
 
 echo "▶ pre-push: pushing to main (this auto-deploys to production) — running checks…"
 
+# stdin here is the push ref list (already consumed above); redirect from
+# /dev/null so tsc/vitest don't inherit it and get killed mid-run in the hook.
 echo "▶ typecheck: npx tsc --noEmit"
-if ! npx tsc --noEmit; then
+if ! npx tsc --noEmit < /dev/null; then
   echo "✖ Type errors — push to main BLOCKED (would fail the Vercel build)."
   echo "  Fix the errors above, or push to a feature branch instead."
   exit 1
@@ -46,7 +48,7 @@ fi
 echo "✓ typecheck passed"
 
 echo "▶ unit tests: npx vitest run"
-if npx vitest run; then
+if npx vitest run < /dev/null; then
   echo "✓ tests passed"
 else
   if [ "$BLOCK_ON_TESTS" = "1" ]; then
