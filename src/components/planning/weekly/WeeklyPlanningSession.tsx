@@ -92,7 +92,11 @@ export function WeeklyPlanningSession({
 
   return (
     <div className="h-full flex flex-col bg-bg-base">
-      <header className="flex items-center justify-between px-6 py-4 border-b border-neutral-200/70">
+      {/* pr-44 on desktop keeps the right-side controls clear of AppShell's
+          absolute domain/AI/help cluster (top-4 right-6 z-20), which only
+          renders on non-Today desktop views. Mobile hides that cluster, so
+          normal padding applies. */}
+      <header className="flex items-center justify-between pl-6 pr-6 md:pr-44 py-4 border-b border-neutral-200/70">
         <div>
           <h1 className="font-display text-2xl text-neutral-800">Weekly Planning</h1>
           <p className="text-sm text-neutral-500">{STEPS[step]} — step {step + 1} of {STEPS.length}</p>
