@@ -1,8 +1,30 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { screen } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { TapEventPanel } from './TapEventPanel'
 import { createMockTask } from '@/test/mocks/factories'
+
+// TapEventPanel now always renders PanelLocation, which calls useDirections
+// (and can render the directions builder). Mock it so neither touches the
+// Google Maps SDK in jsdom.
+const searchPlaces = vi.fn().mockResolvedValue([
+  { placeId: 'p1', description: '1 Main St, Townsville', mainText: '1 Main St', secondaryText: 'Townsville' },
+])
+const getPlaceDetails = vi.fn().mockResolvedValue({ address: '1 Main St, Townsville', name: '1 Main St' })
+
+vi.mock('@/hooks/useDirections', () => ({
+  useDirections: () => ({
+    isCalculating: false,
+    error: null,
+    result: null,
+    calculateRoute: vi.fn(),
+    searchPlaces,
+    getPlaceDetails,
+    openInMaps: vi.fn(),
+  }),
+  formatDuration: (s: number) => `${s}s`,
+  formatDistance: (m: number) => `${m}m`,
+}))
 
 const baseHandlers = {
   onClose: vi.fn(),
@@ -24,6 +46,10 @@ const mockEvent = {
 } as any
 
 describe('TapEventPanel', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   it('renders event title in header', () => {
     render(<TapEventPanel
       event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
@@ -44,5 +70,34 @@ describe('TapEventPanel', () => {
       event={mockEvent} notes="Insurance card" allTasks={[]} {...baseHandlers}
     />)
     expect(screen.getByText(/what to bring/i)).toBeInTheDocument()
+  })
+
+  it('shows the add-location input and no Directions toggle when the event has no location', () => {
+    const noLocation = { ...mockEvent, location: undefined }
+    render(<TapEventPanel
+      event={noLocation} notes={undefined} allTasks={[]} {...baseHandlers} onUpdateEventLocation={vi.fn()}
+    />)
+    expect(screen.getByPlaceholderText(/add a location/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /directions/i })).not.toBeInTheDocument()
+  })
+
+  it('shows the location and a Directions toggle when the event has a location', () => {
+    render(<TapEventPanel
+      event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers} onUpdateEventLocation={vi.fn()}
+    />)
+    expect(screen.getByText('Park Ave Pediatrics')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /directions/i })).toBeInTheDocument()
+  })
+
+  it('calls onUpdateEventLocation with the google event id, address, and calendar id on select', async () => {
+    const onUpdateEventLocation = vi.fn()
+    const event = { ...mockEvent, location: undefined, google_event_id: 'gcal-1', calendar_id: 'cal-1' }
+    const { user } = render(<TapEventPanel
+      event={event} notes={undefined} allTasks={[]} {...baseHandlers} onUpdateEventLocation={onUpdateEventLocation}
+    />)
+    await user.type(screen.getByPlaceholderText(/add a location/i), 'Main St')
+    const result = await screen.findByText('1 Main St')
+    await user.click(result)
+    expect(onUpdateEventLocation).toHaveBeenCalledWith('gcal-1', '1 Main St, Townsville', 'cal-1')
   })
 })

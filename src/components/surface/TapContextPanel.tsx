@@ -114,7 +114,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
       <PanelLocation
         location={task.location}
         locationPlaceId={task.locationPlaceId}
-        taskTitle={task.title}
+        title={task.title}
         showDirections={showDirections}
         onUpdateLocation={props.onUpdateLocation}
         onClearLocation={props.onClearLocation}

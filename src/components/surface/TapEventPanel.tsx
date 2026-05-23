@@ -9,7 +9,7 @@ import { PanelMightBeRelevant } from './sections/PanelMightBeRelevant'
 import { PanelFooter } from './sections/PanelFooter'
 import { useEntityRelations } from './hooks/useEntityRelations'
 import type { MightBeRelevantItem } from './types'
-import { DirectionsBuilder } from '@/components/directions'
+import { PanelLocation } from './sections/PanelLocation'
 import { ConceptIcon } from '@/lib/conceptIcons'
 
 interface TapEventPanelProps {
@@ -26,6 +26,8 @@ interface TapEventPanelProps {
   onOpenTask: (id: string) => void
   onOpenProject: (id: string) => void
   onOpenRelated: (kind: MightBeRelevantItem['kind'], id: string) => void
+  /** Set/change/clear the event's location, syncing back to Google Calendar. */
+  onUpdateEventLocation?: (googleEventId: string, location: string | null, calendarId?: string) => void
 }
 
 type AnyEvent = { start_time?: string; startTime?: string }
@@ -58,6 +60,8 @@ export function TapEventPanel(props: TapEventPanelProps) {
   })
 
   const startTime = getStartTime(event)
+  const eventId = event.google_event_id ?? event.id
+  const calendarId = event.calendar_id ?? event.calendarId
 
   return (
     <article className="bg-bg-elevated rounded-2xl p-5 max-w-md w-full">
@@ -88,17 +92,13 @@ export function TapEventPanel(props: TapEventPanelProps) {
         </button>
       </div>
 
-      {event.location && showDirections && (
-        <div className="mb-4 -mx-1 bg-white rounded-2xl border border-neutral-100 overflow-hidden">
-          <DirectionsBuilder
-            destination={{
-              name: event.title,
-              address: event.location,
-            }}
-            eventTitle={event.title}
-          />
-        </div>
-      )}
+      <PanelLocation
+        location={event.location ?? undefined}
+        title={event.title}
+        showDirections={showDirections}
+        onUpdateLocation={(addr) => props.onUpdateEventLocation?.(eventId, addr, calendarId)}
+        onClearLocation={() => props.onUpdateEventLocation?.(eventId, null, calendarId)}
+      />
 
       <PanelWhy
         key={event.id}

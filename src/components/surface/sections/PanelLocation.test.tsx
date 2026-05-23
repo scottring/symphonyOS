@@ -26,7 +26,7 @@ vi.mock('@/hooks/useDirections', () => ({
 
 describe('PanelLocation', () => {
   const baseProps = {
-    taskTitle: 'Pick up dry cleaning',
+    title: 'Pick up dry cleaning',
     showDirections: false,
     onUpdateLocation: vi.fn(),
     onClearLocation: vi.fn(),

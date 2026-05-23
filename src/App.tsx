@@ -1693,6 +1693,15 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
               onOpenTask={(id) => setSelectedItemId(`task-${id}`)}
               onOpenProject={() => {}}
               onOpenRelated={() => {}}
+              onUpdateEventLocation={async (eventId: string, location: string | null, calendarId?: string) => {
+                try {
+                  await updateEvent({ eventId, location, calendarId })
+                  showToast('Location updated successfully')
+                } catch (error) {
+                  console.error('Failed to update event location:', error)
+                  showToast(error instanceof Error ? error.message : 'Failed to update location', 'warning')
+                }
+              }}
             />
           ) : (
             <Suspense fallback={<LoadingFallback variant="card" />}>

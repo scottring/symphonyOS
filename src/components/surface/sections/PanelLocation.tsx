@@ -5,7 +5,8 @@ import { DirectionsBuilder } from '@/components/directions'
 interface PanelLocationProps {
   location?: string
   locationPlaceId?: string
-  taskTitle: string
+  /** Title of the task or event — feeds the "Directions to …" header. */
+  title: string
   /** When true and a location is set, the directions builder is expanded. */
   showDirections: boolean
   onUpdateLocation: (location: string, placeId?: string) => void
@@ -15,7 +16,7 @@ interface PanelLocationProps {
 export function PanelLocation({
   location,
   locationPlaceId,
-  taskTitle,
+  title,
   showDirections,
   onUpdateLocation,
   onClearLocation,
@@ -36,8 +37,8 @@ export function PanelLocation({
       {location && showDirections && (
         <div className="mt-3 -mx-1 bg-white rounded-2xl border border-neutral-100 overflow-hidden">
           <DirectionsBuilder
-            destination={{ name: taskTitle, address: location, placeId: locationPlaceId }}
-            eventTitle={taskTitle}
+            destination={{ name: title, address: location, placeId: locationPlaceId }}
+            eventTitle={title}
           />
         </div>
       )}
