@@ -31,6 +31,9 @@ vi.mock('@/hooks/useTimelineInsert', () => ({
 
 const ctxValue = { onToggleTask: vi.fn(), projects: [], contacts: [], familyMembers: [], lists: [] }
 
+// Use the actual current date so computeIsToday() returns true for today-mode tests
+const TODAY = new Date()
+
 function renderView(props: Record<string, unknown> = {}, ctxOverrides: Record<string, unknown> = {}) {
   return render(
     <ScheduleActionsProvider value={{ ...ctxValue, ...ctxOverrides } as never}>
@@ -38,7 +41,7 @@ function renderView(props: Record<string, unknown> = {}, ctxOverrides: Record<st
         tasks={[]} events={[]} routines={[]} dateInstances={[]}
         selectedItemId={null} onSelectItem={vi.fn()} onToggleTask={vi.fn()}
         onCompleteRoutine={vi.fn()} onCompleteEvent={vi.fn()} loading={false}
-        viewedDate={new Date('2026-05-19T09:00:00')} onDateChange={vi.fn()}
+        viewedDate={TODAY} onDateChange={vi.fn()}
         projects={[]} {...props}
       />
     </ScheduleActionsProvider>
@@ -76,7 +79,6 @@ describe('TodayView', () => {
     const scrollSpy = vi.fn()
     window.HTMLElement.prototype.scrollIntoView = scrollSpy
     const onSelectItem = vi.fn()
-    const today = new Date('2026-05-19T09:00:00')
     const { user } = renderView({
       onSelectItem,
       tasks: [
@@ -84,10 +86,10 @@ describe('TodayView', () => {
           id: 'abc',
           title: 'Test task',
           completed: false,
-          createdAt: today,
-          updatedAt: today,
+          createdAt: TODAY,
+          updatedAt: TODAY,
           bucket: 'timed' as const,
-          scheduledFor: today,
+          scheduledFor: TODAY,
         },
       ],
     })
@@ -112,16 +114,20 @@ describe('TodayView', () => {
   it('renders the inline "Add to today" input and submitting fires onCreateTask', async () => {
     const onCreateTask = vi.fn()
     const { user } = renderView({}, { onCreateTask })
-    const input = screen.getByPlaceholderText(/add to today/i)
-    await user.type(input, 'New thing{Enter}')
+    // TodayView renders the input in both a desktop-only div (hidden md:block) and a
+    // mobile-only div (md:hidden); jsdom has no CSS so both are in the DOM — use the first.
+    const inputs = screen.getAllByPlaceholderText(/add to today/i)
+    expect(inputs.length).toBeGreaterThan(0)
+    await user.type(inputs[0], 'New thing{Enter}')
     expect(onCreateTask).toHaveBeenCalledWith('New thing')
   })
 
   it('renders the rich OverdueSection (its own header) for overdue tasks', () => {
-    const past = new Date('2026-05-19T09:00:00')
+    // Build a past date 2 days before actual today so computeIsToday + selectOverdue both fire
+    const past = new Date(TODAY)
     past.setDate(past.getDate() - 2)
     renderView({
-      viewedDate: new Date('2026-05-19T09:00:00'),
+      viewedDate: TODAY,
       tasks: [
         {
           id: 'overdue-1',
@@ -140,11 +146,13 @@ describe('TodayView', () => {
   })
 
   it('OverdueSection receives proactive + follow-up wiring (waiting toggle / suggestions present)', () => {
-    const past = new Date('2026-05-17T09:00:00') // 2 days before viewedDate
+    // Build a past date 2 days before actual today so selectOverdue picks it up
+    const past = new Date(TODAY)
+    past.setDate(past.getDate() - 2)
     const onToggleWaiting = vi.fn()
     renderView(
       {
-        viewedDate: new Date('2026-05-19T09:00:00'),
+        viewedDate: TODAY,
         tasks: [
           {
             id: 'overdue-wired',
@@ -177,7 +185,6 @@ describe('TodayView', () => {
   })
 
   it('renders timeline insert (+) slots when create-at handlers are available', () => {
-    const today = new Date('2026-05-19T09:00:00')
     renderView(
       {
         tasks: [
@@ -185,10 +192,10 @@ describe('TodayView', () => {
             id: 'task-1',
             title: 'Test task',
             completed: false,
-            createdAt: today,
-            updatedAt: today,
+            createdAt: TODAY,
+            updatedAt: TODAY,
             bucket: 'timed' as const,
-            scheduledFor: today,
+            scheduledFor: TODAY,
           },
         ],
       } as never,
