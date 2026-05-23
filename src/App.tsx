@@ -1668,6 +1668,12 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
                 const next: TaskLink[] = [...(t.links ?? []), { url }]
                 updateTask(t.id, { links: next })
               }}
+              onUpdateLocation={(location, placeId) =>
+                updateTask(selectedItem.originalTask!.id, { location, locationPlaceId: placeId })
+              }
+              onClearLocation={() =>
+                updateTask(selectedItem.originalTask!.id, { location: undefined, locationPlaceId: undefined })
+              }
             />
           ) : selectedItem.type === 'event' && selectedItem.originalEvent && (selectedItem.originalEvent.id ?? '').startsWith('meal:') ? (
             <TapMealPanel
