@@ -5,7 +5,7 @@ import type { GoalAction } from '@/types/goal'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine } from '@/types/actionable'
 import type { UpdateRoutineInput } from '@/hooks/useRoutines'
-import { isEverydayRoutine, scheduleRoutineOnDate } from '@/lib/routineUtils'
+import { isEverydayRoutine, scheduleRoutineOnDate, matchesRecurrenceForDate } from '@/lib/routineUtils'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 import { isoWeekId } from './weeklyPlanning'
 import { StepWeekAhead } from './StepWeekAhead'
@@ -107,6 +107,20 @@ export function WeeklyPlanningSession({
     [allRoutines, routines, onUpdateRoutine],
   )
 
+  // Per-day routines for the schedule grid. Resolved per column (by recurrence)
+  // rather than from the single-viewedDate `routines` set, so a routine dropped
+  // onto a given weekday actually lands on that column. Reactive to the
+  // optimistic onUpdateRoutine via `allRoutines`. Respects the Hide-daily toggle.
+  const gridRoutinesForDate = useCallback(
+    (date: Date): Routine[] => {
+      const matching = (allRoutines ?? routines).filter(
+        r => r.visibility === 'active' && matchesRecurrenceForDate(r, date),
+      )
+      return hideDaily ? matching.filter(r => !isEverydayRoutine(r.recurrence_pattern)) : matching
+    },
+    [allRoutines, routines, hideDaily],
+  )
+
   const weekId = useMemo(() => isoWeekId(initialDate ?? new Date()), [initialDate])
   const priorities = useMemo(
     () => selectedIds.map(id => tasks.find(t => t.id === id)).filter(Boolean) as Task[],
@@ -201,6 +215,7 @@ export function WeeklyPlanningSession({
             priorities={priorities}
             events={events}
             routines={visibleRoutines}
+            getRoutinesForDate={gridRoutinesForDate}
             draggableRoutines={selectedRoutines}
             onScheduleRoutine={handleScheduleRoutineDrop}
             onUpdateTask={onUpdateTask}

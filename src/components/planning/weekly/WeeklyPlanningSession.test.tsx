@@ -109,6 +109,25 @@ describe('WeeklyPlanningSession', () => {
       expect(screen.getByText(/drag tasks onto the calendar/i)).toBeInTheDocument()
       expect(screen.getByText('Food shopping')).toBeInTheDocument()
     })
+
+    it('renders a timed routine on the step-3 grid for the day it recurs', async () => {
+      // 2026-05-23 is a Saturday; the grid opens on that day.
+      const initial = new Date(2026, 4, 23)
+      const timedSat = makeRoutine({
+        name: 'Soccer practice',
+        recurrence_pattern: { type: 'weekly', days: ['sat'] },
+        time_of_day: '10:00',
+      })
+      const { user } = render(
+        <WeeklyPlanningSession {...baseProps} initialDate={initial} allRoutines={[timedSat]} onUpdateRoutine={vi.fn()} />,
+      )
+      await user.click(screen.getByRole('button', { name: 'Next' })) // step 2
+      await user.click(screen.getByRole('button', { name: 'Next' })) // step 3
+      // A timed routine recurring on the visible day must show on the grid,
+      // not just in the (untimed) drawer — this is what makes a dropped
+      // routine "land" instead of disappearing.
+      expect(screen.getByText('Soccer practice')).toBeInTheDocument()
+    })
   })
 
   describe('hide daily chores', () => {
