@@ -18,8 +18,9 @@
 
 set -uo pipefail
 
-# Flip to 1 once `npx vitest run` is green on main to gate pushes on tests too.
-BLOCK_ON_TESTS=0
+# Tests gate pushes to main (suite green as of 2026-05-23). Set to 0 to
+# temporarily downgrade tests to warn-only if the suite goes red and you must ship.
+BLOCK_ON_TESTS=1
 
 # Node/npm live under nvm; a git hook doesn't inherit the interactive shell PATH.
 export PATH="$HOME/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:$PATH"
