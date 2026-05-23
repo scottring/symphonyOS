@@ -4,6 +4,7 @@ import type { Task } from '@/types/task'
 import type { GoalAction } from '@/types/goal'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine } from '@/types/actionable'
+import type { UpdateRoutineInput } from '@/hooks/useRoutines'
 import { isEverydayRoutine } from '@/lib/routineUtils'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 import { isoWeekId } from './weeklyPlanning'
@@ -27,6 +28,10 @@ interface Props {
   onAddGoalAction?: (action: GoalAction) => void
   /** Open a day's full view from the week-ahead overview (typically exits planning). */
   onSelectDay?: (date: Date) => void
+  /** Full active+reference routine set, used to list non-daily routines on step 2. */
+  allRoutines?: Routine[]
+  /** Persist a routine's recurrence/time when scheduled on step 2. */
+  onUpdateRoutine?: (id: string, input: UpdateRoutineInput) => Promise<boolean>
 }
 
 export function WeeklyPlanningSession({
@@ -41,6 +46,8 @@ export function WeeklyPlanningSession({
   goalActions = [],
   onAddGoalAction,
   onSelectDay,
+  allRoutines,
+  onUpdateRoutine,
 }: Props) {
   const [step, setStep] = useState(0)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -59,6 +66,28 @@ export function WeeklyPlanningSession({
   const visibleRoutines = useMemo(
     () => hideDaily ? routines.filter(r => !isEverydayRoutine(r.recurrence_pattern)) : routines,
     [hideDaily, routines],
+  )
+
+  // Active, non-daily routines (weekly, monthly, unscheduled, etc.) surfaced on
+  // step 2 so they can be pinned to a day this week. Falls back to the
+  // date-filtered `routines` when the full set isn't supplied.
+  const nonDailyRoutines = useMemo(
+    () => (allRoutines ?? routines).filter(
+      r => r.visibility === 'active' && !isEverydayRoutine(r.recurrence_pattern),
+    ),
+    [allRoutines, routines],
+  )
+
+  const handleScheduleRoutine = useCallback(
+    (routineId: string, day: string, time: string | null) => {
+      const routine = (allRoutines ?? routines).find(r => r.id === routineId)
+      if (!routine || !onUpdateRoutine) return
+      onUpdateRoutine(routineId, {
+        recurrence_pattern: { ...routine.recurrence_pattern, type: 'weekly', days: [day] },
+        time_of_day: time,
+      })
+    },
+    [allRoutines, routines, onUpdateRoutine],
   )
 
   const weekId = useMemo(() => isoWeekId(initialDate ?? new Date()), [initialDate])
@@ -144,6 +173,8 @@ export function WeeklyPlanningSession({
             goalActions={goalActions}
             addedGoalActionIds={addedGoalActionIds}
             onAddGoalAction={handleAddGoalAction}
+            routines={nonDailyRoutines}
+            onScheduleRoutine={onUpdateRoutine ? handleScheduleRoutine : undefined}
           />
         )}
         {step === 2 && (

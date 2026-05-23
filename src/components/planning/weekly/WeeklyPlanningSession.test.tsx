@@ -66,6 +66,38 @@ describe('WeeklyPlanningSession', () => {
     expect(onSavePlanToVault).toHaveBeenCalled()
   })
 
+  describe('routines this week (step 2)', () => {
+    it('lists active non-daily routines and excludes everyday ones', async () => {
+      const weekly = makeRoutine({ name: 'Food shopping', recurrence_pattern: { type: 'weekly', days: ['sat'] } })
+      const everyday = makeRoutine({ name: 'Brush teeth', recurrence_pattern: { type: 'daily' } })
+      const reference = makeRoutine({ name: 'Old chore', recurrence_pattern: { type: 'weekly', days: ['sat'] }, visibility: 'reference' })
+      const { user } = render(
+        <WeeklyPlanningSession {...baseProps} allRoutines={[weekly, everyday, reference]} onUpdateRoutine={vi.fn()} />,
+      )
+      await user.click(screen.getByRole('button', { name: 'Next' })) // to step 2
+      expect(screen.getByText(/routines this week/i)).toBeInTheDocument()
+      expect(screen.getByText('Food shopping')).toBeInTheDocument()
+      expect(screen.queryByText('Brush teeth')).not.toBeInTheDocument()
+      expect(screen.queryByText('Old chore')).not.toBeInTheDocument()
+    })
+
+    it('scheduling a routine calls onUpdateRoutine with a weekly recurrence on the chosen day + time', async () => {
+      const onUpdateRoutine = vi.fn().mockResolvedValue(true)
+      const weekly = makeRoutine({ name: 'Food shopping', recurrence_pattern: { type: 'weekly', days: [] }, time_of_day: null })
+      const { user } = render(
+        <WeeklyPlanningSession {...baseProps} allRoutines={[weekly]} onUpdateRoutine={onUpdateRoutine} />,
+      )
+      await user.click(screen.getByRole('button', { name: 'Next' })) // step 2
+      await user.click(screen.getByRole('button', { name: /schedule food shopping/i }))
+      await user.click(screen.getByRole('button', { name: 'Sat' }))
+      await user.click(screen.getByRole('button', { name: /apply/i }))
+      expect(onUpdateRoutine).toHaveBeenCalledWith(weekly.id, {
+        recurrence_pattern: { type: 'weekly', days: ['sat'] },
+        time_of_day: null,
+      })
+    })
+  })
+
   describe('hide daily chores', () => {
     const daily = makeRoutine({ name: 'Brush teeth', recurrence_pattern: { type: 'daily' } })
     const weekly = makeRoutine({ name: 'Take out trash', recurrence_pattern: { type: 'weekly', days: ['mon'] } })

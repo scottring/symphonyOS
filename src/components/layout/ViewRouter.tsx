@@ -269,6 +269,8 @@ export function ViewRouter(props: ViewRouterProps) {
             goalActions={props.weeklyGoalActions}
             onAddGoalAction={props.onAddGoalActionToWeek}
             onSelectDay={(date) => { props.onDateChange(date); props.onViewChange('today') }}
+            allRoutines={props.allRoutines}
+            onUpdateRoutine={props.onUpdateRoutine}
           />
         </Suspense>
       )}

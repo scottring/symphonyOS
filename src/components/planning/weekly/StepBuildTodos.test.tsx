@@ -1,9 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
-import { screen, within } from '@testing-library/react'
+import { screen, within, fireEvent } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { StepBuildTodos } from './StepBuildTodos'
 import type { Task } from '@/types/task'
 import type { GoalAction } from '@/types/goal'
+import type { Routine } from '@/types/actionable'
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -13,6 +14,25 @@ function makeTask(overrides: Partial<Task> & { id: string; title: string }): Tas
     createdAt: new Date('2026-01-01'),
     updatedAt: new Date('2026-01-01'),
     ...overrides,
+  }
+}
+
+function makeRoutine(over: Partial<Routine> & Pick<Routine, 'id' | 'name'>): Routine {
+  return {
+    user_id: 'u1',
+    description: null,
+    default_assignee: null,
+    assigned_to: null,
+    assigned_to_all: null,
+    visibility: 'active',
+    paused_until: null,
+    recurrence_pattern: { type: 'weekly', days: [] },
+    time_of_day: null,
+    raw_input: null,
+    show_on_timeline: true,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+    ...over,
   }
 }
 
@@ -128,5 +148,77 @@ describe('StepBuildTodos', () => {
 
     const addedButton = screen.getByRole('button', { name: /added/i })
     expect(addedButton).toBeDisabled()
+  })
+
+  describe('routines this week', () => {
+    it('lists provided routines under a "Routines this week" group', () => {
+      const foodShopping = makeRoutine({ id: 'r1', name: 'Food shopping' })
+      const foodPlanning = makeRoutine({ id: 'r2', name: 'Food planning' })
+      render(
+        <StepBuildTodos
+          tasks={allTasks}
+          selectedIds={[]}
+          onToggle={vi.fn()}
+          onReorder={vi.fn()}
+          routines={[foodShopping, foodPlanning]}
+          onScheduleRoutine={vi.fn()}
+        />,
+      )
+      expect(screen.getByText(/routines this week/i)).toBeInTheDocument()
+      expect(screen.getByText('Food shopping')).toBeInTheDocument()
+      expect(screen.getByText('Food planning')).toBeInTheDocument()
+    })
+
+    it('does not render the routines group when none are provided', () => {
+      render(
+        <StepBuildTodos tasks={allTasks} selectedIds={[]} onToggle={vi.fn()} onReorder={vi.fn()} />,
+      )
+      expect(screen.queryByText(/routines this week/i)).not.toBeInTheDocument()
+    })
+
+    it('schedules a routine onto a chosen day and time', async () => {
+      const onScheduleRoutine = vi.fn()
+      const r = makeRoutine({ id: 'r1', name: 'Food shopping' })
+      const { user } = render(
+        <StepBuildTodos
+          tasks={allTasks}
+          selectedIds={[]}
+          onToggle={vi.fn()}
+          onReorder={vi.fn()}
+          routines={[r]}
+          onScheduleRoutine={onScheduleRoutine}
+        />,
+      )
+
+      // Open the scheduling popover for this routine
+      await user.click(screen.getByRole('button', { name: /schedule food shopping/i }))
+      // Pick Saturday
+      await user.click(screen.getByRole('button', { name: 'Sat' }))
+      // Set a time
+      fireEvent.change(screen.getByLabelText(/time/i), { target: { value: '10:00' } })
+      // Apply
+      await user.click(screen.getByRole('button', { name: /apply/i }))
+
+      expect(onScheduleRoutine).toHaveBeenCalledWith('r1', 'sat', '10:00')
+    })
+
+    it('applies with no time when none is entered', async () => {
+      const onScheduleRoutine = vi.fn()
+      const r = makeRoutine({ id: 'r1', name: 'Water plants' })
+      const { user } = render(
+        <StepBuildTodos
+          tasks={allTasks}
+          selectedIds={[]}
+          onToggle={vi.fn()}
+          onReorder={vi.fn()}
+          routines={[r]}
+          onScheduleRoutine={onScheduleRoutine}
+        />,
+      )
+      await user.click(screen.getByRole('button', { name: /schedule water plants/i }))
+      await user.click(screen.getByRole('button', { name: 'Tue' }))
+      await user.click(screen.getByRole('button', { name: /apply/i }))
+      expect(onScheduleRoutine).toHaveBeenCalledWith('r1', 'tue', null)
+    })
   })
 })
