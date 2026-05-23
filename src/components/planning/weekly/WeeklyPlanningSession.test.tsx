@@ -96,6 +96,19 @@ describe('WeeklyPlanningSession', () => {
       const priorityRoutines = screen.getByTestId('priority-routines')
       expect(within(priorityRoutines).getByText('Food shopping')).toBeInTheDocument()
     })
+
+    it('carries a selected routine into the step-3 schedule drawer', async () => {
+      const weekly = makeRoutine({ name: 'Food shopping', recurrence_pattern: { type: 'weekly', days: ['sat'] }, time_of_day: null })
+      const { user } = render(
+        <WeeklyPlanningSession {...baseProps} allRoutines={[weekly]} onUpdateRoutine={vi.fn()} />,
+      )
+      await user.click(screen.getByRole('button', { name: 'Next' })) // step 2
+      await user.click(screen.getByRole('checkbox', { name: 'Food shopping' }))
+      await user.click(screen.getByRole('button', { name: 'Next' })) // step 3
+      // The schedule drawer offers it as a draggable chip
+      expect(screen.getByText(/drag tasks onto the calendar/i)).toBeInTheDocument()
+      expect(screen.getByText('Food shopping')).toBeInTheDocument()
+    })
   })
 
   describe('hide daily chores', () => {

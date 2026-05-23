@@ -2,6 +2,30 @@ import type { Routine, RecurrencePattern } from '@/types/actionable'
 
 const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const
 
+/** Recurrence day keys indexed by JS Date.getDay() (0 = Sunday). */
+export const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
+
+/** The recurrence day key ('sun'…'sat') for a given date's weekday. */
+export function weekdayKeyForDate(date: Date): string {
+  return WEEKDAY_KEYS[date.getDay()]
+}
+
+/**
+ * Build the routine update for pinning a routine to a specific date+time
+ * (e.g. dropped onto the schedule grid). Converts it to a weekly routine on
+ * that weekday, preserving any other recurrence fields, and sets the time.
+ */
+export function scheduleRoutineOnDate(
+  routine: Routine,
+  date: Date,
+  time: string,
+): { recurrence_pattern: RecurrencePattern; time_of_day: string } {
+  return {
+    recurrence_pattern: { ...routine.recurrence_pattern, type: 'weekly', days: [weekdayKeyForDate(date)] },
+    time_of_day: time,
+  }
+}
+
 /**
  * True when a routine effectively recurs at least every weekday (>= 5x/week).
  * Covers:

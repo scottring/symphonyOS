@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Routine, RecurrencePattern } from '@/types/actionable'
-import { matchesRecurrenceForDate, getRoutinesForDatePure, isEverydayRoutine } from './routineUtils'
+import { matchesRecurrenceForDate, getRoutinesForDatePure, isEverydayRoutine, weekdayKeyForDate, scheduleRoutineOnDate } from './routineUtils'
 
 function makeRoutine(pattern: RecurrencePattern, overrides: Partial<Routine> = {}): Routine {
   return {
@@ -144,5 +144,34 @@ describe('isEverydayRoutine', () => {
 
   it('returns false for a weekly routine with no days array', () => {
     expect(isEverydayRoutine({ type: 'weekly' })).toBe(false)
+  })
+})
+
+describe('weekdayKeyForDate', () => {
+  it('maps each weekday to its recurrence key', () => {
+    // 2026-05-17 is a Sunday
+    expect(weekdayKeyForDate(new Date(2026, 4, 17))).toBe('sun')
+    expect(weekdayKeyForDate(new Date(2026, 4, 18))).toBe('mon')
+    expect(weekdayKeyForDate(new Date(2026, 4, 23))).toBe('sat')
+  })
+})
+
+describe('scheduleRoutineOnDate', () => {
+  it('converts the routine to weekly on the dropped weekday at the given time', () => {
+    const routine = makeRoutine({ type: 'weekly', days: [] })
+    const sat = new Date(2026, 4, 23) // Saturday
+    expect(scheduleRoutineOnDate(routine, sat, '10:00')).toEqual({
+      recurrence_pattern: { type: 'weekly', days: ['sat'] },
+      time_of_day: '10:00',
+    })
+  })
+
+  it('preserves other recurrence fields while overriding type/days', () => {
+    const routine = makeRoutine({ type: 'monthly', day_of_month: 5, interval: 2 })
+    const wed = new Date(2026, 4, 20) // Wednesday
+    expect(scheduleRoutineOnDate(routine, wed, '14:30')).toEqual({
+      recurrence_pattern: { type: 'weekly', days: ['wed'], day_of_month: 5, interval: 2 },
+      time_of_day: '14:30',
+    })
   })
 })

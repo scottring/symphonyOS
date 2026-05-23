@@ -4,7 +4,8 @@ import type { Task } from '@/types/task'
 import type { GoalAction } from '@/types/goal'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine } from '@/types/actionable'
-import { isEverydayRoutine } from '@/lib/routineUtils'
+import type { UpdateRoutineInput } from '@/hooks/useRoutines'
+import { isEverydayRoutine, scheduleRoutineOnDate } from '@/lib/routineUtils'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 import { isoWeekId } from './weeklyPlanning'
 import { StepWeekAhead } from './StepWeekAhead'
@@ -29,6 +30,8 @@ interface Props {
   onSelectDay?: (date: Date) => void
   /** Full active+reference routine set, used to list non-daily routines on step 2. */
   allRoutines?: Routine[]
+  /** Persist a routine when it's dropped onto the schedule grid (step 3). */
+  onUpdateRoutine?: (id: string, input: UpdateRoutineInput) => Promise<boolean>
 }
 
 export function WeeklyPlanningSession({
@@ -44,6 +47,7 @@ export function WeeklyPlanningSession({
   onAddGoalAction,
   onSelectDay,
   allRoutines,
+  onUpdateRoutine,
 }: Props) {
   const [step, setStep] = useState(0)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -83,6 +87,24 @@ export function WeeklyPlanningSession({
       )
     },
     [],
+  )
+
+  // Selected, still-untimed routines — offered as draggable chips on step 3.
+  const selectedRoutines = useMemo(
+    () => nonDailyRoutines.filter(r => selectedRoutineIds.includes(r.id)),
+    [nonDailyRoutines, selectedRoutineIds],
+  )
+
+  // A routine dropped on a grid slot becomes weekly on that weekday at that
+  // time. The optimistic routine update gives it a time_of_day, which removes
+  // it from nonDailyRoutines (and the drawer) and shows it on the grid.
+  const handleScheduleRoutineDrop = useCallback(
+    (routineId: string, date: Date, time: string) => {
+      const routine = (allRoutines ?? routines).find(r => r.id === routineId)
+      if (!routine || !onUpdateRoutine) return
+      onUpdateRoutine(routineId, scheduleRoutineOnDate(routine, date, time))
+    },
+    [allRoutines, routines, onUpdateRoutine],
   )
 
   const weekId = useMemo(() => isoWeekId(initialDate ?? new Date()), [initialDate])
@@ -179,6 +201,8 @@ export function WeeklyPlanningSession({
             priorities={priorities}
             events={events}
             routines={visibleRoutines}
+            draggableRoutines={selectedRoutines}
+            onScheduleRoutine={handleScheduleRoutineDrop}
             onUpdateTask={onUpdateTask}
             onPushTask={onPushTask}
           />

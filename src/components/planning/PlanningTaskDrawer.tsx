@@ -1,13 +1,16 @@
 import { useDroppable } from '@dnd-kit/core'
 import type { Task } from '@/types/task'
+import type { Routine } from '@/types/actionable'
 import { PlanningTaskCard } from './PlanningTaskCard'
+import { PlanningRoutineDragCard } from './PlanningRoutineDragCard'
 
 interface PlanningTaskDrawerProps {
   tasks: Task[]
+  routines?: Routine[]
   onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
 }
 
-export function PlanningTaskDrawer({ tasks, onPushTask }: PlanningTaskDrawerProps) {
+export function PlanningTaskDrawer({ tasks, routines = [], onPushTask }: PlanningTaskDrawerProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: 'unscheduled-drawer',
   })
@@ -46,7 +49,7 @@ export function PlanningTaskDrawer({ tasks, onPushTask }: PlanningTaskDrawerProp
 
       {/* Task list - overflow-x-clip allows dropdown to show while y scrolls */}
       <div className="flex-1 overflow-y-auto overflow-x-clip p-3 space-y-2">
-        {tasks.length === 0 ? (
+        {tasks.length === 0 && routines.length === 0 ? (
           <div className={`text-center py-8 ${isOver ? 'opacity-50' : ''}`}>
             <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-neutral-100 flex items-center justify-center">
               <svg
@@ -69,13 +72,25 @@ export function PlanningTaskDrawer({ tasks, onPushTask }: PlanningTaskDrawerProp
             </p>
           </div>
         ) : (
-          tasks.map((task) => (
-            <PlanningTaskCard 
-              key={task.id} 
-              task={task} 
-              onPushTask={onPushTask}
-            />
-          ))
+          <>
+            {tasks.map((task) => (
+              <PlanningTaskCard
+                key={task.id}
+                task={task}
+                onPushTask={onPushTask}
+              />
+            ))}
+            {routines.length > 0 && (
+              <div className="pt-1 space-y-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-600/70 px-1">
+                  Routines
+                </p>
+                {routines.map((routine) => (
+                  <PlanningRoutineDragCard key={routine.id} routine={routine} />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 

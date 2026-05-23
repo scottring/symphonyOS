@@ -270,6 +270,7 @@ export function ViewRouter(props: ViewRouterProps) {
             onAddGoalAction={props.onAddGoalActionToWeek}
             onSelectDay={(date) => { props.onDateChange(date); props.onViewChange('today') }}
             allRoutines={props.allRoutines}
+            onUpdateRoutine={props.onUpdateRoutine}
           />
         </Suspense>
       )}

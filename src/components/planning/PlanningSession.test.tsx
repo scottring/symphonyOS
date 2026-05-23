@@ -144,6 +144,28 @@ describe('PlanningSession', () => {
     expect(screen.getByText('Morning Meditation')).toBeInTheDocument()
   })
 
+  it('shows draggable routines in the drawer under a Routines heading', () => {
+    const routine = createMockRoutine({
+      name: 'Food shopping',
+      recurrence_pattern: { type: 'weekly', days: ['sat'] },
+      time_of_day: null,
+    })
+    render(
+      <PlanningSession
+        tasks={[]}
+        events={[]}
+        routines={[]}
+        draggableRoutines={[routine]}
+        onScheduleRoutine={vi.fn()}
+        onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Routines')).toBeInTheDocument()
+    expect(screen.getByText('Food shopping')).toBeInTheDocument()
+  })
+
   it('calls onClose when close button is clicked', async () => {
     const onClose = vi.fn()
     const { user } = render(

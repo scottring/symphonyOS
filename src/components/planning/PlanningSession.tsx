@@ -21,11 +21,16 @@ import { PlanningHeader } from './PlanningHeader'
 import { PlanningGrid } from './PlanningGrid'
 import { PlanningTaskDrawer } from './PlanningTaskDrawer'
 import { PlanningTaskCard } from './PlanningTaskCard'
+import { PlanningRoutineDragCard, ROUTINE_DRAG_PREFIX } from './PlanningRoutineDragCard'
 
 interface PlanningSessionProps {
   tasks: Task[]
   events: CalendarEvent[]
   routines: Routine[]
+  /** Untimed routines shown in the drawer as draggable chips (weekly planning). */
+  draggableRoutines?: Routine[]
+  /** Drop handler for a dragged routine: pins it to a date's weekday + time. */
+  onScheduleRoutine?: (routineId: string, date: Date, time: string) => void
   familyMembers?: FamilyMember[]
   eventNotesMap?: Map<string, EventNote>
   onUpdateTask: (id: string, updates: Partial<Task>) => void
@@ -52,6 +57,8 @@ export function PlanningSession({
   tasks,
   events,
   routines,
+  draggableRoutines = [],
+  onScheduleRoutine,
   familyMembers = [],
   eventNotesMap,
   onUpdateTask,
@@ -188,6 +195,13 @@ export function PlanningSession({
     return tasks.find((t) => t.id === activeId) ?? null
   }, [activeId, tasks])
 
+  // Get the currently dragged routine (drag ids are prefixed `routine-`)
+  const activeRoutine = useMemo(() => {
+    if (!activeId || !activeId.startsWith(ROUTINE_DRAG_PREFIX)) return null
+    const routineId = activeId.slice(ROUTINE_DRAG_PREFIX.length)
+    return draggableRoutines.find((r) => r.id === routineId) ?? null
+  }, [activeId, draggableRoutines])
+
   // Add a day to the date range
   const handleAddDay = useCallback(() => {
     setDateRange((prev) => {
@@ -266,6 +280,19 @@ export function PlanningSession({
 
       const dropTarget = over.id as string
 
+      // Routine drags (id `routine-<id>`): only meaningful when dropped on a
+      // time slot — that pins the routine to the slot's weekday + time. Dropping
+      // a routine anywhere else (e.g. back on the drawer) is a no-op.
+      if (activeId.startsWith(ROUTINE_DRAG_PREFIX)) {
+        if (!dropTarget.startsWith('slot-')) return
+        const parsed = parseSlotId(dropTarget)
+        if (!parsed) return
+        const date = new Date(parsed.year, parsed.month, parsed.day)
+        const time = `${String(parsed.hour).padStart(2, '0')}:${String(parsed.minute).padStart(2, '0')}`
+        onScheduleRoutine?.(activeId.slice(ROUTINE_DRAG_PREFIX.length), date, time)
+        return
+      }
+
       // Handle dropping on unscheduled drawer
       if (dropTarget === 'unscheduled-drawer') {
         // Clear the time AND drop out of the 'timed' bucket — a task with no
@@ -297,7 +324,7 @@ export function PlanningSession({
         })
       }
     },
-    [onUpdateTask, tasks]
+    [onUpdateTask, tasks, onScheduleRoutine]
   )
 
   return (
@@ -327,7 +354,7 @@ export function PlanningSession({
           onDragEnd={handleDragEnd}
         >
           {/* Task drawer (sidebar) */}
-          <PlanningTaskDrawer tasks={unscheduledTasks} onPushTask={onPushTask} />
+          <PlanningTaskDrawer tasks={unscheduledTasks} routines={draggableRoutines} onPushTask={onPushTask} />
 
           {/* Planning grid */}
           <PlanningGrid
@@ -346,6 +373,9 @@ export function PlanningSession({
           <DragOverlay dropAnimation={null}>
             {activeTask && (
               <PlanningTaskCard task={activeTask} isDragging />
+            )}
+            {activeRoutine && (
+              <PlanningRoutineDragCard routine={activeRoutine} isOverlay />
             )}
           </DragOverlay>
         </DndContext>
