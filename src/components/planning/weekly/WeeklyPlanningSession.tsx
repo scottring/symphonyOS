@@ -68,12 +68,13 @@ export function WeeklyPlanningSession({
     [hideDaily, routines],
   )
 
-  // Active, non-daily routines (weekly, monthly, unscheduled, etc.) surfaced on
-  // step 2 so they can be pinned to a day this week. Falls back to the
-  // date-filtered `routines` when the full set isn't supplied.
+  // Active routines that still need a slot: non-daily AND without a set time.
+  // Once a routine has a time_of_day it shows on the schedule grid, so it drops
+  // off this "needs scheduling" list. Falls back to the date-filtered `routines`
+  // when the full set isn't supplied.
   const nonDailyRoutines = useMemo(
     () => (allRoutines ?? routines).filter(
-      r => r.visibility === 'active' && !isEverydayRoutine(r.recurrence_pattern),
+      r => r.visibility === 'active' && !isEverydayRoutine(r.recurrence_pattern) && !r.time_of_day,
     ),
     [allRoutines, routines],
   )

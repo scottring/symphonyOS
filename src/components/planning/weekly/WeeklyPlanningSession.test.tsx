@@ -67,17 +67,19 @@ describe('WeeklyPlanningSession', () => {
   })
 
   describe('routines this week (step 2)', () => {
-    it('lists active non-daily routines and excludes everyday ones', async () => {
-      const weekly = makeRoutine({ name: 'Food shopping', recurrence_pattern: { type: 'weekly', days: ['sat'] } })
-      const everyday = makeRoutine({ name: 'Brush teeth', recurrence_pattern: { type: 'daily' } })
-      const reference = makeRoutine({ name: 'Old chore', recurrence_pattern: { type: 'weekly', days: ['sat'] }, visibility: 'reference' })
+    it('lists active, non-daily, untimed routines and excludes everyday, timed, and reference ones', async () => {
+      const untimed = makeRoutine({ name: 'Food shopping', recurrence_pattern: { type: 'weekly', days: ['sat'] }, time_of_day: null })
+      const everyday = makeRoutine({ name: 'Brush teeth', recurrence_pattern: { type: 'daily' }, time_of_day: null })
+      const timed = makeRoutine({ name: 'Morning walk', recurrence_pattern: { type: 'weekly', days: ['sat'] }, time_of_day: '09:00' })
+      const reference = makeRoutine({ name: 'Old chore', recurrence_pattern: { type: 'weekly', days: ['sat'] }, time_of_day: null, visibility: 'reference' })
       const { user } = render(
-        <WeeklyPlanningSession {...baseProps} allRoutines={[weekly, everyday, reference]} onUpdateRoutine={vi.fn()} />,
+        <WeeklyPlanningSession {...baseProps} allRoutines={[untimed, everyday, timed, reference]} onUpdateRoutine={vi.fn()} />,
       )
       await user.click(screen.getByRole('button', { name: 'Next' })) // to step 2
       expect(screen.getByText(/routines this week/i)).toBeInTheDocument()
       expect(screen.getByText('Food shopping')).toBeInTheDocument()
       expect(screen.queryByText('Brush teeth')).not.toBeInTheDocument()
+      expect(screen.queryByText('Morning walk')).not.toBeInTheDocument()
       expect(screen.queryByText('Old chore')).not.toBeInTheDocument()
     })
 
