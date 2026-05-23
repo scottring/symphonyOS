@@ -1,0 +1,46 @@
+import { useDirections } from '@/hooks/useDirections'
+import { PlacesAutocomplete } from '@/components/location/PlacesAutocomplete'
+import { DirectionsBuilder } from '@/components/directions'
+
+interface PanelLocationProps {
+  location?: string
+  locationPlaceId?: string
+  taskTitle: string
+  /** When true and a location is set, the directions builder is expanded. */
+  showDirections: boolean
+  onUpdateLocation: (location: string, placeId?: string) => void
+  onClearLocation: () => void
+}
+
+export function PanelLocation({
+  location,
+  locationPlaceId,
+  taskTitle,
+  showDirections,
+  onUpdateLocation,
+  onClearLocation,
+}: PanelLocationProps) {
+  const { searchPlaces, getPlaceDetails } = useDirections()
+
+  return (
+    <section className="mb-4">
+      <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">Location</div>
+      <PlacesAutocomplete
+        value={location ? { address: location, placeId: locationPlaceId } : null}
+        onSelect={(place) => onUpdateLocation(place.address, place.placeId)}
+        onClear={onClearLocation}
+        onSearch={searchPlaces}
+        onGetDetails={getPlaceDetails}
+        placeholder="Add a location…"
+      />
+      {location && showDirections && (
+        <div className="mt-3 -mx-1 bg-white rounded-2xl border border-neutral-100 overflow-hidden">
+          <DirectionsBuilder
+            destination={{ name: taskTitle, address: location, placeId: locationPlaceId }}
+            eventTitle={taskTitle}
+          />
+        </div>
+      )}
+    </section>
+  )
+}
