@@ -43,6 +43,19 @@ describe('WeeklyPlanningSession', () => {
     expect(screen.getByText(/step 2 of 4/i)).toBeInTheDocument()
   })
 
+  it('calls onSelectDay with the clicked day on the week-ahead step', async () => {
+    const onSelectDay = vi.fn()
+    // 2026-05-20 is a Wednesday; sundayOfWeek anchors the grid on Sun 5/17.
+    const { user } = render(
+      <WeeklyPlanningSession {...baseProps} onSelectDay={onSelectDay} initialDate={new Date('2026-05-20T12:00:00')} />,
+    )
+    await user.click(screen.getByText('Wed').closest('button')!)
+    expect(onSelectDay).toHaveBeenCalledTimes(1)
+    const arg = onSelectDay.mock.calls[0][0] as Date
+    expect(arg).toBeInstanceOf(Date)
+    expect(arg.getDay()).toBe(3) // Wednesday
+  })
+
   it('shows Finish on the last step and calls onSavePlanToVault', async () => {
     const onSavePlanToVault = vi.fn().mockResolvedValue({ ok: true })
     const { user } = render(<WeeklyPlanningSession {...baseProps} onSavePlanToVault={onSavePlanToVault} />)

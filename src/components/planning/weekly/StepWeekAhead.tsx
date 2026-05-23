@@ -10,9 +10,10 @@ interface Props {
   tasks: Task[]
   events: CalendarEvent[]
   routines: Routine[]
+  onSelectDay?: (date: Date) => void
 }
 
-export function StepWeekAhead({ weekDate, tasks, events, routines }: Props) {
+export function StepWeekAhead({ weekDate, tasks, events, routines, onSelectDay }: Props) {
   const [viewWeekStart, setViewWeekStart] = useState<Date>(() => sundayOfWeek(weekDate))
 
   return (
@@ -27,7 +28,7 @@ export function StepWeekAhead({ weekDate, tasks, events, routines }: Props) {
         dateInstances={[]}
         weekStart={viewWeekStart}
         onWeekChange={setViewWeekStart}
-        onSelectDay={() => {}}
+        onSelectDay={onSelectDay ?? (() => {})}
       />
     </div>
   )

@@ -268,6 +268,7 @@ export function ViewRouter(props: ViewRouterProps) {
             onSavePlanToVault={props.onSaveWeeklyPlanToVault}
             goalActions={props.weeklyGoalActions}
             onAddGoalAction={props.onAddGoalActionToWeek}
+            onSelectDay={(date) => { props.onDateChange(date); props.onViewChange('today') }}
           />
         </Suspense>
       )}

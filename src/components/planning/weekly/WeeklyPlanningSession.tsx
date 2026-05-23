@@ -25,6 +25,8 @@ interface Props {
   initialDate?: Date
   goalActions?: GoalAction[]
   onAddGoalAction?: (action: GoalAction) => void
+  /** Open a day's full view from the week-ahead overview (typically exits planning). */
+  onSelectDay?: (date: Date) => void
 }
 
 export function WeeklyPlanningSession({
@@ -38,6 +40,7 @@ export function WeeklyPlanningSession({
   initialDate,
   goalActions = [],
   onAddGoalAction,
+  onSelectDay,
 }: Props) {
   const [step, setStep] = useState(0)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -129,6 +132,7 @@ export function WeeklyPlanningSession({
             tasks={tasks}
             events={events}
             routines={visibleRoutines}
+            onSelectDay={onSelectDay}
           />
         )}
         {step === 1 && (
