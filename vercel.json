@@ -1,9 +1,12 @@
 {
   "git": {
-    "deploymentEnabled": false
+    "deploymentEnabled": true
   },
   "rewrites": [
-    { "source": "/((?!assets/).*)", "destination": "/" }
+    {
+      "source": "/((?!assets/).*)",
+      "destination": "/"
+    }
   ],
   "headers": [
     {
