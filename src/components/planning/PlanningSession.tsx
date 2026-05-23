@@ -268,9 +268,13 @@ export function PlanningSession({
 
       // Handle dropping on unscheduled drawer
       if (dropTarget === 'unscheduled-drawer') {
+        // Clear the time AND drop out of the 'timed' bucket — a task with no
+        // scheduledFor must not stay bucket:'timed' (it would vanish from every
+        // Today pool). Return it to the week bucket as a planned, untimed task.
         onUpdateTask(activeId, {
+          bucket: 'week',
           scheduledFor: undefined,
-          isAllDay: true,
+          isAllDay: false,
         })
         return
       }
@@ -283,7 +287,11 @@ export function PlanningSession({
         // Create date in local time (not UTC) to avoid timezone shift
         const scheduledFor = new Date(parsed.year, parsed.month, parsed.day, parsed.hour, parsed.minute, 0, 0)
 
+        // bucket:'timed' is required for the task to surface in the Today/Day
+        // view (selectTimed filters on bucket==='timed'); scheduledFor alone
+        // only shows in the Week grid. Keep them in lockstep.
         onUpdateTask(activeId, {
+          bucket: 'timed',
           scheduledFor,
           isAllDay: false,
         })
