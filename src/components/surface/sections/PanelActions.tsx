@@ -5,10 +5,12 @@ import { ConceptIcon } from '@/lib/conceptIcons'
 interface PanelActionsProps {
   completed: boolean
   phoneNumber?: string
+  location?: string
   scheduledFor?: Date
   isAllDay?: boolean
   isPinned: boolean
   onToggleComplete: () => void
+  onShowDirections?: () => void
   onSchedule: (date: Date, isAllDay: boolean) => void
   onClearSchedule?: () => void
   onTogglePin: () => void
@@ -18,10 +20,12 @@ interface PanelActionsProps {
 export function PanelActions({
   completed,
   phoneNumber,
+  location,
   scheduledFor,
   isAllDay,
   isPinned,
   onToggleComplete,
+  onShowDirections,
   onSchedule,
   onClearSchedule,
   onTogglePin,
@@ -42,6 +46,14 @@ export function PanelActions({
         >
           <ConceptIcon name="call" decorative /> {phoneNumber}
         </a>
+      )}
+      {location && onShowDirections && (
+        <button
+          onClick={onShowDirections}
+          className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
+        >
+          <ConceptIcon name="location" decorative /> Directions
+        </button>
       )}
       <SchedulePopover
         value={scheduledFor}

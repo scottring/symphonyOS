@@ -57,4 +57,23 @@ describe('PanelActions', () => {
     />)
     expect(screen.getByLabelText('More actions')).toBeInTheDocument()
   })
+
+  it('renders Directions button when location present', () => {
+    render(<PanelActions {...baseProps} location="500 Market St" onShowDirections={vi.fn()} />)
+    expect(screen.getByRole('button', { name: /directions/i })).toBeInTheDocument()
+  })
+
+  it('does not render Directions button when location missing', () => {
+    render(<PanelActions {...baseProps} />)
+    expect(screen.queryByRole('button', { name: /directions/i })).not.toBeInTheDocument()
+  })
+
+  it('calls onShowDirections when Directions clicked', async () => {
+    const onShowDirections = vi.fn()
+    const { user } = render(
+      <PanelActions {...baseProps} location="500 Market St" onShowDirections={onShowDirections} />
+    )
+    await user.click(screen.getByRole('button', { name: /directions/i }))
+    expect(onShowDirections).toHaveBeenCalledOnce()
+  })
 })
