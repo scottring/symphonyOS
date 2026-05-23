@@ -1,8 +1,11 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
+import { CalendarCheck, CalendarX } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { GoalAction } from '@/types/goal'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine } from '@/types/actionable'
+import { isEverydayRoutine } from '@/lib/routineUtils'
+import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 import { isoWeekId } from './weeklyPlanning'
 import { StepWeekAhead } from './StepWeekAhead'
 import { StepBuildTodos } from './StepBuildTodos'
@@ -41,6 +44,19 @@ export function WeeklyPlanningSession({
   const [concerns, setConcerns] = useState('')
   const [saving, setSaving] = useState(false)
   const [addedGoalActionIds, setAddedGoalActionIds] = useState<string[]>([])
+
+  // Share the app-wide "Hide daily" preference (same localStorage signal Today,
+  // Week, and Wall use). Toggling here also updates those views, and vice-versa.
+  const [hideDaily, setHideDaily] = useState<boolean>(() => readHideRoutines())
+  useEffect(() => onHideRoutinesChange(setHideDaily), [])
+
+  // When hiding, drop everyday-ish routines (daily, weekdays, weekly-covering-
+  // all-5) so planning focuses on the lower-frequency chores. Filtering here
+  // flows into both the week-ahead overview and the schedule grid.
+  const visibleRoutines = useMemo(
+    () => hideDaily ? routines.filter(r => !isEverydayRoutine(r.recurrence_pattern)) : routines,
+    [hideDaily, routines],
+  )
 
   const weekId = useMemo(() => isoWeekId(initialDate ?? new Date()), [initialDate])
   const priorities = useMemo(
@@ -81,7 +97,19 @@ export function WeeklyPlanningSession({
           <h1 className="font-display text-2xl text-neutral-800">Weekly Planning</h1>
           <p className="text-sm text-neutral-500">{STEPS[step]} — step {step + 1} of {STEPS.length}</p>
         </div>
-        <button onClick={onClose} className="text-neutral-400 hover:text-neutral-700 text-sm">Close</button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => writeHideRoutines(!hideDaily)}
+            title={hideDaily ? 'Show daily chores' : 'Hide daily chores'}
+            aria-pressed={hideDaily}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-neutral-600 hover:bg-neutral-100 transition-colors"
+          >
+            {hideDaily ? <CalendarX className="w-4 h-4" /> : <CalendarCheck className="w-4 h-4" />}
+            <span>{hideDaily ? 'Show daily' : 'Hide daily'}</span>
+          </button>
+          <button onClick={onClose} className="text-neutral-400 hover:text-neutral-700 text-sm">Close</button>
+        </div>
       </header>
 
       <div className="flex items-center gap-2 px-6 py-3">
@@ -96,7 +124,7 @@ export function WeeklyPlanningSession({
             weekDate={initialDate ?? new Date()}
             tasks={tasks}
             events={events}
-            routines={routines}
+            routines={visibleRoutines}
           />
         )}
         {step === 1 && (
@@ -115,7 +143,7 @@ export function WeeklyPlanningSession({
             weekDate={initialDate ?? new Date()}
             priorities={priorities}
             events={events}
-            routines={routines}
+            routines={visibleRoutines}
             onUpdateTask={onUpdateTask}
             onPushTask={onPushTask}
           />
