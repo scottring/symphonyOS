@@ -2,24 +2,25 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## ⚠️ Parallel sessions: never share the main worktree's HEAD
+## Git workflow: branch directly by default; worktrees only for parallel sessions
 
-Multiple Claude sessions run against this repo concurrently. The main worktree
-(`/Users/scottkaufman/Developer/Developer/symphonyOS`) **must stay on `main`.**
+**Default (single session):** Do feature work on a normal branch in the main
+checkout (`git switch -c <branch>`), then fast-forward `main` and push. No
+worktree needed — it's faster and avoids merge friction. This is the right path
+whenever only one Claude session is active, which is the common case.
 
-- **Do NOT `git checkout`/`switch` a feature branch in the main worktree.** If two
-  sessions do this, they yank each other's HEAD mid-operation — commits land on
-  the wrong branch and cherry-picks/resets corrupt. This caused real lost-time
-  incidents (vite commit + meal fix stranded on wrong branches, May 2026).
-- **Each session does feature work in its own worktree:**
-  `git worktree add .worktrees/<task> -b <branch>` (or check out an existing
-  branch there). `.worktrees/` is gitignored.
-- **Race-safe ops** (fine from any worktree): `git push origin main:main`,
-  `git branch -D <name>`, `git worktree add`. **Never** run
-  `checkout`/`cherry-pick`/`reset` in the shared main worktree when another
-  session may be active.
-- If you find the main worktree on a non-`main` branch, that's the bug — surface
-  it, don't build on it.
+**Only use a worktree when two or more Claude sessions run against this repo at
+the same time.** Concurrent sessions sharing the main checkout's HEAD will yank
+each other mid-operation — commits land on the wrong branch and
+cherry-picks/resets corrupt (real lost-time incident: vite commit + meal fix
+stranded on wrong branches, May 2026). To isolate a parallel session:
+`git worktree add .worktrees/<task> -b <branch>` (`.worktrees/` is gitignored).
+
+**The hard safety rule (always applies):** **Never** run
+`checkout`/`switch`/`cherry-pick`/`reset` in the shared main checkout while
+another session may be active. Fast-forward merges and `git push origin main:main`
+are safe. If you find the main checkout on an unexpected branch while another
+session is running, that's the bug — surface it, don't build on it.
 
 ### The main worktree is NOT a workspace — never commit or edit in it
 
