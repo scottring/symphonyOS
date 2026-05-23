@@ -52,7 +52,9 @@ export function PlanningTaskCard({ task, isDragging, isPlaced, onPushTask, assig
     <div
       ref={setNodeRef}
       style={style}
-      className={`relative px-2 py-1.5 rounded-lg transition-shadow ${
+      {...attributes}
+      {...listeners}
+      className={`relative px-2 py-1.5 rounded-lg transition-shadow touch-none ${
         isPlaced ? 'h-full' : 'min-h-[40px]'
       } ${bgClass} border ${
         isDragging
@@ -63,12 +65,8 @@ export function PlanningTaskCard({ task, isDragging, isPlaced, onPushTask, assig
       }`}
     >
       <div className="flex items-start gap-1.5">
-        {/* Drag handle indicator - drag listeners only on handle */}
-        <div 
-          className="shrink-0 mt-0.5 touch-none cursor-grab"
-          {...listeners}
-          {...attributes}
-        >
+        {/* Drag handle indicator (the whole card is draggable; this is a visual affordance) */}
+        <div className="shrink-0 mt-0.5">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className={`w-3 h-3 ${iconClass}`}
@@ -90,7 +88,11 @@ export function PlanningTaskCard({ task, isDragging, isPlaced, onPushTask, assig
 
         {/* Defer button - only for unscheduled tasks */}
         {!isPlaced && onPushTask && (
-          <div className="shrink-0 -mr-1">
+          <div
+            className="shrink-0 -mr-1"
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
             <PushDropdown
               size="sm"
               onPush={(date) => onPushTask(task.id, date)}
