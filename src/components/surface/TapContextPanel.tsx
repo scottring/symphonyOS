@@ -124,6 +124,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
         subtasks={task.subtasks ?? []}
         onToggleSubtask={props.onToggleSubtask}
         onAddSubtask={props.onAddSubtask}
+        onOpenSubtask={props.onOpenTask}
       />
       <PanelPeople
         contact={linked.contact}

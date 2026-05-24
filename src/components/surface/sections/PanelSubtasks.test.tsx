@@ -41,4 +41,38 @@ describe('PanelSubtasks', () => {
     await user.type(input, 'New step{Enter}')
     expect(onAddSubtask).toHaveBeenCalledWith('New step')
   })
+
+  describe('open in editor', () => {
+    it('toggles completion via the checkbox when an open handler is present', async () => {
+      const onToggleSubtask = vi.fn()
+      const subs = [createMockTask({ id: 's1', title: 'Buy groceries', completed: false })]
+      const { user } = render(
+        <PanelSubtasks subtasks={subs} onToggleSubtask={onToggleSubtask} onOpenSubtask={vi.fn()} />,
+      )
+      await user.click(screen.getByRole('button', { name: /mark Buy groceries complete/i }))
+      expect(onToggleSubtask).toHaveBeenCalledWith('s1')
+    })
+
+    it('opens the subtask in the editor when its title is clicked', async () => {
+      const onOpenSubtask = vi.fn()
+      const onToggleSubtask = vi.fn()
+      const subs = [createMockTask({ id: 's1', title: 'Buy groceries', completed: false })]
+      const { user } = render(
+        <PanelSubtasks subtasks={subs} onToggleSubtask={onToggleSubtask} onOpenSubtask={onOpenSubtask} />,
+      )
+      await user.click(screen.getByRole('button', { name: /open Buy groceries/i }))
+      expect(onOpenSubtask).toHaveBeenCalledWith('s1')
+      expect(onToggleSubtask).not.toHaveBeenCalled()
+    })
+
+    it('falls back to toggling the whole row when no open handler is given', async () => {
+      const onToggleSubtask = vi.fn()
+      const subs = [createMockTask({ id: 's1', title: 'Buy groceries', completed: false })]
+      const { user } = render(
+        <PanelSubtasks subtasks={subs} onToggleSubtask={onToggleSubtask} />,
+      )
+      await user.click(screen.getByText('Buy groceries'))
+      expect(onToggleSubtask).toHaveBeenCalledWith('s1')
+    })
+  })
 })
