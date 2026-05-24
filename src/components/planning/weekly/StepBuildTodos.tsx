@@ -23,6 +23,8 @@ interface Props {
   onCompleteTask?: (taskId: string) => void
   /** Delete a candidate task outright. */
   onDeleteTask?: (taskId: string) => void
+  /** Select (or clear) every task in a section at once. */
+  onSelectMany?: (tasks: Task[], selected: boolean) => void
 }
 
 /** Normalize a title for duplicate detection: trimmed + lower-cased. */
@@ -38,12 +40,26 @@ interface CandidateGroupProps {
   isDuplicate: (task: Task) => boolean
   onCompleteTask?: (taskId: string) => void
   onDeleteTask?: (taskId: string) => void
+  onSelectMany?: (tasks: Task[], selected: boolean) => void
 }
 
-function CandidateGroup({ label, items, selectedIds, onToggle, isDuplicate, onCompleteTask, onDeleteTask }: CandidateGroupProps) {
+function CandidateGroup({ label, items, selectedIds, onToggle, isDuplicate, onCompleteTask, onDeleteTask, onSelectMany }: CandidateGroupProps) {
+  const allSelected = items.length > 0 && items.every(t => selectedIds.includes(t.id))
   return (
     <div>
-      <h3 className="text-xs uppercase tracking-wider text-neutral-400 mb-2">{label}</h3>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-xs uppercase tracking-wider text-neutral-400">{label}</h3>
+        {items.length > 0 && onSelectMany && (
+          <button
+            type="button"
+            onClick={() => onSelectMany(items, !allSelected)}
+            aria-label={`${allSelected ? 'Select none' : 'Select all'} ${label}`}
+            className="text-[11px] font-medium text-primary-600 hover:text-primary-700 transition-colors"
+          >
+            {allSelected ? 'Select none' : 'Select all'}
+          </button>
+        )}
+      </div>
       {items.length === 0 ? (
         <p className="text-sm text-neutral-400 pl-1">—</p>
       ) : (
@@ -115,6 +131,7 @@ export function StepBuildTodos({
   onToggleRoutine,
   onCompleteTask,
   onDeleteTask,
+  onSelectMany,
 }: Props) {
   const candidates = selectWeeklyCandidates(tasks)
 
@@ -193,6 +210,7 @@ export function StepBuildTodos({
             isDuplicate={isDuplicate}
             onCompleteTask={onCompleteTask}
             onDeleteTask={onDeleteTask}
+            onSelectMany={onSelectMany}
           />
         ))}
 

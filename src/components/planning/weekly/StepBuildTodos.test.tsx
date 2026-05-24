@@ -56,6 +56,55 @@ const goalAction: GoalAction = {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('StepBuildTodos', () => {
+  describe('section select all / none', () => {
+    const i1 = makeTask({ id: 'i1', title: 'Inbox 1', bucket: 'inbox' })
+    const i2 = makeTask({ id: 'i2', title: 'Inbox 2', bucket: 'inbox' })
+
+    it('selects every task in a section', async () => {
+      const onSelectMany = vi.fn()
+      const { user } = render(
+        <StepBuildTodos
+          tasks={[i1, i2]}
+          selectedIds={[]}
+          onToggle={vi.fn()}
+          onReorder={vi.fn()}
+          onSelectMany={onSelectMany}
+        />,
+      )
+      await user.click(screen.getByRole('button', { name: /select all inbox/i }))
+      expect(onSelectMany).toHaveBeenCalledWith([i1, i2], true)
+    })
+
+    it('clears a section when all are already selected', async () => {
+      const onSelectMany = vi.fn()
+      const { user } = render(
+        <StepBuildTodos
+          tasks={[i1, i2]}
+          selectedIds={[i1.id, i2.id]}
+          onToggle={vi.fn()}
+          onReorder={vi.fn()}
+          onSelectMany={onSelectMany}
+        />,
+      )
+      await user.click(screen.getByRole('button', { name: /select none inbox/i }))
+      expect(onSelectMany).toHaveBeenCalledWith([i1, i2], false)
+    })
+
+    it('shows no select-all control for an empty section or when handler absent', () => {
+      const { rerender } = render(
+        <StepBuildTodos tasks={[i1, i2]} selectedIds={[]} onToggle={vi.fn()} onReorder={vi.fn()} />,
+      )
+      // No handler -> no control
+      expect(screen.queryByRole('button', { name: /select all inbox/i })).not.toBeInTheDocument()
+      // With handler but empty section (Someday) -> no control for that section
+      rerender(
+        <StepBuildTodos tasks={[i1, i2]} selectedIds={[]} onToggle={vi.fn()} onReorder={vi.fn()} onSelectMany={vi.fn()} />,
+      )
+      expect(screen.getByRole('button', { name: /select all inbox/i })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /select all someday/i })).not.toBeInTheDocument()
+    })
+  })
+
   it('renders candidate groups; checking an inbox task calls onToggle', async () => {
     const onToggle = vi.fn()
     const { user } = render(

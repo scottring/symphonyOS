@@ -56,6 +56,20 @@ describe('WeeklyPlanningSession', () => {
     expect(arg.getDay()).toBe(3) // Wednesday
   })
 
+  it('section "Select all" on step 2 adds the whole section to the priority list', async () => {
+    const now = new Date('2026-01-01')
+    const tasks = [
+      { id: 'i1', title: 'Inbox one', completed: false, bucket: 'inbox', createdAt: now, updatedAt: now },
+      { id: 'i2', title: 'Inbox two', completed: false, bucket: 'inbox', createdAt: now, updatedAt: now },
+    ] as unknown as typeof baseProps.tasks
+    const { user } = render(<WeeklyPlanningSession {...baseProps} tasks={tasks} />)
+    await user.click(screen.getByRole('button', { name: 'Next' })) // step 2
+    await user.click(screen.getByRole('button', { name: /select all inbox/i }))
+    const list = screen.getByTestId('priority-order')
+    expect(within(list).getByText('Inbox one')).toBeInTheDocument()
+    expect(within(list).getByText('Inbox two')).toBeInTheDocument()
+  })
+
   it('shows Finish on the last step and calls onSavePlanToVault', async () => {
     const onSavePlanToVault = vi.fn().mockResolvedValue({ ok: true })
     const { user } = render(<WeeklyPlanningSession {...baseProps} onSavePlanToVault={onSavePlanToVault} />)

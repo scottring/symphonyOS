@@ -142,6 +142,24 @@ export function WeeklyPlanningSession({
     [selectedIds, onUpdateTask],
   )
 
+  // Bulk select/clear a whole candidate section. Mirrors handleToggle's side
+  // effect: newly-selected tasks move to the 'week' bucket.
+  const handleSelectMany = useCallback(
+    (sectionTasks: Task[], selected: boolean) => {
+      const ids = sectionTasks.map(t => t.id)
+      if (selected) {
+        for (const t of sectionTasks) {
+          if (!selectedIds.includes(t.id)) onUpdateTask(t.id, { bucket: 'week' })
+        }
+        setSelectedIds(prev => Array.from(new Set([...prev, ...ids])))
+      } else {
+        const remove = new Set(ids)
+        setSelectedIds(prev => prev.filter(id => !remove.has(id)))
+      }
+    },
+    [selectedIds, onUpdateTask],
+  )
+
   const handleAddGoalAction = useCallback(
     (action: GoalAction) => {
       onAddGoalAction?.(action)
@@ -215,6 +233,7 @@ export function WeeklyPlanningSession({
             onToggleRoutine={handleToggleRoutine}
             onCompleteTask={onCompleteTask}
             onDeleteTask={onDeleteTask}
+            onSelectMany={handleSelectMany}
           />
         )}
         {step === 2 && (
