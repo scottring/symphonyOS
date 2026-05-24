@@ -162,9 +162,11 @@ export function StepBuildTodos({
     [onAddGoalAction],
   )
 
+  // Exclude completed/deleted tasks so completing one from the priority list
+  // (or anywhere) drops it out cleanly.
   const selectedTasks = selectedIds
     .map(id => tasks.find(t => t.id === id))
-    .filter(Boolean) as Task[]
+    .filter((t): t is Task => Boolean(t) && !t!.completed)
 
   const selectedRoutines = routines.filter(r => selectedRoutineIds.includes(r.id))
 
@@ -302,6 +304,28 @@ export function StepBuildTodos({
                     <ChevronDown className="h-4 w-4" />
                   </button>
                 </div>
+                {onCompleteTask && (
+                  <button
+                    type="button"
+                    onClick={() => onCompleteTask(task.id)}
+                    aria-label={`Complete ${task.title}`}
+                    title="Mark complete"
+                    className="shrink-0 p-0.5 text-neutral-300 hover:text-primary-600 transition-colors"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                  </button>
+                )}
+                {onDeleteTask && (
+                  <button
+                    type="button"
+                    onClick={() => onDeleteTask(task.id)}
+                    aria-label={`Delete ${task.title}`}
+                    title="Delete task"
+                    className="shrink-0 p-0.5 text-neutral-300 hover:text-red-600 transition-colors"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
               </li>
             ))}
           </ol>

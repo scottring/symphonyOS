@@ -262,5 +262,56 @@ describe('StepBuildTodos', () => {
       expect(screen.queryByRole('button', { name: /complete Inbox task/i })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: /delete Inbox task/i })).not.toBeInTheDocument()
     })
+
+    it('completes a task from the priority-order list', async () => {
+      const onCompleteTask = vi.fn()
+      const { user } = render(
+        <StepBuildTodos
+          tasks={allTasks}
+          selectedIds={[inboxTask.id]}
+          onToggle={vi.fn()}
+          onReorder={vi.fn()}
+          onCompleteTask={onCompleteTask}
+          onDeleteTask={vi.fn()}
+        />,
+      )
+      const list = screen.getByTestId('priority-order')
+      await user.click(within(list).getByRole('button', { name: /complete Inbox task/i }))
+      expect(onCompleteTask).toHaveBeenCalledWith('task-inbox')
+    })
+
+    it('deletes a task from the priority-order list', async () => {
+      const onDeleteTask = vi.fn()
+      const { user } = render(
+        <StepBuildTodos
+          tasks={allTasks}
+          selectedIds={[inboxTask.id]}
+          onToggle={vi.fn()}
+          onReorder={vi.fn()}
+          onCompleteTask={vi.fn()}
+          onDeleteTask={onDeleteTask}
+        />,
+      )
+      const list = screen.getByTestId('priority-order')
+      await user.click(within(list).getByRole('button', { name: /delete Inbox task/i }))
+      expect(onDeleteTask).toHaveBeenCalledWith('task-inbox')
+    })
+
+    it('drops a completed task out of the priority-order list', () => {
+      const doneTask = makeTask({ id: 'done-1', title: 'Done task', bucket: 'week', completed: true })
+      render(
+        <StepBuildTodos
+          tasks={[...allTasks, doneTask]}
+          selectedIds={[doneTask.id, weekTask.id]}
+          onToggle={vi.fn()}
+          onReorder={vi.fn()}
+          onCompleteTask={vi.fn()}
+          onDeleteTask={vi.fn()}
+        />,
+      )
+      const list = screen.getByTestId('priority-order')
+      expect(within(list).queryByText('Done task')).not.toBeInTheDocument()
+      expect(within(list).getByText('Week task')).toBeInTheDocument()
+    })
   })
 })
