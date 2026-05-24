@@ -1,5 +1,6 @@
 // src/components/schedule/InboxView.tsx
 import { useMemo, useCallback, useState } from 'react'
+import { X } from 'lucide-react'
 import type { Task, TaskContext } from '@/types/task'
 import type { Project } from '@/types/project'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
@@ -50,7 +51,7 @@ export function InboxView({
   panelOpen: _panelOpen, onClosePanel: _onClosePanel, currentUserMemberId,
 }: InboxViewProps) {
   const {
-    onUpdateTask, onPushTask, onDeleteTask,
+    onUpdateTask, onPushTask, onDeleteTask, onUpdateTasksBulk,
     onAssignTaskAll, familyMembers = [], onOpenProject, onToggleTask,
     onAddProject, onDeleteProject,
   } = useScheduleActionsContext()
@@ -61,6 +62,38 @@ export function InboxView({
 
   const [notePickerTaskId, setNotePickerTaskId] = useState<string | null>(null)
   const [mode, setMode] = useInboxMode()
+
+  // Bulk select → assign context (and delete). Lets you tag many items at once
+  // (e.g. mark a batch 'family' so they surface on the kitchen wall).
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
+
+  const toggleTaskSelection = useCallback((id: string) => {
+    setSelectedTaskIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }, [])
+
+  const exitSelection = useCallback(() => {
+    setSelectionMode(false)
+    setSelectedTaskIds(new Set())
+  }, [])
+
+  const handleBulkContext = useCallback(async (context: TaskContext | null) => {
+    const ids = Array.from(selectedTaskIds)
+    if (ids.length === 0) return
+    if (onUpdateTasksBulk) await onUpdateTasksBulk(ids, { context: context ?? undefined })
+    else ids.forEach(id => onUpdateTask?.(id, { context: context ?? undefined }))
+    exitSelection()
+  }, [selectedTaskIds, onUpdateTasksBulk, onUpdateTask, exitSelection])
+
+  const handleBulkDelete = useCallback(() => {
+    const ids = Array.from(selectedTaskIds)
+    ids.forEach(id => onDeleteTask?.(id))
+    exitSelection()
+  }, [selectedTaskIds, onDeleteTask, exitSelection])
 
   const makeOnCreateProject = useCallback(
     (taskId: string) => async (name: string, context: TaskContext | null) => {
@@ -322,7 +355,10 @@ export function InboxView({
           }}
           onToggleComplete={() => onToggleTask?.(task.id)}
           onUpdate={(updates) => onUpdateTask?.(task.id, updates)}
-          onSelect={() => handleSelect(task.id)}
+          onSelect={() => (selectionMode ? toggleTaskSelection(task.id) : handleSelect(task.id))}
+          selectionMode={selectionMode}
+          isSelected={selectedTaskIds.has(task.id)}
+          onToggleSelection={() => toggleTaskSelection(task.id)}
           onOpenProject={onOpenProject}
           onAssign={onAssignTaskAll ? (memberIds) => onAssignTaskAll(task.id, memberIds) : undefined}
           onCreateProject={makeOnCreateProject(task.id)}
@@ -353,6 +389,15 @@ export function InboxView({
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {totalCount > 0 && (
+            <button
+              type="button"
+              onClick={() => (selectionMode ? exitSelection() : setSelectionMode(true))}
+              className={`text-sm font-medium px-2.5 py-1.5 rounded-lg transition-colors ${selectionMode ? 'text-primary-700 bg-primary-50' : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100'}`}
+            >
+              {selectionMode ? 'Done' : 'Select'}
+            </button>
+          )}
           {totalCount > 0 && <InboxModeToggle mode={mode} onChange={setMode} />}
           {familyMembers.length > 0 && (
             <AssigneeFilter
@@ -420,6 +465,25 @@ export function InboxView({
         />
       )}
       </div>
+
+      {selectedTaskIds.size > 0 && (
+        <div
+          role="toolbar"
+          aria-label="Bulk actions"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-neutral-900 text-white shadow-xl"
+        >
+          <span className="text-sm font-medium pr-1">{selectedTaskIds.size} selected</span>
+          <span className="text-neutral-500">·</span>
+          <span className="text-xs text-neutral-400 pl-1">Context:</span>
+          <button type="button" onClick={() => handleBulkContext('work')} className="text-sm px-2 py-1 rounded-lg hover:bg-white/10">Work</button>
+          <button type="button" onClick={() => handleBulkContext('family')} className="text-sm px-2 py-1 rounded-lg hover:bg-white/10">Family</button>
+          <button type="button" onClick={() => handleBulkContext('personal')} className="text-sm px-2 py-1 rounded-lg hover:bg-white/10">Personal</button>
+          <button type="button" onClick={() => handleBulkContext(null)} className="text-sm px-2 py-1 rounded-lg hover:bg-white/10 text-neutral-300">Clear</button>
+          <span className="text-neutral-600 mx-1">|</span>
+          <button type="button" onClick={handleBulkDelete} className="text-sm px-2 py-1 rounded-lg hover:bg-red-500/30 text-red-300">Delete</button>
+          <button type="button" onClick={exitSelection} aria-label="Cancel selection" className="ml-1 p-1 rounded-lg hover:bg-white/10"><X className="w-4 h-4" /></button>
+        </div>
+      )}
     </div>
   )
 }

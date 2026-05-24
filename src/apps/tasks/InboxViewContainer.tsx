@@ -24,7 +24,7 @@ import { InboxView } from '@/components/schedule/InboxView';
 import { useSelection } from '@/shell/providers/SelectionProvider';
 
 export function InboxViewContainer() {
-  const { tasks, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask } = useSupabaseTasks();
+  const { tasks, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, pushTask } = useSupabaseTasks();
   const { events } = useGoogleCalendar();
   const { notes: eventNotesMap, updateEventAssignment, updateEventAssignmentAll, updateEventContext, updateEventProject } = useEventNotes();
   const { contacts, contactsMap, addContact, searchContacts } = useContacts();
@@ -109,6 +109,7 @@ export function InboxViewContainer() {
       onToggleTask: toggleTask,
       onToggleWaiting: toggleWaiting,
       onUpdateTask: updateTask,
+      onUpdateTasksBulk: updateTasksBulk,
       onPushTask: pushTask,
       onDeleteTask: deleteTask,
       onCreateTask: onCreateTaskFromValue,
@@ -152,7 +153,7 @@ export function InboxViewContainer() {
       onUpdateEventProject: updateEventProject,
     }),
     [
-      toggleTask, toggleWaiting, updateTask, pushTask, deleteTask, onCreateTaskFromValue,
+      toggleTask, toggleWaiting, updateTask, updateTasksBulk, pushTask, deleteTask, onCreateTaskFromValue,
       setSelection,
       scheduleActions, updateRoutine, updateEventContext, hideEvent,
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,

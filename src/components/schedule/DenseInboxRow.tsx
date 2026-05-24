@@ -1,5 +1,5 @@
 import { memo, useState, useCallback } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Trash2, Check } from 'lucide-react'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import type { Task, TaskContext } from '@/types/task'
 import type { Project } from '@/types/project'
@@ -50,6 +50,10 @@ interface DenseInboxRowProps {
   /** When true, hide context dot + quick actions until the row is hovered or
    *  contains focus. Reduces visual noise in long lists. Default: false. */
   hoverOnlyChrome?: boolean
+  /** Bulk-select mode: the leading control toggles selection instead of completion. */
+  selectionMode?: boolean
+  isSelected?: boolean
+  onToggleSelection?: () => void
 }
 
 const CONTEXT_OPTIONS: Array<{ value: TaskContext | null; label: string }> = [
@@ -75,6 +79,9 @@ export const DenseInboxRow = memo(function DenseInboxRow({
   onAssign,
   onCreateProject,
   isLeaving,
+  selectionMode = false,
+  isSelected = false,
+  onToggleSelection,
 }: DenseInboxRowProps) {
   const [contextOpen, setContextOpen] = useState(false)
 
@@ -89,20 +96,36 @@ export const DenseInboxRow = memo(function DenseInboxRow({
       data-row
       data-task-id={task.id}
       className={`
-        group flex items-start gap-2 bg-white rounded-xl border border-neutral-100
+        group flex items-start gap-2 rounded-xl border
         px-3 py-2 shadow-sm transition-all duration-200
+        ${isSelected ? 'bg-primary-50/50 border-primary-300' : 'bg-white border-neutral-100'}
         ${isLeaving ? 'opacity-0 translate-x-2 max-h-0 py-0 my-0 overflow-hidden border-transparent' : 'hover:shadow-md'}
       `}
     >
-      {/* Checkbox */}
+      {/* Leading control: selection checkbox in bulk mode, else completion. */}
       <div className="shrink-0 mt-0.5" onClick={(e) => e.stopPropagation()}>
-        <TaskCheckbox
-          completed={task.completed}
-          isWaiting={task.isWaiting}
-          onToggleComplete={onToggleComplete}
-          onToggleWaiting={handleToggleWaiting}
-          contextColor={contextColor}
-        />
+        {selectionMode ? (
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={isSelected}
+            aria-label={`Select ${task.title}`}
+            onClick={onToggleSelection}
+            className={`w-5 h-5 rounded-md border-2 grid place-items-center transition-colors ${
+              isSelected ? 'bg-primary-500 border-primary-500 text-white' : 'border-neutral-300 text-transparent hover:border-primary-400'
+            }`}
+          >
+            <Check className="w-3.5 h-3.5" strokeWidth={3} />
+          </button>
+        ) : (
+          <TaskCheckbox
+            completed={task.completed}
+            isWaiting={task.isWaiting}
+            onToggleComplete={onToggleComplete}
+            onToggleWaiting={handleToggleWaiting}
+            contextColor={contextColor}
+          />
+        )}
       </div>
 
       {/* Context dot button — visually redundant with the colored checkbox ring,

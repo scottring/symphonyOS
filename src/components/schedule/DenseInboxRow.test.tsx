@@ -102,4 +102,21 @@ describe('DenseInboxRow', () => {
     render(<DenseInboxRow {...baseProps} task={task} quickActions={INBOX_ACTIONS} />)
     expect(screen.getByText('Done').className).toMatch(/line-through/)
   })
+
+  it('shows a selection checkbox in selection mode and calls onToggleSelection', () => {
+    const onToggleSelection = vi.fn()
+    render(
+      <DenseInboxRow
+        {...baseProps}
+        quickActions={INBOX_ACTIONS}
+        selectionMode
+        isSelected={false}
+        onToggleSelection={onToggleSelection}
+      />,
+    )
+    const checkbox = screen.getByRole('checkbox', { name: /select Test row/i })
+    expect(checkbox).toHaveAttribute('aria-checked', 'false')
+    fireEvent.click(checkbox)
+    expect(onToggleSelection).toHaveBeenCalled()
+  })
 })
