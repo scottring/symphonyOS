@@ -63,6 +63,8 @@ export interface WallV2TimelineEvent {
   highlight?: WallV2Tint;
   /** Truthy when the card should render a recipe-viewer chevron. */
   recipeUrl?: string | null;
+  /** Completion state (drives the touch checkbox on the wall). */
+  completed?: boolean;
 }
 
 /** A labeled grouping of events — Afternoon / Evening / Night. */

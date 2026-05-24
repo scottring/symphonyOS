@@ -10,6 +10,7 @@ import type { LucideIcon } from 'lucide-react';
 interface Props {
   weekday: string;        // "Wednesday"
   fullDate: string;       // "May 20, 2026"
+  time: string;           // "9:41 AM"
   weatherIcon: LucideIcon;
   weatherTint: { bg: string; fg: string };
   temp: number;
@@ -19,7 +20,7 @@ interface Props {
 }
 
 export function WallV2DateColumn({
-  weekday, fullDate, weatherIcon: WeatherIcon, weatherTint,
+  weekday, fullDate, time, weatherIcon: WeatherIcon, weatherTint,
   temp, condition, high, low,
 }: Props) {
   return (
@@ -34,6 +35,9 @@ export function WallV2DateColumn({
         </div>
         <div className="mt-1.5 text-[1.05rem] font-bold text-emerald-800 dark:text-emerald-300">
           {fullDate}
+        </div>
+        <div className="mt-2 font-display text-[2.6rem] text-stone-700 dark:text-stone-200 leading-none tabular-nums">
+          {time}
         </div>
       </div>
 

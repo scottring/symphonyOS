@@ -12,10 +12,11 @@ import type { WallV2TimelineSection } from './types';
 interface Props {
   sections: WallV2TimelineSection[];
   onTapEvent?: (id: string) => void;
+  onToggleComplete?: (id: string, completed: boolean) => void;
   onTapFullDay?: () => void;
 }
 
-export function WallV2Timeline({ sections, onTapEvent, onTapFullDay }: Props) {
+export function WallV2Timeline({ sections, onTapEvent, onToggleComplete, onTapFullDay }: Props) {
   return (
     <div className="bg-white/70 dark:bg-stone-900/60 border border-stone-200/70 dark:border-stone-700/60 rounded-3xl p-5 flex flex-col gap-4 h-full min-h-0">
       <div className="text-[0.72rem] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400 shrink-0">
@@ -68,6 +69,7 @@ export function WallV2Timeline({ sections, onTapEvent, onTapFullDay }: Props) {
                     key={event.id}
                     event={event}
                     onTap={onTapEvent}
+                    onToggleComplete={onToggleComplete}
                   />
                 ))}
               </div>

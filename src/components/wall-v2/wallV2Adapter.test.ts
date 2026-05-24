@@ -145,6 +145,18 @@ describe('adaptTimelineSections', () => {
     expect(morning.events.map((e) => e.title)).toContain('Morning task');
   });
 
+  it('carries completed state through to the wall event', () => {
+    const today = makeDay({
+      isToday: true,
+      items: {
+        allday: [], morning: [makeItem({ id: 'task-1', type: 'task', title: 'Done thing', completed: true, startTime: new Date(2026, 4, 20, 9, 0) })],
+        afternoon: [], evening: [], unscheduled: [],
+      },
+    });
+    const result = adaptTimelineSections(today, members, now, null);
+    expect(result.find((s) => s.label === 'Morning')!.events[0].completed).toBe(true);
+  });
+
   it('shows earlier-today items (whole day, not forward-only)', () => {
     const today = makeDay({
       isToday: true,

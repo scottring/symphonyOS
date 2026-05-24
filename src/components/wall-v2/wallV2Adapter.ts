@@ -166,6 +166,7 @@ export function adaptTimelineEvent(
     subtitle: item.location || (item.type === 'routine' ? 'Routine' : item.type === 'event' ? 'Event' : 'Task'),
     meta: durationMeta(item),
     members: memberBubbles,
+    completed: item.completed,
   };
 }
 

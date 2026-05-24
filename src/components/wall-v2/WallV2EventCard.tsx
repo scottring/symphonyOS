@@ -6,32 +6,56 @@
 // Optional `highlight` tints the entire card background (used for the
 // featured family-dinner row in the mockup).
 
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Check } from 'lucide-react';
 import { TINTS } from './tints';
 import type { WallV2TimelineEvent } from './types';
 
 interface Props {
   event: WallV2TimelineEvent;
   onTap?: (id: string) => void;
+  /** Toggle completion from the wall. `completed` is the desired next state. */
+  onToggleComplete?: (id: string, completed: boolean) => void;
 }
 
-export function WallV2EventCard({ event, onTap }: Props) {
+// Only real tasks/routines/events can be completed — not synthetic cards
+// (e.g. the promoted "dinner-" meal card).
+const COMPLETABLE = /^(task|routine|event)-/;
+
+export function WallV2EventCard({ event, onTap, onToggleComplete }: Props) {
   const tint = TINTS[event.tint];
   const highlight = event.highlight ? TINTS[event.highlight] : null;
   const Icon = event.icon;
   const tappable = Boolean(onTap || event.recipeUrl);
+  const completable = Boolean(onToggleComplete) && COMPLETABLE.test(event.id);
 
   const handleClick = () => {
     if (onTap) onTap(event.id);
   };
 
   return (
+    <div className="flex items-center gap-2">
+      {completable && (
+        <button
+          type="button"
+          onClick={() => onToggleComplete!(event.id, !event.completed)}
+          aria-label={`${event.completed ? 'Mark incomplete' : 'Mark complete'}: ${event.title}`}
+          aria-pressed={!!event.completed}
+          className={[
+            'shrink-0 grid place-items-center w-11 h-11 rounded-full border-2 transition-colors',
+            event.completed
+              ? 'bg-emerald-500 border-emerald-500 text-white'
+              : 'border-stone-300 dark:border-stone-600 text-transparent hover:border-emerald-400',
+          ].join(' ')}
+        >
+          <Check className="w-5 h-5" strokeWidth={3} />
+        </button>
+      )}
     <button
       type="button"
       onClick={tappable ? handleClick : undefined}
       disabled={!tappable}
       className={[
-        'group w-full text-left flex items-center gap-4 rounded-2xl px-4 py-3 border transition-colors',
+        'group flex-1 min-w-0 text-left flex items-center gap-4 rounded-2xl px-4 py-3 border transition-colors',
         highlight
           ? `${highlight.soft} border-stone-200/70 dark:border-stone-700/60`
           : 'bg-white/85 dark:bg-stone-900/70 border-stone-200/60 dark:border-stone-700/60',
@@ -46,7 +70,7 @@ export function WallV2EventCard({ event, onTap }: Props) {
       </div>
 
       <div className="flex-1 min-w-0 leading-tight">
-        <div className="text-[1.05rem] font-bold text-stone-800 dark:text-stone-100 truncate">
+        <div className={`text-[1.05rem] font-bold truncate ${event.completed ? 'text-stone-400 line-through dark:text-stone-500' : 'text-stone-800 dark:text-stone-100'}`}>
           {event.title}
         </div>
         {(event.subtitle || event.meta) && (
@@ -104,5 +128,6 @@ export function WallV2EventCard({ event, onTap }: Props) {
         <ChevronRight className="shrink-0 w-5 h-5 text-stone-400 dark:text-stone-500 group-hover:text-stone-600 dark:group-hover:text-stone-300" />
       )}
     </button>
+    </div>
   );
 }

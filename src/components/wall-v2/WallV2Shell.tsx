@@ -11,7 +11,8 @@
 // dev-only `/wall-design` preview (see `wallV2Mock.ts`).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Eye, EyeOff, Moon, Sun } from 'lucide-react';
+import { Eye, EyeOff, Moon, Sun, RefreshCw } from 'lucide-react';
+import { useActionableInstances } from '@/hooks/useActionableInstances';
 import {
   readHideRoutines,
   writeHideRoutines,
@@ -99,6 +100,10 @@ export function WallV2Shell() {
   }, [hideRoutines]);
 
   const { weekday, fullDate } = useMemo(() => formatDate(now), [now]);
+  const clock = useMemo(
+    () => now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+    [now],
+  );
 
   const wallData = useWallData();
   const { weather } = useWeather();
@@ -185,6 +190,25 @@ export function WallV2Shell() {
     }
   }, [updateTask, unflagEvent]);
 
+  // Tap-to-complete from the wall. Timeline ids are prefixed (task-/routine-/
+  // event-); tasks toggle their completed flag, routines/events write a
+  // completed (or undone) actionable_instance for today. Refetch to refresh.
+  const { markDone, undoDone } = useActionableInstances();
+  const handleToggleComplete = useCallback((id: string, completed: boolean) => {
+    void (async () => {
+      if (id.startsWith('task-')) {
+        await updateTask(id.slice('task-'.length), { completed });
+      } else if (id.startsWith('routine-')) {
+        const rid = id.slice('routine-'.length);
+        await (completed ? markDone('routine', rid, now) : undoDone('routine', rid, now));
+      } else if (id.startsWith('event-')) {
+        const eid = id.slice('event-'.length);
+        await (completed ? markDone('calendar_event', eid, now) : undoDone('calendar_event', eid, now));
+      }
+      await wallData.refetch();
+    })();
+  }, [updateTask, markDone, undoDone, now, wallData]);
+
   // Insert an unscheduled family task — same shape WallMicButton uses, so the
   // wall capture surface stays consistent regardless of input method.
   const handleQuickCaptureAdd = useCallback(async (title: string) => {
@@ -269,6 +293,15 @@ export function WallV2Shell() {
       <div className="absolute top-8 right-8 z-30 flex items-center gap-2">
         <button
           type="button"
+          onClick={() => { void wallData.refetch(); showFlash('Refreshing…'); }}
+          aria-label="Refresh"
+          title="Refresh"
+          className="grid place-items-center w-14 h-14 rounded-full bg-white/80 dark:bg-stone-800/80 border border-stone-300/70 dark:border-stone-700/70 text-stone-700 dark:text-stone-200 backdrop-blur-md hover:bg-white dark:hover:bg-stone-800 transition-colors shadow-md"
+        >
+          <RefreshCw className={`w-6 h-6 ${wallData.loading ? 'animate-spin' : ''}`} />
+        </button>
+        <button
+          type="button"
           onClick={toggleHideRoutines}
           aria-label={hideRoutines ? 'Show daily routines' : 'Hide daily routines'}
           title={hideRoutines ? 'Show daily routines' : 'Hide daily routines'}
@@ -291,6 +324,7 @@ export function WallV2Shell() {
           <WallV2DateColumn
             weekday={weekday}
             fullDate={fullDate}
+            time={clock}
             weatherIcon={weatherData.icon ?? Sun}
             weatherTint={{ bg: TINTS.honey.bg, fg: TINTS.honey.fg }}
             temp={weatherData.temp}
@@ -307,6 +341,7 @@ export function WallV2Shell() {
             <WallV2Timeline
               sections={timeline}
               onTapEvent={handleTapEvent}
+              onToggleComplete={handleToggleComplete}
               onTapFullDay={handleTapFullDay}
             />
           </div>
