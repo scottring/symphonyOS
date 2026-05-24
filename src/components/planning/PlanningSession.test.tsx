@@ -144,6 +144,25 @@ describe('PlanningSession', () => {
     expect(screen.getByText('Morning Meditation')).toBeInTheDocument()
   })
 
+  it('brings a clicked overlapping card to the front (raised z-index)', async () => {
+    const r1 = createMockRoutine({ id: 'r1', name: 'Routine One', time_of_day: '08:00' })
+    const r2 = createMockRoutine({ id: 'r2', name: 'Routine Two', time_of_day: '08:00' })
+    const { user } = render(
+      <PlanningSession
+        tasks={[]}
+        events={[]}
+        routines={[r1, r2]}
+        onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    const w1 = screen.getByTestId('placed-r1')
+    expect(w1.style.zIndex).not.toBe('30')
+    await user.click(w1)
+    expect(w1.style.zIndex).toBe('30')
+  })
+
   it('shows draggable routines in the drawer under a Routines heading', () => {
     const routine = createMockRoutine({
       name: 'Food shopping',

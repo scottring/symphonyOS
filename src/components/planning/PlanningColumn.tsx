@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from 'react'
+import { useMemo, useCallback, useState } from 'react'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { EventNote } from '@/hooks/useEventNotes'
@@ -43,6 +43,10 @@ export function PlanningColumn({
     if (!id) return undefined
     return familyMembers.find(m => m.id === id)
   }, [familyMembers])
+
+  // Click-to-front: overlapping placed cards (esp. full-width routines/events)
+  // otherwise hide each other. Clicking one raises it above the rest.
+  const [raisedId, setRaisedId] = useState<string | null>(null)
   const dateKey = formatDateKey(date)
   const isToday = useMemo(() => {
     const today = new Date()
@@ -230,12 +234,15 @@ export function PlanningColumn({
           return (
             <div
               key={task.id}
-              className="absolute z-10"
+              data-testid={`placed-${task.id}`}
+              onClick={() => setRaisedId(task.id)}
+              className="absolute"
               style={{
                 top: `${top}px`,
                 height: `${height}px`,
                 left: `calc(4px + ${leftPercent}%)`,
                 width: `calc(${widthPercent}% - 8px)`,
+                zIndex: raisedId === task.id ? 30 : 10,
               }}
             >
               <PlanningTaskCard task={task} isPlaced assignee={getMember(task.assignedTo)} />
@@ -251,8 +258,10 @@ export function PlanningColumn({
           return (
             <div
               key={event.id}
-              className="absolute left-1 right-1 pointer-events-none"
-              style={{ top: `${top}px`, height: `${height}px` }}
+              data-testid={`placed-${event.id}`}
+              onClick={() => setRaisedId(event.id)}
+              className="absolute left-1 right-1 cursor-pointer"
+              style={{ top: `${top}px`, height: `${height}px`, zIndex: raisedId === event.id ? 30 : undefined }}
             >
               <PlanningEventBlock event={event} height={height} assignee={eventAssignee} />
             </div>
@@ -263,8 +272,10 @@ export function PlanningColumn({
         {placedRoutines.map(({ routine, top, height }) => (
           <div
             key={routine.id}
-            className="absolute left-1 right-1 pointer-events-none"
-            style={{ top: `${top}px`, height: `${height}px` }}
+            data-testid={`placed-${routine.id}`}
+            onClick={() => setRaisedId(routine.id)}
+            className="absolute left-1 right-1 cursor-pointer"
+            style={{ top: `${top}px`, height: `${height}px`, zIndex: raisedId === routine.id ? 30 : undefined }}
           >
             <PlanningRoutineBlock routine={routine} assignee={getMember(routine.assigned_to)} />
           </div>
