@@ -104,6 +104,13 @@ describe('TodayView', () => {
     expect(screen.getByRole('button', { name: /hide daily|show daily/i })).toBeInTheDocument()
   })
 
+  it('shows a Plan day button that opens the planning grid', async () => {
+    const onOpenPlanning = vi.fn()
+    const { user } = renderView({}, { onOpenPlanning })
+    await user.click(screen.getByRole('button', { name: /plan day/i }))
+    expect(onOpenPlanning).toHaveBeenCalled()
+  })
+
   it('routine toggle flips its label after click', async () => {
     const { user } = renderView()
     const toggle = screen.getByRole('button', { name: /hide daily/i })

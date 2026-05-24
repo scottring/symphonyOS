@@ -55,6 +55,7 @@ import type { MeetingState } from '@/hooks/useMeetingNotes'
 import type { TaskLink } from '@/types/task'
 import type { PinnableEntityType } from '@/types/pin'
 import type { GoalAction } from '@/types/goal'
+import { isEverydayRoutine, scheduleRoutineOnDate } from '@/lib/routineUtils'
 
 export interface ViewRouterProps {
   activeView: ViewType
@@ -245,6 +246,13 @@ export function ViewRouter(props: ViewRouterProps) {
             tasks={props.tasks}
             events={props.events}
             routines={props.filteredRoutines}
+            // Untimed, non-daily routines (food prep, food shopping, …) become
+            // draggable chips in the drawer so they can be dropped onto the day.
+            draggableRoutines={props.allRoutines.filter(r => r.visibility === 'active' && !isEverydayRoutine(r.recurrence_pattern) && !r.time_of_day)}
+            onScheduleRoutine={(routineId, date, time) => {
+              const routine = props.allRoutines.find(r => r.id === routineId)
+              if (routine) props.onUpdateRoutine(routineId, scheduleRoutineOnDate(routine, date, time))
+            }}
             initialDate={props.viewedDate}
             onClose={props.onClosePlanning}
             onUpdateTask={props.onUpdateTask}

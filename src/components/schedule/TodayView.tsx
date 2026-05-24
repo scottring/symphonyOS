@@ -28,7 +28,7 @@ import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 import { computeAnchorTime } from '@/lib/timelineAnchor'
 
-import { Eye, EyeOff, Repeat } from 'lucide-react'
+import { Eye, EyeOff, Repeat, CalendarClock } from 'lucide-react'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
 import { TodayAddInput } from './TodayAddInput'
@@ -454,6 +454,18 @@ export function TodayView({
                 {createElement(hideRoutines ? EyeOff : Eye, { className: 'w-4 h-4' })}
                 <span>{hideRoutines ? 'Show daily' : 'Hide daily'}</span>
               </button>
+              {data.isToday && ctx.onOpenPlanning && (
+                <button
+                  type="button"
+                  onClick={ctx.onOpenPlanning}
+                  title="Plan day — drag unscheduled tasks and routines onto the timeline"
+                  aria-label="Plan day"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm text-primary-600 hover:bg-primary-50 transition-all"
+                >
+                  <CalendarClock className="w-4 h-4" />
+                  <span>Plan day</span>
+                </button>
+              )}
             </>
           }
         />
@@ -492,6 +504,16 @@ export function TodayView({
             >
               <Repeat className="w-4 h-4" />
             </button>
+            {data.isToday && ctx.onOpenPlanning && (
+              <button
+                type="button"
+                onClick={ctx.onOpenPlanning}
+                aria-label="Plan day"
+                className="shrink-0 p-2 rounded-lg text-primary-600 hover:bg-primary-50 transition-colors"
+              >
+                <CalendarClock className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </>
       )}
