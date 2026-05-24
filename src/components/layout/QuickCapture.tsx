@@ -5,6 +5,7 @@ import { useDomain } from '@/hooks/useDomain'
 import { useQuickParse } from '@/hooks/useQuickParse'
 import { ParsedFieldChips } from '@/components/capture/ParsedFieldChips'
 import { ConceptIcon } from '@/lib/conceptIcons'
+import { DictationMicButton } from '@/components/common/DictationMicButton'
 
 interface QuickCaptureProps {
   onAdd: (title: string) => void
@@ -297,7 +298,7 @@ export function QuickCapture({
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
+              <div className="relative">
                 <input
                   ref={inputRef}
                   type="text"
@@ -305,9 +306,14 @@ export function QuickCapture({
                   onChange={(e) => setTitle(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="What's on your mind?"
-                  className="w-full px-4 py-3 rounded-xl border border-neutral-200 bg-neutral-50
+                  className="w-full pl-4 pr-14 py-3 rounded-xl border border-neutral-200 bg-neutral-50
                              text-neutral-800 placeholder:text-neutral-400 text-lg md:text-2xl font-display
                              focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+                <DictationMicButton
+                  onTranscript={(text) => setTitle((prev) => (prev ? prev.trimEnd() + ' ' : '') + text)}
+                  title="Dictate into this field"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9"
                 />
               </div>
 
