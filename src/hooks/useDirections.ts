@@ -166,14 +166,15 @@ export function useDirections(): UseDirectionsResult {
   const searchPlaces = useCallback(async (query: string): Promise<PlaceAutocompleteResult[]> => {
     if (!query.trim()) return []
 
-    // If SDK not ready yet, return empty
-    if (!sdkReady || !placesLibraryRef.current) {
-      console.warn('Google Maps SDK not ready for autocomplete')
-      return []
-    }
-
     try {
-      const { AutocompleteSuggestion } = placesLibraryRef.current
+      // Await the Places library rather than early-returning when the mount
+      // effect hasn't finished loading it yet — otherwise the first keystrokes
+      // (common on mobile/slow networks) return [] and the UI shows
+      // "No places found". loadPlacesLibrary caches, so this is instant after
+      // the first load.
+      const placesLib = placesLibraryRef.current ?? (await loadPlacesLibrary())
+      placesLibraryRef.current = placesLib
+      const { AutocompleteSuggestion } = placesLib
 
       // Use the new Places API AutocompleteSuggestion
       const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
@@ -194,7 +195,7 @@ export function useDirections(): UseDirectionsResult {
       console.warn('Places autocomplete error:', err)
       return []
     }
-  }, [sdkReady])
+  }, [])
 
   // =============================================================================
   // LEGACY searchPlaces (commented out - kept for reference)
@@ -242,14 +243,11 @@ export function useDirections(): UseDirectionsResult {
   // NEW PLACES API - getPlaceDetails using Place.fetchFields
   // =============================================================================
   const getPlaceDetails = useCallback(async (placeId: string): Promise<{ address: string; name: string } | null> => {
-    // If SDK not ready yet, return null
-    if (!sdkReady || !placesLibraryRef.current) {
-      console.warn('Google Maps SDK not ready for place details')
-      return null
-    }
-
     try {
-      const { Place } = placesLibraryRef.current
+      // Await the Places library (cached) — same reasoning as searchPlaces.
+      const placesLib = placesLibraryRef.current ?? (await loadPlacesLibrary())
+      placesLibraryRef.current = placesLib
+      const { Place } = placesLib
 
       // Use the new Places API Place class
       const place = new Place({ id: placeId })
@@ -263,7 +261,7 @@ export function useDirections(): UseDirectionsResult {
       console.warn('Place details error:', err)
       return null
     }
-  }, [sdkReady])
+  }, [])
 
   // =============================================================================
   // LEGACY getPlaceDetails (commented out - kept for reference)
