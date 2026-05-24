@@ -67,9 +67,9 @@ export interface WallV2TimelineEvent {
   completed?: boolean;
 }
 
-/** A labeled grouping of events — Afternoon / Evening / Night. */
+/** A labeled grouping of events — All-day / Morning / Afternoon / Evening / Night. */
 export interface WallV2TimelineSection {
-  id: 'morning' | 'afternoon' | 'evening' | 'night';
+  id: 'allday' | 'morning' | 'afternoon' | 'evening' | 'night';
   label: string;
   icon: LucideIcon;
   tint: WallV2Tint;
