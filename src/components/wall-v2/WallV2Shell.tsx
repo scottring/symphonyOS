@@ -11,8 +11,9 @@
 // dev-only `/wall-design` preview (see `wallV2Mock.ts`).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Eye, EyeOff, Moon, Sun, RefreshCw } from 'lucide-react';
+import { Eye, EyeOff, Moon, Sun, RefreshCw, ImageOff } from 'lucide-react';
 import { useActionableInstances } from '@/hooks/useActionableInstances';
+import { WallV2GuestScreen } from './WallV2GuestScreen';
 import {
   readHideRoutines,
   writeHideRoutines,
@@ -153,6 +154,9 @@ export function WallV2Shell() {
   };
 
   // ─── Overlay state ───
+  // Guest mode: a privacy cover for when company's over — hides all content
+  // behind a full-screen ambient clock/weather screen.
+  const [guestMode, setGuestMode] = useState(false);
   const [showRecipeViewer, setShowRecipeViewer] = useState(false);
   const [showDiscussion, setShowDiscussion] = useState(false);
   const [showQuickCapture, setShowQuickCapture] = useState(false);
@@ -293,6 +297,15 @@ export function WallV2Shell() {
       <div className="absolute top-8 right-8 z-30 flex items-center gap-2">
         <button
           type="button"
+          onClick={() => setGuestMode(true)}
+          aria-label="Guest mode"
+          title="Guest mode — hide everything"
+          className="grid place-items-center w-14 h-14 rounded-full bg-white/80 dark:bg-stone-800/80 border border-stone-300/70 dark:border-stone-700/70 text-stone-700 dark:text-stone-200 backdrop-blur-md hover:bg-white dark:hover:bg-stone-800 transition-colors shadow-md"
+        >
+          <ImageOff className="w-6 h-6" />
+        </button>
+        <button
+          type="button"
           onClick={() => { void wallData.refetch(); showFlash('Refreshing…'); }}
           aria-label="Refresh"
           title="Refresh"
@@ -402,6 +415,18 @@ export function WallV2Shell() {
       />
 
       <WallMicButton />
+
+      {guestMode && (
+        <WallV2GuestScreen
+          time={clock}
+          weekday={weekday}
+          fullDate={fullDate}
+          temp={weatherData.temp}
+          condition={weatherData.condition}
+          weatherIcon={weatherData.icon ?? Sun}
+          onExit={() => setGuestMode(false)}
+        />
+      )}
     </div>
   );
 }
