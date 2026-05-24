@@ -214,7 +214,7 @@ function dedupeRoutines(
 export function adaptTimelineSections(
   today: WallDayData | undefined,
   members: FamilyMember[],
-  now: Date,
+  _now: Date,
   dinnerEvent: CalendarEvent | null,
   hideDailyRoutines: boolean = false,
 ): WallV2TimelineSection[] {
@@ -229,28 +229,28 @@ export function adaptTimelineSections(
     return !isEverydayRoutine(i.recurrencePattern);
   };
 
-  const afternoonItems = (today.items.afternoon ?? []).filter(isVisible);
-  const eveningItemsRaw = (today.items.evening ?? []).filter(isVisible);
+  // Whole-day view: render every section in order (All-day, Morning,
+  // Afternoon, Evening, Night). No forward-only filtering — earlier-today
+  // items still show (completed ones render checked) so the wall reflects the
+  // full day rather than only what's next.
+  const pick = (items: TimelineItem[] | undefined) =>
+    dedupeRoutines((items ?? []).filter(isVisible), members);
 
-  const eveningItems: TimelineItem[] = [];
-  const nightItems: TimelineItem[] = [];
-  for (const item of eveningItemsRaw) {
+  const alldayItems = pick(today.items.allday);
+  const morningItems = pick(today.items.morning);
+  const afternoonItems = pick(today.items.afternoon);
+
+  // Evening splits into Evening (<9pm) and Night (>=9pm).
+  const eveningRaw = (today.items.evening ?? []).filter(isVisible);
+  const eveningPre: TimelineItem[] = [];
+  const nightPre: TimelineItem[] = [];
+  for (const item of eveningRaw) {
     const h = item.startTime?.getHours() ?? 0;
-    if (h >= 21) nightItems.push(item);
-    else eveningItems.push(item);
+    if (h >= 21) nightPre.push(item);
+    else eveningPre.push(item);
   }
-
-  const sections: WallV2TimelineSection[] = [];
-
-  // Filter past items so the timeline stays forward-looking, except keep
-  // anything happening within the last 30 minutes so context lingers.
-  const recencyCutoff = new Date(now.getTime() - 30 * 60_000);
-  const isForward = (i: TimelineItem) =>
-    !i.startTime || i.startTime >= recencyCutoff;
-
-  const afternoonFwd = dedupeRoutines(afternoonItems.filter(isForward), members);
-  const eveningFwd = dedupeRoutines(eveningItems.filter(isForward), members);
-  const nightFwd = dedupeRoutines(nightItems.filter(isForward), members);
+  const eveningItems = dedupeRoutines(eveningPre, members);
+  const nightItems = dedupeRoutines(nightPre, members);
 
   // If we have a structured dinner event (from meal plan), promote it into
   // the Evening section with the recipe URL + all family avatars.
@@ -268,20 +268,27 @@ export function adaptTimelineSections(
       recipeUrl,
     };
     // Avoid duplicate if the dinner event also appeared in the bucketed feed.
-    const filtered = eveningFwd.filter((e) => !e.title.toLowerCase().includes('dinner'));
+    const filtered = eveningItems.filter((e) => !e.title.toLowerCase().includes('dinner'));
     filtered.unshift(dinnerCard);
-    eveningFwd.length = 0;
-    eveningFwd.push(...filtered);
+    eveningItems.length = 0;
+    eveningItems.push(...filtered);
   }
 
-  if (afternoonFwd.length > 0) {
-    sections.push({ id: 'afternoon', label: 'Afternoon', icon: Sun, tint: 'honey', events: afternoonFwd });
+  const sections: WallV2TimelineSection[] = [];
+  if (alldayItems.length > 0) {
+    sections.push({ id: 'allday', label: 'All day', icon: Calendar, tint: 'sage', events: alldayItems });
   }
-  if (eveningFwd.length > 0) {
-    sections.push({ id: 'evening', label: 'Evening', icon: Moon, tint: 'lavender', events: eveningFwd });
+  if (morningItems.length > 0) {
+    sections.push({ id: 'morning', label: 'Morning', icon: Sunrise, tint: 'sky', events: morningItems });
   }
-  if (nightFwd.length > 0) {
-    sections.push({ id: 'night', label: 'Night', icon: Moon, tint: 'sand', events: nightFwd });
+  if (afternoonItems.length > 0) {
+    sections.push({ id: 'afternoon', label: 'Afternoon', icon: Sun, tint: 'honey', events: afternoonItems });
+  }
+  if (eveningItems.length > 0) {
+    sections.push({ id: 'evening', label: 'Evening', icon: Moon, tint: 'lavender', events: eveningItems });
+  }
+  if (nightItems.length > 0) {
+    sections.push({ id: 'night', label: 'Night', icon: Moon, tint: 'sand', events: nightItems });
   }
   return sections;
 }

@@ -128,6 +128,38 @@ describe('adaptTimelineSections', () => {
     expect(evening.events).toHaveLength(2);
   });
 
+  it('renders Morning and All-day sections', () => {
+    const today = makeDay({
+      isToday: true,
+      items: {
+        allday: [makeItem({ id: 'a', type: 'event', title: 'All day thing', startTime: null })],
+        morning: [makeItem({ id: 'm', type: 'task', title: 'Morning task', startTime: new Date(2026, 4, 20, 9, 0) })],
+        afternoon: [], evening: [], unscheduled: [],
+      },
+    });
+    const result = adaptTimelineSections(today, members, now, null);
+    const labels = result.map((s) => s.label);
+    expect(labels).toContain('Morning');
+    expect(labels).toContain('All day');
+    const morning = result.find((s) => s.label === 'Morning')!;
+    expect(morning.events.map((e) => e.title)).toContain('Morning task');
+  });
+
+  it('shows earlier-today items (whole day, not forward-only)', () => {
+    const today = makeDay({
+      isToday: true,
+      items: {
+        allday: [], morning: [],
+        // 10am is in the past relative to now (1pm) — must still appear.
+        afternoon: [makeItem({ id: 'p', type: 'task', title: 'Past task', startTime: new Date(2026, 4, 20, 10, 0) })],
+        evening: [], unscheduled: [],
+      },
+    });
+    const result = adaptTimelineSections(today, members, now, null);
+    const afternoon = result.find((s) => s.label === 'Afternoon')!;
+    expect(afternoon.events.map((e) => e.title)).toContain('Past task');
+  });
+
   it('promotes a dinner event into Evening with recipe URL', () => {
     const today = makeDay({
       isToday: true,
