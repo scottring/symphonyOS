@@ -271,6 +271,8 @@ export function ViewRouter(props: ViewRouterProps) {
             onSelectDay={(date) => { props.onDateChange(date); props.onViewChange('today') }}
             allRoutines={props.allRoutines}
             onUpdateRoutine={props.onUpdateRoutine}
+            onCompleteTask={props.onToggleTask}
+            onDeleteTask={props.onDeleteTask}
           />
         </Suspense>
       )}

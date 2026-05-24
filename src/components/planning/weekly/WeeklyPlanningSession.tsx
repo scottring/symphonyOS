@@ -32,6 +32,10 @@ interface Props {
   allRoutines?: Routine[]
   /** Persist a routine when it's dropped onto the schedule grid (step 3). */
   onUpdateRoutine?: (id: string, input: UpdateRoutineInput) => Promise<boolean>
+  /** Mark a candidate task complete from step 2. */
+  onCompleteTask?: (taskId: string) => void
+  /** Delete a candidate task from step 2. */
+  onDeleteTask?: (taskId: string) => void
 }
 
 export function WeeklyPlanningSession({
@@ -48,6 +52,8 @@ export function WeeklyPlanningSession({
   onSelectDay,
   allRoutines,
   onUpdateRoutine,
+  onCompleteTask,
+  onDeleteTask,
 }: Props) {
   const [step, setStep] = useState(0)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -207,6 +213,8 @@ export function WeeklyPlanningSession({
             routines={nonDailyRoutines}
             selectedRoutineIds={selectedRoutineIds}
             onToggleRoutine={handleToggleRoutine}
+            onCompleteTask={onCompleteTask}
+            onDeleteTask={onDeleteTask}
           />
         )}
         {step === 2 && (

@@ -1,5 +1,5 @@
-import { useCallback } from 'react'
-import { ChevronUp, ChevronDown, Plus, Check, Repeat } from 'lucide-react'
+import { useCallback, useMemo } from 'react'
+import { ChevronUp, ChevronDown, Plus, Check, Repeat, Trash2, CheckCircle2, Copy } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { GoalAction } from '@/types/goal'
 import type { Routine } from '@/types/actionable'
@@ -19,6 +19,15 @@ interface Props {
   selectedRoutineIds?: string[]
   /** Toggle a routine into/out of this week's plan. */
   onToggleRoutine?: (routine: Routine) => void
+  /** Mark a candidate task complete (removes it from the list). */
+  onCompleteTask?: (taskId: string) => void
+  /** Delete a candidate task outright. */
+  onDeleteTask?: (taskId: string) => void
+}
+
+/** Normalize a title for duplicate detection: trimmed + lower-cased. */
+function normalizeTitle(title: string): string {
+  return title.trim().toLowerCase()
 }
 
 interface CandidateGroupProps {
@@ -26,9 +35,12 @@ interface CandidateGroupProps {
   items: Task[]
   selectedIds: string[]
   onToggle: (task: Task) => void
+  isDuplicate: (task: Task) => boolean
+  onCompleteTask?: (taskId: string) => void
+  onDeleteTask?: (taskId: string) => void
 }
 
-function CandidateGroup({ label, items, selectedIds, onToggle }: CandidateGroupProps) {
+function CandidateGroup({ label, items, selectedIds, onToggle, isDuplicate, onCompleteTask, onDeleteTask }: CandidateGroupProps) {
   return (
     <div>
       <h3 className="text-xs uppercase tracking-wider text-neutral-400 mb-2">{label}</h3>
@@ -37,20 +49,51 @@ function CandidateGroup({ label, items, selectedIds, onToggle }: CandidateGroupP
       ) : (
         <ul className="space-y-1">
           {items.map(task => (
-            <li key={task.id} className="flex items-center gap-2">
+            <li key={task.id} className="group flex items-center gap-2">
               <input
                 type="checkbox"
                 id={`candidate-${task.id}`}
                 checked={selectedIds.includes(task.id)}
                 onChange={() => onToggle(task)}
-                className="h-4 w-4 rounded border-neutral-300 text-primary-500 cursor-pointer"
+                className="h-4 w-4 rounded border-neutral-300 text-primary-500 cursor-pointer shrink-0"
               />
               <label
                 htmlFor={`candidate-${task.id}`}
-                className="text-sm text-neutral-700 cursor-pointer leading-snug"
+                className="flex-1 text-sm text-neutral-700 cursor-pointer leading-snug"
               >
                 {task.title}
               </label>
+              {isDuplicate(task) && (
+                <span
+                  className="shrink-0 inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-amber-50 text-amber-700"
+                  title="Another open task has the same title — possible duplicate"
+                >
+                  <Copy className="h-2.5 w-2.5" />
+                  duplicate?
+                </span>
+              )}
+              {onCompleteTask && (
+                <button
+                  type="button"
+                  onClick={() => onCompleteTask(task.id)}
+                  aria-label={`Complete ${task.title}`}
+                  title="Mark complete"
+                  className="shrink-0 p-0.5 text-neutral-300 hover:text-primary-600 transition-colors"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                </button>
+              )}
+              {onDeleteTask && (
+                <button
+                  type="button"
+                  onClick={() => onDeleteTask(task.id)}
+                  aria-label={`Delete ${task.title}`}
+                  title="Delete task"
+                  className="shrink-0 p-0.5 text-neutral-300 hover:text-red-600 transition-colors"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
             </li>
           ))}
         </ul>
@@ -70,8 +113,27 @@ export function StepBuildTodos({
   routines = [],
   selectedRoutineIds = [],
   onToggleRoutine,
+  onCompleteTask,
+  onDeleteTask,
 }: Props) {
   const candidates = selectWeeklyCandidates(tasks)
+
+  // Titles that appear on more than one open task — used to flag likely
+  // duplicates (e.g. a carryover task that also exists as a scheduled one).
+  const duplicateTitles = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const t of tasks) {
+      if (t.completed) continue
+      const key = normalizeTitle(t.title)
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
+    return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([k]) => k))
+  }, [tasks])
+
+  const isDuplicate = useCallback(
+    (task: Task) => duplicateTitles.has(normalizeTitle(task.title)),
+    [duplicateTitles],
+  )
 
   const moveUp = useCallback(
     (index: number) => {
@@ -126,6 +188,9 @@ export function StepBuildTodos({
             items={items}
             selectedIds={selectedIds}
             onToggle={onToggle}
+            isDuplicate={isDuplicate}
+            onCompleteTask={onCompleteTask}
+            onDeleteTask={onDeleteTask}
           />
         ))}
 

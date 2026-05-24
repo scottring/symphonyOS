@@ -198,4 +198,69 @@ describe('StepBuildTodos', () => {
       expect(within(priorityRoutines).getByText('Food shopping')).toBeInTheDocument()
     })
   })
+
+  describe('candidate complete / delete / dedup', () => {
+    it('completes a candidate via its complete button', async () => {
+      const onCompleteTask = vi.fn()
+      const { user } = render(
+        <StepBuildTodos
+          tasks={allTasks}
+          selectedIds={[]}
+          onToggle={vi.fn()}
+          onReorder={vi.fn()}
+          onCompleteTask={onCompleteTask}
+          onDeleteTask={vi.fn()}
+        />,
+      )
+      await user.click(screen.getByRole('button', { name: /complete Inbox task/i }))
+      expect(onCompleteTask).toHaveBeenCalledWith('task-inbox')
+    })
+
+    it('deletes a candidate via its delete button', async () => {
+      const onDeleteTask = vi.fn()
+      const { user } = render(
+        <StepBuildTodos
+          tasks={allTasks}
+          selectedIds={[]}
+          onToggle={vi.fn()}
+          onReorder={vi.fn()}
+          onCompleteTask={vi.fn()}
+          onDeleteTask={onDeleteTask}
+        />,
+      )
+      await user.click(screen.getByRole('button', { name: /delete Week task/i }))
+      expect(onDeleteTask).toHaveBeenCalledWith('task-week')
+    })
+
+    it('flags a candidate whose title matches another open task as a possible duplicate', () => {
+      // A carryover task and a timed task share a (case-insensitive) title.
+      const carry = makeTask({ id: 'c1', title: 'Hang up hooks', bucket: 'week' })
+      const timed = makeTask({ id: 't1', title: 'hang up hooks', bucket: 'timed' })
+      const unique = makeTask({ id: 'u1', title: 'Unique task', bucket: 'week' })
+      render(
+        <StepBuildTodos
+          tasks={[carry, timed, unique]}
+          selectedIds={[]}
+          onToggle={vi.fn()}
+          onReorder={vi.fn()}
+          onCompleteTask={vi.fn()}
+          onDeleteTask={vi.fn()}
+        />,
+      )
+      // The carryover candidate is flagged…
+      const carryRow = screen.getByText('Hang up hooks').closest('li')!
+      expect(within(carryRow).getByText(/duplicate/i)).toBeInTheDocument()
+      // …the unique one is not.
+      const uniqueRow = screen.getByText('Unique task').closest('li')!
+      expect(within(uniqueRow).queryByText(/duplicate/i)).not.toBeInTheDocument()
+    })
+
+    it('does not render complete/delete controls when handlers are absent', () => {
+      render(
+        <StepBuildTodos tasks={allTasks} selectedIds={[]} onToggle={vi.fn()} onReorder={vi.fn()} />,
+      )
+      expect(screen.queryByRole('button', { name: /complete Inbox task/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /delete Inbox task/i })).not.toBeInTheDocument()
+    })
+  })
 })
