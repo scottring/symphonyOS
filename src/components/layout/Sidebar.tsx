@@ -102,11 +102,16 @@ export function Sidebar({
 
   const { state: groupState, toggle: toggleGroup, setOpen: openGroup } = useSidebarGroupState()
 
-  const planActive = activeView === 'projects' || activeView === 'routines' || activeView === 'goals'
+  // Auto-expand the folder containing the current view. "This Week" and
+  // "Calendar" both route to activeView='today', so they can't be detected
+  // here — those folders just keep their persisted open/closed state.
+  const planActive =
+    activeView === 'projects' || activeView === 'routines' || activeView === 'goals' ||
+    activeView === 'weekly-planning' || activeView === 'meals'
   const libraryActive =
     activeView === 'notes' || activeView === 'lists' ||
     activeView === 'contacts' || activeView === 'contact-detail' || activeView === 'history'
-  const spacesActive = activeView === 'home-app' || activeView === 'meals'
+  const spacesActive = activeView === 'home-app'
 
   useEffect(() => {
     if (planActive) openGroup('plan')
@@ -235,7 +240,7 @@ export function Sidebar({
         />
       )}
 
-      {/* Navigation — flat list per mockup */}
+      {/* Navigation — Today/Inbox pinned at top, the rest in collapsible folders */}
       <nav className="flex-1 px-3 mt-4 space-y-0.5 overflow-y-auto">
         {/* Today — also forces HomeView D/W/M back to 'today' so clicking
             this link from Week/Workweek/Month returns the user to Day view. */}
@@ -256,103 +261,6 @@ export function Sidebar({
           {!collapsed && <span>Today</span>}
         </button>
 
-        {/* This Week — navigates to /today and forces HomeView D/W/M into 'week'. */}
-        <button
-          onClick={() => {
-            try {
-              localStorage.setItem(HOME_VIEW_STORAGE_KEY, 'week')
-              window.dispatchEvent(new StorageEvent('storage', {
-                key: HOME_VIEW_STORAGE_KEY,
-                newValue: 'week',
-              }))
-            } catch { /* ignore — falls back to next-mount read */ }
-            onViewChange('today')
-          }}
-          className={navItemClass(activeView === 'today' && (homeCurrentView === 'week' || homeCurrentView === 'workweek'))}
-        >
-          {createElement(CalendarRange, { className: 'w-5 h-5 shrink-0' })}
-          {!collapsed && <span>This Week</span>}
-        </button>
-
-        {/* Plan the week — top-level weekly planning session view. */}
-        <button
-          onClick={() => onViewChange('weekly-planning')}
-          className={navItemClass(activeView === 'weekly-planning')}
-        >
-          {createElement(CalendarCheck, { className: 'w-5 h-5 shrink-0' })}
-          {!collapsed && <span>Plan the week</span>}
-        </button>
-
-        {/* Meals */}
-        <button
-          onClick={() => onViewChange('meals')}
-          className={navItemClass(activeView === 'meals')}
-        >
-          {createElement(UtensilsCrossed, { className: 'w-5 h-5 shrink-0' })}
-          {!collapsed && <span>Meals</span>}
-        </button>
-        {!collapsed && activeView === 'meals' && (
-          <>
-            <button
-              onClick={() => navigate('/meals/shelf')}
-              className={`w-full flex items-center gap-3 pl-9 pr-3.5 py-2 rounded-lg transition-all duration-200 ${location.pathname.startsWith('/meals/shelf') ? 'text-primary-700 bg-primary-50/60 font-medium' : 'text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700'}`}
-            >
-              <span className="text-[14px]">Shelf</span>
-            </button>
-            <button
-              onClick={() => navigate('/meals/habits')}
-              className={`w-full flex items-center gap-3 pl-9 pr-3.5 py-2 rounded-lg transition-all duration-200 ${location.pathname.startsWith('/meals/habits') ? 'text-primary-700 bg-primary-50/60 font-medium' : 'text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700'}`}
-            >
-              <span className="text-[14px]">Habits</span>
-            </button>
-          </>
-        )}
-
-        {/* Projects */}
-        <button
-          onClick={() => onViewChange('projects')}
-          className={navItemClass(activeView === 'projects')}
-        >
-          {createElement(FolderKanban, { className: 'w-5 h-5 shrink-0' })}
-          {!collapsed && <span>Projects</span>}
-        </button>
-
-        {/* Routines */}
-        <button
-          onClick={() => onViewChange('routines')}
-          className={navItemClass(activeView === 'routines')}
-        >
-          {createElement(Repeat, { className: 'w-5 h-5 shrink-0' })}
-          {!collapsed && <span>Routines</span>}
-        </button>
-
-        {/* House (was "Home" — renamed per Scott; same destination) */}
-        <button
-          onClick={() => onViewChange('home-app')}
-          className={navItemClass(homeAppActive)}
-          aria-label="House"
-        >
-          {createElement(Home, { className: 'w-5 h-5 shrink-0' })}
-          {!collapsed && <span>House</span>}
-        </button>
-        {!collapsed && homeAppActive && inlineRooms.map((r) => (
-          <button
-            key={r.id}
-            onClick={() => navigate(`/home/space/${r.id}`)}
-            className={`w-full flex items-center gap-3 pl-9 pr-3.5 py-2 rounded-lg transition-all duration-200 ${location.pathname === `/home/space/${r.id}` ? 'text-primary-700 bg-primary-50/60 font-medium' : 'text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700'}`}
-          >
-            <span className="text-[14px] truncate">{r.name}</span>
-          </button>
-        ))}
-        {!collapsed && homeAppActive && moreRoomsCount > 0 && (
-          <button
-            onClick={() => navigate('/home')}
-            className="w-full flex items-center gap-3 pl-9 pr-3.5 py-1.5 text-[13px] text-neutral-400 hover:text-neutral-600"
-          >
-            All rooms ({rooms.length}) →
-          </button>
-        )}
-
         {/* Inbox */}
         <button
           onClick={() => onViewChange('inbox')}
@@ -371,76 +279,200 @@ export function Sidebar({
           )}
         </button>
 
-        {/* Divider */}
+        {/* Divider between the everyday destinations and the folders */}
         <div className="border-t border-neutral-200/60 my-3" />
 
-        {/* Calendar */}
-        <button
-          onClick={() => onViewChange('today')}
-          className={navItemClass(false)}
+        {/* ── Planning ── */}
+        <SidebarGroup
+          label="Planning"
+          open={groupState.plan}
+          onToggle={() => toggleGroup('plan')}
+          forceOpen={planActive}
+          collapsed={collapsed}
         >
-          {createElement(Calendar, { className: 'w-5 h-5 shrink-0' })}
-          {!collapsed && <span>Calendar</span>}
-        </button>
-
-        {/* Notes */}
-        {FEATURES.notes && (
+          {/* This Week — navigates to /today and forces HomeView D/W/M into 'week'. */}
           <button
-            onClick={() => onViewChange('notes')}
-            className={navItemClass(activeView === 'notes')}
+            onClick={() => {
+              try {
+                localStorage.setItem(HOME_VIEW_STORAGE_KEY, 'week')
+                window.dispatchEvent(new StorageEvent('storage', {
+                  key: HOME_VIEW_STORAGE_KEY,
+                  newValue: 'week',
+                }))
+              } catch { /* ignore — falls back to next-mount read */ }
+              onViewChange('today')
+            }}
+            className={navItemClass(activeView === 'today' && (homeCurrentView === 'week' || homeCurrentView === 'workweek'))}
           >
-            {createElement(FileText, { className: 'w-5 h-5 shrink-0' })}
-            {!collapsed && <span>Notes</span>}
+            {createElement(CalendarRange, { className: 'w-5 h-5 shrink-0' })}
+            {!collapsed && <span>This Week</span>}
           </button>
-        )}
 
-        {/* Contacts */}
-        <button
-          onClick={() => onViewChange('contacts')}
-          className={navItemClass(activeView === 'contacts' || activeView === 'contact-detail')}
+          {/* Plan the week — weekly planning session view. */}
+          <button
+            onClick={() => onViewChange('weekly-planning')}
+            className={navItemClass(activeView === 'weekly-planning')}
+          >
+            {createElement(CalendarCheck, { className: 'w-5 h-5 shrink-0' })}
+            {!collapsed && <span>Plan the week</span>}
+          </button>
+
+          {/* Projects */}
+          <button
+            onClick={() => onViewChange('projects')}
+            className={navItemClass(activeView === 'projects')}
+          >
+            {createElement(FolderKanban, { className: 'w-5 h-5 shrink-0' })}
+            {!collapsed && <span>Projects</span>}
+          </button>
+
+          {/* Routines */}
+          <button
+            onClick={() => onViewChange('routines')}
+            className={navItemClass(activeView === 'routines')}
+          >
+            {createElement(Repeat, { className: 'w-5 h-5 shrink-0' })}
+            {!collapsed && <span>Routines</span>}
+          </button>
+
+          {/* Meals */}
+          <button
+            onClick={() => onViewChange('meals')}
+            className={navItemClass(activeView === 'meals')}
+          >
+            {createElement(UtensilsCrossed, { className: 'w-5 h-5 shrink-0' })}
+            {!collapsed && <span>Meals</span>}
+          </button>
+          {!collapsed && activeView === 'meals' && (
+            <>
+              <button
+                onClick={() => navigate('/meals/shelf')}
+                className={`w-full flex items-center gap-3 pl-9 pr-3.5 py-2 rounded-lg transition-all duration-200 ${location.pathname.startsWith('/meals/shelf') ? 'text-primary-700 bg-primary-50/60 font-medium' : 'text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700'}`}
+              >
+                <span className="text-[14px]">Shelf</span>
+              </button>
+              <button
+                onClick={() => navigate('/meals/habits')}
+                className={`w-full flex items-center gap-3 pl-9 pr-3.5 py-2 rounded-lg transition-all duration-200 ${location.pathname.startsWith('/meals/habits') ? 'text-primary-700 bg-primary-50/60 font-medium' : 'text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700'}`}
+              >
+                <span className="text-[14px]">Habits</span>
+              </button>
+            </>
+          )}
+        </SidebarGroup>
+
+        {/* ── Home ── */}
+        <SidebarGroup
+          label="Home"
+          open={groupState.spaces}
+          onToggle={() => toggleGroup('spaces')}
+          forceOpen={spacesActive}
+          collapsed={collapsed}
         >
-          {createElement(Users2, { className: 'w-5 h-5 shrink-0' })}
-          {!collapsed && <span>Contacts</span>}
-        </button>
-
-        {/* Lists */}
-        {FEATURES.lists && (
-          <>
+          {/* House (was "Home" — renamed per Scott; same destination) */}
+          <button
+            onClick={() => onViewChange('home-app')}
+            className={navItemClass(homeAppActive)}
+            aria-label="House"
+          >
+            {createElement(Home, { className: 'w-5 h-5 shrink-0' })}
+            {!collapsed && <span>House</span>}
+          </button>
+          {!collapsed && homeAppActive && inlineRooms.map((r) => (
             <button
-              onClick={() => onViewChange('lists')}
-              className={navItemClass(activeView === 'lists')}
+              key={r.id}
+              onClick={() => navigate(`/home/space/${r.id}`)}
+              className={`w-full flex items-center gap-3 pl-9 pr-3.5 py-2 rounded-lg transition-all duration-200 ${location.pathname === `/home/space/${r.id}` ? 'text-primary-700 bg-primary-50/60 font-medium' : 'text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700'}`}
             >
-              {createElement(List, { className: 'w-5 h-5 shrink-0' })}
-              {!collapsed && <span>Lists</span>}
+              <span className="text-[14px] truncate">{r.name}</span>
             </button>
-            {!collapsed && listsActive && inlineLists.map((l) => (
-              <button
-                key={l.id}
-                onClick={() => onViewChange('lists')}
-                className="w-full flex items-center gap-3 pl-9 pr-3.5 py-2 rounded-lg text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700 transition-all duration-200"
-              >
-                <span className="text-[14px] truncate">{l.icon ? l.icon : <ConceptIcon name="list" size={14} decorative />} {l.title}</span>
-              </button>
-            ))}
-            {!collapsed && listsActive && moreListsCount > 0 && (
-              <button
-                onClick={() => onViewChange('lists')}
-                className="w-full flex items-center gap-3 pl-9 pr-3.5 py-1.5 text-[13px] text-neutral-400 hover:text-neutral-600"
-              >
-                All lists ({allLists.length}) →
-              </button>
-            )}
-          </>
-        )}
+          ))}
+          {!collapsed && homeAppActive && moreRoomsCount > 0 && (
+            <button
+              onClick={() => navigate('/home')}
+              className="w-full flex items-center gap-3 pl-9 pr-3.5 py-1.5 text-[13px] text-neutral-400 hover:text-neutral-600"
+            >
+              All rooms ({rooms.length}) →
+            </button>
+          )}
 
-        {/* History */}
-        <button
-          onClick={() => onViewChange('history')}
-          className={navItemClass(activeView === 'history')}
+          {/* Calendar */}
+          <button
+            onClick={() => onViewChange('today')}
+            className={navItemClass(false)}
+          >
+            {createElement(Calendar, { className: 'w-5 h-5 shrink-0' })}
+            {!collapsed && <span>Calendar</span>}
+          </button>
+        </SidebarGroup>
+
+        {/* ── Library ── */}
+        <SidebarGroup
+          label="Library"
+          open={groupState.library}
+          onToggle={() => toggleGroup('library')}
+          forceOpen={libraryActive}
+          collapsed={collapsed}
         >
-          {createElement(History, { className: 'w-5 h-5 shrink-0' })}
-          {!collapsed && <span>History</span>}
-        </button>
+          {/* Notes */}
+          {FEATURES.notes && (
+            <button
+              onClick={() => onViewChange('notes')}
+              className={navItemClass(activeView === 'notes')}
+            >
+              {createElement(FileText, { className: 'w-5 h-5 shrink-0' })}
+              {!collapsed && <span>Notes</span>}
+            </button>
+          )}
+
+          {/* Lists */}
+          {FEATURES.lists && (
+            <>
+              <button
+                onClick={() => onViewChange('lists')}
+                className={navItemClass(activeView === 'lists')}
+              >
+                {createElement(List, { className: 'w-5 h-5 shrink-0' })}
+                {!collapsed && <span>Lists</span>}
+              </button>
+              {!collapsed && listsActive && inlineLists.map((l) => (
+                <button
+                  key={l.id}
+                  onClick={() => onViewChange('lists')}
+                  className="w-full flex items-center gap-3 pl-9 pr-3.5 py-2 rounded-lg text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700 transition-all duration-200"
+                >
+                  <span className="text-[14px] truncate">{l.icon ? l.icon : <ConceptIcon name="list" size={14} decorative />} {l.title}</span>
+                </button>
+              ))}
+              {!collapsed && listsActive && moreListsCount > 0 && (
+                <button
+                  onClick={() => onViewChange('lists')}
+                  className="w-full flex items-center gap-3 pl-9 pr-3.5 py-1.5 text-[13px] text-neutral-400 hover:text-neutral-600"
+                >
+                  All lists ({allLists.length}) →
+                </button>
+              )}
+            </>
+          )}
+
+          {/* Contacts */}
+          <button
+            onClick={() => onViewChange('contacts')}
+            className={navItemClass(activeView === 'contacts' || activeView === 'contact-detail')}
+          >
+            {createElement(Users2, { className: 'w-5 h-5 shrink-0' })}
+            {!collapsed && <span>Contacts</span>}
+          </button>
+
+          {/* History */}
+          <button
+            onClick={() => onViewChange('history')}
+            className={navItemClass(activeView === 'history')}
+          >
+            {createElement(History, { className: 'w-5 h-5 shrink-0' })}
+            {!collapsed && <span>History</span>}
+          </button>
+        </SidebarGroup>
 
         {/* Apps (registry-driven) */}
         {(() => {
