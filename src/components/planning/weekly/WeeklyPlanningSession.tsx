@@ -133,6 +133,26 @@ export function WeeklyPlanningSession({
     [selectedIds, tasks],
   )
 
+  // Tasks already scheduled within the planning week — surfaced on the step-3
+  // grid as context so prior planning is visible (the wizard otherwise only
+  // shows this session's picks). Window is initialDate .. +7d (the grid's max
+  // range), keyed off the prop (not "now") so past tasks don't flood the drawer.
+  const scheduleStepTasks = useMemo(() => {
+    const start = new Date(initialDate ?? new Date())
+    start.setHours(0, 0, 0, 0)
+    const end = new Date(start)
+    end.setDate(end.getDate() + 7)
+    const scheduledInWeek = tasks.filter(t => {
+      if (t.completed || t.isAllDay || !t.scheduledFor) return false
+      const d = new Date(t.scheduledFor)
+      return d >= start && d < end
+    })
+    // Merge with the session's priorities (to place), de-duped by id.
+    const byId = new Map<string, Task>()
+    for (const t of [...priorities, ...scheduledInWeek]) byId.set(t.id, t)
+    return [...byId.values()]
+  }, [tasks, initialDate, priorities])
+
   const handleToggle = useCallback(
     (task: Task) => {
       const isSelected = selectedIds.includes(task.id)
@@ -239,7 +259,7 @@ export function WeeklyPlanningSession({
         {step === 2 && (
           <StepSchedule
             weekDate={initialDate ?? new Date()}
-            priorities={priorities}
+            priorities={scheduleStepTasks}
             events={events}
             routines={visibleRoutines}
             getRoutinesForDate={gridRoutinesForDate}

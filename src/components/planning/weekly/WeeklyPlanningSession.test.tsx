@@ -70,6 +70,26 @@ describe('WeeklyPlanningSession', () => {
     expect(within(list).getByText('Inbox two')).toBeInTheDocument()
   })
 
+  it('shows tasks already scheduled for the planning week on the step-3 grid', async () => {
+    // A task scheduled on the planning week's first day, NOT selected this session.
+    const scheduled = {
+      id: 'sched-1',
+      title: 'Already scheduled task',
+      completed: false,
+      bucket: 'timed',
+      scheduledFor: new Date('2026-05-25T10:00:00'),
+      createdAt: new Date('2026-01-01'),
+      updatedAt: new Date('2026-01-01'),
+    }
+    const tasks = [scheduled] as unknown as typeof baseProps.tasks
+    const { user } = render(
+      <WeeklyPlanningSession {...baseProps} tasks={tasks} initialDate={new Date('2026-05-25T00:00:00')} />,
+    )
+    await user.click(screen.getByRole('button', { name: 'Next' })) // step 2
+    await user.click(screen.getByRole('button', { name: 'Next' })) // step 3
+    expect(screen.getAllByText('Already scheduled task').length).toBeGreaterThan(0)
+  })
+
   it('shows Finish on the last step and calls onSavePlanToVault', async () => {
     const onSavePlanToVault = vi.fn().mockResolvedValue({ ok: true })
     const { user } = render(<WeeklyPlanningSession {...baseProps} onSavePlanToVault={onSavePlanToVault} />)
