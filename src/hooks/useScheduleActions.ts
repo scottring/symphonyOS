@@ -12,7 +12,7 @@ interface UseScheduleActionsDeps {
   viewedDate: Date
   updateTask: (id: string, updates: Partial<Task>) => void
   updateRoutine: (id: string, updates: Partial<Routine>) => void
-  deleteRoutine: (id: string) => Promise<void>
+  deleteRoutine: (id: string) => Promise<unknown>
   updateEventAssignment: (eventId: string, memberId: string | null) => void
   updateEventAssignmentAll: (eventId: string, memberIds: string[]) => void
   markDone: (entityType: 'routine' | 'calendar_event', entityId: string, date: Date) => Promise<boolean>

@@ -44,6 +44,7 @@ export function HomeViewContainer() {
     getRoutinesForDate,
     loading: routinesLoading,
     updateRoutine,
+    deleteRoutine,
   } = useRoutines();
   const { getInstancesForDate, markDone, undoDone, skip, reschedule } = useActionableInstances();
   const { members: familyMembers, getCurrentUserMember } = useFamilyMembers();
@@ -125,6 +126,7 @@ export function HomeViewContainer() {
     viewedDate,
     updateTask,
     updateRoutine,
+    deleteRoutine,
     updateEventAssignment,
     updateEventAssignmentAll,
     markDone,
@@ -201,6 +203,7 @@ export function HomeViewContainer() {
       onCompleteRoutine: scheduleActions.onCompleteRoutine,
       onSkipRoutine: scheduleActions.onSkipRoutine,
       onPushRoutine: scheduleActions.onPushRoutine,
+      onDeleteRoutine: scheduleActions.onDeleteRoutine,
       onUpdateRoutine: updateRoutine,
 
       // Event actions

@@ -692,6 +692,7 @@ export function DetailPanelRedesign({
 
   // Time picker state
   const [showTimePicker, setShowTimePicker] = useState(false)
+  const [eventTimeDraft, setEventTimeDraft] = useState('')
   const [showRoutineDeleteConfirm, setShowRoutineDeleteConfirm] = useState(false)
 
   // Contact picker state
@@ -3442,24 +3443,34 @@ export function DetailPanelRedesign({
             <div className="text-sm font-semibold text-neutral-700 mb-3">Reschedule event</div>
             <input
               type="datetime-local"
-              defaultValue={toLocalInputValue(item.startTime)}
+              value={eventTimeDraft || toLocalInputValue(item.startTime)}
               className="w-full p-3 rounded-xl border border-neutral-200 text-sm"
-              onChange={(e) => {
-                const newStart = new Date(e.target.value)
-                if (isNaN(newStart.getTime())) return
-                const durationMs = (item.endTime?.getTime() ?? item.startTime!.getTime() + 30 * 60_000) - item.startTime!.getTime()
-                const eventId = item.originalEvent?.google_event_id || item.originalEvent?.id || item.id.replace('event-', '')
-                void onUpdateEvent(eventId, { startTime: newStart, endTime: new Date(newStart.getTime() + durationMs) })
-                setShowTimePicker(false)
-              }}
+              onChange={(e) => setEventTimeDraft(e.target.value)}
             />
-            <button
-              type="button"
-              onClick={() => setShowTimePicker(false)}
-              className="mt-3 w-full p-3 text-sm font-medium text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-lg"
-            >
-              Cancel
-            </button>
+            <div className="flex gap-2 mt-3">
+              <button
+                type="button"
+                onClick={() => { setEventTimeDraft(''); setShowTimePicker(false) }}
+                className="flex-1 p-3 text-sm font-medium text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const newStart = new Date(eventTimeDraft || toLocalInputValue(item.startTime!))
+                  if (isNaN(newStart.getTime())) return
+                  const durationMs = (item.endTime?.getTime() ?? item.startTime!.getTime() + 30 * 60_000) - item.startTime!.getTime()
+                  const eventId = item.originalEvent?.google_event_id || item.originalEvent?.id || item.id.replace('event-', '')
+                  void onUpdateEvent!(eventId, { startTime: newStart, endTime: new Date(newStart.getTime() + durationMs) })
+                  setEventTimeDraft('')
+                  setShowTimePicker(false)
+                }}
+                className="flex-1 p-3 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg"
+              >
+                Save
+              </button>
+            </div>
           </div>
         </div>
       )}

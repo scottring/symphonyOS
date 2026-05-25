@@ -29,7 +29,7 @@ export function InboxViewContainer() {
   const { notes: eventNotesMap, updateEventAssignment, updateEventAssignmentAll, updateEventContext, updateEventProject } = useEventNotes();
   const { contacts, contactsMap, addContact, searchContacts } = useContacts();
   const { projects, projectsMap, addProject, deleteProject } = useProjects();
-  const { routines: allRoutines, updateRoutine } = useRoutines();
+  const { routines: allRoutines, updateRoutine, deleteRoutine } = useRoutines();
   const { markDone, undoDone, skip, reschedule } = useActionableInstances();
   const { members: familyMembers, getCurrentUserMember } = useFamilyMembers();
   const { hideEvent } = useHiddenCalendarEvents();
@@ -73,6 +73,7 @@ export function InboxViewContainer() {
     viewedDate,
     updateTask,
     updateRoutine,
+    deleteRoutine,
     updateEventAssignment,
     updateEventAssignmentAll,
     markDone,
@@ -125,6 +126,7 @@ export function InboxViewContainer() {
       onCompleteRoutine: scheduleActions.onCompleteRoutine,
       onSkipRoutine: scheduleActions.onSkipRoutine,
       onPushRoutine: scheduleActions.onPushRoutine,
+      onDeleteRoutine: scheduleActions.onDeleteRoutine,
       onUpdateRoutine: updateRoutine,
 
       onCompleteEvent: scheduleActions.onCompleteEvent,
