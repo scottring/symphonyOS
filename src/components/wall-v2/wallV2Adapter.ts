@@ -160,6 +160,7 @@ export function adaptTimelineEvent(
   const memberBubbles = assigned ? [memberBubble(assigned)] : undefined;
   return {
     id: item.id,
+    kind: item.type,
     icon,
     tint,
     title: item.title,

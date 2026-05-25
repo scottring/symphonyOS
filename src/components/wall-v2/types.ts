@@ -65,6 +65,8 @@ export interface WallV2TimelineEvent {
   recipeUrl?: string | null;
   /** Completion state (drives the touch checkbox on the wall). */
   completed?: boolean;
+  /** Source item type, so the wall action sheet can pick the right entity/actions. */
+  kind?: 'task' | 'event' | 'routine';
 }
 
 /** A labeled grouping of events — All-day / Morning / Afternoon / Evening / Night. */
