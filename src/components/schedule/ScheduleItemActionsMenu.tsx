@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { MoreHorizontal, Redo2, Clock, Trash2 } from 'lucide-react'
 import type { TimelineItem } from '@/types/timeline'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
@@ -12,7 +12,9 @@ interface Props {
 export function ScheduleItemActionsMenu({ item, onOpenDetail }: Props) {
   const ctx = useScheduleActionsContext()
   const [open, setOpen] = useState(false)
+  const [openUp, setOpenUp] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const triggerRef = useRef<HTMLButtonElement>(null)
 
   const close = useCallback(() => { setOpen(false); setConfirmDelete(false) }, [])
 
@@ -33,9 +35,19 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail }: Props) {
   return (
     <div className="relative shrink-0" onClick={stop}>
       <button
+        ref={triggerRef}
         type="button"
         aria-label="Item actions"
-        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o) }}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (!open) {
+            const rect = triggerRef.current?.getBoundingClientRect()
+            setOpenUp(rect ? window.innerHeight - rect.bottom < 280 : false)
+          }
+          setOpen((o) => !o)
+        }}
         className="shrink-0 p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
       >
         <MoreHorizontal className="w-4 h-4" />
@@ -53,8 +65,7 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail }: Props) {
           />
           <div
             role="menu"
-            className="absolute right-0 top-full mt-1 z-50 min-w-[176px] py-1
-                       bg-white rounded-xl border border-neutral-200 shadow-lg"
+            className={`absolute right-0 z-50 min-w-[176px] py-1 bg-white rounded-xl border border-neutral-200 shadow-lg ${openUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}
           >
             {/* Skip today — routines and events */}
             {(isRoutine || isEvent) && !item.completed && !item.skipped && (
