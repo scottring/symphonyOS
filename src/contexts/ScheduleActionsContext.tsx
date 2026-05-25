@@ -1,5 +1,6 @@
 import { createContext, useContext, type ReactNode } from 'react'
 import type { Task, TaskContext, TaskLink } from '@/types/task'
+import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Contact, ContactCategory } from '@/types/contact'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
@@ -43,11 +44,13 @@ export interface ScheduleActionsValue {
   onSkipRoutine?: (routineId: string) => void
   onPushRoutine?: (routineId: string, date: Date) => void
   onUpdateRoutine?: (id: string, updates: Partial<Routine>) => void
+  onDeleteRoutine?: (routineId: string) => void
 
   // Event actions
   onCompleteEvent?: (eventId: string, completed: boolean) => void
   onSkipEvent?: (eventId: string) => void
   onPushEvent?: (eventId: string, date: Date) => void
+  onDeleteEvent?: (event: CalendarEvent) => void
   onUpdateEventContext?: (eventId: string, context: TaskContext | null) => void
   onHideEvent?: (googleEventId: string, title?: string, calendarId?: string) => Promise<boolean>
 

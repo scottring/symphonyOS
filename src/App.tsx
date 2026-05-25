@@ -532,6 +532,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     viewedDate,
     updateTask,
     updateRoutine,
+    deleteRoutine,
     updateEventAssignment,
     updateEventAssignmentAll,
     markDone,
@@ -1402,11 +1403,13 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     onSkipRoutine: scheduleActions.onSkipRoutine,
     onPushRoutine: scheduleActions.onPushRoutine,
     onUpdateRoutine: updateRoutine,
+    onDeleteRoutine: scheduleActions.onDeleteRoutine,
 
     // Event actions
     onCompleteEvent: scheduleActions.onCompleteEvent,
     onSkipEvent: scheduleActions.onSkipEvent,
     onPushEvent: scheduleActions.onPushEvent,
+    onDeleteEvent: handleDeleteEvent,
     onUpdateEventContext: updateEventContext,
     onHideEvent: hideEvent,
     onUpdateEvent: async (eventId: string, { startTime, endTime }: { startTime: Date; endTime: Date }) => {
@@ -1446,7 +1449,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   }), [
     handleToggleTask, toggleWaiting, handleUpdateTaskWithToast, pushTask, deleteTask, addTask, getCurrentUserMember, currentDomain, handleCreateFollowUp,
     addNote, deleteNote, appendToNote, notes,
-    addRoutine, deleteRoutine, createEvent, deleteEvent,
+    addRoutine, deleteRoutine, createEvent, deleteEvent, handleDeleteEvent,
     fmtT, setTlUndo, showToast,
     scheduleActions, updateRoutine, updateEventContext, hideEvent, updateEvent,
     contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
