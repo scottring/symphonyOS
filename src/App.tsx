@@ -1794,6 +1794,10 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
                 onUpdateEventAssignment={updateEventAssignmentAll}
                 eventProjectId={selectedEventProjectId}
                 onUpdateEventProject={updateEventProject}
+                onUpdateEvent={async (eventId: string, { startTime, endTime }: { startTime: Date; endTime: Date }) => {
+                  await updateEvent({ eventId, startTime, endTime })
+                }}
+                onDeleteRoutine={scheduleActions.onDeleteRoutine}
                 onOpenGuidedChat={handleOpenGuidedChat}
                 viewedDate={viewedDate}
               />

@@ -32,6 +32,11 @@ import { MealEventSection } from './MealEventSection'
 import { useEventDiscussionFlags } from '@/hooks/useEventDiscussionFlags'
 import { MessageCircle, CloudUpload, Check } from 'lucide-react'
 
+function toLocalInputValue(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 // Component to render text with clickable links (handles HTML links and plain URLs)
 function RichText({ text }: { text: string }) {
   const parts = useMemo(() => {
@@ -185,6 +190,10 @@ interface DetailPanelRedesignProps {
   // Event project linking
   eventProjectId?: string | null
   onUpdateEventProject?: (googleEventId: string, projectId: string | null, eventTitle?: string | null, eventStartTime?: Date | null) => void
+  // Event rescheduling
+  onUpdateEvent?: (eventId: string, updates: { startTime: Date; endTime: Date }) => Promise<void> | void
+  // Routine deletion (removes from every day)
+  onDeleteRoutine?: (routineId: string) => void
   // Quick action support for linked tasks
   getScheduleItemsForDate?: (date: Date) => ScheduleContextItem[]
   // Guided reflection
@@ -650,6 +659,8 @@ export function DetailPanelRedesign({
   onUpdateEventAssignment,
   eventProjectId,
   onUpdateEventProject,
+  onUpdateEvent,
+  onDeleteRoutine,
   getScheduleItemsForDate,
   onOpenGuidedChat,
   viewedDate,
@@ -681,6 +692,7 @@ export function DetailPanelRedesign({
 
   // Time picker state
   const [showTimePicker, setShowTimePicker] = useState(false)
+  const [showRoutineDeleteConfirm, setShowRoutineDeleteConfirm] = useState(false)
 
   // Contact picker state
   const [showContactPicker, setShowContactPicker] = useState(false)
@@ -1517,7 +1529,7 @@ export function DetailPanelRedesign({
             <div className="flex flex-wrap gap-2 mt-3">
               {item.startTime && (
                 <button
-                  onClick={() => isTask && setShowTimePicker(!showTimePicker)}
+                  onClick={() => (isTask || (isEvent && !item.allDay)) && setShowTimePicker(!showTimePicker)}
                   className="inline-flex items-center gap-1.5 px-2.5 py-1
                             bg-neutral-100 text-neutral-600 text-sm rounded-full
                             hover:bg-neutral-200 transition-colors"
@@ -2221,6 +2233,37 @@ export function DetailPanelRedesign({
                 />
               </label>
             </div>
+          </div>
+        )}
+
+        {isRoutine && item.originalRoutine && onDeleteRoutine && (
+          <div className="p-6 safe-area-bottom">
+            {showRoutineDeleteConfirm ? (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowRoutineDeleteConfirm(false)}
+                  className="flex-1 p-3 text-sm font-medium text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => { onDeleteRoutine(item.originalRoutine!.id); onClose?.() }}
+                  className="flex-1 p-3 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors"
+                >
+                  Delete routine
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowRoutineDeleteConfirm(true)}
+                className="w-full p-3 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors text-center"
+              >
+                Delete routine
+              </button>
+            )}
+            <p className="mt-2 text-xs text-neutral-400 text-center">
+              Removes this routine from every day. To skip just today, use Skip above.
+            </p>
           </div>
         )}
 
@@ -3387,6 +3430,36 @@ export function DetailPanelRedesign({
                 Clear Schedule
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showTimePicker && isEvent && !item.allDay && item.startTime && onUpdateEvent && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center sm:justify-center bg-black/40"
+             onClick={() => setShowTimePicker(false)}>
+          <div className="w-full sm:max-w-sm bg-white rounded-t-3xl sm:rounded-2xl p-5 safe-area-bottom"
+               onClick={(e) => e.stopPropagation()}>
+            <div className="text-sm font-semibold text-neutral-700 mb-3">Reschedule event</div>
+            <input
+              type="datetime-local"
+              defaultValue={toLocalInputValue(item.startTime)}
+              className="w-full p-3 rounded-xl border border-neutral-200 text-sm"
+              onChange={(e) => {
+                const newStart = new Date(e.target.value)
+                if (isNaN(newStart.getTime())) return
+                const durationMs = (item.endTime?.getTime() ?? item.startTime!.getTime() + 30 * 60_000) - item.startTime!.getTime()
+                const eventId = item.originalEvent?.google_event_id || item.originalEvent?.id || item.id.replace('event-', '')
+                void onUpdateEvent(eventId, { startTime: newStart, endTime: new Date(newStart.getTime() + durationMs) })
+                setShowTimePicker(false)
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowTimePicker(false)}
+              className="mt-3 w-full p-3 text-sm font-medium text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-lg"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}
