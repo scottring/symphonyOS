@@ -5,7 +5,6 @@ import { useWallData } from '@/hooks/useWallData'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import type { TimelineItem } from '@/types/timeline'
 import type { Task } from '@/types/task'
-import { WallMicButton } from './WallMicButton'
 import { WallItemDetail } from './WallItemDetail'
 import { findDinnerEvent, getMealIcon } from './WallDinnerWidget'
 import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider'
@@ -590,7 +589,8 @@ export function WallCalendar() {
         </div>
       )}
 
-      <WallMicButton />
+      {/* Wall mic disabled 2026-05-25 (kids playing with it). Restore by
+          re-adding <WallMicButton /> here + its import. */}
 
       {isNighttime && nightWake && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white/5 text-white/30 px-4 py-2 rounded-xl text-[0.85rem] font-bold uppercase tracking-widest border border-white/10 z-50">

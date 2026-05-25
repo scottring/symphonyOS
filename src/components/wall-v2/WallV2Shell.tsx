@@ -38,7 +38,6 @@ import { useWeather } from '@/hooks/useWeather';
 import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
 import { findDinnerEvent, getMealIcon } from '@/components/wall/WallDinnerWidget';
 import { extractRecipeNameHint, detectRecipeUrl } from '@/lib/recipeDetection';
-import { WallMicButton } from '@/components/wall/WallMicButton';
 import { WallRecipeViewer } from '@/components/wall/WallRecipeViewer';
 import { WallDiscussionOverlay } from '@/components/wall/WallDiscussionOverlay';
 import { useFamilyDiscussionItems, type DiscussionItem } from '@/hooks/useFamilyDiscussionItems';
@@ -447,7 +446,8 @@ export function WallV2Shell() {
         showFab={false}
       />
 
-      <WallMicButton />
+      {/* Wall mic disabled 2026-05-25 (kids playing with it). Restore by
+          re-adding <WallMicButton /> here + its import. */}
 
       {guestMode && (
         <WallV2GuestScreen
