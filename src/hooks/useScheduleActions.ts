@@ -12,6 +12,7 @@ interface UseScheduleActionsDeps {
   viewedDate: Date
   updateTask: (id: string, updates: Partial<Task>) => void
   updateRoutine: (id: string, updates: Partial<Routine>) => void
+  deleteRoutine: (id: string) => Promise<void>
   updateEventAssignment: (eventId: string, memberId: string | null) => void
   updateEventAssignmentAll: (eventId: string, memberIds: string[]) => void
   markDone: (entityType: 'routine' | 'calendar_event', entityId: string, date: Date) => Promise<boolean>
@@ -30,6 +31,7 @@ export function useScheduleActions({
   viewedDate,
   updateTask,
   updateRoutine,
+  deleteRoutine,
   updateEventAssignment,
   updateEventAssignmentAll,
   markDone,
@@ -125,6 +127,10 @@ export function useScheduleActions({
     refreshDateInstances()
   }, [allRoutines, viewedDate, reschedule, undoDone, refreshDateInstances, pushAction])
 
+  const onDeleteRoutine = useCallback(async (routineId: string) => {
+    await deleteRoutine(routineId)
+  }, [deleteRoutine])
+
   const onCompleteEvent = useCallback(async (eventId: string, completed: boolean) => {
     const event = events.find(e => (e.google_event_id || e.id) === eventId)
     const eventName = event?.title || 'Event'
@@ -175,6 +181,7 @@ export function useScheduleActions({
     onCompleteRoutine,
     onSkipRoutine,
     onPushRoutine,
+    onDeleteRoutine,
     onCompleteEvent,
     onSkipEvent,
     onPushEvent,

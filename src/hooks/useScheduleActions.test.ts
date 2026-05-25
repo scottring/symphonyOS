@@ -74,6 +74,7 @@ function createMocks() {
   return {
     updateTask: vi.fn(),
     updateRoutine: vi.fn(),
+    deleteRoutine: vi.fn().mockResolvedValue(undefined),
     updateEventAssignment: vi.fn(),
     updateEventAssignmentAll: vi.fn(),
     markDone: vi.fn().mockResolvedValue(true),
@@ -107,6 +108,7 @@ function renderActions(
     viewedDate: overrides.viewedDate ?? new Date('2026-02-19'),
     updateTask: merged.updateTask,
     updateRoutine: merged.updateRoutine,
+    deleteRoutine: merged.deleteRoutine,
     updateEventAssignment: merged.updateEventAssignment,
     updateEventAssignmentAll: merged.updateEventAssignmentAll,
     markDone: merged.markDone,
@@ -554,6 +556,18 @@ describe('useScheduleActions', () => {
     })
   })
 
+  describe('onDeleteRoutine', () => {
+    it('calls deleteRoutine with the routine id', async () => {
+      const { result, mocks } = renderActions()
+
+      await act(async () => {
+        await result.current.onDeleteRoutine('routine-1')
+      })
+
+      expect(mocks.deleteRoutine).toHaveBeenCalledWith('routine-1')
+    })
+  })
+
   // -------------------------------------------------------------------------
   // Event complete / skip / push
   // -------------------------------------------------------------------------
@@ -745,7 +759,7 @@ describe('useScheduleActions', () => {
   // Return shape
   // -------------------------------------------------------------------------
   describe('return value', () => {
-    it('returns all 12 action functions', () => {
+    it('returns all 13 action functions', () => {
       const { result } = renderActions()
 
       const expectedKeys = [
@@ -758,6 +772,7 @@ describe('useScheduleActions', () => {
         'onCompleteRoutine',
         'onSkipRoutine',
         'onPushRoutine',
+        'onDeleteRoutine',
         'onCompleteEvent',
         'onSkipEvent',
         'onPushEvent',
