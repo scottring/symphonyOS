@@ -5,9 +5,10 @@ import type { TaskContext } from '@/types/task'
 import type { ProactiveSuggestion } from '@/types/proactiveSuggestion'
 import { formatTimeLong, formatTimeRangeLong, inferMealTime } from '@/lib/timeUtils'
 import { getProjectColor } from '@/lib/projectUtils'
-import { PushDropdown, SchedulePopover, ContextPicker, DiscussionPicker, type ScheduleContextItem } from '@/components/triage'
+import { SchedulePopover, ContextPicker, DiscussionPicker, type ScheduleContextItem } from '@/components/triage'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
-import { Redo2, Video, Tag, Check, Pencil, Link as LinkIcon } from 'lucide-react'
+import { Video, Tag, Check, Pencil, Link as LinkIcon } from 'lucide-react'
+import { ScheduleItemActionsMenu } from './ScheduleItemActionsMenu'
 import { ConceptIcon, type ConceptName } from '@/lib/conceptIcons'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useMobile } from '@/hooks/useMobile'
@@ -656,35 +657,9 @@ export const ScheduleItem = memo(function ScheduleItem({
           <PromoteTaskToProjectButton item={item} />
         )}
 
-        {/* Skip button - for routines and events, hidden by default, shows on hover */}
-        {variant !== 'minimal' && (isRoutine || item.type === 'event') && onSkip && !item.completed && !item.skipped && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onSkip()
-            }}
-            className="shrink-0 p-1.5 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-all opacity-0 group-hover:opacity-100"
-            title="Skip this time"
-            aria-label="Skip this time"
-          >
-            <Redo2 className="w-4 h-4" />
-          </button>
-        )}
-
-        {/* Push button - for tasks and routines, hover on desktop */}
-        {variant !== 'minimal' && (isTask || isRoutine) && onPush && (
-          <div
-            className={`shrink-0 ${isMobile && isOverdue ? '' : 'hidden md:block opacity-0 group-hover:opacity-100'} transition-opacity`}
-            onClick={(e) => {
-              e.stopPropagation()
-              // Close panel when opening push dropdown
-              if (panelOpen && onClosePanel) {
-                onClosePanel()
-              }
-            }}
-          >
-            <PushDropdown onPush={onPush} size="sm" showTodayOption={isOverdue} />
-          </div>
+        {/* Unified actions menu — always visible (touch + desktop) */}
+        {variant !== 'minimal' && (isRoutine || isTask || item.type === 'event') && (
+          <ScheduleItemActionsMenu item={item} onOpenDetail={onSelect} />
         )}
 
         {/* Right indicators — compact group: context + assignee */}
