@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Eye, EyeOff, Moon, Sun, RefreshCw, ImageOff } from 'lucide-react';
 import { useActionableInstances } from '@/hooks/useActionableInstances';
 import { WallV2GuestScreen } from './WallV2GuestScreen';
+import { WallV2ItemActionSheet } from './WallV2ItemActionSheet';
 import {
   readHideRoutines,
   writeHideRoutines,
@@ -48,6 +49,7 @@ import { supabase } from '@/lib/supabase';
 import type {
   WallV2GlanceCard,
   WallV2GroceryData,
+  WallV2TimelineEvent,
 } from './types';
 
 function formatDate(d: Date): { weekday: string; fullDate: string } {
@@ -197,7 +199,8 @@ export function WallV2Shell() {
   // Tap-to-complete from the wall. Timeline ids are prefixed (task-/routine-/
   // event-); tasks toggle their completed flag, routines/events write a
   // completed (or undone) actionable_instance for today. Refetch to refresh.
-  const { markDone, undoDone } = useActionableInstances();
+  const { skip, markDone, undoDone } = useActionableInstances();
+  const [actionSheetItem, setActionSheetItem] = useState<WallV2TimelineEvent | null>(null);
   const handleToggleComplete = useCallback((id: string, completed: boolean) => {
     void (async () => {
       if (id.startsWith('task-')) {
@@ -267,11 +270,32 @@ export function WallV2Shell() {
       else showFlash(`Tonight: ${dinnerMealName}`);
       return;
     }
-    // Other cards: surface the title as a flash so the tap registers and
-    // the user knows what they hit. A full detail panel comes in a later pass.
+    // Routine/event cards open the touch action sheet (Skip today / Mark done).
+    // Tasks (and anything else) just flash their title for now.
     const tapped = timeline.flatMap((s) => s.events).find((e) => e.id === id);
-    if (tapped) showFlash(tapped.title);
+    if (!tapped) return;
+    if (tapped.kind === 'routine' || tapped.kind === 'event') {
+      setActionSheetItem(tapped);
+    } else {
+      showFlash(tapped.title);
+    }
   }, [recipeUrl, dinnerMealName, timeline, showFlash]);
+
+  const handleWallSkip = useCallback(async (id: string, kind: 'event' | 'routine') => {
+    const entityType = kind === 'routine' ? 'routine' : 'calendar_event';
+    const entityId = id.replace(/^(routine-|event-)/, '');
+    await skip(entityType, entityId, now);
+    wallData.refetch();
+    showFlash('Skipped for today');
+  }, [skip, now, wallData, showFlash]);
+
+  const handleWallMarkDone = useCallback(async (id: string, kind: 'event' | 'routine') => {
+    const entityType = kind === 'routine' ? 'routine' : 'calendar_event';
+    const entityId = id.replace(/^(routine-|event-)/, '');
+    await markDone(entityType, entityId, now);
+    wallData.refetch();
+    showFlash('Marked done');
+  }, [markDone, now, wallData, showFlash]);
 
   const handleTapFullDay = useCallback(() => {
     // eslint-disable-next-line no-console
@@ -384,6 +408,15 @@ export function WallV2Shell() {
       </div>
 
       {/* ─── Overlays ─── */}
+      {actionSheetItem && (
+        <WallV2ItemActionSheet
+          event={actionSheetItem}
+          onSkip={handleWallSkip}
+          onMarkDone={handleWallMarkDone}
+          onClose={() => setActionSheetItem(null)}
+        />
+      )}
+
       {showRecipeViewer && recipeUrl && (
         <WallRecipeViewer
           url={recipeUrl}
