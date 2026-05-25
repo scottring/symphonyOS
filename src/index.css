@@ -987,6 +987,29 @@ body {
   transition: background 120s ease;
 }
 
+/* ─── Kiosk touch hardening ───
+   The wall is a finger-only touchscreen (no mouse, no keyboard). Make every
+   finger interaction feel right:
+   - touch-action: manipulation → removes the ~300ms double-tap-zoom delay so
+     taps register instantly. (touch-action intersects down the tree, so this
+     covers all cards/buttons in the wall subtree.) Panning/scrolling still works.
+   - user-select: none → a finger drag to scroll never starts selecting text.
+   - touch-callout / tap-highlight → no long-press context menu, no grey flash.
+   Real inputs (QuickCapture) re-enable text selection so typing still works. */
+.wall-touch-root {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.wall-touch-root input,
+.wall-touch-root textarea,
+.wall-touch-root [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 /* Wall bottom bar animations */
 @keyframes fillUp {
   from { transform: scaleY(0); }

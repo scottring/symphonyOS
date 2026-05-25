@@ -317,7 +317,7 @@ export function WallV2Shell() {
   );
 
   return (
-    <div className={`${isDark ? 'dark ' : ''}relative h-screen w-screen bg-[var(--color-bg-base)] dark:bg-stone-950 text-stone-800 dark:text-stone-100 overflow-hidden transition-colors`}>
+    <div className={`${isDark ? 'dark ' : ''}wall-touch-root relative h-screen w-screen bg-[var(--color-bg-base)] dark:bg-stone-950 text-stone-800 dark:text-stone-100 overflow-hidden transition-colors`}>
       <div className="absolute top-8 right-8 z-30 flex items-center gap-2">
         <button
           type="button"
