@@ -331,7 +331,7 @@ export function WallV2Shell() {
           {isDark ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
         </button>
       </div>
-      <div className="h-full w-full p-6 grid grid-cols-[280px_1fr_360px] grid-rows-[1fr_auto] gap-4">
+      <div className="h-full w-full p-6 grid grid-cols-[280px_1fr_360px] grid-rows-[minmax(0,1fr)_auto] gap-4">
         {/* Row 1 — Left rail */}
         <div className="row-span-1 col-start-1">
           <WallV2DateColumn
@@ -361,7 +361,7 @@ export function WallV2Shell() {
         </div>
 
         {/* Row 1 — Right column (4 widgets) */}
-        <div className="row-span-1 col-start-3">
+        <div className="row-span-1 col-start-3 min-h-0">
           <WallV2RightColumn
             grocery={PLACEHOLDER_GROCERY}
             upcoming={upcoming}

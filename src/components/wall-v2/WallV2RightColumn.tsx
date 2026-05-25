@@ -24,7 +24,7 @@ export function WallV2RightColumn({
   grocery, upcoming, question, onTapGrocery, onTapQuestion,
 }: Props) {
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 h-full min-h-0 overflow-y-auto pr-1 -mr-1">
       <WallV2GroceryCard data={grocery} onTap={onTapGrocery} />
       <WallV2UpcomingCard items={upcoming} />
       <WallV2QuestionCard question={question} onTap={onTapQuestion} />
