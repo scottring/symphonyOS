@@ -41,7 +41,6 @@ import {
   RecipeViewer,
   AuthForm,
   FocusMode,
-  DetailPanelRedesign as DetailPanel,
 } from '@/components/lazy'
 import type { User } from '@supabase/supabase-js'
 import { useScheduleActions } from '@/hooks/useScheduleActions'
@@ -65,7 +64,6 @@ import {
   TapEventPanel,
   TapMealPanel,
   TapRoutinePanel,
-  SURFACE_PANEL_ENABLED,
 } from '@/components/surface'
 
 function PasswordResetForm({ onSubmit }: { onSubmit: (password: string) => Promise<{ error: { message: string } | null }> }) {
@@ -1616,7 +1614,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
               onClose={() => setRecipeUrl(null)}
             />
           </Suspense>
-        ) : SURFACE_PANEL_ENABLED && selectedItem ? (
+        ) : selectedItem ? (
           selectedItem.type === 'task' && selectedItem.originalTask ? (
             <TapContextPanel
               task={selectedItem.originalTask}
@@ -1721,199 +1719,8 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
               onContextChange={(ctx) => updateRoutine(selectedItem.originalRoutine!.id, { context: ctx ?? null })}
               onVisibilityChange={(v) => updateRoutine(selectedItem.originalRoutine!.id, { visibility: v })}
             />
-          ) : (
-            <Suspense fallback={<LoadingFallback variant="card" />}>
-              <DetailPanel
-                item={selectedItem}
-                onClose={() => setSelectedItemId(null)}
-                onUpdate={updateTask}
-                onDelete={deleteTask}
-                onToggleComplete={handleToggleTask}
-                onSaveNoteToVault={handleSaveTaskNoteToVault}
-                onUpdateEventNote={updateNote}
-                onUpdateEventLocation={async (eventId: string, location: string | null, calendarId?: string) => {
-                  try {
-                    await updateEvent({ eventId, location, calendarId })
-                    showToast('Location updated successfully')
-                  } catch (error) {
-                    console.error('Failed to update event location:', error)
-                    showToast(error instanceof Error ? error.message : 'Failed to update location', 'warning')
-                  }
-                }}
-                fetchCalendarList={fetchCalendarList}
-                onDeleteEvent={handleDeleteEvent}
-                onMoveEventToCalendar={async (eventId: string, sourceCalendarId: string, destinationCalendarId: string) => {
-                  try {
-                    await moveEvent({ eventId, sourceCalendarId, destinationCalendarId })
-                    // Refresh events so the moved event reflects its new calendar
-                    const today = new Date()
-                    today.setHours(0, 0, 0, 0)
-                    const weekLater = new Date(today)
-                    weekLater.setDate(weekLater.getDate() + 7)
-                    await fetchEvents(today, weekLater)
-                    showToast('Event moved to new calendar', 'success')
-                  } catch (error) {
-                    console.error('Failed to move event:', error)
-                    showToast(error instanceof Error ? error.message : 'Failed to move event', 'warning')
-                  }
-                }}
-                eventRecipeUrl={selectedEventRecipeUrl}
-                onUpdateRecipeUrl={updateRecipeUrl}
-                onOpenRecipe={setRecipeUrl}
-                contact={selectedContact}
-                contacts={contacts}
-                onSearchContacts={searchContacts}
-                onUpdateContact={updateContact}
-                onOpenContact={handleOpenContact}
-                onAddContact={addContact}
-                project={selectedItemProject}
-                projects={projects}
-                onSearchProjects={searchProjects}
-                onUpdateProject={handleUpdateProject}
-                onOpenProject={handleOpenProject}
-                onAddProject={addProject}
-                allTasks={tasks}
-                onAddSubtask={addSubtask}
-                onActionComplete={refreshDateInstances}
-                onHideEvent={hideEvent}
-                prepTasks={tasks}
-                onAddPrepTask={addPrepTask}
-                onTogglePrepTask={handleToggleTask}
-                attachments={selectedItemAttachments}
-                onUploadAttachment={attachments.uploadAttachment}
-                onDeleteAttachment={attachments.deleteAttachment}
-                onOpenAttachment={async (attachment) => {
-                  const url = await attachments.getSignedUrl(attachment.storagePath)
-                  if (url) window.open(url, '_blank')
-                }}
-                isUploadingAttachment={attachments.isLoading}
-                attachmentError={attachments.error}
-                isPinned={selectedItem?.originalTask ? pinnedItems.isPinned('task', selectedItem.originalTask.id) : false}
-                canPin={pinnedItems.canPin()}
-                onPin={pinnedItems.pin}
-                onUnpin={pinnedItems.unpin}
-                parentTask={selectedItem?.originalTask?.parentTaskId
-                  ? tasks.find(t => t.id === selectedItem.originalTask?.parentTaskId) ?? null
-                  : null
-                }
-                onOpenParentTask={(taskId) => setSelectedItemId(`task-${taskId}`)}
-                linkedTasks={selectedItemLinkedTasks}
-                onAddLinkedTask={handleAddLinkedTask}
-                onLinkExistingTask={handleLinkExistingTask}
-                onToggleLinkedTask={handleToggleLinkedTask}
-                onDeleteLinkedTask={handleDeleteLinkedTask}
-                routine={selectedItemRoutine}
-                onUpdateRoutine={updateRoutine}
-                familyMembers={familyMembers}
-                eventAssignedToAll={selectedEventAssignedToAll}
-                onUpdateEventAssignment={updateEventAssignmentAll}
-                eventProjectId={selectedEventProjectId}
-                onUpdateEventProject={updateEventProject}
-                onUpdateEvent={async (eventId: string, { startTime, endTime }: { startTime: Date; endTime: Date }) => {
-                  await updateEvent({ eventId, startTime, endTime })
-                }}
-                onDeleteRoutine={scheduleActions.onDeleteRoutine}
-                onOpenGuidedChat={handleOpenGuidedChat}
-                viewedDate={viewedDate}
-              />
-            </Suspense>
-          )
-        ) : (
-          <Suspense fallback={<LoadingFallback variant="card" />}>
-            <DetailPanel
-              item={selectedItem}
-              onClose={() => setSelectedItemId(null)}
-              onUpdate={updateTask}
-              onDelete={deleteTask}
-              onToggleComplete={handleToggleTask}
-              onSaveNoteToVault={handleSaveTaskNoteToVault}
-              onUpdateEventNote={updateNote}
-              onUpdateEventLocation={async (eventId: string, location: string | null, calendarId?: string) => {
-                try {
-                  await updateEvent({ eventId, location, calendarId })
-                  showToast('Location updated successfully')
-                } catch (error) {
-                  console.error('Failed to update event location:', error)
-                  showToast(error instanceof Error ? error.message : 'Failed to update location', 'warning')
-                }
-              }}
-              fetchCalendarList={fetchCalendarList}
-              onDeleteEvent={handleDeleteEvent}
-              onMoveEventToCalendar={async (eventId: string, sourceCalendarId: string, destinationCalendarId: string) => {
-                try {
-                  await moveEvent({ eventId, sourceCalendarId, destinationCalendarId })
-                  const today = new Date()
-                  today.setHours(0, 0, 0, 0)
-                  const weekLater = new Date(today)
-                  weekLater.setDate(weekLater.getDate() + 7)
-                  await fetchEvents(today, weekLater)
-                  showToast('Event moved to new calendar', 'success')
-                } catch (error) {
-                  console.error('Failed to move event:', error)
-                  showToast(error instanceof Error ? error.message : 'Failed to move event', 'warning')
-                }
-              }}
-              eventRecipeUrl={selectedEventRecipeUrl}
-              onUpdateRecipeUrl={updateRecipeUrl}
-              onOpenRecipe={setRecipeUrl}
-              contact={selectedContact}
-              contacts={contacts}
-              onSearchContacts={searchContacts}
-              onUpdateContact={updateContact}
-              onOpenContact={handleOpenContact}
-              onAddContact={addContact}
-              project={selectedItemProject}
-              projects={projects}
-              onSearchProjects={searchProjects}
-              onUpdateProject={handleUpdateProject}
-              onOpenProject={handleOpenProject}
-              onAddProject={addProject}
-              allTasks={tasks}
-              onAddSubtask={addSubtask}
-              onActionComplete={refreshDateInstances}
-              onHideEvent={hideEvent}
-              prepTasks={tasks}
-              onAddPrepTask={addPrepTask}
-              onTogglePrepTask={handleToggleTask}
-              attachments={selectedItemAttachments}
-              onUploadAttachment={attachments.uploadAttachment}
-              onDeleteAttachment={attachments.deleteAttachment}
-              onOpenAttachment={async (attachment) => {
-                const url = await attachments.getSignedUrl(attachment.storagePath)
-                if (url) window.open(url, '_blank')
-              }}
-              isUploadingAttachment={attachments.isLoading}
-              attachmentError={attachments.error}
-              isPinned={selectedItem?.originalTask ? pinnedItems.isPinned('task', selectedItem.originalTask.id) : false}
-              canPin={pinnedItems.canPin()}
-              onPin={pinnedItems.pin}
-              onUnpin={pinnedItems.unpin}
-              parentTask={selectedItem?.originalTask?.parentTaskId
-                ? tasks.find(t => t.id === selectedItem.originalTask?.parentTaskId) ?? null
-                : null
-              }
-              onOpenParentTask={(taskId) => setSelectedItemId(`task-${taskId}`)}
-              linkedTasks={selectedItemLinkedTasks}
-              onAddLinkedTask={handleAddLinkedTask}
-              onLinkExistingTask={handleLinkExistingTask}
-              onToggleLinkedTask={handleToggleLinkedTask}
-              onDeleteLinkedTask={handleDeleteLinkedTask}
-              routine={selectedItemRoutine}
-              onUpdateRoutine={updateRoutine}
-              familyMembers={familyMembers}
-              eventAssignedToAll={selectedEventAssignedToAll}
-              onUpdateEventAssignment={updateEventAssignmentAll}
-              eventProjectId={selectedEventProjectId}
-              onUpdateEventProject={updateEventProject}
-              onUpdateEvent={async (eventId: string, { startTime, endTime }: { startTime: Date; endTime: Date }) => {
-                await updateEvent({ eventId, startTime, endTime })
-              }}
-              onDeleteRoutine={scheduleActions.onDeleteRoutine}
-              onOpenGuidedChat={handleOpenGuidedChat}
-              viewedDate={viewedDate}
-            />
-          </Suspense>
-        )
+          ) : null
+        ) : null
       }
     >
       <DomainPageOutline>
