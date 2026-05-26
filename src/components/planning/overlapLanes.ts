@@ -9,31 +9,46 @@ export interface Lane {
   totalColumns: number
 }
 
+/** A collapsed cluster of items that didn't fit within the lane cap. */
+export interface OverflowChip {
+  id: string
+  column: number
+  totalColumns: number
+  startMinutes: number
+  itemIds: string[]
+}
+
+export interface LaneLayout {
+  /** Items that get a visible side-by-side lane. */
+  lanes: Map<string, Lane>
+  /** "+N" chips standing in for the items that exceeded the cap. */
+  chips: OverflowChip[]
+}
+
 /**
- * Assign side-by-side lanes to time-overlapping items so the renderer can lay
- * them out next to each other instead of stacked on top of one another.
+ * Lay out time-overlapping items into side-by-side lanes so they don't stack on
+ * top of each other. Type-agnostic — keyed only by `id`, so tasks, events, and
+ * routines sharing a time share one group.
  *
- * Items whose [start, end) intervals overlap — directly or transitively — form a
- * group; each item in a group gets a `column` index and the group's
- * `totalColumns`. Non-overlapping items get `{ column: 0, totalColumns: 1 }`
- * (full width). Type-agnostic: a task, event, and routine at the same time share
- * one group, keyed only by `id`.
- *
- * This is the overlap algorithm previously inlined for tasks in PlanningColumn,
- * now extracted so it can run once across ALL placed item types.
+ * Groups are formed from items whose [start, end) intervals overlap (directly or
+ * transitively). A group of N items:
+ *   - N <= maxColumns → each item gets its own full lane (totalColumns = N).
+ *   - N >  maxColumns → the first (maxColumns - 1) items get lanes; the rest
+ *     collapse into a single "+N" chip occupying the last lane, so the visible
+ *     cards never shred into unreadable slivers.
  */
-export function assignOverlapLanes(items: LaneInput[]): Map<string, Lane> {
+export function layoutLanes(items: LaneInput[], maxColumns = 4): LaneLayout {
+  const cap = Math.max(2, maxColumns)
   const sorted = [...items].sort((a, b) => a.startMinutes - b.startMinutes)
-  const result = new Map<string, Lane>()
+  const lanes = new Map<string, Lane>()
+  const chips: OverflowChip[] = []
   const processed = new Set<number>()
 
   for (let i = 0; i < sorted.length; i++) {
     if (processed.has(i)) continue
 
-    // Build the group of items overlapping this one (transitively, via maxEnd).
     const group: number[] = [i]
     let maxEnd = sorted[i].endMinutes
-
     for (let j = i + 1; j < sorted.length; j++) {
       if (processed.has(j)) continue
       if (sorted[j].startMinutes < maxEnd) {
@@ -41,13 +56,26 @@ export function assignOverlapLanes(items: LaneInput[]): Map<string, Lane> {
         maxEnd = Math.max(maxEnd, sorted[j].endMinutes)
       }
     }
+    group.forEach((idx) => processed.add(idx))
 
-    const totalColumns = group.length
-    group.forEach((idx, col) => {
-      result.set(sorted[idx].id, { column: col, totalColumns })
-      processed.add(idx)
-    })
+    const n = group.length
+    if (n <= cap) {
+      group.forEach((idx, col) => lanes.set(sorted[idx].id, { column: col, totalColumns: n }))
+    } else {
+      const visibleCount = cap - 1
+      for (let col = 0; col < visibleCount; col++) {
+        lanes.set(sorted[group[col]].id, { column: col, totalColumns: cap })
+      }
+      const overflow = group.slice(visibleCount)
+      chips.push({
+        id: `overflow-${sorted[overflow[0]].id}`,
+        column: cap - 1,
+        totalColumns: cap,
+        startMinutes: sorted[overflow[0]].startMinutes,
+        itemIds: overflow.map((idx) => sorted[idx].id),
+      })
+    }
   }
 
-  return result
+  return { lanes, chips }
 }

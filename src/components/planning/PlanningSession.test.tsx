@@ -315,4 +315,30 @@ describe('PlanningSession', () => {
     expect(wb.style.width).toContain('50%')
     expect(wa.style.left).not.toBe(wb.style.left)
   })
+
+  it('collapses heavy overlap (beyond the lane cap) into a "+N" chip', () => {
+    const today = new Date()
+    today.setHours(9, 0, 0, 0)
+    const end = new Date(today.getTime() + 60 * 60000)
+    const events = Array.from({ length: 6 }, (_, i) =>
+      createMockCalendarEvent({ id: `ov${i}`, title: `E${i}`, start_time: today.toISOString(), end_time: end.toISOString() })
+    )
+
+    render(
+      <PlanningSession
+        tasks={[]}
+        events={events}
+        routines={[]}
+        onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
+        onClose={vi.fn()}
+        initialDate={today}
+      />
+    )
+
+    // Cap is 4 → 3 events rendered as cards, the other 3 behind a "+3" chip.
+    const renderedCards = events.filter((e) => screen.queryByTestId(`placed-${e.id}`))
+    expect(renderedCards.length).toBe(3)
+    expect(screen.getByRole('button', { name: /3 more overlapping items/i })).toBeInTheDocument()
+  })
 })

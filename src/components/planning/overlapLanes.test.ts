@@ -1,45 +1,53 @@
 import { describe, it, expect } from 'vitest'
-import { assignOverlapLanes } from './overlapLanes'
+import { layoutLanes } from './overlapLanes'
 
-describe('assignOverlapLanes', () => {
-  it('gives non-overlapping items a single full-width lane', () => {
-    const lanes = assignOverlapLanes([
+describe('layoutLanes', () => {
+  it('gives non-overlapping items a single full-width lane and no chips', () => {
+    const { lanes, chips } = layoutLanes([
       { id: 'a', startMinutes: 0, endMinutes: 30 },
       { id: 'b', startMinutes: 60, endMinutes: 90 },
-    ])
+    ], 4)
     expect(lanes.get('a')).toEqual({ column: 0, totalColumns: 1 })
     expect(lanes.get('b')).toEqual({ column: 0, totalColumns: 1 })
+    expect(chips).toEqual([])
   })
 
-  it('splits two overlapping items into two side-by-side lanes', () => {
-    const lanes = assignOverlapLanes([
-      { id: 'a', startMinutes: 540, endMinutes: 600 }, // 9:00–10:00
-      { id: 'b', startMinutes: 570, endMinutes: 630 }, // 9:30–10:30
-    ])
+  it('lanes a small overlapping group side-by-side (under the cap)', () => {
+    const { lanes, chips } = layoutLanes([
+      { id: 'a', startMinutes: 540, endMinutes: 600 },
+      { id: 'b', startMinutes: 570, endMinutes: 630 },
+    ], 4)
     expect(lanes.get('a')).toEqual({ column: 0, totalColumns: 2 })
     expect(lanes.get('b')).toEqual({ column: 1, totalColumns: 2 })
+    expect(chips).toEqual([])
   })
 
-  it('groups transitively overlapping items into one group of three', () => {
-    const lanes = assignOverlapLanes([
-      { id: 'a', startMinutes: 540, endMinutes: 600 }, // 9:00–10:00
-      { id: 'b', startMinutes: 570, endMinutes: 630 }, // 9:30–10:30 (overlaps a)
-      { id: 'c', startMinutes: 615, endMinutes: 660 }, // 10:15–11:00 (overlaps b, not a)
-    ])
-    expect(lanes.get('a')?.totalColumns).toBe(3)
-    expect(lanes.get('b')?.totalColumns).toBe(3)
-    expect(lanes.get('c')?.totalColumns).toBe(3)
-    // distinct columns within the group
-    const cols = ['a', 'b', 'c'].map((id) => lanes.get(id)!.column).sort()
-    expect(cols).toEqual([0, 1, 2])
+  it('caps lanes and collapses the excess into one "+N" chip', () => {
+    // 6 items all overlapping at 9:00, cap 4 → 3 visible lanes + 1 chip lane
+    const items = Array.from({ length: 6 }, (_, i) => ({
+      id: `e${i}`, startMinutes: 540, endMinutes: 600,
+    }))
+    const { lanes, chips } = layoutLanes(items, 4)
+
+    // 3 visible items, each at totalColumns 4 (lanes 0,1,2)
+    const visible = items.map((it) => it.id).filter((id) => lanes.has(id))
+    expect(visible.length).toBe(3)
+    visible.forEach((id) => expect(lanes.get(id)!.totalColumns).toBe(4))
+    expect(new Set(visible.map((id) => lanes.get(id)!.column))).toEqual(new Set([0, 1, 2]))
+
+    // 1 chip in the last lane holding the other 3 items
+    expect(chips.length).toBe(1)
+    expect(chips[0].column).toBe(3)
+    expect(chips[0].totalColumns).toBe(4)
+    expect(chips[0].itemIds.length).toBe(3)
+    // chip + visible together cover all 6 items
+    expect(new Set([...visible, ...chips[0].itemIds])).toEqual(new Set(items.map((it) => it.id)))
   })
 
-  it('lanes are assigned across item identity only (type-agnostic): an event and a task at the same time share a group', () => {
-    const lanes = assignOverlapLanes([
-      { id: 'task-1', startMinutes: 600, endMinutes: 660 },
-      { id: 'event-x', startMinutes: 600, endMinutes: 660 },
-    ])
-    expect(lanes.get('task-1')?.totalColumns).toBe(2)
-    expect(lanes.get('event-x')?.totalColumns).toBe(2)
+  it('exactly at the cap stays fully laned with no chip', () => {
+    const items = Array.from({ length: 4 }, (_, i) => ({ id: `e${i}`, startMinutes: 540, endMinutes: 600 }))
+    const { lanes, chips } = layoutLanes(items, 4)
+    expect([...lanes.keys()].length).toBe(4)
+    expect(chips).toEqual([])
   })
 })

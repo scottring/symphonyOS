@@ -8,7 +8,20 @@ import { PlanningTimeSlot } from './PlanningTimeSlot'
 import { PlanningTaskCard } from './PlanningTaskCard'
 import { PlanningEventBlock } from './PlanningEventBlock'
 import { PlanningRoutineBlock } from './PlanningRoutineBlock'
-import { assignOverlapLanes, type Lane } from './overlapLanes'
+import { layoutLanes, type Lane } from './overlapLanes'
+
+// Max side-by-side lanes before overlapping items collapse into a "+N" chip.
+const MAX_LANES = 4
+
+// "8:00 AM" style label from minutes-since-day-start.
+function minutesToLabel(minutesFromStart: number, dayStartHour: number): string {
+  const total = dayStartHour * 60 + minutesFromStart
+  const hour24 = Math.floor(total / 60)
+  const minute = total % 60
+  const period = hour24 >= 12 ? 'PM' : 'AM'
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12
+  return minute === 0 ? `${hour12} ${period}` : `${hour12}:${String(minute).padStart(2, '0')} ${period}`
+}
 
 // Side-by-side lane → absolute-position style. Lanes let time-overlapping items
 // sit next to each other instead of stacking. Defaults to one full-width lane.
@@ -165,15 +178,28 @@ export function PlanningColumn({
   }, [routines, slotHeight, dayStartHour])
 
   // Single overlap pass across ALL placed items (tasks + events + routines) so
-  // anything sharing a time gets its own side-by-side lane regardless of type —
-  // instead of events/routines stacking full-width on top of each other.
-  const lanes = useMemo(() => {
-    return assignOverlapLanes([
+  // anything sharing a time gets its own side-by-side lane regardless of type.
+  // Lanes are capped (MAX_LANES); excess items collapse into a "+N" chip so the
+  // visible cards never shred into unreadable slivers.
+  const layout = useMemo(() => {
+    return layoutLanes([
       ...placedTasks.map((p) => ({ id: p.task.id, startMinutes: p.startMinutes, endMinutes: p.endMinutes })),
       ...placedEvents.map((p) => ({ id: p.event.id, startMinutes: p.startMinutes, endMinutes: p.endMinutes })),
       ...placedRoutines.map((p) => ({ id: p.routine.id, startMinutes: p.startMinutes, endMinutes: p.endMinutes })),
-    ])
+    ], MAX_LANES)
   }, [placedTasks, placedEvents, placedRoutines])
+
+  // Look up a hidden item's label + time so the "+N" popover can list them.
+  const itemInfo = useMemo(() => {
+    const m = new Map<string, { title: string; time: string }>()
+    for (const { task, startMinutes } of placedTasks) m.set(task.id, { title: task.title, time: minutesToLabel(startMinutes, dayStartHour) })
+    for (const { event, startMinutes } of placedEvents) m.set(event.id, { title: event.title, time: minutesToLabel(startMinutes, dayStartHour) })
+    for (const { routine, startMinutes } of placedRoutines) m.set(routine.id, { title: routine.name, time: minutesToLabel(startMinutes, dayStartHour) })
+    return m
+  }, [placedTasks, placedEvents, placedRoutines, dayStartHour])
+
+  // Which "+N" chip's reveal popover is open.
+  const [openChipId, setOpenChipId] = useState<string | null>(null)
 
   return (
     <div
@@ -212,21 +238,21 @@ export function PlanningColumn({
           />
         ))}
 
-        {/* Placed tasks — overlay on slots, laned by the unified overlap pass */}
-        {placedTasks.map(({ task, top, height }) => (
+        {/* Placed tasks — laned by the unified overlap pass (skip overflow) */}
+        {placedTasks.filter(({ task }) => layout.lanes.has(task.id)).map(({ task, top, height }) => (
           <div
             key={task.id}
             data-testid={`placed-${task.id}`}
             onClick={() => setRaisedId(task.id)}
             className="absolute"
-            style={laneStyle(lanes.get(task.id), top, height, raisedId === task.id)}
+            style={laneStyle(layout.lanes.get(task.id), top, height, raisedId === task.id)}
           >
             <PlanningTaskCard task={task} isPlaced assignee={getMember(task.assignedTo)} />
           </div>
         ))}
 
         {/* Placed events */}
-        {placedEvents.map(({ event, top, height }) => {
+        {placedEvents.filter(({ event }) => layout.lanes.has(event.id)).map(({ event, top, height }) => {
           const eventId = event.google_event_id || event.id
           const eventNote = eventNotesMap?.get(eventId)
           const eventAssignee = eventNote?.assignedTo ? getMember(eventNote.assignedTo) : undefined
@@ -236,7 +262,7 @@ export function PlanningColumn({
               data-testid={`placed-${event.id}`}
               onClick={() => setRaisedId(event.id)}
               className="absolute cursor-pointer"
-              style={laneStyle(lanes.get(event.id), top, height, raisedId === event.id)}
+              style={laneStyle(layout.lanes.get(event.id), top, height, raisedId === event.id)}
             >
               <PlanningEventBlock event={event} height={height} assignee={eventAssignee} />
             </div>
@@ -244,17 +270,59 @@ export function PlanningColumn({
         })}
 
         {/* Placed routines */}
-        {placedRoutines.map(({ routine, top, height }) => (
+        {placedRoutines.filter(({ routine }) => layout.lanes.has(routine.id)).map(({ routine, top, height }) => (
           <div
             key={routine.id}
             data-testid={`placed-${routine.id}`}
             onClick={() => setRaisedId(routine.id)}
             className="absolute cursor-pointer"
-            style={laneStyle(lanes.get(routine.id), top, height, raisedId === routine.id)}
+            style={laneStyle(layout.lanes.get(routine.id), top, height, raisedId === routine.id)}
           >
             <PlanningRoutineBlock routine={routine} assignee={getMember(routine.assigned_to)} />
           </div>
         ))}
+
+        {/* "+N" overflow chips — collapse items beyond the lane cap. Click to
+            reveal the hidden items (title + time) in a popover. */}
+        {layout.chips.map((chip) => {
+          const top = (chip.startMinutes / 30) * slotHeight
+          const open = openChipId === chip.id
+          return (
+            <div
+              key={chip.id}
+              className="absolute"
+              style={laneStyle({ column: chip.column, totalColumns: chip.totalColumns }, top, slotHeight, open)}
+            >
+              <button
+                type="button"
+                onClick={() => setOpenChipId(open ? null : chip.id)}
+                aria-label={`${chip.itemIds.length} more overlapping items`}
+                className="h-full w-full rounded-lg bg-neutral-200 text-neutral-700 text-xs font-semibold hover:bg-neutral-300 transition-colors flex items-center justify-center"
+              >
+                +{chip.itemIds.length}
+              </button>
+              {open && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setOpenChipId(null)} />
+                  <div className="absolute right-0 top-full mt-1 z-50 w-56 max-h-64 overflow-y-auto rounded-xl bg-white shadow-lg border border-neutral-200 p-1.5">
+                    <div className="px-2 py-1 text-[10px] uppercase tracking-wider font-semibold text-neutral-400">
+                      {chip.itemIds.length} more at this time
+                    </div>
+                    {chip.itemIds.map((id) => {
+                      const info = itemInfo.get(id)
+                      return (
+                        <div key={id} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-50">
+                          <span className="text-sm text-neutral-800 truncate">{info?.title ?? 'Untitled'}</span>
+                          <span className="text-[10px] text-neutral-400 shrink-0">{info?.time ?? ''}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )
