@@ -64,6 +64,7 @@ import {
   TapContextPanel,
   TapEventPanel,
   TapMealPanel,
+  TapRoutinePanel,
   SURFACE_PANEL_ENABLED,
 } from '@/components/surface'
 
@@ -1711,6 +1712,14 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
                   showToast(error instanceof Error ? error.message : 'Failed to update location', 'warning')
                 }
               }}
+            />
+          ) : selectedItem.type === 'routine' && selectedItem.originalRoutine ? (
+            <TapRoutinePanel
+              routine={selectedItem.originalRoutine}
+              onClose={() => setSelectedItemId(null)}
+              onNotesChange={(n) => updateRoutine(selectedItem.originalRoutine!.id, { description: n })}
+              onContextChange={(ctx) => updateRoutine(selectedItem.originalRoutine!.id, { context: ctx ?? null })}
+              onVisibilityChange={(v) => updateRoutine(selectedItem.originalRoutine!.id, { visibility: v })}
             />
           ) : (
             <Suspense fallback={<LoadingFallback variant="card" />}>
