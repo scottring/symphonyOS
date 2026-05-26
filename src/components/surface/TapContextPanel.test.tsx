@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen } from '@testing-library/react'
+import { screen, fireEvent } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { TapContextPanel } from './TapContextPanel'
 import { createMockTask, createMockContact, createMockProject } from '@/test/mocks/factories'
@@ -23,6 +23,8 @@ describe('TapContextPanel', () => {
     onToggleSubtask: vi.fn(),
     onAddSubtask: vi.fn(),
     onAddLink: vi.fn(),
+    onContextChange: vi.fn(),
+    onAssigneesChange: vi.fn(),
   }
 
   beforeEach(() => { vi.clearAllMocks() })
@@ -98,5 +100,21 @@ describe('TapContextPanel', () => {
       {...baseHandlers}
     />)
     expect(screen.getByText('Sub one')).toBeInTheDocument()
+  })
+
+  it('lets you change the task context', () => {
+    const onContextChange = vi.fn()
+    const task = createMockTask({ context: 'work' })
+    render(<TapContextPanel
+      task={task}
+      contacts={[]} projects={[]} events={[]} familyMembers={[]} siblingTaskCandidates={[]} allTasks={[task]}
+      {...baseHandlers}
+      onContextChange={onContextChange}
+      onAssigneesChange={vi.fn()}
+    />)
+    // Open the ContextPicker trigger, then click the 'Personal' option
+    fireEvent.click(screen.getByRole('button', { name: /set context/i }))
+    fireEvent.click(screen.getByRole('button', { name: /personal/i }))
+    expect(onContextChange).toHaveBeenCalledWith('personal')
   })
 })

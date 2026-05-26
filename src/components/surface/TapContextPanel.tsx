@@ -14,6 +14,7 @@ import { PanelLinked } from './sections/PanelLinked'
 import { PanelLinks } from './sections/PanelLinks'
 import { PanelLocation } from './sections/PanelLocation'
 import { PanelMightBeRelevant } from './sections/PanelMightBeRelevant'
+import { PanelClassify } from './sections/PanelClassify'
 import { PanelFooter } from './sections/PanelFooter'
 import { useLinkedEntities } from './hooks/useLinkedEntities'
 import { useMightBeRelevant } from './hooks/useMightBeRelevant'
@@ -54,6 +55,8 @@ interface TapContextPanelProps {
   onAddLink: (url: string) => void
   onUpdateLocation: (location: string, placeId?: string) => void
   onClearLocation: () => void
+  onContextChange: (context: TaskContext | undefined) => void
+  onAssigneesChange: (ids: string[]) => void
 }
 
 function contextToDomain(ctx: TaskContext | null | undefined): 'work' | 'family' | 'personal' | undefined {
@@ -110,6 +113,13 @@ export function TapContextPanel(props: TapContextPanelProps) {
         onClearSchedule={props.onClearSchedule}
         onTogglePin={props.onTogglePin}
         onDelete={props.onDelete}
+      />
+      <PanelClassify
+        context={task.context}
+        onContextChange={props.onContextChange}
+        members={props.familyMembers}
+        selectedAssigneeIds={task.assignedToAll ?? (task.assignedTo ? [task.assignedTo] : [])}
+        onAssigneesChange={props.onAssigneesChange}
       />
       <PanelLocation
         location={task.location}
