@@ -1927,6 +1927,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
           planningOpen={planningOpen}
           onClosePlanning={() => setPlanningOpen(false)}
           onUpdateTask={updateTask}
+          onRescheduleEvent={(eventId, startTime, endTime, calendarId) => updateEvent({ eventId, startTime, endTime, calendarId })}
           pushTask={pushTask}
           familyMembers={familyMembers}
           eventNotesMap={eventNotesMap}

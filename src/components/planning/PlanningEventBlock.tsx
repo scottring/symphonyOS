@@ -1,13 +1,24 @@
+import { useDraggable } from '@dnd-kit/core'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { FAMILY_COLORS, type FamilyMember, type FamilyMemberColor } from '@/types/family'
+
+/** Drag id prefix for an event already placed on the grid. */
+export const PLACED_EVENT_DRAG_PREFIX = 'event-'
 
 interface PlanningEventBlockProps {
   event: CalendarEvent
   height: number
   assignee?: FamilyMember
+  /** When true (DragOverlay preview), skip the draggable wiring. */
+  isOverlay?: boolean
 }
 
-export function PlanningEventBlock({ event, height, assignee }: PlanningEventBlockProps) {
+export function PlanningEventBlock({ event, height, assignee, isOverlay }: PlanningEventBlockProps) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `${PLACED_EVENT_DRAG_PREFIX}${event.id}`,
+    disabled: isOverlay,
+  })
+
   // Get colors based on assignee, fallback to neutral (event default)
   const colors = assignee
     ? FAMILY_COLORS[assignee.color as FamilyMemberColor] || FAMILY_COLORS.blue
@@ -29,10 +40,30 @@ export function PlanningEventBlock({ event, height, assignee }: PlanningEventBlo
     })
   }
 
+  // Hide the original while dragging — the DragOverlay renders the preview.
+  if (isDragging) {
+    return (
+      <div
+        ref={setNodeRef}
+        className={`h-full px-2 py-1 rounded-lg ${bgClass} border-2 border-dashed opacity-50`}
+        style={{ minHeight: height }}
+      />
+    )
+  }
+
+  const style = transform
+    ? { minHeight: height, transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 100 }
+    : { minHeight: height }
+
   return (
     <div
-      className={`h-full px-2 py-1 rounded-lg ${bgClass} border ${borderClass} overflow-hidden`}
-      style={{ minHeight: height }}
+      ref={isOverlay ? undefined : setNodeRef}
+      style={style}
+      {...(isOverlay ? {} : attributes)}
+      {...(isOverlay ? {} : listeners)}
+      className={`h-full px-2 py-1 rounded-lg ${bgClass} border ${borderClass} overflow-hidden touch-none ${
+        isOverlay ? 'cursor-grabbing shadow-lg' : 'cursor-grab active:cursor-grabbing'
+      }`}
     >
       <div className="flex items-start gap-1.5">
         {/* Calendar icon */}

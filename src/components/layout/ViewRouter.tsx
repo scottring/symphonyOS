@@ -157,6 +157,8 @@ export interface ViewRouterProps {
   creatingRoutine: boolean
   onAddRoutine: (input: CreateRoutineInput) => Promise<Routine | null>
   onUpdateRoutine: (id: string, input: UpdateRoutineInput) => Promise<boolean>
+  /** Reschedule a placed calendar event (drag on the planning grid). */
+  onRescheduleEvent?: (eventId: string, startTime: Date, endTime: Date, calendarId?: string) => void
   onDeleteRoutine: (id: string) => Promise<boolean>
   onToggleRoutineVisibility: (id: string) => Promise<boolean>
 
@@ -253,6 +255,14 @@ export function ViewRouter(props: ViewRouterProps) {
               const routine = props.allRoutines.find(r => r.id === routineId)
               if (routine) props.onUpdateRoutine(routineId, scheduleRoutineOnDate(routine, date, time))
             }}
+            onRescheduleEvent={(event, startTime, endTime) =>
+              props.onRescheduleEvent?.(
+                event.google_event_id || event.id,
+                startTime,
+                endTime,
+                event.calendar_id || event.calendarId,
+              )
+            }
             initialDate={props.viewedDate}
             onClose={props.onClosePlanning}
             onUpdateTask={props.onUpdateTask}

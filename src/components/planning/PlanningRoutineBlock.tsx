@@ -1,12 +1,27 @@
+import { useDraggable } from '@dnd-kit/core'
 import type { Routine } from '@/types/actionable'
 import { FAMILY_COLORS, type FamilyMember, type FamilyMemberColor } from '@/types/family'
+
+/**
+ * Drag id prefix for a routine already placed on the grid. Distinct from the
+ * drawer chip's `routine-` prefix so dnd-kit never sees duplicate ids when the
+ * same routine is both in the drawer and on the grid.
+ */
+export const PLACED_ROUTINE_DRAG_PREFIX = 'placed-routine-'
 
 interface PlanningRoutineBlockProps {
   routine: Routine
   assignee?: FamilyMember
+  /** When true (DragOverlay preview), skip the draggable wiring. */
+  isOverlay?: boolean
 }
 
-export function PlanningRoutineBlock({ routine, assignee }: PlanningRoutineBlockProps) {
+export function PlanningRoutineBlock({ routine, assignee, isOverlay }: PlanningRoutineBlockProps) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `${PLACED_ROUTINE_DRAG_PREFIX}${routine.id}`,
+    disabled: isOverlay,
+  })
+
   // Get colors based on assignee, fallback to sage (routine default)
   const colors = assignee
     ? FAMILY_COLORS[assignee.color as FamilyMemberColor] || FAMILY_COLORS.green
@@ -18,8 +33,30 @@ export function PlanningRoutineBlock({ routine, assignee }: PlanningRoutineBlock
   const iconClass = colors ? colors.icon : 'text-sage-400'
   const subtextClass = colors ? colors.icon : 'text-sage-500'
 
+  // Hide the original while dragging — the DragOverlay renders the preview.
+  if (isDragging) {
+    return (
+      <div
+        ref={setNodeRef}
+        className={`h-full px-2 py-1 rounded-lg ${bgClass} border-2 border-dashed opacity-50`}
+      />
+    )
+  }
+
+  const style = transform
+    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 100 }
+    : undefined
+
   return (
-    <div className={`h-full px-2 py-1 rounded-lg ${bgClass} border ${borderClass} overflow-hidden`}>
+    <div
+      ref={isOverlay ? undefined : setNodeRef}
+      style={style}
+      {...(isOverlay ? {} : attributes)}
+      {...(isOverlay ? {} : listeners)}
+      className={`h-full px-2 py-1 rounded-lg ${bgClass} border ${borderClass} overflow-hidden touch-none ${
+        isOverlay ? 'cursor-grabbing shadow-lg' : 'cursor-grab active:cursor-grabbing'
+      }`}
+    >
       <div className="flex items-start gap-1.5">
         {/* Routine icon (circle for checkbox-like appearance) */}
         <div className="shrink-0 mt-0.5">

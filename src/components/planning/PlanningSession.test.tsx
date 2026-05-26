@@ -225,6 +225,45 @@ describe('PlanningSession', () => {
     expect(screen.getByText('3')).toBeInTheDocument()
   })
 
+  it('makes a placed event draggable (so it can be moved to a new time)', () => {
+    const today = new Date()
+    today.setHours(14, 0, 0, 0)
+    const event = createMockCalendarEvent({ id: 'evt1', title: 'Team Meeting', start_time: today.toISOString() })
+
+    render(
+      <PlanningSession
+        tasks={[]}
+        events={[event]}
+        routines={[]}
+        onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
+        onClose={vi.fn()}
+        initialDate={today}
+      />
+    )
+
+    const block = screen.getByTestId('placed-evt1').querySelector('[aria-roledescription="draggable"]')
+    expect(block).not.toBeNull()
+  })
+
+  it('makes a placed routine draggable (so it can be moved to a new time)', () => {
+    const routine = createMockRoutine({ id: 'rt1', name: 'Morning Meditation', time_of_day: '08:00' })
+
+    render(
+      <PlanningSession
+        tasks={[]}
+        events={[]}
+        routines={[routine]}
+        onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+
+    const block = screen.getByTestId('placed-rt1').querySelector('[aria-roledescription="draggable"]')
+    expect(block).not.toBeNull()
+  })
+
   it('shows empty state when all tasks are scheduled', () => {
     const today = new Date()
     today.setHours(10, 0, 0, 0)

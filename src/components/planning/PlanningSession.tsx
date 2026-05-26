@@ -22,6 +22,9 @@ import { PlanningGrid } from './PlanningGrid'
 import { PlanningTaskDrawer } from './PlanningTaskDrawer'
 import { PlanningTaskCard } from './PlanningTaskCard'
 import { PlanningRoutineDragCard, ROUTINE_DRAG_PREFIX } from './PlanningRoutineDragCard'
+import { PlanningEventBlock, PLACED_EVENT_DRAG_PREFIX } from './PlanningEventBlock'
+import { PlanningRoutineBlock, PLACED_ROUTINE_DRAG_PREFIX } from './PlanningRoutineBlock'
+import { computeEventReschedule } from './planningReschedule'
 
 interface PlanningSessionProps {
   tasks: Task[]
@@ -31,6 +34,8 @@ interface PlanningSessionProps {
   draggableRoutines?: Routine[]
   /** Drop handler for a dragged routine: pins it to a date's weekday + time. */
   onScheduleRoutine?: (routineId: string, date: Date, time: string) => void
+  /** Reschedule a placed calendar event to a new start/end (preserves duration). */
+  onRescheduleEvent?: (event: CalendarEvent, startTime: Date, endTime: Date) => void
   familyMembers?: FamilyMember[]
   eventNotesMap?: Map<string, EventNote>
   onUpdateTask: (id: string, updates: Partial<Task>) => void
@@ -59,6 +64,7 @@ export function PlanningSession({
   routines,
   draggableRoutines = [],
   onScheduleRoutine,
+  onRescheduleEvent,
   familyMembers = [],
   eventNotesMap,
   onUpdateTask,
@@ -202,6 +208,24 @@ export function PlanningSession({
     return draggableRoutines.find((r) => r.id === routineId) ?? null
   }, [activeId, draggableRoutines])
 
+  // Currently dragged placed event (drag ids are prefixed `event-`)
+  const activeEvent = useMemo(() => {
+    if (!activeId || !activeId.startsWith(PLACED_EVENT_DRAG_PREFIX)) return null
+    const id = activeId.slice(PLACED_EVENT_DRAG_PREFIX.length)
+    return events.find((e) => e.id === id) ?? null
+  }, [activeId, events])
+
+  // Currently dragged placed routine (drag ids are prefixed `placed-routine-`)
+  const activePlacedRoutine = useMemo(() => {
+    if (!activeId || !activeId.startsWith(PLACED_ROUTINE_DRAG_PREFIX)) return null
+    const id = activeId.slice(PLACED_ROUTINE_DRAG_PREFIX.length)
+    for (const list of routinesByDate.values()) {
+      const found = list.find((r) => r.id === id)
+      if (found) return found
+    }
+    return null
+  }, [activeId, routinesByDate])
+
   // Add a day to the date range
   const handleAddDay = useCallback(() => {
     setDateRange((prev) => {
@@ -293,6 +317,31 @@ export function PlanningSession({
         return
       }
 
+      // Placed routine reschedule (id `placed-routine-<id>`): same effect as a
+      // drawer-routine drop — pin it to the slot's weekday + time.
+      if (activeId.startsWith(PLACED_ROUTINE_DRAG_PREFIX)) {
+        if (!dropTarget.startsWith('slot-')) return
+        const parsed = parseSlotId(dropTarget)
+        if (!parsed) return
+        const date = new Date(parsed.year, parsed.month, parsed.day)
+        const time = `${String(parsed.hour).padStart(2, '0')}:${String(parsed.minute).padStart(2, '0')}`
+        onScheduleRoutine?.(activeId.slice(PLACED_ROUTINE_DRAG_PREFIX.length), date, time)
+        return
+      }
+
+      // Placed event reschedule (id `event-<id>`): rewrite the calendar event's
+      // start/end, preserving its duration. Only meaningful on a slot drop.
+      if (activeId.startsWith(PLACED_EVENT_DRAG_PREFIX)) {
+        if (!dropTarget.startsWith('slot-')) return
+        const parsed = parseSlotId(dropTarget)
+        if (!parsed) return
+        const ev = events.find((e) => e.id === activeId.slice(PLACED_EVENT_DRAG_PREFIX.length))
+        if (!ev) return
+        const { startTime, endTime } = computeEventReschedule(ev, parsed)
+        onRescheduleEvent?.(ev, startTime, endTime)
+        return
+      }
+
       // Handle dropping on unscheduled drawer
       if (dropTarget === 'unscheduled-drawer') {
         // Clear the time AND drop out of the 'timed' bucket — a task with no
@@ -324,7 +373,7 @@ export function PlanningSession({
         })
       }
     },
-    [onUpdateTask, tasks, onScheduleRoutine]
+    [onUpdateTask, tasks, onScheduleRoutine, onRescheduleEvent, events]
   )
 
   return (
@@ -376,6 +425,12 @@ export function PlanningSession({
             )}
             {activeRoutine && (
               <PlanningRoutineDragCard routine={activeRoutine} isOverlay />
+            )}
+            {activeEvent && (
+              <PlanningEventBlock event={activeEvent} height={SLOT_HEIGHT} isOverlay />
+            )}
+            {activePlacedRoutine && (
+              <PlanningRoutineBlock routine={activePlacedRoutine} isOverlay />
             )}
           </DragOverlay>
         </DndContext>
