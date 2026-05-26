@@ -288,7 +288,6 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     return stored === 'true'
   })
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [viewedDate, setViewedDate] = useState(() => new Date())
 
   // ── Meal-plan entries synthesized as CalendarEvent objects ────────────
@@ -623,7 +622,6 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   // Handle view change - clear selections when switching views
   const handleViewChange = useCallback((view: ViewType) => {
     setSelectedItemId(null)
-    setSelectedTaskId(null)
     setSelectedListId(null)
     setRecipeUrl(null)
 
@@ -666,7 +664,6 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   // Handle opening a project from detail panel
   const handleOpenProject = useCallback((projectId: string) => {
     setSelectedItemId(null)
-    setSelectedTaskId(null)
     setRecipeUrl(null)
     navigate(`/projects/${projectId}`)
   }, [navigate])
@@ -674,7 +671,6 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   // Handle opening a contact (from TaskView, DetailPanel, etc.)
   const handleOpenContact = useCallback((contactId: string) => {
     setSelectedItemId(null)
-    setSelectedTaskId(null)
     setRecipeUrl(null)
     navigate(`/contacts/${contactId}`)
   }, [navigate])
@@ -687,7 +683,6 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       return
     }
     setSelectedItemId(null)
-    setSelectedTaskId(null)
     setRecipeUrl(null)
     navigate(`/family/${memberId}`)
   }, [navigate, getCurrentUserMember])
@@ -729,10 +724,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   // Update chat entity context when viewing different entities
   useEffect(() => {
     let ctx: ChatEntityContext | null = null
-    if (selectedTaskId) {
-      const task = tasks.find(t => t.id === selectedTaskId)
-      if (task) ctx = { type: 'task', id: task.id, name: task.title }
-    } else if (selectedContactId) {
+    if (selectedContactId) {
       const contact = contactsMap.get(selectedContactId)
       if (contact) ctx = { type: 'contact', id: contact.id, name: contact.name }
     } else if (selectedProjectId) {
@@ -740,19 +732,17 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       if (project) ctx = { type: 'project', id: project.id, name: project.name }
     }
     chat.updateEntityContext(ctx)
-  }, [selectedTaskId, selectedContactId, selectedProjectId, tasks, contactsMap, projects, chat.updateEntityContext])
+  }, [selectedContactId, selectedProjectId, contactsMap, projects, chat.updateEntityContext])
 
   // Handle selecting an item - all types open DetailPanel (unified UX)
   const handleSelectItem = useCallback((itemId: string | null) => {
     if (!itemId) {
       setSelectedItemId(null)
-      setSelectedTaskId(null)
       return
     }
 
     // All item types (tasks, events, routines) use DetailPanel
     setSelectedItemId(itemId)
-    setSelectedTaskId(null)
     setRecipeUrl(null)
     // When selecting an item, switch to details tab
     setActivePanelTab('details')
@@ -849,52 +839,6 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     chat.startNewChat()
   }, [chat, chatSessions])
 
-  // Get selected task for TaskView (desktop)
-  const selectedTask = useMemo(() => {
-    if (!selectedTaskId) return null
-    return tasks.find(t => t.id === selectedTaskId) ?? null
-  }, [selectedTaskId, tasks])
-
-  // Get contact for selected task (TaskView)
-  const selectedTaskContact = useMemo(() => {
-    if (!selectedTask?.contactId) return null
-    return contactsMap.get(selectedTask.contactId) ?? null
-  }, [selectedTask, contactsMap])
-
-  // Get project for selected task (TaskView)
-  const selectedTaskProject = useMemo(() => {
-    if (!selectedTask?.projectId) return null
-    return projectsMap.get(selectedTask.projectId) ?? null
-  }, [selectedTask, projectsMap])
-
-  // Get notes linked to selected task (TaskView)
-  const [selectedTaskNotes, setSelectedTaskNotes] = useState<Note[]>([])
-  const [selectedTaskNotesLoading, setSelectedTaskNotesLoading] = useState(false)
-
-  useEffect(() => {
-    if (!selectedTask) {
-      setSelectedTaskNotes([])
-      return
-    }
-    setSelectedTaskNotesLoading(true)
-    getNotesForEntity('task', selectedTask.id)
-      .then(setSelectedTaskNotes)
-      .finally(() => setSelectedTaskNotesLoading(false))
-  }, [selectedTask?.id, getNotesForEntity])
-
-  const handleAddTaskNote = useCallback(
-    async (content: string, entityType: NoteEntityType, entityId: string) => {
-      const note = await addNote({ content })
-      if (note) {
-        await addEntityLink(note.id, { entityType, entityId })
-        // Refresh the task notes
-        const updatedNotes = await getNotesForEntity('task', entityId)
-        setSelectedTaskNotes(updatedNotes)
-      }
-    },
-    [addNote, addEntityLink, getNotesForEntity]
-  )
-
   // "Save to vault": promote a task's notes into a persisting vault note (durable,
   // via GitHub), linked to the task so it survives the task being completed.
   const saveTaskNoteToVault = useCallback(
@@ -918,11 +862,10 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       // still success — the file was written.
       if (result.noteId) {
         await addEntityLink(result.noteId, { entityType: 'task', entityId: task.id, linkType: 'primary' })
-        setSelectedTaskNotes(await getNotesForEntity('task', task.id))
       }
       return { ok: true, url: result.githubUrl }
     },
-    [vaultWrite, addEntityLink, getNotesForEntity]
+    [vaultWrite, addEntityLink]
   )
 
   // Current-quarter incomplete goal actions — surfaced in the weekly planning session
@@ -955,14 +898,6 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     const id = await addTask(action.description)
     if (id) await setBucket(id, 'week')
   }, [addTask, setBucket])
-
-  // Legacy desktop/panel paths bind to selectedTask; the surface panel binds to
-  // its own selectedItem.originalTask (see the TapContextPanel render below).
-  const handleSaveTaskNoteToVault = useCallback(
-    (content: string): Promise<{ ok: boolean; url?: string }> =>
-      selectedTask ? saveTaskNoteToVault(selectedTask, content) : Promise.resolve({ ok: false }),
-    [selectedTask, saveTaskNoteToVault]
-  )
 
   // Handle search result selection
   const handleSearchSelect = useCallback((result: SearchResult) => {
