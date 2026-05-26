@@ -21,7 +21,7 @@ import type { TimelineItem } from '@/types/timeline';
 import type { FamilyMember } from '@/types/family';
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar';
 import type { WallDayData } from '@/hooks/useWallData';
-import { extractRecipeNameHint, detectRecipeUrl } from '@/lib/recipeDetection';
+import { extractRecipeNameHint, resolveRecipeUrl } from '@/lib/recipeDetection';
 import { isEverydayRoutine } from '@/lib/routineUtils';
 
 import type {
@@ -258,7 +258,7 @@ export function adaptTimelineSections(
   // the Evening section with the recipe URL + all family avatars.
   if (dinnerEvent) {
     const mealTitle = extractRecipeNameHint(dinnerEvent.title) || dinnerEvent.title;
-    const recipeUrl = detectRecipeUrl(dinnerEvent.description);
+    const recipeUrl = resolveRecipeUrl(dinnerEvent.description);
     const dinnerCard: WallV2TimelineEvent = {
       id: `dinner-${dinnerEvent.id}`,
       icon: UtensilsCrossed,

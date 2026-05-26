@@ -26,7 +26,7 @@ import { WallV2AtAGlance } from './WallV2AtAGlance';
 import { WallV2Timeline } from './WallV2Timeline';
 import { WallV2RightColumn } from './WallV2RightColumn';
 import { WallV2ActionDock } from './WallV2ActionDock';
-import { MOCK_ACTIONS, MOCK_TAGLINE } from './wallV2Mock';
+import { MOCK_ACTIONS } from './wallV2Mock';
 import {
   adaptGlanceForMember,
   adaptTimelineSections,
@@ -37,7 +37,7 @@ import { useWallData } from '@/hooks/useWallData';
 import { useWeather } from '@/hooks/useWeather';
 import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
 import { findDinnerEvent, getMealIcon } from '@/components/wall/WallDinnerWidget';
-import { extractRecipeNameHint, detectRecipeUrl } from '@/lib/recipeDetection';
+import { extractRecipeNameHint, resolveRecipeUrl } from '@/lib/recipeDetection';
 import { WallRecipeViewer } from '@/components/wall/WallRecipeViewer';
 import { WallDiscussionOverlay } from '@/components/wall/WallDiscussionOverlay';
 import { useFamilyDiscussionItems, type DiscussionItem } from '@/hooks/useFamilyDiscussionItems';
@@ -183,7 +183,7 @@ export function WallV2Shell() {
     [dinnerEvent],
   );
   const recipeUrl = useMemo(
-    () => dinnerEvent ? detectRecipeUrl(dinnerEvent.description) : null,
+    () => dinnerEvent ? resolveRecipeUrl(dinnerEvent.description) : null,
     [dinnerEvent],
   );
 
@@ -372,7 +372,7 @@ export function WallV2Shell() {
 
         {/* Row 1 — Center column (glance strip + timeline) */}
         <div className="row-span-1 col-start-2 flex flex-col gap-4 min-h-0">
-          <WallV2AtAGlance tagline={MOCK_TAGLINE} cards={glance} />
+          <WallV2AtAGlance cards={glance} />
           <div className="min-h-0 flex-1">
             <WallV2Timeline
               sections={timeline}

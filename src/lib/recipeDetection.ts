@@ -73,6 +73,21 @@ export function detectRecipeUrl(text: string | null | undefined): string | null 
 }
 
 /**
+ * Resolve the recipe URL for a meal/event description.
+ *
+ * Planned meals store the recipe's `sourceUrl` as the entire description, so if
+ * the description IS a bare URL we use it directly — regardless of domain. Only
+ * for free-text descriptions (e.g. a Google Calendar event with a URL embedded
+ * in prose) do we fall back to `detectRecipeUrl`'s recipe-domain heuristic.
+ */
+export function resolveRecipeUrl(text: string | null | undefined): string | null {
+  if (!text) return null
+  const trimmed = text.trim()
+  if (/^https?:\/\/\S+$/.test(trimmed)) return trimmed
+  return detectRecipeUrl(text)
+}
+
+/**
  * Clean up a URL by removing trailing punctuation
  */
 function cleanUrl(url: string): string {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { detectRecipeUrl, isRecipeDomain, extractRecipeNameHint } from './recipeDetection'
+import { detectRecipeUrl, isRecipeDomain, extractRecipeNameHint, resolveRecipeUrl } from './recipeDetection'
 
 describe('recipeDetection', () => {
   describe('detectRecipeUrl', () => {
@@ -91,6 +91,35 @@ describe('recipeDetection', () => {
 
     it('is case insensitive', () => {
       expect(extractRecipeNameHint('DINNER: Pasta')).toBe('Pasta')
+    })
+  })
+
+  describe('resolveRecipeUrl', () => {
+    it('returns a bare URL directly, even from a non-allowlisted domain', () => {
+      // A planned meal stores the recipe sourceUrl as the whole description.
+      expect(resolveRecipeUrl('https://mygrandmasrecipes.io/tofu-stir-fry')).toBe(
+        'https://mygrandmasrecipes.io/tofu-stir-fry',
+      )
+    })
+
+    it('returns a bare allowlisted URL directly too', () => {
+      expect(resolveRecipeUrl('https://www.seriouseats.com/x')).toBe('https://www.seriouseats.com/x')
+    })
+
+    it('trims surrounding whitespace on a bare URL', () => {
+      expect(resolveRecipeUrl('  https://example.com/dish  ')).toBe('https://example.com/dish')
+    })
+
+    it('falls back to the recipe-domain heuristic for embedded URLs in free text', () => {
+      expect(resolveRecipeUrl('Make this tonight: https://www.allrecipes.com/recipe/123 yum')).toBe(
+        'https://www.allrecipes.com/recipe/123',
+      )
+    })
+
+    it('returns null for empty / non-URL text', () => {
+      expect(resolveRecipeUrl(null)).toBeNull()
+      expect(resolveRecipeUrl('')).toBeNull()
+      expect(resolveRecipeUrl('just a plain note')).toBeNull()
     })
   })
 })

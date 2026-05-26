@@ -7,7 +7,7 @@ import { WallV2GlanceCard } from './WallV2GlanceCard';
 import type { WallV2GlanceCard as GlanceCardData } from './types';
 
 interface Props {
-  tagline: string;
+  tagline?: string;
   cards: GlanceCardData[];
 }
 
@@ -27,10 +27,14 @@ export function WallV2AtAGlance({ tagline, cards }: Props) {
         <div className="text-[0.72rem] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">
           At a glance
         </div>
-        <div className="font-display italic text-[1.35rem] leading-tight text-stone-700 dark:text-stone-200 truncate">
-          {tagline}
-        </div>
-        <div className="w-[6rem]" aria-hidden />
+        {tagline && (
+          <>
+            <div className="font-display italic text-[1.35rem] leading-tight text-stone-700 dark:text-stone-200 truncate">
+              {tagline}
+            </div>
+            <div className="w-[6rem]" aria-hidden />
+          </>
+        )}
       </div>
       {cards.length > 0 ? (
         <div className={`grid ${gridColsClass} gap-3`}>
