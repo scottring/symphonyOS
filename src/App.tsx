@@ -374,10 +374,10 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   // URL-based navigation
   const navigate = useNavigate()
   const location = useLocation()
-  const params = useParams<{ projectId?: string; routineId?: string; contactId?: string; memberId?: string }>()
+  const params = useParams<{ projectId?: string; routineId?: string; contactId?: string; memberId?: string; taskId?: string }>()
 
   // State for non-URL-routed views
-  const [stateView, setStateView] = useState<'agent' | 'today' | 'inbox' | 'lists' | 'notes' | 'history' | 'settings' | 'task-detail' | 'weekly-planning' | null>(null)
+  const [stateView, setStateView] = useState<'agent' | 'today' | 'inbox' | 'lists' | 'notes' | 'history' | 'settings' | 'weekly-planning' | null>(null)
 
   // Derive view from URL path or state
   const activeView: ViewType = useMemo(() => {
@@ -404,6 +404,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   const selectedProjectId = params.projectId || null
   const selectedRoutineId = params.routineId || null
   const selectedContactId = params.contactId || null
+  const urlTaskId = params.taskId || null
   const creatingRoutine = location.pathname === '/routines/new'
   const [, setRecentlyCreatedTaskId] = useState<string | null>(null)
   const [planningOpen, setPlanningOpen] = useState(false)
@@ -416,6 +417,13 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   useEffect(() => {
     localStorage.setItem('symphony-sidebar-collapsed', String(sidebarCollapsed))
   }, [sidebarCollapsed])
+
+  // Deep-link: /task/:taskId opens the task in the side panel
+  useEffect(() => {
+    if (urlTaskId) {
+      setSelectedItemId(`task-${urlTaskId}`)
+    }
+  }, [urlTaskId])
 
   // When the URL changes to a path that maps to a URL-based view, clear
   // any state-based view so in-app <Link> navigation isn't trapped inside
@@ -643,7 +651,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       navigate('/home')
     }
     // Handle state-based views
-    else if (view === 'agent' || view === 'inbox' || view === 'lists' || view === 'notes' || view === 'history' || view === 'settings' || view === 'task-detail') {
+    else if (view === 'agent' || view === 'inbox' || view === 'lists' || view === 'notes' || view === 'history' || view === 'settings') {
       setStateView(view)
       navigate('/') // Navigate to home URL but show state view
     } else if (view === 'weekly-planning') {
@@ -1753,29 +1761,15 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
           pushTask={pushTask}
           familyMembers={familyMembers}
           eventNotesMap={eventNotesMap}
-          selectedTask={selectedTask}
-          onBackFromTask={() => { setSelectedTaskId(null); setStateView(null) }}
-          onDeleteTaskAndBack={(id) => { deleteTask(id); setSelectedTaskId(null); setStateView(null) }}
           onToggleTask={handleToggleTask}
-          selectedTaskContact={selectedTaskContact}
           contacts={contacts}
-          onSearchContacts={searchContacts}
           onAddContact={addContact}
-          onOpenContact={handleOpenContact}
-          selectedTaskProject={selectedTaskProject}
-          onSearchProjects={searchProjects}
-          onOpenProject={handleOpenProject}
           onAddProject={addProject}
-          onAddSubtask={addSubtask}
-          selectedTaskNotes={selectedTaskNotes}
-          selectedTaskNotesLoading={selectedTaskNotesLoading}
-          onAddTaskNote={handleAddTaskNote}
-          onSaveTaskNoteToVault={handleSaveTaskNoteToVault}
           onDeleteContact={deleteContact}
           onUpdateContact={updateContact}
           selectedContactForView={selectedContactForView}
           selectedContactId={selectedContactId}
-          onSelectTaskFromContact={(taskId) => { setSelectedTaskId(taskId); setStateView('task-detail') }}
+          onSelectTaskFromContact={(taskId) => { setSelectedItemId(`task-${taskId}`) }}
           pinnedItems={pinnedItems}
           selectedContactNotes={selectedContactNotes}
           selectedContactNotesLoading={selectedContactNotesLoading}

@@ -25,7 +25,6 @@ import {
   RoutinesList,
   RoutineForm,
   RoutineInput,
-  TaskView,
   ContactView,
   ContactsList,
   CalendarConnect,
@@ -95,25 +94,11 @@ export interface ViewRouterProps {
   familyMembers: FamilyMember[]
   eventNotesMap: Map<string, EventNote>
 
-  // Task detail view
-  selectedTask: Task | null
-  onBackFromTask: () => void
-  onDeleteTaskAndBack: (id: string) => void
+  // Task actions (used by weekly-planning and other views)
   onToggleTask: (taskId: string) => Promise<void>
-  selectedTaskContact: Contact | null
   contacts: Contact[]
-  onSearchContacts: (query: string) => Contact[]
   onAddContact: (contact: { name: string; phone?: string; email?: string; notes?: string; category?: ContactCategory; birthday?: string; relationship?: string; preferences?: string }) => Promise<Contact | null>
-  onOpenContact: (contactId: string) => void
-  selectedTaskProject: Project | null
-  onSearchProjects: (query: string) => Project[]
-  onOpenProject: (projectId: string) => void
   onAddProject: (project: { name: string; notes?: string; links?: TaskLink[]; phoneNumber?: string; parentId?: string; context?: 'work' | 'family' | 'personal' }) => Promise<Project | null>
-  onAddSubtask: (parentId: string, title: string, options?: { defaultAssigneeId?: string }) => Promise<string | undefined>
-  selectedTaskNotes: Note[]
-  selectedTaskNotesLoading: boolean
-  onAddTaskNote: (content: string, entityType: NoteEntityType, entityId: string) => Promise<void>
-  onSaveTaskNoteToVault?: (content: string) => Promise<{ ok: boolean; url?: string }>
 
   // Contacts view
   onDeleteContact: (id: string) => Promise<void>
@@ -291,34 +276,6 @@ export function ViewRouter(props: ViewRouterProps) {
             onUpdateRoutine={props.onUpdateRoutine}
             onCompleteTask={props.onToggleTask}
             onDeleteTask={props.onDeleteTask}
-          />
-        </Suspense>
-      )}
-
-      {props.activeView === 'task-detail' && props.selectedTask && (
-        <Suspense fallback={<LoadingFallback />}>
-          <TaskView
-            task={props.selectedTask}
-            onBack={props.onBackFromTask}
-            onUpdate={props.onUpdateTask}
-            onDelete={props.onDeleteTaskAndBack}
-            onToggleComplete={props.onToggleTask}
-            onPush={props.pushTask}
-            contact={props.selectedTaskContact}
-            contacts={props.contacts}
-            onSearchContacts={props.onSearchContacts}
-            onAddContact={props.onAddContact}
-            onOpenContact={props.onOpenContact}
-            project={props.selectedTaskProject}
-            projects={props.projects}
-            onSearchProjects={props.onSearchProjects}
-            onOpenProject={props.onOpenProject}
-            onAddProject={props.onAddProject}
-            onAddSubtask={props.onAddSubtask}
-            entityNotes={props.selectedTaskNotes}
-            entityNotesLoading={props.selectedTaskNotesLoading}
-            onAddEntityNote={props.onAddTaskNote}
-            onSaveNoteToVault={props.onSaveTaskNoteToVault}
           />
         </Suspense>
       )}
