@@ -65,3 +65,20 @@ final class FailingSetExternalIdSymphonyMock: MockSymphonyClient {
         throw NSError(domain: "test", code: 1)
     }
 }
+
+/// Symphony mock whose `insert` throws for one specific externalId (simulating a
+/// unique-constraint collision on a single row), recording all other inserts.
+final class FailingInsertSymphonyMock: MockSymphonyClient {
+    var failForExternalId: String
+
+    init(failForExternalId: String) {
+        self.failForExternalId = failForExternalId
+    }
+
+    override func insert(listId: UUID, userId: UUID, text: String, completed: Bool, externalId: String) async throws {
+        if externalId == failForExternalId {
+            throw NSError(domain: "test", code: 23505)
+        }
+        try await super.insert(listId: listId, userId: userId, text: text, completed: completed, externalId: externalId)
+    }
+}

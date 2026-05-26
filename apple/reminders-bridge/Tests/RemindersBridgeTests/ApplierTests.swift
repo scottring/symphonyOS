@@ -88,4 +88,28 @@ final class ApplierTests: XCTestCase {
         XCTAssertEqual(r.inserted.count, 1)
         XCTAssertEqual(r.deleted, ["ghost-id"]) // compensating delete invoked
     }
+
+    func testOneFailingOpDoesNotBlockTheRest() async throws {
+        let r = MockRemindersClient()
+        let s = FailingInsertSymphonyMock(failForExternalId: "boom")
+        let applier = Applier(reminders: r, symphony: s, userId: userId)
+        let good1 = AppleItem(externalId: "g1", title: "milk", isCompleted: false, lastModified: t0)
+        let bad = AppleItem(externalId: "boom", title: "dup", isCompleted: false, lastModified: t0)
+        let good2 = AppleItem(externalId: "g2", title: "eggs", isCompleted: false, lastModified: t0)
+
+        do {
+            try await applier.apply([
+                .insertSymphony(listId: listId, apple: good1),
+                .insertSymphony(listId: listId, apple: bad),
+                .insertSymphony(listId: listId, apple: good2),
+            ])
+            XCTFail("expected aggregate throw reporting the failed op")
+        } catch {
+            // expected: the pass surfaces a failure...
+        }
+
+        // ...but the good ops on either side of the bad one still applied, so a
+        // single collision can't wedge the whole sync into an infinite retry.
+        XCTAssertEqual(s.inserted.map { $0.externalId }, ["g1", "g2"])
+    }
 }

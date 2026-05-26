@@ -26,12 +26,18 @@ public final class SymphonyClient: SymphonyClientProtocol {
             let updated_at: Date
             let external_id: String?
         }
-        let rows: [Row] = try await client
-            .from("list_items")
-            .select("id,list_id,text,completed,updated_at,external_id")
-            .eq("list_id", value: listId.uuidString)
-            .execute()
-            .value
+        // PostgREST caps a single response at ~1000 rows, so page through the
+        // whole list. A stable `order` is required or page windows overlap/skip.
+        let rows: [Row] = try await Paginator.fetchAll(pageSize: 1000) { offset, limit in
+            try await client
+                .from("list_items")
+                .select("id,list_id,text,completed,updated_at,external_id")
+                .eq("list_id", value: listId.uuidString)
+                .order("id", ascending: true)
+                .range(from: offset, to: offset + limit - 1)
+                .execute()
+                .value
+        }
 
         return rows.map {
             SymphonyItem(

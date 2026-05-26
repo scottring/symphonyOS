@@ -1,5 +1,11 @@
 import Foundation
 
+public enum ApplierError: Error {
+    /// Some ops in the pass failed. The good ops were still applied; this reports
+    /// how many failed and the first underlying error for logging.
+    case partialFailure(failed: Int, of: Int, first: Error)
+}
+
 public final class Applier {
     private let reminders: RemindersClientProtocol
     private let symphony: SymphonyClientProtocol
@@ -12,8 +18,21 @@ public final class Applier {
     }
 
     public func apply(_ ops: [SyncOp]) async throws {
+        var firstError: Error?
+        var failed = 0
         for op in ops {
-            try await applyOne(op)
+            do {
+                try await applyOne(op)
+            } catch {
+                // Don't let one bad op (e.g. a single unique-constraint collision)
+                // abort the rest of the pass — that's what turned a one-row problem
+                // into an endless retry of the same failing batch every tick.
+                failed += 1
+                if firstError == nil { firstError = error }
+            }
+        }
+        if let firstError {
+            throw ApplierError.partialFailure(failed: failed, of: ops.count, first: firstError)
         }
     }
 
