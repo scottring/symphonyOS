@@ -1655,10 +1655,16 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
                 deleteTask(selectedItem.originalTask!.id)
                 setSelectedItemId(null)
               }}
-              onOpenContact={() => {}} // TODO Plan 2 wires this
-              onOpenMember={() => {}} // TODO Plan 2 wires this
-              onOpenProject={() => {}} // TODO Plan 2 wires this
-              onOpenEvent={() => {}} // TODO Plan 2 wires this
+              onOpenContact={(id) => handleOpenContact(id)}
+              onOpenMember={(id) => handleOpenMember(id)}
+              onOpenProject={(id) => handleOpenProject(id)}
+              onOpenEvent={(id) => setSelectedItemId(`event-${id}`)}
+              onContextChange={(ctx) => updateTask(selectedItem.originalTask!.id, { context: ctx ?? null })}
+              onAssigneesChange={(ids) =>
+                updateTask(selectedItem.originalTask!.id, {
+                  assignedToAll: ids.length > 0 ? ids : undefined,
+                })
+              }
               onOpenTask={(id) => setSelectedItemId(`task-${id}`)}
               onOpenRelated={(kind, id) => {
                 if (kind === 'task') setSelectedItemId(`task-${id}`)
