@@ -1,4 +1,6 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
+import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
+import { isEverydayRoutine } from '@/lib/routineUtils'
 import {
   DndContext,
   DragOverlay,
@@ -181,19 +183,29 @@ export function PlanningSession({
     return map
   }, [events, dateRange])
 
-  // Get routines for the date range
+  // App-wide "hide daily activities" preference (shared with Today/Week views via
+  // the hideRoutinesSignal). Toggling here syncs everywhere.
+  const [hideRoutines, setHideRoutines] = useState<boolean>(() => readHideRoutines())
+  useEffect(() => onHideRoutinesChange(setHideRoutines), [])
+
+  // Get routines for the date range. Mirrors the Week grid's routine visibility:
+  //   1. show_on_timeline === false → never render.
+  //   2. "Hide daily activities" toggle → drop everyday/weekday routines (the
+  //      noise); lower-frequency routines still show.
   const routinesByDate = useMemo(() => {
     const map = new Map<string, Routine[]>()
 
     for (const date of dateRange) {
       const dateKey = formatDateKey(date)
       // Use getRoutinesForDate if provided, otherwise use routines prop directly
-      const routinesForDay = getRoutinesForDate ? getRoutinesForDate(date) : routines
+      const routinesForDay = (getRoutinesForDate ? getRoutinesForDate(date) : routines)
+        .filter((r) => r.show_on_timeline !== false)
+        .filter((r) => !hideRoutines || !isEverydayRoutine(r.recurrence_pattern))
       map.set(dateKey, routinesForDay)
     }
 
     return map
-  }, [dateRange, getRoutinesForDate, routines])
+  }, [dateRange, getRoutinesForDate, routines, hideRoutines])
 
   // Get the currently dragged task
   const activeTask = useMemo(() => {
@@ -386,6 +398,8 @@ export function PlanningSession({
         onRemoveDay={handleRemoveDay}
         onDateChange={handleDateChange}
         showClose={!embedded}
+        hideRoutines={hideRoutines}
+        onToggleRoutines={() => writeHideRoutines(!hideRoutines)}
       />
 
       {/* Main content */}

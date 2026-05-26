@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
 
 interface PlanningHeaderProps {
   dateRange: Date[]
@@ -7,6 +8,8 @@ interface PlanningHeaderProps {
   onRemoveDay: () => void
   onDateChange: (startDate: Date) => void
   showClose?: boolean
+  hideRoutines?: boolean
+  onToggleRoutines?: () => void
 }
 
 export function PlanningHeader({
@@ -16,6 +19,8 @@ export function PlanningHeader({
   onRemoveDay,
   onDateChange,
   showClose = true,
+  hideRoutines = false,
+  onToggleRoutines,
 }: PlanningHeaderProps) {
   const [showDatePicker, setShowDatePicker] = useState(false)
 
@@ -143,13 +148,25 @@ export function PlanningHeader({
           )}
         </div>
 
-        {/* Right side: Done button */}
-        <button
-          onClick={onClose}
-          className="btn-primary px-6 py-2"
-        >
-          Done
-        </button>
+        {/* Right side: routine toggle + Done button */}
+        <div className="flex items-center gap-2">
+          {onToggleRoutines && (
+            <button
+              onClick={onToggleRoutines}
+              title={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
+              aria-label={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
+              className="p-2 rounded-lg text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
+            >
+              {hideRoutines ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="btn-primary px-6 py-2"
+          >
+            Done
+          </button>
+        </div>
       </div>
     </div>
   )
