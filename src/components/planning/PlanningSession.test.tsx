@@ -287,4 +287,32 @@ describe('PlanningSession', () => {
 
     expect(screen.getByText('All tasks scheduled')).toBeInTheDocument()
   })
+
+  it('lays overlapping events out in side-by-side lanes (not stacked full-width)', () => {
+    const today = new Date()
+    today.setHours(14, 0, 0, 0)
+    const end = new Date(today.getTime() + 60 * 60000)
+    const e1 = createMockCalendarEvent({ id: 'ev-a', title: 'A', start_time: today.toISOString(), end_time: end.toISOString() })
+    const e2 = createMockCalendarEvent({ id: 'ev-b', title: 'B', start_time: today.toISOString(), end_time: end.toISOString() })
+
+    render(
+      <PlanningSession
+        tasks={[]}
+        events={[e1, e2]}
+        routines={[]}
+        onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
+        onClose={vi.fn()}
+        initialDate={today}
+      />
+    )
+
+    const wa = screen.getByTestId('placed-ev-a')
+    const wb = screen.getByTestId('placed-ev-b')
+    // Two overlapping events each take half the width and sit at different left
+    // offsets — i.e. side by side, not stacked on top of each other.
+    expect(wa.style.width).toContain('50%')
+    expect(wb.style.width).toContain('50%')
+    expect(wa.style.left).not.toBe(wb.style.left)
+  })
 })

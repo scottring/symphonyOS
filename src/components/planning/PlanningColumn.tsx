@@ -8,6 +8,23 @@ import { PlanningTimeSlot } from './PlanningTimeSlot'
 import { PlanningTaskCard } from './PlanningTaskCard'
 import { PlanningEventBlock } from './PlanningEventBlock'
 import { PlanningRoutineBlock } from './PlanningRoutineBlock'
+import { assignOverlapLanes, type Lane } from './overlapLanes'
+
+// Side-by-side lane → absolute-position style. Lanes let time-overlapping items
+// sit next to each other instead of stacking. Defaults to one full-width lane.
+function laneStyle(lane: Lane | undefined, top: number, height: number, raised: boolean) {
+  const totalColumns = lane?.totalColumns ?? 1
+  const column = lane?.column ?? 0
+  const widthPercent = 100 / totalColumns
+  const leftPercent = column * widthPercent
+  return {
+    top: `${top}px`,
+    height: `${height}px`,
+    left: `calc(4px + ${leftPercent}%)`,
+    width: `calc(${widthPercent}% - 8px)`,
+    zIndex: raised ? 30 : 10,
+  }
+}
 
 interface TimeLabel {
   hour: number
@@ -57,81 +74,36 @@ export function PlanningColumn({
     )
   }, [date])
 
-  // Calculate positions for placed items with overlap handling
+  // Calculate positions for placed tasks. Overlap lanes are computed once across
+  // ALL placed item types below, so we only compute position + time range here.
   const placedTasks = useMemo(() => {
-    const taskPositions = tasks.map((task) => {
+    return tasks.map((task) => {
       if (!task.scheduledFor) return null
 
       const taskDate = new Date(task.scheduledFor)
       const hour = taskDate.getHours()
       const minute = taskDate.getMinutes()
 
-      // Calculate top position relative to day start
       const minutesFromStart = (hour - dayStartHour) * 60 + minute
       const top = (minutesFromStart / 30) * slotHeight
 
-      // Duration in slots (default 30 min = 1 slot)
       const duration = task.estimatedDuration || 30
       const height = (duration / 30) * slotHeight
-
-      // Store start/end minutes for overlap detection
-      const startMinutes = minutesFromStart
-      const endMinutes = startMinutes + duration
 
       return {
         task,
         top,
         height,
-        startMinutes,
-        endMinutes,
-        // These will be calculated after overlap detection
-        column: 0,
-        totalColumns: 1,
+        startMinutes: minutesFromStart,
+        endMinutes: minutesFromStart + duration,
       }
-    }).filter(Boolean) as { 
-      task: Task; 
-      top: number; 
-      height: number; 
-      startMinutes: number;
-      endMinutes: number;
-      column: number;
-      totalColumns: number;
+    }).filter(Boolean) as {
+      task: Task
+      top: number
+      height: number
+      startMinutes: number
+      endMinutes: number
     }[]
-
-    // Sort by start time for overlap detection
-    taskPositions.sort((a, b) => a.startMinutes - b.startMinutes)
-
-    // Find overlapping groups and assign columns
-    const processed = new Set<number>()
-    
-    for (let i = 0; i < taskPositions.length; i++) {
-      if (processed.has(i)) continue
-      
-      // Find all tasks that overlap with this one (directly or transitively)
-      const group: number[] = [i]
-      let maxEnd = taskPositions[i].endMinutes
-      
-      for (let j = i + 1; j < taskPositions.length; j++) {
-        if (processed.has(j)) continue
-        
-        // Check if this task overlaps with any task in the current group
-        const task = taskPositions[j]
-        if (task.startMinutes < maxEnd) {
-          group.push(j)
-          maxEnd = Math.max(maxEnd, task.endMinutes)
-        }
-      }
-      
-      // Assign columns to tasks in the group
-      const totalColumns = group.length
-      group.forEach((idx, col) => {
-        taskPositions[idx].column = col
-        taskPositions[idx].totalColumns = totalColumns
-        processed.add(idx)
-      })
-    }
-
-    return taskPositions
   }, [tasks, slotHeight, dayStartHour])
 
   // Calculate positions for events
@@ -153,18 +125,20 @@ export function PlanningColumn({
       const top = (minutesFromStart / 30) * slotHeight
 
       // Calculate height based on duration
-      let height = slotHeight // Default 30 min
+      let durationMinutes = 30 // Default 30 min
       if (endDate) {
-        const durationMinutes = (endDate.getTime() - startDate.getTime()) / 60000
-        height = (durationMinutes / 30) * slotHeight
+        durationMinutes = (endDate.getTime() - startDate.getTime()) / 60000
       }
+      const height = (durationMinutes / 30) * slotHeight
 
       return {
         event,
         top,
         height: Math.max(height, slotHeight), // Minimum 1 slot
+        startMinutes: minutesFromStart,
+        endMinutes: minutesFromStart + Math.max(durationMinutes, 30),
       }
-    }).filter(Boolean) as { event: CalendarEvent; top: number; height: number }[]
+    }).filter(Boolean) as { event: CalendarEvent; top: number; height: number; startMinutes: number; endMinutes: number }[]
   }, [events, slotHeight, dayStartHour])
 
   // Calculate positions for routines
@@ -184,9 +158,22 @@ export function PlanningColumn({
           routine,
           top,
           height: slotHeight, // Routines are 30 min by default
+          startMinutes: minutesFromStart,
+          endMinutes: minutesFromStart + 30,
         }
       })
   }, [routines, slotHeight, dayStartHour])
+
+  // Single overlap pass across ALL placed items (tasks + events + routines) so
+  // anything sharing a time gets its own side-by-side lane regardless of type —
+  // instead of events/routines stacking full-width on top of each other.
+  const lanes = useMemo(() => {
+    return assignOverlapLanes([
+      ...placedTasks.map((p) => ({ id: p.task.id, startMinutes: p.startMinutes, endMinutes: p.endMinutes })),
+      ...placedEvents.map((p) => ({ id: p.event.id, startMinutes: p.startMinutes, endMinutes: p.endMinutes })),
+      ...placedRoutines.map((p) => ({ id: p.routine.id, startMinutes: p.startMinutes, endMinutes: p.endMinutes })),
+    ])
+  }, [placedTasks, placedEvents, placedRoutines])
 
   return (
     <div
@@ -225,32 +212,20 @@ export function PlanningColumn({
           />
         ))}
 
-        {/* Placed tasks - overlay on top of slots with overlap handling */}
-        {placedTasks.map(({ task, top, height, column, totalColumns }) => {
-          // Calculate horizontal position for overlapping tasks
-          const widthPercent = 100 / totalColumns
-          const leftPercent = column * widthPercent
-          
-          return (
-            <div
-              key={task.id}
-              data-testid={`placed-${task.id}`}
-              onClick={() => setRaisedId(task.id)}
-              className="absolute"
-              style={{
-                top: `${top}px`,
-                height: `${height}px`,
-                left: `calc(4px + ${leftPercent}%)`,
-                width: `calc(${widthPercent}% - 8px)`,
-                zIndex: raisedId === task.id ? 30 : 10,
-              }}
-            >
-              <PlanningTaskCard task={task} isPlaced assignee={getMember(task.assignedTo)} />
-            </div>
-          )
-        })}
+        {/* Placed tasks — overlay on slots, laned by the unified overlap pass */}
+        {placedTasks.map(({ task, top, height }) => (
+          <div
+            key={task.id}
+            data-testid={`placed-${task.id}`}
+            onClick={() => setRaisedId(task.id)}
+            className="absolute"
+            style={laneStyle(lanes.get(task.id), top, height, raisedId === task.id)}
+          >
+            <PlanningTaskCard task={task} isPlaced assignee={getMember(task.assignedTo)} />
+          </div>
+        ))}
 
-        {/* Placed events - not draggable */}
+        {/* Placed events */}
         {placedEvents.map(({ event, top, height }) => {
           const eventId = event.google_event_id || event.id
           const eventNote = eventNotesMap?.get(eventId)
@@ -260,22 +235,22 @@ export function PlanningColumn({
               key={event.id}
               data-testid={`placed-${event.id}`}
               onClick={() => setRaisedId(event.id)}
-              className="absolute left-1 right-1 cursor-pointer"
-              style={{ top: `${top}px`, height: `${height}px`, zIndex: raisedId === event.id ? 30 : undefined }}
+              className="absolute cursor-pointer"
+              style={laneStyle(lanes.get(event.id), top, height, raisedId === event.id)}
             >
               <PlanningEventBlock event={event} height={height} assignee={eventAssignee} />
             </div>
           )
         })}
 
-        {/* Placed routines - not draggable */}
+        {/* Placed routines */}
         {placedRoutines.map(({ routine, top, height }) => (
           <div
             key={routine.id}
             data-testid={`placed-${routine.id}`}
             onClick={() => setRaisedId(routine.id)}
-            className="absolute left-1 right-1 cursor-pointer"
-            style={{ top: `${top}px`, height: `${height}px`, zIndex: raisedId === routine.id ? 30 : undefined }}
+            className="absolute cursor-pointer"
+            style={laneStyle(lanes.get(routine.id), top, height, raisedId === routine.id)}
           >
             <PlanningRoutineBlock routine={routine} assignee={getMember(routine.assigned_to)} />
           </div>
