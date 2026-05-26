@@ -5,6 +5,7 @@ import type { ConsolidatedIngredient } from '@/lib/consolidateIngredients'
 import type { Recipe } from '@/types/meal-planner'
 import type { PantryInventory, PantryLevel } from '@/types/meal-planner'
 import { IngredientLineRow } from './IngredientLineRow'
+import { filterNewItems } from './groceryDedupe'
 import { useStoreOverrides } from '@/hooks/useStoreOverrides'
 import { usePantryInventory } from '@/hooks/usePantryInventory'
 import { StoreChip } from './StoreChip'
@@ -122,7 +123,18 @@ export function GroceryReviewSection({ consolidated, groceriesListId, stores, cu
     if (groups.size === 0) { setError('no destination list available'); setSending(false); return }
 
     for (const [listId, list] of groups) {
-      const inserts = list.map((it, idx) => ({
+      // Dedupe against what's already on this list (and within the batch) so the
+      // same grocery doesn't pile up every time a meal plan is sent.
+      const { data: existing, error: fetchErr } = await supabase
+        .from('list_items')
+        .select('text')
+        .eq('list_id', listId)
+      if (fetchErr) { setError(fetchErr.message); setSending(false); return }
+      const existingTexts = (existing ?? []).map((r: { text: string }) => r.text)
+      const fresh = filterNewItems(list, existingTexts)
+      if (fresh.length === 0) continue
+
+      const inserts = fresh.map((it, idx) => ({
         list_id: listId,
         user_id: userId,
         text: it.text,
