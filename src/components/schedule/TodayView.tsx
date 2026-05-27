@@ -21,6 +21,7 @@ import { useMobile } from '@/hooks/useMobile'
 import { useTodayData } from '@/hooks/useTodayData'
 import { useSystemHealth } from '@/hooks/useSystemHealth'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
+import { useNavigate } from 'react-router-dom'
 import { useProactiveSuggestions } from '@/hooks/useProactiveSuggestions'
 import { useRoutineStats } from '@/hooks/useRoutineStats'
 import { useRecurringEventDetection } from '@/hooks/useRecurringEventDetection'
@@ -133,6 +134,7 @@ export function TodayView({
 }: TodayViewProps) {
   // ── Context ──────────────────────────────────────────────────────────────────
   const isMobile = useMobile()
+  const navigate = useNavigate()
   const ctx = useScheduleActionsContext()
   const {
     onToggleWaiting, onUpdateTask, onPushTask,
@@ -280,6 +282,7 @@ export function TodayView({
       familyMembers={familyMembers}
       onOpenProject={ctx.onOpenProject}
       onAssignTaskAll={ctx.onAssignTaskAll}
+      onScrollToInbox={() => navigate('/inbox')}
       trigger={clarityRingTrigger}
     />
   )
