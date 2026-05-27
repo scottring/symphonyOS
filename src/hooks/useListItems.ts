@@ -171,6 +171,29 @@ export function useListItems(listId: string | null) {
     }
   }, [items])
 
+  // Clear all checked-off items — the "done shopping" action. Deletes propagate
+  // to Apple Reminders via the reminders bridge.
+  const clearCompleted = useCallback(async () => {
+    if (!listId) return
+    const completed = items.filter((i) => i.completed)
+    if (completed.length === 0) return
+    const ids = completed.map((i) => i.id)
+
+    // Optimistic remove
+    setItems((prev) => prev.filter((i) => !i.completed))
+
+    const { error: deleteError } = await supabase
+      .from('list_items')
+      .delete()
+      .in('id', ids)
+
+    if (deleteError) {
+      // Rollback on error
+      setItems((prev) => [...prev, ...completed].sort((a, b) => a.sortOrder - b.sortOrder))
+      setError(deleteError.message)
+    }
+  }, [listId, items])
+
   // Reorder items (update sort_order)
   const reorderItems = useCallback(async (itemIds: string[]) => {
     const originalItems = [...items]
@@ -244,6 +267,7 @@ export function useListItems(listId: string | null) {
     addItem,
     updateItem,
     deleteItem,
+    clearCompleted,
     reorderItems,
     searchItems,
     getItemById,

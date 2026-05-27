@@ -17,6 +17,7 @@ export interface ListsContextValue {
   addItem: (item: { text: string; note?: string }) => Promise<ListItem | null>
   updateItem: (id: string, updates: Partial<ListItem>) => Promise<void>
   deleteItem: (id: string) => Promise<void>
+  clearCompleted: () => Promise<void>
   reorderItems: (itemIds: string[]) => Promise<void>
 }
 
@@ -39,6 +40,7 @@ export function ListsProvider({ children }: { children: ReactNode }) {
     addItem,
     updateItem,
     deleteItem,
+    clearCompleted,
     reorderItems,
   } = useListItems(selectedListId)
 
@@ -63,6 +65,7 @@ export function ListsProvider({ children }: { children: ReactNode }) {
         addItem,
         updateItem,
         deleteItem,
+        clearCompleted,
         reorderItems,
       }}
     >

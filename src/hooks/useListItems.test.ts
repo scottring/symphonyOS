@@ -11,6 +11,7 @@ const mockOrder = vi.fn()
 const mockInsert = vi.fn()
 const mockUpdate = vi.fn()
 const mockDelete = vi.fn()
+const mockDeleteIn = vi.fn()
 const mockSingle = vi.fn()
 const mockEq = vi.fn()
 const mockEqListId = vi.fn()
@@ -47,7 +48,7 @@ vi.mock('@/lib/supabase', () => ({
         mockUpdate(data)
         return { eq: () => mockEq() }
       },
-      delete: () => ({ eq: () => mockDelete() }),
+      delete: () => ({ eq: () => mockDelete(), in: () => mockDeleteIn() }),
     }),
   },
 }))
@@ -82,6 +83,7 @@ describe('useListItems', () => {
     )
     mockEq.mockResolvedValue({ error: null })
     mockDelete.mockResolvedValue({ error: null })
+    mockDeleteIn.mockResolvedValue({ error: null })
   })
 
   describe('initial state', () => {
@@ -585,6 +587,68 @@ describe('useListItems', () => {
       })
 
       expect(mockDelete).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('clearCompleted', () => {
+    it('removes only completed items with optimistic update', async () => {
+      mockSupabaseData.push(
+        createMockDbListItem({ id: '1', text: 'Milk', completed: false, sort_order: 0 }),
+        createMockDbListItem({ id: '2', text: 'Eggs', completed: true, sort_order: 1 }),
+        createMockDbListItem({ id: '3', text: 'Bread', completed: true, sort_order: 2 })
+      )
+
+      const { result } = renderHook(() => useListItems('list-1'))
+
+      await waitFor(() => {
+        expect(result.current.items).toHaveLength(3)
+      })
+
+      await act(async () => {
+        await result.current.clearCompleted()
+      })
+
+      expect(result.current.items).toHaveLength(1)
+      expect(result.current.items[0].text).toBe('Milk')
+      expect(mockDeleteIn).toHaveBeenCalled()
+    })
+
+    it('does nothing when there are no completed items', async () => {
+      mockSupabaseData.push(createMockDbListItem({ id: '1', completed: false }))
+
+      const { result } = renderHook(() => useListItems('list-1'))
+
+      await waitFor(() => {
+        expect(result.current.items).toHaveLength(1)
+      })
+
+      await act(async () => {
+        await result.current.clearCompleted()
+      })
+
+      expect(mockDeleteIn).not.toHaveBeenCalled()
+      expect(result.current.items).toHaveLength(1)
+    })
+
+    it('rolls back on error', async () => {
+      mockSupabaseData.push(
+        createMockDbListItem({ id: '1', text: 'Milk', completed: false, sort_order: 0 }),
+        createMockDbListItem({ id: '2', text: 'Eggs', completed: true, sort_order: 1 })
+      )
+      mockDeleteIn.mockResolvedValue({ error: { message: 'Clear failed' } })
+
+      const { result } = renderHook(() => useListItems('list-1'))
+
+      await waitFor(() => {
+        expect(result.current.items).toHaveLength(2)
+      })
+
+      await act(async () => {
+        await result.current.clearCompleted()
+      })
+
+      expect(result.current.items).toHaveLength(2)
+      expect(result.current.error).toBe('Clear failed')
     })
   })
 

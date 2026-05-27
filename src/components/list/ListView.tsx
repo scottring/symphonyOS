@@ -13,6 +13,7 @@ interface ListViewProps {
   onAddItem?: (item: { text: string; note?: string; parentItemId?: string }) => Promise<ListItem | null>
   onUpdateItem?: (itemId: string, updates: Partial<ListItem>) => void
   onDeleteItem?: (itemId: string) => void
+  onClearCompleted?: () => void
   onReorderItems?: (itemIds: string[]) => void
   isPinned?: boolean
   canPin?: boolean
@@ -29,6 +30,7 @@ export function ListView({
   onAddItem,
   onUpdateItem,
   onDeleteItem,
+  onClearCompleted,
   isPinned,
   canPin,
   onPin,
@@ -227,6 +229,15 @@ export function ListView({
                 </div>
               </div>
               <div className="flex items-center gap-1">
+                {onClearCompleted && items.some((i) => i.completed) && (
+                  <button
+                    onClick={onClearCompleted}
+                    className="px-2.5 py-1.5 mr-1 text-xs font-medium text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors whitespace-nowrap"
+                    aria-label="Clear checked items"
+                  >
+                    Clear checked
+                  </button>
+                )}
                 {onPin && onUnpin && (
                   <PinButton
                     entityType="list"

@@ -598,7 +598,7 @@ function GoalsSection({ currentDomain }: { currentDomain: TaskContext | 'univers
 }
 
 function ListsSection({ pinnedItems }: { pinnedItems: ViewRouterProps['pinnedItems'] }) {
-  const { lists, listsByCategory, selectedListId, setSelectedListId, selectedList, listItems, addList, updateList, deleteList, addItem, updateItem, deleteItem, reorderItems } = useListsContext()
+  const { lists, listsByCategory, selectedListId, setSelectedListId, selectedList, listItems, addList, updateList, deleteList, addItem, updateItem, deleteItem, clearCompleted, reorderItems } = useListsContext()
 
   return (
     <>
@@ -624,6 +624,7 @@ function ListsSection({ pinnedItems }: { pinnedItems: ViewRouterProps['pinnedIte
             onAddItem={addItem}
             onUpdateItem={updateItem}
             onDeleteItem={deleteItem}
+            onClearCompleted={clearCompleted}
             onReorderItems={reorderItems}
             isPinned={pinnedItems.isPinned('list', selectedList.id)}
             canPin={pinnedItems.canPin()}
