@@ -1,20 +1,47 @@
-import type { Contact } from '@/types/contact'
+import type { Contact, ContactCategory } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
 import { ConceptIcon } from '@/lib/conceptIcons'
+import { AssignPicker } from '@/components/triage/AssignPicker'
 
 interface PanelPeopleProps {
   contact?: Contact
   assignee?: FamilyMember
   onOpenContact: (id: string) => void
   onOpenMember: (id: string) => void
+  // When provided, the section shows a picker to link/change/clear the related contact.
+  contacts?: Contact[]
+  onContactChange?: (contactId: string | undefined) => void
+  onSearchContacts?: (query: string) => Contact[]
+  onAddContact?: (name: string, details?: { phone?: string; category?: ContactCategory }) => Promise<Contact | null>
 }
 
-export function PanelPeople({ contact, assignee, onOpenContact, onOpenMember }: PanelPeopleProps) {
-  if (!contact && !assignee) return null
+export function PanelPeople({
+  contact,
+  assignee,
+  onOpenContact,
+  onOpenMember,
+  contacts,
+  onContactChange,
+  onSearchContacts,
+  onAddContact,
+}: PanelPeopleProps) {
+  const canEditContact = !!onContactChange
+  if (!contact && !assignee && !canEditContact) return null
 
   return (
     <section className="mb-4">
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">People</div>
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400">People</div>
+        {canEditContact && (
+          <AssignPicker
+            value={contact?.id}
+            contacts={contacts ?? []}
+            onSearchContacts={onSearchContacts}
+            onChange={onContactChange}
+            onAddContact={onAddContact}
+          />
+        )}
+      </div>
       {contact && (
         <button
           onClick={() => onOpenContact(contact.id)}
@@ -28,6 +55,9 @@ export function PanelPeople({ contact, assignee, onOpenContact, onOpenMember }: 
             {contact.phone && <div className="text-xs text-neutral-500"><ConceptIcon name="call" decorative /> {contact.phone}</div>}
           </span>
         </button>
+      )}
+      {!contact && canEditContact && (
+        <div className="text-sm text-neutral-400 px-1 py-1.5">No related contact</div>
       )}
       {assignee && (
         <button

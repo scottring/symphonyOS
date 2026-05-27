@@ -57,6 +57,10 @@ interface TapContextPanelProps {
   onClearLocation: () => void
   onContextChange: (context: TaskContext | undefined) => void
   onAssigneesChange: (ids: string[]) => void
+  /** Link/change/clear the task's related contact. When omitted, the People section is read-only. */
+  onContactChange?: (contactId: string | undefined) => void
+  onSearchContacts?: (query: string) => Contact[]
+  onAddContact?: (name: string, details?: { phone?: string; category?: import('@/types/contact').ContactCategory }) => Promise<Contact | null>
 }
 
 function contextToDomain(ctx: TaskContext | null | undefined): 'work' | 'family' | 'personal' | undefined {
@@ -141,6 +145,10 @@ export function TapContextPanel(props: TapContextPanelProps) {
         assignee={linked.assignee}
         onOpenContact={props.onOpenContact}
         onOpenMember={props.onOpenMember}
+        contacts={props.contacts}
+        onContactChange={props.onContactChange}
+        onSearchContacts={props.onSearchContacts}
+        onAddContact={props.onAddContact}
       />
       <PanelLinked
         project={linked.project}

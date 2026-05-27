@@ -4,6 +4,17 @@ import { render } from '@/test/test-utils'
 import { PanelPeople } from './PanelPeople'
 import { createMockContact, createMockFamilyMember } from '@/test/mocks/factories'
 
+// AssignPicker (rendered only when onContactChange is provided) depends on Google Places.
+vi.mock('@/hooks/useGooglePlaces', () => ({
+  useGooglePlaces: () => ({
+    results: [],
+    loading: false,
+    searchPlaces: vi.fn(),
+    getPlaceDetails: vi.fn(),
+    clearResults: vi.fn(),
+  }),
+}))
+
 describe('PanelPeople', () => {
   it('renders nothing when no people present', () => {
     const { container } = render(<PanelPeople onOpenContact={vi.fn()} onOpenMember={vi.fn()} />)
@@ -29,5 +40,24 @@ describe('PanelPeople', () => {
     const { user } = render(<PanelPeople contact={contact} onOpenContact={onOpenContact} onOpenMember={vi.fn()} />)
     await user.click(screen.getByRole('button', { name: /Dr. Smith/ }))
     expect(onOpenContact).toHaveBeenCalledWith('c1')
+  })
+
+  it('renders the picker and empty state when editable but no contact linked', () => {
+    render(
+      <PanelPeople onOpenContact={vi.fn()} onOpenMember={vi.fn()} contacts={[]} onContactChange={vi.fn()} />
+    )
+    expect(screen.getByText('No related contact')).toBeInTheDocument()
+    expect(screen.getByLabelText('Assign to')).toBeInTheDocument()
+  })
+
+  it('selecting a contact from the picker calls onContactChange', async () => {
+    const onContactChange = vi.fn()
+    const contacts = [createMockContact({ id: 'c2', name: 'Evan Ross' })]
+    const { user } = render(
+      <PanelPeople onOpenContact={vi.fn()} onOpenMember={vi.fn()} contacts={contacts} onContactChange={onContactChange} />
+    )
+    await user.click(screen.getByLabelText('Assign to'))
+    await user.click(screen.getByText('Evan Ross'))
+    expect(onContactChange).toHaveBeenCalledWith('c2')
   })
 })

@@ -1607,6 +1607,9 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
                   assignedToAll: ids.length > 0 ? ids : undefined,
                 })
               }
+              onContactChange={(id) => updateTask(selectedItem.originalTask!.id, { contactId: id })}
+              onSearchContacts={searchContacts}
+              onAddContact={(name, details) => addContact({ name, ...details })}
               onOpenTask={(id) => setSelectedItemId(`task-${id}`)}
               onOpenRelated={(kind, id) => {
                 if (kind === 'task') setSelectedItemId(`task-${id}`)
