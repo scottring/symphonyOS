@@ -3,6 +3,7 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { PanelWhy } from './sections/PanelWhy'
 import { PanelWhatToBring } from './sections/PanelWhatToBring'
 import { PanelIngredients } from './sections/PanelIngredients'
+import { PanelSteps } from './sections/PanelSteps'
 import { PanelLinks } from './sections/PanelLinks'
 import { PanelFooter } from './sections/PanelFooter'
 import { sundayOfWeek } from '@/lib/weekHelpers'
@@ -165,6 +166,7 @@ export function TapMealPanel({ event, onClose }: TapMealPanelProps) {
       />
       <PanelWhatToBring notes={entry?.notes} />
       <PanelIngredients ingredients={recipe?.ingredients} />
+      <PanelSteps steps={recipe?.instructions} />
       <PanelLinks links={recipe?.sourceUrl ? [{ url: recipe.sourceUrl, title: recipe.title }] : undefined} />
 
       <PanelFooter
