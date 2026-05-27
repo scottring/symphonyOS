@@ -17,7 +17,6 @@ export function WallRecipeViewer({ url, content, mealName, mealIcon, onClose }: 
   const [recipe, setRecipe] = useState<RecipeData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [currentStep, setCurrentStep] = useState(0)
   const [checkedIngredients, setCheckedIngredients] = useState<Set<number>>(new Set())
   const [visible, setVisible] = useState(false)
 
@@ -31,16 +30,10 @@ export function WallRecipeViewer({ url, content, mealName, mealIcon, onClose }: 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
-      if (e.key === 'ArrowRight' && recipe) {
-        setCurrentStep(s => Math.min(recipe.instructions.length - 1, s + 1))
-      }
-      if (e.key === 'ArrowLeft') {
-        setCurrentStep(s => Math.max(0, s - 1))
-      }
     }
     document.addEventListener('keydown', handleKey)
     return () => document.removeEventListener('keydown', handleKey)
-  }, [onClose, recipe])
+  }, [onClose])
 
   // Load recipe: use stored content directly when provided, otherwise fetch+parse the URL.
   useEffect(() => {
@@ -186,10 +179,10 @@ export function WallRecipeViewer({ url, content, mealName, mealIcon, onClose }: 
             </div>
           </div>
 
-          {/* Step counter */}
+          {/* Total step count */}
           {narrativeSteps.length > 0 && (
-            <div className="text-white/30 font-black text-[1rem] uppercase tracking-widest">
-              Step {currentStep + 1} / {narrativeSteps.length}
+            <div className="text-white/30 font-black text-[1.1rem] uppercase tracking-widest">
+              {narrativeSteps.length} steps
             </div>
           )}
         </div>
@@ -245,11 +238,11 @@ export function WallRecipeViewer({ url, content, mealName, mealIcon, onClose }: 
                     {/* Ingredient text */}
                     <div className={`flex-1 transition-all duration-200 ${isChecked ? 'opacity-40' : ''}`}>
                       {ing.amount && (
-                        <span className="text-[#6DC4A7] font-black text-[1.15rem]">
+                        <span className="text-[#6DC4A7] font-black text-[1.4rem]">
                           {ing.amount}{' '}
                         </span>
                       )}
-                      <span className={`font-bold text-[1.15rem] ${isChecked ? 'text-white/40 line-through' : 'text-white/80'}`}>
+                      <span className={`font-bold text-[1.4rem] ${isChecked ? 'text-white/40 line-through' : 'text-white/80'}`}>
                         {ing.name}
                       </span>
                     </div>
@@ -272,24 +265,24 @@ export function WallRecipeViewer({ url, content, mealName, mealIcon, onClose }: 
             </div>
 
             {narrativeSteps.length > 0 ? (
-              <>
-                {/* Current step — large, prominent */}
-                <div className="flex-1 flex flex-col">
-                  <div className="flex-1 flex items-start gap-6">
-                    {/* Step number */}
-                    <div className="w-16 h-16 rounded-2xl bg-[#F9C35C] flex items-center justify-center flex-shrink-0">
-                      <span className="text-[#0f172a] font-black text-[1.8rem]">
-                        {currentStep + 1}
-                      </span>
-                    </div>
-
-                    {/* Step text */}
-                    <div className="flex-1 pt-2">
+              // All steps at once — the cook is 10-15 ft away and can't tap
+              // through a carousel. Big type, every step visible (multi-column
+              // when there are many, so they fit on one screen).
+              <div
+                className="flex-1 overflow-y-auto pr-2"
+                style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}
+              >
+                <div className={narrativeSteps.length > 6 ? 'columns-2 gap-10' : ''}>
+                  {narrativeSteps.map((step, i) => (
+                    <div key={i} className="flex items-start gap-5 mb-6 break-inside-avoid">
+                      <div className="w-12 h-12 rounded-xl bg-[#F9C35C] flex items-center justify-center flex-shrink-0">
+                        <span className="text-[#0f172a] font-black text-[1.5rem]">{i + 1}</span>
+                      </div>
                       <p
-                        className="text-white/90 font-medium text-[1.5rem] leading-relaxed"
+                        className="flex-1 text-white/90 font-semibold text-[1.7rem] leading-snug pt-1"
                         dangerouslySetInnerHTML={{
                           __html: DOMPurify.sanitize(
-                            narrativeSteps[currentStep].replace(
+                            step.replace(
                               /\*\*([^*]+)\*\*/g,
                               '<strong class="text-[#6DC4A7] font-bold">$1</strong>'
                             )
@@ -297,68 +290,9 @@ export function WallRecipeViewer({ url, content, mealName, mealIcon, onClose }: 
                         }}
                       />
                     </div>
-                  </div>
-
-                  {/* Step dots / mini timeline */}
-                  <div className="flex items-center justify-center gap-2 mt-6 mb-4">
-                    {narrativeSteps.map((_, i) => (
-                      <button
-                        key={i}
-                        onClick={() => setCurrentStep(i)}
-                        className={`
-                          rounded-full transition-all duration-300
-                          ${i === currentStep
-                            ? 'w-8 h-3 bg-[#F9C35C]'
-                            : i < currentStep
-                              ? 'w-3 h-3 bg-[#6DC4A7]/50'
-                              : 'w-3 h-3 bg-white/15 hover:bg-white/25'
-                          }
-                        `}
-                        aria-label={`Go to step ${i + 1}`}
-                      />
-                    ))}
-                  </div>
-
-                  {/* Navigation buttons */}
-                  <div className="flex items-center justify-between mt-auto pt-4">
-                    <button
-                      onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
-                      disabled={currentStep === 0}
-                      className={`
-                        flex items-center gap-3 px-8 py-4 rounded-xl font-bold text-[1.15rem]
-                        uppercase tracking-wider transition-all duration-200
-                        ${currentStep === 0
-                          ? 'text-white/15 cursor-not-allowed'
-                          : 'text-white/60 bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white/80'
-                        }
-                      `}
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-                      </svg>
-                      Previous
-                    </button>
-
-                    <button
-                      onClick={() => setCurrentStep(Math.min(narrativeSteps.length - 1, currentStep + 1))}
-                      disabled={currentStep === narrativeSteps.length - 1}
-                      className={`
-                        flex items-center gap-3 px-8 py-4 rounded-xl font-bold text-[1.15rem]
-                        uppercase tracking-wider transition-all duration-200
-                        ${currentStep === narrativeSteps.length - 1
-                          ? 'text-white/15 cursor-not-allowed'
-                          : 'bg-[#F9C35C] text-[#0f172a] hover:bg-[#f7b832]'
-                        }
-                      `}
-                    >
-                      Next
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
-                  </div>
+                  ))}
                 </div>
-              </>
+              </div>
             ) : (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center">
