@@ -149,8 +149,8 @@ describe('useNotes', () => {
         audio_url: null,
         external_id: null,
         external_url: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        created_at: '2026-05-20T11:00:00.000Z',
+        updated_at: '2026-05-20T11:00:00.000Z',
       },
       {
         id: 'note-2',
@@ -163,8 +163,8 @@ describe('useNotes', () => {
         audio_url: null,
         external_id: null,
         external_url: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        created_at: '2026-05-20T12:00:00.000Z',
+        updated_at: '2026-05-20T12:00:00.000Z',
       },
     ]
     mockSupabaseData = mockNotes
@@ -175,9 +175,14 @@ describe('useNotes', () => {
       expect(result.current.loading).toBe(false)
     })
 
+    // Look up by id rather than array position: the hook sorts notes by
+    // updatedAt desc, so input order is not preserved. (Asserting on notes[0]
+    // made this flaky when the two fixtures' timestamps straddled a millisecond.)
     expect(result.current.notes).toHaveLength(2)
-    expect(result.current.notes[0].title).toBe('First Note')
-    expect(result.current.notes[1].type).toBe('meeting_note')
+    const firstNote = result.current.notes.find((n) => n.id === 'note-1')
+    const secondNote = result.current.notes.find((n) => n.id === 'note-2')
+    expect(firstNote?.title).toBe('First Note')
+    expect(secondNote?.type).toBe('meeting_note')
   })
 
   it('adds a note with optimistic update', async () => {
