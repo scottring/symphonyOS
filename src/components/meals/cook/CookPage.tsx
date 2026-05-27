@@ -121,6 +121,16 @@ export function CookPage() {
           <p className="mt-3 font-display italic text-[18px] text-sage-500 leading-snug">
             {encouragement}
           </p>
+          {recipe.sourceUrl && (
+            <a
+              href={recipe.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary-50 text-primary-700 text-[13px] font-medium hover:bg-primary-100 transition-colors"
+            >
+              View recipe ↗
+            </a>
+          )}
 
           <div className="mt-8">
             {hasSteps ? (

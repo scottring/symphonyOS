@@ -38,6 +38,17 @@ export function RecipeDetailModal({ recipeId, onClose }: Props) {
               </div>
               <h2 className="font-display text-4xl text-neutral-800 mb-4">{recipe.title}</h2>
 
+              {recipe.sourceUrl && (
+                <a
+                  href={recipe.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 mb-6 px-4 py-2 rounded-full bg-primary-50 text-primary-700 text-[13px] font-medium hover:bg-primary-100 transition-colors"
+                >
+                  View recipe ↗
+                </a>
+              )}
+
               <div className="bg-review-50 border border-review-100 rounded-2xl p-5 mb-6">
                 <div className="text-[10px] font-bold uppercase tracking-widest text-review-600 mb-2">KIDS</div>
                 {!editingAcceptance ? (
@@ -64,12 +75,14 @@ export function RecipeDetailModal({ recipeId, onClose }: Props) {
                 )}
               </div>
 
-              <div className="mb-6">
-                <div className="text-[12px] font-bold uppercase tracking-widest text-neutral-500 mb-3">INGREDIENTS</div>
-                <ul className="space-y-1 text-[15px] text-neutral-700">
-                  {recipe.ingredients.map((ing, i) => <li key={i}>· {ing}</li>)}
-                </ul>
-              </div>
+              {recipe.ingredients.length > 0 && (
+                <div className="mb-6">
+                  <div className="text-[12px] font-bold uppercase tracking-widest text-neutral-500 mb-3">INGREDIENTS</div>
+                  <ul className="space-y-1 text-[15px] text-neutral-700">
+                    {recipe.ingredients.map((ing, i) => <li key={i}>· {ing}</li>)}
+                  </ul>
+                </div>
+              )}
 
               {recipe.instructions.length > 0 && (
                 <div className="mb-6">
