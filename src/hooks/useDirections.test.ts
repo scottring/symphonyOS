@@ -19,6 +19,7 @@ const fetchAutocompleteSuggestions = vi.fn(async () => ({
 vi.mock('@/lib/googleMaps', () => ({
   isGoogleMapsLoaded: () => false,
   getPlacesLibrary: () => null,
+  getMapsLoadError: () => null,
   loadPlacesLibrary: vi.fn(async () => ({
     AutocompleteSuggestion: { fetchAutocompleteSuggestions },
     Place: class {},
