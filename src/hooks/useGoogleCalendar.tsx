@@ -66,6 +66,9 @@ export interface CalendarEvent {
   meetingUrl?: string | null
   // Attendees (from Google Calendar API)
   attendees?: { email: string; displayName?: string; responseStatus?: string; self?: boolean }[]
+  // Set on synthetic meal events (from the meal plan) so the wall can open the
+  // linked recipe's stored ingredients/instructions, not just a source URL.
+  recipeId?: string | null
 }
 
 export interface DeleteEventParams {

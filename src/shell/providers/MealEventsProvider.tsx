@@ -52,7 +52,7 @@ export function synthesizeMealEvents(params: {
   const memberById = new Map(familyMembers.map(m => [m.id, m]));
   const recipeTitleById = new Map(recipes.map(r => [r.id, r.title]));
   const recipeUrlById = new Map(recipes.map(r => [r.id, r.sourceUrl]));
-  const groups = new Map<string, { slot: string; title: string; entryIds: string[]; recipeUrl?: string }>();
+  const groups = new Map<string, { slot: string; title: string; entryIds: string[]; recipeUrl?: string; recipeId?: string }>();
   for (const e of mealPlan.entries) {
     if (e.dayOfWeek !== dow) continue;
     if (!SLOT_TIMES[e.slot]) continue;
@@ -68,10 +68,10 @@ export function synthesizeMealEvents(params: {
     const key = `${e.slot}|${title}`;
     const existing = groups.get(key);
     if (existing) existing.entryIds.push(e.id);
-    else groups.set(key, { slot: e.slot, title, entryIds: [e.id], recipeUrl });
+    else groups.set(key, { slot: e.slot, title, entryIds: [e.id], recipeUrl, recipeId: e.recipeId ?? undefined });
   }
   const out: CalendarEvent[] = [];
-  for (const [, { slot, title, entryIds, recipeUrl }] of groups) {
+  for (const [, { slot, title, entryIds, recipeUrl, recipeId }] of groups) {
     const [hh, mm] = SLOT_TIMES[slot]!;
     const start = new Date(viewedDate); start.setHours(hh, mm, 0, 0);
     const end = new Date(start.getTime() + 45 * 60 * 1000);
@@ -85,6 +85,7 @@ export function synthesizeMealEvents(params: {
       calendar_name: 'Meals',
       calendar_color: '#0F8A4A',
       description: recipeUrl ?? null,
+      recipeId: recipeId ?? null,
     });
   }
   return out;

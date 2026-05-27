@@ -4,13 +4,16 @@ import { fetchRecipe, formatIngredientNarrative, toNarrativeStep } from '@/lib/r
 import type { RecipeData } from '@/lib/recipeParser'
 
 interface WallRecipeViewerProps {
-  url: string
+  /** Web recipe URL to fetch + parse. Omit when passing `content` directly. */
+  url?: string
+  /** Stored recipe content (ingredients/instructions), shown without fetching. */
+  content?: { title: string; ingredients: string[]; instructions: string[] }
   mealName: string
   mealIcon: string
   onClose: () => void
 }
 
-export function WallRecipeViewer({ url, mealName, mealIcon, onClose }: WallRecipeViewerProps) {
+export function WallRecipeViewer({ url, content, mealName, mealIcon, onClose }: WallRecipeViewerProps) {
   const [recipe, setRecipe] = useState<RecipeData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -39,13 +42,29 @@ export function WallRecipeViewer({ url, mealName, mealIcon, onClose }: WallRecip
     return () => document.removeEventListener('keydown', handleKey)
   }, [onClose, recipe])
 
-  // Fetch recipe
+  // Load recipe: use stored content directly when provided, otherwise fetch+parse the URL.
   useEffect(() => {
+    if (content) {
+      setRecipe({
+        title: content.title,
+        ingredients: content.ingredients,
+        instructions: content.instructions,
+        source: 'Saved recipe',
+      })
+      setError(null)
+      setLoading(false)
+      return
+    }
+    if (!url) {
+      setError('No recipe to show')
+      setLoading(false)
+      return
+    }
     async function load() {
       setLoading(true)
       setError(null)
       try {
-        const parsed = await fetchRecipe(url)
+        const parsed = await fetchRecipe(url!)
         setRecipe(parsed)
       } catch (err) {
         console.error('Wall recipe fetch error:', err)
@@ -55,7 +74,7 @@ export function WallRecipeViewer({ url, mealName, mealIcon, onClose }: WallRecip
       }
     }
     load()
-  }, [url])
+  }, [url, content])
 
   const parsedIngredients = useMemo(() => {
     if (!recipe) return []
