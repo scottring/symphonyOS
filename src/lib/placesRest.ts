@@ -1,22 +1,15 @@
 /**
- * Places API (New) over plain REST + fetch.
+ * Places API (New) via our own Supabase edge function ('places-proxy').
  *
- * Why not the Maps JS SDK (`AutocompleteSuggestion`)? Its autocomplete travels
- * over a gRPC-web transport (`places.googleapis.com/$rpc/.../AutocompletePlaces`)
- * that fails on some devices/networks ("Rpc failed due to xhr error") — content
- * blockers and proxies routinely break the binary RPC while leaving the plain
- * JSON REST endpoint working. REST is CORS-enabled for browser keys and is what
- * we verified works from the production origin, so we use it directly.
+ * We do NOT call places.googleapis.com from the browser — neither the Maps JS
+ * SDK's gRPC-web transport ("Rpc failed due to xhr error") nor a plain REST
+ * fetch ("Load failed") survives on some devices/networks (content blockers,
+ * iCloud Private Relay, DNS filters that block googleapis.com). The edge
+ * function calls Google server-side, so the browser only ever talks to our own
+ * Supabase domain — the same channel that already loads the user's data.
  */
+import { supabase } from '@/lib/supabase'
 import type { PlaceAutocompleteResult } from '@/types/directions'
-
-const BASE = 'https://places.googleapis.com/v1'
-
-function apiKey(): string {
-  const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-  if (!key) throw new Error('Maps API key is missing from this build (VITE_GOOGLE_MAPS_API_KEY).')
-  return key
-}
 
 interface RestText {
   text?: string
@@ -43,23 +36,12 @@ export async function placesAutocomplete(
   input: string,
   includedPrimaryTypes?: string[],
 ): Promise<PlaceAutocompleteResult[]> {
-  const body: Record<string, unknown> = { input }
-  if (includedPrimaryTypes && includedPrimaryTypes.length > 0) {
-    body.includedPrimaryTypes = includedPrimaryTypes
-  }
-
-  const res = await fetch(`${BASE}/places:autocomplete`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': apiKey() },
-    body: JSON.stringify(body),
+  const { data, error } = await supabase.functions.invoke<RestAutocompleteResponse>('places-proxy', {
+    body: { action: 'autocomplete', input, includedPrimaryTypes },
   })
-  if (!res.ok) {
-    const detail = await res.text().catch(() => '')
-    throw new Error(`Places autocomplete failed (HTTP ${res.status})${detail ? `: ${detail.slice(0, 200)}` : ''}`)
-  }
+  if (error) throw new Error(error.message || 'Place lookup failed')
 
-  const data = (await res.json()) as RestAutocompleteResponse
-  return (data.suggestions ?? [])
+  return (data?.suggestions ?? [])
     .map((s) => s.placePrediction)
     .filter((p): p is RestPlacePrediction => Boolean(p && p.placeId))
     .map((p) => ({
@@ -75,16 +57,11 @@ export async function placesAutocomplete(
 export async function placeDetails(
   placeId: string,
 ): Promise<{ name: string; address: string; phone?: string } | null> {
-  const res = await fetch(`${BASE}/places/${encodeURIComponent(placeId)}`, {
-    headers: {
-      'X-Goog-Api-Key': apiKey(),
-      'X-Goog-FieldMask': 'displayName,formattedAddress,nationalPhoneNumber',
-    },
+  const { data, error } = await supabase.functions.invoke<RestPlaceDetails>('places-proxy', {
+    body: { action: 'details', placeId },
   })
-  if (!res.ok) {
-    throw new Error(`Place details failed (HTTP ${res.status})`)
-  }
-  const data = (await res.json()) as RestPlaceDetails
+  if (error) throw new Error(error.message || 'Place details failed')
+  if (!data) return null
   return {
     name: data.displayName?.text ?? '',
     address: data.formattedAddress ?? '',

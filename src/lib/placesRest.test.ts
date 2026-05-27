@@ -1,29 +1,17 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { placesAutocomplete, placeDetails } from './placesRest'
 
-const fetchMock = vi.fn()
+const invoke = vi.fn()
+vi.mock('@/lib/supabase', () => ({
+  supabase: { functions: { invoke: (...args: unknown[]) => invoke(...args) } },
+}))
 
-beforeEach(() => {
-  vi.stubGlobal('fetch', fetchMock)
-  fetchMock.mockReset()
-})
-afterEach(() => {
-  vi.unstubAllGlobals()
-})
-
-function jsonResponse(body: unknown, ok = true, status = 200): Response {
-  return {
-    ok,
-    status,
-    json: async () => body,
-    text: async () => JSON.stringify(body),
-  } as unknown as Response
-}
+beforeEach(() => invoke.mockReset())
 
 describe('placesAutocomplete', () => {
-  it('maps REST suggestions (structuredFormat nesting) and drops entries without a placeId', async () => {
-    fetchMock.mockResolvedValue(
-      jsonResponse({
+  it('maps proxy suggestions (structuredFormat nesting) and drops entries without a placeId', async () => {
+    invoke.mockResolvedValue({
+      data: {
         suggestions: [
           {
             placePrediction: {
@@ -37,47 +25,50 @@ describe('placesAutocomplete', () => {
           },
           { queryPrediction: { text: { text: 'no place id here' } } },
         ],
-      }),
-    )
+      },
+      error: null,
+    })
 
     const results = await placesAutocomplete('guitar')
-    expect(results).toHaveLength(1)
-    expect(results[0]).toEqual({
-      placeId: 'p1',
-      description: 'The Guitar Shop, Route 9, Howell Township, NJ, USA',
-      mainText: 'The Guitar Shop',
-      secondaryText: 'Route 9, Howell Township, NJ, USA',
+    expect(invoke).toHaveBeenCalledWith('places-proxy', {
+      body: { action: 'autocomplete', input: 'guitar', includedPrimaryTypes: undefined },
+    })
+    expect(results).toEqual([
+      {
+        placeId: 'p1',
+        description: 'The Guitar Shop, Route 9, Howell Township, NJ, USA',
+        mainText: 'The Guitar Shop',
+        secondaryText: 'Route 9, Howell Township, NJ, USA',
+      },
+    ])
+  })
+
+  it('passes includedPrimaryTypes through to the proxy', async () => {
+    invoke.mockResolvedValue({ data: { suggestions: [] }, error: null })
+    await placesAutocomplete('q', ['establishment'])
+    expect(invoke).toHaveBeenCalledWith('places-proxy', {
+      body: { action: 'autocomplete', input: 'q', includedPrimaryTypes: ['establishment'] },
     })
   })
 
-  it('sends includedPrimaryTypes only when provided', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ suggestions: [] }))
-    await placesAutocomplete('q', ['establishment'])
-    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
-    expect(body).toEqual({ input: 'q', includedPrimaryTypes: ['establishment'] })
-
-    fetchMock.mockResolvedValue(jsonResponse({ suggestions: [] }))
-    await placesAutocomplete('q')
-    const body2 = JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string)
-    expect(body2).toEqual({ input: 'q' })
-  })
-
-  it('throws with the HTTP status when the request fails', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ error: 'nope' }, false, 403))
-    await expect(placesAutocomplete('q')).rejects.toThrow(/403/)
+  it('throws when the proxy returns an error', async () => {
+    invoke.mockResolvedValue({ data: null, error: { message: 'boom' } })
+    await expect(placesAutocomplete('q')).rejects.toThrow('boom')
   })
 })
 
 describe('placeDetails', () => {
   it('maps displayName/formattedAddress/phone', async () => {
-    fetchMock.mockResolvedValue(
-      jsonResponse({
+    invoke.mockResolvedValue({
+      data: {
         displayName: { text: 'The Guitar Shop' },
         formattedAddress: '123 Route 9, Howell Township, NJ',
         nationalPhoneNumber: '(555) 111-2222',
-      }),
-    )
+      },
+      error: null,
+    })
     const details = await placeDetails('p1')
+    expect(invoke).toHaveBeenCalledWith('places-proxy', { body: { action: 'details', placeId: 'p1' } })
     expect(details).toEqual({
       name: 'The Guitar Shop',
       address: '123 Route 9, Howell Township, NJ',
