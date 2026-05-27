@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
-import { loadPlacesLibrary } from '@/lib/googleMaps'
+import { placesAutocomplete, placeDetails } from '@/lib/placesRest'
 
 export interface PlaceResult {
   placeId: string
@@ -12,7 +12,6 @@ export function useGooglePlaces() {
   const [results, setResults] = useState<PlaceResult[]>([])
   const [loading, setLoading] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const placesLibraryRef = useRef<google.maps.PlacesLibrary | null>(null)
 
   const searchPlaces = useCallback((query: string) => {
     // Clear previous debounce
@@ -30,30 +29,18 @@ export function useGooglePlaces() {
 
     debounceRef.current = setTimeout(async () => {
       try {
-        // Cache the Places library across calls; awaiting a fresh load on every
-        // keystroke loses the first results on mobile/slow networks.
-        const placesLib = placesLibraryRef.current ?? (await loadPlacesLibrary())
-        placesLibraryRef.current = placesLib
-        const { AutocompleteSuggestion } = placesLib
-
-        const response = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
-          input: query,
-          includedPrimaryTypes: ['establishment'],
-        })
-
-        const places: PlaceResult[] = response.suggestions
-          .filter((s) => s.placePrediction)
-          .slice(0, 5)
-          .map((s) => ({
-            placeId: s.placePrediction!.placeId,
-            name: s.placePrediction!.mainText?.text ?? s.placePrediction!.text?.text ?? query,
-            address: s.placePrediction!.secondaryText?.text ?? undefined,
-          }))
-
+        // REST (fetch) rather than the Maps JS SDK's AutocompleteSuggestion:
+        // the SDK's gRPC-web transport fails on some devices/networks
+        // ("Rpc failed due to xhr error"). Restrict to businesses for the
+        // contact picker.
+        const predictions = await placesAutocomplete(query, ['establishment'])
+        const places: PlaceResult[] = predictions.slice(0, 5).map((p) => ({
+          placeId: p.placeId,
+          name: p.mainText || p.description || query,
+          address: p.secondaryText || undefined,
+        }))
         setResults(places)
       } catch (err) {
-        // Surface the error instead of silently showing "No places found" —
-        // distinguishes an API/network failure from a genuine empty result.
         console.warn('Places autocomplete error:', err)
         setResults([])
       } finally {
@@ -64,17 +51,13 @@ export function useGooglePlaces() {
 
   const getPlaceDetails = useCallback(async (placeId: string): Promise<PlaceResult | null> => {
     try {
-      const placesLib = await loadPlacesLibrary()
-      const { Place } = placesLib
-
-      const place = new Place({ id: placeId })
-      await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'nationalPhoneNumber'] })
-
+      const details = await placeDetails(placeId)
+      if (!details) return null
       return {
         placeId,
-        name: place.displayName ?? '',
-        address: place.formattedAddress ?? undefined,
-        phone: place.nationalPhoneNumber ?? undefined,
+        name: details.name,
+        address: details.address || undefined,
+        phone: details.phone,
       }
     } catch {
       return null

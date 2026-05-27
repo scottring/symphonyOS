@@ -6,6 +6,7 @@ import type {
   PlaceAutocompleteResult,
 } from '@/types/directions'
 import { loadPlacesLibrary, isGoogleMapsLoaded, getPlacesLibrary, getMapsLoadError } from '@/lib/googleMaps'
+import { placesAutocomplete, placeDetails } from '@/lib/placesRest'
 
 interface UseDirectionsResult {
   // State
@@ -180,31 +181,14 @@ export function useDirections(): UseDirectionsResult {
     if (!query.trim()) return []
 
     try {
-      // Await the Places library rather than early-returning when the mount
-      // effect hasn't finished loading it yet — otherwise the first keystrokes
-      // (common on mobile/slow networks) return [] and the UI shows
-      // "No places found". loadPlacesLibrary caches, so this is instant after
-      // the first load.
-      const placesLib = placesLibraryRef.current ?? (await loadPlacesLibrary())
-      placesLibraryRef.current = placesLib
-      const { AutocompleteSuggestion } = placesLib
-
-      // Use the new Places API AutocompleteSuggestion
-      const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
-        input: query.trim(),
-      })
-
+      // Use the REST endpoint over fetch, NOT the Maps JS SDK's
+      // AutocompleteSuggestion: the SDK routes autocomplete through a gRPC-web
+      // transport (places.googleapis.com/$rpc/.../AutocompletePlaces) that fails
+      // on some devices/networks ("Rpc failed due to xhr error"). REST is
+      // CORS-enabled and works where the gRPC transport is blocked.
+      const results = await placesAutocomplete(query.trim())
       setPlacesError(null)
-      // Map to our PlaceAutocompleteResult format
-      return suggestions.map((suggestion) => {
-        const placePrediction = suggestion.placePrediction
-        return {
-          placeId: placePrediction?.placeId || '',
-          description: placePrediction?.text?.text || '',
-          mainText: placePrediction?.mainText?.text || '',
-          secondaryText: placePrediction?.secondaryText?.text || '',
-        }
-      }).filter(result => result.placeId) // Filter out any without placeId
+      return results
     } catch (err) {
       console.warn('Places autocomplete error:', err)
       // Surface the reason so the field shows it instead of a blank "No places found".
@@ -260,19 +244,9 @@ export function useDirections(): UseDirectionsResult {
   // =============================================================================
   const getPlaceDetails = useCallback(async (placeId: string): Promise<{ address: string; name: string } | null> => {
     try {
-      // Await the Places library (cached) — same reasoning as searchPlaces.
-      const placesLib = placesLibraryRef.current ?? (await loadPlacesLibrary())
-      placesLibraryRef.current = placesLib
-      const { Place } = placesLib
-
-      // Use the new Places API Place class
-      const place = new Place({ id: placeId })
-      await place.fetchFields({ fields: ['formattedAddress', 'displayName'] })
-
-      return {
-        address: place.formattedAddress || '',
-        name: place.displayName || '',
-      }
+      // REST place details (same transport reasoning as searchPlaces).
+      const details = await placeDetails(placeId)
+      return details ? { address: details.address, name: details.name } : null
     } catch (err) {
       console.warn('Place details error:', err)
       return null
