@@ -159,6 +159,15 @@ export function AssetDetailPanel({ asset, spaces, onClose, onUpdate, onDelete, o
           />
         </dd>
 
+        <dt className="text-neutral-500">Code / password</dt>
+        <dd>
+          <SecretText
+            value={String(asset.details.access_code ?? '')}
+            onCommit={(v) => onUpdate({ details: { ...asset.details, access_code: v || undefined } })}
+            placeholder="Gate code, lock combo, Wi-Fi…"
+          />
+        </dd>
+
         {ASSET_TYPE_FIELDS[asset.assetType]?.map((f) => (
           <FieldPair key={f.key} label={f.label}>
             <InlineText
@@ -185,6 +194,48 @@ function FieldPair({ label, children }: { label: string; children: React.ReactNo
       <dt className="text-neutral-500">{label}</dt>
       <dd>{children}</dd>
     </>
+  )
+}
+
+function SecretText({
+  value, onCommit, placeholder,
+}: { value: string; onCommit: (v: string) => void; placeholder?: string }) {
+  const [editing, setEditing] = useState(false)
+  const [revealed, setRevealed] = useState(false)
+  const [draft, setDraft] = useState(value)
+
+  if (editing) {
+    return (
+      <input
+        className="input-base w-full"
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => { setEditing(false); if (draft !== value) onCommit(draft) }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+          if (e.key === 'Escape') { setDraft(value); setEditing(false) }
+        }}
+      />
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span
+        onClick={() => { setDraft(value); setEditing(true) }}
+        className={`cursor-text inline-block -mx-1 px-1 rounded hover:bg-neutral-100 font-mono ${value ? '' : 'text-neutral-400 font-sans'}`}
+        title="Click to edit"
+      >
+        {value ? (revealed ? value : '•'.repeat(Math.min(value.length, 12))) : (placeholder || '—')}
+      </span>
+      {value && (
+        <button
+          type="button"
+          onClick={() => setRevealed((r) => !r)}
+          className="text-xs text-primary-700 hover:underline"
+        >{revealed ? 'Hide' : 'Show'}</button>
+      )}
+    </span>
   )
 }
 
