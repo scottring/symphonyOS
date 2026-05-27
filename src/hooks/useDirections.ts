@@ -5,13 +5,15 @@ import type {
   TravelMode,
   PlaceAutocompleteResult,
 } from '@/types/directions'
-import { loadPlacesLibrary, isGoogleMapsLoaded, getPlacesLibrary } from '@/lib/googleMaps'
+import { loadPlacesLibrary, isGoogleMapsLoaded, getPlacesLibrary, getMapsLoadError } from '@/lib/googleMaps'
 
 interface UseDirectionsResult {
   // State
   isCalculating: boolean
   error: string | null
   result: DirectionsResult | null
+  /** Why the last place lookup failed (key rejected, script blocked, …), if it did. */
+  placesError: string | null
 
   // Actions
   calculateRoute: (context: DirectionsContext) => Promise<DirectionsResult | null>
@@ -31,6 +33,7 @@ export function useDirections(): UseDirectionsResult {
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<DirectionsResult | null>(null)
   const [sdkReady, setSdkReady] = useState(isGoogleMapsLoaded())
+  const [placesError, setPlacesError] = useState<string | null>(getMapsLoadError())
   const placesLibraryRef = useRef<google.maps.PlacesLibrary | null>(getPlacesLibrary())
 
   // Load Google Maps SDK and Places library on mount
@@ -44,8 +47,18 @@ export function useDirections(): UseDirectionsResult {
       })
       .catch((err) => {
         console.error('Failed to load Google Maps SDK:', err)
+        setPlacesError(getMapsLoadError() ?? (err instanceof Error ? err.message : 'Failed to load Google Maps'))
       })
   }, [sdkReady])
+
+  // Google's auth/script failures arrive asynchronously (window.gm_authFailure,
+  // script onerror) — listen so the field can surface the reason even if it
+  // fires after the first search resolved empty.
+  useEffect(() => {
+    const onMapsError = (e: Event) => setPlacesError((e as CustomEvent<string>).detail)
+    window.addEventListener('symphony:maps-error', onMapsError)
+    return () => window.removeEventListener('symphony:maps-error', onMapsError)
+  }, [])
 
   // =============================================================================
   // LEGACY SERVICE INITIALIZATION (commented out - kept for reference)
@@ -181,6 +194,7 @@ export function useDirections(): UseDirectionsResult {
         input: query.trim(),
       })
 
+      setPlacesError(null)
       // Map to our PlaceAutocompleteResult format
       return suggestions.map((suggestion) => {
         const placePrediction = suggestion.placePrediction
@@ -193,6 +207,8 @@ export function useDirections(): UseDirectionsResult {
       }).filter(result => result.placeId) // Filter out any without placeId
     } catch (err) {
       console.warn('Places autocomplete error:', err)
+      // Surface the reason so the field shows it instead of a blank "No places found".
+      setPlacesError(getMapsLoadError() ?? (err instanceof Error ? err.message : 'Place lookup failed'))
       return []
     }
   }, [])
@@ -333,6 +349,7 @@ export function useDirections(): UseDirectionsResult {
     isCalculating,
     error,
     result,
+    placesError,
     calculateRoute,
     searchPlaces,
     getPlaceDetails,

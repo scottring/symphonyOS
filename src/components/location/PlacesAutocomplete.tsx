@@ -22,6 +22,8 @@ interface PlacesAutocompleteProps {
   initialQuery?: string
   /** Placeholder text */
   placeholder?: string
+  /** When Places fails (key rejected, script blocked, …), show this instead of "No places found". */
+  error?: string | null
 }
 
 /**
@@ -36,6 +38,7 @@ export function PlacesAutocomplete({
   onGetDetails,
   initialQuery = '',
   placeholder = 'Search for a place...',
+  error = null,
 }: PlacesAutocompleteProps) {
   const [isEditing, setIsEditing] = useState(!value)
   const [query, setQuery] = useState(initialQuery)
@@ -181,8 +184,16 @@ export function PlacesAutocomplete({
         </div>
       )}
 
+      {/* Error message — Places failed (key rejected, script blocked, offline). */}
+      {error && !isSearching && results.length === 0 && (
+        <div className="absolute left-0 right-0 mt-2 bg-red-50 border border-red-200 rounded-xl shadow-lg z-20 p-4 text-left text-red-700 text-sm">
+          <p className="font-medium">Place search isn’t working</p>
+          <p className="mt-1 text-red-600">{error}</p>
+        </div>
+      )}
+
       {/* No results message */}
-      {query.trim() && !isSearching && results.length === 0 && (
+      {!error && query.trim() && !isSearching && results.length === 0 && (
         <div className="absolute left-0 right-0 mt-2 bg-white border border-neutral-200 rounded-xl shadow-lg z-20 p-4 text-center text-neutral-500 text-sm">
           No places found
         </div>

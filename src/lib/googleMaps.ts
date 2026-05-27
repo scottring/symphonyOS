@@ -18,6 +18,23 @@ let coreLoadPromise: Promise<void> | null = null
 let placesLibrary: google.maps.PlacesLibrary | null = null
 let placesLoadPromise: Promise<google.maps.PlacesLibrary> | null = null
 
+// Capture WHY Maps failed so the UI can show it instead of a blank "No places
+// found". The two common silent failures are (a) Google rejecting the API key
+// for this domain/device (fires window.gm_authFailure, never throws) and
+// (b) the script being blocked from loading (ad/content blocker, offline).
+let mapsLoadError: string | null = null
+export function getMapsLoadError(): string | null {
+  return mapsLoadError
+}
+function recordMapsLoadError(message: string) {
+  mapsLoadError = message
+  try {
+    window.dispatchEvent(new CustomEvent('symphony:maps-error', { detail: message }))
+  } catch {
+    // CustomEvent unavailable (non-browser) — the getter still works.
+  }
+}
+
 /**
  * Load the Google Maps core SDK
  * Returns a promise that resolves when the core SDK is ready
@@ -35,7 +52,17 @@ export async function loadGoogleMapsSDK(): Promise<void> {
 
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
   if (!apiKey) {
+    recordMapsLoadError('Maps API key is missing from this build (VITE_GOOGLE_MAPS_API_KEY).')
     throw new Error('VITE_GOOGLE_MAPS_API_KEY is not configured')
+  }
+
+  // Google calls this when it rejects the key (e.g. RefererNotAllowedMapError,
+  // ApiNotActivatedMapError) — it does NOT throw in our promise, so without
+  // this hook the failure is invisible.
+  ;(window as unknown as { gm_authFailure?: () => void }).gm_authFailure = () => {
+    recordMapsLoadError(
+      'Google rejected the Maps API key for this site/device. Usually an API-key HTTP-referrer or API restriction, or a content/ad blocker.'
+    )
   }
 
   coreLoadPromise = new Promise((resolve, reject) => {
@@ -55,6 +82,7 @@ export async function loadGoogleMapsSDK(): Promise<void> {
     script.defer = true
     script.onerror = () => {
       coreLoadPromise = null
+      recordMapsLoadError('The Google Maps script failed to load — network offline or blocked by a content/ad blocker.')
       reject(new Error('Failed to load Google Maps SDK'))
     }
 

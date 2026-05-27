@@ -21,7 +21,7 @@ export function PanelLocation({
   onUpdateLocation,
   onClearLocation,
 }: PanelLocationProps) {
-  const { searchPlaces, getPlaceDetails } = useDirections()
+  const { searchPlaces, getPlaceDetails, placesError } = useDirections()
 
   return (
     <section className="mb-4">
@@ -32,6 +32,7 @@ export function PanelLocation({
         onClear={onClearLocation}
         onSearch={searchPlaces}
         onGetDetails={getPlaceDetails}
+        error={placesError}
         placeholder="Add a location…"
       />
       {location && showDirections && (
