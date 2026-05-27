@@ -43,6 +43,46 @@ export function StopItem({ stop, type, onEdit, onRemove, onChangeLocation, legTo
     <div className="w-6 h-6 rounded-full border-2 border-neutral-300 flex items-center justify-center bg-white" />
   )
 
+  // For the origin row the whole name/address block is tappable to change the
+  // starting point — not just the small pin icon (which stays as a visual cue).
+  const isClickableOrigin = type === 'origin' && !!onChangeLocation
+
+  const content = (
+    <>
+      {isEditing ? (
+        <input
+          type="text"
+          value={editedName}
+          onChange={(e) => setEditedName(e.target.value)}
+          onBlur={handleSave}
+          onKeyDown={handleKeyDown}
+          className="w-full px-2 py-1 text-sm border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+          autoFocus
+        />
+      ) : (
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-neutral-800 truncate">
+            {stop.name}
+          </span>
+          {type === 'stop' && onEdit && (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="text-neutral-400 hover:text-neutral-600 flex-shrink-0"
+              title="Edit name"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+              </svg>
+            </button>
+          )}
+        </div>
+      )}
+      <p className="text-xs text-neutral-500 truncate mt-0.5">
+        {stop.address}
+      </p>
+    </>
+  )
+
   return (
     <div>
       <div className="flex items-start gap-3 py-2">
@@ -53,37 +93,18 @@ export function StopItem({ stop, type, onEdit, onRemove, onChangeLocation, legTo
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          {isEditing ? (
-            <input
-              type="text"
-              value={editedName}
-              onChange={(e) => setEditedName(e.target.value)}
-              onBlur={handleSave}
-              onKeyDown={handleKeyDown}
-              className="w-full px-2 py-1 text-sm border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
-              autoFocus
-            />
+          {isClickableOrigin ? (
+            <button
+              type="button"
+              onClick={onChangeLocation}
+              className="w-full text-left -mx-1 px-1 py-0.5 rounded-md hover:bg-primary-50/60 transition-colors"
+              title="Set starting point"
+            >
+              {content}
+            </button>
           ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-neutral-800 truncate">
-                {stop.name}
-              </span>
-              {type === 'stop' && onEdit && (
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="text-neutral-400 hover:text-neutral-600 flex-shrink-0"
-                  title="Edit name"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                  </svg>
-                </button>
-              )}
-            </div>
+            content
           )}
-          <p className="text-xs text-neutral-500 truncate mt-0.5">
-            {stop.address}
-          </p>
         </div>
 
         {/* Actions */}
