@@ -19,6 +19,7 @@ vi.mock('@/hooks/useDirections', () => ({
     searchPlaces,
     getPlaceDetails,
     openInMaps: vi.fn(),
+    buildMapsUrl: () => 'https://www.google.com/maps/dir/?api=1',
   }),
   formatDuration: (s: number) => `${s}s`,
   formatDistance: (m: number) => `${m}m`,
