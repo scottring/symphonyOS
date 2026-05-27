@@ -55,7 +55,7 @@ function normalizeLinks(links: (string | TaskLink)[] | null): TaskLink[] | undef
   })
 }
 
-function dbTaskToTask(dbTask: DbTask): Task {
+export function dbTaskToTask(dbTask: DbTask): Task {
   // Build linkedTo from new generalized fields if present
   const linkedTo: LinkedActivity | undefined =
     dbTask.linked_activity_type && dbTask.linked_activity_id
@@ -81,7 +81,14 @@ function dbTaskToTask(dbTask: DbTask): Task {
     phoneNumber: dbTask.phone_number ?? undefined,
     contactId: dbTask.contact_id ?? undefined,
     assignedTo: dbTask.assigned_to ?? undefined,
-    assignedToAll: dbTask.assigned_to_all ?? undefined,
+    // Normalize assignee: legacy single-assignee tasks store only `assigned_to`
+    // (array null). Surfaces that read `assignedToAll` (the Today timeline's
+    // multi-assignee avatars) would then show the task as unassigned while the
+    // detail panel — which reads `assignedTo` — shows the assignee. Fall back so
+    // every consumer agrees.
+    assignedToAll: (dbTask.assigned_to_all && dbTask.assigned_to_all.length > 0)
+      ? dbTask.assigned_to_all
+      : (dbTask.assigned_to ? [dbTask.assigned_to] : undefined),
     projectId: dbTask.project_id ?? undefined,
     parentTaskId: dbTask.parent_task_id ?? undefined,
     linkedEventId: dbTask.linked_event_id ?? undefined,

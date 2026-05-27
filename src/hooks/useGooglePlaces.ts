@@ -12,6 +12,7 @@ export function useGooglePlaces() {
   const [results, setResults] = useState<PlaceResult[]>([])
   const [loading, setLoading] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const placesLibraryRef = useRef<google.maps.PlacesLibrary | null>(null)
 
   const searchPlaces = useCallback((query: string) => {
     // Clear previous debounce
@@ -29,7 +30,10 @@ export function useGooglePlaces() {
 
     debounceRef.current = setTimeout(async () => {
       try {
-        const placesLib = await loadPlacesLibrary()
+        // Cache the Places library across calls; awaiting a fresh load on every
+        // keystroke loses the first results on mobile/slow networks.
+        const placesLib = placesLibraryRef.current ?? (await loadPlacesLibrary())
+        placesLibraryRef.current = placesLib
         const { AutocompleteSuggestion } = placesLib
 
         const response = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
@@ -47,7 +51,10 @@ export function useGooglePlaces() {
           }))
 
         setResults(places)
-      } catch {
+      } catch (err) {
+        // Surface the error instead of silently showing "No places found" —
+        // distinguishes an API/network failure from a genuine empty result.
+        console.warn('Places autocomplete error:', err)
         setResults([])
       } finally {
         setLoading(false)

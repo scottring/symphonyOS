@@ -109,11 +109,15 @@ export function TiptapEditor({
     },
   })
 
-  // Update content when prop changes (e.g., switching notes)
-  // Use emitUpdate: false to prevent triggering onChange when syncing external content
-  // This prevents race conditions where synced content triggers a save with stale/empty data
+  // Update content when prop changes (e.g., switching notes).
+  // Guard on `!editor.isFocused`: while the user is actively typing, the parent
+  // round-trips our own onChange back down as `content`. Re-syncing it would call
+  // setContent mid-keystroke — resetting the cursor to the start and scrambling
+  // fast input. Only sync external content when the editor is NOT focused
+  // (switching entities, programmatic updates).
+  // emitUpdate: false avoids triggering onChange when syncing external content.
   useEffect(() => {
-    if (editor && content !== editor.getHTML()) {
+    if (editor && !editor.isFocused && content !== editor.getHTML()) {
       editor.commands.setContent(content, { emitUpdate: false })
     }
   }, [content, editor])
