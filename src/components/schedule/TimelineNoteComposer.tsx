@@ -10,7 +10,7 @@ interface Props {
   onClose: () => void
 }
 
-export function TimelineNoteComposer({ anchor, existingNotes, onCreateNew, onAppendExisting, onLinkExisting, onClose }: Props) {
+export function TimelineNoteComposer({ anchor, existingNotes, onCreateNew, onAppendExisting, onClose }: Props) {
   const [mode, setMode] = useState<'new' | 'link'>('new')
   const [text, setText] = useState('')
   const [selId, setSelId] = useState<string | null>(null)

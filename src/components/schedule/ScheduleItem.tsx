@@ -7,7 +7,7 @@ import { formatTimeLong, formatTimeRangeLong, inferMealTime } from '@/lib/timeUt
 import { getProjectColor } from '@/lib/projectUtils'
 import { SchedulePopover, ContextPicker, DiscussionPicker, type ScheduleContextItem } from '@/components/triage'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
-import { Video, Tag, Check, Pencil, Link as LinkIcon } from 'lucide-react'
+import { Video, Tag, Check, Pencil } from 'lucide-react'
 import { ScheduleItemActionsMenu } from './ScheduleItemActionsMenu'
 import { ConceptIcon, type ConceptName } from '@/lib/conceptIcons'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
@@ -207,7 +207,6 @@ export const ScheduleItem = memo(function ScheduleItem({
   onToggleWaiting,
   onPush,
   onSchedule,
-  onSkip,
   contactName,
   projectName,
   projectId,

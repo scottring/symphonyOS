@@ -118,7 +118,6 @@ export function TodayView({
   onCompleteEvent,
   loading: _loading,
   viewedDate,
-  onDateChange,
   selectedAssignee,
   onSelectAssignee,
   assigneesWithTasks,
@@ -129,8 +128,6 @@ export function TodayView({
   onAppendNoteAt: onAppendNoteAtProp,
   onLinkNote: onLinkNoteProp,
   timelineNotes: timelineNotesProp,
-  currentHomeView,
-  onHomeViewChange,
 }: TodayViewProps) {
   // ── Context ──────────────────────────────────────────────────────────────────
   const isMobile = useMobile()

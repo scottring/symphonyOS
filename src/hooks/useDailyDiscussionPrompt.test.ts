@@ -26,8 +26,7 @@ describe('useDailyDiscussionPrompt', () => {
   })
 
   it('returns a different prompt on a different day', () => {
-    const { result: r1 } = renderHook(() => useDailyDiscussionPrompt())
-    const first = r1.current.prompt
+    renderHook(() => useDailyDiscussionPrompt())
     vi.setSystemTime(new Date('2026-05-18T08:00:00')) // next day
     const { result: r2 } = renderHook(() => useDailyDiscussionPrompt())
     expect(typeof r2.current.prompt).toBe('string')

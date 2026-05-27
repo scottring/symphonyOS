@@ -50,7 +50,6 @@ import { useDetailPanelState } from '@/hooks/useDetailPanelState'
 import { useScheduleFiltering } from '@/hooks/useScheduleFiltering'
 import type { ViewType } from '@/components/layout/Sidebar'
 import type { LinkedActivityType, TaskLink, Task, TaskContext } from '@/types/task'
-import { type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
 import { useHiddenCalendarEvents } from '@/hooks/useHiddenCalendarEvents'
 import { useMealPlan } from '@/hooks/useMealPlan'
 import { useRecipes } from '@/hooks/useRecipes'
@@ -206,9 +205,9 @@ function App() {
 }
 
 function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
-  const { tasks, loading: tasksLoading, addTask, addSubtask, addPrepTask, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask, setBucket } = useSupabaseTasks()
+  const { tasks, loading: tasksLoading, addTask, addSubtask, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask, setBucket } = useSupabaseTasks()
   const { goals, getCurrentQuarter } = useGoalsContext()
-  const { isConnected, events, fetchEvents, isFetching: eventsFetching, createEvent, updateEvent, moveEvent, deleteEvent, removeEventLocal, restoreEventLocal, fetchCalendarList, connect: connectCalendar } = useGoogleCalendar()
+  const { isConnected, events, fetchEvents, isFetching: eventsFetching, createEvent, updateEvent, deleteEvent, removeEventLocal, restoreEventLocal, connect: connectCalendar } = useGoogleCalendar()
   const attachments = useAttachments()
   const { fetchAttachments } = attachments
   const pinnedItems = usePinnedItems()
@@ -225,9 +224,9 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   const dismissTlUndo = useCallback(() => setTlUndo(null), [])
   const runTlUndo = useCallback(() => { setTlUndo(prev => { prev?.onUndo(); return null }) }, [])
 
-  const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, updateEventAssignmentAll, updateRecipeUrl, updateEventProject, getNote, getEventNotesForProject, updateEventContext, notes: eventNotesMap } = useEventNotes()
+  const { fetchNote, fetchNotesForEvents, updateNote, updateEventAssignment, updateEventAssignmentAll, updateEventProject, getNote, getEventNotesForProject, updateEventContext, notes: eventNotesMap } = useEventNotes()
   const { contacts, contactsMap, addContact, updateContact, deleteContact, searchContacts } = useContacts()
-  const { projects, projectsMap, addProject, updateProject, deleteProject, searchProjects, recalculateProjectStatus } = useProjects()
+  const { projects, projectsMap, addProject, updateProject, deleteProject, recalculateProjectStatus } = useProjects()
   const meetingNotes = useMeetingNotes(contacts, tasks)
 
   const {
@@ -551,14 +550,6 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
 
   const {
     selectedItem,
-    selectedContact,
-    selectedItemProject,
-    selectedEventRecipeUrl,
-    selectedEventAssignedToAll,
-    selectedEventProjectId,
-    selectedItemAttachments,
-    selectedItemLinkedTasks,
-    selectedItemRoutine,
   } = useDetailPanelState({
     selectedItemId,
     tasks,
@@ -984,7 +975,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   }, [tasks, addTask, viewedDate, getCurrentUserMember])
 
   // Handler for adding linked prep/followup tasks from DetailPanel
-  const handleAddLinkedTask = useCallback(async (
+  const _handleAddLinkedTask = useCallback(async (
     title: string,
     linkedTo: { type: LinkedActivityType; id: string },
     linkType: 'prep' | 'followup',
@@ -1000,7 +991,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   }, [addTask, viewedDate, getCurrentUserMember])
 
   // Handler for linking an existing task as prep/follow-up
-  const handleLinkExistingTask = useCallback(async (
+  const _handleLinkExistingTask = useCallback(async (
     taskId: string,
     linkedTo: { type: LinkedActivityType; id: string },
     linkType: 'prep' | 'followup',
@@ -1009,12 +1000,12 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   }, [updateTask])
 
   // Handler for toggling a linked task's completion
-  const handleToggleLinkedTask = useCallback(async (taskId: string) => {
+  const _handleToggleLinkedTask = useCallback(async (taskId: string) => {
     await toggleTask(taskId)
   }, [toggleTask])
 
   // Handler for deleting a linked task
-  const handleDeleteLinkedTask = useCallback(async (taskId: string) => {
+  const _handleDeleteLinkedTask = useCallback(async (taskId: string) => {
     await deleteTask(taskId)
   }, [deleteTask])
 

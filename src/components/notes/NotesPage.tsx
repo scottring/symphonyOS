@@ -50,7 +50,6 @@ export function NotesPage({
   onAddEntityLink,
   onRemoveEntityLink,
   getVaultNoteContent,
-  onNavigateToTask,
 }: NotesPageProps) {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(
     () => sessionStorage.getItem('symphony:selectedNoteId')

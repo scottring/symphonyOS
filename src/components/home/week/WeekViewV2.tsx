@@ -279,7 +279,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
             const task = tasks.find((t) => t.id === taskId)
             if (task) blocks.push(taskToTimelineItem(task))
           } else if (itemId.startsWith('event-')) {
-            const eventId = itemId.slice('event-'.length)
             const event = events.find((ev) => {
               const id = ev.google_event_id || ev.id
               return `event-${id}` === itemId

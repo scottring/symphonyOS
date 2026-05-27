@@ -129,10 +129,13 @@ export function TapEventPanel(props: TapEventPanelProps) {
 
       <PanelMightBeRelevant items={[]} onOpen={props.onOpenRelated} />
 
-      <PanelFooter
-        createdAt={new Date(startTime ?? Date.now())}
-        updatedAt={new Date(startTime ?? Date.now())}
-      />
+      {/* Events carry no created/updated timestamps; show the start time when present. */}
+      {startTime && (
+        <PanelFooter
+          createdAt={new Date(startTime)}
+          updatedAt={new Date(startTime)}
+        />
+      )}
     </article>
   )
 }

@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import type { EmailActionItem } from '@/types/emailAction'
-import { CATEGORY_CONFIG } from '@/types/emailAction'
 import { ConceptIcon } from '@/lib/conceptIcons'
 
 interface EmailActionsBannerProps {
@@ -56,7 +55,6 @@ export function EmailActionsBanner({
 
       <div className="space-y-2">
         {shown.map(item => {
-          const cat = CATEGORY_CONFIG[item.category]
           const isOverdue = item.due_date && new Date(item.due_date + 'T00:00:00') < new Date(new Date().toDateString())
 
           return (
