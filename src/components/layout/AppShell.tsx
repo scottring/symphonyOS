@@ -393,10 +393,13 @@ export function AppShell({
       {/* Right panel column — tabbed: Details + AI share one 380px column */}
       {isMobile ? (
         <>
-          {/* Mobile: detail panel as full-screen overlay */}
+          {/* Mobile: detail panel as full-screen overlay.
+              overflow-y-auto so long panels (e.g. a task with the Directions
+              builder expanded) scroll instead of being cut off below the fold. */}
           <div
             className={`
               fixed inset-0 z-50 bg-bg-elevated
+              overflow-y-auto overscroll-contain
               transform transition-transform duration-300 ease-out
               ${panelOpen ? 'translate-x-0' : 'translate-x-full'}
               safe-top safe-bottom
