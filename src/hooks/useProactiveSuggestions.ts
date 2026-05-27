@@ -8,7 +8,7 @@ import type {
 } from '@/types/proactiveSuggestion'
 import { rowToSuggestion } from '@/types/proactiveSuggestion'
 
-const POLL_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes
+const POLL_INTERVAL_MS = 12 * 60 * 1000 // 12 minutes — realtime covers new rows; poll is a safety net
 const ENGINE_INTERVAL_MS = 4 * 60 * 60 * 1000 // 4 hours
 const ENGINE_KEY = 'proactive-engine-last-run'
 

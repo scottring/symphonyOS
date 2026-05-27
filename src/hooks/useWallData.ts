@@ -16,7 +16,12 @@ import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 
-const POLL_INTERVAL_MS = 3 * 60 * 1000 // 3 minutes
+const POLL_INTERVAL_MS = 12 * 60 * 1000 // 12 minutes — wall is glanceable, not live
+
+// Only the columns the wall actually renders. Avoids `select('*')`, which pulls
+// heavy/unused columns (links jsonb, codes, etc.) on every poll and dominates egress.
+const TASK_COLUMNS =
+  'id, title, completed, created_at, updated_at, scheduled_for, is_all_day, is_waiting, context, category, notes, phone_number, contact_id, assigned_to, project_id, parent_task_id, location, location_place_id'
 
 export interface BirthdayItem {
   name: string
@@ -124,7 +129,7 @@ export function useWallData(): UseWallDataReturn {
         // 2. Tasks in date range (family only for kiosk)
         supabase
           .from('tasks')
-          .select('*')
+          .select(TASK_COLUMNS)
           .gte('scheduled_for', startDate.toISOString())
           .lte('scheduled_for', endDate.toISOString())
           .eq('context', 'family'),
@@ -169,7 +174,7 @@ export function useWallData(): UseWallDataReturn {
         // 11. Overdue tasks (scheduled before today, not completed, family only)
         supabase
           .from('tasks')
-          .select('*')
+          .select(TASK_COLUMNS)
           .lt('scheduled_for', startDate.toISOString())
           .eq('completed', false)
           .eq('context', 'family'),
@@ -392,16 +397,28 @@ export function useWallData(): UseWallDataReturn {
     }
   }, [user, isConnected, fetchEvents])
 
-  // Initial fetch + polling
+  // Initial fetch + polling. Skip polls while the tab is hidden (backgrounded
+  // laptop/phone tabs) to avoid needless egress; refetch immediately on return
+  // so the view is fresh when someone comes back to it. The always-on wall TV
+  // stays visible, so it keeps polling at the normal interval.
   useEffect(() => {
     mountedRef.current = true
     fetchAllData()
 
-    const interval = setInterval(fetchAllData, POLL_INTERVAL_MS)
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return
+      fetchAllData()
+    }, POLL_INTERVAL_MS)
+
+    const onVisibility = () => {
+      if (!document.hidden) fetchAllData()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
 
     return () => {
       mountedRef.current = false
       clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisibility)
     }
   }, [fetchAllData])
 

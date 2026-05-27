@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import type { EmailActionItem, EmailActionCategory } from '@/types/emailAction'
 
-const POLL_INTERVAL_MS = 2 * 60 * 1000 // 2 minutes
+const POLL_INTERVAL_MS = 8 * 60 * 1000 // 8 minutes — realtime covers new items; poll is a safety net
 const SCAN_INTERVAL_MS = 2 * 60 * 60 * 1000 // 2 hours
 const SCAN_KEY = 'email-scanner-last-run'
 
