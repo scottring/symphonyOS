@@ -21,6 +21,8 @@ interface UseDirectionsResult {
   searchPlaces: (query: string) => Promise<PlaceAutocompleteResult[]>
   getPlaceDetails: (placeId: string) => Promise<{ address: string; name: string } | null>
   openInMaps: (context: DirectionsContext) => void
+  /** Pure URL builder for a route — render into an <a target="_blank">. */
+  buildMapsUrl: (context: DirectionsContext) => string
 }
 
 /**
@@ -287,8 +289,12 @@ export function useDirections(): UseDirectionsResult {
   // }, [])
   // =============================================================================
 
-  // Open route in Google Maps app/web
-  const openInMaps = useCallback((context: DirectionsContext) => {
+  // Build the Google Maps directions URL for a route. Pure — render it into an
+  // <a target="_blank"> rather than calling window.open: on iOS a programmatic
+  // window.open spawns a new tab that redirects into the Maps app, stranding the
+  // user on a blank leftover tab when they come back. A real anchor lets the OS
+  // hand the universal link to Maps and return cleanly to Symphony.
+  const buildMapsUrl = useCallback((context: DirectionsContext): string => {
     const origin = encodeURIComponent(context.origin.address)
     const destination = encodeURIComponent(context.destination.address)
 
@@ -298,7 +304,6 @@ export function useDirections(): UseDirectionsResult {
       .map(stop => encodeURIComponent(stop.address))
       .join('|')
 
-    // Build Google Maps URL
     let url = `https://www.google.com/maps/dir/?api=1`
     url += `&origin=${origin}`
     url += `&destination=${destination}`
@@ -307,17 +312,19 @@ export function useDirections(): UseDirectionsResult {
       url += `&waypoints=${waypoints}`
     }
 
-    // Map travel mode to Google Maps format
     const travelModeMap: Record<TravelMode, string> = {
       driving: 'driving',
       walking: 'walking',
       transit: 'transit',
     }
     url += `&travelmode=${travelModeMap[context.travelMode]}`
-
-    // Open in new tab/app
-    window.open(url, '_blank')
+    return url
   }, [])
+
+  // Open route in Google Maps app/web (non-anchor callers).
+  const openInMaps = useCallback((context: DirectionsContext) => {
+    window.open(buildMapsUrl(context), '_blank', 'noopener')
+  }, [buildMapsUrl])
 
   return {
     isCalculating,
@@ -328,6 +335,7 @@ export function useDirections(): UseDirectionsResult {
     searchPlaces,
     getPlaceDetails,
     openInMaps,
+    buildMapsUrl,
   }
 }
 

@@ -57,7 +57,7 @@ export function DirectionsBuilder({
   eventTitle,
   defaultOrigin,
 }: DirectionsBuilderProps) {
-  const { isCalculating, error, result, calculateRoute, searchPlaces, getPlaceDetails, openInMaps } = useDirections()
+  const { isCalculating, error, result, calculateRoute, searchPlaces, getPlaceDetails, buildMapsUrl } = useDirections()
 
   // State - Origin can be changed via location picker
   const [origin, setOrigin] = useState<RouteStop>(() => {
@@ -229,15 +229,12 @@ export function DirectionsBuilder({
     setOriginSearchResults([])
   }
 
-  const handleOpenInMaps = () => {
-    const context: DirectionsContext = {
-      origin,
-      destination: destinationStop,
-      stops,
-      travelMode,
-    }
-    openInMaps(context)
-  }
+  const mapsUrl = buildMapsUrl({
+    origin,
+    destination: destinationStop,
+    stops,
+    travelMode,
+  })
 
   return (
     <div>
@@ -445,17 +442,21 @@ export function DirectionsBuilder({
         ) : null}
       </div>
 
-      {/* Open in Maps button */}
+      {/* Open in Maps — a real anchor (not window.open): on iOS the OS hands the
+          universal link to the Maps app and returns to Symphony cleanly, instead
+          of stranding the user on a blank leftover tab. */}
       <div className="px-4 py-4">
-        <button
-          onClick={handleOpenInMaps}
+        <a
+          href={mapsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
           className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary-500 text-white font-medium rounded-xl hover:bg-primary-600 transition-colors"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
           </svg>
           Open in Maps
-        </button>
+        </a>
       </div>
     </div>
   )
