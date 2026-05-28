@@ -7,6 +7,18 @@ import type { TimelineItem } from '@/types/timeline'
 // Force the mobile branch of ScheduleItem to render.
 vi.mock('@/hooks/useMobile', () => ({ useMobile: () => true }))
 
+// Defensive: ScheduleItem's desktop branch calls useScheduleActionsContext,
+// which throws without a provider. The mobile branch never reaches those
+// sub-components today, but mocking the context here keeps these tests safe
+// against future refactors that pull a context consumer into the mobile path.
+vi.mock('@/contexts/ScheduleActionsContext', () => ({
+  useScheduleActionsContext: () => ({
+    onToggleTask: () => {},
+    onStartMeeting: undefined,
+  }),
+  ScheduleActionsProvider: ({ children }: { children: React.ReactNode }) => children,
+}))
+
 const baseTask: TimelineItem = {
   id: 'task-1',
   type: 'task',
