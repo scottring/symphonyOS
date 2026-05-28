@@ -928,17 +928,55 @@ function ScheduleItemMobileCard({
   cardClassName,
   children,
 }: ScheduleItemMobileCardProps) {
-  const [dx, setDx] = useState(0)
+  // `dragging` is the only React state — it flips on/off between gestures so
+  // the CSS transition class can toggle. Per-frame motion is driven via refs
+  // below so the card subtree (including dropdowns) never re-renders mid-drag.
   const [dragging, setDragging] = useState(false)
+
+  const cardEl = useRef<HTMLDivElement>(null)
+  const completePanelEl = useRef<HTMLDivElement>(null)
+  const editPanelEl = useRef<HTMLDivElement>(null)
+
   const startX = useRef(0)
   const startY = useRef(0)
   const decided = useRef<'horizontal' | 'vertical' | null>(null)
+  const dxRef = useRef(0)
+  const rafPending = useRef(false)
+  const haptic = useRef(false) // fires once per gesture when crossing commit
+
+  const paint = () => {
+    rafPending.current = false
+    const dx = dxRef.current
+    if (cardEl.current) {
+      cardEl.current.style.transform = `translateX(${dx}px)`
+    }
+    const intensity = Math.min(1, Math.abs(dx) / swipeCommitPx)
+    if (completePanelEl.current) {
+      completePanelEl.current.style.opacity = dx < 0 ? String(intensity) : '0'
+    }
+    if (editPanelEl.current) {
+      editPanelEl.current.style.opacity = dx > 0 ? String(intensity) : '0'
+    }
+    // Light haptic tick on commit-threshold crossing (Android only; no-op on iOS).
+    if (!haptic.current && Math.abs(dx) >= swipeCommitPx) {
+      haptic.current = true
+      navigator.vibrate?.(10)
+    }
+  }
+
+  const requestPaint = () => {
+    if (rafPending.current) return
+    rafPending.current = true
+    requestAnimationFrame(paint)
+  }
 
   const onTouchStart = (e: React.TouchEvent) => {
     const t = e.touches[0]
     startX.current = t.clientX
     startY.current = t.clientY
     decided.current = null
+    dxRef.current = 0
+    haptic.current = false
     setDragging(true)
   }
 
@@ -951,13 +989,12 @@ function ScheduleItemMobileCard({
       decided.current = Math.abs(ax) > Math.abs(ay) ? 'horizontal' : 'vertical'
     }
     if (decided.current === 'vertical') return // let the page scroll
-    // clamp the visible translation so it doesn't drag off-screen
-    const clamped = Math.max(-swipeMaxPx, Math.min(swipeMaxPx, ax))
-    setDx(clamped)
+    dxRef.current = Math.max(-swipeMaxPx, Math.min(swipeMaxPx, ax))
+    requestPaint()
   }
 
-  const onTouchEnd = () => {
-    setDragging(false)
+  const commit = () => {
+    const dx = dxRef.current
     if (decided.current === 'horizontal') {
       // Right-to-left (dx < 0) → Complete. Left-to-right (dx > 0) → Edit.
       if (dx <= -swipeCommitPx) {
@@ -966,48 +1003,48 @@ function ScheduleItemMobileCard({
         onEditSwipe()
       }
     }
-    setDx(0)
+    // Snap back. Once `dragging` flips to false on the next React frame, the
+    // card gains the transform-transition class, so this looks like a spring.
+    dxRef.current = 0
+    requestPaint()
     decided.current = null
+    setDragging(false)
   }
-
-  // Visibility of action panels — fade in proportionally with drag.
-  const rightActive = dx > 0
-  const leftActive = dx < 0
-  const intensity = Math.min(1, Math.abs(dx) / swipeCommitPx)
 
   return (
     <div className="relative mb-3 overflow-hidden rounded-2xl">
-      {/* Complete action — revealed when swiping right-to-left (card moves
-          left, exposing the right side of the row). */}
+      {/* Complete action — right side, revealed on right-to-left swipe. */}
       <div
+        ref={completePanelEl}
         aria-hidden
-        className={`absolute inset-y-0 right-0 w-1/2 flex items-center justify-end pr-5 rounded-r-2xl bg-emerald-500 transition-opacity ${leftActive ? 'opacity-100' : 'opacity-0'}`}
-        style={{ opacity: leftActive ? intensity : 0 }}
+        className="absolute inset-y-0 right-0 w-1/2 flex items-center justify-end pr-5 rounded-r-2xl bg-emerald-500"
+        style={{ opacity: 0 }}
       >
         <Check className="w-6 h-6 text-white" />
         <span className="ml-2 text-white text-sm font-medium">Complete</span>
       </div>
-      {/* Edit action — revealed when swiping left-to-right (card moves
-          right, exposing the left side of the row). */}
+      {/* Edit action — left side, revealed on left-to-right swipe. */}
       <div
+        ref={editPanelEl}
         aria-hidden
-        className={`absolute inset-y-0 left-0 w-1/2 flex items-center justify-start pl-5 rounded-l-2xl bg-sky-500 transition-opacity ${rightActive ? 'opacity-100' : 'opacity-0'}`}
-        style={{ opacity: rightActive ? intensity : 0 }}
+        className="absolute inset-y-0 left-0 w-1/2 flex items-center justify-start pl-5 rounded-l-2xl bg-sky-500"
+        style={{ opacity: 0 }}
       >
         <Pencil className="w-5 h-5 text-white" />
         <span className="ml-2 text-white text-sm font-medium">Edit</span>
       </div>
 
       <div
+        ref={cardEl}
         data-selectable
         aria-pressed={ariaPressed}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-        onTouchCancel={onTouchEnd}
+        onTouchEnd={commit}
+        onTouchCancel={commit}
         className={cardClassName}
         style={{
-          transform: `translateX(${dx}px)`,
+          transform: 'translateX(0px)',
           transition: dragging ? 'none' : 'transform 200ms ease-out',
           touchAction: 'pan-y',
         }}

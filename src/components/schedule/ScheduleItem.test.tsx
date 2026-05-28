@@ -99,3 +99,24 @@ describe('ScheduleItem — mobile swipe gesture', () => {
     expect(onToggleComplete).not.toHaveBeenCalled()
   })
 })
+
+describe('ScheduleItem — swipe runtime', () => {
+  it('updates the card transform via inline style on touchmove', async () => {
+    const { container } = render(
+      <ScheduleItem
+        item={baseTask}
+        onSelect={vi.fn()}
+        onToggleComplete={vi.fn()}
+      />,
+    )
+    const card = container.querySelector('[data-selectable]') as HTMLElement
+    fireEvent.touchStart(card, { touches: [{ clientX: 200, clientY: 100 }] })
+    fireEvent.touchMove(card, { touches: [{ clientX: 140, clientY: 100 }] })
+    // Flush the rAF tick scheduled by touchmove.
+    await new Promise((r) => requestAnimationFrame(() => r(null)))
+    // The card's inline transform must reflect the drag delta directly,
+    // proving the gesture is driven by ref-based DOM writes rather than a
+    // React re-render path.
+    expect(card.style.transform).toMatch(/translateX\(-60px\)/)
+  })
+})
