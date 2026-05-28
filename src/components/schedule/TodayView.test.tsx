@@ -4,6 +4,10 @@ import { render } from '@/test/test-utils'
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext'
 import { TodayView } from './TodayView'
 
+// File-wide mock: every test in this file renders TodayView's mobile branch.
+// Today this affects exactly one JS branch (the EveningMealCard at
+// TodayView.tsx ~line 651) — if you add a meal-related test, scope a
+// per-test override with vi.spyOn so the desktop meal card path is reachable.
 vi.mock('@/hooks/useMobile', () => ({ useMobile: () => true }))
 vi.mock('@/hooks/useWeather', () => ({ useWeather: () => ({ weather: null, loading: false, error: 'x', requestLocation: vi.fn() }) }))
 vi.mock('@/hooks/useProactiveSuggestions', () => ({ useProactiveSuggestions: () => ({ suggestions: [], topSuggestions: [], suggestionsForEntity: () => [], actOnSuggestion: vi.fn(), dismissSuggestion: vi.fn(), isLoading: false }) }))
@@ -235,8 +239,9 @@ describe('TodayView', () => {
     }
   })
 
-  it('renders mobile section headers in italic serif on mobile', () => {
-    // Create a task scheduled for the morning (8am)
+  it('renders the Morning section header on mobile in italic serif', () => {
+    // Create a task scheduled for the morning (8am) so the Morning section
+    // actually renders.
     const morningTime = new Date(TODAY)
     morningTime.setHours(8, 0, 0)
 
@@ -254,15 +259,21 @@ describe('TodayView', () => {
       ],
     } as never)
 
-    // Query for h3 elements with md:hidden class
-    const headers = document.querySelectorAll('h3.md\\:hidden')
-    expect(headers.length).toBeGreaterThan(0)
+    // Both responsive variants (desktop hidden md:flex + mobile md:hidden)
+    // render in jsdom; verifying both exist is the durable behavior check.
+    // If the responsive split is ever consolidated, this test will fail
+    // loudly and the developer can adjust the count accordingly.
+    expect(screen.getAllByText('Morning')).toHaveLength(2)
 
-    // Verify each header has the font-display italic styling
-    headers.forEach((h) => {
-      const span = h.querySelector('span.font-display')
-      expect(span).not.toBeNull()
-      expect(span?.className).toMatch(/italic/)
-    })
+    // At least one of the two label nodes must carry the mobile variant's
+    // editorial italic-serif treatment. Asserted via Tailwind utility
+    // classes because that is what makes the mobile variant distinct from
+    // the desktop variant; this is the smallest assertion that still
+    // verifies the design intent.
+    const labels = screen.getAllByText('Morning')
+    const italicSerifMatch = labels.some(
+      (el) => /font-display/.test(el.className) && /italic/.test(el.className),
+    )
+    expect(italicSerifMatch).toBe(true)
   })
 })
