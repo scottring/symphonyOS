@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Eye, EyeOff, Moon, Sun, RefreshCw, ImageOff } from 'lucide-react';
 import { useActionableInstances } from '@/hooks/useActionableInstances';
 import { WallV2GuestScreen } from './WallV2GuestScreen';
-import { WallV2ItemActionSheet } from './WallV2ItemActionSheet';
+import { WallV2ItemActionSheet, type PushPreset } from './WallV2ItemActionSheet';
 import {
   readHideRoutines,
   writeHideRoutines,
@@ -51,6 +51,38 @@ import type {
   WallV2GroceryData,
   WallV2TimelineEvent,
 } from './types';
+import type { Task } from '@/types/task';
+
+/**
+ * Map one of the wall's four push presets to the exact Partial<Task>
+ * mutation the existing updateTask hook expects. Exported so it can be
+ * unit-tested without spinning up the Shell.
+ *
+ * - this-week  → drop into the "week" bucket
+ * - next-week  → drop into "week" + set weekDeferredAt=now (existing
+ *                convention: "sink to the bottom of This Week so it
+ *                surfaces during next week's planning")
+ * - next-month → drop into "month"
+ * - someday    → drop into "quarter" (longest review horizon; the
+ *                family-readable "Someday" label is UI-only)
+ *
+ * scheduledFor and isSomeday are always cleared: a bucket push means
+ * "do this in that bucket, no specific date," matching how triage
+ * already mutates tasks elsewhere in the app.
+ */
+export function pushPresetToUpdates(preset: PushPreset): Partial<Task> {
+  const common = { scheduledFor: undefined, isSomeday: false } as const
+  switch (preset) {
+    case 'this-week':
+      return { ...common, bucket: 'week', weekDeferredAt: undefined }
+    case 'next-week':
+      return { ...common, bucket: 'week', weekDeferredAt: new Date() }
+    case 'next-month':
+      return { ...common, bucket: 'month', weekDeferredAt: undefined }
+    case 'someday':
+      return { ...common, bucket: 'quarter', weekDeferredAt: undefined }
+  }
+}
 
 function formatDate(d: Date): { weekday: string; fullDate: string } {
   const weekday = d.toLocaleDateString('en-US', { weekday: 'long' });
