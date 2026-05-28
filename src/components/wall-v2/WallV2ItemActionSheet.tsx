@@ -1,16 +1,35 @@
 import { Redo2, Check, X } from 'lucide-react'
 import type { WallV2TimelineEvent } from './types'
 
+/**
+ * Push targets a task to a fuzzy time bucket without picking a specific
+ * date. The four presets are the wall's only push vocabulary; finer
+ * scheduling stays on mobile / desktop.
+ */
+export type PushPreset = 'this-week' | 'next-week' | 'next-month' | 'someday'
+
 interface Props {
   event: WallV2TimelineEvent
   /** (id, kind) — id keeps its prefix; the shell strips it for the entity call. */
   onSkip: (id: string, kind: 'event' | 'routine') => void
-  onMarkDone: (id: string, kind: 'event' | 'routine') => void
+  /** Now widened to accept tasks; the Shell internally routes task completes
+   *  through the same handleToggleComplete the row's checkbox already uses. */
+  onMarkDone: (id: string, kind: 'event' | 'routine' | 'task') => void
+  /** Task variant only — emits a fuzzy push preset; the Shell maps it to a
+   *  bucket mutation. Routines / events never fire this. */
+  onPushTask: (id: string, preset: PushPreset) => void
   onClose: () => void
 }
 
-export function WallV2ItemActionSheet({ event, onSkip, onMarkDone, onClose }: Props) {
-  const kind = event.kind === 'routine' ? 'routine' : 'event'
+const PUSH_PRESETS: ReadonlyArray<{ preset: PushPreset; label: string }> = [
+  { preset: 'this-week',  label: 'This week'  },
+  { preset: 'next-week',  label: 'Next week'  },
+  { preset: 'next-month', label: 'Next month' },
+  { preset: 'someday',    label: 'Someday'    },
+]
+
+export function WallV2ItemActionSheet({ event, onSkip, onMarkDone, onPushTask, onClose }: Props) {
+  const kind: 'routine' | 'event' | 'task' = event.kind ?? 'event'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
@@ -24,23 +43,52 @@ export function WallV2ItemActionSheet({ event, onSkip, onMarkDone, onClose }: Pr
         </div>
 
         <div className="flex flex-col gap-3">
-          {kind === 'routine' && (
-            <button
-              type="button"
-              onClick={() => { onMarkDone(event.id, 'routine'); onClose() }}
-              className="flex items-center justify-center gap-3 w-full min-h-[64px] rounded-2xl bg-emerald-500 text-white text-lg font-bold active:scale-[0.98] transition-transform"
-            >
-              <Check className="w-6 h-6" /> Mark done
-            </button>
-          )}
+          {kind === 'task' ? (
+            <>
+              {/* Complete — full-width emerald (matches routine "Mark done") */}
+              <button
+                type="button"
+                onClick={() => { onMarkDone(event.id, 'task'); onClose() }}
+                className="flex items-center justify-center gap-3 w-full min-h-[64px] rounded-2xl bg-emerald-500 text-white text-lg font-bold active:scale-[0.98] transition-transform"
+              >
+                <Check className="w-6 h-6" /> Mark complete
+              </button>
 
-          <button
-            type="button"
-            onClick={() => { onSkip(event.id, kind); onClose() }}
-            className="flex items-center justify-center gap-3 w-full min-h-[64px] rounded-2xl bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-200 text-lg font-bold active:scale-[0.98] transition-transform"
-          >
-            <Redo2 className="w-6 h-6" /> Skip today
-          </button>
+              {/* Push presets — 2×2 grid of stone buttons */}
+              <div className="grid grid-cols-2 gap-3">
+                {PUSH_PRESETS.map(({ preset, label }) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => { onPushTask(event.id, preset); onClose() }}
+                    className="flex items-center justify-center w-full min-h-[64px] rounded-2xl bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-200 text-lg font-bold active:scale-[0.98] transition-transform"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              {kind === 'routine' && (
+                <button
+                  type="button"
+                  onClick={() => { onMarkDone(event.id, 'routine'); onClose() }}
+                  className="flex items-center justify-center gap-3 w-full min-h-[64px] rounded-2xl bg-emerald-500 text-white text-lg font-bold active:scale-[0.98] transition-transform"
+                >
+                  <Check className="w-6 h-6" /> Mark done
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => { onSkip(event.id, kind); onClose() }}
+                className="flex items-center justify-center gap-3 w-full min-h-[64px] rounded-2xl bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-200 text-lg font-bold active:scale-[0.98] transition-transform"
+              >
+                <Redo2 className="w-6 h-6" /> Skip today
+              </button>
+            </>
+          )}
 
           <button
             type="button"
