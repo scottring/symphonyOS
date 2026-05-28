@@ -126,8 +126,15 @@ export function WallV2Shell() {
   );
 
   const timeline = useMemo(
-    () => adaptTimelineSections(todayData, wallData.familyMembers, now, dinnerEvent, hideRoutines),
-    [todayData, wallData.familyMembers, now, dinnerEvent, hideRoutines],
+    () => adaptTimelineSections(
+      todayData,
+      wallData.familyMembers,
+      now,
+      dinnerEvent,
+      hideRoutines,
+      wallData.overdueTasks,
+    ),
+    [todayData, wallData.familyMembers, now, dinnerEvent, hideRoutines, wallData.overdueTasks],
   );
 
   const upcoming = useMemo(
