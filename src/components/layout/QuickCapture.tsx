@@ -53,6 +53,11 @@ export function QuickCapture({
 
   const [title, setTitle] = useState('')
   const [isClosing, setIsClosing] = useState(false)
+  // `isEntering` is true for one frame after the sheet mounts so the mobile
+  // bottom sheet can transition from translate-y-full → translate-y-0 (a
+  // visible slide-up). Without this, the sheet appears already in its open
+  // position and the slide is invisible. Desktop ignores it (no transform).
+  const [isEntering, setIsEntering] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const autoCloseTimerRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -114,12 +119,18 @@ export function QuickCapture({
     }, 200) // Match the animation duration
   }
 
-  // Focus input when modal opens
+  // Focus input when modal opens, and run the one-tick entrance animation.
   useEffect(() => {
     if (isOpen) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting on modal open is valid
       setTitle('')
       resetOverrides()
+      // Mount in the offscreen state, then flip to the on-screen state on
+      // the next animation frame so the CSS transition has a starting point
+      // to interpolate from. Without this, mobile mounts already at
+      // translate-y-0 and the slide-up is invisible.
+      setIsEntering(true)
+      requestAnimationFrame(() => setIsEntering(false))
       setTimeout(() => inputRef.current?.focus(), 50)
     }
   }, [isOpen])
@@ -277,7 +288,7 @@ export function QuickCapture({
               p-6
               transform transition-transform duration-200 md:transition-all
               motion-reduce:transition-none
-              ${isClosing
+              ${isClosing || isEntering
                 ? 'translate-y-full md:translate-y-0 md:opacity-0 md:scale-95'
                 : 'translate-y-0 md:opacity-100 md:scale-100'}
             `}
