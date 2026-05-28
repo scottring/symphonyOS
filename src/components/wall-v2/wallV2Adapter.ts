@@ -51,7 +51,7 @@ function memberTint(m: FamilyMember | undefined): WallV2Tint {
   return COLOR_TO_TINT[m.color] ?? 'sand';
 }
 
-function memberBubble(m: FamilyMember): WallV2MemberBubble {
+export function memberBubble(m: FamilyMember): WallV2MemberBubble {
   return {
     id: m.id,
     initials: m.initials,
