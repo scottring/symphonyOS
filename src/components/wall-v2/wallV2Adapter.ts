@@ -221,7 +221,11 @@ export function adaptTimelineSections(
   hideDailyRoutines: boolean,
   overdueTasks: TimelineItem[],
 ): WallV2TimelineSection[] {
-  if (!today) return [];
+  // Compute overdue first so it survives the no-today early return below.
+  // Without this, a transient data race (today missing in days, overdue
+  // populated) would silently drop the user's overdue list on the wall.
+  const overdueOnlyEarly = adaptOverdueSection(overdueTasks, members, now);
+  if (!today) return overdueOnlyEarly ? [overdueOnlyEarly] : [];
 
   // "Hide daily" drops routines that effectively recur every weekday (daily +
   // weekday-only weeklies). One-off routines (since-last, monthly, etc.) stay
@@ -293,8 +297,9 @@ export function adaptTimelineSections(
   if (nightItems.length > 0) {
     baseSections.push({ id: 'night', label: 'Night', icon: Moon, tint: 'sand', events: nightItems });
   }
-  const overdueSection = adaptOverdueSection(overdueTasks, members, now);
-  return overdueSection ? [overdueSection, ...baseSections] : baseSections;
+  // Reuse the overdue computation from the top of the function — same
+  // inputs, same output, no point computing twice.
+  return overdueOnlyEarly ? [overdueOnlyEarly, ...baseSections] : baseSections;
 }
 
 // ────────────────────────────────────────────────────────────────────────────

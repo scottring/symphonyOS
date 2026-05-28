@@ -229,10 +229,12 @@ describe('adaptTimelineSections', () => {
 
     const sections = adaptTimelineSections(today, [], now, null, false, [overdueTask]);
 
-    // First section should be Overdue, then the existing sections in order.
+    // First section should be Overdue, then Morning. The concrete
+    // .toBe('morning') (not just .not.toBe('overdue')) catches the
+    // silent-regression where morning gets dropped during the prepend.
     expect(sections[0].id).toBe('overdue');
     expect(sections[0].events[0].title).toBe('Pay water bill');
-    expect(sections[1].id).not.toBe('overdue');
+    expect(sections[1].id).toBe('morning');
   });
 
   it('omits the Overdue section entirely when overdueTasks is empty', () => {
@@ -253,6 +255,34 @@ describe('adaptTimelineSections', () => {
     const sections = adaptTimelineSections(today, [], now, null, false, []);
 
     expect(sections.find((s) => s.id === 'overdue')).toBeUndefined();
+  });
+
+  it('returns the Overdue section alone when today data is missing but overdueTasks are present', () => {
+    // Edge case: a transient data race (today not yet matched in days,
+    // overdue already loaded). The early return must NOT silently swallow
+    // the overdue list — the family needs to see it even with no day data.
+    const now = new Date('2026-05-28T09:00:00');
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const overdueTask = makeItem({
+      id: 'task-od-stale',
+      type: 'task',
+      title: 'Pay water bill',
+      startTime: yesterday,
+      completed: false,
+    });
+
+    const sections = adaptTimelineSections(undefined, [], now, null, false, [overdueTask]);
+
+    expect(sections).toHaveLength(1);
+    expect(sections[0].id).toBe('overdue');
+    expect(sections[0].events[0].title).toBe('Pay water bill');
+  });
+
+  it('returns an empty array when both today and overdueTasks are absent', () => {
+    const now = new Date('2026-05-28T09:00:00');
+    const sections = adaptTimelineSections(undefined, [], now, null, false, []);
+    expect(sections).toEqual([]);
   });
 });
 
