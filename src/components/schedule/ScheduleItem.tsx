@@ -16,6 +16,7 @@ import { TaskCheckbox } from './TaskCheckbox'
 import { PromoteToProjectButton } from './PromoteToProjectButton'
 import { PromoteTaskToProjectButton } from './PromoteTaskToProjectButton'
 import { ExpandingPanel } from './ExpandingPanel'
+import { MobileTypeTile } from './MobileTypeTile'
 import { DOMAIN_COLORS } from '@/lib/domainColors'
 import { rowSubtitle } from '@/lib/rowSubtitle'
 import { locationLink } from '@/lib/locationLink'
@@ -369,17 +370,24 @@ export const ScheduleItem = memo(function ScheduleItem({
         onCompleteSwipe={() => handleCheckboxClick({ stopPropagation: () => {} } as React.MouseEvent)}
         onEditSwipe={onSelect}
         cardClassName={`
-          relative flex items-center gap-3 bg-bg-elevated rounded-xl border border-neutral-200/50
-          px-3 py-3
-          ${selected ? 'ring-2 ring-primary-300' : ''}
+          relative flex items-center gap-3 bg-bg-elevated rounded-2xl border border-neutral-200/70
+          px-3 py-3 shadow-card
+          ${selected ? 'ring-2 ring-primary-300 shadow-md' : ''}
           ${item.completed || item.skipped ? 'opacity-60' : ''}
         `}
         ariaPressed={selected}
       >
         {/* Left time column — stacked */}
-        <div className="w-12 shrink-0 text-[12px] font-medium text-neutral-500 leading-tight tabular-nums text-left">
+        <div className="w-10 shrink-0 text-[11px] font-medium text-neutral-500 leading-tight tabular-nums text-left">
           {renderStackedTime()}
         </div>
+
+        {/* Tinted type tile — anchors the row's left side and carries domain color */}
+        <MobileTypeTile
+          type={item.type}
+          context={item.context ?? null}
+          completed={item.completed || item.skipped}
+        />
 
         {/* Title + context line */}
         <div className="flex-1 min-w-0">
@@ -396,7 +404,7 @@ export const ScheduleItem = memo(function ScheduleItem({
 
         {/* Right cluster — project tag + assignee. Three-dot removed; swipe
             now exposes the same actions (right→complete, left→edit). */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1 shrink-0">
           {projectName && (
             <Tag className="w-4 h-4 text-orange-400" style={projectColor ? { color: projectColor } : undefined} />
           )}
@@ -966,7 +974,7 @@ function ScheduleItemMobileCard({
   const intensity = Math.min(1, Math.abs(dx) / swipeCommitPx)
 
   return (
-    <div className="relative mb-2 overflow-hidden rounded-xl">
+    <div className="relative mb-3 overflow-hidden rounded-2xl">
       {/* Complete action — revealed when swiping right (card moves right). */}
       <div
         aria-hidden
