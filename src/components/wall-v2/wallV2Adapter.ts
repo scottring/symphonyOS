@@ -451,7 +451,8 @@ function overdueLabel(scheduledFor: Date, now: Date): string {
  *
  * The data layer (useWallData.ts) already filters to family-context,
  * incomplete, scheduled-before-today tasks. This function only re-shapes,
- * caps, sorts, and attaches bubbles.
+ * sorts oldest-first, and attaches bubbles. No UI cap — the Timeline
+ * column handles long lists via scroll.
  */
 export function adaptOverdueSection(
   overdueTasks: TimelineItem[],
@@ -468,9 +469,11 @@ export function adaptOverdueSection(
     (a, b) => (a.startTime!.getTime() - b.startTime!.getTime()),
   );
 
-  const capped = sorted.slice(0, 5);
-
-  const events: WallV2TimelineEvent[] = capped.map((t) => {
+  // No cap — the wall's Timeline column owns scrolling
+  // (overflow-y-auto on WallV2Timeline's inner section), so a long
+  // overdue list is reachable by scroll. The family's "let me scroll"
+  // ask defeats a UI cap.
+  const events: WallV2TimelineEvent[] = sorted.map((t) => {
     const assignee = t.assignedTo ? members.find((m) => m.id === t.assignedTo) : undefined;
     return {
       id: t.id,

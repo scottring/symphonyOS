@@ -372,10 +372,13 @@ describe('adaptOverdueSection', () => {
     expect(section!.events).toHaveLength(1);
   });
 
-  it('caps the section at 5 rows even when more tasks are overdue', () => {
-    const tasks = [1, 2, 3, 4, 5, 6, 7, 8].map((d) => makeOverdueTask(d));
+  it('renders every overdue task — no UI cap (Timeline column owns scrolling)', () => {
+    const tasks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((d) => makeOverdueTask(d));
     const section = adaptOverdueSection(tasks, [], now);
-    expect(section!.events).toHaveLength(5);
+    // The Timeline column has overflow-y-auto and handles long lists by
+    // scroll; capping here would defeat the family's "let me reach all
+    // overdue" intent.
+    expect(section!.events).toHaveLength(12);
   });
 
   it('sorts rows oldest first regardless of input order', () => {
