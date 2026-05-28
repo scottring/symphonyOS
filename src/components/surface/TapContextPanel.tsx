@@ -92,7 +92,16 @@ export function TapContextPanel(props: TapContextPanelProps) {
   const mightBeRelevant = useMightBeRelevant(task, { allTasks })
 
   return (
-    <article className="bg-bg-elevated rounded-2xl p-5 max-w-md w-full">
+    <article
+      className="
+        bg-bg-elevated max-w-md w-full
+        rounded-2xl
+        px-4 md:px-5 py-3 md:py-5
+        divide-y divide-neutral-200/60
+        [&>*]:py-4 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0
+      "
+      style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
+    >
       <PanelHeader
         title={task.title}
         onTitleChange={props.onTitleChange}

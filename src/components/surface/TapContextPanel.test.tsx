@@ -117,4 +117,41 @@ describe('TapContextPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: /personal/i }))
     expect(onContextChange).toHaveBeenCalledWith('personal')
   })
+
+  it('lays sections out in a single column with hairline dividers and safe-top padding', () => {
+    const task = createMockTask({ id: 'task-1', title: 'Test Task' })
+    const { container } = render(
+      <TapContextPanel
+        task={task}
+        contacts={[]}
+        projects={[]}
+        events={[]}
+        familyMembers={[]}
+        siblingTaskCandidates={[]}
+        allTasks={[task]}
+        {...baseHandlers}
+        onAddLink={vi.fn()}
+        onUpdateLocation={vi.fn()}
+        onClearLocation={vi.fn()}
+        onContextChange={vi.fn()}
+        onAssigneesChange={vi.fn()}
+        onAddSubtask={vi.fn()}
+        onToggleSubtask={vi.fn()}
+        onOpenTask={vi.fn()}
+        onOpenRelated={vi.fn()}
+      />,
+    )
+    const article = container.querySelector('article')
+    expect(article).not.toBeNull()
+    // Check for divide-y hairline dividers between sections
+    expect(article!.className).toMatch(/divide-y/)
+    expect(article!.className).toMatch(/divide-neutral-200/)
+    // Mobile padding tighter than desktop
+    expect(article!.className).toMatch(/px-4/)
+    // Py-4 rhythm applied to direct children
+    expect(article!.className).toMatch(/\[&>\*\]:py-4/)
+    // First child has collapsed top padding, last child has collapsed bottom padding
+    expect(article!.className).toMatch(/\[&>\*:first-child\]:pt-0/)
+    expect(article!.className).toMatch(/\[&>\*:last-child\]:pb-0/)
+  })
 })
