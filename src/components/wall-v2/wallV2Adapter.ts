@@ -411,6 +411,12 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
  *
  * Internal helper for `adaptOverdueSection`; not part of the wall's
  * public adapter surface.
+ *
+ * NOTE on DST: setHours(0,0,0,0) floors to the engine's local timezone.
+ * A DST transition between scheduledFor and now can shift the delta by
+ * ±1h, which may push a boundary day (e.g. 6.5 days) into the wrong
+ * round-bucket twice a year. Acceptable for a family wall label; would
+ * not be acceptable for billing or SLA logic.
  */
 function overdueLabel(scheduledFor: Date, now: Date): string {
   // Compare day floors so a task scheduled for "yesterday 11pm" reads as
@@ -419,6 +425,10 @@ function overdueLabel(scheduledFor: Date, now: Date): string {
   startOfNow.setHours(0, 0, 0, 0);
   const startOfScheduled = new Date(scheduledFor);
   startOfScheduled.setHours(0, 0, 0, 0);
+  // Clamp to 1 so same-day stragglers (which shouldn't reach here per
+  // useWallData's `scheduled_for < today` filter) don't render as
+  // "0 days ago." If this ever returns 1 for a today-task, the caller's
+  // filter is the bug, not this function.
   const days = Math.max(1, Math.round((startOfNow.getTime() - startOfScheduled.getTime()) / MS_PER_DAY));
 
   if (days === 1) return 'Was due yesterday';
