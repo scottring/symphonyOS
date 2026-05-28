@@ -327,7 +327,10 @@ export function WallV2Shell() {
     // Tasks (and anything else) just flash their title for now.
     const tapped = timeline.flatMap((s) => s.events).find((e) => e.id === id);
     if (!tapped) return;
-    if (tapped.kind === 'routine' || tapped.kind === 'event') {
+    // Tasks now open the action sheet too (task variant) — completion
+    // plus four push presets. Routines and events keep their existing
+    // routine / event branches inside the sheet.
+    if (tapped.kind === 'routine' || tapped.kind === 'event' || tapped.kind === 'task') {
       setActionSheetItem(tapped);
     } else {
       showFlash(tapped.title);
@@ -342,13 +345,33 @@ export function WallV2Shell() {
     showFlash('Skipped for today');
   }, [skip, now, wallData, showFlash]);
 
-  const handleWallMarkDone = useCallback(async (id: string, kind: 'event' | 'routine') => {
+  const handleWallMarkDone = useCallback(async (id: string, kind: 'event' | 'routine' | 'task') => {
+    if (kind === 'task') {
+      // Reuse the same path the row's checkbox uses — single source of
+      // truth for "complete this task" mutations from the wall.
+      handleToggleComplete(id, true);
+      showFlash('Marked complete');
+      return;
+    }
     const entityType = kind === 'routine' ? 'routine' : 'calendar_event';
     const entityId = id.replace(/^(routine-|event-)/, '');
     await markDone(entityType, entityId, now);
     wallData.refetch();
     showFlash('Marked done');
-  }, [markDone, now, wallData, showFlash]);
+  }, [handleToggleComplete, markDone, now, wallData, showFlash]);
+
+  const handleWallPushTask = useCallback(async (id: string, preset: PushPreset) => {
+    const taskId = id.replace(/^task-/, '');
+    await updateTask(taskId, pushPresetToUpdates(preset));
+    wallData.refetch();
+    const flash: Record<PushPreset, string> = {
+      'this-week':  'Pushed to this week',
+      'next-week':  'Pushed to next week',
+      'next-month': 'Pushed to next month',
+      'someday':    'Pushed to Someday',
+    };
+    showFlash(flash[preset]);
+  }, [updateTask, wallData, showFlash]);
 
   const handleTapFullDay = useCallback(() => {
     // eslint-disable-next-line no-console
@@ -466,6 +489,7 @@ export function WallV2Shell() {
           event={actionSheetItem}
           onSkip={handleWallSkip}
           onMarkDone={handleWallMarkDone}
+          onPushTask={handleWallPushTask}
           onClose={() => setActionSheetItem(null)}
         />
       )}
