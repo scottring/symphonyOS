@@ -903,8 +903,8 @@ export const ScheduleItem = memo(function ScheduleItem({
 
 // ─── ScheduleItemMobileCard ──────────────────────────────────────────────────
 // Wraps the mobile card with swipe gestures:
-//   • drag right past commit threshold → fire onCompleteSwipe (complete)
-//   • drag left past commit threshold  → fire onEditSwipe (open detail)
+//   • drag left  past commit threshold → fire onCompleteSwipe (complete)
+//   • drag right past commit threshold → fire onEditSwipe (open detail)
 // Coloured action panels reveal underneath as the card slides. Touches that
 // move primarily vertically don't engage the swipe (so page scroll still
 // works). A small tap (delta < 6px) falls through to onClickCard.
