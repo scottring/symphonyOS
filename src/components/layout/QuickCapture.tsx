@@ -259,21 +259,36 @@ export function QuickCapture({
         </button>
       )}
 
-      {/* Modal Overlay */}
+      {/* Modal Overlay — bottom sheet on mobile, centered modal on desktop. */}
       {isOpen && (
         <div
-          className={`fixed inset-0 z-50 bg-black/40 flex items-center justify-center transition-opacity duration-200 ${
+          className={`fixed inset-0 z-50 bg-black/40 flex items-end justify-center md:items-center transition-opacity duration-200 ${
             isClosing ? 'opacity-0' : 'opacity-100'
           }`}
           onClick={handleClose}
         >
-          {/* Modal Content */}
+          {/* Sheet / Modal Content */}
           <div
-            className={`bg-white p-6 w-[90%] md:w-1/2 max-w-lg rounded-2xl shadow-xl transition-all duration-200 ${
-              isClosing ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
-            }`}
+            data-testid="quick-capture-sheet"
+            className={`
+              bg-bg-elevated shadow-xl
+              w-full md:w-1/2 md:max-w-lg
+              rounded-t-3xl md:rounded-2xl
+              p-6
+              transform transition-transform duration-200 md:transition-all
+              motion-reduce:transition-none
+              ${isClosing
+                ? 'translate-y-full md:translate-y-0 md:opacity-0 md:scale-95'
+                : 'translate-y-0 md:opacity-100 md:scale-100'}
+            `}
+            style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Drag handle — mobile only, decorative */}
+            <div
+              aria-hidden
+              className="md:hidden mx-auto w-10 h-1.5 rounded-full bg-neutral-200 mb-3"
+            />
             {/* Header with keyboard hint and close button */}
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-neutral-800">

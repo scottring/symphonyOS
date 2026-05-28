@@ -43,6 +43,37 @@ describe('QuickCapture', () => {
     })
   })
 
+  describe('mobile bottom sheet', () => {
+    it('anchors the overlay to the bottom on mobile (items-end)', () => {
+      const { container } = render(
+        <QuickCapture onAdd={vi.fn()} isOpen={true} showFab={false} />,
+      )
+      const overlay = container.querySelector('.fixed.inset-0') as HTMLElement
+      expect(overlay.className).toMatch(/items-end/)
+      // Desktop alignment is preserved as a responsive variant.
+      expect(overlay.className).toMatch(/md:items-center/)
+    })
+
+    it('uses bg-bg-elevated, full-bleed width, and rounded top corners on mobile', () => {
+      const { getByTestId } = render(
+        <QuickCapture onAdd={vi.fn()} isOpen={true} showFab={false} />,
+      )
+      const sheet = getByTestId('quick-capture-sheet')
+      expect(sheet.className).toMatch(/bg-bg-elevated/)
+      expect(sheet.className).toMatch(/w-full/)
+      expect(sheet.className).toMatch(/rounded-t-3xl/)
+    })
+
+    it('renders a decorative drag handle (mobile only)', () => {
+      const { container } = render(
+        <QuickCapture onAdd={vi.fn()} isOpen={true} showFab={false} />,
+      )
+      // The handle is the first child of the sheet and is mobile-only.
+      const handle = container.querySelector('.md\\:hidden.mx-auto.rounded-full')
+      expect(handle).not.toBeNull()
+    })
+  })
+
   describe('Close behavior', () => {
     it('calls onClose when Escape key is pressed', async () => {
       const onClose = vi.fn()
