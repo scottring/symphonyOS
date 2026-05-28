@@ -4,6 +4,7 @@ import { render } from '@/test/test-utils'
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext'
 import { TodayView } from './TodayView'
 
+vi.mock('@/hooks/useMobile', () => ({ useMobile: () => true }))
 vi.mock('@/hooks/useWeather', () => ({ useWeather: () => ({ weather: null, loading: false, error: 'x', requestLocation: vi.fn() }) }))
 vi.mock('@/hooks/useProactiveSuggestions', () => ({ useProactiveSuggestions: () => ({ suggestions: [], topSuggestions: [], suggestionsForEntity: () => [], actOnSuggestion: vi.fn(), dismissSuggestion: vi.fn(), isLoading: false }) }))
 vi.mock('@/hooks/useRoutineStats', () => ({ useRoutineStats: () => ({ getStats: () => undefined }) }))
@@ -232,5 +233,36 @@ describe('TodayView', () => {
       // Reset so other tests are unaffected
       mockNoteComposer = null
     }
+  })
+
+  it('renders mobile section headers in italic serif on mobile', () => {
+    // Create a task scheduled for the morning (8am)
+    const morningTime = new Date(TODAY)
+    morningTime.setHours(8, 0, 0)
+
+    renderView({
+      tasks: [
+        {
+          id: 'morning-task',
+          title: 'Morning task',
+          completed: false,
+          createdAt: TODAY,
+          updatedAt: TODAY,
+          bucket: 'timed' as const,
+          scheduledFor: morningTime,
+        },
+      ],
+    } as never)
+
+    // Query for h3 elements with md:hidden class
+    const headers = document.querySelectorAll('h3.md\\:hidden')
+    expect(headers.length).toBeGreaterThan(0)
+
+    // Verify each header has the font-display italic styling
+    headers.forEach((h) => {
+      const span = h.querySelector('span.font-display')
+      expect(span).not.toBeNull()
+      expect(span?.className).toMatch(/italic/)
+    })
   })
 })

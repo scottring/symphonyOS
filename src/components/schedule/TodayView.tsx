@@ -600,6 +600,17 @@ export function TodayView({
                     )}
                   </h3>
 
+                  <h3 className="md:hidden flex items-baseline gap-2 px-1 mb-2 mt-1">
+                    <span className="font-display italic text-[15px] text-neutral-600">
+                      {meta.label}
+                    </span>
+                    {meta.range && (
+                      <span className="text-[11px] text-neutral-400 tabular-nums">
+                        {meta.range}
+                      </span>
+                    )}
+                  </h3>
+
                   <div className="space-y-1">
                     {items.map((item, itemIndex) => {
                       const taskId = item.id.startsWith('task-') ? item.id.replace('task-', '') : null
