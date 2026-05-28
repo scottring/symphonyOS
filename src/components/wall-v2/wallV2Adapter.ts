@@ -216,9 +216,10 @@ function dedupeRoutines(
 export function adaptTimelineSections(
   today: WallDayData | undefined,
   members: FamilyMember[],
-  _now: Date,
+  now: Date,
   dinnerEvent: CalendarEvent | null,
-  hideDailyRoutines: boolean = false,
+  hideDailyRoutines: boolean,
+  overdueTasks: TimelineItem[],
 ): WallV2TimelineSection[] {
   if (!today) return [];
 
@@ -276,23 +277,24 @@ export function adaptTimelineSections(
     eveningItems.push(...filtered);
   }
 
-  const sections: WallV2TimelineSection[] = [];
+  const baseSections: WallV2TimelineSection[] = [];
   if (alldayItems.length > 0) {
-    sections.push({ id: 'allday', label: 'All day', icon: Calendar, tint: 'sage', events: alldayItems });
+    baseSections.push({ id: 'allday', label: 'All day', icon: Calendar, tint: 'sage', events: alldayItems });
   }
   if (morningItems.length > 0) {
-    sections.push({ id: 'morning', label: 'Morning', icon: Sunrise, tint: 'sky', events: morningItems });
+    baseSections.push({ id: 'morning', label: 'Morning', icon: Sunrise, tint: 'sky', events: morningItems });
   }
   if (afternoonItems.length > 0) {
-    sections.push({ id: 'afternoon', label: 'Afternoon', icon: Sun, tint: 'honey', events: afternoonItems });
+    baseSections.push({ id: 'afternoon', label: 'Afternoon', icon: Sun, tint: 'honey', events: afternoonItems });
   }
   if (eveningItems.length > 0) {
-    sections.push({ id: 'evening', label: 'Evening', icon: Moon, tint: 'lavender', events: eveningItems });
+    baseSections.push({ id: 'evening', label: 'Evening', icon: Moon, tint: 'lavender', events: eveningItems });
   }
   if (nightItems.length > 0) {
-    sections.push({ id: 'night', label: 'Night', icon: Moon, tint: 'sand', events: nightItems });
+    baseSections.push({ id: 'night', label: 'Night', icon: Moon, tint: 'sand', events: nightItems });
   }
-  return sections;
+  const overdueSection = adaptOverdueSection(overdueTasks, members, now);
+  return overdueSection ? [overdueSection, ...baseSections] : baseSections;
 }
 
 // ────────────────────────────────────────────────────────────────────────────

@@ -66,7 +66,7 @@ describe('adaptTimelineSections', () => {
   const members: FamilyMember[] = [];
 
   it('returns no sections when today data is missing', () => {
-    const result = adaptTimelineSections(undefined, members, now, null);
+    const result = adaptTimelineSections(undefined, members, now, null, false, []);
     expect(result).toEqual([]);
   });
 
@@ -82,7 +82,7 @@ describe('adaptTimelineSections', () => {
         unscheduled: [],
       },
     });
-    const result = adaptTimelineSections(today, members, now, null);
+    const result = adaptTimelineSections(today, members, now, null, false, []);
     const labels = result.map((s) => s.label);
     expect(labels).toContain('Evening');
     expect(labels).toContain('Night');
@@ -105,7 +105,7 @@ describe('adaptTimelineSections', () => {
         unscheduled: [],
       },
     });
-    const result = adaptTimelineSections(today, [kaleb, ella], now, null);
+    const result = adaptTimelineSections(today, [kaleb, ella], now, null, false, []);
     const evening = result.find((s) => s.label === 'Evening')!;
     expect(evening.events.map((e) => e.title)).toEqual(['Get undressed', 'Brush teeth']);
     const undressed = evening.events.find((e) => e.title === 'Get undressed')!;
@@ -124,7 +124,7 @@ describe('adaptTimelineSections', () => {
         unscheduled: [],
       },
     });
-    const result = adaptTimelineSections(today, [], now, null);
+    const result = adaptTimelineSections(today, [], now, null, false, []);
     const evening = result.find((s) => s.label === 'Evening')!;
     expect(evening.events).toHaveLength(2);
   });
@@ -138,7 +138,7 @@ describe('adaptTimelineSections', () => {
         afternoon: [], evening: [], unscheduled: [],
       },
     });
-    const result = adaptTimelineSections(today, members, now, null);
+    const result = adaptTimelineSections(today, members, now, null, false, []);
     const labels = result.map((s) => s.label);
     expect(labels).toContain('Morning');
     expect(labels).toContain('All day');
@@ -154,7 +154,7 @@ describe('adaptTimelineSections', () => {
         afternoon: [], evening: [], unscheduled: [],
       },
     });
-    const result = adaptTimelineSections(today, members, now, null);
+    const result = adaptTimelineSections(today, members, now, null, false, []);
     expect(result.find((s) => s.label === 'Morning')!.events[0].completed).toBe(true);
   });
 
@@ -168,7 +168,7 @@ describe('adaptTimelineSections', () => {
         evening: [], unscheduled: [],
       },
     });
-    const result = adaptTimelineSections(today, members, now, null);
+    const result = adaptTimelineSections(today, members, now, null, false, []);
     const afternoon = result.find((s) => s.label === 'Afternoon')!;
     expect(afternoon.events.map((e) => e.title)).toContain('Past task');
   });
@@ -195,10 +195,64 @@ describe('adaptTimelineSections', () => {
       allDay: false,
     } as unknown as CalendarEvent;
 
-    const result = adaptTimelineSections(today, members, now, dinner);
+    const result = adaptTimelineSections(today, members, now, dinner, false, []);
     const evening = result.find((s) => s.label === 'Evening')!;
     expect(evening.events[0].title).toBe('Family dinner');
     expect(evening.events[0].recipeUrl).toBe('https://example.com/recipes/crispy-tofu');
+  });
+
+  it('prepends the Overdue section before all other sections when there are overdue tasks', () => {
+    const now = new Date('2026-05-28T09:00:00');
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const overdueTask = makeItem({
+      id: 'task-od-1',
+      type: 'task',
+      title: 'Pay water bill',
+      startTime: yesterday,
+      completed: false,
+    });
+
+    // A minimal today with one morning item so we can verify ordering.
+    const morningItem = makeItem({
+      id: 'task-am',
+      type: 'task',
+      title: 'Standup',
+      startTime: new Date('2026-05-28T08:30:00'),
+    });
+    const today = makeDay({
+      isToday: true,
+      items: {
+        allday: [], morning: [morningItem], afternoon: [], evening: [], unscheduled: [],
+      },
+    });
+
+    const sections = adaptTimelineSections(today, [], now, null, false, [overdueTask]);
+
+    // First section should be Overdue, then the existing sections in order.
+    expect(sections[0].id).toBe('overdue');
+    expect(sections[0].events[0].title).toBe('Pay water bill');
+    expect(sections[1].id).not.toBe('overdue');
+  });
+
+  it('omits the Overdue section entirely when overdueTasks is empty', () => {
+    const now = new Date('2026-05-28T09:00:00');
+    const morningItem = makeItem({
+      id: 'task-am',
+      type: 'task',
+      title: 'Standup',
+      startTime: new Date('2026-05-28T08:30:00'),
+    });
+    const today = makeDay({
+      isToday: true,
+      items: {
+        allday: [], morning: [morningItem], afternoon: [], evening: [], unscheduled: [],
+      },
+    });
+
+    const sections = adaptTimelineSections(today, [], now, null, false, []);
+
+    expect(sections.find((s) => s.id === 'overdue')).toBeUndefined();
   });
 });
 
