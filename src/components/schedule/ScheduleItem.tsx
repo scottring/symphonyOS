@@ -1,4 +1,4 @@
-import { memo, useState, useRef } from 'react'
+import { memo, useState, useRef, useEffect } from 'react'
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
 import type { TaskContext } from '@/types/task'
@@ -943,9 +943,15 @@ function ScheduleItemMobileCard({
   const dxRef = useRef(0)
   const rafPending = useRef(false)
   const haptic = useRef(false) // fires once per gesture when crossing commit
+  // Track mount so a rAF that survives the component (e.g. a fast swipe-to-
+  // complete removes the card from the list mid-gesture) doesn't fire a
+  // spurious haptic tick on a row that no longer exists.
+  const mounted = useRef(true)
+  useEffect(() => () => { mounted.current = false }, [])
 
   const paint = () => {
     rafPending.current = false
+    if (!mounted.current) return
     const dx = dxRef.current
     if (cardEl.current) {
       cardEl.current.style.transform = `translateX(${dx}px)`
@@ -1043,6 +1049,13 @@ function ScheduleItemMobileCard({
         onTouchEnd={commit}
         onTouchCancel={commit}
         className={cardClassName}
+        // INVARIANT: `transform` MUST stay a static string literal here.
+        // React's style diff only writes properties whose virtual-DOM value
+        // changed — because `transform` is never a different string between
+        // renders, React never overwrites the imperative value paint() wrote
+        // via cardEl.current.style.transform. If you ever make `transform`
+        // dependent on a render-time value, React will snap the card back to
+        // that value on every re-render mid-drag.
         style={{
           transform: 'translateX(0px)',
           transition: dragging ? 'none' : 'transform 200ms ease-out',
