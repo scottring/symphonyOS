@@ -959,9 +959,10 @@ function ScheduleItemMobileCard({
   const onTouchEnd = () => {
     setDragging(false)
     if (decided.current === 'horizontal') {
-      if (dx >= swipeCommitPx) {
+      // Right-to-left (dx < 0) → Complete. Left-to-right (dx > 0) → Edit.
+      if (dx <= -swipeCommitPx) {
         onCompleteSwipe()
-      } else if (dx <= -swipeCommitPx) {
+      } else if (dx >= swipeCommitPx) {
         onEditSwipe()
       }
     }
@@ -976,23 +977,25 @@ function ScheduleItemMobileCard({
 
   return (
     <div className="relative mb-3 overflow-hidden rounded-2xl">
-      {/* Complete action — revealed when swiping right (card moves right). */}
+      {/* Complete action — revealed when swiping right-to-left (card moves
+          left, exposing the right side of the row). */}
       <div
         aria-hidden
-        className={`absolute inset-y-0 left-0 w-1/2 flex items-center justify-start pl-5 rounded-l-xl bg-emerald-500 transition-opacity ${rightActive ? 'opacity-100' : 'opacity-0'}`}
-        style={{ opacity: rightActive ? intensity : 0 }}
+        className={`absolute inset-y-0 right-0 w-1/2 flex items-center justify-end pr-5 rounded-r-2xl bg-emerald-500 transition-opacity ${leftActive ? 'opacity-100' : 'opacity-0'}`}
+        style={{ opacity: leftActive ? intensity : 0 }}
       >
         <Check className="w-6 h-6 text-white" />
         <span className="ml-2 text-white text-sm font-medium">Complete</span>
       </div>
-      {/* Edit action — revealed when swiping left (card moves left). */}
+      {/* Edit action — revealed when swiping left-to-right (card moves
+          right, exposing the left side of the row). */}
       <div
         aria-hidden
-        className={`absolute inset-y-0 right-0 w-1/2 flex items-center justify-end pr-5 rounded-r-xl bg-sky-500 transition-opacity ${leftActive ? 'opacity-100' : 'opacity-0'}`}
-        style={{ opacity: leftActive ? intensity : 0 }}
+        className={`absolute inset-y-0 left-0 w-1/2 flex items-center justify-start pl-5 rounded-l-2xl bg-sky-500 transition-opacity ${rightActive ? 'opacity-100' : 'opacity-0'}`}
+        style={{ opacity: rightActive ? intensity : 0 }}
       >
-        <span className="mr-2 text-white text-sm font-medium">Edit</span>
         <Pencil className="w-5 h-5 text-white" />
+        <span className="ml-2 text-white text-sm font-medium">Edit</span>
       </div>
 
       <div
