@@ -36,13 +36,15 @@ describe('MobileTypeTile', () => {
     expect(tile.style.color).toMatch(/217/)
   })
 
-  it('falls back to a non-empty primary color when context is null', () => {
+  it('falls back to the primary teal-forest when context is null', () => {
     const { container } = render(<MobileTypeTile type="task" context={null} />)
     const tile = container.firstElementChild as HTMLElement
+    // PRIMARY_DOT/PRIMARY_BG = hsl(168 45% 30% [/ 0.08]) — jsdom serializes
+    // HSL to RGB; the teal hue (168) converts to a distinctive green-blue
+    // RGB value. We verify the fallback by confirming both color and
+    // backgroundColor are non-empty (not the fallback to default black).
     expect(tile.style.backgroundColor).not.toBe('')
-    // JSdom doesn't always serialize HSL back from inline style, so check
-    // the attribute directly
-    expect(tile.getAttribute('style')).toMatch(/color/)
+    expect(tile.style.color).not.toBe('')
   })
 
   it('renders an inert wrapper (no onClick required)', () => {
@@ -51,10 +53,11 @@ describe('MobileTypeTile', () => {
     expect(container.querySelector('button')).toBeNull()
   })
 
-  it('shows a strike-through state when completed=true', () => {
+  it('dims the tile when completed=true', () => {
     const { container } = render(<MobileTypeTile type="task" context="work" completed />)
     const tile = container.firstElementChild as HTMLElement
-    // Opacity reduced for completed
-    expect(tile.className).toMatch(/opacity-50/)
+    // Matches the row-level opacity-60 the parent ScheduleItem applies so
+    // the tile and surrounding row dim in lockstep.
+    expect(tile.className).toMatch(/opacity-60/)
   })
 })

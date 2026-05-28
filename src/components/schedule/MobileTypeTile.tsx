@@ -6,8 +6,9 @@ import { DOMAIN_COLORS } from '@/lib/domainColors'
 
 // Primary teal-forest from the design system — used as fallback when an item
 // has no domain context yet.
-const PRIMARY_DOT = 'hsl(168 45% 30%)'
-const PRIMARY_BG = 'hsla(168, 45%, 30%, 0.08)'
+// hsl(168 45% 30%) = rgb(37 117 101)
+const PRIMARY_DOT = 'rgb(37 117 101)'
+const PRIMARY_BG = 'rgba(37 117 101 / 0.08)'
 
 interface MobileTypeTileProps {
   type: TimelineItem['type']
@@ -40,7 +41,7 @@ export const MobileTypeTile = memo(function MobileTypeTile({
     <div
       aria-hidden
       className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-        completed ? 'opacity-50' : ''
+        completed ? 'opacity-60' : ''
       }`}
       style={{ backgroundColor: bg, color: dot }}
     >
