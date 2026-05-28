@@ -12,7 +12,7 @@
 import {
   Backpack, Bath, Briefcase, Calendar, Car, Check, ChefHat, ClipboardList,
   Coffee, Heart, Moon, Music, Plane, Plug, RotateCw, ShoppingBag, Sparkles,
-  Sun, Sunrise, Trophy, Users, UtensilsCrossed,
+  Sun, Sunrise, Trophy, Users, UtensilsCrossed, Clock, AlertCircle,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -396,3 +396,82 @@ export const HEART_ICON: LucideIcon = Heart;
 export const CHECKLIST_ICON: LucideIcon = ClipboardList;
 export const SUNRISE_ICON: LucideIcon = Sunrise;
 export const USERS_ICON: LucideIcon = Users;
+
+// ────────────────────────────────────────────────────────────────────────────
+// Overdue
+// ────────────────────────────────────────────────────────────────────────────
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * Family-readable distance from `scheduledFor` to `now`.
+ *   1 day  → "Was due yesterday"
+ *   2–6    → "N days ago"
+ *   ≥ 7    → "N weeks ago" (rounded to the nearest whole week)
+ *
+ * Internal helper for `adaptOverdueSection`; not part of the wall's
+ * public adapter surface.
+ */
+function overdueLabel(scheduledFor: Date, now: Date): string {
+  // Compare day floors so a task scheduled for "yesterday 11pm" reads as
+  // "Was due yesterday" rather than "less than a day ago."
+  const startOfNow = new Date(now);
+  startOfNow.setHours(0, 0, 0, 0);
+  const startOfScheduled = new Date(scheduledFor);
+  startOfScheduled.setHours(0, 0, 0, 0);
+  const days = Math.max(1, Math.round((startOfNow.getTime() - startOfScheduled.getTime()) / MS_PER_DAY));
+
+  if (days === 1) return 'Was due yesterday';
+  if (days < 7) return `${days} days ago`;
+  const weeks = Math.round(days / 7);
+  return weeks === 1 ? '1 week ago' : `${weeks} weeks ago`;
+}
+
+/**
+ * Build the wall's "Overdue" timeline section from the already-filtered
+ * `overdueTasks` returned by useWallData. Returns null when there's nothing
+ * to show — the caller should omit the section entirely.
+ *
+ * The data layer (useWallData.ts) already filters to family-context,
+ * incomplete, scheduled-before-today tasks. This function only re-shapes,
+ * caps, sorts, and attaches bubbles.
+ */
+export function adaptOverdueSection(
+  overdueTasks: TimelineItem[],
+  members: FamilyMember[],
+  now: Date,
+): WallV2TimelineSection | null {
+  // Defensive: ignore items missing a startTime — they can't be overdue
+  // in any meaningful sense.
+  const dated = overdueTasks.filter((t) => t.startTime instanceof Date);
+  if (dated.length === 0) return null;
+
+  // Oldest first so the most-overdue item lands at the top of the section.
+  const sorted = [...dated].sort(
+    (a, b) => (a.startTime!.getTime() - b.startTime!.getTime()),
+  );
+
+  const capped = sorted.slice(0, 5);
+
+  const events: WallV2TimelineEvent[] = capped.map((t) => {
+    const assignee = t.assignedTo ? members.find((m) => m.id === t.assignedTo) : undefined;
+    return {
+      id: t.id,
+      icon: AlertCircle,            // calm warning glyph per row
+      tint: 'honey',                // warm muted; not red
+      title: t.title,
+      subtitle: overdueLabel(t.startTime!, now),
+      members: assignee ? [memberBubble(assignee)] : undefined,
+      kind: 'task' as const,
+      completed: false,
+    };
+  });
+
+  return {
+    id: 'overdue',
+    label: 'Overdue',
+    icon: Clock,                    // section icon
+    tint: 'honey',
+    events,
+  };
+}
