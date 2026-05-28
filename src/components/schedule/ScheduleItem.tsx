@@ -382,11 +382,12 @@ export const ScheduleItem = memo(function ScheduleItem({
           {renderStackedTime()}
         </div>
 
-        {/* Tinted type tile — anchors the row's left side and carries domain color */}
+        {/* Tinted type tile — anchors the row's left side and carries domain
+            color. The parent card owns the completed/skipped opacity-60, so
+            the tile must not re-apply opacity itself. */}
         <MobileTypeTile
           type={item.type}
           context={item.context ?? null}
-          completed={item.completed || item.skipped}
         />
 
         {/* Title + context line */}

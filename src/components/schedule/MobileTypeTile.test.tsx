@@ -55,11 +55,11 @@ describe('MobileTypeTile', () => {
     expect(container.querySelector('button')).toBeNull()
   })
 
-  it('dims the tile when completed=true', () => {
-    const { container } = render(<MobileTypeTile type="task" context="work" completed />)
+  it('does not apply its own opacity (the parent row owns the dim state)', () => {
+    const { container } = render(<MobileTypeTile type="task" context="work" />)
     const tile = container.firstElementChild as HTMLElement
-    // Matches the row-level opacity-60 the parent ScheduleItem applies so
-    // the tile and surrounding row dim in lockstep.
-    expect(tile.className).toMatch(/opacity-60/)
+    // The parent ScheduleItem card applies opacity-60 on completed/skipped
+    // items. If the tile re-applied opacity it would compound to ~36%.
+    expect(tile.className).not.toMatch(/opacity-/)
   })
 })

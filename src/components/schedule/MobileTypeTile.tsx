@@ -15,7 +15,6 @@ const PRIMARY_BG = 'hsla(168, 45%, 30%, 0.08)'
 interface MobileTypeTileProps {
   type: TimelineItem['type']
   context: TaskContext | null | undefined
-  completed?: boolean
 }
 
 /**
@@ -27,12 +26,12 @@ interface MobileTypeTileProps {
  * domain still feel intentional.
  *
  * Presentational only — taps on the row's checkbox / complete affordance are
- * handled elsewhere.
+ * handled elsewhere. The completed/skipped dim is inherited from the parent
+ * row's `opacity-60`; the tile must not re-apply opacity or it double-dims.
  */
 export const MobileTypeTile = memo(function MobileTypeTile({
   type,
   context,
-  completed = false,
 }: MobileTypeTileProps) {
   const dot = context ? DOMAIN_COLORS[context].dot : PRIMARY_DOT
   const bg = context ? DOMAIN_COLORS[context].bg : PRIMARY_BG
@@ -42,9 +41,7 @@ export const MobileTypeTile = memo(function MobileTypeTile({
   return (
     <div
       aria-hidden
-      className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-        completed ? 'opacity-60' : ''
-      }`}
+      className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
       style={{ backgroundColor: bg, color: dot }}
     >
       <Glyph className="w-[18px] h-[18px]" strokeWidth={2} />
