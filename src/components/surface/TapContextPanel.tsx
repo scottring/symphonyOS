@@ -100,7 +100,6 @@ export function TapContextPanel(props: TapContextPanelProps) {
         divide-y divide-neutral-200/60
         [&>*]:py-4 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0
       "
-      style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
     >
       <PanelHeader
         title={task.title}

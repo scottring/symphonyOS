@@ -90,7 +90,7 @@ export function PanelWhy({ notes, onChange, label = 'Why', onSaveToVault }: Pane
     return (
       <>
         {/* Keep an inline placeholder so the section's spot in the panel is stable. */}
-        <section className="mb-4">
+        <section>
           <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-1">{label}</div>
           <div className="text-sm italic text-neutral-400 border-l-2 border-neutral-300 pl-3 py-1">Editing — expanded ↗</div>
         </section>

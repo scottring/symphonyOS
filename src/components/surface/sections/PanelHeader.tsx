@@ -16,7 +16,7 @@ export function PanelHeader({ title, onTitleChange, onClose }: PanelHeaderProps)
   }
 
   return (
-    <div className="flex items-start justify-between gap-3 mb-4">
+    <div className="flex items-start justify-between gap-3">
       {editing ? (
         <input
           autoFocus

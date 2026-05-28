@@ -24,7 +24,7 @@ export function PanelLocation({
   const { searchPlaces, getPlaceDetails, placesError } = useDirections()
 
   return (
-    <section className="mb-4">
+    <section>
       <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">Location</div>
       <PlacesAutocomplete
         value={location ? { address: location, placeId: locationPlaceId } : null}

@@ -26,7 +26,7 @@ export function PanelLinks({ links, onAddLink }: PanelLinksProps) {
   }
 
   return (
-    <section className="mb-4">
+    <section>
       <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">Links</div>
       {list.map((link) => (
         <a

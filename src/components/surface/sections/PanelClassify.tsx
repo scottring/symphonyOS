@@ -13,7 +13,7 @@ interface PanelClassifyProps {
 
 export function PanelClassify(props: PanelClassifyProps) {
   return (
-    <section className="flex flex-wrap items-center gap-2 pb-4 mb-4 border-b border-neutral-200">
+    <section className="flex flex-wrap items-center gap-2">
       <ContextPicker
         value={props.context ?? undefined}
         onChange={props.onContextChange}

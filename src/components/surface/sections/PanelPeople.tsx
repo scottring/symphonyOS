@@ -29,7 +29,7 @@ export function PanelPeople({
   if (!contact && !assignee && !canEditContact) return null
 
   return (
-    <section className="mb-4">
+    <section>
       <div className="flex items-center justify-between mb-2">
         <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400">People</div>
         {canEditContact && (

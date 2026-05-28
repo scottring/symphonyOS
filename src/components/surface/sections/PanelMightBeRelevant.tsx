@@ -18,7 +18,7 @@ export function PanelMightBeRelevant({ items, onOpen }: PanelMightBeRelevantProp
   if (items.length === 0) return null
 
   return (
-    <section className="mb-4">
+    <section>
       <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">Might be relevant</div>
       {items.map((item) => (
         <button

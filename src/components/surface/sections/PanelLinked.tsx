@@ -23,7 +23,7 @@ export function PanelLinked({ project, linkedEvent, siblingTasks, onOpenProject,
   if (!hasAny) return null
 
   return (
-    <section className="mb-4">
+    <section>
       <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">Linked</div>
       {project && (
         <button

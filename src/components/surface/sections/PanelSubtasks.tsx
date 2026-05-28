@@ -34,7 +34,7 @@ export function PanelSubtasks({ subtasks, onToggleSubtask, onAddSubtask, onOpenS
   }
 
   return (
-    <section className="mb-4">
+    <section>
       <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">Subtasks</div>
       <div className="flex flex-col gap-1.5">
         {subtasks.map(sub => (

@@ -18,7 +18,7 @@ export function PanelFooter({ createdAt, updatedAt, createdByName }: PanelFooter
   if (isLater(updatedAt, createdAt)) parts.push(`Updated ${fmt(updatedAt)}`)
 
   return (
-    <footer className="text-[11px] text-neutral-400 pt-3 mt-3 border-t border-neutral-200">
+    <footer className="text-[11px] text-neutral-400">
       {parts.join(' · ')}
     </footer>
   )

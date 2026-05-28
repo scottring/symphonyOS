@@ -19,7 +19,7 @@ export function PanelMetaRow({ bucket, assigneeName, createdByName, domain }: Pa
   if (createdByName) parts.push(`created by ${createdByName}`)
 
   return (
-    <div className="flex items-center gap-2 text-xs text-neutral-500 mb-3">
+    <div className="flex items-center gap-2 text-xs text-neutral-500">
       {domain && (
         <span
           data-testid="domain-chip"

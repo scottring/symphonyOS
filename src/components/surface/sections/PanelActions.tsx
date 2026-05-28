@@ -32,7 +32,7 @@ export function PanelActions({
   onDelete,
 }: PanelActionsProps) {
   return (
-    <div className="flex flex-wrap gap-2 pb-4 mb-4 border-b border-neutral-200">
+    <div className="flex flex-wrap gap-2">
       <button
         onClick={onToggleComplete}
         className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-primary-600 text-white hover:bg-primary-700 transition-colors"
