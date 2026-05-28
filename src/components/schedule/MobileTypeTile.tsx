@@ -4,11 +4,13 @@ import type { TaskContext } from '@/types/task'
 import type { TimelineItem } from '@/types/timeline'
 import { DOMAIN_COLORS } from '@/lib/domainColors'
 
-// Primary teal-forest from the design system — used as fallback when an item
-// has no domain context yet.
-// hsl(168 45% 30%) = rgb(37 117 101)
-const PRIMARY_DOT = 'rgb(37 117 101)'
-const PRIMARY_BG = 'rgba(37 117 101 / 0.08)'
+// Primary teal-forest from the design system (--color-primary-500 in
+// src/index.css) — used as fallback when an item has no domain context yet.
+// Legacy comma HSL syntax is used so jsdom in tests serializes it back from
+// inline style; modern space-separated form is silently dropped by older
+// jsdom versions.
+const PRIMARY_DOT = 'hsl(168, 45%, 30%)'
+const PRIMARY_BG = 'hsla(168, 45%, 30%, 0.08)'
 
 interface MobileTypeTileProps {
   type: TimelineItem['type']

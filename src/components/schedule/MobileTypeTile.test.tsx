@@ -39,10 +39,12 @@ describe('MobileTypeTile', () => {
   it('falls back to the primary teal-forest when context is null', () => {
     const { container } = render(<MobileTypeTile type="task" context={null} />)
     const tile = container.firstElementChild as HTMLElement
-    // PRIMARY_DOT/PRIMARY_BG = hsl(168 45% 30% [/ 0.08]) — jsdom serializes
-    // HSL to RGB; the teal hue (168) converts to a distinctive green-blue
-    // RGB value. We verify the fallback by confirming both color and
-    // backgroundColor are non-empty (not the fallback to default black).
+    // PRIMARY_DOT/PRIMARY_BG = hsl(168 45% 30% [/ 0.08]). The hue channel
+    // (168) is distinctive — work uses 235, family uses 6, personal uses
+    // 234 — so finding 168 anywhere in the inline style proves the primary
+    // fallback was applied, not just that some color was set.
+    const style = tile.getAttribute('style') ?? ''
+    expect(style).toMatch(/168/)
     expect(tile.style.backgroundColor).not.toBe('')
     expect(tile.style.color).not.toBe('')
   })
