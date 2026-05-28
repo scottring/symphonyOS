@@ -281,11 +281,17 @@ export function QuickCapture({
                 ? 'translate-y-full md:translate-y-0 md:opacity-0 md:scale-95'
                 : 'translate-y-0 md:opacity-100 md:scale-100'}
             `}
+            // p-6 sets uniform 1.5rem padding; this inline paddingBottom
+            // wins on notch devices (safe-area-inset-bottom > 1.5rem) and
+            // is a no-op everywhere else. Intentional asymmetry on iOS so
+            // the form clears the home indicator without a separate
+            // safe-bottom utility.
             style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Drag handle — mobile only, decorative */}
+            {/* Drag handle — mobile only, decorative (no swipe-to-dismiss yet) */}
             <div
+              data-testid="drag-handle"
               aria-hidden
               className="md:hidden mx-auto w-10 h-1.5 rounded-full bg-neutral-200 mb-3"
             />

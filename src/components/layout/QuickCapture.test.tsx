@@ -64,13 +64,20 @@ describe('QuickCapture', () => {
       expect(sheet.className).toMatch(/rounded-t-3xl/)
     })
 
-    it('renders a decorative drag handle (mobile only)', () => {
-      const { container } = render(
+    it('renders a decorative drag handle (mobile only) inside the sheet', () => {
+      const { getByTestId } = render(
         <QuickCapture onAdd={vi.fn()} isOpen={true} showFab={false} />,
       )
-      // The handle is the first child of the sheet and is mobile-only.
-      const handle = container.querySelector('.md\\:hidden.mx-auto.rounded-full')
-      expect(handle).not.toBeNull()
+      const handle = getByTestId('drag-handle')
+      // Mobile-only visibility is enforced via Tailwind's md:hidden utility.
+      expect(handle.className).toMatch(/md:hidden/)
+      // Decorative — must be hidden from the accessibility tree.
+      expect(handle.getAttribute('aria-hidden')).not.toBeNull()
+      // The handle lives inside the sheet, not floating elsewhere in the
+      // overlay; assert containment so a future refactor can't accidentally
+      // move it outside without failing this test.
+      const sheet = getByTestId('quick-capture-sheet')
+      expect(sheet.contains(handle)).toBe(true)
     })
   })
 
