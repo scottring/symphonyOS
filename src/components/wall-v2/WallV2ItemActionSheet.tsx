@@ -1,4 +1,4 @@
-import { Redo2, Check, X } from 'lucide-react'
+import { Redo2, Check, X, Phone, MapPin, FileText, Video, Link as LinkIcon } from 'lucide-react'
 import type { WallV2TimelineEvent } from './types'
 
 /**
@@ -28,21 +28,107 @@ const PUSH_PRESETS: ReadonlyArray<{ preset: PushPreset; label: string }> = [
   { preset: 'someday',    label: 'Someday'    },
 ]
 
+// Destination-only Maps link — the wall is stationary, so we surface "where is
+// this" rather than a turn-by-turn route. Rendered into an <a> (never
+// window.open) so the OS hands the universal link to Maps cleanly.
+function mapsUrlFor(location: string, placeId?: string): string {
+  const base = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`
+  return placeId ? `${base}&query_place_id=${encodeURIComponent(placeId)}` : base
+}
+
+// Shared styling for a tappable context row (phone / location / link / meeting).
+const ctxRow =
+  'flex items-center gap-3 w-full min-h-[60px] px-4 rounded-2xl bg-stone-100 dark:bg-stone-800 ' +
+  'text-stone-800 dark:text-stone-100 active:scale-[0.98] transition-transform'
+
 export function WallV2ItemActionSheet({ event, onSkip, onMarkDone, onPushTask, onClose }: Props) {
   const kind: 'routine' | 'event' | 'task' = event.kind ?? 'event'
+
+  const hasContext = Boolean(
+    event.phoneNumber ||
+    event.meetingUrl ||
+    event.location ||
+    event.notes ||
+    (event.links && event.links.length > 0),
+  )
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div
-        className="w-[min(92vw,560px)] bg-white dark:bg-stone-900 rounded-3xl p-6 shadow-2xl"
+        className="w-[min(92vw,560px)] max-h-[88vh] bg-white dark:bg-stone-900 rounded-3xl shadow-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="text-center mb-5">
+        {/* Header */}
+        <div className="px-6 pt-6 pb-4 text-center shrink-0">
           <div className="text-[1.4rem] font-display text-stone-800 dark:text-stone-100">{event.title}</div>
           {event.subtitle && <div className="text-stone-500 dark:text-stone-400 mt-1">{event.subtitle}</div>}
         </div>
 
-        <div className="flex flex-col gap-3">
+        {/* Context — the rich detail that was planned earlier, surfaced now.
+            Scrollable so long notes never push the actions off-screen. */}
+        {hasContext && (
+          <div
+            className="px-6 flex-1 min-h-0 overflow-y-auto"
+            style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
+          >
+            <div className="flex flex-col gap-2.5 pb-1">
+              {event.phoneNumber && (
+                <a href={`tel:${event.phoneNumber}`} className={ctxRow}>
+                  <Phone className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span className="font-bold truncate">{event.phoneNumber}</span>
+                  <span className="ml-auto text-sm text-stone-500 dark:text-stone-400 shrink-0">Tap to call</span>
+                </a>
+              )}
+
+              {event.meetingUrl && (
+                <a href={event.meetingUrl} target="_blank" rel="noopener noreferrer" className={ctxRow}>
+                  <Video className="w-5 h-5 text-sky-600 dark:text-sky-400 shrink-0" />
+                  <span className="font-bold truncate">Join meeting</span>
+                </a>
+              )}
+
+              {event.location && (
+                <a
+                  href={mapsUrlFor(event.location, event.locationPlaceId)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={ctxRow}
+                >
+                  <MapPin className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />
+                  <span className="font-bold truncate">{event.location}</span>
+                  <span className="ml-auto text-sm text-stone-500 dark:text-stone-400 shrink-0">Directions</span>
+                </a>
+              )}
+
+              {event.links?.map((link, i) => (
+                <a
+                  key={`${link.url}-${i}`}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={ctxRow}
+                >
+                  <LinkIcon className="w-5 h-5 text-violet-500 dark:text-violet-300 shrink-0" />
+                  <span className="font-bold truncate">{link.title || link.url}</span>
+                </a>
+              ))}
+
+              {event.notes && (
+                <div className="rounded-2xl bg-stone-100 dark:bg-stone-800 px-4 py-3">
+                  <div className="flex items-center gap-2 text-[0.72rem] font-bold uppercase tracking-[0.18em] text-stone-500 dark:text-stone-400 mb-1.5">
+                    <FileText className="w-4 h-4" /> Notes
+                  </div>
+                  <div className="text-stone-700 dark:text-stone-200 whitespace-pre-wrap leading-snug">
+                    {event.notes}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="px-6 pt-4 pb-6 flex flex-col gap-3 shrink-0">
           {kind === 'task' ? (
             <>
               {/* Complete — full-width emerald (matches routine "Mark done") */}

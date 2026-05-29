@@ -110,6 +110,33 @@ describe('WallV2ItemActionSheet', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
+  it('context: renders phone (tap-to-call), location (Maps), meeting, links and notes', () => {
+    const rich: WallV2TimelineEvent = {
+      id: 'event-rich', icon: Calendar, tint: 'sky', title: 'Dentist', kind: 'event',
+      phoneNumber: '555-0142',
+      location: '123 Main St',
+      locationPlaceId: 'place_abc',
+      meetingUrl: 'https://meet.example.com/xyz',
+      links: [{ url: 'https://forms.example.com', title: 'Intake form' }],
+      notes: 'Bring insurance card',
+    }
+    render(<WallV2ItemActionSheet event={rich} onSkip={vi.fn()} onMarkDone={vi.fn()} onPushTask={vi.fn()} onClose={vi.fn()} />)
+
+    expect(screen.getByText('555-0142').closest('a')).toHaveAttribute('href', 'tel:555-0142')
+    const maps = screen.getByText('123 Main St').closest('a')
+    expect(maps).toHaveAttribute('href', expect.stringContaining('query_place_id=place_abc'))
+    expect(screen.getByText('Join meeting').closest('a')).toHaveAttribute('href', 'https://meet.example.com/xyz')
+    expect(screen.getByText('Intake form').closest('a')).toHaveAttribute('href', 'https://forms.example.com')
+    expect(screen.getByText('Bring insurance card')).toBeInTheDocument()
+  })
+
+  it('context: renders nothing extra when the item has no context', () => {
+    render(<WallV2ItemActionSheet event={event} onSkip={vi.fn()} onMarkDone={vi.fn()} onPushTask={vi.fn()} onClose={vi.fn()} />)
+    expect(screen.queryByText('Tap to call')).toBeNull()
+    expect(screen.queryByText('Directions')).toBeNull()
+    expect(screen.queryByText('Join meeting')).toBeNull()
+  })
+
   it('routine and event variants are unchanged (onPushTask never fires)', () => {
     const onPushTask = vi.fn()
     render(

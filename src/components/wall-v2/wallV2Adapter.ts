@@ -168,6 +168,14 @@ export function adaptTimelineEvent(
     meta: durationMeta(item),
     members: memberBubbles,
     completed: item.completed,
+    // Carry the rich context through so the tap action sheet can surface it.
+    // (Events keep their read-only Google description as the notes fallback.)
+    phoneNumber: item.phoneNumber,
+    location: item.location,
+    locationPlaceId: item.locationPlaceId,
+    notes: item.notes || item.googleDescription,
+    links: item.links,
+    meetingUrl: item.meetingUrl,
   };
 }
 

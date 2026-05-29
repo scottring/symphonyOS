@@ -5,6 +5,7 @@
 // and the real-data wiring in WallV2Shell can share the exact same render path.
 
 import type { LucideIcon } from 'lucide-react';
+import type { TaskLink } from '@/types/task';
 
 /** A pastel color preset used to tint icon chips and avatars. */
 export type WallV2Tint =
@@ -67,6 +68,21 @@ export interface WallV2TimelineEvent {
   completed?: boolean;
   /** Source item type, so the wall action sheet can pick the right entity/actions. */
   kind?: 'task' | 'event' | 'routine';
+  // ─── Rich context surfaced in the tap action sheet ───
+  // Symphony's whole point: links/phone/notes attach during planning and
+  // surface at execution. The wall tap sheet renders whichever of these exist.
+  /** Tap-to-call number (vendor, doctor, school, coach). */
+  phoneNumber?: string;
+  /** Human-readable address / place name. */
+  location?: string;
+  /** Google Place ID for a precise Maps link. */
+  locationPlaceId?: string;
+  /** Free-text notes (measurements, instructions, decisions). */
+  notes?: string;
+  /** Attached links (reservations, docs, product pages). */
+  links?: TaskLink[];
+  /** Video-meeting join URL (Google Meet / Zoom). */
+  meetingUrl?: string;
 }
 
 /** A labeled grouping of events — All-day / Morning / Afternoon / Evening / Night. */
