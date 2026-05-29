@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
 import { transcribeVoice, isOpenBrainConfigured } from '@/lib/openBrain'
+import { isQuietHours } from '@/lib/quietHours'
 
 // ============================================================================
 // WallScratchpad — voice-first family inbox capture
@@ -95,7 +96,8 @@ export function WallScratchpad() {
 
   useEffect(() => {
     fetchRecent()
-    const interval = setInterval(fetchRecent, RECENT_POLL_INTERVAL_MS)
+    // Skip overnight polls on the always-on wall to reduce egress.
+    const interval = setInterval(() => { if (!isQuietHours()) fetchRecent() }, RECENT_POLL_INTERVAL_MS)
     return () => clearInterval(interval)
   }, [fetchRecent])
 

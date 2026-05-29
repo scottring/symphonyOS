@@ -9,6 +9,7 @@ import {
   routineToTimelineItem,
 } from '@/types/timeline'
 import { groupByDaySection, type DaySection } from '@/lib/timeUtils'
+import { isQuietHours } from '@/lib/quietHours'
 import { computeScreenTimeSummaries, type ChildScreenTimeSummary } from '@/hooks/useScreenTime'
 import type { TimelineItem } from '@/types/timeline'
 import type { Task } from '@/types/task'
@@ -407,6 +408,9 @@ export function useWallData(): UseWallDataReturn {
 
     const interval = setInterval(() => {
       if (typeof document !== 'undefined' && document.hidden) return
+      // The always-on wall never goes hidden; skip overnight polls to cut the
+      // egress floor. Manual refresh + visibility-return below still refetch.
+      if (isQuietHours()) return
       fetchAllData()
     }, POLL_INTERVAL_MS)
 

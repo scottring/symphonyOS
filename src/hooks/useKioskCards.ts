@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { isQuietHours } from '@/lib/quietHours'
 
 export interface KioskCard {
   id: string
@@ -98,7 +99,8 @@ export function useKioskCards() {
       runAgent()
     })
 
-    const interval = setInterval(fetchCards, POLL_INTERVAL_MS)
+    // Skip overnight polls — the always-on wall is unread while everyone sleeps.
+    const interval = setInterval(() => { if (!isQuietHours()) fetchCards() }, POLL_INTERVAL_MS)
     return () => {
       mountedRef.current = false
       clearInterval(interval)
