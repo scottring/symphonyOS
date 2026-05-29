@@ -40,6 +40,12 @@ export function WallV2EventCard({ event, onTap, onToggleComplete }: Props) {
           onClick={() => onToggleComplete!(event.id, !event.completed)}
           aria-label={`${event.completed ? 'Mark incomplete' : 'Mark complete'}: ${event.title}`}
           aria-pressed={!!event.completed}
+          // pan-y: button declines vertical drag so the parent column
+          // scrolls instead. Tap (down + up, no movement) still fires
+          // onClick normally. Without this, dragging a finger that
+          // starts on the checkbox is captured as a button press and
+          // the wall's column never scrolls.
+          style={{ touchAction: 'pan-y' }}
           className={[
             'shrink-0 grid place-items-center w-11 h-11 rounded-full border-2 transition-colors',
             event.completed
@@ -54,6 +60,11 @@ export function WallV2EventCard({ event, onTap, onToggleComplete }: Props) {
       type="button"
       onClick={tappable ? handleClick : undefined}
       disabled={!tappable}
+      // Same rationale as the checkbox above: this row body is a full
+      // <button> and the wall's scroll column can only scroll if the
+      // button explicitly delegates vertical pan to its ancestor.
+      // touch-action does NOT inherit — each element must opt in.
+      style={{ touchAction: 'pan-y' }}
       className={[
         'group flex-1 min-w-0 text-left flex items-center gap-4 rounded-2xl px-4 py-3 border transition-colors',
         highlight
