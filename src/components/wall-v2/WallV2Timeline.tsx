@@ -36,7 +36,20 @@ export function WallV2Timeline({ sections, onTapEvent, onToggleComplete, onTapFu
           </div>
         </div>
       ) : (
-      <div className="flex flex-col gap-4 relative flex-1 min-h-0 overflow-y-auto pr-1 -mr-1">
+      <div
+        className="flex flex-col gap-4 relative flex-1 min-h-0 overflow-y-auto pr-1 -mr-1"
+        // The wall is a touchscreen. The outer .wall-touch-root sets
+        // `touch-action: manipulation` to kill the 300ms double-tap delay;
+        // spec-wise that should still allow pan-y, but on a few touch
+        // controllers (especially Android WebView / older Safari) the
+        // intersection on a `<button>`-bearing scroll child silently
+        // suppresses vertical pan. Re-asserting pan-y here and adding the
+        // legacy `-webkit-overflow-scrolling: touch` is the established
+        // wall pattern (see WallChoresWidget.tsx:159). Without these two
+        // declarations, the family can see the list overflow but can't
+        // swipe-scroll to reach the rest of it.
+        style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
+      >
         {sections.map((section, idx) => {
           const tint = TINTS[section.tint];
           const Icon = section.icon;
