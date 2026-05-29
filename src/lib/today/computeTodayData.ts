@@ -25,6 +25,17 @@ export function computeTodayData(input: TodayDataInput): TodayData {
   const completedInboxTasks = selectCompletedInbox(input.tasks, input.viewedDate, match)
   const timedTasks = selectTimed(input.tasks, input.viewedDate, match)
 
+  // Completed-task linger: a checked-off task stays visible briefly, then
+  // drops out of the displayed list (counts below still use the full pools).
+  // `cutoff` undefined → keep all completed (desktop default).
+  const cutoff = input.completedLingerCutoff
+  const stillVisible = (t: { completed: boolean; updatedAt: Date }): boolean => {
+    if (!t.completed || cutoff == null) return true
+    return new Date(t.updatedAt).getTime() >= cutoff
+  }
+  const displayTimedTasks = cutoff == null ? timedTasks : timedTasks.filter(stillVisible)
+  const displayOverdueTasks = cutoff == null ? overdueTasks : overdueTasks.filter(stillVisible)
+
   const routineStatusMap = buildRoutineStatusMap(input.dateInstances)
   const eventStatusMap = buildEventStatusMap(input.dateInstances)
   const visibleRoutines = selectVisibleRoutines(input.routines, input.hideRoutines)
@@ -49,7 +60,7 @@ export function computeTodayData(input: TodayDataInput): TodayData {
   })
 
   const grouped = buildGroupedSections({
-    timedTasks,
+    timedTasks: displayTimedTasks,
     events: filteredEvents,
     routines: visibleRoutines,
     viewedDate: input.viewedDate,
@@ -73,7 +84,7 @@ export function computeTodayData(input: TodayDataInput): TodayData {
 
   return {
     isToday,
-    overdueTasks,
+    overdueTasks: displayOverdueTasks,
     inboxTasks,
     weekTasks,
     completedInboxTasks,

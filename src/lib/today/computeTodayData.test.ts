@@ -36,6 +36,37 @@ describe('computeTodayData', () => {
     expect(d.counts.completedCount).toBe(1)
     expect(d.counts.progressPercent).toBeCloseTo(50)
   })
+  it('completedLingerCutoff hides completed tasks older than the cutoff but keeps counts', () => {
+    const now = new Date()
+    const old = new Date(now.getTime() - 120_000) // checked off 2 min ago
+    const done = task({ id: 'd', bucket: 'timed', scheduledFor: now, completed: true, updatedAt: old })
+    const open = task({ id: 'o', bucket: 'timed', scheduledFor: now, completed: false })
+
+    // No cutoff (desktop default): both render.
+    const all = computeTodayData(baseInput({ tasks: [done, open], viewedDate: now }))
+    expect(Object.values(all.grouped).flat().length).toBe(2)
+
+    // Cutoff at now-60s: the 2-min-old completed task drops out of the display.
+    const filtered = computeTodayData(baseInput({
+      tasks: [done, open], viewedDate: now, completedLingerCutoff: now.getTime() - 60_000,
+    }))
+    const ids = Object.values(filtered.grouped).flat().map((i) => i.id)
+    expect(ids).toContain('task-o')
+    expect(ids).not.toContain('task-d')
+    // Counts use the full pool, so the completed task is still tallied.
+    expect(filtered.counts.completedCount).toBe(1)
+  })
+
+  it('completedLingerCutoff keeps a just-completed task visible during the linger window', () => {
+    const now = new Date()
+    const done = task({ id: 'd', bucket: 'timed', scheduledFor: now, completed: true, updatedAt: now })
+    const filtered = computeTodayData(baseInput({
+      tasks: [done], viewedDate: now, completedLingerCutoff: now.getTime() - 60_000,
+    }))
+    const ids = Object.values(filtered.grouped).flat().map((i) => i.id)
+    expect(ids).toContain('task-d')
+  })
+
   it('week + inbox pools populate only when isToday', () => {
     const now = new Date()
     const w = task({ id: 'w', bucket: 'week' })

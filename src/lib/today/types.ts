@@ -21,6 +21,13 @@ export interface TodayDataInput {
   /** Present for parity with legacy deps; not used by current logic. */
   projectsMap?: Map<string, { name: string }>
   contactsMap?: Map<string, Contact>
+  /**
+   * When set, completed tasks whose `updatedAt` is older than this timestamp
+   * (ms epoch) are dropped from the *displayed* list — they linger briefly
+   * after being checked off, then disappear. Counts are unaffected (they use
+   * the full pool). Undefined = never hide completed (current desktop behavior).
+   */
+  completedLingerCutoff?: number
 }
 
 export interface TodayCounts {

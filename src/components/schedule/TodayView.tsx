@@ -157,6 +157,20 @@ export function TodayView({
     })
   }, [])
 
+  // ── Completed-task linger (mobile only) ───────────────────────────────────────
+  // On mobile, a checked-off task stays visible (crossed out) for ~60s so the
+  // completion registers, then drops off Today to keep the list focused on what's
+  // left. Desktop keeps completed items for the whole day. `nowTick` advances on
+  // an interval so lingering items expire on their own without a manual refresh.
+  const COMPLETED_LINGER_MS = 60_000
+  const [nowTick, setNowTick] = useState(() => Date.now())
+  useEffect(() => {
+    if (!isMobile) return
+    const id = setInterval(() => setNowTick(Date.now()), 15_000)
+    return () => clearInterval(id)
+  }, [isMobile])
+  const completedLingerCutoff = isMobile ? nowTick - COMPLETED_LINGER_MS : undefined
+
   // ── Derived data ─────────────────────────────────────────────────────────────
   const todayInput = useMemo(() => ({
     tasks,
@@ -166,11 +180,12 @@ export function TodayView({
     viewedDate,
     selectedAssignee: selectedAssignee ?? null,
     hideRoutines,
+    completedLingerCutoff,
     // Cast: EventNote.notes is string|null; TodayDataInput expects string|undefined — structurally compatible at runtime
     eventNotesMap: ctx.eventNotesMap as unknown as Map<string, { notes?: string; assignedTo?: string | null }> | undefined,
     eventContextOverrides: ctx.eventContextOverrides,
     getDomainForCalendar: ctx.getDomainForCalendar,
-  }), [tasks, events, routines, dateInstances, viewedDate, selectedAssignee, hideRoutines,
+  }), [tasks, events, routines, dateInstances, viewedDate, selectedAssignee, hideRoutines, completedLingerCutoff,
       ctx.eventNotesMap, ctx.eventContextOverrides, ctx.getDomainForCalendar])
 
   const data = useTodayData(todayInput)
@@ -542,9 +557,10 @@ export function TodayView({
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Overdue section — gets data-today-first marker when it renders */}
+            {/* Overdue section — gets data-today-first marker when it renders.
+                Shown on mobile too (OverdueSection has its own mobile layout). */}
             {data.isToday && data.overdueTasks.length > 0 && (
-              <div data-today-first="" className="hidden md:block">
+              <div data-today-first="">
                 <OverdueSection
                   tasks={data.overdueTasks}
                   selectedItemId={selectedItemId}
