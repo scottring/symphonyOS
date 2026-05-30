@@ -44,6 +44,7 @@ import { WallDiscussionOverlay } from '@/components/wall/WallDiscussionOverlay';
 import { useFamilyDiscussionItems, type DiscussionItem } from '@/hooks/useFamilyDiscussionItems';
 import { QuickCapture } from '@/components/layout/QuickCapture';
 import { useAuth } from '@/hooks/useAuth';
+import { AuthForm } from '@/components/AuthForm';
 import { useDailyDiscussionPrompt } from '@/hooks/useDailyDiscussionPrompt';
 import { supabase } from '@/lib/supabase';
 import type {
@@ -104,7 +105,7 @@ const PLACEHOLDER_GROCERY: WallV2GroceryData = {
 const THEME_KEY = 'symphony-wall-theme';
 
 export function WallV2Shell() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   // Re-rendering each minute keeps the date, timeline filter, and time-aware
   // copy minute-fresh without thrashing the hooks below.
@@ -391,6 +392,16 @@ export function WallV2Shell() {
     () => wallData.familyMembers.map((m) => ({ id: m.id, name: m.name })),
     [wallData.familyMembers],
   );
+
+  // Chromeless kiosk recovery: the wall has no nav, so a lost session (e.g. it
+  // sat through a Supabase outage and its token couldn't refresh) leaves every
+  // data fetch no-op'ing on `!user` and the refresh spinner stuck forever, with
+  // no way to log back in. Render the sign-in form instead of a dead spinner so
+  // the wall can recover itself. Wait out the initial auth check to avoid a
+  // login flash; AuthForm flips `user` on success and we re-render into the wall.
+  if (!authLoading && !user) {
+    return <AuthForm />;
+  }
 
   return (
     <div className={`${isDark ? 'dark ' : ''}wall-touch-root relative h-screen w-screen bg-[var(--color-bg-base)] dark:bg-stone-950 text-stone-800 dark:text-stone-100 overflow-hidden transition-colors`}>
