@@ -34,6 +34,16 @@ describe('ContextPicker', () => {
       expect(button).toBeInTheDocument()
     })
 
+    it('pulses (tag-needs-context) when untagged, and stops once a context is set', () => {
+      const { rerender } = render(<ContextPicker onChange={mockOnChange} />)
+      const untagged = screen.getByRole('button', { name: 'Set context' })
+      expect(untagged).toHaveClass('tag-needs-context')
+
+      rerender(<ContextPicker value="work" onChange={mockOnChange} />)
+      const tagged = screen.getByRole('button', { name: 'Set context' })
+      expect(tagged).not.toHaveClass('tag-needs-context')
+    })
+
     it('does not show dropdown initially', () => {
       render(<ContextPicker onChange={mockOnChange} />)
 

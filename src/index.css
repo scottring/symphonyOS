@@ -1172,3 +1172,23 @@ body {
 .wall-stagger > *:nth-child(5) { animation-delay: 240ms; }
 .wall-stagger > *:nth-child(6) { animation-delay: 300ms; }
 
+/* ─── Untagged-task nudge ───
+   A soft, fuzzy, slow-breathing glow around the tag icon on tasks that have no
+   context yet. Untagged tasks stay visible in every domain so they're never
+   lost; this pulse pulls the eye to categorize them (Work / Family / Personal).
+   Teal (brand) rather than a domain colour so it never reads as work/family/
+   personal. Slow + low-contrast so an always-open app never feels noisy. */
+@keyframes tagNeedsContext {
+  0%, 100% { box-shadow: 0 0 3px 1px rgba(20, 122, 104, 0.18); }
+  50%      { box-shadow: 0 0 10px 3px rgba(20, 122, 104, 0.50); }
+}
+.tag-needs-context {
+  animation: tagNeedsContext 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tag-needs-context {
+    animation: none;
+    box-shadow: 0 0 0 2px rgba(20, 122, 104, 0.40);
+  }
+}
+

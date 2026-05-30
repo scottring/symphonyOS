@@ -109,8 +109,9 @@ export function ContextPicker({ value, onChange }: ContextPickerProps) {
     <div ref={triggerRef} className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="p-2 rounded-lg transition-colors hover:bg-neutral-100"
+        className={`p-2 rounded-lg transition-colors hover:bg-neutral-100 ${hasValue ? '' : 'tag-needs-context'}`}
         aria-label="Set context"
+        title={hasValue ? undefined : 'Untagged — tap to set Work / Family / Personal'}
       >
         <svg
           className="w-5 h-5 transition-colors"

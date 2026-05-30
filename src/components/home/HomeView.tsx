@@ -72,9 +72,6 @@ export function HomeView({
   // Specific domains show ONLY matching items — untagged items stay in universal
   // For work/personal: hide tasks assigned to someone else (they're not yours)
   const filteredTasks = useMemo(() => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
     return tasks.filter(task => {
       // Hide other members' work/personal tasks (private domains) in ALL views.
       // A private task is visible to anyone it's assigned to, so check membership
@@ -90,18 +87,13 @@ export function HomeView({
       // Universal shows everything that passes the privacy filter above
       if (currentDomain === 'universal') return true
 
-      // Always show overdue tasks regardless of domain — they need attention
-      if (task.scheduledFor && !task.completed) {
-        const taskDate = new Date(task.scheduledFor)
-        taskDate.setHours(0, 0, 0, 0)
-        if (taskDate < today) return true
-      }
-
-      // Always show inbox tasks regardless of domain — they need triage
-      if (task.bucket === 'inbox' && !task.completed) return true
-
-      // Specific domains show ONLY matching items
-      return task.context === currentDomain
+      // A specific domain isolates to its OWN items plus UNTAGGED tasks.
+      // Untagged tasks stay visible in every domain (and get a pulsing tag glow
+      // nudging the user to categorize them) so they're never lost — but tagged
+      // items from OTHER domains don't leak in. This deliberately replaces the
+      // old "always show overdue/inbox regardless of domain" overrides, which
+      // leaked e.g. family overdue items into the Work view.
+      return task.context === currentDomain || task.context == null
     })
   }, [tasks, currentDomain, currentUserMemberId])
 
