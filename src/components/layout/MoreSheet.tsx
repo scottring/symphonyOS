@@ -9,16 +9,30 @@ interface MoreSheetProps {
   onClose: () => void
   onNavigate: (view: ViewType) => void
   activeView: ViewType
+  /** Unread inbox count — shown as a badge on the Inbox entry. */
+  inboxCount?: number
 }
 
 interface NavItem {
   view: ViewType
   label: string
   icon: ReactElement
+  /** Optional count badge (e.g. inbox). Hidden when 0/undefined. */
+  badge?: number
 }
 
-export function MoreSheet({ isOpen, onClose, onNavigate, activeView }: MoreSheetProps) {
+export function MoreSheet({ isOpen, onClose, onNavigate, activeView, inboxCount = 0 }: MoreSheetProps) {
   const items: NavItem[] = [
+    {
+      view: 'inbox',
+      label: 'Inbox',
+      badge: inboxCount,
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 2h10v6h-2.586a1 1 0 00-.707.293l-1.414 1.414a1 1 0 01-1.414 0l-1.414-1.414A1 1 0 007.586 11H5V5z" clipRule="evenodd" />
+        </svg>
+      ),
+    },
     {
       view: 'routines',
       label: 'Routines',
@@ -129,6 +143,11 @@ export function MoreSheet({ isOpen, onClose, onNavigate, activeView }: MoreSheet
             >
               {item.icon}
               <span className="text-[11px] font-medium">{item.label}</span>
+              {item.badge ? (
+                <span className="absolute top-2 right-2 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-primary-500 text-white text-[10px] font-semibold leading-none">
+                  {item.badge > 99 ? '99+' : item.badge}
+                </span>
+              ) : null}
             </button>
           ))}
         </div>

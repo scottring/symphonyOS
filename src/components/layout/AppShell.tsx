@@ -386,7 +386,7 @@ export function AppShell({
           isOpen={quickAddOpen}
           onOpen={onOpenQuickAdd}
           onClose={onCloseQuickAdd}
-          showFab={!(isMobile && activeView === 'today') && !(isMobile && panelOpen)}
+          showFab={!(isMobile && panelOpen)}
         />
       )}
 
@@ -692,6 +692,7 @@ export function AppShell({
           onClose={() => setMoreSheetOpen(false)}
           onNavigate={onViewChange}
           activeView={activeView}
+          inboxCount={entities?.tasks.filter(t => t.bucket === 'inbox' && !t.completed).length}
         />
       )}
 
