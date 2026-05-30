@@ -1,6 +1,6 @@
 import type { Task } from '@/types/task'
 
-type Match = (assignedTo: string | null | undefined) => boolean
+type Match = (assignedTo: string | null | undefined, assignedToAll?: readonly string[] | null) => boolean
 
 /** Ports TodaySchedule.overdueTasks (~621-657). `now` defaults to new Date(). */
 export function selectOverdue(tasks: Task[], isToday: boolean, match: Match, now: Date = new Date()): Task[] {
@@ -9,7 +9,7 @@ export function selectOverdue(tasks: Task[], isToday: boolean, match: Match, now
   today.setHours(0, 0, 0, 0)
   const isOverdue = (task: Task): boolean => {
     if (!task.scheduledFor) return false
-    if (!match(task.assignedTo)) return false
+    if (!match(task.assignedTo, task.assignedToAll)) return false
     const taskDate = new Date(task.scheduledFor)
     taskDate.setHours(0, 0, 0, 0)
     if (task.completed) {
@@ -39,7 +39,7 @@ export function selectInbox(tasks: Task[], isToday: boolean, match: Match): Task
   return tasks.filter((task) => {
     if (task.completed) return false
     if (task.bucket !== 'inbox') return false
-    if (!match(task.assignedTo)) return false
+    if (!match(task.assignedTo, task.assignedToAll)) return false
     return true
   })
 }
@@ -50,7 +50,7 @@ export function selectWeek(tasks: Task[], isToday: boolean, match: Match): Task[
   return tasks.filter((task) => {
     if (task.completed) return false
     if (task.bucket !== 'week') return false
-    if (!match(task.assignedTo)) return false
+    if (!match(task.assignedTo, task.assignedToAll)) return false
     return true
   })
 }
@@ -64,7 +64,7 @@ export function selectCompletedInbox(tasks: Task[], viewedDate: Date, match: Mat
   return tasks.filter((task) => {
     if (!task.completed) return false
     if (task.bucket === 'timed') return false
-    if (!match(task.assignedTo)) return false
+    if (!match(task.assignedTo, task.assignedToAll)) return false
     const updatedDate = new Date(task.updatedAt)
     if (updatedDate < startOfDay || updatedDate > endOfDay) return false
     return true
@@ -84,11 +84,11 @@ export function selectTimed(tasks: Task[], viewedDate: Date, match: Match): Task
   }
   const result: Task[] = []
   for (const task of tasks) {
-    if (!match(task.assignedTo)) continue
+    if (!match(task.assignedTo, task.assignedToAll)) continue
     if (task.bucket === 'timed' && isOnViewedDate(task.scheduledFor)) result.push(task)
     if (task.subtasks) {
       for (const subtask of task.subtasks) {
-        if (!match(subtask.assignedTo)) continue
+        if (!match(subtask.assignedTo, subtask.assignedToAll)) continue
         if (subtask.bucket === 'timed' && isOnViewedDate(subtask.scheduledFor)) result.push(subtask)
       }
     }

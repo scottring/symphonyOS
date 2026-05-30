@@ -111,10 +111,15 @@ export function MonthView({
   // Generate calendar grid
   const calendarDays = useMemo(() => {
     // Helper function to check if an item matches the assignee filter
-    const matchesAssigneeFilter = (assignedTo: string | null | undefined): boolean => {
+    const matchesAssigneeFilter = (
+      assignedTo: string | null | undefined,
+      assignedToAll?: readonly string[] | null,
+    ): boolean => {
       if (selectedAssignee === null || selectedAssignee === undefined) return true
-      if (selectedAssignee === 'unassigned') return !assignedTo
-      return assignedTo === selectedAssignee
+      const hasMulti = Array.isArray(assignedToAll) && assignedToAll.length > 0
+      if (selectedAssignee === 'unassigned') return !assignedTo && !hasMulti
+      if (assignedTo === selectedAssignee) return true
+      return hasMulti && assignedToAll!.includes(selectedAssignee)
     }
 
     const today = new Date()
@@ -145,7 +150,7 @@ export function MonthView({
       // Filter items for this day
       const dayTasks = tasks.filter((task) => {
         if (!task.scheduledFor) return false
-        if (!matchesAssigneeFilter(task.assignedTo)) return false
+        if (!matchesAssigneeFilter(task.assignedTo, task.assignedToAll)) return false
         const taskDate = new Date(task.scheduledFor)
         return taskDate >= date && taskDate < nextDate
       })
@@ -164,7 +169,7 @@ export function MonthView({
       const activeRoutines = routines.filter((r) =>
         r.visibility === 'active' &&
         r.show_on_timeline !== false &&
-        matchesAssigneeFilter(r.assigned_to)
+        matchesAssigneeFilter(r.assigned_to, r.assigned_to_all)
       )
 
       // Count routines that apply to this day of week

@@ -67,6 +67,19 @@ describe('computeTodayData', () => {
     expect(ids).toContain('task-d')
   })
 
+  it('selectedAssignee matches a timed task via assignedToAll (multi-member)', () => {
+    const now = new Date()
+    const shared = task({
+      id: 's', bucket: 'timed', scheduledFor: now,
+      assignedTo: 'scott', assignedToAll: ['scott', 'iris'],
+    })
+    // Filtering by Iris must surface a task she shares via assignedToAll, even
+    // though the legacy single assignedTo is Scott.
+    const d = computeTodayData(baseInput({ tasks: [shared], viewedDate: now, selectedAssignee: 'iris' }))
+    const ids = Object.values(d.grouped).flat().map((i) => i.id)
+    expect(ids).toContain('task-s')
+  })
+
   it('week + inbox pools populate only when isToday', () => {
     const now = new Date()
     const w = task({ id: 'w', bucket: 'week' })

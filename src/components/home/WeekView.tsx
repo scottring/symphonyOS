@@ -194,10 +194,15 @@ export function WeekView({
   // Generate 7 days of the week
   const weekDays = useMemo(() => {
     // Helper function to check if an item matches the assignee filter
-    const matchesAssigneeFilter = (assignedTo: string | null | undefined): boolean => {
-      if (selectedAssignee === null || selectedAssignee === undefined) return true // "All" - show everything
-      if (selectedAssignee === 'unassigned') return !assignedTo // Show only unassigned
-      return assignedTo === selectedAssignee // Show items assigned to selected person
+    const matchesAssigneeFilter = (
+      assignedTo: string | null | undefined,
+      assignedToAll?: readonly string[] | null,
+    ): boolean => {
+      if (selectedAssignee === null || selectedAssignee === undefined) return true // "All"
+      const hasMulti = Array.isArray(assignedToAll) && assignedToAll.length > 0
+      if (selectedAssignee === 'unassigned') return !assignedTo && !hasMulti
+      if (assignedTo === selectedAssignee) return true
+      return hasMulti && assignedToAll!.includes(selectedAssignee) // multi-member match
     }
     const days: DayData[] = []
     const today = new Date()
@@ -222,7 +227,7 @@ export function WeekView({
       // Filter items for this day and by assignee
       const dayTasks = tasks.filter((task) => {
         if (!task.scheduledFor) return false
-        if (!matchesAssigneeFilter(task.assignedTo)) return false
+        if (!matchesAssigneeFilter(task.assignedTo, task.assignedToAll)) return false
         const taskDate = new Date(task.scheduledFor)
         return taskDate >= date && taskDate < nextDate
       })
@@ -242,7 +247,7 @@ export function WeekView({
       const activeRoutines = routines.filter((r) =>
         r.visibility === 'active' &&
         r.show_on_timeline !== false &&
-        matchesAssigneeFilter(r.assigned_to)
+        matchesAssigneeFilter(r.assigned_to, r.assigned_to_all)
       )
 
       // Convert to timeline items and group by section

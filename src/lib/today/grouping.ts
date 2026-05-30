@@ -13,7 +13,7 @@ export interface GroupingInput {
   viewedDate: Date
   routineStatusMap: Map<string, ActionableInstance>
   eventStatusMap: Map<string, ActionableInstance>
-  match: (assignedTo: string | null | undefined) => boolean
+  match: (assignedTo: string | null | undefined, assignedToAll?: readonly string[] | null) => boolean
   eventNotesMap?: Map<string, { notes?: string; assignedTo?: string | null }>
   eventContextOverrides?: Map<string, 'work' | 'family' | 'personal'>
   getDomainForCalendar?: (calendarId?: string, calendarName?: string) => 'work' | 'family' | 'personal' | null
@@ -65,7 +65,7 @@ export function buildGroupedSections(input: GroupingInput): Record<DaySection, T
 
   // Map and filter routines by assignee
   const routineItems = routines
-    .filter((routine) => match(routine.assigned_to))
+    .filter((routine) => match(routine.assigned_to, routine.assigned_to_all))
     .map((routine) => {
       const item = routineToTimelineItem(routine, viewedDate)
       const instance = routineStatusMap.get(routine.id)

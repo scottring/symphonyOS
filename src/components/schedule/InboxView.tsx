@@ -222,8 +222,11 @@ export function InboxView({
   const filteredByDomain = useMemo(() => {
     return tasks.filter((task) => {
       if (currentUserMemberId && (task.context === 'work' || task.context === 'personal')) {
-        const assignee = task.assignedTo || task.assignedToAll?.[0]
-        if (assignee && assignee !== currentUserMemberId) return false
+        // Visible to anyone the task is assigned to — check the full set, not [0].
+        const assignees = task.assignedToAll && task.assignedToAll.length > 0
+          ? task.assignedToAll
+          : (task.assignedTo ? [task.assignedTo] : [])
+        if (assignees.length > 0 && !assignees.includes(currentUserMemberId)) return false
       }
       if (currentDomain === 'universal') return true
       if (task.bucket === 'inbox' && !task.completed) return true

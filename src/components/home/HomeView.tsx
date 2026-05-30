@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -76,10 +76,16 @@ export function HomeView({
     today.setHours(0, 0, 0, 0)
 
     return tasks.filter(task => {
-      // Hide other members' work/personal tasks (private domains) in ALL views
+      // Hide other members' work/personal tasks (private domains) in ALL views.
+      // A private task is visible to anyone it's assigned to, so check membership
+      // in the full assignee set — not just the first entry. (The old code used
+      // assignedToAll?.[0], which hid a shared private task from everyone but the
+      // first assignee.)
       if (currentUserMemberId && (task.context === 'work' || task.context === 'personal')) {
-        const assignee = task.assignedTo || (task.assignedToAll?.[0])
-        if (assignee && assignee !== currentUserMemberId) return false
+        const assignees = task.assignedToAll && task.assignedToAll.length > 0
+          ? task.assignedToAll
+          : (task.assignedTo ? [task.assignedTo] : [])
+        if (assignees.length > 0 && !assignees.includes(currentUserMemberId)) return false
       }
       // Universal shows everything that passes the privacy filter above
       if (currentDomain === 'universal') return true
@@ -121,16 +127,44 @@ export function HomeView({
   // through unfiltered — domain filtering applies to tasks/routines/projects only.
   const filteredEvents = events
 
-  // Assignee filter state
-  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
+  // Assignee filter state — persisted, and defaulted to the logged-in person
+  // ("my tasks") so each member sees their own world first and can tap to
+  // "Everyone". Persisting + defaulting means the selection survives view
+  // switches and reloads instead of resetting to "everyone" every time.
+  const ASSIGNEE_FILTER_KEY = 'symphony-assignee-filter'
+  const hadStoredAssigneeRef = useRef(false)
+  const [selectedAssignees, setSelectedAssigneesState] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return []
+    try {
+      const raw = window.localStorage.getItem(ASSIGNEE_FILTER_KEY)
+      if (raw !== null) { hadStoredAssigneeRef.current = true; return JSON.parse(raw) as string[] }
+    } catch { /* ignore */ }
+    return []
+  })
+  const setSelectedAssignees = useCallback((next: string[]) => {
+    setSelectedAssigneesState(next)
+    try { window.localStorage.setItem(ASSIGNEE_FILTER_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+  }, [])
+
+  // First-ever load (no stored preference): default to the current user once we
+  // know who they are. An explicit later choice (including "Everyone" → []) is
+  // stored and wins on subsequent loads.
+  const didDefaultAssigneeRef = useRef(false)
+  useEffect(() => {
+    if (hadStoredAssigneeRef.current || didDefaultAssigneeRef.current) return
+    if (currentUserMemberId) {
+      didDefaultAssigneeRef.current = true
+      setSelectedAssignees([currentUserMemberId])
+    }
+  }, [currentUserMemberId, setSelectedAssignees])
 
   const showRiverView = useMemo(() => {
     const realMemberCount = selectedAssignees.filter(id => id !== 'unassigned').length
     return realMemberCount >= 2
   }, [selectedAssignees])
 
+  // Keep the assignee selection across view switches (don't reset to Everyone).
   const handleViewChange = useCallback((view: typeof currentView) => {
-    setSelectedAssignees([])
     setCurrentView(view)
   }, [setCurrentView])
 
