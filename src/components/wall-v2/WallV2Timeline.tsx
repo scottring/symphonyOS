@@ -7,6 +7,7 @@
 import { CalendarDays, Coffee } from 'lucide-react';
 import { TINTS } from './tints';
 import { WallV2EventCard } from './WallV2EventCard';
+import { useDragScroll } from '@/hooks/useDragScroll';
 import type { WallV2TimelineSection } from './types';
 
 interface Props {
@@ -17,6 +18,9 @@ interface Props {
 }
 
 export function WallV2Timeline({ sections, onTapEvent, onToggleComplete, onTapFullDay }: Props) {
+  // The wall is a Pi touchscreen that delivers touch as mouse events, so native
+  // touch scrolling never fires — drive scroll from pointer drag instead.
+  const scrollRef = useDragScroll<HTMLDivElement>();
   return (
     <div className="bg-white/70 dark:bg-stone-900/60 border border-stone-200/70 dark:border-stone-700/60 rounded-3xl p-5 flex flex-col gap-4 h-full min-h-0">
       <div className="text-[0.72rem] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400 shrink-0">
@@ -37,17 +41,12 @@ export function WallV2Timeline({ sections, onTapEvent, onToggleComplete, onTapFu
         </div>
       ) : (
       <div
+        ref={scrollRef}
         className="flex flex-col gap-4 relative flex-1 min-h-0 overflow-y-auto pr-1 -mr-1"
-        // The wall is a touchscreen. The outer .wall-touch-root sets
-        // `touch-action: manipulation` to kill the 300ms double-tap delay;
-        // spec-wise that should still allow pan-y, but on a few touch
-        // controllers (especially Android WebView / older Safari) the
-        // intersection on a `<button>`-bearing scroll child silently
-        // suppresses vertical pan. Re-asserting pan-y here and adding the
-        // legacy `-webkit-overflow-scrolling: touch` is the established
-        // wall pattern (see WallChoresWidget.tsx:159). Without these two
-        // declarations, the family can see the list overflow but can't
-        // swipe-scroll to reach the rest of it.
+        // Scroll is driven by useDragScroll (pointer-drag → scrollTop) because
+        // the Pi kiosk delivers touch as mouse events, so native touch scroll
+        // and `touch-action` never fire here. The touch-action/-webkit props are
+        // kept as a no-cost fallback for any surface that *does* get real touch.
         style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
       >
         {sections.map((section, idx) => {
