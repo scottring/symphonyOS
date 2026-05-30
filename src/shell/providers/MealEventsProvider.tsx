@@ -24,6 +24,7 @@ import { useMealPlan } from '@/hooks/useMealPlan';
 import { useRecipes } from '@/hooks/useRecipes';
 import { sundayOfWeek } from '@/lib/weekHelpers';
 import { GeneratePlanProvider } from '@/contexts/GeneratePlanContext';
+import { SHOW_PLANNED_MEALS_ON_TIMELINE } from '@/lib/mealsVisibility';
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar';
 import type { MealPlan, Recipe } from '@/types/meal-planner';
 import type { FamilyMember } from '@/types/family';
@@ -130,13 +131,17 @@ export function useMealEventsForDate(viewedDate: Date): CalendarEvent[] {
 
   return useMemo(
     () =>
-      synthesizeMealEvents({
-        viewedDate,
-        mealPlan: plan,
-        recipes,
-        familyMembers,
-        currentMemberId: getCurrentUserMember()?.id ?? null,
-      }),
+      // Planned meals are paused from the timeline until the planner is set up
+      // properly (see mealsVisibility.ts). synthesizeMealEvents stays pure.
+      SHOW_PLANNED_MEALS_ON_TIMELINE
+        ? synthesizeMealEvents({
+            viewedDate,
+            mealPlan: plan,
+            recipes,
+            familyMembers,
+            currentMemberId: getCurrentUserMember()?.id ?? null,
+          })
+        : [],
     [viewedDate, plan, recipes, familyMembers, getCurrentUserMember],
   );
 }

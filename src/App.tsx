@@ -26,6 +26,7 @@ import type { PinnableEntityType } from '@/types/pin'
 import { supabase } from '@/lib/supabase'
 import { sundayOfWeek } from '@/lib/weekHelpers'
 import { detectContextSharingChange } from '@/lib/contextSharingToast'
+import { SHOW_PLANNED_MEALS_ON_TIMELINE } from '@/lib/mealsVisibility'
 import { convertTaskToProject } from '@/lib/convertTaskToProject'
 import { DomainPageOutline } from '@/components/domain/DomainPageOutline'
 import { ViewRouter } from '@/components/layout/ViewRouter'
@@ -296,6 +297,9 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   const { plan: mealPlanForEvents } = useMealPlan(mealWeekStartForEvents)
   const { recipes: mealRecipesForEvents } = useRecipes()
   const mealEvents = useMemo<CalendarEvent[]>(() => {
+    // Planned meals paused from the timeline until the planner is set up
+    // properly (see mealsVisibility.ts). Flip the flag to resurface them.
+    if (!SHOW_PLANNED_MEALS_ON_TIMELINE) return []
     if (!mealPlanForEvents) return []
     const SLOT_TIMES: Record<string, [number, number]> = {
       breakfast: [7, 30], lunch: [12, 30], snack: [15, 30], dinner: [18, 30], prep: [16, 0],
