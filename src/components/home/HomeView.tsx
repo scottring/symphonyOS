@@ -4,6 +4,7 @@ import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
+import { resolveEventContext } from '@/lib/today/eventContext'
 import { useHomeView } from '@/hooks/useHomeView'
 import { useMobile } from '@/hooks/useMobile'
 import { useUndo } from '@/hooks/useUndo'
@@ -115,9 +116,18 @@ export function HomeView({
     return projects.filter(project => project.context === currentDomain)
   }, [projects, currentDomain])
 
-  // Calendar events (including meal-plan entries synthesized in App.tsx) flow
-  // through unfiltered — domain filtering applies to tasks/routines/projects only.
-  const filteredEvents = events
+  // Calendar events are domain-filtered like tasks. An event's context is
+  // resolved (manual override → calendar→domain mapping → null). A specific
+  // domain shows its own events PLUS untagged ones (calendars with no domain
+  // mapping stay visible everywhere until mapped); Universal shows all. This
+  // stops e.g. work-calendar events leaking into the Family/Personal views.
+  const filteredEvents = useMemo(() => {
+    if (currentDomain === 'universal') return events
+    return events.filter(event => {
+      const resolved = resolveEventContext(event, ctx.eventContextOverrides, ctx.getDomainForCalendar)
+      return resolved === currentDomain || resolved == null
+    })
+  }, [events, currentDomain, ctx.eventContextOverrides, ctx.getDomainForCalendar])
 
   // Assignee filter state — persisted, and defaulted to the logged-in person
   // ("my tasks") so each member sees their own world first and can tap to

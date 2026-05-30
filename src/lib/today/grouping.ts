@@ -5,6 +5,7 @@ import type { TimelineItem } from '@/types/timeline'
 import type { DaySection } from '@/lib/timeUtils'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import { groupByDaySection } from '@/lib/timeUtils'
+import { resolveEventContext } from './eventContext'
 
 export interface GroupingInput {
   timedTasks: Task[]
@@ -36,16 +37,10 @@ export function buildGroupedSections(input: GroupingInput): Record<DaySection, T
       const eventNote = eventNotesMap?.get(eventId)
       if (eventNote?.notes) item.notes = eventNote.notes
       if (eventNote?.assignedTo) item.assignedTo = eventNote.assignedTo
-      // Resolve event context: override → calendar domain mapping → null
-      const contextOverride = eventContextOverrides?.get(eventId)
-      if (contextOverride) {
-        item.context = contextOverride
-      } else if (getDomainForCalendar) {
-        const calendarId = event.calendar_id || event.calendarId
-        const calendarName = event.calendar_name || event.calendarName
-        const resolved = getDomainForCalendar(calendarId ?? undefined, calendarName ?? undefined)
-        if (resolved) item.context = resolved
-      }
+      // Resolve event context (override → calendar domain mapping → null) via
+      // the shared helper, so this matches HomeView's event domain filter.
+      const resolvedContext = resolveEventContext(event, eventContextOverrides, getDomainForCalendar)
+      if (resolvedContext) item.context = resolvedContext
       // Check if event is completed via actionable_instances
       const instance = eventStatusMap.get(eventId)
       if (instance?.status === 'completed') item.completed = true
