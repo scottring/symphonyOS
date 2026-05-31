@@ -5,7 +5,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { parseWhatsAppExport } from './lib/whatsapp.ts'
 import { filterSince } from './lib/dedupe.ts'
-import { buildExtractPrompt, parseExtractResponse, type CandidateItem } from './lib/extract.ts'
+import { buildExtractPrompt, parseExtractResponse, type CandidateItem, type GapFlag } from './lib/extract.ts'
+import { chunkMessages } from './lib/chunk.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,7 +20,7 @@ async function callAnthropic(prompt: string, apiKey: string): Promise<string> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1500, messages: [{ role: 'user', content: prompt }] }),
+    body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 4096, messages: [{ role: 'user', content: prompt }] }),
   })
   if (!res.ok) throw new Error(`Anthropic returned ${res.status}`)
   const data = await res.json()
@@ -80,8 +81,10 @@ Deno.serve(async (req: Request) => {
   if (capErr || !capture) return json({ error: 'capture not found' }, 404)
 
   try {
-    let body = capture.raw_text ?? ''
+    const MAX_CHARS = 300_000
     let newestIso: string | null = null
+    let chunks: string[]
+
     if (capture.kind === 'whatsapp_export' && capture.source_key) {
       const { data: cp } = await supabase
         .from('capture_checkpoints')
@@ -90,20 +93,27 @@ Deno.serve(async (req: Request) => {
         .eq('source_key', capture.source_key)
         .maybeSingle()
       const lastIso = cp?.last_processed_at ? cp.last_processed_at.replace(' ', 'T').slice(0, 19) : null
-      const { fresh, newestIso: n } = filterSince(parseWhatsAppExport(body), lastIso)
+      const { fresh, newestIso: n } = filterSince(parseWhatsAppExport(capture.raw_text ?? ''), lastIso)
       newestIso = n
-      body = fresh.map((m) => `[${m.timestamp}] ${m.sender}: ${m.text}`).join('\n')
+      chunks = chunkMessages(fresh, MAX_CHARS)
+    } else {
+      chunks = capture.raw_text && capture.raw_text.trim() ? [capture.raw_text] : []
     }
 
     const apiKey = Deno.env.get('ANTHROPIC_API_KEY')!
-    const result = body.trim()
-      ? parseExtractResponse(
-          await callAnthropic(
-            buildExtractPrompt(body, capture.source_label ?? capture.source_key ?? 'capture'),
-            apiKey,
-          ),
-        )
-      : { candidates: [], summary: `Nothing new since ${newestIso ?? 'last run'}.`, gaps: [] }
+    const label = capture.source_label ?? capture.source_key ?? 'capture'
+    const merged: { candidates: CandidateItem[]; summary: string[]; gaps: GapFlag[] } = { candidates: [], summary: [], gaps: [] }
+    for (const chunk of chunks) {
+      const r = parseExtractResponse(await callAnthropic(buildExtractPrompt(chunk, label), apiKey))
+      merged.candidates.push(...r.candidates)
+      if (r.summary) merged.summary.push(r.summary)
+      merged.gaps.push(...r.gaps)
+    }
+    const result = {
+      candidates: merged.candidates,
+      summary: chunks.length === 0 ? `Nothing new since ${newestIso ?? 'last run'}.` : (merged.summary.join(' ') || 'No actionable items found.'),
+      gaps: merged.gaps,
+    }
 
     if (result.candidates.length > 0) {
       const rows = result.candidates.map((c) => candidateToTaskRow(c, capture.user_id, capture))

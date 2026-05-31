@@ -67,7 +67,18 @@ export function parseExtractResponse(raw: string): ExtractionResult {
   try {
     parsed = JSON.parse(trimmed)
   } catch {
-    return { ...EMPTY }
+    // Fallback: extract the substring between the first '{' and the last '}'
+    const first = trimmed.indexOf('{')
+    const last = trimmed.lastIndexOf('}')
+    if (first !== -1 && last > first) {
+      try {
+        parsed = JSON.parse(trimmed.slice(first, last + 1))
+      } catch {
+        return { ...EMPTY }
+      }
+    } else {
+      return { ...EMPTY }
+    }
   }
   if (!parsed || typeof parsed !== 'object') return { ...EMPTY }
   const o = parsed as Record<string, unknown>

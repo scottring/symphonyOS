@@ -41,4 +41,11 @@ describe('parseExtractResponse', () => {
     const r = parseExtractResponse(raw)
     expect(r.candidates.map((c) => c.title)).toEqual(['ok'])
   })
+
+  it('extracts the JSON object even when wrapped in prose', () => {
+    const raw = 'Here is the result:\n{"candidates":[{"category":"task","title":"ok","confidence":0.5}],"summary":"s","gaps":[]}\nHope that helps!'
+    const r = parseExtractResponse(raw)
+    expect(r.candidates.map((c) => c.title)).toEqual(['ok'])
+    expect(r.summary).toBe('s')
+  })
 })
