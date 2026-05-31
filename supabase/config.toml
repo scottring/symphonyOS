@@ -261,6 +261,10 @@ inspector_port = 8083
 [functions.capture-to-inbox]
 verify_jwt = false
 
+# Internal: authenticated via x-capture-secret shared secret, not JWT.
+[functions.extract-capture]
+verify_jwt = false
+
 # GitHub webhook (scottring/scotts-world) calls this with an x-hub-signature-256
 # HMAC, not a Supabase JWT. JWT verification must stay off or the webhook 401s
 # at the platform gateway before the function's own signature check runs.

@@ -17,6 +17,7 @@ export default defineConfig({
     include: [
       'src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
       'vite/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}',
+      'supabase/functions/**/*.{test,spec}.{ts,mts,cts}',
     ],
     coverage: {
       provider: 'v8',
