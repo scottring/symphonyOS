@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { Utensils, ShoppingBag, ChefHat } from 'lucide-react'
 import type { FamilyDinnerSummary, GroceriesSummary, PrepAheadSummary } from '@/lib/weekHighlights'
+import { SHOW_PLANNED_MEALS_ON_TIMELINE } from '@/lib/mealsVisibility'
 
 interface WeekSummaryRowProps {
   familyDinner: FamilyDinnerSummary
@@ -14,7 +15,9 @@ const CARD_CLASS =
 export function WeekSummaryRow({ familyDinner, groceries, prepAhead }: WeekSummaryRowProps) {
   const navigate = useNavigate()
   const showDinner = familyDinner.nights > 0
-  const showGroceries = groceries.missingCount > 0
+  // Hide the groceries card while planned meals are paused — the count is
+  // derived from the meal planner, so it's noise until meals are live again.
+  const showGroceries = SHOW_PLANNED_MEALS_ON_TIMELINE && groceries.missingCount > 0
   const showPrep = !!prepAhead
   if (!showDinner && !showGroceries && !showPrep) return null
 
