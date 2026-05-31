@@ -119,7 +119,10 @@ function AllDaySlot({ day, children }: { day: Date; children?: ReactNode }) {
   return (
     <div
       ref={setNodeRef}
-      className={`border-l border-neutral-200/60 p-1 flex flex-col gap-1 ${isOver ? 'bg-primary-50/60' : ''}`}
+      // min-w-0 is essential: grid items default to min-width:auto, so a long
+      // chip title would stretch this cell past its 1fr column, misaligning the
+      // all-day row from the hour grid below (chips straddling day boundaries).
+      className={`border-l border-neutral-200/60 p-1 flex flex-col gap-1 min-w-0 overflow-hidden ${isOver ? 'bg-primary-50/60' : ''}`}
     >
       {children}
     </div>
