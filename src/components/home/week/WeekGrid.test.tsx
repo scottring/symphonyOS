@@ -43,6 +43,18 @@ describe('WeekGrid', () => {
     expect(screen.getByTestId('positioned-block')).toBeInTheDocument()
   })
 
+  it('renders renderAllDay content into each day of the all-day row', () => {
+    renderWithDnd(
+      <WeekGrid
+        weekStart={weekStart}
+        children={null}
+        renderAllDay={(day) => <span>chip-{day.getDate()}</span>}
+      />,
+    )
+    expect(screen.getByText('chip-17')).toBeInTheDocument() // Sun May 17
+    expect(screen.getByText('chip-23')).toBeInTheDocument() // Sat May 23
+  })
+
   it('renders 5 day-column headers when dayCount=5', () => {
     // 2026-05-18 is a Monday
     const monday = new Date(2026, 4, 18)

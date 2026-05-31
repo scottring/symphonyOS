@@ -21,8 +21,8 @@ import { sundayOfWeek } from '@/lib/weekHelpers'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import { familyDinnerSummary, groceriesSummary, prepAheadSummary } from '@/lib/weekHighlights'
 import { WeekSummaryRow } from './WeekSummaryRow'
-import { UnscheduledChipStrip } from './UnscheduledChipStrip'
-import { WeekGrid } from './WeekGrid'
+import { WeekGrid, dayKey } from './WeekGrid'
+import { WeekAllDayChip } from './WeekAllDayChip'
 import { WeekEventBlock } from './WeekEventBlock'
 import { layoutWeekLanes, type PlacedItem } from './layoutLanes'
 import { useWeekDragDrop } from './useWeekDragDrop'
@@ -202,14 +202,22 @@ export function WeekViewV2(props: WeekViewV2Props) {
     [tasks, weekStart],
   )
 
-  // All-day tasks shown as draggable chips above the grid. Completed tasks are
-  // excluded so finishing one elsewhere (Today, detail panel) removes its chip
-  // here — otherwise the strip shows stale, already-done items.
-  const unscheduledTasks = useMemo(
-    () => tasks.filter((t) => t.scheduledFor && inWeek(t.scheduledFor) && t.isAllDay && !t.completed),
+  // All-day tasks, grouped by day so each renders in the grid's all-day row
+  // under its actual day column. Completed tasks are excluded so finishing one
+  // elsewhere (Today, detail panel) removes its chip here.
+  const allDayByDay = useMemo(() => {
+    const map = new Map<string, Task[]>()
+    for (const t of tasks) {
+      if (!t.scheduledFor || !t.isAllDay || t.completed) continue
+      if (!inWeek(t.scheduledFor)) continue
+      const key = dayKey(t.scheduledFor)
+      const arr = map.get(key)
+      if (arr) arr.push(t)
+      else map.set(key, [t])
+    }
+    return map
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tasks, weekStart],
-  )
+  }, [tasks, weekStart])
 
   const weekEvents = useMemo(
     () =>
@@ -390,11 +398,14 @@ export function WeekViewV2(props: WeekViewV2Props) {
         onDragCancel={drag.dndHandlers.onDragCancel}
         onDragMove={handleDragMove}
       >
-        <UnscheduledChipStrip tasks={unscheduledTasks} />
-
         <WeekGrid
           weekStart={weekStart}
           dayCount={dayCount}
+          renderAllDay={(day) =>
+            (allDayByDay.get(dayKey(day)) ?? []).map((t) => (
+              <WeekAllDayChip key={t.id} task={t} onSelect={onSelectItem} />
+            ))
+          }
           onCreateGesture={
             drag.activeDragId
               ? undefined
