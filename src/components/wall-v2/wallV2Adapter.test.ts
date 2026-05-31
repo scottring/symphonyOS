@@ -90,6 +90,41 @@ describe('adaptTimelineSections', () => {
     expect(night.events.map((e) => e.title)).toEqual(['Wind down']);
   });
 
+  it('surfaces timeless (unscheduled) routines in an "Anytime" section', () => {
+    const today = makeDay({
+      isToday: true,
+      items: {
+        allday: [], morning: [], afternoon: [], evening: [],
+        unscheduled: [
+          makeItem({ id: 'r-meals', type: 'routine', title: 'Plan meals', startTime: null }),
+          makeItem({ id: 'r-sheets', type: 'routine', title: 'Change sheets', startTime: null }),
+          // A non-routine in the unscheduled bucket must NOT leak onto the wall.
+          makeItem({ id: 't-buy', type: 'task', title: 'Buy stamps', startTime: null }),
+        ],
+      },
+    });
+    const result = adaptTimelineSections(today, members, now, null, false, []);
+    const anytime = result.find((s) => s.label === 'Anytime');
+    expect(anytime).toBeDefined();
+    expect(anytime!.events.map((e) => e.title).sort()).toEqual(['Change sheets', 'Plan meals']);
+  });
+
+  it('hides timeless daily routines when hideDailyRoutines is on, keeps weekly ones', () => {
+    const today = makeDay({
+      isToday: true,
+      items: {
+        allday: [], morning: [], afternoon: [], evening: [],
+        unscheduled: [
+          makeItem({ id: 'r-daily', type: 'routine', title: 'Tidy up', startTime: null, recurrencePattern: { type: 'daily' } }),
+          makeItem({ id: 'r-weekly', type: 'routine', title: 'Plan meals', startTime: null, recurrencePattern: { type: 'weekly', days: ['sunday'] } }),
+        ],
+      },
+    });
+    const result = adaptTimelineSections(today, members, now, null, true, []);
+    const anytime = result.find((s) => s.label === 'Anytime');
+    expect(anytime!.events.map((e) => e.title)).toEqual(['Plan meals']);
+  });
+
   it('collapses identical routines into one card with merged avatars', () => {
     const kaleb: FamilyMember = { id: 'k', name: 'Kaleb', initials: 'KA', color: 'blue' } as FamilyMember;
     const ella: FamilyMember = { id: 'e', name: 'Ella', initials: 'EL', color: 'pink' } as FamilyMember;

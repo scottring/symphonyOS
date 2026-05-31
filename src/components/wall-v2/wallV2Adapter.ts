@@ -255,6 +255,15 @@ export function adaptTimelineSections(
   const morningItems = pick(today.items.morning);
   const afternoonItems = pick(today.items.afternoon);
 
+  // Timeless routines (e.g. weekly "plan meals", "change sheets") have no
+  // time_of_day, so getDaySection drops them into the 'unscheduled' bucket.
+  // The Today view surfaces these; the wall must too, or non-daily routines
+  // silently vanish from the kiosk. Routines only — any non-routine here is a
+  // bucketed/untriaged task that shouldn't spam the wall.
+  const anytimeItems = pick(
+    (today.items.unscheduled ?? []).filter((i) => i.type === 'routine'),
+  );
+
   // Evening splits into Evening (<9pm) and Night (>=9pm).
   const eveningRaw = (today.items.evening ?? []).filter(isVisible);
   const eveningPre: TimelineItem[] = [];
@@ -304,6 +313,11 @@ export function adaptTimelineSections(
   }
   if (nightItems.length > 0) {
     baseSections.push({ id: 'night', label: 'Night', icon: Moon, tint: 'sand', events: nightItems });
+  }
+  // Timeless routines sit at the end — they're "sometime today", not tied to a
+  // part of the day, so they read naturally after the timed sections.
+  if (anytimeItems.length > 0) {
+    baseSections.push({ id: 'anytime', label: 'Anytime', icon: Clock, tint: 'mint', events: anytimeItems });
   }
   // Reuse the overdue computation from the top of the function — same
   // inputs, same output, no point computing twice.
