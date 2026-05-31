@@ -23,7 +23,7 @@ export function WeekSummaryRow({ familyDinner, groceries, prepAhead }: WeekSumma
       {showDinner && (
         <button
           type="button"
-          onClick={() => navigate('/meals')}
+          onClick={() => navigate('/meals/plan')}
           aria-label={`Family dinner — ${familyDinner.nights} nights this week. Open meal plan.`}
           className={CARD_CLASS}
         >
@@ -51,7 +51,7 @@ export function WeekSummaryRow({ familyDinner, groceries, prepAhead }: WeekSumma
       {showGroceries && (
         <button
           type="button"
-          onClick={() => navigate('/meals')}
+          onClick={() => navigate('/meals/plan')}
           aria-label={`Groceries — ${groceries.missingCount} items missing. Open meal plan.`}
           className={CARD_CLASS}
         >
@@ -66,7 +66,7 @@ export function WeekSummaryRow({ familyDinner, groceries, prepAhead }: WeekSumma
       {showPrep && (
         <button
           type="button"
-          onClick={() => navigate('/meals')}
+          onClick={() => navigate('/meals/plan')}
           aria-label={`Prep ahead — ${prepAhead!.recipeName}. Open meal plan.`}
           className={CARD_CLASS}
         >
