@@ -1,4 +1,4 @@
-import type { ParsedMessage } from './whatsapp'
+import type { ParsedMessage } from './whatsapp.ts'
 
 export interface DedupeResult {
   fresh: ParsedMessage[]
