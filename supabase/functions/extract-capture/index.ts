@@ -123,7 +123,7 @@ Deno.serve(async (req: Request) => {
     //             NOTE: plan used 'inbox_triage' which violates this constraint;
     //             corrected to 'import' (closest valid value for programmatic ingestion).
     //   type    — text check (...,'general',...) — using 'general' (appropriate default)
-    await supabase.from('notes').insert({
+    const { error: noteErr } = await supabase.from('notes').insert({
       user_id: capture.user_id,
       title: `Capture: ${capture.source_label ?? capture.source_key ?? 'note'}`,
       content: `${result.summary}${gapText}`,
@@ -131,6 +131,7 @@ Deno.serve(async (req: Request) => {
       source: 'import',
       type: 'general',
     })
+    if (noteErr) throw new Error(`note insert failed: ${noteErr.message}`)
 
     if (capture.kind === 'whatsapp_export' && capture.source_key && newestIso) {
       await supabase.from('capture_checkpoints').upsert({
