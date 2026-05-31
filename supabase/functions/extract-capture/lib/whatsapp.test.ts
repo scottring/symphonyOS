@@ -30,4 +30,12 @@ describe('parseWhatsAppExport', () => {
     const msgs = parseWhatsAppExport(txt)
     expect(msgs[0].text).toBe('<attached: flyer.jpg>')
   })
+
+  it('handles CRLF line endings', () => {
+    const txt = `[2026-05-30, 09:14:23] Mom: a\r\n[2026-05-30, 09:15:00] Dad: b`
+    const msgs = parseWhatsAppExport(txt)
+    expect(msgs).toHaveLength(2)
+    expect(msgs[0].text).toBe('a')
+    expect(msgs[1].text).toBe('b')
+  })
 })

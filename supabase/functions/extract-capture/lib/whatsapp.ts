@@ -4,6 +4,9 @@ export interface ParsedMessage {
   text: string
 }
 
+// Known gap (acceptable this slice): bracketed system/notification lines
+// (e.g. "<Media omitted>", "X added Y") lack "sender: text" and, if they follow
+// a real message, fold into it. Cleaned up in a later slice.
 // Matches the bracketed prefix WhatsApp puts on the first line of each message.
 // Group 1 = datetime substring, Group 2 = sender, Group 3 = first line of text.
 const HEAD = /^‎?\[([^\]]+)\]\s([^:]+):\s?‎?(.*)$/
@@ -37,7 +40,8 @@ export function normalizeTimestamp(raw: string): string {
 
 export function parseWhatsAppExport(text: string): ParsedMessage[] {
   const out: ParsedMessage[] = []
-  for (const line of text.split('\n')) {
+  // Split on CRLF or LF — exports forwarded via email/Windows can be CRLF.
+  for (const line of text.split(/\r?\n/)) {
     const head = HEAD.exec(line)
     if (head) {
       out.push({
