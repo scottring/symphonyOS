@@ -20,7 +20,11 @@ const corsHeaders = {
 
 interface CaptureBody {
   user_email: string
-  title: string
+  title?: string                  // legacy quick-capture path
+  kind?: 'text' | 'whatsapp_export'
+  text?: string
+  source_key?: string
+  source_label?: string
 }
 
 type ValidationResult =
@@ -39,10 +43,15 @@ export function validateRequest(
   if (!body.user_email || typeof body.user_email !== 'string' || body.user_email.trim() === '') {
     return { ok: false, status: 400, error: 'user_email required' }
   }
-  if (!body.title || typeof body.title !== 'string' || body.title.trim() === '') {
+  const isExtract = body.kind === 'text' || body.kind === 'whatsapp_export'
+  if (isExtract) {
+    if (!body.text || typeof body.text !== 'string' || body.text.trim() === '') {
+      return { ok: false, status: 400, error: 'text required for kind=text|whatsapp_export' }
+    }
+  } else if (!body.title || typeof body.title !== 'string' || body.title.trim() === '') {
     return { ok: false, status: 400, error: 'title required' }
   }
-  return { ok: true, body: { user_email: body.user_email, title: body.title } }
+  return { ok: true, body: body as CaptureBody }
 }
 
 Deno.serve(async (req: Request) => {
@@ -90,10 +99,36 @@ Deno.serve(async (req: Request) => {
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const admin = createClient(supabaseUrl, serviceRoleKey)
 
+  // New extract path: create a captures row and invoke extract-capture.
+  if (v.body.kind === 'text' || v.body.kind === 'whatsapp_export') {
+    const { data: cap, error: capErr } = await admin
+      .from('captures')
+      .insert({
+        user_id: userId,
+        kind: v.body.kind,
+        source_key: v.body.source_key ?? null,
+        source_label: v.body.source_label ?? null,
+        raw_text: v.body.text,
+        status: 'pending',
+      })
+      .select('id')
+      .single()
+    if (capErr || !cap) return jsonResponse({ error: 'failed to create capture' }, 500)
+
+    // Fire-and-forget extraction; failures are recorded on the captures row.
+    fetch(`${supabaseUrl}/functions/v1/extract-capture`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-capture-secret': expectedSecret },
+      body: JSON.stringify({ capture_id: cap.id }),
+    }).catch(() => {})
+    return jsonResponse({ ok: true, capture_id: cap.id }, 202)
+  }
+
+  // Legacy quick-capture path: insert a plain inbox task.
   const { data: task, error: insertErr } = await admin
     .from('tasks')
     .insert({
-      title: v.body.title.trim(),
+      title: v.body.title!.trim(),
       user_id: userId,
       bucket: 'inbox',
       context: null,
