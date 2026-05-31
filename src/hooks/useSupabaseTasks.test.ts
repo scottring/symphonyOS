@@ -734,6 +734,36 @@ describe.skip('useSupabaseTasks', () => {
 
       expect(result.current.tasks[0].deferredUntil).toEqual(deferDate)
     })
+
+    it('marks the task all-day when scheduled to a day with no specific time', async () => {
+      // The inbox → "Today"/a-day flow passes a date at local midnight (no time
+      // chosen). That must persist isAllDay:true, or the task gets a midnight
+      // scheduledFor with isAllDay undefined and is mis-bucketed everywhere.
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', scheduled_for: null }))
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+
+      const day = new Date(2024, 5, 20) // local midnight = "no time"
+      await act(async () => {
+        await result.current.pushTask('task-1', day)
+      })
+
+      expect(result.current.tasks[0].bucket).toBe('timed')
+      expect(result.current.tasks[0].isAllDay).toBe(true)
+    })
+
+    it('keeps the task timed (isAllDay false) when scheduled to a specific time', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', scheduled_for: null }))
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+
+      const at230pm = new Date(2024, 5, 20, 14, 30)
+      await act(async () => {
+        await result.current.pushTask('task-1', at230pm)
+      })
+
+      expect(result.current.tasks[0].isAllDay).toBe(false)
+    })
   })
 
   describe('data transformation', () => {

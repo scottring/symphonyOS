@@ -885,12 +885,17 @@ export function useSupabaseTasks() {
         newScheduledFor.setHours(task.scheduledFor.getHours(), task.scheduledFor.getMinutes(), 0, 0)
       }
 
-      // If the target date has a specific time set (not midnight), respect it
+      // If the target date has a specific time set (not midnight), respect it.
+      // A day with no time means "all-day" — this MUST be persisted, or the
+      // task gets a midnight scheduledFor with isAllDay left undefined, which
+      // every timeline view mishandles: Today buckets it as 'unscheduled'
+      // instead of "All day", and the Week grid drops it at the 00:00 row
+      // (top-left) instead of the all-day strip. Always write a real boolean.
       const hasSpecificTime = newScheduledFor.getHours() !== 0 || newScheduledFor.getMinutes() !== 0
       await updateTask(id, {
         bucket: 'timed',
         scheduledFor: newScheduledFor,
-        ...(isOverdue && !hasSpecificTime ? { isAllDay: true } : {}),
+        isAllDay: !hasSpecificTime,
       })
     }
   }, [findTaskById, updateTask])
