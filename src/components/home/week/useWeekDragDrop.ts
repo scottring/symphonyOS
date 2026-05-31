@@ -60,6 +60,34 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
       | undefined
 
     if (!activeData || !overData) return
+
+    // Dropped on a day's all-day cell → schedule (or keep) the task as all-day
+    // on that day. Without this, an all-day chip could only be dropped on a
+    // time slot, so "move this to another day, still all-day" did nothing.
+    if (overData.kind === 'allDay' && overData.dayIso) {
+      const taskId =
+        activeData.kind === 'chip'
+          ? activeData.taskId
+          : activeData.itemId?.startsWith('task-')
+          ? activeData.itemId.slice('task-'.length)
+          : undefined
+      if (!taskId) return
+      const newDay = parseSlotTime(overData.dayIso, 0, 0)
+      const task = tasks.find((t) => t.id === taskId)
+      const prevScheduledFor = task?.scheduledFor ?? null
+      const prevIsAllDay = task?.isAllDay ?? false
+      const prevEndTime = task?.endTime
+      void onUpdateTask(taskId, { isAllDay: true, scheduledFor: newDay })
+      args.pushAction?.(`Moved "${task?.title ?? 'task'}"`, () => {
+        void onUpdateTask(taskId, {
+          isAllDay: prevIsAllDay,
+          scheduledFor: prevScheduledFor as Date,
+          endTime: prevEndTime,
+        })
+      })
+      return
+    }
+
     if (overData.kind !== 'timed' || !overData.dayIso) return
 
     const newStart = parseSlotTime(overData.dayIso, overData.hour ?? 0, overData.minute ?? 0)

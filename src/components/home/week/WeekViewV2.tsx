@@ -202,9 +202,11 @@ export function WeekViewV2(props: WeekViewV2Props) {
     [tasks, weekStart],
   )
 
-  // All-day tasks shown as draggable chips above the grid
+  // All-day tasks shown as draggable chips above the grid. Completed tasks are
+  // excluded so finishing one elsewhere (Today, detail panel) removes its chip
+  // here — otherwise the strip shows stale, already-done items.
   const unscheduledTasks = useMemo(
-    () => tasks.filter((t) => t.scheduledFor && inWeek(t.scheduledFor) && t.isAllDay),
+    () => tasks.filter((t) => t.scheduledFor && inWeek(t.scheduledFor) && t.isAllDay && !t.completed),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [tasks, weekStart],
   )
@@ -465,6 +467,21 @@ export function WeekViewV2(props: WeekViewV2Props) {
         <DragOverlay dropAnimation={null}>
           {drag.activeDragId
             ? (() => {
+                // All-day strip chips drag with a 'chip:<taskId>' id and aren't
+                // in placedItems — render their own floating pill so the drag
+                // has visible feedback (without this the chip looked unmovable).
+                if (drag.activeDragId.startsWith('chip:')) {
+                  const taskId = drag.activeDragId.slice('chip:'.length)
+                  const task = tasks.find((t) => t.id === taskId)
+                  if (!task) return null
+                  return (
+                    <div className="opacity-80 pointer-events-none">
+                      <div className="px-3 py-1.5 rounded-full bg-bg-elevated border border-neutral-300 text-[12px] text-neutral-800 shadow-md whitespace-nowrap">
+                        {task.title}
+                      </div>
+                    </div>
+                  )
+                }
                 // Strip the dnd-kit drag prefix to recover the TimelineItem id.
                 // Routines use 'block-routine:', everything else uses 'block:'.
                 const itemId = drag.activeDragId.startsWith('block-routine:')

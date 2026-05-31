@@ -69,6 +69,35 @@ describe('useWeekDragDrop', () => {
     expect((updates.scheduledFor as Date).getHours()).toBe(14)
   })
 
+  it('chip drop on an all-day cell keeps it all-day and moves it to that day', async () => {
+    const onUpdateTask = vi.fn().mockResolvedValue(undefined)
+    const { result } = renderHook(() => useWeekDragDrop({
+      weekStart: new Date(2026, 4, 17),
+      onWeekChange: vi.fn(),
+      onUpdateTask,
+      onUpdateEvent: vi.fn(),
+      onUpdateRoutine: vi.fn(),
+      tasks: [{ id: 't1', title: 'X', isAllDay: true, scheduledFor: new Date(2026, 4, 20) } as never],
+      events: [], routines: [],
+    }))
+
+    const allDayDrop = {
+      active: { id: 'chip:t1', data: { current: { kind: 'chip', taskId: 't1' } } },
+      over: { id: 'slot:2026-05-22:all-day', data: { current: { kind: 'allDay', dayIso: '2026-05-22' } } },
+    }
+
+    await act(async () => {
+      result.current.dndHandlers.onDragEnd(allDayDrop as never)
+    })
+
+    expect(onUpdateTask).toHaveBeenCalledTimes(1)
+    const [taskId, updates] = onUpdateTask.mock.calls[0]
+    expect(taskId).toBe('t1')
+    expect(updates.isAllDay).toBe(true)
+    expect((updates.scheduledFor as Date).getDate()).toBe(22)
+    expect((updates.scheduledFor as Date).getHours()).toBe(0)
+  })
+
   it('onDragCancel produces no mutation', async () => {
     const onUpdateTask = vi.fn()
     const { result } = renderHook(() => useWeekDragDrop({
