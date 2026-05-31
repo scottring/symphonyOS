@@ -1,4 +1,5 @@
 import { Redo2, Check, X, Phone, MapPin, FileText, Video, Link as LinkIcon } from 'lucide-react'
+import { useDragScroll } from '@/hooks/useDragScroll'
 import type { WallV2TimelineEvent } from './types'
 
 /**
@@ -44,6 +45,10 @@ const ctxRow =
 export function WallV2ItemActionSheet({ event, onSkip, onMarkDone, onPushTask, onClose }: Props) {
   const kind: 'routine' | 'event' | 'task' = event.kind ?? 'event'
 
+  // The Pi delivers touch as mouse events, so the touch-action CSS below never
+  // scrolls on the wall. Drive scroll by pointer-drag like the other surfaces.
+  const ctxScrollRef = useDragScroll<HTMLDivElement>()
+
   const hasContext = Boolean(
     event.phoneNumber ||
     event.meetingUrl ||
@@ -68,6 +73,7 @@ export function WallV2ItemActionSheet({ event, onSkip, onMarkDone, onPushTask, o
             Scrollable so long notes never push the actions off-screen. */}
         {hasContext && (
           <div
+            ref={ctxScrollRef}
             className="px-6 flex-1 min-h-0 overflow-y-auto"
             style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
           >

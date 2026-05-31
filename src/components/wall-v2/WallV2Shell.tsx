@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Eye, EyeOff, Moon, Sun, RefreshCw, ImageOff } from 'lucide-react';
 import { useActionableInstances } from '@/hooks/useActionableInstances';
+import { useBuildAutoReload } from '@/hooks/useBuildAutoReload';
 import { WallV2GuestScreen } from './WallV2GuestScreen';
 import { WallV2ItemActionSheet, type PushPreset } from './WallV2ItemActionSheet';
 import {
@@ -106,6 +107,11 @@ const THEME_KEY = 'symphony-wall-theme';
 
 export function WallV2Shell() {
   const { user, loading: authLoading } = useAuth();
+
+  // The chromeless Pi kiosk can't reload itself to pick up a new deploy, so a
+  // shipped fix can stay invisible on the wall until a power-cycle. Poll for a
+  // newer build and reload automatically. See useBuildAutoReload.
+  useBuildAutoReload();
 
   // Re-rendering each minute keeps the date, timeline filter, and time-aware
   // copy minute-fresh without thrashing the hooks below.
