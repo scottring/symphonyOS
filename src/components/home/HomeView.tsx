@@ -436,7 +436,7 @@ export function HomeView({
   return (
     <div className={`relative flex flex-col h-full transition-colors duration-500 ${DOMAIN_BG[currentDomain]}`}>
       {!isMobile && (
-        <div className="px-6 pt-4">
+        <div className={currentView === 'today' ? 'max-w-[940px] mx-auto px-8 pt-4' : 'px-6 pt-4'}>
           <HomeHeader
             currentView={currentView}
             onViewChange={handleViewChange}
