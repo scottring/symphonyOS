@@ -72,8 +72,6 @@ interface AppShellProps {
   // Pinned items props
   pins?: PinnedItem[]
   entities?: EntityData
-  /** Opens a family member's detail page. */
-  onOpenMember?: (id: string) => void
   onPinNavigate?: (entityType: PinnableEntityType, entityId: string) => void
   onPinMarkAccessed?: (entityType: PinnableEntityType, entityId: string) => void
   onPinRefreshStale?: (id: string) => void
