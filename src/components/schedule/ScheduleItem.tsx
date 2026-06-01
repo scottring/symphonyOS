@@ -224,9 +224,9 @@ export const ScheduleItem = memo(function ScheduleItem({
   routineStreak,
 }: ScheduleItemProps) {
   const isMobile = useMobile()
-  // Hover state powers the smooth expanding banner (proactive suggestions,
-  // location-only metadata row). On mobile we never expand — preserves the
-  // pre-existing behavior where these were never visible without hover.
+  // Hover state powers the smooth expanding banner (location-only metadata row).
+  // On mobile we never expand — preserves the pre-existing behavior where
+  // these were never visible without hover.
   const [isHovered, setIsHovered] = useState(false)
   const isTask = item.type === 'task'
   const isRoutine = item.type === 'routine'

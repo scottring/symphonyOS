@@ -180,10 +180,6 @@ export function OverdueSection({
                 hideTime={shouldHideTime}
                 panelOpen={panelOpen}
                 onClosePanel={onClosePanel}
-                suggestions={proactiveSuggs.length > 0 ? proactiveSuggs : undefined}
-                onActSuggestion={onActSuggestion}
-                onDismissSuggestion={onDismissSuggestion}
-                onOpenGuidedChat={onOpenGuidedChat}
               />
               {followUpTaskId === taskId && onFollowUpSubmit && onFollowUpDismiss && (
                 <FollowUpInput
