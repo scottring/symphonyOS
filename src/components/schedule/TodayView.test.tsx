@@ -152,8 +152,8 @@ describe('TodayView', () => {
         },
       ],
     } as never)
-    // OverdueSection renders a role="region" aria-label="Overdue tasks" wrapper
-    expect(screen.getByRole('region', { name: /overdue tasks/i })).toBeInTheDocument()
+    // OverdueSection renders a role="region" aria-label="Carried over tasks" wrapper
+    expect(screen.getByRole('region', { name: /carried over tasks/i })).toBeInTheDocument()
     expect(screen.getByText('Overdue task title')).toBeInTheDocument()
   })
 
@@ -179,15 +179,14 @@ describe('TodayView', () => {
       } as never,
       { onToggleWaiting },
     )
-    // OverdueSection renders with the aria-label region
-    expect(screen.getByRole('region', { name: /overdue tasks/i })).toBeInTheDocument()
+    // CarriedOver (overdue) section renders with its aria-label region
+    expect(screen.getByRole('region', { name: /carried over tasks/i })).toBeInTheDocument()
     expect(screen.getByText('Wired overdue task')).toBeInTheDocument()
-    // The "Overdue" h3 heading is present — rendered by OverdueSection
-    // (use getAllByText since the region aria-label also contains "overdue")
-    expect(screen.getAllByText(/overdue/i).length).toBeGreaterThan(0)
+    // The "Carried over" h3 heading is present — rendered by OverdueSection
+    expect(screen.getByText('Carried over')).toBeInTheDocument()
     // onToggleWaiting was passed into context — ScheduleItem renders a waiting toggle
     // when onToggleWaiting is provided; verify it's reachable (no prop-threading crash)
-    expect(screen.getByRole('region', { name: /overdue tasks/i })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /carried over tasks/i })).toBeInTheDocument()
   })
 
   it('mounts EmailActionsBanner without breaking the Today render', () => {

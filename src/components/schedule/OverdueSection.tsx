@@ -88,12 +88,12 @@ export function OverdueSection({
   return (
     <div
       role="region"
-      aria-label="Overdue tasks"
+      aria-label="Carried over tasks"
       className="mb-10 animate-fade-in-up"
     >
-      {/* Section header — warm but subtle */}
-      <h3 className="time-group-header mb-4" style={{ color: 'hsl(32 60% 50%)' }}>
-        Overdue
+      {/* Section header — calm, plain. These are obligations, not emergencies. */}
+      <h3 className="time-group-header mb-4" style={{ color: 'hsl(220 9% 46%)' }}>
+        Carried over
       </h3>
 
       <div className="timeline-group timeline-group--tight stagger-in">
