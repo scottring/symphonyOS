@@ -52,6 +52,7 @@ vi.mock('@/lib/dateHelpers', () => ({
     d.setHours(0, 0, 0, 0)
     return d
   },
+  formatShortDate: (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
 }))
 
 vi.mock('@/lib/inputStyles', () => ({
@@ -405,5 +406,16 @@ describe('WhenPicker', () => {
       expect(screen.getByText('This Week')).toBeInTheDocument()
       expect(screen.queryByText('All Day')).not.toBeInTheDocument()
     })
+  })
+
+  it('weekend buttons show their resolved dates', () => {
+    render(<WhenPicker onChange={vi.fn()} />)
+    fireEvent.click(screen.getByLabelText('Set when'))
+    // labels now read "This Weekend · <date>" / "Next Weekend · <date>"
+    const buttons = screen.getAllByRole('button')
+    const thisWeekendBtn = buttons.find(b => /This Weekend ·/.test(b.textContent ?? ''))
+    const nextWeekendBtn = buttons.find(b => /Next Weekend ·/.test(b.textContent ?? ''))
+    expect(thisWeekendBtn).toBeInTheDocument()
+    expect(nextWeekendBtn).toBeInTheDocument()
   })
 })

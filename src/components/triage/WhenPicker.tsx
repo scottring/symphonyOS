@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { getBaseDate, getNextWeekend, getWeekendAfterNext, parseDateInput, parseTimeInput, formatDateLabel } from '@/lib/dateHelpers'
+import { getBaseDate, getNextWeekend, getWeekendAfterNext, parseDateInput, parseTimeInput, formatDateLabel, formatShortDate } from '@/lib/dateHelpers'
 import { DATE_INPUT_CLASS, TIME_INPUT_CLASS } from '@/lib/inputStyles'
 import type { TaskBucket } from '@/types/task'
 
@@ -171,13 +171,13 @@ export function WhenPicker({ bucket, value: _value, isAllDay: _isAllDay, onChang
                 onClick={() => handleBucketSelect('timed', getNextWeekend())}
                 className="w-full px-3 py-2 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
               >
-                This Weekend
+                This Weekend <span className="text-neutral-400">· {formatShortDate(getNextWeekend())}</span>
               </button>
               <button
                 onClick={() => handleBucketSelect('timed', getWeekendAfterNext())}
                 className="w-full px-3 py-2 text-sm text-left rounded-lg hover:bg-primary-50 text-neutral-700"
               >
-                Next Weekend
+                Next Weekend <span className="text-neutral-400">· {formatShortDate(getWeekendAfterNext())}</span>
               </button>
               <div className="border-t border-neutral-100 my-1" />
               <button
