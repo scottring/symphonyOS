@@ -1,8 +1,6 @@
 import { useState, useCallback, useRef, useEffect, Suspense, type ReactNode } from 'react'
-import { PanelRightOpen, Sparkles } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import { AppShellChromeContext } from '@/contexts/AppShellChromeContext'
-import { TodayRail } from '@/components/today/TodayRail'
-import { useScratchpadHidden } from '@/hooks/useScratchpadHidden'
 import { Sidebar, type ViewType } from './Sidebar'
 import { SidebarKinetic } from './SidebarKinetic'
 import { MoreSheet } from './MoreSheet'
@@ -74,12 +72,7 @@ interface AppShellProps {
   // Pinned items props
   pins?: PinnedItem[]
   entities?: EntityData
-  /** Full FamilyMember[] for the Today rail's Family Snapshot panel.
-   *  Distinct from quickAddFamilyMembers (slim {id,name} version for QuickCapture). */
-  railFamilyMembers?: import('@/types/family').FamilyMember[]
-  /** Opens a task's detail view — used by the rail's For Discussion panel. */
-  onRailSelectTask?: (taskId: string) => void
-  /** Opens a family member's detail page — used by the rail's Family Snapshot. */
+  /** Opens a family member's detail page. */
   onOpenMember?: (id: string) => void
   onPinNavigate?: (entityType: PinnableEntityType, entityId: string) => void
   onPinMarkAccessed?: (entityType: PinnableEntityType, entityId: string) => void
@@ -137,9 +130,6 @@ export function AppShell({
   onDateChange,
   pins,
   entities,
-  railFamilyMembers = [],
-  onRailSelectTask,
-  onOpenMember,
   onPinNavigate,
   onPinMarkAccessed,
   onPinRefreshStale,
@@ -167,7 +157,6 @@ export function AppShell({
 }: AppShellProps) {
   const isMobile = useMobile()
   const { theme } = useTheme()
-  const { hidden: scratchpadHidden, setHidden: setScratchpadHidden } = useScratchpadHidden()
   const [moreSheetOpen, setMoreSheetOpen] = useState(false)
   const setChatOpen = useCallback((open: boolean) => onChatOpenChange?.(open), [onChatOpenChange])
   const mainRef = useRef<HTMLElement>(null)
@@ -189,10 +178,6 @@ export function AppShell({
   // Whether the right panel column is visible (detail or chat or both active)
   const rightPanelVisible = panelOpen || chatOpen
   const bothPanelsActive = panelOpen && chatOpen
-  // Scratchpad fills the right rail on Today when no detail/chat panel is open (desktop only)
-  // Also requires the user hasn't hidden it.
-  const scratchpadSlot = !isMobile && !rightPanelVisible && activeView === 'today'
-  const scratchpadVisible = scratchpadSlot && !scratchpadHidden
   // Wide screen: show both panels side-by-side. Narrow: tabbed in single column.
   const useThreePanelLayout = isWideScreen && bothPanelsActive
   // Show tabs only when both are active AND screen is too narrow for side-by-side
@@ -263,7 +248,6 @@ export function AppShell({
                 : rightPanelVisible && focusModeOpen ? '760px'
                 : focusModeOpen ? '380px'
                 : rightPanelVisible ? '380px'
-                : scratchpadVisible ? '380px'
                 : '0'
             }
         }
@@ -567,45 +551,6 @@ export function AppShell({
         </aside>
       )}
 
-      {/* Today rail — right rail on Today when no detail/chat panel is open.
-          Hosts ambient panels (At a Glance, future Family Snapshot + Active
-          Projects) above the Scratchpad. */}
-      {scratchpadVisible && (
-        <aside
-          className="fixed top-0 bottom-0 right-0 w-[380px] bg-bg-base border-l border-neutral-200/80 z-10 p-4"
-          aria-label="Today rail"
-        >
-          <TodayRail
-            tasks={entities?.tasks ?? []}
-            projects={entities?.projects ?? []}
-            familyMembers={railFamilyMembers}
-            onSelectProject={(id) => {
-              // Open the specific project. Falls back to the projects list
-              // if the deep-link handler isn't wired.
-              if (onPinNavigate) onPinNavigate('project', id)
-              else onViewChange('projects')
-            }}
-            onViewAllProjects={() => onViewChange('projects')}
-            onSelectMember={(id) => {
-              if (onOpenMember) onOpenMember(id)
-              else onViewChange('home-app')
-            }}
-            onViewAllFamily={() => onViewChange('settings') /* no family-list view yet; Settings manages members */}
-            onSelectTask={(id) => onRailSelectTask?.(id)}
-          />
-        </aside>
-      )}
-
-      {/* Show-scratchpad tab — slim right-edge affordance when scratchpad is hidden */}
-      {scratchpadSlot && scratchpadHidden && (
-        <button
-          onClick={() => setScratchpadHidden(false)}
-          aria-label="Show scratchpad"
-          className="fixed right-0 top-1/2 -translate-y-1/2 z-10 bg-bg-elevated border border-neutral-200 rounded-l-lg px-1.5 py-3 text-neutral-400 hover:text-neutral-600 shadow-card transition-colors"
-        >
-          <PanelRightOpen size={16} />
-        </button>
-      )}
 
       {/* Mobile bottom navigation — 4 tabs */}
       {isMobile && !panelOpen && (

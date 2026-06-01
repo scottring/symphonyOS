@@ -1515,12 +1515,6 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       onOpenSearch={() => setSearchOpen(true)}
       pins={pinnedItems.pins}
       entities={pinnedEntities}
-      railFamilyMembers={familyMembers}
-      onRailSelectTask={(taskId) => {
-        // Convention used elsewhere: selectedItemId expects 'task-<uuid>'
-        // for tasks. Tasks in entities expose the bare uuid.
-        setSelectedItemId(`task-${taskId}`)
-      }}
       onOpenMember={handleOpenMember}
       onPinNavigate={handlePinNavigate}
       onPinMarkAccessed={pinnedItems.markAccessed}
