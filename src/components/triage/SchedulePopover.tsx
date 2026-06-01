@@ -9,6 +9,7 @@ import {
   getNextMonday,
   parseDateInput,
   formatDateLabel,
+  formatShortDate,
 } from '@/lib/dateHelpers'
 
 // Minimal schedule item for display
@@ -490,7 +491,7 @@ export function SchedulePopover({
                     transition-all duration-150"
                 >
                   <CalendarDays className="w-4 h-4" />
-                  <span>This Weekend</span>
+                  <span>This Weekend · {formatShortDate(getNextWeekend())}</span>
                 </button>
                 <button
                   onClick={() => handleDateSelect(getWeekendAfterNext())}
@@ -499,7 +500,7 @@ export function SchedulePopover({
                     transition-all duration-150"
                 >
                   <CalendarDays className="w-4 h-4" />
-                  <span>Next Weekend</span>
+                  <span>Next Weekend · {formatShortDate(getWeekendAfterNext())}</span>
                 </button>
                 <button
                   onClick={() => handleDateSelect(getNextMonday())}
