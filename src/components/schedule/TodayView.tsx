@@ -251,7 +251,7 @@ export function TodayView({
 
   // ── Email nudge for StatsRow ──────────────────────────────────────────────
   const activeEmailCount = emailActions.items.filter(i => i.status === 'new').length
-  const emailNudge = activeEmailCount > 0 ? (
+  const emailNudge = data.isToday && activeEmailCount > 0 ? (
     <button
       type="button"
       onClick={() => navigate('/inbox')}
