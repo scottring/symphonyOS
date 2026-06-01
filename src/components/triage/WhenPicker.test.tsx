@@ -36,6 +36,22 @@ vi.mock('@/lib/dateHelpers', () => ({
     if (d.getTime() === tomorrow.getTime()) return 'Tomorrow'
     return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
   },
+  getNextWeekend: () => {
+    const d = new Date()
+    const day = d.getDay()
+    const daysUntilSat = day === 0 ? 6 : 6 - day
+    d.setDate(d.getDate() + daysUntilSat)
+    d.setHours(0, 0, 0, 0)
+    return d
+  },
+  getWeekendAfterNext: () => {
+    const d = new Date()
+    const day = d.getDay()
+    const daysUntilSat = day === 0 ? 6 : 6 - day
+    d.setDate(d.getDate() + daysUntilSat + 7)
+    d.setHours(0, 0, 0, 0)
+    return d
+  },
 }))
 
 vi.mock('@/lib/inputStyles', () => ({
@@ -174,6 +190,20 @@ describe('WhenPicker', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Set when' }))
       fireEvent.click(screen.getByText('Tomorrow'))
 
+      expect(screen.getByText('All Day')).toBeInTheDocument()
+    })
+
+    it('shows This Weekend and Next Weekend in bucket options', () => {
+      render(<WhenPicker onChange={vi.fn()} />)
+      fireEvent.click(screen.getByLabelText('Set when'))
+      expect(screen.getByText('This Weekend')).toBeInTheDocument()
+      expect(screen.getByText('Next Weekend')).toBeInTheDocument()
+    })
+
+    it('selecting This Weekend advances to time selection', () => {
+      render(<WhenPicker onChange={vi.fn()} />)
+      fireEvent.click(screen.getByLabelText('Set when'))
+      fireEvent.click(screen.getByText('This Weekend'))
       expect(screen.getByText('All Day')).toBeInTheDocument()
     })
   })
