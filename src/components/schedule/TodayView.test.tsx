@@ -238,6 +238,22 @@ describe('TodayView', () => {
     }
   })
 
+  it('shows the discussion badge when a task needs discussion', () => {
+    renderView({
+      tasks: [
+        {
+          id: 'disc-1',
+          title: 'Talk to Iris about budget',
+          completed: false,
+          createdAt: TODAY,
+          updatedAt: TODAY,
+          needsDiscussion: true,
+        },
+      ],
+    })
+    expect(screen.getByText(/to discuss/i)).toBeInTheDocument()
+  })
+
   it('renders the Morning section header on mobile in italic serif', () => {
     // Create a task scheduled for the morning (8am) so the Morning section
     // actually renders.

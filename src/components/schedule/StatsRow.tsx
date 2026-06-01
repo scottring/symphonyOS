@@ -10,11 +10,13 @@ interface StatsRowProps {
   aiAvailable?: boolean   // kept in interface; not rendered
   clarityTrigger?: React.ReactNode
   weekTrigger?: React.ReactNode
+  /** Glanceable "N to discuss" badge, rendered among the stats. */
+  discussionTrigger?: React.ReactNode
   /** Rendered at the trailing end of the bar (assignee filter + show-daily toggle) */
   endControls?: React.ReactNode
 }
 
-export function StatsRow({ dueToday, doneToday, weekTrigger, thisWeek, clarityTrigger, endControls }: StatsRowProps) {
+export function StatsRow({ dueToday, doneToday, weekTrigger, thisWeek, clarityTrigger, discussionTrigger, endControls }: StatsRowProps) {
   return (
     <div className="flex items-center flex-wrap gap-x-5 gap-y-2 text-[13px] text-neutral-500">
       {/* Done today — desktop only on mobile we just want the filters */}
@@ -32,6 +34,12 @@ export function StatsRow({ dueToday, doneToday, weekTrigger, thisWeek, clarityTr
       {clarityTrigger && (
         <span className="hidden md:inline-flex items-center gap-1.5">
           {clarityTrigger}
+        </span>
+      )}
+
+      {discussionTrigger && (
+        <span className="hidden md:inline-flex items-center gap-1.5">
+          {discussionTrigger}
         </span>
       )}
 

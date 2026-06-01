@@ -48,6 +48,8 @@ import { TimelineNoteComposer } from './TimelineNoteComposer'
 
 import { useEmailActionItems } from '@/hooks/useEmailActionItems'
 
+import { discussionItems } from '@/lib/discussionItems'
+import { DiscussionBadge } from './DiscussionBadge'
 import { focusHeadline } from '@/lib/focusHeadline'
 import { daySectionMeta } from '@/lib/daySectionMeta'
 import { parseMealTitle } from '@/lib/mealTitle'
@@ -318,6 +320,8 @@ export function TodayView({
     />
   )
 
+  const discussion = discussionItems(tasks)
+
   // ── Focus card counts ─────────────────────────────────────────────────────────
   const { focusPriorities, focusMeals, focusEvents } = useMemo(() => {
     const allItems = Object.values(data.grouped).flat()
@@ -449,6 +453,7 @@ export function TodayView({
           aiAvailable={false}
           clarityTrigger={clarityTrigger}
           weekTrigger={weekTrigger}
+          discussionTrigger={discussion.length > 0 ? <DiscussionBadge items={discussion} onSelectItem={onSelectItem} /> : undefined}
           endControls={
             <>
               {onSelectAssignee && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
