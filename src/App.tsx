@@ -1644,6 +1644,21 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
                   showToast(error instanceof Error ? error.message : 'Failed to update location', 'warning')
                 }
               }}
+              onReschedule={async (startTime: Date, endTime: Date) => {
+                const ev = selectedItem.originalEvent!
+                try {
+                  await updateEvent({
+                    eventId: ev.google_event_id ?? ev.id,
+                    startTime,
+                    endTime,
+                    calendarId: ev.calendar_id ?? ev.calendarId,
+                  })
+                  showToast('Event rescheduled')
+                } catch (error) {
+                  console.error('Failed to reschedule event:', error)
+                  showToast(error instanceof Error ? error.message : 'Failed to reschedule', 'warning')
+                }
+              }}
             />
           ) : selectedItem.type === 'routine' && selectedItem.originalRoutine ? (
             <TapRoutinePanel

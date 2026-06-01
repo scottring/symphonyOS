@@ -100,4 +100,26 @@ describe('TapEventPanel', () => {
     await user.click(result)
     expect(onUpdateEventLocation).toHaveBeenCalledWith('gcal-1', '1 Main St, Townsville', 'cal-1')
   })
+
+  it('renders a Reschedule trigger when onReschedule is provided', () => {
+    render(<TapEventPanel
+      event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers} onReschedule={vi.fn()}
+    />)
+    expect(screen.getByRole('button', { name: /reschedule/i })).toBeInTheDocument()
+  })
+
+  it('reschedules the event preserving its duration via the popover', async () => {
+    const onReschedule = vi.fn()
+    const { user } = render(<TapEventPanel
+      event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers} onReschedule={onReschedule}
+    />)
+    await user.click(screen.getByRole('button', { name: /reschedule/i }))
+    await user.click(screen.getByText('Today'))
+    await user.click(screen.getByRole('button', { name: '9am' }))
+    expect(onReschedule).toHaveBeenCalledTimes(1)
+    const [start, end] = onReschedule.mock.calls[0]
+    expect(start).toBeInstanceOf(Date)
+    // mockEvent is 09:00–09:30Z (30 min); reschedule must keep that duration
+    expect(end.getTime() - start.getTime()).toBe(30 * 60 * 1000)
+  })
 })

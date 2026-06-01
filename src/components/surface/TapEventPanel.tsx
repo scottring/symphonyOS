@@ -11,6 +11,8 @@ import { useEntityRelations } from './hooks/useEntityRelations'
 import type { MightBeRelevantItem } from './types'
 import { PanelLocation } from './sections/PanelLocation'
 import { ConceptIcon } from '@/lib/conceptIcons'
+import { SchedulePopover } from '@/components/triage/SchedulePopover'
+import { computeEventReschedule } from '@/components/planning/planningReschedule'
 
 interface TapEventPanelProps {
   event: CalendarEvent
@@ -28,6 +30,12 @@ interface TapEventPanelProps {
   onOpenRelated: (kind: MightBeRelevantItem['kind'], id: string) => void
   /** Set/change/clear the event's location, syncing back to Google Calendar. */
   onUpdateEventLocation?: (googleEventId: string, location: string | null, calendarId?: string) => void
+  /**
+   * Move the event to a new start, keeping its original duration. Pushes back to
+   * Google Calendar (this instance only for a recurring series). When omitted,
+   * the Reschedule control is hidden.
+   */
+  onReschedule?: (startTime: Date, endTime: Date) => void
 }
 
 type AnyEvent = { start_time?: string; startTime?: string }
@@ -63,6 +71,19 @@ export function TapEventPanel(props: TapEventPanelProps) {
   const eventId = event.google_event_id ?? event.id
   const calendarId = event.calendar_id ?? event.calendarId
 
+  // SchedulePopover yields the new start as a full Date; reuse the planning
+  // reschedule math so the event keeps its original duration.
+  const handleReschedule = (date: Date) => {
+    const { startTime: newStart, endTime: newEnd } = computeEventReschedule(event, {
+      year: date.getFullYear(),
+      month: date.getMonth(),
+      day: date.getDate(),
+      hour: date.getHours(),
+      minute: date.getMinutes(),
+    })
+    props.onReschedule?.(newStart, newEnd)
+  }
+
   return (
     <article className="bg-bg-elevated rounded-2xl p-5 max-w-md w-full">
       <PanelHeader
@@ -82,6 +103,18 @@ export function TapEventPanel(props: TapEventPanelProps) {
           >
             <ConceptIcon name="location" decorative /> Directions {showDirections ? '▾' : '▸'}
           </button>
+        )}
+        {props.onReschedule && (
+          <SchedulePopover
+            value={startTime ? new Date(startTime) : undefined}
+            onSchedule={handleReschedule}
+            itemTitle={event.title}
+            trigger={
+              <button className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors">
+                <ConceptIcon name="when" decorative /> Reschedule
+              </button>
+            }
+          />
         )}
         <button
           onClick={props.onMore}
