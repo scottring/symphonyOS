@@ -2,7 +2,7 @@
  * TodayView — editorial Today shell.
  *
  * Drop-in replacement for TodaySchedule (same TodayScheduleProps interface).
- * Composes: TodayHeader, StatsRow, TodaysFocusCard, WeatherCard,
+ * Composes: TodayHeader, StatsRow, WeatherChip,
  *           EveningMealCard, ScheduleItem.
  *
  * NOT wired to the route yet — that happens in R4.
