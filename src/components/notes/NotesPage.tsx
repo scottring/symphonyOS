@@ -27,6 +27,10 @@ interface NotesPageProps {
   getEntityLinks?: (noteId: string) => Promise<NoteEntityLink[]>
   onAddEntityLink?: (noteId: string, entityType: NoteEntityType, entityId: string) => Promise<void>
   onRemoveEntityLink?: (linkId: string) => Promise<void>
+  // Inline-create from the link picker, resolving to the new entity's id.
+  onCreateTask?: (title: string) => Promise<string | undefined>
+  onCreateProject?: (name: string) => Promise<string | undefined>
+  onCreateContact?: (name: string) => Promise<string | undefined>
   // Vault
   getVaultNoteContent?: (noteId: string) => Promise<string | null>
   // Navigation
@@ -49,6 +53,9 @@ export function NotesPage({
   getEntityLinks,
   onAddEntityLink,
   onRemoveEntityLink,
+  onCreateTask,
+  onCreateProject,
+  onCreateContact,
   getVaultNoteContent,
 }: NotesPageProps) {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(
@@ -264,6 +271,9 @@ export function NotesPage({
           onAddTopic={handleAddTopic}
           onAddEntityLink={onAddEntityLink ? handleAddEntityLink : undefined}
           onRemoveEntityLink={onRemoveEntityLink ? handleRemoveEntityLink : undefined}
+          onCreateTask={onCreateTask}
+          onCreateProject={onCreateProject}
+          onCreateContact={onCreateContact}
           onClose={() => setSelectedNoteId(null)}
         />
       </div>

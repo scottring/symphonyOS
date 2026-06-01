@@ -99,6 +99,10 @@ export interface ViewRouterProps {
   contacts: Contact[]
   onAddContact: (contact: { name: string; phone?: string; email?: string; notes?: string; category?: ContactCategory; birthday?: string; relationship?: string; preferences?: string }) => Promise<Contact | null>
   onAddProject: (project: { name: string; notes?: string; links?: TaskLink[]; phoneNumber?: string; parentId?: string; context?: 'work' | 'family' | 'personal' }) => Promise<Project | null>
+  // Inline-create from the Notes link picker, resolving to the new entity's id.
+  onCreateNoteTask?: (title: string) => Promise<string | undefined>
+  onCreateNoteProject?: (name: string) => Promise<string | undefined>
+  onCreateNoteContact?: (name: string) => Promise<string | undefined>
 
   // Contacts view
   onDeleteContact: (id: string) => Promise<void>
@@ -440,7 +444,7 @@ export function ViewRouter(props: ViewRouterProps) {
         </Suspense>
       )}
 
-      {props.activeView === 'notes' && <NotesSection tasks={props.tasks} projects={props.projects} contacts={props.contacts} onSelectItem={props.onSelectItem} />}
+      {props.activeView === 'notes' && <NotesSection tasks={props.tasks} projects={props.projects} contacts={props.contacts} onSelectItem={props.onSelectItem} onCreateTask={props.onCreateNoteTask} onCreateProject={props.onCreateNoteProject} onCreateContact={props.onCreateNoteContact} />}
 
       {props.activeView === 'agent' && (
         <AgentHomeView />
@@ -637,7 +641,7 @@ function ListsSection({ pinnedItems }: { pinnedItems: ViewRouterProps['pinnedIte
   )
 }
 
-function NotesSection({ tasks, projects, contacts, onSelectItem }: { tasks: Task[]; projects: Project[]; contacts: Contact[]; onSelectItem: (id: string | null) => void }) {
+function NotesSection({ tasks, projects, contacts, onSelectItem, onCreateTask, onCreateProject, onCreateContact }: { tasks: Task[]; projects: Project[]; contacts: Contact[]; onSelectItem: (id: string | null) => void; onCreateTask?: (title: string) => Promise<string | undefined>; onCreateProject?: (name: string) => Promise<string | undefined>; onCreateContact?: (name: string) => Promise<string | undefined> }) {
   const { notes, notesByDate, loading, addNote, updateNote, deleteNote, activeTopics, topicsMap, addTopic, getEntityLinks, addEntityLink, removeEntityLink, getVaultNoteContent } = useNotesContext()
 
   return (
@@ -660,6 +664,9 @@ function NotesSection({ tasks, projects, contacts, onSelectItem }: { tasks: Task
           await addEntityLink(noteId, { entityType, entityId })
         }}
         onRemoveEntityLink={removeEntityLink}
+        onCreateTask={onCreateTask}
+        onCreateProject={onCreateProject}
+        onCreateContact={onCreateContact}
         getVaultNoteContent={getVaultNoteContent}
         onNavigateToTask={(taskId) => onSelectItem(`task-${taskId}`)}
       />

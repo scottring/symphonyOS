@@ -25,6 +25,10 @@ interface NoteDetailProps {
   onAddTopic?: (name: string) => Promise<NoteTopic | null>
   onAddEntityLink?: (noteId: string, entityType: NoteEntityType, entityId: string) => Promise<void>
   onRemoveEntityLink?: (linkId: string) => Promise<void>
+  // Inline-create a new entity from the link picker, resolving to its new id.
+  onCreateTask?: (title: string) => Promise<string | undefined>
+  onCreateProject?: (name: string) => Promise<string | undefined>
+  onCreateContact?: (name: string) => Promise<string | undefined>
   onClose?: () => void
 }
 
@@ -40,6 +44,9 @@ export function NoteDetail({
   onAddTopic,
   onAddEntityLink,
   onRemoveEntityLink,
+  onCreateTask,
+  onCreateProject,
+  onCreateContact,
   onClose,
 }: NoteDetailProps) {
   const [isEditing, setIsEditing] = useState(false)
@@ -354,6 +361,9 @@ export function NoteDetail({
                     onSelect={handleAddEntityLink}
                     onClose={() => setShowEntityPicker(false)}
                     excludeLinks={entityLinks.map((l) => ({ entityType: l.entityType, entityId: l.entityId }))}
+                    onCreateTask={onCreateTask}
+                    onCreateProject={onCreateProject}
+                    onCreateContact={onCreateContact}
                   />
                 </div>
               )}

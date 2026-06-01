@@ -1706,6 +1706,9 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
           contacts={contacts}
           onAddContact={addContact}
           onAddProject={addProject}
+          onCreateNoteTask={(title) => addTask(title, undefined, undefined, undefined, { assignedTo: getCurrentUserMember()?.id })}
+          onCreateNoteProject={async (name) => (await addProject({ name }))?.id}
+          onCreateNoteContact={async (name) => (await addContact({ name }))?.id}
           onDeleteContact={deleteContact}
           onUpdateContact={updateContact}
           selectedContactForView={selectedContactForView}

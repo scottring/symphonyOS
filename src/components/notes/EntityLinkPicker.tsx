@@ -12,7 +12,17 @@ interface EntityLinkPickerProps {
   onSelect: (entityType: NoteEntityType, entityId: string) => void
   onClose: () => void
   excludeLinks?: Array<{ entityType: NoteEntityType; entityId: string }>
+  /**
+   * Create a new entity from the typed name, resolving to its new id (or
+   * undefined on failure). When a callback is omitted, that type's create row
+   * is hidden. The just-created id is linked via the existing onSelect path.
+   */
+  onCreateTask?: (title: string) => Promise<string | undefined>
+  onCreateProject?: (name: string) => Promise<string | undefined>
+  onCreateContact?: (name: string) => Promise<string | undefined>
 }
+
+type CreatableType = 'task' | 'project' | 'contact'
 
 type EntityOption = {
   type: NoteEntityType
@@ -28,9 +38,14 @@ export function EntityLinkPicker({
   onSelect,
   onClose,
   excludeLinks = [],
+  onCreateTask,
+  onCreateProject,
+  onCreateContact,
 }: EntityLinkPickerProps) {
   const [search, setSearch] = useState('')
   const [activeTab, setActiveTab] = useState<'all' | 'task' | 'project' | 'contact'>('all')
+  const [creatingType, setCreatingType] = useState<CreatableType | null>(null)
+  const [createError, setCreateError] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -99,6 +114,47 @@ export function EntityLinkPicker({
     onClose()
   }
 
+  // Create rows: name comes from the search box. Follow the active tab; on the
+  // "all" tab show every creatable type. Omit types without a create callback.
+  const createCallbacks: Record<CreatableType, ((name: string) => Promise<string | undefined>) | undefined> = {
+    task: onCreateTask,
+    project: onCreateProject,
+    contact: onCreateContact,
+  }
+  const createIcons: Record<CreatableType, ConceptName> = {
+    task: 'list',
+    project: 'project',
+    contact: 'person',
+  }
+  const createRowTypes = (['task', 'project', 'contact'] as const).filter(
+    (type) => createCallbacks[type] && (activeTab === 'all' || activeTab === type),
+  )
+
+  const handleCreate = async (type: CreatableType) => {
+    const name = search.trim()
+    if (!name) {
+      // Name-only create needs a name; send the user to the box to type one.
+      inputRef.current?.focus()
+      return
+    }
+    if (creatingType) return
+    setCreateError(false)
+    setCreatingType(type)
+    try {
+      const id = await createCallbacks[type]?.(name)
+      if (id) {
+        onSelect(type, id)
+        onClose()
+        return
+      }
+      setCreateError(true)
+    } catch {
+      setCreateError(true)
+    } finally {
+      setCreatingType(null)
+    }
+  }
+
   return (
     <div className="bg-white rounded-xl shadow-lg border border-neutral-200 overflow-hidden w-80">
       {/* Search */}
@@ -155,6 +211,33 @@ export function EntityLinkPicker({
           </ul>
         )}
       </div>
+
+      {/* Create new — always available; the search box doubles as the name */}
+      {createRowTypes.length > 0 && (
+        <div className="border-t border-neutral-100 py-1">
+          {createRowTypes.map((type) => (
+            <button
+              key={`create-${type}`}
+              onClick={() => handleCreate(type)}
+              disabled={creatingType !== null}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-primary-700 hover:bg-primary-50/60 transition-colors disabled:opacity-50"
+            >
+              <ConceptIcon name={createIcons[type]} size={16} decorative />
+              <span className="flex-1 truncate">
+                {creatingType === type
+                  ? 'Creating…'
+                  : search.trim()
+                    ? `Create ${type} "${search.trim()}"`
+                    : `New ${type}`}
+              </span>
+              <span className="text-base leading-none text-primary-400">+</span>
+            </button>
+          ))}
+          {createError && (
+            <div className="px-4 py-1.5 text-xs text-danger-500">Couldn't create — try again.</div>
+          )}
+        </div>
+      )}
 
       {/* Footer */}
       <div className="p-2 border-t border-neutral-100 bg-neutral-50">
