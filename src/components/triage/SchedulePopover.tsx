@@ -5,6 +5,7 @@ import { ConceptIcon } from '@/lib/conceptIcons'
 import {
   getBaseDate,
   getNextWeekend,
+  getWeekendAfterNext,
   getNextMonday,
   parseDateInput,
   formatDateLabel,
@@ -490,6 +491,15 @@ export function SchedulePopover({
                 >
                   <CalendarDays className="w-4 h-4" />
                   <span>This Weekend</span>
+                </button>
+                <button
+                  onClick={() => handleDateSelect(getWeekendAfterNext())}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
+                    text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
+                    transition-all duration-150"
+                >
+                  <CalendarDays className="w-4 h-4" />
+                  <span>Next Weekend</span>
                 </button>
                 <button
                   onClick={() => handleDateSelect(getNextMonday())}
