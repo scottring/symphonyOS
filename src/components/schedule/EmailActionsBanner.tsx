@@ -38,13 +38,13 @@ export function EmailActionsBanner({
   const shown = expanded ? sorted : sorted.slice(0, 3)
 
   return (
-    <div className="mb-8 animate-fade-in-up">
+    <div className="mb-8 animate-fade-in-up rounded-2xl border border-neutral-200/70 bg-neutral-50/60 px-4 py-3">
       <button
         onClick={() => setExpanded(!expanded)}
         className="time-group-header mb-3 flex items-center gap-2 hover:opacity-80 transition-opacity"
       >
         <ConceptIcon name="email" decorative />
-        From Email
+        Inbox
         <span className="text-neutral-400 font-normal">{activeItems.length}</span>
         {urgentCount > 0 && (
           <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 font-semibold">
