@@ -46,6 +46,9 @@ export function EntityLinkPicker({
   const [activeTab, setActiveTab] = useState<'all' | 'task' | 'project' | 'contact'>('all')
   const [creatingType, setCreatingType] = useState<CreatableType | null>(null)
   const [createError, setCreateError] = useState(false)
+  // Which create row (if any) is in inline "name it" mode, plus its draft text.
+  const [namingType, setNamingType] = useState<CreatableType | null>(null)
+  const [draftName, setDraftName] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -130,14 +133,23 @@ export function EntityLinkPicker({
     (type) => createCallbacks[type] && (activeTab === 'all' || activeTab === type),
   )
 
-  const handleCreate = async (type: CreatableType) => {
-    const name = search.trim()
-    if (!name) {
-      // Name-only create needs a name; send the user to the box to type one.
-      inputRef.current?.focus()
-      return
-    }
-    if (creatingType) return
+  // Clicking a create row opens an inline "name it" input (prefilled with any
+  // typed search text) rather than creating immediately — the search box may be
+  // empty or scrolled out of view, so naming has to happen in the row itself.
+  const startNaming = (type: CreatableType) => {
+    setCreateError(false)
+    setDraftName(search.trim())
+    setNamingType(type)
+  }
+
+  const cancelNaming = () => {
+    setNamingType(null)
+    setDraftName('')
+  }
+
+  const submitNaming = async (type: CreatableType) => {
+    const name = draftName.trim()
+    if (!name || creatingType) return
     setCreateError(false)
     setCreatingType(type)
     try {
@@ -215,24 +227,45 @@ export function EntityLinkPicker({
       {/* Create new — always available; the search box doubles as the name */}
       {createRowTypes.length > 0 && (
         <div className="border-t border-neutral-100 py-1">
-          {createRowTypes.map((type) => (
-            <button
-              key={`create-${type}`}
-              onClick={() => handleCreate(type)}
-              disabled={creatingType !== null}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-primary-700 hover:bg-primary-50/60 transition-colors disabled:opacity-50"
-            >
-              <ConceptIcon name={createIcons[type]} size={16} decorative />
-              <span className="flex-1 truncate">
-                {creatingType === type
-                  ? 'Creating…'
-                  : search.trim()
-                    ? `Create ${type} "${search.trim()}"`
-                    : `New ${type}`}
-              </span>
-              <span className="text-base leading-none text-primary-400">+</span>
-            </button>
-          ))}
+          {createRowTypes.map((type) =>
+            namingType === type ? (
+              <div key={`create-${type}`} className="flex items-center gap-3 px-4 py-2">
+                <ConceptIcon name={createIcons[type]} size={16} decorative />
+                <input
+                  autoFocus
+                  value={draftName}
+                  onChange={(e) => setDraftName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); submitNaming(type) }
+                    else if (e.key === 'Escape') { e.preventDefault(); cancelNaming() }
+                  }}
+                  disabled={creatingType === type}
+                  placeholder={`Name the ${type}`}
+                  className="flex-1 min-w-0 px-2 py-1 text-sm bg-neutral-50 border border-primary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                />
+                <button
+                  onClick={() => submitNaming(type)}
+                  disabled={!draftName.trim() || creatingType === type}
+                  className="text-xs font-semibold text-primary-700 disabled:opacity-40"
+                >
+                  {creatingType === type ? '…' : 'Create'}
+                </button>
+              </div>
+            ) : (
+              <button
+                key={`create-${type}`}
+                onClick={() => startNaming(type)}
+                disabled={creatingType !== null}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-primary-700 hover:bg-primary-50/60 transition-colors disabled:opacity-50"
+              >
+                <ConceptIcon name={createIcons[type]} size={16} decorative />
+                <span className="flex-1 truncate">
+                  {search.trim() ? `Create ${type} "${search.trim()}"` : `New ${type}`}
+                </span>
+                <span className="text-base leading-none text-primary-400">+</span>
+              </button>
+            ),
+          )}
           {createError && (
             <div className="px-4 py-1.5 text-xs text-danger-500">Couldn't create — try again.</div>
           )}

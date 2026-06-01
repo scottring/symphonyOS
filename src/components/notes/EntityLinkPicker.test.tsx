@@ -51,29 +51,55 @@ describe('EntityLinkPicker inline create', () => {
     expect(screen.getByRole('button', { name: /create task "Groceries"/i })).toBeInTheDocument()
   })
 
-  it('focuses the search box and does not create when the box is empty', () => {
+  it('clicking a create row reveals an inline name input and does not create yet', () => {
     const props = setup()
     fireEvent.click(screen.getByRole('button', { name: /new task/i }))
     expect(props.onCreateTask).not.toHaveBeenCalled()
-    expect(screen.getByPlaceholderText(/search/i)).toHaveFocus()
+    expect(screen.getByPlaceholderText(/name the task/i)).toBeInTheDocument()
   })
 
-  it('creates, links via onSelect with the new id, then closes', async () => {
-    const props = setup()
+  it('prefills the inline input with the typed search text', () => {
+    setup()
     fireEvent.change(screen.getByPlaceholderText(/search/i), { target: { value: 'Groceries' } })
     fireEvent.click(screen.getByRole('button', { name: /create task "Groceries"/i }))
+    expect(screen.getByPlaceholderText(/name the task/i)).toHaveValue('Groceries')
+  })
+
+  it('creates on Enter, links via onSelect with the new id, then closes', async () => {
+    const props = setup()
+    fireEvent.click(screen.getByRole('button', { name: /new task/i }))
+    const input = screen.getByPlaceholderText(/name the task/i)
+    fireEvent.change(input, { target: { value: 'Groceries' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
     await waitFor(() => expect(props.onCreateTask).toHaveBeenCalledWith('Groceries'))
     await waitFor(() => expect(props.onSelect).toHaveBeenCalledWith('task', 'task-new'))
     expect(props.onClose).toHaveBeenCalled()
   })
 
+  it('does not create from an empty inline input', () => {
+    const props = setup()
+    fireEvent.click(screen.getByRole('button', { name: /new task/i }))
+    const input = screen.getByPlaceholderText(/name the task/i)
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(props.onCreateTask).not.toHaveBeenCalled()
+  })
+
   it('keeps the picker open and does not link when create fails', async () => {
     const props = setup({ onCreateTask: vi.fn(async () => undefined) })
-    fireEvent.change(screen.getByPlaceholderText(/search/i), { target: { value: 'Groceries' } })
-    fireEvent.click(screen.getByRole('button', { name: /create task "Groceries"/i }))
+    fireEvent.click(screen.getByRole('button', { name: /new task/i }))
+    const input = screen.getByPlaceholderText(/name the task/i)
+    fireEvent.change(input, { target: { value: 'Groceries' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
     await waitFor(() => expect(props.onCreateTask).toHaveBeenCalled())
     expect(props.onSelect).not.toHaveBeenCalled()
     expect(props.onClose).not.toHaveBeenCalled()
-    expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument()
+  })
+
+  it('Escape cancels naming mode back to the create row', () => {
+    setup()
+    fireEvent.click(screen.getByRole('button', { name: /new task/i }))
+    fireEvent.keyDown(screen.getByPlaceholderText(/name the task/i), { key: 'Escape' })
+    expect(screen.queryByPlaceholderText(/name the task/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /new task/i })).toBeInTheDocument()
   })
 })
