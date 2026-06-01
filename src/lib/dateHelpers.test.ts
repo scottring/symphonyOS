@@ -13,6 +13,7 @@ import {
   parseTimeInput,
   formatDateLabel,
   formatTimeCompact,
+  formatShortDate,
 } from './dateHelpers'
 
 beforeEach(() => {
@@ -582,6 +583,17 @@ describe('formatDateLabel', () => {
     const result = formatDateLabel(futureDate)
     expect(result).toContain('Jun')
     expect(result).toContain('15')
+  })
+})
+
+describe('formatShortDate', () => {
+  it('formats as weekday, short month, day with no relative words', () => {
+    // Sat Jun 6 2026
+    expect(formatShortDate(new Date(2026, 5, 6))).toBe('Sat, Jun 6')
+  })
+  it('never returns Today/Tomorrow', () => {
+    const today = new Date()
+    expect(formatShortDate(today)).not.toBe('Today')
   })
 })
 

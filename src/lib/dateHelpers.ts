@@ -137,6 +137,11 @@ export function formatDateLabel(date: Date): string {
   return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
+/** Non-relative compact label, e.g. "Sat, Jun 6". Unlike formatDateLabel, never returns Today/Tomorrow. */
+export function formatShortDate(date: Date): string {
+  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
 /**
  * Format time in compact style (e.g., "2p", "2:30p")
  */
