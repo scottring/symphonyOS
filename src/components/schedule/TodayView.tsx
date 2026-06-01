@@ -37,8 +37,7 @@ import { TimelineInsertPoint } from './TimelineInsertPoint'
 import { StatsRow } from './StatsRow'
 import { ClarityIndicator } from './ClarityIndicator'
 import { StagingFloat } from './StagingFloat'
-import { TodaysFocusCard } from './TodaysFocusCard'
-import { WeatherCard } from './WeatherCard'
+import { WeatherChip } from './WeatherChip'
 import { EveningMealCard } from './EveningMealCard'
 import { EndOfDayCard } from './EndOfDayCard'
 import { ScheduleItem } from './ScheduleItem'
@@ -50,7 +49,6 @@ import { useEmailActionItems } from '@/hooks/useEmailActionItems'
 
 import { discussionItems } from '@/lib/discussionItems'
 import { DiscussionBadge } from './DiscussionBadge'
-import { focusHeadline } from '@/lib/focusHeadline'
 import { daySectionMeta } from '@/lib/daySectionMeta'
 import { parseMealTitle } from '@/lib/mealTitle'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
@@ -322,24 +320,6 @@ export function TodayView({
 
   const discussion = discussionItems(tasks)
 
-  // ── Focus card counts ─────────────────────────────────────────────────────────
-  const { focusPriorities, focusMeals, focusEvents } = useMemo(() => {
-    const allItems = Object.values(data.grouped).flat()
-    let focusPriorities = 0
-    let focusMeals = 0
-    let focusEvents = 0
-    for (const item of allItems) {
-      if (isMealItem(item.id, item.type, item.title)) {
-        focusMeals++
-      } else if (item.type === 'event') {
-        focusEvents++
-      } else if (item.type === 'task' && !item.completed) {
-        focusPriorities++
-      }
-    }
-    return { focusPriorities, focusMeals, focusEvents }
-  }, [data.grouped])
-
   // ── Tasks map for parent task lookup ─────────────────────────────────────────
   const tasksMap = useMemo(() => {
     const map = new Map<string, Task>()
@@ -381,50 +361,6 @@ export function TodayView({
 
   const listRef = useRef<HTMLDivElement>(null)
 
-  // ── Today's top priority — the task the focus card jumps to ──────────────────
-  // Overdue tasks win (mirroring OverdueSection's sort: incomplete first, then
-  // earliest scheduledFor). Otherwise the first incomplete, non-meal task in
-  // schedule order. Meals and events are never "priorities". null = nothing to do.
-  const topPriorityId = useMemo<string | null>(() => {
-    if (data.isToday && data.overdueTasks.length > 0) {
-      const top = [...data.overdueTasks]
-        .filter((t) => !t.completed)
-        .sort((a, b) => {
-          const da = a.scheduledFor ? new Date(a.scheduledFor).getTime() : 0
-          const db = b.scheduledFor ? new Date(b.scheduledFor).getTime() : 0
-          return da - db
-        })[0]
-      if (top) return `task-${top.id}`
-    }
-    for (const section of data.sectionsOrder) {
-      const items = data.grouped[section]
-      if (!items) continue
-      for (const item of items) {
-        if (item.type === 'task' && !item.completed && !isMealItem(item.id, item.type, item.title)) {
-          return item.id
-        }
-      }
-    }
-    return null
-  }, [data.isToday, data.overdueTasks, data.sectionsOrder, data.grouped])
-
-  const handleFocusActivate = useCallback(() => {
-    if (topPriorityId) {
-      // Scroll the task into view, then open its detail panel. Standard rows carry
-      // a data-item-id marker; overdue rows live inside OverdueSection (no marker),
-      // so fall back to that section's data-today-first wrapper.
-      const el =
-        (listRef.current?.querySelector(`[data-item-id="${topPriorityId}"]`) as HTMLElement | null) ??
-        (listRef.current?.querySelector('[data-today-first]') as HTMLElement | null)
-      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      onSelectItem(topPriorityId)
-      return
-    }
-    // Only meals/events today — keep the old scroll-to-first behavior.
-    const el = listRef.current?.querySelector('[data-today-first]') as HTMLElement | null
-    el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }, [topPriorityId, onSelectItem])
-
   // ── First-item marker (exactly one element gets data-today-first) ────────────
   // Overdue section takes priority; otherwise the first item id of the first non-empty section.
   const overdueWillRender = data.isToday && data.overdueTasks.length > 0
@@ -454,6 +390,7 @@ export function TodayView({
           clarityTrigger={clarityTrigger}
           weekTrigger={weekTrigger}
           discussionTrigger={discussion.length > 0 ? <DiscussionBadge items={discussion} onSelectItem={onSelectItem} /> : undefined}
+          weatherTrigger={<WeatherChip />}
           endControls={
             <>
               {onSelectAssignee && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
@@ -536,20 +473,6 @@ export function TodayView({
             )}
           </div>
         </>
-      )}
-
-      {/* Two-up: Focus card + Weather — only shown when there is something to focus on */}
-      {data.counts.totalItems > 0 && (
-        <div className="hidden md:grid grid-cols-1 md:grid-cols-[1.6fr_1fr] gap-4 mb-7 mt-6">
-          <TodaysFocusCard
-            headline={focusHeadline(health.healthColor)}
-            priorities={focusPriorities}
-            meals={focusMeals}
-            events={focusEvents}
-            onActivate={handleFocusActivate}
-          />
-          <WeatherCard />
-        </div>
       )}
 
       {/* Task list — wrapped in a card on desktop; on mobile the rows go
