@@ -120,3 +120,19 @@ describe('ScheduleItem — swipe runtime', () => {
     expect(card.style.transform).toMatch(/translateX\(-60px\)/)
   })
 })
+
+describe('ScheduleItem — static rows (no suggestion chips)', () => {
+  it('does not render suggestion chips even when suggestions prop is passed', () => {
+    const { queryByRole } = render(
+      <ScheduleItem
+        item={baseTask}
+        onSelect={vi.fn()}
+        onToggleComplete={vi.fn()}
+        suggestions={[{ id: 'sg-1', title: 'Call now', suggestionType: 'call', actionType: 'call', actionPayload: { phoneNumber: '555-1234' } } as never]}
+        onActSuggestion={vi.fn()}
+      />,
+    )
+    // Suggestion chip buttons are not rendered anywhere in the row
+    expect(queryByRole('button', { name: /call now/i })).toBeNull()
+  })
+})

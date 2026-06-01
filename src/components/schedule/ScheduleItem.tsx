@@ -9,7 +9,7 @@ import { SchedulePopover, ContextPicker, DiscussionPicker, type ScheduleContextI
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
 import { Video, Tag, Check, Pencil } from 'lucide-react'
 import { ScheduleItemActionsMenu } from './ScheduleItemActionsMenu'
-import { ConceptIcon, type ConceptName } from '@/lib/conceptIcons'
+import { ConceptIcon } from '@/lib/conceptIcons'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useMobile } from '@/hooks/useMobile'
 import { TaskCheckbox } from './TaskCheckbox'
@@ -150,15 +150,6 @@ interface ScheduleItemProps {
   onOpenGuidedChat?: (entityType: 'task' | 'contact' | 'project' | 'event', entityId: string, entityName: string, prompt?: string) => void
 }
 
-// Maps suggestion action types to ConceptIcon names (null = use text fallback)
-const ICON_CONCEPTS: Record<string, ConceptName | null> = {
-  call: 'call', text: 'discussion', email: 'email', open_link: null,
-  navigate: 'location', followup: null, guided_chat: 'discussion',
-  create_task: 'add', someday: 'time', stale: null, do_today: 'done',
-}
-
-const ICON_FALLBACKS: Record<string, string> = { open_link: '→', followup: '↻', stale: '?' }
-
 // Warm muted color tokens for overdue styling
 const overdueColors = {
   warning50: 'hsl(38 50% 96%)',
@@ -231,10 +222,6 @@ export const ScheduleItem = memo(function ScheduleItem({
   variant = 'full',
   hideTime,
   routineStreak,
-  suggestions,
-  onActSuggestion,
-  onDismissSuggestion: _onDismissSuggestion,
-  onOpenGuidedChat,
 }: ScheduleItemProps) {
   const isMobile = useMobile()
   // Hover state powers the smooth expanding banner (proactive suggestions,
@@ -823,80 +810,6 @@ export const ScheduleItem = memo(function ScheduleItem({
           : metadataContent
       })()}
 
-      {/* Proactive suggestions — hover-only, ambient. Wrapped in ExpandingPanel
-          so the layout below shifts smoothly when the banner appears/disappears
-          rather than jerking. */}
-      {suggestions && suggestions.length > 0 && !item.completed && !item.skipped && onActSuggestion && (
-        <ExpandingPanel open={isHovered && !isMobile} className="ml-[5.75rem]">
-          <div className="flex gap-1.5 pt-1 pb-0.5 flex-wrap">
-            {suggestions.map((s) => {
-              const actionType = s.actionType || s.suggestionType
-              return (
-                <button
-                  key={s.id}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    const payload = s.actionPayload
-                    switch (actionType) {
-                      case 'call':
-                        if (payload.phoneNumber) {
-                          window.open(`tel:${payload.phoneNumber}`, '_self')
-                          onActSuggestion(s.id, `Called ${payload.phoneNumber}`)
-                        }
-                        break
-                      case 'text':
-                        if (payload.phoneNumber) {
-                          const body = payload.messageTemplate ? `&body=${encodeURIComponent(String(payload.messageTemplate))}` : ''
-                          window.open(`sms:${payload.phoneNumber}${body}`, '_self')
-                          onActSuggestion(s.id, `Texted ${payload.phoneNumber}`, 'sent')
-                        }
-                        break
-                      case 'email':
-                        if (payload.email) {
-                          const subject = payload.subject ? `?subject=${encodeURIComponent(String(payload.subject))}` : ''
-                          window.open(`mailto:${payload.email}${subject}`, '_blank')
-                          onActSuggestion(s.id, `Emailed ${payload.email}`, 'sent')
-                        }
-                        break
-                      case 'open_link':
-                        if (payload.url) {
-                          window.open(String(payload.url), '_blank')
-                          onActSuggestion(s.id, `Opened ${payload.url}`, 'success')
-                        }
-                        break
-                      case 'navigate':
-                        if (payload.location) {
-                          const q = payload.placeId
-                            ? `https://www.google.com/maps/place/?q=place_id:${payload.placeId}`
-                            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(String(payload.location))}`
-                          window.open(q, '_blank')
-                          onActSuggestion(s.id, `Navigated to ${payload.location}`)
-                        }
-                        break
-                      case 'guided_chat':
-                        if (onOpenGuidedChat) {
-                          const entType = item.type === 'event' ? 'event' as const : 'task' as const
-                          const entId = item.type === 'event' ? item.id.replace('event-', '') : item.id.replace('task-', '')
-                          const prompt = payload.prompt ? String(payload.prompt) : s.detail || `Help me think through: ${s.title}`
-                          onOpenGuidedChat(entType, entId, item.title, prompt)
-                          onActSuggestion(s.id, 'Opened guided chat')
-                        }
-                        break
-                      default:
-                        onActSuggestion(s.id)
-                    }
-                  }}
-                  title={s.detail || s.title}
-                  className="text-[10px] px-2 py-0.5 rounded-full border transition-colors bg-amber-50/80 border-amber-200/60 text-amber-700 hover:bg-amber-100 hover:border-amber-300"
-                >
-                  {(() => { const c = ICON_CONCEPTS[actionType]; const fb = ICON_FALLBACKS[actionType]; return c ? <ConceptIcon name={c} decorative className="mr-0.5" /> : fb ? <span className="mr-0.5">{fb}</span> : <ConceptIcon name="ai" decorative className="mr-0.5" /> })()}
-                  {s.title}
-                </button>
-              )
-            })}
-          </div>
-        </ExpandingPanel>
-      )}
     </div>
   )
 })
