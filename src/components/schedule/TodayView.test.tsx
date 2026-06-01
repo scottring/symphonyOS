@@ -99,11 +99,16 @@ describe('TodayView', () => {
     expect(screen.getByRole('button', { name: /show daily/i })).toBeInTheDocument()
   })
 
-  it('renders the inline "Add to today" input and submitting fires onCreateTask', async () => {
+  it('renders the inline "Add to today" pill and expanding+submitting fires onCreateTask', async () => {
     const onCreateTask = vi.fn()
     const { user } = renderView({}, { onCreateTask })
-    // TodayView renders the input in both a desktop-only div (hidden md:block) and a
-    // mobile-only div (md:hidden); jsdom has no CSS so both are in the DOM — use the first.
+    // TodayAddInput starts collapsed — shows an "Add to today" button pill.
+    // jsdom renders both desktop (hidden md:block) and mobile (md:hidden) variants
+    // since CSS media queries are not applied; click the first one to expand.
+    const pills = screen.getAllByRole('button', { name: /add to today/i })
+    expect(pills.length).toBeGreaterThan(0)
+    await user.click(pills[0])
+    // Now the input should be visible
     const inputs = screen.getAllByPlaceholderText(/add to today/i)
     expect(inputs.length).toBeGreaterThan(0)
     await user.type(inputs[0], 'New thing{Enter}')
