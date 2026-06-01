@@ -435,8 +435,12 @@ export function HomeView({
 
   return (
     <div className={`relative flex flex-col h-full transition-colors duration-500 ${DOMAIN_BG[currentDomain]}`}>
-      {!isMobile && (
-        <div className={currentView === 'today' ? 'max-w-[940px] mx-auto px-8 pt-4' : 'px-6 pt-4'}>
+      {/* Today header is rendered INSIDE the scroll container so it shares
+          the exact same max-w/px column as TodayView's content, keeping the
+          date label and controls left/right-aligned with the task rows.
+          Week/Month headers stay outside the scroll container (full-width). */}
+      {!isMobile && currentView !== 'today' && (
+        <div className="px-6 pt-4">
           <HomeHeader
             currentView={currentView}
             onViewChange={handleViewChange}
@@ -452,6 +456,21 @@ export function HomeView({
       )}
 
       <div className="flex-1 overflow-y-auto">
+        {!isMobile && currentView === 'today' && (
+          <div className="max-w-[940px] w-full mx-auto px-0 md:px-8 pt-4">
+            <HomeHeader
+              currentView={currentView}
+              onViewChange={handleViewChange}
+              viewedDate={viewedDate}
+              onDateChange={onDateChange}
+              weekStart={weekStart}
+              onWeekChange={setWeekStart}
+              monthStart={monthStart}
+              onMonthChange={setMonthStart}
+              onOpenWeeklyPlanning={onOpenWeeklyPlanning}
+            />
+          </div>
+        )}
         {renderContent()}
       </div>
 
