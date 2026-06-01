@@ -230,6 +230,12 @@ describe('TodayView', () => {
     expect(screen.getByText(/to discuss/i)).toBeInTheDocument()
   })
 
+  it('does not render Clarity in the content stats row (moved to sidebar)', () => {
+    renderView()
+    expect(screen.queryByText('Clarity')).not.toBeInTheDocument()
+    expect(screen.getByText(/done today/i)).toBeInTheDocument()
+  })
+
   it('renders the Morning section header on mobile in italic serif', () => {
     // Create a task scheduled for the morning (8am) so the Morning section
     // actually renders.

@@ -19,9 +19,7 @@ import type { HomeViewType } from '@/types/homeView'
 
 import { useMobile } from '@/hooks/useMobile'
 import { useTodayData } from '@/hooks/useTodayData'
-import { useSystemHealth } from '@/hooks/useSystemHealth'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
-import { useNavigate } from 'react-router-dom'
 import { useProactiveSuggestions } from '@/hooks/useProactiveSuggestions'
 import { useRoutineStats } from '@/hooks/useRoutineStats'
 import { useRecurringEventDetection } from '@/hooks/useRecurringEventDetection'
@@ -35,7 +33,6 @@ import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { TodayAddInput } from './TodayAddInput'
 import { TimelineInsertPoint } from './TimelineInsertPoint'
 import { StatsRow } from './StatsRow'
-import { ClarityIndicator } from './ClarityIndicator'
 import { StagingFloat } from './StagingFloat'
 import { WeatherChip } from './WeatherChip'
 import { EveningMealCard } from './EveningMealCard'
@@ -131,7 +128,6 @@ export function TodayView({
 }: TodayViewProps) {
   // ── Context ──────────────────────────────────────────────────────────────────
   const isMobile = useMobile()
-  const navigate = useNavigate()
   const ctx = useScheduleActionsContext()
   const {
     onToggleWaiting, onUpdateTask, onPushTask,
@@ -189,7 +185,6 @@ export function TodayView({
       ctx.eventNotesMap, ctx.eventContextOverrides, ctx.getDomainForCalendar])
 
   const data = useTodayData(todayInput)
-  const health = useSystemHealth({ tasks, projects, projectsWithLinkedEvents: new Set() })
   const proactive = useProactiveSuggestions()
   const emailActions = useEmailActionItems()
   const { getStats: getRoutineStats } = useRoutineStats()
@@ -231,73 +226,6 @@ export function TodayView({
   const onAppendNoteAt = onAppendNoteAtProp ?? ctx.onAppendNoteAt
   const onLinkNote = onLinkNoteProp ?? ctx.onLinkNote
   const timelineNotes = timelineNotesProp ?? ctx.timelineNotes
-
-  // ── Clarity label ─────────────────────────────────────────────────────────────
-  const clarityLabel = (
-    { excellent: 'Excellent', good: 'Good', fair: 'Fair', needsAttention: 'Needs attention' } as const
-  )[health.healthColor]
-
-  // Build clarity ring trigger — reuse ClarityIndicator's ring logic inline so
-  // the trigger shows: small ring (22 px) + stacked "Clarity" / status label.
-  // ClarityIndicator receives this as `trigger` and wraps it in its click button.
-  const clarityRingColorClass = (
-    { excellent: 'text-primary-500', good: 'text-sage-500', fair: 'text-amber-500', needsAttention: 'text-orange-500' } as const
-  )[health.healthColor]
-  const clarityStatusColorClass = (
-    { excellent: 'text-primary-600', good: 'text-sage-600', fair: 'text-amber-600', needsAttention: 'text-amber-600' } as const
-  )[health.healthColor]
-  const clarityRingSize = 22
-  const clarityStroke = 2.5
-  const clarityRadius = (clarityRingSize - clarityStroke) / 2
-  const clarityCircumference = 2 * Math.PI * clarityRadius
-  const clarityOffset = clarityCircumference - (health.score / 100) * clarityCircumference
-
-  const clarityRingTrigger = (
-    <span className="inline-flex items-center gap-1.5 cursor-pointer">
-      {/* Mini ring — same geometry as ClarityIndicator's 32px ring, scaled to 22px */}
-      <span className="relative shrink-0" style={{ width: clarityRingSize, height: clarityRingSize }}>
-        <svg width={clarityRingSize} height={clarityRingSize} className="transform -rotate-90" aria-hidden="true">
-          <circle
-            cx={clarityRingSize / 2}
-            cy={clarityRingSize / 2}
-            r={clarityRadius}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={clarityStroke}
-            className="text-neutral-100"
-          />
-          <circle
-            cx={clarityRingSize / 2}
-            cy={clarityRingSize / 2}
-            r={clarityRadius}
-            fill="none"
-            strokeWidth={clarityStroke}
-            strokeLinecap="round"
-            strokeDasharray={clarityCircumference}
-            strokeDashoffset={clarityOffset}
-            className={`${clarityRingColorClass} transition-all duration-500`}
-          />
-        </svg>
-      </span>
-      {/* Stacked label */}
-      <span className="flex flex-col items-start leading-none">
-        <span className="text-[13px] text-neutral-600 font-medium">Clarity</span>
-        <span className={`text-[11px] ${clarityStatusColorClass}`}>{clarityLabel}</span>
-      </span>
-    </span>
-  )
-
-  const clarityTrigger = (
-    <ClarityIndicator
-      tasks={tasks}
-      projects={projects ?? []}
-      familyMembers={familyMembers}
-      onOpenProject={ctx.onOpenProject}
-      onAssignTaskAll={ctx.onAssignTaskAll}
-      onScrollToInbox={() => navigate('/inbox')}
-      trigger={clarityRingTrigger}
-    />
-  )
 
   const weekTrigger = (
     <StagingFloat
@@ -385,9 +313,7 @@ export function TodayView({
           doneToday={data.counts.completedCount}
           thisWeek={data.weekTasks.length}
           total={tasks.filter((t) => !t.completed).length}
-          clarityLabel={clarityLabel}
           aiAvailable={false}
-          clarityTrigger={clarityTrigger}
           weekTrigger={weekTrigger}
           discussionTrigger={discussion.length > 0 ? <DiscussionBadge items={discussion} onSelectItem={onSelectItem} /> : undefined}
           weatherTrigger={<WeatherChip />}
