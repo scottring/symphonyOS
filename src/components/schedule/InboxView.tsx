@@ -8,11 +8,13 @@ import { useDomain } from '@/hooks/useDomain'
 import { useInboxMode } from '@/hooks/useInboxMode'
 import { useNotes } from '@/hooks/useNotes'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
+import { useEmailActionItems } from '@/hooks/useEmailActionItems'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { HomeNeedsDetailsSection } from '@/apps/home/inbox/HomeNeedsDetailsSection'
 import { NotePicker, type NotePickerSelection } from '@/components/notes/NotePicker'
 import { formatInboxBullet } from '@/lib/inboxBullet'
 import { DenseInboxRow, type QuickAction } from './DenseInboxRow'
+import { EmailActionsBanner } from './EmailActionsBanner'
 import { FocusInboxCard } from './FocusInboxCard'
 import { InboxModeToggle } from './InboxModeToggle'
 import { InboxUndoToast } from './InboxUndoToast'
@@ -57,6 +59,7 @@ export function InboxView({
   } = useScheduleActionsContext()
   const { notes, addNote, updateNote, deleteNote } = useNotes()
   const { addTask, updateTask } = useSupabaseTasks()
+  const emailActions = useEmailActionItems()
 
   const { currentDomain } = useDomain()
 
@@ -414,6 +417,13 @@ export function InboxView({
       </header>
 
       <HomeNeedsDetailsSection />
+
+      <EmailActionsBanner
+        items={emailActions.items}
+        onAcknowledge={emailActions.acknowledge}
+        onDismiss={emailActions.dismiss}
+        onSnooze={emailActions.snooze}
+      />
 
       {totalCount === 0 ? (
         <div className="text-center py-16">

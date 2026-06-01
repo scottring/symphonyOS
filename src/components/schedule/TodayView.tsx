@@ -27,7 +27,8 @@ import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 import { computeAnchorTime } from '@/lib/timelineAnchor'
 
-import { Eye, EyeOff, Repeat, CalendarClock } from 'lucide-react'
+import { Eye, EyeOff, Repeat, CalendarClock, Mail } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
 import { TodayAddInput } from './TodayAddInput'
@@ -39,7 +40,6 @@ import { EveningMealCard } from './EveningMealCard'
 import { EndOfDayCard } from './EndOfDayCard'
 import { ScheduleItem } from './ScheduleItem'
 import { OverdueSection } from './OverdueSection'
-import { EmailActionsBanner } from './EmailActionsBanner'
 import { TimelineNoteComposer } from './TimelineNoteComposer'
 
 import { useEmailActionItems } from '@/hooks/useEmailActionItems'
@@ -128,6 +128,7 @@ export function TodayView({
 }: TodayViewProps) {
   // ── Context ──────────────────────────────────────────────────────────────────
   const isMobile = useMobile()
+  const navigate = useNavigate()
   const ctx = useScheduleActionsContext()
   const {
     onToggleWaiting, onUpdateTask, onPushTask,
@@ -248,6 +249,20 @@ export function TodayView({
 
   const discussion = discussionItems(tasks)
 
+  // ── Email nudge for StatsRow ──────────────────────────────────────────────
+  const activeEmailCount = emailActions.items.filter(i => i.status === 'new').length
+  const emailNudge = activeEmailCount > 0 ? (
+    <button
+      type="button"
+      onClick={() => navigate('/inbox')}
+      className="inline-flex items-center gap-1.5 text-[13px] text-neutral-500 hover:text-neutral-700 transition-colors"
+      aria-label={`${activeEmailCount} email action${activeEmailCount !== 1 ? 's' : ''} in Inbox`}
+    >
+      <Mail className="w-4 h-4 text-blue-400" />
+      {activeEmailCount} from email
+    </button>
+  ) : undefined
+
   // ── Tasks map for parent task lookup ─────────────────────────────────────────
   const tasksMap = useMemo(() => {
     const map = new Map<string, Task>()
@@ -316,6 +331,7 @@ export function TodayView({
           aiAvailable={false}
           weekTrigger={weekTrigger}
           discussionTrigger={discussion.length > 0 ? <DiscussionBadge items={discussion} onSelectItem={onSelectItem} /> : undefined}
+          emailTrigger={emailNudge}
           weatherTrigger={<WeatherChip />}
           endControls={
             <>
@@ -441,16 +457,6 @@ export function TodayView({
                   onOpenGuidedChat={onOpenGuidedChat}
                 />
               </div>
-            )}
-
-            {/* Email action items - from Gmail scanner */}
-            {data.isToday && (
-              <EmailActionsBanner
-                items={emailActions.items}
-                onAcknowledge={emailActions.acknowledge}
-                onDismiss={emailActions.dismiss}
-                onSnooze={emailActions.snooze}
-              />
             )}
 
             {/* Sections */}

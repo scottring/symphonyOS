@@ -13,11 +13,13 @@ interface StatsRowProps {
   discussionTrigger?: React.ReactNode
   /** Compact weather chip, rendered among the stats. */
   weatherTrigger?: React.ReactNode
+  /** Glanceable "N from email" nudge, navigates to Inbox when clicked. */
+  emailTrigger?: React.ReactNode
   /** Rendered at the trailing end of the bar (assignee filter + show-daily toggle) */
   endControls?: React.ReactNode
 }
 
-export function StatsRow({ dueToday, doneToday, weekTrigger, thisWeek, discussionTrigger, weatherTrigger, endControls }: StatsRowProps) {
+export function StatsRow({ dueToday, doneToday, weekTrigger, thisWeek, discussionTrigger, weatherTrigger, emailTrigger, endControls }: StatsRowProps) {
   return (
     <div className="flex items-center flex-wrap gap-x-5 gap-y-2 text-[13px] text-neutral-500">
       {/* Done today — desktop only, demoted */}
@@ -34,6 +36,12 @@ export function StatsRow({ dueToday, doneToday, weekTrigger, thisWeek, discussio
       {discussionTrigger && (
         <span className="hidden md:inline-flex items-center gap-1.5">
           {discussionTrigger}
+        </span>
+      )}
+
+      {emailTrigger && (
+        <span className="hidden md:inline-flex items-center gap-1.5">
+          {emailTrigger}
         </span>
       )}
 
