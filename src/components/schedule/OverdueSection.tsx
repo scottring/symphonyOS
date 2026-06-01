@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
@@ -7,11 +7,9 @@ import type { ProactiveSuggestion, SuggestionEntityType } from '@/types/proactiv
 import { ScheduleItem } from './ScheduleItem'
 import { SwipeableCard } from './SwipeableCard'
 import { FollowUpInput } from './FollowUpInput'
-import { ExpandingPanel } from './ExpandingPanel'
 import { taskToTimelineItem } from '@/types/timeline'
 import { formatOverdueDate } from '@/lib/timeUtils'
 import { useMobile } from '@/hooks/useMobile'
-import { getOverdueSuggestions, type OverdueSuggestion } from '@/lib/overdueSuggestions'
 
 interface OverdueSectionProps {
   tasks: Task[]
@@ -59,8 +57,6 @@ export function OverdueSection({
   onFollowUpDismiss,
   panelOpen,
   onClosePanel,
-  onDeleteTask,
-  suggestionsForTask,
   onActSuggestion,
   onDismissSuggestion,
   onOpenGuidedChat,
@@ -148,23 +144,10 @@ export function OverdueSection({
             )
           }
 
-          // Prefer proactive suggestions from engine, fall back to rule-based
-          const proactiveSuggs = suggestionsForTask?.('task', taskId) || []
-          const fallbackSuggs = getOverdueSuggestions(task, contactName || undefined)
-
           return (
             <OverdueCard
               key={task.id}
               parentVisible={parentVisible}
-              showFallbackSuggestions={proactiveSuggs.length === 0 && fallbackSuggs.length > 0}
-              fallbackSuggestionsContent={
-                <SuggestionChips
-                  suggestions={fallbackSuggs}
-                  taskId={taskId}
-                  onPush={onPushTask}
-                  onDelete={onDeleteTask}
-                />
-              }
             >
               <ScheduleItem
                 item={item}
@@ -218,78 +201,17 @@ export function OverdueSection({
   )
 }
 
-/**
- * Wrapper that owns the per-card hover state. Replaces the legacy
- * `group/card` + `group-hover/card:h-auto` pattern (which jerked because
- * CSS cannot animate `height: 0 → auto`) with state-driven smooth
- * expansion via ExpandingPanel.
- */
 function OverdueCard({
   children,
   parentVisible,
-  showFallbackSuggestions,
-  fallbackSuggestionsContent,
 }: {
   children: React.ReactNode
   parentVisible: boolean
-  showFallbackSuggestions: boolean
-  fallbackSuggestionsContent: React.ReactNode
 }) {
-  const [isHovered, setIsHovered] = useState(false)
   return (
-    <div
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      className={parentVisible ? 'ml-6 border-l-2 border-neutral-200 pl-2' : ''}
-    >
+    <div className={parentVisible ? 'ml-6 border-l-2 border-neutral-200 pl-2' : ''}>
       {children}
-      {showFallbackSuggestions && (
-        <ExpandingPanel open={isHovered}>
-          {fallbackSuggestionsContent}
-        </ExpandingPanel>
-      )}
     </div>
   )
 }
 
-function SuggestionChips({
-  suggestions,
-  taskId,
-  onPush,
-  onDelete,
-}: {
-  suggestions: OverdueSuggestion[]
-  taskId: string
-  onPush?: (taskId: string, target: Date | 'week' | 'month' | 'quarter') => void
-  onDelete?: (taskId: string) => void
-}) {
-  return (
-    <div className="flex gap-2 ml-[6.5rem] mt-0.5 mb-2">
-      {suggestions.map((s) => (
-        <button
-          key={s.type}
-          onClick={() => {
-            if (s.type === 'call' && s.phoneNumber) {
-              window.open(`tel:${s.phoneNumber}`, '_self')
-            } else if (s.type === 'open_link' && s.url) {
-              window.open(s.url, '_blank')
-            } else if (s.type === 'someday' && onPush) {
-              onPush(taskId, 'quarter')
-            } else if (s.type === 'stale' && onDelete) {
-              onDelete(taskId)
-            }
-          }}
-          className="text-xs px-2.5 py-1 rounded-full border transition-colors bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
-        >
-          {s.type === 'call' && (
-            <span className="mr-1">&#9743;</span>
-          )}
-          {s.type === 'open_link' && (
-            <span className="mr-1">&rarr;</span>
-          )}
-          {s.label}
-        </button>
-      ))}
-    </div>
-  )
-}
