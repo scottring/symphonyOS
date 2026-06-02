@@ -188,6 +188,11 @@ Shared memory = the vault (already the cross-agent memory). No new memory store.
 - Live terminal-session mirroring / hand-off ("both, eventually" stretch goal).
 - Deleting `symphony-chat` / `useChat` (kept as possible fallback this round).
 - Multi-user rollout (the seam is built here; the rollout is not).
+- Full session reconciliation: map each Symphony session to an engine channel
+  (`web:<sessionId>`) so the session list drives engine history. NOTE: until then,
+  right-rail agent conversations are NOT auto-saved to the session list (the
+  auto-save effect keys off the old `useChat` messages, which the agent path no
+  longer populates), and the session list is hidden in the AI pane.
 
 ## Risks / watch-items
 
