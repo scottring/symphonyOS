@@ -17,6 +17,7 @@ interface ChatPanelProps {
   onSourceClick?: (noteId: string) => void
   onSaveToVault?: (title: string, content: string) => Promise<boolean>
   onAddTask?: (title: string, destination: 'inbox' | 'today') => void
+  toolActivity?: string[]
   mode?: ChatMode
   // Chat history
   sessions?: ChatSession[]
@@ -53,6 +54,7 @@ export function ChatPanel({
   onSourceClick,
   onSaveToVault,
   onAddTask,
+  toolActivity,
   mode = 'chat',
   sessions = [],
   sessionsLoading = false,
@@ -304,6 +306,13 @@ export function ChatPanel({
           </div>
         )}
       </div>
+
+      {/* Tool activity */}
+      {toolActivity && toolActivity.length > 0 && loading && (
+        <div className="px-4 py-1.5 text-xs text-neutral-400 border-t border-neutral-200/60">
+          {toolActivity[toolActivity.length - 1].replace(/^symphony_/, '').replace(/_/g, ' ')}…
+        </div>
+      )}
 
       {/* Input */}
       <ChatInput
