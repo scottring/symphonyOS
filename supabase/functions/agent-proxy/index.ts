@@ -26,77 +26,86 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  // Auth — requires user JWT. Verify before any forwarding.
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader) {
-    return new Response(JSON.stringify({ error: 'Missing authorization header' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  try {
+    // Auth — requires user JWT. Verify before any forwarding.
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Missing authorization header' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } },
+    )
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Parse request body
+    const { message, channelId } = await req.json().catch(() => ({}))
+    if (!message || typeof message !== 'string') {
+      return new Response(JSON.stringify({ error: 'message is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Engine config — secret stays server-side, never sent to the browser.
+    const engineUrl = Deno.env.get('OPEN_BRAIN_URL')
+    const engineKey = Deno.env.get('OPEN_BRAIN_API_KEY')
+    if (!engineUrl || !engineKey) {
+      return new Response(JSON.stringify({ error: 'Engine not configured' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Forward to the engine's SSE endpoint with the server-side secret.
+    let upstream: Response
+    try {
+      upstream = await fetch(`${engineUrl}/api/agent-chat/stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Api-Key': engineKey },
+        body: JSON.stringify({ message, channelId: channelId ?? 'web:default' }),
+      })
+    } catch (err) {
+      console.error('agent-proxy: engine fetch failed:', err)
+      return new Response(JSON.stringify({ error: 'Engine unreachable' }), {
+        status: 502,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (!upstream.ok || !upstream.body) {
+      console.error('agent-proxy: engine returned', upstream.status)
+      return new Response(JSON.stringify({ error: 'Engine unreachable' }), {
+        status: 502,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Stream the SSE body straight back to the client (not buffered).
+    return new Response(upstream.body, {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+      },
     })
-  }
-
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    { global: { headers: { Authorization: authHeader } } },
-  )
-
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
-  if (userError || !user) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
-
-  // Parse request body
-  const { message, channelId } = await req.json().catch(() => ({}))
-  if (!message || typeof message !== 'string') {
-    return new Response(JSON.stringify({ error: 'message is required' }), {
-      status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
-
-  // Engine config — secret stays server-side, never sent to the browser.
-  const engineUrl = Deno.env.get('OPEN_BRAIN_URL')
-  const engineKey = Deno.env.get('OPEN_BRAIN_API_KEY')
-  if (!engineUrl || !engineKey) {
-    return new Response(JSON.stringify({ error: 'Engine not configured' }), {
+  } catch (err) {
+    console.error('agent-proxy: unexpected error:', err)
+    return new Response(JSON.stringify({ error: 'Internal error' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
-
-  // Forward to the engine's SSE endpoint with the server-side secret.
-  let upstream: Response
-  try {
-    upstream = await fetch(`${engineUrl}/api/agent-chat/stream`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Api-Key': engineKey },
-      body: JSON.stringify({ message, channelId: channelId ?? 'web:default' }),
-    })
-  } catch (err) {
-    console.error('agent-proxy: engine fetch failed:', err)
-    return new Response(JSON.stringify({ error: 'Engine unreachable' }), {
-      status: 502,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
-
-  if (!upstream.ok || !upstream.body) {
-    return new Response(JSON.stringify({ error: 'Engine unreachable' }), {
-      status: 502,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
-
-  // Stream the SSE body straight back to the client (not buffered).
-  return new Response(upstream.body, {
-    headers: {
-      ...corsHeaders,
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-transform',
-    },
-  })
 })
