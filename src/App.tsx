@@ -1534,12 +1534,12 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       chatToolActivity={agent.toolActivity}
       onChatSaveToVault={handleChatSaveToVault}
       onChatAddTask={handleChatAddTask}
-      chatSessions={chatSessions.sessions}
-      chatSessionsLoading={chatSessions.loading}
+      chatSessions={[]}
+      chatSessionsLoading={false}
       onChatLoadSession={handleChatLoadSession}
       onChatDeleteSession={chatSessions.deleteSession}
-      onChatNewChat={handleChatNewChat}
-      activeChatSessionId={chat.sessionId}
+      onChatNewChat={agent.resetSession}
+      activeChatSessionId={null}
       panel={
         recipeUrl ? (
           <Suspense fallback={<LoadingFallback />}>
