@@ -1,22 +1,29 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { agentChat, getAgentChatHistory, resetAgentSession, type AgentChatMessage } from '@/lib/openBrain'
+import { getAgentChatHistory, resetAgentSession } from '@/lib/openBrain'
+import { streamAgentChat } from '@/lib/agentStream'
+import type { ChatMessage } from '@/hooks/useChat'
 
 const CHANNEL_ID = 'web:default'
 
 export function useAgentChat() {
-  const [messages, setMessages] = useState<AgentChatMessage[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [toolActivity, setToolActivity] = useState<string[]>([])
   const loadedRef = useRef(false)
 
-  // Load chat history on mount
+  // Load prior history (engine SQLite) on mount, adapted to ChatMessage shape.
   useEffect(() => {
     if (loadedRef.current) return
     loadedRef.current = true
-
     getAgentChatHistory(CHANNEL_ID, 50).then((history) => {
       if (history && history.length > 0) {
-        setMessages(history)
+        setMessages(history.map((m, i) => ({
+          id: `hist-${i}`,
+          role: m.role,
+          content: m.content,
+          timestamp: new Date(m.timestamp * 1000),
+        })))
       }
     })
   }, [])
@@ -24,47 +31,47 @@ export function useAgentChat() {
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || loading) return
 
-    // Optimistically add user message
-    const userMsg: AgentChatMessage = {
+    const userMsg: ChatMessage = {
+      id: crypto.randomUUID(),
       role: 'user',
-      content: text,
-      timestamp: Math.floor(Date.now() / 1000),
+      content: text.trim(),
+      timestamp: new Date(),
     }
-    setMessages((prev) => [...prev, userMsg])
+    const assistantId = crypto.randomUUID()
+    setMessages((prev) => [
+      ...prev,
+      userMsg,
+      { id: assistantId, role: 'assistant', content: '', timestamp: new Date() },
+    ])
     setLoading(true)
     setError(null)
+    setToolActivity([])
 
-    try {
-      const response = await agentChat(text, CHANNEL_ID)
+    const appendText = (chunk: string) =>
+      setMessages((prev) => prev.map((m) =>
+        m.id === assistantId ? { ...m, content: m.content + chunk } : m))
 
-      if (response) {
-        const assistantMsg: AgentChatMessage = {
-          role: 'assistant',
-          content: response.reply,
-          timestamp: Math.floor(Date.now() / 1000),
-        }
-        setMessages((prev) => [...prev, assistantMsg])
-      } else {
-        setError('Could not reach Open Brain. Is the Mac Mini online?')
-      }
-    } catch {
-      setError('Failed to send message')
-    } finally {
-      setLoading(false)
-    }
+    await streamAgentChat(text.trim(), CHANNEL_ID, {
+      onText: appendText,
+      onTool: (name) => setToolActivity((prev) => [...prev, name]),
+      onDone: (reply) => {
+        // Prefer the authoritative final reply if streamed text was empty.
+        setMessages((prev) => prev.map((m) =>
+          m.id === assistantId && m.content.length === 0
+            ? { ...m, content: reply } : m))
+      },
+      onError: (message) => setError(message),
+    })
+
+    setLoading(false)
   }, [loading])
 
   const resetSession = useCallback(async () => {
     await resetAgentSession(CHANNEL_ID)
     setMessages([])
     setError(null)
+    setToolActivity([])
   }, [])
 
-  return {
-    messages,
-    loading,
-    error,
-    sendMessage,
-    resetSession,
-  }
+  return { messages, loading, error, toolActivity, sendMessage, resetSession }
 }
