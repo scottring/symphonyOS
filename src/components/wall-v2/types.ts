@@ -66,6 +66,8 @@ export interface WallV2TimelineEvent {
   recipeUrl?: string | null;
   /** Completion state (drives the touch checkbox on the wall). */
   completed?: boolean;
+  /** Formatted clock time ("2:00 PM") for the Schedule band's left gutter. Only set by adaptScheduleBand. */
+  time?: string;
   /** Source item type, so the wall action sheet can pick the right entity/actions. */
   kind?: 'task' | 'event' | 'routine';
   // ─── Rich context surfaced in the tap action sheet ───
@@ -135,4 +137,12 @@ export interface WallV2ActionDef {
   caption: string;
   icon: LucideIcon;
   tint: WallV2Tint;
+}
+
+/** The prioritized timed-agenda band: all-day commitments + chronological timed rows. */
+export interface WallV2ScheduleBandData {
+  /** All-day calendar events ("Mia field trip"), shown in a small strip at the top. */
+  allDay: WallV2TimelineEvent[];
+  /** Timed commitments (events + timed tasks + dinner), sorted ascending by start time. */
+  timed: WallV2TimelineEvent[];
 }

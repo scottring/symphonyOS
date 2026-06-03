@@ -11,6 +11,7 @@ import type { FamilyMember } from '@/types/family';
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar';
 import type { WallDayData } from '@/hooks/useWallData';
 import {
+  adaptScheduleBand,
   adaptTimelineSections,
   adaptUpcoming,
   adaptWeather,
@@ -76,8 +77,8 @@ describe('adaptTimelineSections', () => {
       items: {
         allday: [], morning: [], afternoon: [],
         evening: [
-          makeItem({ id: 'wind', title: 'Wind down', startTime: new Date(2026, 4, 20, 22, 0) }),
-          makeItem({ id: 'shower', title: 'Kids shower', startTime: new Date(2026, 4, 20, 19, 30) }),
+          makeItem({ id: 'wind', type: 'routine', title: 'Wind down', startTime: new Date(2026, 4, 20, 22, 0) }),
+          makeItem({ id: 'shower', type: 'routine', title: 'Kids shower', startTime: new Date(2026, 4, 20, 19, 30) }),
         ],
         unscheduled: [],
       },
@@ -153,8 +154,8 @@ describe('adaptTimelineSections', () => {
       items: {
         allday: [], morning: [], afternoon: [],
         evening: [
-          makeItem({ id: 't1', type: 'task', title: 'Walk the dog', startTime: new Date(2026, 4, 20, 19, 0) }),
-          makeItem({ id: 't2', type: 'task', title: 'Walk the dog', startTime: new Date(2026, 4, 20, 20, 0) }),
+          makeItem({ id: 't1', type: 'task', title: 'Walk the dog', startTime: null }),
+          makeItem({ id: 't2', type: 'task', title: 'Walk the dog', startTime: null }),
         ],
         unscheduled: [],
       },
@@ -168,8 +169,8 @@ describe('adaptTimelineSections', () => {
     const today = makeDay({
       isToday: true,
       items: {
-        allday: [makeItem({ id: 'a', type: 'event', title: 'All day thing', startTime: null })],
-        morning: [makeItem({ id: 'm', type: 'task', title: 'Morning task', startTime: new Date(2026, 4, 20, 9, 0) })],
+        allday: [makeItem({ id: 'a', type: 'task', title: 'All day thing', startTime: null, allDay: true })],
+        morning: [makeItem({ id: 'm', type: 'routine', title: 'Morning routine', startTime: new Date(2026, 4, 20, 9, 0) })],
         afternoon: [], evening: [], unscheduled: [],
       },
     });
@@ -178,14 +179,14 @@ describe('adaptTimelineSections', () => {
     expect(labels).toContain('Morning');
     expect(labels).toContain('All day');
     const morning = result.find((s) => s.label === 'Morning')!;
-    expect(morning.events.map((e) => e.title)).toContain('Morning task');
+    expect(morning.events.map((e) => e.title)).toContain('Morning routine');
   });
 
   it('carries completed state through to the wall event', () => {
     const today = makeDay({
       isToday: true,
       items: {
-        allday: [], morning: [makeItem({ id: 'task-1', type: 'task', title: 'Done thing', completed: true, startTime: new Date(2026, 4, 20, 9, 0) })],
+        allday: [], morning: [makeItem({ id: 'routine-1', type: 'routine', title: 'Done thing', completed: true, startTime: new Date(2026, 4, 20, 9, 0) })],
         afternoon: [], evening: [], unscheduled: [],
       },
     });
@@ -199,7 +200,7 @@ describe('adaptTimelineSections', () => {
       items: {
         allday: [], morning: [],
         // 10am is in the past relative to now (1pm) — must still appear.
-        afternoon: [makeItem({ id: 'p', type: 'task', title: 'Past task', startTime: new Date(2026, 4, 20, 10, 0) })],
+        afternoon: [makeItem({ id: 'p', type: 'routine', title: 'Past task', startTime: new Date(2026, 4, 20, 10, 0) })],
         evening: [], unscheduled: [],
       },
     });
@@ -208,19 +209,17 @@ describe('adaptTimelineSections', () => {
     expect(afternoon.events.map((e) => e.title)).toContain('Past task');
   });
 
-  it('promotes a dinner event into Evening with recipe URL', () => {
+  it('keeps the dinner event out of the rhythm sections (it moves to the Schedule band)', () => {
     const today = makeDay({
       isToday: true,
       items: {
         allday: [], morning: [], afternoon: [],
         evening: [
-          makeItem({ id: 'shower', title: 'Kids shower', startTime: new Date(2026, 4, 20, 19, 30) }),
+          makeItem({ id: 'r-shower', type: 'routine', title: 'Kids shower', startTime: new Date(2026, 4, 20, 19, 30) }),
         ],
         unscheduled: [],
       },
     });
-    // URL must match detectRecipeUrl's heuristic — either a known recipe
-    // domain or contain "/recipe" in the path.
     const dinner: CalendarEvent = {
       id: 'dn-1',
       title: 'Crispy tofu stir fry',
@@ -232,8 +231,9 @@ describe('adaptTimelineSections', () => {
 
     const result = adaptTimelineSections(today, members, now, dinner, false, []);
     const evening = result.find((s) => s.label === 'Evening')!;
-    expect(evening.events[0].title).toBe('Family dinner');
-    expect(evening.events[0].recipeUrl).toBe('https://example.com/recipes/crispy-tofu');
+    // Dinner now lives in the Schedule band, not the rhythm sections.
+    expect(evening.events.map((e) => e.title)).not.toContain('Family dinner');
+    expect(evening.events.map((e) => e.title)).toContain('Kids shower');
   });
 
   it('prepends the Overdue section before all other sections when there are overdue tasks', () => {
@@ -248,10 +248,10 @@ describe('adaptTimelineSections', () => {
       completed: false,
     });
 
-    // A minimal today with one morning item so we can verify ordering.
+    // A minimal today with one morning rhythm item so we can verify ordering.
     const morningItem = makeItem({
-      id: 'task-am',
-      type: 'task',
+      id: 'routine-am',
+      type: 'routine',
       title: 'Standup',
       startTime: new Date('2026-05-28T08:30:00'),
     });
@@ -318,6 +318,118 @@ describe('adaptTimelineSections', () => {
     const now = new Date('2026-05-28T09:00:00');
     const sections = adaptTimelineSections(undefined, [], now, null, false, []);
     expect(sections).toEqual([]);
+  });
+});
+
+describe('adaptScheduleBand', () => {
+  const members: FamilyMember[] = [];
+  const now = new Date('2026-06-03T12:00:00');
+
+  it('returns empty band when there is no today data', () => {
+    expect(adaptScheduleBand(undefined, members, now, null)).toEqual({ allDay: [], timed: [] });
+  });
+
+  it('collects timed events + timed tasks into one chronological list, with formatted time', () => {
+    const day = makeDay({
+      isToday: true,
+      items: {
+        allday: [],
+        morning: [makeItem({ id: 'task-1', type: 'task', title: 'Call plumber', startTime: new Date('2026-06-03T09:30:00') })],
+        afternoon: [makeItem({ id: 'event-1', type: 'event', title: 'Dentist', startTime: new Date('2026-06-03T14:00:00') })],
+        evening: [],
+        unscheduled: [],
+      },
+    });
+    const band = adaptScheduleBand(day, members, now, null);
+    expect(band.timed.map((e) => e.title)).toEqual(['Call plumber', 'Dentist']);
+    expect(band.timed[0].time).toBe('9:30 AM');
+    expect(band.timed[1].time).toBe('2:00 PM');
+  });
+
+  it('routes all-day events to the allDay strip, never the timed list', () => {
+    const day = makeDay({
+      isToday: true,
+      items: {
+        allday: [makeItem({ id: 'event-2', type: 'event', title: 'Field trip', allDay: true })],
+        morning: [], afternoon: [], evening: [], unscheduled: [],
+      },
+    });
+    const band = adaptScheduleBand(day, members, now, null);
+    expect(band.allDay.map((e) => e.title)).toEqual(['Field trip']);
+    expect(band.timed).toEqual([]);
+  });
+
+  it('excludes routines and untimed tasks from the band entirely', () => {
+    const day = makeDay({
+      isToday: true,
+      items: {
+        allday: [],
+        morning: [
+          makeItem({ id: 'routine-1', type: 'routine', title: 'Brush teeth', startTime: new Date('2026-06-03T07:30:00') }),
+          makeItem({ id: 'task-2', type: 'task', title: 'Untimed task', startTime: null }),
+        ],
+        afternoon: [], evening: [], unscheduled: [],
+      },
+    });
+    const band = adaptScheduleBand(day, members, now, null);
+    expect(band.timed).toEqual([]);
+    expect(band.allDay).toEqual([]);
+  });
+
+  it('inserts the dinner card by time and drops a duplicate dinner event', () => {
+    const day = makeDay({
+      isToday: true,
+      items: {
+        allday: [],
+        morning: [], afternoon: [],
+        evening: [makeItem({ id: 'event-d', type: 'event', title: 'Family dinner', startTime: new Date('2026-06-03T18:30:00') })],
+        unscheduled: [],
+      },
+    });
+    const dinner = { id: 'd1', title: 'Stir-fry', description: '', start_time: '2026-06-03T18:30:00' } as unknown as CalendarEvent;
+    const band = adaptScheduleBand(day, members, now, dinner);
+    const dinnerCards = band.timed.filter((e) => e.id.startsWith('dinner-'));
+    expect(dinnerCards).toHaveLength(1);
+    // The raw "Family dinner" event is replaced by the dinner card, not shown twice.
+    expect(band.timed.filter((e) => /dinner/i.test(e.title))).toHaveLength(1);
+  });
+});
+
+describe('adaptTimelineSections — rhythm only', () => {
+  const now = new Date('2026-06-03T12:00:00');
+
+  it('excludes calendar events and timed tasks (they belong to the band)', () => {
+    const day = makeDay({
+      isToday: true,
+      items: {
+        allday: [],
+        morning: [
+          makeItem({ id: 'event-1', type: 'event', title: 'Dentist', startTime: new Date('2026-06-03T14:00:00') }),
+          makeItem({ id: 'task-1', type: 'task', title: 'Call plumber', startTime: new Date('2026-06-03T09:30:00') }),
+          makeItem({ id: 'routine-1', type: 'routine', title: 'Brush teeth', startTime: new Date('2026-06-03T07:30:00') }),
+        ],
+        afternoon: [], evening: [], unscheduled: [],
+      },
+    });
+    const sections = adaptTimelineSections(day, [], now, null, false, []);
+    const titles = sections.flatMap((s) => s.events.map((e) => e.title));
+    expect(titles).toContain('Brush teeth'); // routine stays — even though it has a time
+    expect(titles).not.toContain('Dentist'); // event → band
+    expect(titles).not.toContain('Call plumber'); // timed task → band
+  });
+
+  it('keeps untimed tasks in the rhythm zone', () => {
+    const day = makeDay({
+      isToday: true,
+      items: {
+        allday: [],
+        morning: [makeItem({ id: 'task-2', type: 'task', title: 'Untimed chore', startTime: null })],
+        afternoon: [], evening: [], unscheduled: [],
+      },
+    });
+    const sections = adaptTimelineSections(day, [], now, null, false, []);
+    const titles = sections.flatMap((s) => s.events.map((e) => e.title));
+    expect(titles).toContain('Untimed chore');
   });
 });
 

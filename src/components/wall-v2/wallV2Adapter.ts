@@ -26,6 +26,7 @@ import { isEverydayRoutine } from '@/lib/routineUtils';
 
 import type {
   WallV2MemberBubble,
+  WallV2ScheduleBandData,
   WallV2TimelineEvent,
   WallV2TimelineSection,
   WallV2Tint,
@@ -216,6 +217,94 @@ function dedupeRoutines(
   return events;
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// Schedule band — prioritized timed agenda (events + timed tasks)
+// ────────────────────────────────────────────────────────────────────────────
+
+function formatBandTime(d: Date): string {
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+/** Sort key for band rows by their formatted time; rows without a time sink to the end. */
+function bandTimeKey(e: WallV2TimelineEvent): number {
+  if (!e.time) return Number.POSITIVE_INFINITY;
+  const m = e.time.match(/^(\d+):(\d+)\s*(AM|PM)$/i);
+  if (!m) return Number.POSITIVE_INFINITY;
+  let h = Number(m[1]) % 12;
+  if (/pm/i.test(m[3])) h += 12;
+  return h * 60 + Number(m[2]);
+}
+
+/** True for the prioritized band: a timed commitment (event or task with a real clock time). Routines never qualify. */
+export function isCommitment(item: TimelineItem): boolean {
+  if (item.type !== 'event' && item.type !== 'task') return false;
+  return item.startTime != null && !item.allDay;
+}
+
+/**
+ * Build the prioritized Schedule band from today's items:
+ *   - all-day calendar events → `allDay` strip
+ *   - timed events + timed tasks → `timed`, sorted ascending by start time,
+ *     each tagged with a formatted `time`
+ *   - the structured dinner event (if any) → a special dinner card placed by
+ *     time, replacing any raw "dinner" event so it isn't shown twice
+ * Routines and untimed tasks are excluded entirely (they belong to the rhythm zone).
+ */
+export function adaptScheduleBand(
+  today: WallDayData | undefined,
+  members: FamilyMember[],
+  _now: Date,
+  dinnerEvent: CalendarEvent | null,
+): WallV2ScheduleBandData {
+  if (!today) return { allDay: [], timed: [] };
+
+  const all: TimelineItem[] = [
+    ...(today.items.allday ?? []),
+    ...(today.items.morning ?? []),
+    ...(today.items.afternoon ?? []),
+    ...(today.items.evening ?? []),
+    ...(today.items.unscheduled ?? []),
+  ];
+
+  const allDay = all
+    .filter((i) => i.type === 'event' && i.allDay)
+    .map((i) => adaptTimelineEvent(i, members));
+
+  const timedItems = all
+    .filter(isCommitment)
+    .sort((a, b) => a.startTime!.getTime() - b.startTime!.getTime());
+
+  let timed = timedItems.map((i) => ({
+    ...adaptTimelineEvent(i, members),
+    time: formatBandTime(i.startTime!),
+  }));
+
+  if (dinnerEvent) {
+    const mealTitle = extractRecipeNameHint(dinnerEvent.title) || dinnerEvent.title;
+    const recipeUrl = resolveRecipeUrl(dinnerEvent.description);
+    const startStr = dinnerEvent.start_time || dinnerEvent.startTime;
+    const start = startStr ? new Date(startStr) : null;
+    const dinnerCard: WallV2TimelineEvent = {
+      id: `dinner-${dinnerEvent.id}`,
+      icon: UtensilsCrossed,
+      tint: 'peach',
+      title: 'Family dinner',
+      subtitle: mealTitle,
+      highlight: 'peach',
+      members: members.slice(0, 4).map(memberBubble),
+      recipeUrl,
+      time: start ? formatBandTime(start) : undefined,
+    };
+    // Drop any raw "dinner" event so the meal isn't listed twice, then
+    // re-insert the dinner card and re-sort into chronological position.
+    timed = timed.filter((e) => !/dinner/i.test(e.title));
+    timed.push(dinnerCard);
+    timed.sort((a, b) => bandTimeKey(a) - bandTimeKey(b));
+  }
+
+  return { allDay, timed };
+}
+
 /**
  * Split today's items into Afternoon / Evening / Night sections. We re-use
  * the existing `morning|afternoon|evening` buckets from useWallData and
@@ -225,7 +314,7 @@ export function adaptTimelineSections(
   today: WallDayData | undefined,
   members: FamilyMember[],
   now: Date,
-  dinnerEvent: CalendarEvent | null,
+  _dinnerEvent: CalendarEvent | null,
   hideDailyRoutines: boolean,
   overdueTasks: TimelineItem[],
 ): WallV2TimelineSection[] {
@@ -235,10 +324,16 @@ export function adaptTimelineSections(
   const overdueOnlyEarly = adaptOverdueSection(overdueTasks, members, now);
   if (!today) return overdueOnlyEarly ? [overdueOnlyEarly] : [];
 
-  // "Hide daily" drops routines that effectively recur every weekday (daily +
+  // Rhythm zone = routines (always) + untimed/all-day tasks. Calendar events and
+  // timed tasks are pulled into the prioritized Schedule band (adaptScheduleBand),
+  // so drop them here to avoid showing a commitment in two places.
+  //
+  // "Hide daily" then drops routines that effectively recur every weekday (daily +
   // weekday-only weeklies). One-off routines (since-last, monthly, etc.) stay
   // visible because they're never "noise."
   const isVisible = (i: TimelineItem) => {
+    if (i.type === 'event') return false;            // all events → band (timed or all-day strip)
+    if (isCommitment(i)) return false;               // timed tasks → band
     if (!hideDailyRoutines) return true;
     if (i.type !== 'routine') return true;
     return !isEverydayRoutine(i.recurrencePattern);
@@ -275,28 +370,6 @@ export function adaptTimelineSections(
   }
   const eveningItems = dedupeRoutines(eveningPre, members);
   const nightItems = dedupeRoutines(nightPre, members);
-
-  // If we have a structured dinner event (from meal plan), promote it into
-  // the Evening section with the recipe URL + all family avatars.
-  if (dinnerEvent) {
-    const mealTitle = extractRecipeNameHint(dinnerEvent.title) || dinnerEvent.title;
-    const recipeUrl = resolveRecipeUrl(dinnerEvent.description);
-    const dinnerCard: WallV2TimelineEvent = {
-      id: `dinner-${dinnerEvent.id}`,
-      icon: UtensilsCrossed,
-      tint: 'peach',
-      title: 'Family dinner',
-      subtitle: mealTitle,
-      highlight: 'peach',
-      members: members.slice(0, 4).map(memberBubble),
-      recipeUrl,
-    };
-    // Avoid duplicate if the dinner event also appeared in the bucketed feed.
-    const filtered = eveningItems.filter((e) => !e.title.toLowerCase().includes('dinner'));
-    filtered.unshift(dinnerCard);
-    eveningItems.length = 0;
-    eveningItems.push(...filtered);
-  }
 
   const baseSections: WallV2TimelineSection[] = [];
   if (alldayItems.length > 0) {
