@@ -558,7 +558,6 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     selectedItemId,
     tasks,
     events: eventsWithMeals,
-    activeRoutines,
     allRoutines,
     viewedDate,
     dateInstances,

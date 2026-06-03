@@ -14,7 +14,6 @@ interface UseDetailPanelStateParams {
   selectedItemId: string | null
   tasks: Task[]
   events: CalendarEvent[]
-  activeRoutines: Routine[]
   allRoutines: Routine[]
   viewedDate: Date
   dateInstances: ActionableInstance[]
@@ -44,7 +43,6 @@ export function useDetailPanelState({
   selectedItemId,
   tasks,
   events,
-  activeRoutines,
   allRoutines,
   viewedDate,
   dateInstances,
@@ -109,10 +107,14 @@ export function useDetailPanelState({
       return timelineItem
     }
 
-    // Check if it's a routine
+    // Check if it's a routine. Search ALL routines (not just active): when the
+    // open panel flips a routine to "reference" visibility it leaves the active
+    // set and the timeline, but the panel must stay populated so it doesn't go
+    // blank — and so the user can flip it back. Timeline membership is governed
+    // separately by the active-only filter in the data layer.
     if (selectedItemId.startsWith('routine-')) {
       const routineId = selectedItemId.replace('routine-', '')
-      const routine = activeRoutines.find((r) => r.id === routineId)
+      const routine = allRoutines.find((r) => r.id === routineId)
       if (!routine) return null
 
       // Create timeline item with the viewed date for time context
@@ -130,7 +132,7 @@ export function useDetailPanelState({
     }
 
     return null
-  }, [selectedItemId, tasks, events, activeRoutines, viewedDate, dateInstances, getNote])
+  }, [selectedItemId, tasks, events, allRoutines, viewedDate, dateInstances, getNote])
 
   // Get contact for selected item
   const selectedContact = useMemo(() => {
