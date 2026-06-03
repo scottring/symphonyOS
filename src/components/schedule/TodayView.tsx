@@ -68,9 +68,9 @@ interface TodayViewProps {
   onToggleTask: (taskId: string) => void
   onCompleteRoutine?: (routineId: string, completed: boolean) => void
   onCompleteEvent?: (eventId: string, completed: boolean) => void
-  // Assignee filter (managed by HomeView)
-  selectedAssignee?: string | null
-  onSelectAssignee?: (id: string | null) => void
+  // Assignee filter (managed by HomeView) — multi-select union; [] = everyone
+  selectedAssignees?: string[]
+  onSelectAssignees?: (ids: string[]) => void
   assigneesWithTasks?: FamilyMember[]
   hasUnassignedTasks?: boolean
   // Panel state
@@ -115,8 +115,8 @@ export function TodayView({
   onCompleteEvent,
   loading: _loading,
   viewedDate,
-  selectedAssignee,
-  onSelectAssignee,
+  selectedAssignees,
+  onSelectAssignees,
   assigneesWithTasks,
   hasUnassignedTasks,
   panelOpen,
@@ -175,14 +175,14 @@ export function TodayView({
     routines,
     dateInstances,
     viewedDate,
-    selectedAssignee: selectedAssignee ?? null,
+    selectedAssignee: selectedAssignees ?? [],
     hideRoutines,
     completedLingerCutoff,
     // Cast: EventNote.notes is string|null; TodayDataInput expects string|undefined — structurally compatible at runtime
     eventNotesMap: ctx.eventNotesMap as unknown as Map<string, { notes?: string; assignedTo?: string | null }> | undefined,
     eventContextOverrides: ctx.eventContextOverrides,
     getDomainForCalendar: ctx.getDomainForCalendar,
-  }), [tasks, events, routines, dateInstances, viewedDate, selectedAssignee, hideRoutines, completedLingerCutoff,
+  }), [tasks, events, routines, dateInstances, viewedDate, selectedAssignees, hideRoutines, completedLingerCutoff,
       ctx.eventNotesMap, ctx.eventContextOverrides, ctx.getDomainForCalendar])
 
   const data = useTodayData(todayInput)
@@ -335,10 +335,10 @@ export function TodayView({
           weatherTrigger={<WeatherChip />}
           endControls={
             <>
-              {onSelectAssignee && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
+              {onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
                 <AssigneeFilter
-                  selectedAssignees={selectedAssignee ? [selectedAssignee] : []}
-                  onSelectAssignees={(ids) => onSelectAssignee(ids.length > 0 ? ids[0] : null)}
+                  selectedAssignees={selectedAssignees ?? []}
+                  onSelectAssignees={onSelectAssignees}
                   assigneesWithTasks={assigneesWithTasks ?? []}
                   hasUnassignedTasks={!!hasUnassignedTasks}
                 />
@@ -385,10 +385,10 @@ export function TodayView({
             <div className="flex-1 min-w-0">
               <TodayAddInput onAdd={ctx.onCreateTask} />
             </div>
-            {onSelectAssignee && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
+            {onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
               <AssigneeFilter
-                selectedAssignees={selectedAssignee ? [selectedAssignee] : []}
-                onSelectAssignees={(ids) => onSelectAssignee(ids.length > 0 ? ids[0] : null)}
+                selectedAssignees={selectedAssignees ?? []}
+                onSelectAssignees={onSelectAssignees}
                 assigneesWithTasks={assigneesWithTasks ?? []}
                 hasUnassignedTasks={!!hasUnassignedTasks}
               />

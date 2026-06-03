@@ -411,8 +411,8 @@ export function HomeView({
         viewedDate={viewedDate}
         onDateChange={onDateChange}
         projects={filteredProjects}
-        selectedAssignee={selectedAssigneeForSchedule}
-        onSelectAssignee={(id) => setSelectedAssignees(id ? [id] : [])}
+        selectedAssignees={selectedAssignees}
+        onSelectAssignees={setSelectedAssignees}
         assigneesWithTasks={ctx.familyMembers}
         hasUnassignedTasks={hasUnassignedTasks}
         panelOpen={selectedItemId !== null}

@@ -5,7 +5,9 @@ import type { TimelineItem } from '@/types/timeline'
 import type { DaySection } from '@/lib/timeUtils'
 import type { Contact } from '@/types/contact'
 
-export type AssigneeFilter = string | null | undefined
+// A single selected id, an array of selected ids (multi-select / union), or
+// null/undefined/[] meaning "everyone". The pseudo-id 'unassigned' is allowed.
+export type AssigneeFilter = string | readonly string[] | null | undefined
 
 export interface TodayDataInput {
   tasks: Task[]
