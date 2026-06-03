@@ -1662,10 +1662,12 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
           ) : selectedItem.type === 'routine' && selectedItem.originalRoutine ? (
             <TapRoutinePanel
               routine={selectedItem.originalRoutine}
+              familyMembers={familyMembers}
               onClose={() => setSelectedItemId(null)}
               onNotesChange={(n) => updateRoutine(selectedItem.originalRoutine!.id, { description: n })}
               onContextChange={(ctx) => updateRoutine(selectedItem.originalRoutine!.id, { context: ctx ?? null })}
               onVisibilityChange={(v) => updateRoutine(selectedItem.originalRoutine!.id, { visibility: v })}
+              onAssignChange={(ids) => updateRoutine(selectedItem.originalRoutine!.id, { assigned_to_all: ids })}
             />
           ) : null
         ) : null
