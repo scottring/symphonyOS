@@ -100,11 +100,6 @@ export const ListView = lazy(() =>
   import('./list/ListView').then(m => ({ default: m.ListView }))
 )
 
-// Notes page
-export const NotesPage = lazy(() =>
-  import('./notes/NotesPage').then(m => ({ default: m.NotesPage }))
-)
-
 // History
 export const CompletedTasksView = lazy(() =>
   import('./history/CompletedTasksView').then(m => ({ default: m.CompletedTasksView }))

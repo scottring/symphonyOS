@@ -18,7 +18,6 @@ import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/S
 import { InboxView } from '@/components/schedule/InboxView'
 import { useGoalsContext } from '@/contexts/GoalsContext'
 import { useListsContext } from '@/contexts/ListsContext'
-import { useNotesContext } from '@/contexts/NotesContext'
 import {
   ProjectsList,
   ProjectView,
@@ -36,7 +35,6 @@ import {
   WeeklyPlanningSession,
   ListsList,
   ListView,
-  NotesPage,
   CompletedTasksView,
 } from '@/components/lazy'
 
@@ -444,7 +442,6 @@ export function ViewRouter(props: ViewRouterProps) {
         </Suspense>
       )}
 
-      {props.activeView === 'notes' && <NotesSection tasks={props.tasks} projects={props.projects} contacts={props.contacts} onSelectItem={props.onSelectItem} onCreateTask={props.onCreateNoteTask} onCreateProject={props.onCreateNoteProject} onCreateContact={props.onCreateNoteContact} />}
 
       {props.activeView === 'agent' && (
         <AgentHomeView />
@@ -641,35 +638,3 @@ function ListsSection({ pinnedItems }: { pinnedItems: ViewRouterProps['pinnedIte
   )
 }
 
-function NotesSection({ tasks, projects, contacts, onSelectItem, onCreateTask, onCreateProject, onCreateContact }: { tasks: Task[]; projects: Project[]; contacts: Contact[]; onSelectItem: (id: string | null) => void; onCreateTask?: (title: string) => Promise<string | undefined>; onCreateProject?: (name: string) => Promise<string | undefined>; onCreateContact?: (name: string) => Promise<string | undefined> }) {
-  const { notes, notesByDate, loading, addNote, updateNote, deleteNote, activeTopics, topicsMap, addTopic, getEntityLinks, addEntityLink, removeEntityLink, getVaultNoteContent } = useNotesContext()
-
-  return (
-    <Suspense fallback={<LoadingFallback />}>
-      <NotesPage
-        notes={notes}
-        notesByDate={notesByDate}
-        topics={activeTopics}
-        topicsMap={topicsMap}
-        loading={loading}
-        tasks={tasks}
-        projects={projects}
-        contacts={contacts}
-        onAddNote={async (content, topicId) => addNote({ content, topicId })}
-        onUpdateNote={async (id, updates) => { await updateNote(id, updates) }}
-        onDeleteNote={deleteNote}
-        onAddTopic={async (name) => addTopic({ name })}
-        getEntityLinks={getEntityLinks}
-        onAddEntityLink={async (noteId, entityType, entityId) => {
-          await addEntityLink(noteId, { entityType, entityId })
-        }}
-        onRemoveEntityLink={removeEntityLink}
-        onCreateTask={onCreateTask}
-        onCreateProject={onCreateProject}
-        onCreateContact={onCreateContact}
-        getVaultNoteContent={getVaultNoteContent}
-        onNavigateToTask={(taskId) => onSelectItem(`task-${taskId}`)}
-      />
-    </Suspense>
-  )
-}

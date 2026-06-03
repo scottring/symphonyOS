@@ -279,7 +279,6 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     contacts,
     routines: allRoutines,
     lists,
-    notes,
   })
 
   // UI state
@@ -379,7 +378,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   const params = useParams<{ projectId?: string; routineId?: string; contactId?: string; memberId?: string; taskId?: string }>()
 
   // State for non-URL-routed views
-  const [stateView, setStateView] = useState<'agent' | 'today' | 'inbox' | 'lists' | 'notes' | 'history' | 'settings' | 'weekly-planning' | null>(null)
+  const [stateView, setStateView] = useState<'agent' | 'today' | 'inbox' | 'lists' | 'history' | 'settings' | 'weekly-planning' | null>(null)
 
   // Derive view from URL path or state
   const activeView: ViewType = useMemo(() => {
@@ -643,7 +642,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       navigate('/home')
     }
     // Handle state-based views
-    else if (view === 'agent' || view === 'inbox' || view === 'lists' || view === 'notes' || view === 'history' || view === 'settings') {
+    else if (view === 'agent' || view === 'inbox' || view === 'lists' || view === 'history' || view === 'settings') {
       setStateView(view)
       navigate('/') // Navigate to home URL but show state view
     } else if (view === 'weekly-planning') {
@@ -914,9 +913,6 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       case 'list':
         setSelectedListId(result.id)
         setStateView('lists')
-        break
-      case 'note':
-        setStateView('notes')
         break
     }
   }, [clearSearch, handleSelectItem, handleOpenProject, handleOpenContact])

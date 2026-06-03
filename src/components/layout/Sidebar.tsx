@@ -27,7 +27,6 @@ import {
   Home,
   Inbox,
   Calendar,
-  FileText,
   Users2,
   List,
   Repeat,
@@ -40,11 +39,10 @@ const HOME_VIEW_STORAGE_KEY = 'symphony-home-view'
 
 // Feature flags for in-progress features
 const FEATURES = {
-  notes: true,
   lists: true,
 }
 
-export type ViewType = 'agent' | 'home' | 'home-app' | 'today' | 'inbox' | 'goals' | 'projects' | 'routines' | 'lists' | 'notes' | 'contacts' | 'history' | 'task-detail' | 'contact-detail' | 'settings' | 'meals' | 'morning' | 'bedtime' | 'weekly-planning' | 'family-member'
+export type ViewType = 'agent' | 'home' | 'home-app' | 'today' | 'inbox' | 'goals' | 'projects' | 'routines' | 'lists' | 'contacts' | 'history' | 'task-detail' | 'contact-detail' | 'settings' | 'meals' | 'morning' | 'bedtime' | 'weekly-planning' | 'family-member'
 
 interface EntityData {
   tasks: Task[]
@@ -111,7 +109,7 @@ export function Sidebar({
     activeView === 'projects' || activeView === 'routines' || activeView === 'goals' ||
     activeView === 'weekly-planning' || activeView === 'meals'
   const libraryActive =
-    activeView === 'notes' || activeView === 'lists' ||
+    activeView === 'lists' ||
     activeView === 'contacts' || activeView === 'contact-detail' || activeView === 'history'
   const spacesActive = activeView === 'home-app'
 
@@ -424,17 +422,6 @@ export function Sidebar({
           forceOpen={libraryActive}
           collapsed={collapsed}
         >
-          {/* Notes */}
-          {FEATURES.notes && (
-            <button
-              onClick={() => onViewChange('notes')}
-              className={navItemClass(activeView === 'notes')}
-            >
-              {createElement(FileText, { className: 'w-5 h-5 shrink-0' })}
-              {!collapsed && <span>Notes</span>}
-            </button>
-          )}
-
           {/* Lists */}
           {FEATURES.lists && (
             <>

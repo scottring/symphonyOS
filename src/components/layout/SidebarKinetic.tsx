@@ -11,15 +11,9 @@ import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { Routine } from '@/types/routine'
 import type { ViewType } from './Sidebar'
-import { Home, Flag, FolderKanban, RefreshCw, Clock, FileText, Search, Settings, LogOut, ChevronLeft, ChevronRight, UtensilsCrossed, CalendarRange } from 'lucide-react'
+import { Home, Flag, FolderKanban, RefreshCw, Clock, Search, Settings, LogOut, ChevronLeft, ChevronRight, UtensilsCrossed, CalendarRange } from 'lucide-react'
 
 const HOME_VIEW_STORAGE_KEY = 'symphony-home-view'
-
-// Feature flags for in-progress features
-const FEATURES = {
-  notes: true,
-  lists: false,
-}
 
 interface EntityData {
   tasks: Task[]
@@ -214,17 +208,6 @@ export function SidebarKinetic({
           gradient="from-amber-500 to-magenta-500"
         />
 
-        {FEATURES.notes && (
-          <NavButton
-            icon={FileText}
-            label="Notes"
-            active={activeView === 'notes'}
-            collapsed={collapsed}
-            onClick={() => onViewChange('notes')}
-            gradient="from-cyan-400 to-cyan-600"
-            badge="New"
-          />
-        )}
       </nav>
 
       {/* User section */}

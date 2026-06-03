@@ -37,7 +37,6 @@ export interface NotesContextValue {
   searchNotes: (query: string) => Note[]
   getNotesByTopic: (topicId: string | null) => Note[]
   getNotesByType: (type: NoteType) => Note[]
-  getVaultNoteContent: (noteId: string) => Promise<string | null>
   // Topics
   topics: NoteTopic[]
   topicsMap: Map<string, NoteTopic>
@@ -66,7 +65,6 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     searchNotes,
     getNotesByTopic,
     getNotesByType,
-    getVaultNoteContent,
   } = useNotes()
 
   const {
@@ -96,7 +94,6 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         searchNotes,
         getNotesByTopic,
         getNotesByType,
-        getVaultNoteContent,
         topics,
         topicsMap,
         activeTopics,
