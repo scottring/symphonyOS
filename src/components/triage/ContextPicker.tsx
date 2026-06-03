@@ -15,16 +15,21 @@ const CONTEXTS: { value: TaskContext; label: string; color: string }[] = [
 
 export function ContextPicker({ value, onChange }: ContextPickerProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 })
+  const [menuPosition, setMenuPosition] = useState<{ top?: number; bottom?: number; right: number }>({ top: 0, right: 0 })
   const triggerRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
-  // Calculate menu position when opening
+  // Calculate menu position when opening. Flip the menu ABOVE the trigger when
+  // there isn't room below (e.g. this picker lives in the bottom-fixed bulk
+  // action bar, where opening downward gets clipped by the viewport edge).
   useEffect(() => {
     if (isOpen && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - rect.bottom
+      const openUp = spaceBelow < 220
       setMenuPosition({
-        top: rect.bottom + 4,
+        top: openUp ? undefined : rect.bottom + 4,
+        bottom: openUp ? window.innerHeight - rect.top + 4 : undefined,
         right: window.innerWidth - rect.right,
       })
     }
@@ -72,6 +77,7 @@ export function ContextPicker({ value, onChange }: ContextPickerProps) {
       className="fixed z-[9999] bg-white rounded-xl border border-neutral-200 shadow-lg p-2 min-w-[120px] animate-fade-in-up"
       style={{
         top: menuPosition.top,
+        bottom: menuPosition.bottom,
         right: menuPosition.right,
       }}
     >

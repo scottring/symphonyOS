@@ -522,7 +522,7 @@ export function SchedulePopover({
                     input?.showPicker?.()
                     input?.focus()
                   }}
-                  className="col-span-2 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
                     text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700
                     transition-all duration-150"
                 >
