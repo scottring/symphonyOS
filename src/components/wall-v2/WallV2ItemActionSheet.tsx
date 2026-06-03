@@ -3,11 +3,18 @@ import { useDragScroll } from '@/hooks/useDragScroll'
 import type { WallV2TimelineEvent } from './types'
 
 /**
- * Push targets a task to a fuzzy time bucket without picking a specific
- * date. The four presets are the wall's only push vocabulary; finer
- * scheduling stays on mobile / desktop.
+ * Push reschedules a task from the wall. Most presets target a fuzzy time
+ * bucket without a specific date; the two weekend presets mirror the main
+ * page's SchedulePopover and schedule the task all-day on the upcoming (or
+ * following) Saturday. Finer scheduling still lives on mobile / desktop.
  */
-export type PushPreset = 'this-week' | 'next-week' | 'next-month' | 'someday'
+export type PushPreset =
+  | 'this-week'
+  | 'this-weekend'
+  | 'next-week'
+  | 'next-weekend'
+  | 'next-month'
+  | 'someday'
 
 interface Props {
   event: WallV2TimelineEvent
@@ -22,11 +29,14 @@ interface Props {
   onClose: () => void
 }
 
+// Ordered by horizon so the 2×2-ish grid reads near→far top-to-bottom.
 const PUSH_PRESETS: ReadonlyArray<{ preset: PushPreset; label: string }> = [
-  { preset: 'this-week',  label: 'This week'  },
-  { preset: 'next-week',  label: 'Next week'  },
-  { preset: 'next-month', label: 'Next month' },
-  { preset: 'someday',    label: 'Someday'    },
+  { preset: 'this-week',    label: 'This week'    },
+  { preset: 'this-weekend', label: 'This weekend' },
+  { preset: 'next-week',    label: 'Next week'    },
+  { preset: 'next-weekend', label: 'Next weekend' },
+  { preset: 'next-month',   label: 'Next month'   },
+  { preset: 'someday',      label: 'Someday'      },
 ]
 
 // Destination-only Maps link — the wall is stationary, so we surface "where is

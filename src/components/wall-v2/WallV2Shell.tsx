@@ -40,6 +40,7 @@ import { useWeather } from '@/hooks/useWeather';
 import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
 import { findDinnerEvent, getMealIcon } from '@/components/wall/WallDinnerWidget';
 import { extractRecipeNameHint, resolveRecipeUrl } from '@/lib/recipeDetection';
+import { getNextWeekend, getWeekendAfterNext } from '@/lib/dateHelpers';
 import { WallRecipeViewer } from '@/components/wall/WallRecipeViewer';
 import { useRecipe } from '@/hooks/useRecipe';
 import { WallDiscussionOverlay } from '@/components/wall/WallDiscussionOverlay';
@@ -61,25 +62,39 @@ import type { Task } from '@/types/task';
  * mutation the existing updateTask hook expects. Exported so it can be
  * unit-tested without spinning up the Shell.
  *
- * - this-week  → drop into the "week" bucket
- * - next-week  → drop into "week" + set weekDeferredAt=now (existing
- *                convention: "sink to the bottom of This Week so it
- *                surfaces during next week's planning")
- * - next-month → drop into "month"
- * - someday    → drop into "quarter" (longest review horizon; the
- *                family-readable "Someday" label is UI-only)
+ * - this-week    → drop into the "week" bucket
+ * - next-week    → drop into "week" + set weekDeferredAt=now (existing
+ *                  convention: "sink to the bottom of This Week so it
+ *                  surfaces during next week's planning")
+ * - this-weekend → schedule all-day on the upcoming Saturday (getNextWeekend)
+ * - next-weekend → schedule all-day on the Saturday after next
+ *                  (getWeekendAfterNext) — mirrors the main page picker
+ * - next-month   → drop into "month"
+ * - someday      → drop into "quarter" (longest review horizon; the
+ *                  family-readable "Someday" label is UI-only)
  *
- * scheduledFor and isSomeday are always cleared: a bucket push means
- * "do this in that bucket, no specific date," matching how triage
- * already mutates tasks elsewhere in the app.
+ * Bucket presets clear scheduledFor (no specific date). The weekend presets
+ * are the exception: they set a real all-day date (bucket "timed"), matching
+ * how SchedulePopover's "This/Next Weekend → All day" path schedules a task.
  */
 export function pushPresetToUpdates(preset: PushPreset): Partial<Task> {
   const common = { scheduledFor: undefined, isSomeday: false } as const
+  const weekend = (date: Date): Partial<Task> => ({
+    scheduledFor: date,
+    isAllDay: true,
+    bucket: 'timed',
+    isSomeday: false,
+    weekDeferredAt: undefined,
+  })
   switch (preset) {
     case 'this-week':
       return { ...common, bucket: 'week', weekDeferredAt: undefined }
     case 'next-week':
       return { ...common, bucket: 'week', weekDeferredAt: new Date() }
+    case 'this-weekend':
+      return weekend(getNextWeekend())
+    case 'next-weekend':
+      return weekend(getWeekendAfterNext())
     case 'next-month':
       return { ...common, bucket: 'month', weekDeferredAt: undefined }
     case 'someday':
@@ -381,10 +396,12 @@ export function WallV2Shell() {
     await updateTask(taskId, pushPresetToUpdates(preset));
     wallData.refetch();
     const flash: Record<PushPreset, string> = {
-      'this-week':  'Pushed to this week',
-      'next-week':  'Pushed to next week',
-      'next-month': 'Pushed to next month',
-      'someday':    'Pushed to Someday',
+      'this-week':    'Pushed to this week',
+      'this-weekend': 'Scheduled for this weekend',
+      'next-week':    'Pushed to next week',
+      'next-weekend': 'Scheduled for next weekend',
+      'next-month':   'Pushed to next month',
+      'someday':      'Pushed to Someday',
     };
     showFlash(flash[preset]);
   }, [updateTask, wallData, showFlash]);

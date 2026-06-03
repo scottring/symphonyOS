@@ -34,6 +34,28 @@ describe('pushPresetToUpdates', () => {
     expect(u.isSomeday).toBe(false)
   })
 
+  it("this-weekend → all-day on the upcoming Saturday, bucket 'timed'", () => {
+    const u = pushPresetToUpdates('this-weekend')
+    expect(u.scheduledFor).toBeInstanceOf(Date)
+    expect(u.scheduledFor!.getDay()).toBe(6) // Saturday
+    expect(u.isAllDay).toBe(true)
+    expect(u.bucket).toBe('timed')
+    expect(u.isSomeday).toBe(false)
+    expect(u.weekDeferredAt).toBeUndefined()
+  })
+
+  it("next-weekend → all-day on the Saturday after next (7 days past this-weekend)", () => {
+    const thisWk = pushPresetToUpdates('this-weekend')
+    const nextWk = pushPresetToUpdates('next-weekend')
+    expect(nextWk.scheduledFor!.getDay()).toBe(6) // Saturday
+    expect(nextWk.isAllDay).toBe(true)
+    expect(nextWk.bucket).toBe('timed')
+    const diffDays = Math.round(
+      (nextWk.scheduledFor!.getTime() - thisWk.scheduledFor!.getTime()) / (24 * 60 * 60 * 1000),
+    )
+    expect(diffDays).toBe(7)
+  })
+
   it("someday → bucket 'quarter' (longest existing bucket, label-only diff)", () => {
     const u = pushPresetToUpdates('someday')
     expect(u.bucket).toBe('quarter')

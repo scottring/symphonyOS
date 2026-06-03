@@ -25,7 +25,7 @@ describe('WallV2ItemActionSheet', () => {
     expect(onSkip).toHaveBeenCalledWith('event-9', 'event')
   })
 
-  it('task: renders Mark complete + 4 push presets + Cancel; no Skip today', () => {
+  it('task: renders Mark complete + 6 push presets + Cancel; no Skip today', () => {
     const task: WallV2TimelineEvent = {
       id: 'task-od-1', icon: Calendar, tint: 'honey',
       title: 'Pay water bill', subtitle: 'Was due 3 days ago',
@@ -45,7 +45,9 @@ describe('WallV2ItemActionSheet', () => {
     // Visible affordances
     expect(screen.getByText('Mark complete')).toBeInTheDocument()
     expect(screen.getByText('This week')).toBeInTheDocument()
+    expect(screen.getByText('This weekend')).toBeInTheDocument()
     expect(screen.getByText('Next week')).toBeInTheDocument()
+    expect(screen.getByText('Next weekend')).toBeInTheDocument()
     expect(screen.getByText('Next month')).toBeInTheDocument()
     expect(screen.getByText('Someday')).toBeInTheDocument()
     expect(screen.getByText('Cancel')).toBeInTheDocument()
@@ -74,10 +76,12 @@ describe('WallV2ItemActionSheet', () => {
   })
 
   it.each([
-    ['This week',  'this-week'],
-    ['Next week',  'next-week'],
-    ['Next month', 'next-month'],
-    ['Someday',    'someday'],
+    ['This week',    'this-week'],
+    ['This weekend', 'this-weekend'],
+    ['Next week',    'next-week'],
+    ['Next weekend', 'next-weekend'],
+    ['Next month',   'next-month'],
+    ['Someday',      'someday'],
   ])('task: tapping %s fires onPushTask with preset %s', (label, preset) => {
     const task: WallV2TimelineEvent = { id: 'task-od-1', icon: Calendar, tint: 'honey', title: 'Pay water bill', kind: 'task' }
     const onPushTask = vi.fn()
