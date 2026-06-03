@@ -3,7 +3,7 @@ import type { TaskContext } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
 import type { List, ListCategory } from '@/types/list'
 import type { ScheduleContextItem } from '@/components/triage'
-import { DeferPicker, SchedulePopover, ContextPicker } from '@/components/triage'
+import { SchedulePopover, ContextPicker } from '@/components/triage'
 import { ListPicker } from '@/components/triage/ListPicker'
 import { MultiAssigneeDropdown } from '@/components/family'
 import { useMobile } from '@/hooks/useMobile'
@@ -58,16 +58,14 @@ export function BulkActionToolbar({
 
         {/* Actions */}
         <div className={`flex items-center ${isMobile ? 'justify-around' : 'gap-2'}`}>
-          {/* Defer */}
-          <DeferPicker
-            onDefer={onDefer}
-          />
-
-          {/* Schedule */}
+          {/* When — one picker covering both specific days and planning
+              horizons (This Week / Next Month / Someday), so there aren't two
+              competing "when" buttons. */}
           <SchedulePopover
             value={undefined}
             isAllDay={undefined}
             onSchedule={onSchedule}
+            onDefer={onDefer}
             onClear={() => {}}
             getItemsForDate={getScheduleItemsForDate || (() => [])}
             itemTitle={`${selectedCount} tasks`}

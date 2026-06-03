@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo, cloneElement, isValidElement } from 'react'
 import { createPortal } from 'react-dom'
-import { CalendarPlus, ChevronLeft, Sun, Sunrise, CalendarDays, Calendar } from 'lucide-react'
+import { CalendarPlus, ChevronLeft, Sun, Sunrise, CalendarDays, Calendar, Layers, Hourglass } from 'lucide-react'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import {
   getBaseDate,
@@ -39,6 +39,10 @@ interface SchedulePopoverProps {
   skipToTime?: boolean
   // Title of task/event being scheduled (for context)
   itemTitle?: string
+  // When provided, the picker also offers no-specific-date "horizon" buckets
+  // (This Week / Next Month / Someday), unifying scheduling + deferring into one
+  // control. Omit to keep a dates-only picker (existing per-row behavior).
+  onDefer?: (target: 'week' | 'month' | 'quarter') => void
 }
 
 type Step = 'date' | 'time'
@@ -155,6 +159,7 @@ export function SchedulePopover({
   getItemsForDate,
   skipToTime = false,
   itemTitle,
+  onDefer,
 }: SchedulePopoverProps) {
   void _isAllDay // Reserved for visual indicator
   const [isOpen, setIsOpen] = useState(false)
@@ -533,6 +538,43 @@ export function SchedulePopover({
                 className="sr-only"
                 onChange={(e) => handleDateInputChange(e.target.value)}
               />
+
+              {/* Horizon buckets — no specific date, just a planning horizon.
+                  Shown only when onDefer is wired (e.g. the bulk action bar), so
+                  scheduling + deferring live in one "When" control. */}
+              {onDefer && (
+                <>
+                  <div className="text-xs font-medium text-neutral-400 uppercase tracking-wider mt-3 mb-2 px-1">
+                    Or a horizon
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      onClick={() => { onDefer('week'); handleClose() }}
+                      className="flex flex-col items-center gap-1 px-2 py-2.5 rounded-lg text-sm font-medium
+                        text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700 transition-all duration-150"
+                    >
+                      <Layers className="w-4 h-4" />
+                      <span>This Week</span>
+                    </button>
+                    <button
+                      onClick={() => { onDefer('month'); handleClose() }}
+                      className="flex flex-col items-center gap-1 px-2 py-2.5 rounded-lg text-sm font-medium
+                        text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700 transition-all duration-150"
+                    >
+                      <Calendar className="w-4 h-4" />
+                      <span>Next Month</span>
+                    </button>
+                    <button
+                      onClick={() => { onDefer('quarter'); handleClose() }}
+                      className="flex flex-col items-center gap-1 px-2 py-2.5 rounded-lg text-sm font-medium
+                        text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700 transition-all duration-150"
+                    >
+                      <Hourglass className="w-4 h-4" />
+                      <span>Someday</span>
+                    </button>
+                  </div>
+                </>
+              )}
 
               {/* Clear option if value exists */}
               {hasValue && onClear && (
