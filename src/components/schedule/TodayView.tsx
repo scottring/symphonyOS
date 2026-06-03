@@ -19,6 +19,7 @@ import type { HomeViewType } from '@/types/homeView'
 
 import { useMobile } from '@/hooks/useMobile'
 import { useTodayData } from '@/hooks/useTodayData'
+import { mergeAssignees } from '@/lib/today/bulkAssign'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useProactiveSuggestions } from '@/hooks/useProactiveSuggestions'
 import { useRoutineStats } from '@/hooks/useRoutineStats'
@@ -40,6 +41,7 @@ import { EveningMealCard } from './EveningMealCard'
 import { EndOfDayCard } from './EndOfDayCard'
 import { ScheduleItem } from './ScheduleItem'
 import { OverdueSection } from './OverdueSection'
+import { BulkActionToolbar } from './BulkActionToolbar'
 import { TimelineNoteComposer } from './TimelineNoteComposer'
 
 import { useEmailActionItems } from '@/hooks/useEmailActionItems'
@@ -140,6 +142,43 @@ export function TodayView({
     contactsMap, projectsMap, familyMembers = [],
     eventNotesMap,
   } = ctx
+
+  // ── Bulk multi-select (hover checkbox on task rows → bottom action bar) ──────
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(() => new Set())
+  const clearBulkSelection = useCallback(() => setSelectedTaskIds(new Set()), [])
+  const toggleBulkSelect = useCallback((taskId: string) => {
+    setSelectedTaskIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(taskId)) next.delete(taskId)
+      else next.add(taskId)
+      return next
+    })
+  }, [])
+  const handleBulkDefer = useCallback((target: 'week' | 'month' | 'quarter') => {
+    if (!onUpdateTask) return
+    for (const id of selectedTaskIds) onUpdateTask(id, { bucket: target, scheduledFor: undefined })
+    clearBulkSelection()
+  }, [selectedTaskIds, onUpdateTask, clearBulkSelection])
+  const handleBulkSchedule = useCallback((date: Date, isAllDay: boolean) => {
+    if (!onUpdateTask) return
+    for (const id of selectedTaskIds) onUpdateTask(id, { bucket: 'timed', scheduledFor: date, isAllDay })
+    clearBulkSelection()
+  }, [selectedTaskIds, onUpdateTask, clearBulkSelection])
+  const handleBulkSetContext = useCallback((context: Task['context']) => {
+    if (!onUpdateTask) return
+    for (const id of selectedTaskIds) onUpdateTask(id, { context })
+    clearBulkSelection()
+  }, [selectedTaskIds, onUpdateTask, clearBulkSelection])
+  // Additive assign: union the chosen members into each task's existing
+  // assignees (so "assign these to Iris" adds Iris without dropping Scott),
+  // matching the user's "if she isn't already assigned" intent.
+  const handleBulkAssign = useCallback((memberIds: string[]) => {
+    if (!onAssignTaskAll) return
+    for (const id of selectedTaskIds) {
+      onAssignTaskAll(id, mergeAssignees(tasks.find((x) => x.id === id), memberIds))
+    }
+    clearBulkSelection()
+  }, [selectedTaskIds, tasks, onAssignTaskAll, clearBulkSelection])
 
   // ── Hide-routines toggle (localStorage parity) ────────────────────────────────
   const [hideRoutines, setHideRoutines] = useState<boolean>(() => readHideRoutines())
@@ -444,6 +483,8 @@ export function TodayView({
                   familyMembers={ctx.familyMembers}
                   onAssignTask={ctx.onAssignTask}
                   onAssignTaskAll={ctx.onAssignTaskAll}
+                  bulkSelectedIds={selectedTaskIds}
+                  onToggleBulkSelect={toggleBulkSelect}
                   followUpTaskId={followUpTaskId}
                   onToggleWithFollowUp={handleToggleTaskWithFollowUp}
                   onFollowUpSubmit={onCreateFollowUp ? handleFollowUpSubmit : undefined}
@@ -579,6 +620,10 @@ export function TodayView({
                         <ScheduleItem
                           item={item}
                           selected={selectedItemId === item.id}
+                          bulkSelectable={item.type === 'task' && !!taskId}
+                          bulkSelected={!!taskId && selectedTaskIds.has(taskId)}
+                          showBulkAffordance={selectedTaskIds.size > 0}
+                          onToggleBulkSelect={taskId ? () => toggleBulkSelect(taskId) : undefined}
                           onSelect={() => handleSelectItem(item.id)}
                           onToggleWaiting={
                             item.type === 'task' && taskId && onToggleWaiting
@@ -730,6 +775,21 @@ export function TodayView({
       <div className="mt-5 hidden md:block">
         <EndOfDayCard onOpenReview={() => {}} />
       </div>
+
+      {/* Bulk action bar — appears when ≥1 task row is selected via the
+          hover checkbox. Reuses the shared toolbar (Inbox uses the same). */}
+      {selectedTaskIds.size > 0 && (
+        <BulkActionToolbar
+          selectedCount={selectedTaskIds.size}
+          onDefer={handleBulkDefer}
+          onSchedule={handleBulkSchedule}
+          onSetContext={handleBulkSetContext}
+          onAssign={handleBulkAssign}
+          onSendToList={() => {}}
+          onCancel={clearBulkSelection}
+          familyMembers={familyMembers}
+        />
+      )}
 
       {/* Timeline note composer (radial wheel → "Note" pick) */}
       {insert.noteComposer && (

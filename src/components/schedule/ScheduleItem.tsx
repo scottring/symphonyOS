@@ -102,6 +102,13 @@ function CalendarIcon({
 interface ScheduleItemProps {
   item: TimelineItem
   selected?: boolean
+  // Bulk multi-select (Today): a hover-revealed checkbox at the row's left edge.
+  // `bulkSelectable` enables it (task rows only); `showBulkAffordance` keeps it
+  // visible once any selection exists; toggling never opens the detail panel.
+  bulkSelectable?: boolean
+  bulkSelected?: boolean
+  showBulkAffordance?: boolean
+  onToggleBulkSelect?: () => void
   onSelect: () => void
   onToggleComplete: () => void
   onToggleWaiting?: () => void
@@ -194,6 +201,10 @@ function StartMeetingButton({ item }: { item: TimelineItem }) {
 export const ScheduleItem = memo(function ScheduleItem({
   item,
   selected,
+  bulkSelectable,
+  bulkSelected,
+  showBulkAffordance,
+  onToggleBulkSelect,
   onSelect,
   onToggleComplete,
   onToggleWaiting,
@@ -454,8 +465,30 @@ export const ScheduleItem = memo(function ScheduleItem({
         />
       )}
 
+      {/* Bulk multi-select checkbox — hover-revealed at the row's left edge.
+          Absolutely positioned so it never shifts layout; the row content gets
+          a left pad (below) only while it's shown. Toggling stops propagation
+          so it never opens the detail panel. */}
+      {bulkSelectable && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onToggleBulkSelect?.() }}
+          aria-label={bulkSelected ? 'Deselect task' : 'Select task'}
+          aria-pressed={!!bulkSelected}
+          className={`absolute left-1 top-1/2 -translate-y-1/2 z-[2] grid place-items-center w-5 h-5 rounded-md border-2 transition-all ${
+            bulkSelected
+              ? 'opacity-100 bg-primary-600 border-primary-600 text-white'
+              : `border-neutral-300 text-transparent ${showBulkAffordance ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`
+          }`}
+        >
+          <Check className="w-3 h-3" strokeWidth={3} />
+        </button>
+      )}
+
       {/* Main row: time | checkbox/circle | title */}
-      <div className="relative flex items-center gap-3">
+      <div className={`relative flex items-center gap-3 transition-[padding] ${
+        bulkSelectable ? (bulkSelected || showBulkAffordance ? 'pl-6' : 'group-hover:pl-6') : ''
+      }`}>
         {/* Time column - fixed width for alignment */}
         {hideTime ? (
           <div className="w-16 shrink-0" />

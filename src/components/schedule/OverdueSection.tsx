@@ -24,6 +24,9 @@ interface OverdueSectionProps {
   familyMembers?: FamilyMember[]
   onAssignTask?: (taskId: string, memberId: string | null) => void
   onAssignTaskAll?: (taskId: string, memberIds: string[]) => void
+  // Bulk multi-select (hover checkbox on each carried-over row)
+  bulkSelectedIds?: Set<string>
+  onToggleBulkSelect?: (taskId: string) => void
   followUpTaskId?: string | null
   onToggleWithFollowUp?: (taskId: string, wasCompleted: boolean) => void
   onFollowUpSubmit?: (title: string, sourceTaskId: string) => void
@@ -51,6 +54,8 @@ export function OverdueSection({
   familyMembers = [],
   onAssignTask,
   onAssignTaskAll,
+  bulkSelectedIds,
+  onToggleBulkSelect,
   followUpTaskId,
   onToggleWithFollowUp,
   onFollowUpSubmit,
@@ -152,6 +157,10 @@ export function OverdueSection({
               <ScheduleItem
                 item={item}
                 selected={selectedItemId === `task-${task.id}`}
+                bulkSelectable
+                bulkSelected={bulkSelectedIds?.has(task.id)}
+                showBulkAffordance={(bulkSelectedIds?.size ?? 0) > 0}
+                onToggleBulkSelect={onToggleBulkSelect ? () => onToggleBulkSelect(task.id) : undefined}
                 onSelect={() => onSelectTask(`task-${task.id}`)}
                 onToggleWaiting={onToggleWaiting ? () => onToggleWaiting(taskId) : undefined}
                 onToggleComplete={() => handleToggle(taskId, !!task.completed)}
