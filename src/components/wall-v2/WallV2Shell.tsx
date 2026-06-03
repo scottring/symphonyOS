@@ -30,6 +30,7 @@ import { WallV2ActionDock } from './WallV2ActionDock';
 import { MOCK_ACTIONS } from './wallV2Mock';
 import {
   adaptGlanceForMember,
+  adaptScheduleBand,
   adaptTimelineSections,
   adaptUpcoming,
   adaptWeather,
@@ -174,6 +175,14 @@ export function WallV2Shell() {
       wallData.overdueTasks,
     ),
     [todayData, wallData.familyMembers, now, dinnerEvent, hideRoutines, wallData.overdueTasks],
+  );
+
+  // Prioritized timed agenda (events + timed tasks) shown in its own band above
+  // the rhythm sections. Dinner is promoted here, so adaptTimelineSections no
+  // longer handles it.
+  const scheduleBand = useMemo(
+    () => adaptScheduleBand(todayData, wallData.familyMembers, now, dinnerEvent),
+    [todayData, wallData.familyMembers, now, dinnerEvent],
   );
 
   const upcoming = useMemo(
@@ -469,6 +478,7 @@ export function WallV2Shell() {
           <WallV2AtAGlance cards={glance} />
           <div className="min-h-0 flex-1">
             <WallV2Timeline
+              band={scheduleBand}
               sections={timeline}
               onTapEvent={handleTapEvent}
               onToggleComplete={handleToggleComplete}

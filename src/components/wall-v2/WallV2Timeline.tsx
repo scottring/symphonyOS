@@ -7,27 +7,31 @@
 import { CalendarDays, Coffee } from 'lucide-react';
 import { TINTS } from './tints';
 import { WallV2EventCard } from './WallV2EventCard';
+import { WallV2ScheduleBand } from './WallV2ScheduleBand';
 import { useDragScroll } from '@/hooks/useDragScroll';
-import type { WallV2TimelineSection } from './types';
+import type { WallV2TimelineSection, WallV2ScheduleBandData } from './types';
 
 interface Props {
+  band: WallV2ScheduleBandData;
   sections: WallV2TimelineSection[];
   onTapEvent?: (id: string) => void;
   onToggleComplete?: (id: string, completed: boolean) => void;
   onTapFullDay?: () => void;
 }
 
-export function WallV2Timeline({ sections, onTapEvent, onToggleComplete, onTapFullDay }: Props) {
+export function WallV2Timeline({ band, sections, onTapEvent, onToggleComplete, onTapFullDay }: Props) {
   // The wall is a Pi touchscreen that delivers touch as mouse events, so native
   // touch scrolling never fires — drive scroll from pointer drag instead.
   const scrollRef = useDragScroll<HTMLDivElement>();
+  const bandEmpty = band.allDay.length === 0 && band.timed.length === 0;
+  const everythingEmpty = bandEmpty && sections.length === 0;
   return (
     <div className="bg-white/70 dark:bg-stone-900/60 border border-stone-200/70 dark:border-stone-700/60 rounded-3xl p-5 flex flex-col gap-4 h-full min-h-0">
       <div className="text-[0.72rem] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400 shrink-0">
         Today's plan
       </div>
 
-      {sections.length === 0 ? (
+      {everythingEmpty ? (
         <div className="flex flex-col items-center justify-center gap-2 py-10 text-stone-500 dark:text-stone-400">
           <div className="grid place-items-center w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-200">
             <Coffee className="w-6 h-6" />
@@ -49,6 +53,20 @@ export function WallV2Timeline({ sections, onTapEvent, onToggleComplete, onTapFu
         // kept as a no-cost fallback for any surface that *does* get real touch.
         style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
       >
+        {/* Prioritized timed agenda — calendar events + timed tasks, separated
+            from and above the home-rhythm sections below. */}
+        <WallV2ScheduleBand
+          band={band}
+          onTapEvent={onTapEvent}
+          onToggleComplete={onToggleComplete}
+        />
+
+        {sections.length > 0 && (
+          <div className="text-[0.62rem] font-bold uppercase tracking-[0.18em] text-stone-500 dark:text-stone-400 mt-1">
+            Home rhythm
+          </div>
+        )}
+
         {sections.map((section, idx) => {
           const tint = TINTS[section.tint];
           const Icon = section.icon;

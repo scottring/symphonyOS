@@ -274,7 +274,7 @@ export function adaptScheduleBand(
     .filter(isCommitment)
     .sort((a, b) => a.startTime!.getTime() - b.startTime!.getTime());
 
-  let timed = timedItems.map((i) => ({
+  let timed: WallV2TimelineEvent[] = timedItems.map((i) => ({
     ...adaptTimelineEvent(i, members),
     time: formatBandTime(i.startTime!),
   }));
