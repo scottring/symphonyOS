@@ -116,8 +116,8 @@ export function ClarityIndicator({
                   className={`${ringColor} transition-all duration-500`}
                 />
               </svg>
-              <span className={`absolute inset-0 flex items-center justify-center text-[11px] font-semibold ${colorClass}`}>
-                {metrics.score}
+              <span className={`absolute inset-0 flex items-center justify-center text-[10px] font-semibold ${colorClass}`}>
+                {metrics.score}%
               </span>
             </div>
             <div className="hidden sm:flex flex-col items-start">
@@ -144,7 +144,7 @@ export function ClarityIndicator({
                 <h4 className="font-medium text-neutral-800">Clarity Score</h4>
                 <p className={`text-sm ${colorClass}`}>{metrics.healthStatus}</p>
               </div>
-              <span className={`text-2xl font-semibold ${colorClass}`}>{metrics.score}</span>
+              <span className={`text-2xl font-semibold ${colorClass}`}>{metrics.score}%</span>
             </div>
             <p className="text-sm text-neutral-600 mb-4">
               {metrics.score >= 85
