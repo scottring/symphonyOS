@@ -28,6 +28,29 @@ function cacheCoords(lat: number, lng: number) {
   localStorage.setItem(COORDS_CACHE_KEY, JSON.stringify({ lat, lng }))
 }
 
+const WEATHER_CACHE_KEY = 'symphony-weather-last'
+// How stale a cached reading may be before we stop showing it as a fallback.
+const WEATHER_MAX_AGE_MS = 12 * 60 * 60 * 1000 // 12 hours
+
+// Last successful reading, shown (slightly stale) when a live fetch fails — e.g.
+// the provider is down — so the chip doesn't go blank. Discarded past 12h.
+function getCachedWeather(): WeatherData | null {
+  try {
+    const raw = localStorage.getItem(WEATHER_CACHE_KEY)
+    if (!raw) return null
+    const { data, cachedAt } = JSON.parse(raw)
+    if (typeof cachedAt !== 'number' || Date.now() - cachedAt > WEATHER_MAX_AGE_MS) return null
+    if (data && typeof data.currentTemp === 'number') return data as WeatherData
+  } catch { /* ignore */ }
+  return null
+}
+
+function cacheWeather(data: WeatherData) {
+  try {
+    localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({ data, cachedAt: Date.now() }))
+  } catch { /* ignore */ }
+}
+
 // WMO Weather Code → human-readable condition
 function getCondition(code: number): string {
   if (code === 0) return 'Clear'
@@ -126,8 +149,10 @@ const HOME_COORDS = { lat: 39.3285, lng: -76.6178 }
 
 export function useWeather() {
   const { user } = useAuth()
-  const [weather, setWeather] = useState<WeatherData | null>(null)
-  const [loading, setLoading] = useState(true)
+  // Seed from the last-known reading so the chip shows immediately (and never
+  // blanks on a failed refresh while a usable cached value exists).
+  const [weather, setWeather] = useState<WeatherData | null>(getCachedWeather)
+  const [loading, setLoading] = useState(() => getCachedWeather() === null)
   const [error, setError] = useState<string | null>(null)
   const mountedRef = useRef(true)
   const coordsRef = useRef<{ lat: number; lng: number } | null>(null)
@@ -142,12 +167,18 @@ export function useWeather() {
         const data = await withTimeout(fetchWeatherData(coordsRef.current.lat, coordsRef.current.lng), 10000)
         if (mountedRef.current) {
           setWeather(data)
+          cacheWeather(data)
           setError(null)
           retryCountRef.current = 0
         }
       } catch (e) {
         console.error('[weather] refetch failed:', e)
-        if (mountedRef.current) setError(`refetch: ${e instanceof Error ? e.message : String(e)}`)
+        if (mountedRef.current) {
+          // Keep showing the last-known reading rather than blanking out.
+          const cached = getCachedWeather()
+          if (cached) { setWeather(cached); setError(null) }
+          else setError(`refetch: ${e instanceof Error ? e.message : String(e)}`)
+        }
       } finally {
         if (mountedRef.current) setLoading(false)
       }
@@ -238,14 +269,18 @@ export function useWeather() {
       console.log('[weather] success:', data.currentTemp, '°F', data.condition)
       if (mountedRef.current) {
         setWeather(data)
+        cacheWeather(data)
         setError(null)
         retryCountRef.current = 0
       }
     } catch (e) {
       console.error('[weather] API fetch failed:', e)
       if (mountedRef.current) {
-        setError(`api: ${e instanceof Error ? e.message : String(e)} [${coordSource}]`)
-        // Auto-retry up to 3 times with backoff
+        // Show the last-known reading (if still fresh enough) instead of blanking.
+        const cached = getCachedWeather()
+        if (cached) { setWeather(cached); setError(null) }
+        else setError(`api: ${e instanceof Error ? e.message : String(e)} [${coordSource}]`)
+        // Auto-retry up to 3 times with backoff to get a live reading
         if (retryCountRef.current < 3) {
           retryCountRef.current++
           const delay = retryCountRef.current * 5000
@@ -282,6 +317,7 @@ export function useWeather() {
       const data = await fetchWeatherData(coords.lat, coords.lng)
       if (mountedRef.current) {
         setWeather(data)
+        cacheWeather(data)
         setError(null)
       }
     } catch {
