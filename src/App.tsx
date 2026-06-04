@@ -56,6 +56,7 @@ import { useMealPlan } from '@/hooks/useMealPlan'
 import { useRecipes } from '@/hooks/useRecipes'
 import { CalendarReconnectError, type CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { useChat, type EntityContext as ChatEntityContext } from '@/hooks/useChat'
+import { useSymphonyAssistant } from '@/hooks/useSymphonyAssistant'
 import { useChatSessions } from '@/hooks/useChatSessions'
 import { useVaultWrite } from '@/hooks/useVaultWrite'
 import { useMeetingNotes } from '@/hooks/useMeetingNotes'
@@ -216,6 +217,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   const { toast, showToast, dismissToast } = useToast()
   const { isHidden: isEventHidden, hideEvent } = useHiddenCalendarEvents()
   const chat = useChat()
+  const assistant = useSymphonyAssistant()
   const chatSessions = useChatSessions()
   const vaultWrite = useVaultWrite()
   const [chatOpen, setChatOpen] = useState(false)
@@ -1517,21 +1519,22 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       onChatOpenChange={handleChatOpenChange}
       activePanelTab={activePanelTab}
       onPanelTabChange={setActivePanelTab}
-      chatMessages={chat.messages}
-      chatLoading={chat.loading}
-      chatError={chat.error}
-      chatEntityContext={chat.entityContext}
-      chatMode={chat.mode}
-      onChatSend={chat.sendMessage}
-      onChatClear={chat.clearChat}
+      chatMessages={assistant.messages}
+      chatLoading={assistant.loading}
+      chatError={assistant.error}
+      chatEntityContext={null}
+      chatMode={'chat'}
+      onChatSend={assistant.sendMessage}
+      onChatClear={assistant.resetSession}
       onChatSaveToVault={handleChatSaveToVault}
       onChatAddTask={handleChatAddTask}
-      chatSessions={chatSessions.sessions}
-      chatSessionsLoading={chatSessions.loading}
+      chatToolActivity={assistant.toolActivity}
+      chatSessions={[]}
+      chatSessionsLoading={false}
       onChatLoadSession={handleChatLoadSession}
       onChatDeleteSession={chatSessions.deleteSession}
-      onChatNewChat={handleChatNewChat}
-      activeChatSessionId={chat.sessionId}
+      onChatNewChat={assistant.resetSession}
+      activeChatSessionId={null}
       panel={
         recipeUrl ? (
           <Suspense fallback={<LoadingFallback />}>
