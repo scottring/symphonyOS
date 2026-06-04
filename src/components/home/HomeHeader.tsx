@@ -89,17 +89,19 @@ export function HomeHeader(props: HomeHeaderProps) {
   return (
     <header className="flex flex-col gap-3 mb-6 px-3 md:px-0 md:flex-row md:items-center md:justify-between md:gap-4">
       <div className="flex items-center gap-2 min-w-0 justify-center md:justify-start">
-        <button
-          aria-label={prevLabel}
-          onClick={onPrev}
-          className="p-1.5 rounded text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors shrink-0"
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </button>
+        {/* Date first so its first letter aligns with the column's left edge
+            (and the task rows below); the prev/next chevrons follow it. */}
         <h1 className="font-display text-2xl md:text-[32px] leading-tight text-neutral-900 min-w-0 text-center md:text-left">
           <span className="md:hidden">{label.short}</span>
           <span className="hidden md:inline">{label.long}</span>
         </h1>
+        <button
+          aria-label={prevLabel}
+          onClick={onPrev}
+          className="p-1.5 rounded text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors shrink-0 md:ml-1"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
         <button
           aria-label={nextLabel}
           onClick={onNext}

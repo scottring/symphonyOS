@@ -400,7 +400,7 @@ export function TodayView({
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-[1180px] w-full mx-auto px-0 py-2 md:px-6 md:py-8">
+    <div className="max-w-[940px] w-full mx-auto px-0 py-2 md:px-8 md:py-8">
       {/* Stats + function bar — desktop only. Mobile combines the filters
           into the Add-to-today row below to save vertical space. */}
       <div className="hidden md:block mb-6">

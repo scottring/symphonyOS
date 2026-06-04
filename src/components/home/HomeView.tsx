@@ -457,7 +457,7 @@ export function HomeView({
 
       <div className="flex-1 overflow-y-auto">
         {!isMobile && currentView === 'today' && (
-          <div className="max-w-[1180px] w-full mx-auto px-0 md:px-6 pt-8">
+          <div className="max-w-[940px] w-full mx-auto px-0 md:px-8 pt-8">
             <HomeHeader
               currentView={currentView}
               onViewChange={handleViewChange}
