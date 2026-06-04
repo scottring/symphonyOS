@@ -32,6 +32,12 @@ interface EntityData {
 interface AppShellProps {
   children: ReactNode
   panel?: ReactNode
+  /** Resting content for the docked right rail (e.g. Day-at-a-glance) — shown
+   *  when nothing is selected and `dockRail` is on. */
+  railContent?: ReactNode
+  /** When true (and desktop), the right panel is a persistent in-flow rail:
+   *  it shows `panel` when something is selected, else `railContent`. */
+  dockRail?: boolean
   sidebarCollapsed: boolean
   onSidebarToggle: () => void
   panelOpen: boolean
@@ -105,6 +111,8 @@ interface AppShellProps {
 export function AppShell({
   children,
   panel,
+  railContent,
+  dockRail = false,
   sidebarCollapsed,
   onSidebarToggle,
   panelOpen,
@@ -173,9 +181,14 @@ export function AppShell({
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Whether the right panel column is visible (detail or chat or both active)
-  const rightPanelVisible = panelOpen || chatOpen
-  const bothPanelsActive = panelOpen && chatOpen
+  // When the rail is docked (desktop + dockRail + railContent), the detail panel
+  // renders *in the rail*, not as a fixed slide-over — so it must not count
+  // toward the fixed right-panel column (else it double-mounts / reserves margin).
+  const railDocked = dockRail && !isMobile && !!railContent
+  const detailInFixed = panelOpen && !railDocked
+  // Whether the fixed right panel column is visible (fixed detail or chat)
+  const rightPanelVisible = detailInFixed || chatOpen
+  const bothPanelsActive = detailInFixed && chatOpen
   // Wide screen: show both panels side-by-side. Narrow: tabbed in single column.
   const useThreePanelLayout = isWideScreen && bothPanelsActive
   // Show tabs only when both are active AND screen is too narrow for side-by-side
@@ -240,6 +253,8 @@ export function AppShell({
         `}
         style={isMobile
           ? { paddingBottom: 'calc(2.75rem + env(safe-area-inset-bottom, 0px))' }
+          : railDocked
+          ? {} // rail is an in-flow flex sibling; no margin reservation needed
           : {
               marginRight: useThreePanelLayout && focusModeOpen ? '1140px'  // 380 + 380 + 380
                 : useThreePanelLayout ? '760px'                             // 380 + 380
@@ -355,6 +370,17 @@ export function AppShell({
           {children}
         </AppShellChromeContext.Provider>
       </main>
+
+      {/* Docked right rail (desktop) — persistent column that shows the selected
+          item's detail, or the resting rail content (Day-at-a-glance) when nothing
+          is selected. The takeover: panel replaces railContent in the same column. */}
+      {railDocked && (
+        <aside className="flex flex-col w-[360px] shrink-0 border-l border-neutral-200/60 bg-bg-base">
+          <div className="flex-1 min-h-0 overflow-hidden">
+            {panelOpen ? panel : railContent}
+          </div>
+        </aside>
+      )}
 
       {/* Quick Capture - FAB shown on all pages when panel is closed (except agent view which has its own input) */}
       {onQuickAdd && activeView !== 'agent' && (
@@ -516,8 +542,9 @@ export function AppShell({
             </div>
           )}
 
-          {/* Panel content — detail or chat, flex child fills remaining aside height */}
-          {((!showPanelTabs && panelOpen) || (showPanelTabs && activePanelTab === 'details')) && panelOpen && (
+          {/* Panel content — detail or chat, flex child fills remaining aside height.
+              Gated on detailInFixed so a docked rail doesn't double-mount the panel. */}
+          {((!showPanelTabs && detailInFixed) || (showPanelTabs && activePanelTab === 'details')) && detailInFixed && (
             <div className="flex-1 min-h-0 overflow-hidden">
               {panel}
             </div>

@@ -31,6 +31,7 @@ import { convertTaskToProject } from '@/lib/convertTaskToProject'
 import { DomainPageOutline } from '@/components/domain/DomainPageOutline'
 import { ViewRouter } from '@/components/layout/ViewRouter'
 import { AppShell, type PanelTab } from '@/components/layout/AppShell'
+import { DayGlancePane } from '@/components/schedule/DayGlancePane'
 import { useFocusMode } from '@/hooks/useFocusMode'
 import { SearchModal } from '@/components/search/SearchModal'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
@@ -1397,6 +1398,10 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
       panelOpen={selectedItemId !== null || recipeUrl !== null}
       onDismissPanel={handleDismissPanel}
+      dockRail={activeView === 'today'}
+      railContent={activeView === 'today'
+        ? <DayGlancePane viewedDate={viewedDate} tasks={tasks} events={events} familyMembers={familyMembers} />
+        : undefined}
       focusModeOpen={focusMode.isOpen}
       userEmail={user.email ?? undefined}
       userName={getCurrentUserMember()?.name}
