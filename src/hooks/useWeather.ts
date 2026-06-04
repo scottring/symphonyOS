@@ -69,16 +69,38 @@ function getCoordinatesFromBrowser(): Promise<{ lat: number; lng: number }> {
 
 const SUPABASE_URL = 'https://mwadppyrqzuzgstmwpuy.supabase.co'
 
-async function fetchWeatherData(lat: number, lng: number): Promise<WeatherData> {
-  // Proxy through Supabase edge function — kiosk browser blocks direct open-meteo calls
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/fetch-weather`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ lat, lng }),
-  })
-  if (!res.ok) throw new Error(`Weather proxy ${res.status}`)
+// Raw Open-Meteo forecast. Primary path is the Supabase proxy (the kiosk browser
+// blocks direct open-meteo calls); if the proxy fails — e.g. the edge function's
+// outbound TLS to open-meteo is down — fall back to calling open-meteo directly,
+// which works in a normal browser. Both return identical Open-Meteo JSON.
+async function fetchOpenMeteo(lat: number, lng: number) {
+  const params =
+    `latitude=${lat}&longitude=${lng}` +
+    `&current=temperature_2m,weather_code&hourly=temperature_2m,weather_code` +
+    `&daily=temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit` +
+    `&timezone=auto&forecast_hours=8&forecast_days=1`
 
-  const data = await res.json()
+  // 1) Supabase proxy
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/fetch-weather`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat, lng }),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      if (data && !data.error && data.current) return data
+    }
+  } catch { /* proxy unreachable — fall back to direct */ }
+
+  // 2) Direct open-meteo (normal browsers; proxy covers the kiosk)
+  const direct = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`)
+  if (!direct.ok) throw new Error(`open-meteo ${direct.status}`)
+  return direct.json()
+}
+
+async function fetchWeatherData(lat: number, lng: number): Promise<WeatherData> {
+  const data = await fetchOpenMeteo(lat, lng)
   const currentHour = new Date().getHours()
   const hourlyForecast = (data.hourly?.time || [])
     .map((t: string, i: number) => ({
