@@ -90,6 +90,7 @@ interface AppShellProps {
   onChatSourceClick?: (noteId: string) => void
   onChatSaveToVault?: (title: string, content: string) => Promise<boolean>
   onChatAddTask?: (title: string, destination: 'inbox' | 'today') => void
+  chatToolActivity?: string[]
   // Chat history
   chatSessions?: ChatSession[]
   chatSessionsLoading?: boolean
@@ -144,6 +145,7 @@ export function AppShell({
   onChatSourceClick,
   onChatSaveToVault,
   onChatAddTask,
+  chatToolActivity,
   chatSessions = [],
   chatSessionsLoading = false,
   onChatLoadSession,
@@ -411,6 +413,7 @@ export function AppShell({
                 onSourceClick={onChatSourceClick}
                 onSaveToVault={onChatSaveToVault}
                 onAddTask={onChatAddTask}
+                toolActivity={chatToolActivity}
                 sessions={chatSessions}
                 sessionsLoading={chatSessionsLoading}
                 onLoadSession={onChatLoadSession}
@@ -462,6 +465,7 @@ export function AppShell({
                 onSourceClick={onChatSourceClick}
                 onSaveToVault={onChatSaveToVault}
                 onAddTask={onChatAddTask}
+                toolActivity={chatToolActivity}
                 sessions={chatSessions}
                 sessionsLoading={chatSessionsLoading}
                 onLoadSession={onChatLoadSession}
@@ -537,6 +541,7 @@ export function AppShell({
                 onSourceClick={onChatSourceClick}
                 onSaveToVault={onChatSaveToVault}
                 onAddTask={onChatAddTask}
+                toolActivity={chatToolActivity}
                 sessions={chatSessions}
                 sessionsLoading={chatSessionsLoading}
                 onLoadSession={onChatLoadSession}
