@@ -15,7 +15,8 @@ export interface ClarityIndicatorProps {
   onClearAssigneeFilter?: () => void
   onOpenProject?: (projectId: string) => void
   onAssignTaskAll?: (taskId: string, memberIds: string[]) => void
-  trigger: React.ReactNode
+  /** Optional custom trigger; when omitted, a built-in ring + status label is rendered. */
+  trigger?: React.ReactNode
 }
 
 export function ClarityIndicator({

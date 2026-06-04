@@ -16,4 +16,14 @@ describe('ClarityIndicator', () => {
     await user.click(screen.getByText('Clarity Good'))
     expect(screen.getByTestId('clarity-popover')).toBeInTheDocument()
   })
+  it('renders a built-in ring trigger when none is provided, and it opens the popover', async () => {
+    // Built-in trigger only renders when there are tasks (guard: no tasks + no trigger → null).
+    const task = { id: 't1', title: 'A', completed: false, bucket: 'inbox', createdAt: new Date() } as unknown as (typeof baseProps)['tasks'][number]
+    const { trigger: _omit, ...rest } = baseProps
+    const { user } = render(<ClarityIndicator {...rest} tasks={[task]} />)
+    const builtIn = screen.getByText('Clarity')
+    expect(builtIn).toBeInTheDocument()
+    await user.click(builtIn)
+    expect(screen.getByTestId('clarity-popover')).toBeInTheDocument()
+  })
 })

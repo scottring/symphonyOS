@@ -35,6 +35,7 @@ import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { TodayAddInput } from './TodayAddInput'
 import { TimelineInsertPoint } from './TimelineInsertPoint'
 import { StatsRow } from './StatsRow'
+import { ClarityIndicator } from './ClarityIndicator'
 import { StagingFloat } from './StagingFloat'
 import { WeatherChip } from './WeatherChip'
 import { EveningMealCard } from './EveningMealCard'
@@ -302,6 +303,21 @@ export function TodayView({
     </button>
   ) : undefined
 
+  // ── Clarity ring + remediation popover for StatsRow ───────────────────────────
+  // Interactive Clarity readout restored to the Today header (a static glance also
+  // lives in the sidebar). Uses ClarityIndicator's built-in ring trigger.
+  const clarityTrigger = (
+    <ClarityIndicator
+      tasks={tasks}
+      projects={projects}
+      familyMembers={familyMembers}
+      onScrollToInbox={() => navigate('/inbox')}
+      onClearAssigneeFilter={onSelectAssignees ? () => onSelectAssignees([]) : undefined}
+      onOpenProject={ctx.onOpenProject}
+      onAssignTaskAll={onAssignTaskAll}
+    />
+  )
+
   // ── Tasks map for parent task lookup ─────────────────────────────────────────
   const tasksMap = useMemo(() => {
     const map = new Map<string, Task>()
@@ -369,6 +385,7 @@ export function TodayView({
           total={tasks.filter((t) => !t.completed).length}
           aiAvailable={false}
           weekTrigger={weekTrigger}
+          clarityTrigger={clarityTrigger}
           discussionTrigger={discussion.length > 0 ? <DiscussionBadge items={discussion} onSelectItem={onSelectItem} /> : undefined}
           emailTrigger={emailNudge}
           weatherTrigger={<WeatherChip />}

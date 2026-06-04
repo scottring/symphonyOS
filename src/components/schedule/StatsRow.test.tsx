@@ -22,4 +22,10 @@ describe('StatsRow', () => {
     render(<StatsRow dueToday={4} doneToday={1} thisWeek={2} />)
     expect(screen.getByText('1 of 4 done today')).toBeInTheDocument()
   })
+  it('renders the clarityTrigger when provided', () => {
+    render(
+      <StatsRow dueToday={1} doneToday={0} thisWeek={1} clarityTrigger={<span>Clarity Good</span>} />,
+    )
+    expect(screen.getByText('Clarity Good')).toBeInTheDocument()
+  })
 })
