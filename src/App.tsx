@@ -1669,6 +1669,8 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
               onContextChange={(ctx) => updateRoutine(selectedItem.originalRoutine!.id, { context: ctx ?? null })}
               onVisibilityChange={(v) => updateRoutine(selectedItem.originalRoutine!.id, { visibility: v })}
               onAssignChange={(ids) => updateRoutine(selectedItem.originalRoutine!.id, { assigned_to_all: ids })}
+              onNameChange={(name) => updateRoutine(selectedItem.originalRoutine!.id, { name })}
+              onScheduleChange={(pattern, timeOfDay) => updateRoutine(selectedItem.originalRoutine!.id, { recurrence_pattern: pattern, time_of_day: timeOfDay })}
             />
           ) : null
         ) : null

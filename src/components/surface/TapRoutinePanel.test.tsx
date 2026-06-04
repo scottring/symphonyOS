@@ -49,6 +49,34 @@ describe('TapRoutinePanel', () => {
     expect(screen.getByText('5-day streak')).toBeInTheDocument()
   })
 
+  it('renames the routine via the editable title', () => {
+    const onNameChange = vi.fn()
+    render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={vi.fn()} onNameChange={onNameChange} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Trash night' }))
+    const input = screen.getByDisplayValue('Trash night')
+    fireEvent.change(input, { target: { value: 'Recycling night' } })
+    fireEvent.blur(input)
+    expect(onNameChange).toHaveBeenCalledWith('Recycling night')
+  })
+
+  it('edits the schedule: frequency, weekday, and shows the time', () => {
+    const onScheduleChange = vi.fn()
+    render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={vi.fn()} onScheduleChange={onScheduleChange} />)
+    // Weekly → switch to Daily (keeps the time)
+    fireEvent.click(screen.getByRole('button', { name: 'Daily' }))
+    expect(onScheduleChange).toHaveBeenCalledWith({ type: 'daily' }, '20:00:00')
+    // Toggle Wednesday on (was just Tuesday)
+    fireEvent.click(screen.getByRole('button', { name: 'wed' }))
+    expect(onScheduleChange).toHaveBeenCalledWith({ type: 'weekly', days: ['tue', 'wed'] }, '20:00:00')
+    // Time input reflects 20:00
+    expect(screen.getByDisplayValue('20:00')).toBeInTheDocument()
+  })
+
+  it('does not render the schedule editor without onScheduleChange', () => {
+    render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: 'Daily' })).not.toBeInTheDocument()
+  })
+
   it('renders the assignee picker when members + onAssignChange are provided', () => {
     render(
       <TapRoutinePanel
