@@ -3,7 +3,6 @@ import { CalendarClock, Moon, Sparkles, Check } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { FamilyMember } from '@/types/family'
-import { WeatherChip } from './WeatherChip'
 
 export interface DayGlancePaneProps {
   viewedDate: Date
@@ -75,15 +74,9 @@ export function DayGlancePane({ viewedDate, tasks, events, familyMembers }: DayG
   )
 
   return (
-    <div className="h-full overflow-y-auto px-5 pt-8 pb-5 bg-bg-base">
-      {/* Persistent header — survives the takeover (date + weather) */}
-      <div className="flex items-center justify-between gap-2 pb-4 mb-1 border-b border-neutral-200/60">
-        <p className="font-display text-base text-neutral-800 leading-tight">
-          {viewedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-        </p>
-        <WeatherChip />
-      </div>
-
+    // Date lives in the main header and weather in the sidebar, so the rail
+    // skips both and goes straight to what isn't shown elsewhere.
+    <div className="h-full overflow-y-auto px-5 pt-8 pb-5 bg-bg-base space-y-6">
       {/* Next event */}
       <Section label="Next event">
         {nextEvent ? (
@@ -131,7 +124,7 @@ export function DayGlancePane({ viewedDate, tasks, events, familyMembers }: DayG
       </Section>
 
       {/* Assistant — stubbed; wired to the proactive assistant in a later pass */}
-      <div className="mt-6 pt-4 border-t border-neutral-200/60">
+      <div className="pt-4 border-t border-neutral-200/60">
         <div className="flex items-center gap-2 mb-2">
           <Sparkles className="w-4 h-4 text-primary-400" />
           <span className="text-[11px] font-medium text-neutral-400 uppercase tracking-wider">Assistant</span>
@@ -146,7 +139,7 @@ export function DayGlancePane({ viewedDate, tasks, events, familyMembers }: DayG
 
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="mt-5">
+    <div>
       <p className="text-[11px] font-medium text-neutral-400 uppercase tracking-wider mb-2">{label}</p>
       {children}
     </div>
