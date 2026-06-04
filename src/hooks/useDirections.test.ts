@@ -37,3 +37,27 @@ describe('useDirections.searchPlaces (REST transport)', () => {
     expect(placesAutocomplete).not.toHaveBeenCalled()
   })
 })
+
+describe('useDirections.buildMapsUrl origin handling', () => {
+  const ctx = (originAddress: string) => ({
+    origin: { id: 'origin', name: 'Home', address: originAddress, order: 0 },
+    destination: { id: 'destination', name: 'Dest', address: '3806 Tudor Arms Ave, Baltimore, MD', order: 999 },
+    stops: [],
+    travelMode: 'driving' as const,
+  })
+
+  it('includes origin when a real starting address is set', () => {
+    const { result } = renderHook(() => useDirections())
+    const url = result.current.buildMapsUrl(ctx('123 Real St, Town, ST'))
+    expect(url).toContain('origin=123%20Real%20St')
+    expect(url).toContain('destination=3806%20Tudor%20Arms')
+  })
+
+  it('omits origin for the placeholder so Maps uses current location', () => {
+    const { result } = renderHook(() => useDirections())
+    const url = result.current.buildMapsUrl(ctx('Tap to set your starting address'))
+    expect(url).not.toContain('origin=')
+    expect(url).toContain('destination=3806%20Tudor%20Arms')
+    expect(url).toContain('travelmode=driving')
+  })
+})

@@ -406,7 +406,7 @@ export function DirectionsBuilder({
             Calculating route...
           </div>
         ) : error ? (
-          error.includes('home address') ? (
+          error.includes('starting address') ? (
             <button
               onClick={() => setShowOriginPicker(true)}
               className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700"

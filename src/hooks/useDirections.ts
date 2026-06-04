@@ -25,6 +25,20 @@ interface UseDirectionsResult {
   buildMapsUrl: (context: DirectionsContext) => string
 }
 
+// Placeholder origin labels that are NOT real starting points. When the origin
+// matches one of these we treat it as "no origin set": the route preview is
+// skipped and the Maps URL omits origin so Google Maps falls back to the
+// device's current location.
+const ORIGIN_PLACEHOLDERS = new Set([
+  'Tap to set your starting address',
+  'Tap to set your home address', // legacy default
+  'Your current location',
+])
+
+export function hasUsableOrigin(address: string | undefined | null): boolean {
+  return !!address && address.trim().length > 0 && !ORIGIN_PLACEHOLDERS.has(address.trim())
+}
+
 /**
  * Hook for Google Maps/Directions integration
  * Updated to use Places API (New) - December 2024
@@ -94,13 +108,10 @@ export function useDirections(): UseDirectionsResult {
     setError(null)
 
     try {
-      // Check if origin has a valid address (not the default placeholder)
-      const hasValidOrigin = context.origin.address &&
-        context.origin.address !== 'Tap to set your home address' &&
-        context.origin.address !== 'Your current location'
-
-      if (!hasValidOrigin) {
-        // No valid origin set - show helpful message
+      // Check if origin has a real address (not a placeholder label).
+      if (!hasUsableOrigin(context.origin.address)) {
+        // No starting point set - show helpful message (the Maps handoff still
+        // works without one; Google Maps uses the device's current location).
         setError('Set your starting address to see estimated travel time')
         setResult(null)
         return null
@@ -295,7 +306,6 @@ export function useDirections(): UseDirectionsResult {
   // user on a blank leftover tab when they come back. A real anchor lets the OS
   // hand the universal link to Maps and return cleanly to Symphony.
   const buildMapsUrl = useCallback((context: DirectionsContext): string => {
-    const origin = encodeURIComponent(context.origin.address)
     const destination = encodeURIComponent(context.destination.address)
 
     // Build waypoints for multi-stop routes
@@ -305,7 +315,12 @@ export function useDirections(): UseDirectionsResult {
       .join('|')
 
     let url = `https://www.google.com/maps/dir/?api=1`
-    url += `&origin=${origin}`
+    // Only pin an origin when there's a real starting point. Without one, Google
+    // Maps uses the device's current location — far better than routing from the
+    // literal placeholder text.
+    if (hasUsableOrigin(context.origin.address)) {
+      url += `&origin=${encodeURIComponent(context.origin.address)}`
+    }
     url += `&destination=${destination}`
 
     if (waypoints) {
