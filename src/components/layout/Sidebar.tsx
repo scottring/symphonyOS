@@ -9,8 +9,6 @@ import { useSidebarGroupState } from '@/hooks/useSidebarGroupState'
 import { useHomes } from '@/hooks/useHomes'
 import { useSpaces } from '@/hooks/useSpaces'
 import { useLists } from '@/hooks/useLists'
-import { useSystemHealth } from '@/hooks/useSystemHealth'
-import { SidebarClarity } from './SidebarClarity'
 import { WeatherChip } from '@/components/schedule/WeatherChip'
 import type { PinnedItem } from '@/types/pin'
 import type { PinnableEntityType } from '@/types/pin'
@@ -139,12 +137,6 @@ export function Sidebar({
   const firstName = (userName || userEmail || '').split(/[\s@]/)[0] || 'there'
   const greetingWord = getGreetingWord()
 
-  const health = useSystemHealth({
-    tasks: entities?.tasks ?? [],
-    projects: entities?.projects ?? [],
-    projectsWithLinkedEvents: new Set(),
-  })
-
   // Nav item helper
   function navItemClass(active: boolean): string {
     return `w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-[15px] ${
@@ -219,8 +211,6 @@ export function Sidebar({
           <WeatherChip />
         </div>
       )}
-
-      {!collapsed && <SidebarClarity healthColor={health.healthColor} />}
 
       {/* Search row. Chat + Wall icons removed in Phase 1 (sidebar restraint);
           chat has its own surfaces and Wall is a rarely-used cross-tab action. */}
