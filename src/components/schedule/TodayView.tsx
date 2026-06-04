@@ -294,10 +294,10 @@ export function TodayView({
     <button
       type="button"
       onClick={() => navigate('/inbox')}
-      className="inline-flex items-center gap-1.5 text-[13px] text-neutral-500 hover:text-neutral-700 transition-colors"
+      className="inline-flex items-center gap-1.5 text-[15px] text-neutral-600 hover:text-neutral-700 transition-colors"
       aria-label={`${activeEmailCount} email action${activeEmailCount !== 1 ? 's' : ''} in Inbox`}
     >
-      <Mail className="w-4 h-4 text-blue-400" />
+      <Mail className="w-5 h-5 text-blue-500" />
       {activeEmailCount} from email
     </button>
   ) : undefined
@@ -318,7 +318,7 @@ export function TodayView({
       trigger={
         <span className="group relative inline-flex items-center">
           <Binoculars
-            className="w-4 h-4 text-neutral-400 group-hover:text-neutral-700 transition-colors"
+            className="w-5 h-5 text-neutral-500 group-hover:text-neutral-700 transition-colors"
             aria-label="Clarity — review what needs attention"
           />
           <span

@@ -22,10 +22,10 @@ export function DiscussionBadge({ items, onSelectItem }: DiscussionBadgeProps) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1.5 text-[13px] text-neutral-500 hover:text-neutral-700 transition-colors"
+        className="inline-flex items-center gap-1.5 text-[15px] text-neutral-600 hover:text-neutral-700 transition-colors"
         aria-label={`${items.length} to discuss`}
       >
-        <MessageSquare className="w-4 h-4 text-amber-500" />
+        <MessageSquare className="w-5 h-5 text-amber-500" />
         {items.length} to discuss
       </button>
 
