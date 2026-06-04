@@ -418,9 +418,9 @@ export function TodayView({
                 onClick={toggleHideRoutines}
                 title={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
                 aria-label={hideRoutines ? 'Show daily' : 'Hide daily'}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm transition-all ${hideRoutines ? 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100' : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100'}`}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[15px] transition-all ${hideRoutines ? 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100' : 'text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100'}`}
               >
-                {createElement(hideRoutines ? EyeOff : Eye, { className: 'w-4 h-4' })}
+                {createElement(hideRoutines ? EyeOff : Eye, { className: 'w-5 h-5' })}
                 <span>{hideRoutines ? 'Show daily' : 'Hide daily'}</span>
               </button>
               {data.isToday && ctx.onOpenPlanning && (
@@ -429,9 +429,9 @@ export function TodayView({
                   onClick={ctx.onOpenPlanning}
                   title="Plan day — drag unscheduled tasks and routines onto the timeline"
                   aria-label="Plan day"
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm text-primary-600 hover:bg-primary-50 transition-all"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[15px] text-primary-600 hover:bg-primary-50 transition-all"
                 >
-                  <CalendarClock className="w-4 h-4" />
+                  <CalendarClock className="w-5 h-5" />
                   <span>Plan day</span>
                 </button>
               )}

@@ -307,7 +307,7 @@ export function AssigneeFilter({
           transition-all duration-200 ease-out
           ${isFiltered
             ? 'text-neutral-800 bg-white shadow-sm'
-            : 'text-neutral-400 hover:text-neutral-600 hover:bg-white/50'
+            : 'text-neutral-600 hover:text-neutral-800 hover:bg-white/50'
           }
           ${isMultiSelect ? 'ring-2 ring-primary-200' : ''}
         `}
