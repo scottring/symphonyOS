@@ -36,6 +36,7 @@ import { TodayAddInput } from './TodayAddInput'
 import { TimelineInsertPoint } from './TimelineInsertPoint'
 import { StatsRow } from './StatsRow'
 import { ClarityIndicator } from './ClarityIndicator'
+import { useSystemHealth } from '@/hooks/useSystemHealth'
 import { StagingFloat } from './StagingFloat'
 import { EveningMealCard } from './EveningMealCard'
 import { EndOfDayCard } from './EndOfDayCard'
@@ -304,8 +305,15 @@ export function TodayView({
 
   // ── Clarity binoculars + remediation popover for StatsRow ─────────────────────
   // Interactive Clarity readout restored to the Today header (a static status
-  // glance also lives in the sidebar). Trigger is a binoculars icon with an
-  // explanatory hover tooltip; clicking opens ClarityIndicator's popover.
+  // glance also lives in the sidebar). Trigger is a binoculars icon + the score,
+  // colour-tiered (green > 95, orange middle, red lowest), with a hover tooltip;
+  // clicking opens ClarityIndicator's popover. Same inputs as ClarityIndicator
+  // so the trigger score matches the popover score.
+  const clarityHealth = useSystemHealth({ tasks, projects: projects ?? [] })
+  const clarityScoreColor =
+    clarityHealth.score > 95 ? 'text-emerald-600'
+    : clarityHealth.score >= 50 ? 'text-orange-500'
+    : 'text-red-500'
   const clarityTrigger = (
     <ClarityIndicator
       tasks={tasks}
@@ -316,11 +324,14 @@ export function TodayView({
       onOpenProject={ctx.onOpenProject}
       onAssignTaskAll={onAssignTaskAll}
       trigger={
-        <span className="group relative inline-flex items-center">
+        <span className="group relative inline-flex items-center gap-1.5">
           <Binoculars
             className="w-5 h-5 text-neutral-500 group-hover:text-neutral-700 transition-colors"
             aria-label="Clarity — review what needs attention"
           />
+          <span className={`tabular-nums text-[15px] font-semibold ${clarityScoreColor}`}>
+            {clarityHealth.score}
+          </span>
           <span
             role="tooltip"
             className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 hidden group-hover:block w-56 rounded-lg bg-neutral-800 px-3 py-2 text-[11px] leading-snug text-white shadow-lg"
