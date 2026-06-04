@@ -57,15 +57,16 @@ describe('TodayView', () => {
   it('renders the stats row (HomeHeader date label is now in HomeView, not TodayView)', () => {
     // The date label (e.g. "Tuesday, May 19, 2026") moved to HomeHeader which is
     // rendered by HomeView — it is not in TodayView's subtree. TodayView's own
-    // stable landmark is the StatsRow ("N of N done today").
+    // stable landmark is the StatsRow "tasks remaining today" control (the
+    // "N of N done today" text became a checklist icon + count with a tooltip).
     renderView()
-    expect(screen.getByText(/\d+ of \d+ done today/i)).toBeInTheDocument()
+    expect(screen.getByTitle(/remaining today/i)).toBeInTheDocument()
   })
   it('renders exactly one stats row (regression guard vs the duplicate-row defect)', () => {
-    // "tasks total" was removed by the Today redesign; use "done today" — always
-    // rendered by StatsRow and unique to it — as the duplicate-row sentinel.
+    // Use the "remaining today" control — always rendered by StatsRow and unique
+    // to it — as the duplicate-row sentinel.
     renderView()
-    expect(screen.getAllByText(/\d+ of \d+ done today/i)).toHaveLength(1)
+    expect(screen.getAllByTitle(/remaining today/i)).toHaveLength(1)
   })
   it('shows the empty state when there are no items', () => {
     renderView()
@@ -235,10 +236,11 @@ describe('TodayView', () => {
     expect(screen.getByText(/to discuss/i)).toBeInTheDocument()
   })
 
-  it('does not render Clarity in the content stats row (moved to sidebar)', () => {
+  it('renders the Clarity binoculars in the content stats row', () => {
+    // Clarity was restored to the Today header as a binoculars icon with an
+    // explanatory hover tooltip; the static status glance still lives in the sidebar.
     renderView()
-    expect(screen.queryByText('Clarity')).not.toBeInTheDocument()
-    expect(screen.getByText(/done today/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/clarity/i)).toBeInTheDocument()
   })
 
   it('renders the Morning section header on mobile in italic serif', () => {

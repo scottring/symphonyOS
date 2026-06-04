@@ -1,5 +1,5 @@
 // src/components/schedule/StatsRow.tsx
-import { CheckCircle2 } from 'lucide-react'
+import { ListChecks } from 'lucide-react'
 
 interface StatsRowProps {
   dueToday: number
@@ -22,12 +22,16 @@ interface StatsRowProps {
 }
 
 export function StatsRow({ dueToday, doneToday, weekTrigger, thisWeek, clarityTrigger, discussionTrigger, weatherTrigger, emailTrigger, endControls }: StatsRowProps) {
+  const remainingToday = Math.max(0, dueToday - doneToday)
   return (
     <div className="flex items-center flex-wrap gap-x-5 gap-y-2 text-[13px] text-neutral-500">
-      {/* Done today — desktop only, demoted */}
-      <span className="hidden md:inline-flex items-center gap-1.5 text-[12px] text-neutral-400">
-        <CheckCircle2 className="w-3.5 h-3.5 text-neutral-300" />
-        {doneToday} of {dueToday} done today
+      {/* Tasks remaining today — checklist icon + count (desktop only, demoted) */}
+      <span
+        className="hidden md:inline-flex items-center gap-1.5 text-[12px] text-neutral-400"
+        title={`${remainingToday} task${remainingToday === 1 ? '' : 's'} remaining today (${doneToday} of ${dueToday} done)`}
+      >
+        <ListChecks className="w-3.5 h-3.5 text-neutral-300" />
+        <span className="tabular-nums">{remainingToday}</span>
       </span>
 
       {/* This week — desktop only, demoted */}

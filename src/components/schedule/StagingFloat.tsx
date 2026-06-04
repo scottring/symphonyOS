@@ -317,9 +317,9 @@ export function StagingFloat({
         onClick={() => setOpen((v) => !v)}
         className={triggerClass}
         aria-label="This week"
+        title="This week"
       >
         <CalendarRange className="w-3.5 h-3.5" />
-        <span>This week</span>
         <span className="font-semibold tabular-nums">{weekTasks.length}</span>
       </button>
 

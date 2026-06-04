@@ -28,7 +28,7 @@ import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 import { computeAnchorTime } from '@/lib/timelineAnchor'
 
-import { Eye, EyeOff, Repeat, CalendarClock, Mail } from 'lucide-react'
+import { Eye, EyeOff, Repeat, CalendarClock, Mail, Binoculars } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
@@ -37,7 +37,6 @@ import { TimelineInsertPoint } from './TimelineInsertPoint'
 import { StatsRow } from './StatsRow'
 import { ClarityIndicator } from './ClarityIndicator'
 import { StagingFloat } from './StagingFloat'
-import { WeatherChip } from './WeatherChip'
 import { EveningMealCard } from './EveningMealCard'
 import { EndOfDayCard } from './EndOfDayCard'
 import { ScheduleItem } from './ScheduleItem'
@@ -303,9 +302,10 @@ export function TodayView({
     </button>
   ) : undefined
 
-  // ── Clarity ring + remediation popover for StatsRow ───────────────────────────
-  // Interactive Clarity readout restored to the Today header (a static glance also
-  // lives in the sidebar). Uses ClarityIndicator's built-in ring trigger.
+  // ── Clarity binoculars + remediation popover for StatsRow ─────────────────────
+  // Interactive Clarity readout restored to the Today header (a static status
+  // glance also lives in the sidebar). Trigger is a binoculars icon with an
+  // explanatory hover tooltip; clicking opens ClarityIndicator's popover.
   const clarityTrigger = (
     <ClarityIndicator
       tasks={tasks}
@@ -315,6 +315,21 @@ export function TodayView({
       onClearAssigneeFilter={onSelectAssignees ? () => onSelectAssignees([]) : undefined}
       onOpenProject={ctx.onOpenProject}
       onAssignTaskAll={onAssignTaskAll}
+      trigger={
+        <span className="group relative inline-flex items-center">
+          <Binoculars
+            className="w-4 h-4 text-neutral-400 group-hover:text-neutral-700 transition-colors"
+            aria-label="Clarity — review what needs attention"
+          />
+          <span
+            role="tooltip"
+            className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 hidden group-hover:block w-56 rounded-lg bg-neutral-800 px-3 py-2 text-[11px] leading-snug text-white shadow-lg"
+          >
+            <span className="font-medium">Clarity</span> — a quick read on how settled your
+            tasks and projects are. Click to see what still needs a home.
+          </span>
+        </span>
+      }
     />
   )
 
@@ -388,7 +403,6 @@ export function TodayView({
           clarityTrigger={clarityTrigger}
           discussionTrigger={discussion.length > 0 ? <DiscussionBadge items={discussion} onSelectItem={onSelectItem} /> : undefined}
           emailTrigger={emailNudge}
-          weatherTrigger={<WeatherChip />}
           endControls={
             <>
               {onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
