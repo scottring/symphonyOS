@@ -75,7 +75,7 @@ export function DayGlancePane({ viewedDate, tasks, events, familyMembers }: DayG
   )
 
   return (
-    <div className="h-full overflow-y-auto px-5 py-5 bg-bg-base">
+    <div className="h-full overflow-y-auto px-5 pt-8 pb-5 bg-bg-base">
       {/* Persistent header — survives the takeover (date + weather) */}
       <div className="flex items-center justify-between gap-2 pb-4 mb-1 border-b border-neutral-200/60">
         <p className="font-display text-base text-neutral-800 leading-tight">

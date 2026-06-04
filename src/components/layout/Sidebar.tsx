@@ -156,7 +156,7 @@ export function Sidebar({
       `}
     >
       {/* Header: logo + name */}
-      <div className="p-5 flex items-center justify-between">
+      <div className="px-5 pt-8 pb-3 flex items-center justify-between">
         <div className={`flex items-center gap-2 ${collapsed ? 'justify-center w-full' : ''}`}>
           <img src="/symphony-logo.jpg" alt="Symphony" className="w-7 h-7 rounded-full object-cover shrink-0" />
           {!collapsed && (
