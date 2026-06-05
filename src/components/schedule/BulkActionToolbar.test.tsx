@@ -43,4 +43,16 @@ describe('BulkActionToolbar — Group action', () => {
     expect(onGroup).toHaveBeenCalledTimes(1)
     expect(onGroup).toHaveBeenCalledWith('Sat AM errands', expect.any(Date), true)
   })
+
+  it('submits the group when Enter is pressed in the name input', () => {
+    const onGroup = vi.fn()
+    render(<BulkActionToolbar {...baseProps} onGroup={onGroup} />)
+    fireEvent.click(screen.getByRole('button', { name: /^group$/i }))
+    const input = screen.getByPlaceholderText(/name this group/i)
+    fireEvent.change(input, { target: { value: 'Morning run' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(onGroup).toHaveBeenCalledTimes(1)
+    expect(onGroup).toHaveBeenCalledWith('Morning run', expect.any(Date), true)
+  })
 })
