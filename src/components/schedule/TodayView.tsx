@@ -574,6 +574,31 @@ export function TodayView({
                       const parentTaskName = parentTaskId ? tasksMap.get(parentTaskId)?.title : undefined
                       const isFirstItem = item.id === firstSectionItemId
 
+                      // ── Group cards ──────────────────────────────────────
+                      // A parent task and its adjacent subtask rows (grouping.ts
+                      // places children directly after their parent within a
+                      // section) render inside one enclosed, tinted card. Roles
+                      // are derived purely from adjacency, so a parent whose
+                      // children live in another section gets no card.
+                      const prevItem = itemIndex > 0 ? items[itemIndex - 1] : null
+                      const nextItem = itemIndex < items.length - 1 ? items[itemIndex + 1] : null
+                      const isGroupParent = !!taskId && !!nextItem && !!nextItem.isSubtask && nextItem.parentTaskId === taskId
+                      const isGroupChild = !!item.isSubtask && !!prevItem &&
+                        (prevItem.id === `task-${item.parentTaskId}` ||
+                          (!!prevItem.isSubtask && prevItem.parentTaskId === item.parentTaskId))
+                      const isLastGroupChild = isGroupChild &&
+                        (!nextItem || !(nextItem.isSubtask && nextItem.parentTaskId === item.parentTaskId))
+                      const groupCardClass = isGroupParent
+                        ? 'rounded-t-2xl border border-b-0 border-primary-200/70 bg-primary-50/30 pt-0.5'
+                        : isLastGroupChild
+                          ? 'border-x border-b border-primary-200/70 bg-primary-50/30 rounded-b-2xl pb-1 pl-4'
+                          : isGroupChild
+                            ? 'border-x border-primary-200/70 bg-primary-50/30 pl-4'
+                            : ''
+                      // Don't offer an insert point between a parent and its
+                      // children — a task added there wouldn't be in the group.
+                      const showInsert = !isGroupChild
+
                       // Insert point before this item (rendered unconditionally when totalItems>0)
                       const prevItemForInsert = itemIndex > 0 ? items[itemIndex - 1] : null
                       const insertCtxBefore = {
@@ -632,7 +657,7 @@ export function TodayView({
                         const servesCount = coreMembers.length > 0 ? coreMembers.length : undefined
                         return (
                           <div key={item.id}>
-                            {insertBefore}
+                            {showInsert && insertBefore}
                             <div {...(isFirstItem ? { 'data-today-first': '' } : {})}>
                               <EveningMealCard
                                 title={parsed.title}
@@ -651,9 +676,9 @@ export function TodayView({
 
                       // Standard schedule item — mirror TodaySchedule wiring
                       return (
-                        <div key={item.id}>
-                        {insertBefore}
-                        <div data-item-id={item.id} {...(isFirstItem ? { 'data-today-first': '' } : {})}>
+                        <div key={item.id} className={isGroupChild ? '-mt-1' : undefined}>
+                        {showInsert && insertBefore}
+                        <div data-item-id={item.id} className={groupCardClass || undefined} {...(isFirstItem ? { 'data-today-first': '' } : {})}>
                         <ScheduleItem
                           item={item}
                           selected={selectedItemId === item.id}
