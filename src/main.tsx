@@ -82,25 +82,34 @@ import { JoinHousehold } from './components/JoinHousehold'
 import { GoogleCalendarProvider } from './hooks/useGoogleCalendar'
 import { DomainProvider } from './hooks/useDomain'
 import { Shell } from './shell/Shell'
+import { AuthGate } from './components/auth/AuthGate'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { OnboardingFlow, SamplePlanPage } from './components/lazy'
 import { LoadingFallback } from './components/layout/LoadingFallback'
 
 // P5 cutover (gated). /, /today, /inbox, /task/:id route to the new Shell-mounted
-// TasksApp when the flag is enabled. Default OFF — legacy App.tsx still owns
-// auth gating + onboarding redirect for those routes. Flipping default-ON in
-// P5.8.1 surfaced an unfinished piece: Shell does not yet host the auth gate,
-// so the auth-form e2e specs at `/` regressed (e2e/app.spec.ts). Restored to
-// default-OFF and tracked in tasks/lift-auth-gate-into-shell.md. Flip locally
-// for parallel-path testing:
+// TasksApp when the flag is enabled, otherwise to legacy App.tsx. Both paths now
+// share the same auth + onboarding gate (AuthGate): App wraps itself in it, and
+// the Shell mounts here are wrapped via `tasksElement`. This is what unblocks
+// flipping the flag default-ON — previously the Shell rendered ungated and the
+// auth-form e2e specs at `/` regressed (e2e/app.spec.ts). Flip locally for
+// parallel-path testing:
 //   localStorage.setItem('symphony.useNewTasks', '1'); location.reload()  // shell-mounted
 //   localStorage.removeItem('symphony.useNewTasks'); location.reload()    // back to legacy (default)
 //
 // /tasks-new/* always routes to Shell regardless of the flag (planned to
-// remove together with the legacy mounts once auth is lifted).
+// remove together with the legacy mounts once the cutover completes).
 const useNewTasks =
   typeof window !== 'undefined' &&
   window.localStorage.getItem('symphony.useNewTasks') === '1'
+
+// Element for the cutover routes: gated Shell when the flag is on, else legacy
+// App (which gates itself). Reused across the four cutover routes below.
+const tasksElement = useNewTasks ? (
+  <AuthGate>{() => <Shell />}</AuthGate>
+) : (
+  <App />
+)
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -109,10 +118,10 @@ createRoot(document.getElementById('root')!).render(
         <BrowserRouter>
           <GoogleCalendarProvider>
             <Routes>
-              <Route path="/" element={useNewTasks ? <Shell /> : <App />} />
-              <Route path="/today" element={useNewTasks ? <Shell /> : <App />} />
-              <Route path="/inbox" element={useNewTasks ? <Shell /> : <App />} />
-              <Route path="/task/:taskId" element={useNewTasks ? <Shell /> : <App />} />
+              <Route path="/" element={tasksElement} />
+              <Route path="/today" element={tasksElement} />
+              <Route path="/inbox" element={tasksElement} />
+              <Route path="/task/:taskId" element={tasksElement} />
               <Route path="/goals" element={<App />} />
               <Route path="/goals/:goalId" element={<App />} />
               <Route path="/projects" element={<App />} />

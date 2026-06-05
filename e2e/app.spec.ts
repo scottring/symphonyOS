@@ -9,10 +9,21 @@ test.describe('App', () => {
 
   test('displays auth form when not logged in', async ({ page }) => {
     await page.goto('/')
-    // Should show auth form with sign in/sign up
-    await expect(page.getByText('Welcome Back')).toBeVisible()
-    await expect(page.getByPlaceholder('Email')).toBeVisible()
-    await expect(page.getByPlaceholder('Password')).toBeVisible()
+    // Should show the sign-in form (default AuthForm mode)
+    await expect(page.getByRole('button', { name: 'Sign In' })).toBeVisible()
+    await expect(page.getByPlaceholder('you@example.com')).toBeVisible()
+  })
+
+  test('displays auth form at / when the new-tasks Shell flag is on (regression)', async ({ page }) => {
+    // lift-auth-gate-into-shell: with `symphony.useNewTasks` ON and no session,
+    // the Shell-mounted route must still render the auth gate. Before the gate
+    // was lifted into the Shell, this rendered ungated and the auth form vanished.
+    await page.addInitScript(() => {
+      window.localStorage.setItem('symphony.useNewTasks', '1')
+    })
+    await page.goto('/')
+    await expect(page.getByRole('button', { name: 'Sign In' })).toBeVisible()
+    await expect(page.getByPlaceholder('you@example.com')).toBeVisible()
   })
 
   test('has sign in and sign up options', async ({ page }) => {

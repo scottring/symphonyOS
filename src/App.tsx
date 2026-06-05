@@ -1,7 +1,6 @@
-import { useEffect, useState, useMemo, useCallback, useRef, Suspense } from 'react'
-import { useNavigate, useParams, useLocation, Navigate } from 'react-router-dom'
+import { useEffect, useState, useMemo, useCallback, Suspense } from 'react'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
-import { useAuth } from '@/hooks/useAuth'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import { useEventNotes, type EventNote } from '@/hooks/useEventNotes'
 import { useContacts } from '@/hooks/useContacts'
@@ -31,6 +30,7 @@ import { convertTaskToProject } from '@/lib/convertTaskToProject'
 import { DomainPageOutline } from '@/components/domain/DomainPageOutline'
 import { ViewRouter } from '@/components/layout/ViewRouter'
 import { AppShell, type PanelTab } from '@/components/layout/AppShell'
+import { AuthGate } from '@/components/auth/AuthGate'
 import { useFocusMode } from '@/hooks/useFocusMode'
 import { SearchModal } from '@/components/search/SearchModal'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
@@ -40,7 +40,6 @@ import { InboxUndoToast } from '@/components/schedule/InboxUndoToast'
 import { type TimelineCaptureResult } from '@/components/schedule/TimelineQuickInput'
 import {
   RecipeViewer,
-  AuthForm,
   FocusMode,
 } from '@/components/lazy'
 import type { User } from '@supabase/supabase-js'
@@ -65,142 +64,21 @@ import {
   TapRoutinePanel,
 } from '@/components/surface'
 
-function PasswordResetForm({ onSubmit }: { onSubmit: (password: string) => Promise<{ error: { message: string } | null }> }) {
-  const [password, setPassword] = useState('')
-  const [confirm, setConfirm] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (password !== confirm) {
-      setError('Passwords do not match.')
-      return
-    }
-    setError(null)
-    setLoading(true)
-    const { error } = await onSubmit(password)
-    if (error) {
-      setError(error.message)
-    }
-    setLoading(false)
-  }
-
-  return (
-    <div className="min-h-screen bg-bg-base flex flex-col items-center justify-center px-6 py-12">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-2">
-            <img src="/symphony-logo.jpg" alt="Symphony Logo" className="w-12 h-12 rounded-full object-cover" />
-            <h1 className="font-display text-3xl text-neutral-900">Symphony</h1>
-          </div>
-        </div>
-        <div className="card p-8">
-          <h2 className="font-display text-xl font-medium text-neutral-800 mb-6 text-center">Set New Password</h2>
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-2">
-              <label htmlFor="new-password" className="block text-sm font-medium text-neutral-600">New Password</label>
-              <input id="new-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="input-base" placeholder="At least 6 characters" required minLength={6} />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="confirm-password" className="block text-sm font-medium text-neutral-600">Confirm Password</label>
-              <input id="confirm-password" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className="input-base" placeholder="Re-enter your password" required minLength={6} />
-            </div>
-            {error && <div className="p-3 rounded-lg text-sm bg-danger-50 text-danger-700">{error}</div>}
-            <button type="submit" disabled={loading} className="w-full btn-primary py-3 text-base font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed">
-              {loading ? 'Updating...' : 'Update Password'}
-            </button>
-          </form>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function App() {
-  const { user, loading: authLoading, signOut, isPasswordRecovery, updatePassword } = useAuth()
-
-  // Onboarding state
-  const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null)
-  const [onboardingLoading, setOnboardingLoading] = useState(true)
-  const onboardingChecked = useRef(false)
-
-  // Check onboarding status — only on initial load, not on auth token refreshes.
-  useEffect(() => {
-    if (onboardingChecked.current) return // Only check once
-    async function checkOnboarding() {
-      if (!user) {
-        setOnboardingLoading(false)
-        return
-      }
-
-      onboardingChecked.current = true
-
-      try {
-        const { data: profile, error } = await supabase
-          .from('user_profiles')
-          .select('onboarding_completed_at')
-          .eq('user_id', user.id)
-          .maybeSingle()
-
-        if (error) {
-          console.error('Error checking onboarding:', error)
-          // Assume complete on error to not block the app
-          setOnboardingComplete(true)
-        } else if (profile?.onboarding_completed_at) {
-          setOnboardingComplete(true)
-        } else {
-          setOnboardingComplete(false)
-        }
-      } catch (err) {
-        console.error('Error in checkOnboarding:', err)
-        setOnboardingComplete(true) // Fail open
-      } finally {
-        setOnboardingLoading(false)
-      }
-    }
-
-    if (!authLoading) {
-      checkOnboarding()
-    }
-  }, [user, authLoading])
-
-  if (authLoading || onboardingLoading) {
-    return (
-      <div className="min-h-screen bg-bg-base flex items-center justify-center">
-        <p className="text-neutral-500">Loading...</p>
-      </div>
-    )
-  }
-
-  if (!user) {
-    return (
-      <Suspense fallback={<LoadingFallback />}>
-        <AuthForm />
-      </Suspense>
-    )
-  }
-
-  if (isPasswordRecovery) {
-    return <PasswordResetForm onSubmit={updatePassword} />
-  }
-
-  if (onboardingComplete === false) {
-    // Onboarding lives at /onboarding as a top-level route. Redirect any
-    // App-rendered path (e.g. /, /meals/plan) there until the user finishes.
-    return <Navigate to="/onboarding" replace />
-  }
-
   return (
-    <GoalsProvider>
-      <ListsProvider>
-        <NotesProvider>
-          <GeneratePlanProvider>
-            <AppContent user={user} signOut={signOut} />
-          </GeneratePlanProvider>
-        </NotesProvider>
-      </ListsProvider>
-    </GoalsProvider>
+    <AuthGate>
+      {({ user, signOut }) => (
+        <GoalsProvider>
+          <ListsProvider>
+            <NotesProvider>
+              <GeneratePlanProvider>
+                <AppContent user={user} signOut={signOut} />
+              </GeneratePlanProvider>
+            </NotesProvider>
+          </ListsProvider>
+        </GoalsProvider>
+      )}
+    </AuthGate>
   )
 }
 
