@@ -52,6 +52,15 @@ test.describe('App', () => {
     await expect(page.getByRole('button', { name: 'Week' }).first()).toBeVisible()
   })
 
+  test('Shell Today right rail shows the Symphony assistant, not the scratchpad', async ({ page }) => {
+    // Yesterday's right-rail redesign (the fenced Symphony assistant) landed only
+    // in the legacy App; the new Shell still rendered the old scratchpad. The
+    // Shell's Today rail must now show the assistant (ChatPanel) instead.
+    await page.goto('/tasks-new/today')
+    await expect(page.getByText('Symphony AI')).toBeVisible()
+    await expect(page.getByText('Jot anything down', { exact: false })).toHaveCount(0)
+  })
+
   test.skip('insert a task between two timeline items via the radial wheel', async ({ page: _page }) => {
     // Unskip when the Playwright auth fixture lands (see MEMORY: followup_e2e_auth_fixture).
     // 1. log in (fixture) 2. open Today 3. hover gap between two items

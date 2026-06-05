@@ -9,7 +9,8 @@ import { DetailPanel } from './DetailPanel';
 import { LegacyDetailPanelHost } from './LegacyDetailPanelHost';
 import { appRegistry } from './appRegistry';
 import { ShellLayout as DefaultShellLayout } from './ShellLayout';
-import { ScratchpadPane } from '@/components/schedule/ScratchpadPane';
+import { ChatPanel } from '@/components/chat/ChatPanel';
+import { useSymphonyAssistant } from '@/hooks/useSymphonyAssistant';
 import { useScratchpadHidden } from '@/hooks/useScratchpadHidden';
 import { useSelection } from './providers/SelectionProvider';
 import { useMobile } from '@/hooks/useMobile';
@@ -35,30 +36,41 @@ interface Props {
 const TODAY_PATHS = new Set(['/', '/today', '/tasks-new/today', '/tasks-new']);
 
 /**
- * Renders the quick scratchpad in the right rail when:
+ * Renders the fenced Symphony assistant (ChatPanel) in the right rail when:
  * - desktop (not mobile)
  * - on a Today path
  * - no item is currently selected (detail pane not open)
  *
+ * This mirrors the legacy AppShell right-rail pane (repointed to the fenced
+ * Symphony agent in ce216cd) — the new Shell previously rendered the old
+ * scratchpad here, which had been retired from the legacy app. The
+ * `useScratchpadHidden` toggle is reused for the rail's hide/show affordance.
+ *
  * Must be rendered inside <SelectionProvider>.
+ *
+ * NOTE: the agent's writes are picked up by the task list's realtime
+ * subscription; we intentionally do not pass an `onMutate` refetch here to
+ * avoid opening a second tasks subscription from the rail. Wiring a shared
+ * refetch is a follow-up if realtime proves insufficient for edge-fn writes.
  */
-function ShellScratchpadHost() {
+function ShellAssistantHost() {
   const { selection } = useSelection();
   const { pathname } = useLocation();
   const isMobile = useMobile();
   const { hidden, setHidden } = useScratchpadHidden();
+  const assistant = useSymphonyAssistant();
 
   const isToday = TODAY_PATHS.has(pathname);
-  // Conditions for the scratchpad slot (desktop, today, no detail pane)
-  const scratchpadSlot = !isMobile && isToday && selection === null;
+  // Conditions for the rail slot (desktop, today, no detail pane open)
+  const railSlot = !isMobile && isToday && selection === null;
 
-  if (!scratchpadSlot) return null;
+  if (!railSlot) return null;
 
   if (hidden) {
     return (
       <button
         onClick={() => setHidden(false)}
-        aria-label="Show scratchpad"
+        aria-label="Show Symphony AI"
         className="fixed right-0 top-1/2 -translate-y-1/2 z-10 bg-bg-elevated border border-neutral-200 rounded-l-lg px-1.5 py-3 text-neutral-400 hover:text-neutral-600 shadow-card transition-colors"
       >
         <PanelRightOpen size={16} />
@@ -68,10 +80,21 @@ function ShellScratchpadHost() {
 
   return (
     <aside
-      className="fixed top-0 bottom-0 right-0 w-[480px] bg-bg-base border-l border-neutral-200/80 z-10 p-4"
-      aria-label="Scratchpad"
+      className="fixed top-0 bottom-0 right-0 w-[420px] z-10"
+      aria-label="Symphony AI"
     >
-      <ScratchpadPane />
+      <ChatPanel
+        messages={assistant.messages}
+        loading={assistant.loading}
+        error={assistant.error}
+        entityContext={null}
+        mode="chat"
+        onSend={assistant.sendMessage}
+        onClear={assistant.resetSession}
+        onClose={() => setHidden(true)}
+        onNewChat={assistant.resetSession}
+        toolActivity={assistant.toolActivity}
+      />
     </aside>
   );
 }
@@ -100,7 +123,7 @@ export function Shell({ registry = appRegistry, Layout = DefaultShellLayout, lay
       <ShellRoutes registry={registry} />
       <DetailPanel registry={registry} />
       <LegacyDetailPanelHost registry={registry} />
-      <ShellScratchpadHost />
+      <ShellAssistantHost />
     </>
   );
 
