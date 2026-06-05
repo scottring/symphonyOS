@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { streamSymphonyAgent, type AgentApiMessage } from '@/lib/agentStream'
-import type { ChatMessage } from '@/hooks/useChat'
+import type { ChatMessage } from '@/types/chat'
 
 // Tools that mutate task/project data. When the agent uses one, the app needs
 // to refresh so the change shows without a page reload.

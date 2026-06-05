@@ -16,8 +16,7 @@ import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { Routine } from '@/types/routine'
-import type { ChatMessage, EntityContext } from '@/hooks/useChat'
-import type { ChatSession } from '@/hooks/useChatSessions'
+import type { ChatMessage, EntityContext, ChatMode, ChatSession } from '@/types/chat'
 
 export type PanelTab = 'details' | 'ai'
 
@@ -84,7 +83,7 @@ interface AppShellProps {
   chatLoading?: boolean
   chatError?: string | null
   chatEntityContext?: EntityContext | null
-  chatMode?: import('@/hooks/useChat').ChatMode
+  chatMode?: ChatMode
   onChatSend?: (message: string) => void
   onChatClear?: () => void
   onChatSourceClick?: (noteId: string) => void

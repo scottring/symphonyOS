@@ -55,9 +55,7 @@ import { useHiddenCalendarEvents } from '@/hooks/useHiddenCalendarEvents'
 import { useMealPlan } from '@/hooks/useMealPlan'
 import { useRecipes } from '@/hooks/useRecipes'
 import { CalendarReconnectError, type CalendarEvent } from '@/hooks/useGoogleCalendar'
-import { useChat, type EntityContext as ChatEntityContext } from '@/hooks/useChat'
 import { useSymphonyAssistant } from '@/hooks/useSymphonyAssistant'
-import { useChatSessions } from '@/hooks/useChatSessions'
 import { useVaultWrite } from '@/hooks/useVaultWrite'
 import { useMeetingNotes } from '@/hooks/useMeetingNotes'
 import {
@@ -216,9 +214,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   const undo = useUndo()
   const { toast, showToast, dismissToast } = useToast()
   const { isHidden: isEventHidden, hideEvent } = useHiddenCalendarEvents()
-  const chat = useChat()
   const assistant = useSymphonyAssistant(refetchTasks)
-  const chatSessions = useChatSessions()
   const vaultWrite = useVaultWrite()
   const [chatOpen, setChatOpen] = useState(false)
   const [activePanelTab, setActivePanelTab] = useState<PanelTab>('details')
@@ -716,19 +712,6 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     [addNote, addEntityLink, getNotesForEntity]
   )
 
-  // Update chat entity context when viewing different entities
-  useEffect(() => {
-    let ctx: ChatEntityContext | null = null
-    if (selectedContactId) {
-      const contact = contactsMap.get(selectedContactId)
-      if (contact) ctx = { type: 'contact', id: contact.id, name: contact.name }
-    } else if (selectedProjectId) {
-      const project = projects.find(p => p.id === selectedProjectId)
-      if (project) ctx = { type: 'project', id: project.id, name: project.name }
-    }
-    chat.updateEntityContext(ctx)
-  }, [selectedContactId, selectedProjectId, contactsMap, projects, chat.updateEntityContext])
-
   // Handle selecting an item - all types open DetailPanel (unified UX)
   const handleSelectItem = useCallback((itemId: string | null) => {
     if (!itemId) {
@@ -754,85 +737,6 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     setChatOpen(open)
     if (open) setActivePanelTab('ai')
   }, [])
-
-  // Handle guided chat — set entity context, enable reflection mode, open chat panel
-  const handleOpenGuidedChat = useCallback((
-    entityType: 'task' | 'contact' | 'project' | 'event',
-    entityId: string,
-    entityName: string,
-    prompt?: string,
-  ) => {
-    chat.updateEntityContext({ type: entityType, id: entityId, name: entityName })
-    chat.setGuidedReflection()
-    setChatOpen(true)
-    setActivePanelTab('ai')
-    // Pre-send the guided prompt so the AI starts the reflection
-    if (prompt) {
-      setTimeout(() => chat.sendMessage(prompt), 100)
-    }
-  }, [chat])
-
-  // Save vault draft from guided reflection — user explicitly approved this note
-  const handleChatSaveToVault = useCallback(async (title: string, content: string): Promise<boolean> => {
-    const result = await vaultWrite.createVaultNote({
-      title,
-      content,
-      domain: 'personal',
-      path: 'Reflections',
-    }, `Save reflection: ${title}`)
-    return result !== null
-  }, [vaultWrite])
-
-  // Add task from AI chat panel
-  const handleChatAddTask = useCallback(async (title: string, destination: 'inbox' | 'today') => {
-    const scheduledFor = destination === 'today' ? new Date() : undefined
-    await addTask(title, undefined, undefined, scheduledFor, {
-      assignedTo: getCurrentUserMember()?.id,
-    })
-  }, [addTask, getCurrentUserMember])
-
-  // Auto-save chat session after each assistant response
-  const prevMessageCountRef = useRef(0)
-  useEffect(() => {
-    const msgCount = chat.messages.length
-    // Only save when a new assistant message arrives (count increased and last msg is from assistant)
-    if (msgCount > prevMessageCountRef.current && msgCount >= 2) {
-      const lastMsg = chat.messages[msgCount - 1]
-      if (lastMsg.role === 'assistant') {
-        chatSessions.saveSession(
-          chat.sessionId,
-          chat.messages,
-          chat.entityContext,
-          chat.mode
-        ).then((id) => {
-          if (id && !chat.sessionId) {
-            chat.setSessionId(id)
-          }
-        })
-      }
-    }
-    prevMessageCountRef.current = msgCount
-  }, [chat.messages]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Load a saved chat session
-  const handleChatLoadSession = useCallback((session: import('@/hooks/useChatSessions').ChatSession) => {
-    // Auto-save current conversation before switching (if it has messages)
-    if (chat.messages.length >= 2) {
-      chatSessions.saveSession(chat.sessionId, chat.messages, chat.entityContext, chat.mode)
-    }
-    const entityCtx = session.entityType && session.entityId
-      ? { type: session.entityType as ChatEntityContext['type'], id: session.entityId, name: '' }
-      : null
-    chat.loadSession(session.id, session.messages, entityCtx, session.mode)
-  }, [chat, chatSessions])
-
-  // Start a new chat (save current first)
-  const handleChatNewChat = useCallback(() => {
-    if (chat.messages.length >= 2) {
-      chatSessions.saveSession(chat.sessionId, chat.messages, chat.entityContext, chat.mode)
-    }
-    chat.startNewChat()
-  }, [chat, chatSessions])
 
   // "Save to vault": promote a task's notes into a persisting vault note (durable,
   // via GitHub), linked to the task so it survives the task being completed.
@@ -1377,7 +1281,6 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     // Navigation
     onRefreshInstances: refreshDateInstances,
     onOpenChat: () => handleChatOpenChange(true),
-    onOpenGuidedChat: handleOpenGuidedChat,
     onStartMeeting: meetingNotes.startMeeting,
     onUpdateEventProject: updateEventProject,
   }), [
@@ -1390,7 +1293,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     eventNotesMap, eventContextOverrides,
     handleSendToList, handleCreateListInTriage, addProject, handleConvertTaskToProject, searchContacts, addContact,
     handleOpenProject, getDomainForCalendar,
-    refreshDateInstances, meetingNotes.startMeeting, updateEventProject, handleChatOpenChange, handleOpenGuidedChat,
+    refreshDateInstances, meetingNotes.startMeeting, updateEventProject, handleChatOpenChange,
   ])
 
   return (
@@ -1526,13 +1429,9 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       chatMode={'chat'}
       onChatSend={assistant.sendMessage}
       onChatClear={assistant.resetSession}
-      onChatSaveToVault={handleChatSaveToVault}
-      onChatAddTask={handleChatAddTask}
       chatToolActivity={assistant.toolActivity}
       chatSessions={[]}
       chatSessionsLoading={false}
-      onChatLoadSession={handleChatLoadSession}
-      onChatDeleteSession={chatSessions.deleteSession}
       onChatNewChat={assistant.resetSession}
       activeChatSessionId={null}
       panel={

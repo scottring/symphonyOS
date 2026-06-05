@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { ChatMessage as ChatMessageType } from '@/hooks/useChat'
+import type { ChatMessage as ChatMessageType } from '@/types/chat'
 
 interface ChatMessageProps {
   message: ChatMessageType

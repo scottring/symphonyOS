@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseMealRequest } from './useChat'
+import { parseMealRequest } from './parseMealRequest'
 
 describe('parseMealRequest', () => {
   it('extracts the request and strips the block', () => {
