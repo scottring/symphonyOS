@@ -35,8 +35,13 @@ export function CalendarCallback() {
           return
         }
 
-        // Success - redirect to home
-        navigate('/', { replace: true })
+        // Success - redirect to home with a FULL reload (not SPA navigation).
+        // The GoogleCalendarProvider validates the connection only once on
+        // mount, so an in-app navigate() would leave isConnected=false until a
+        // manual refresh — the connection silently "won't stick" and every
+        // surface keeps showing the Connect prompt. A hard reload remounts the
+        // provider, which re-checks and flips isConnected=true.
+        window.location.replace('/')
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       }

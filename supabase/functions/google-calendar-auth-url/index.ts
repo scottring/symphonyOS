@@ -69,7 +69,11 @@ Deno.serve(async (req) => {
     authUrl.searchParams.set('response_type', 'code')
     authUrl.searchParams.set('scope', scopes.join(' '))
     authUrl.searchParams.set('access_type', 'offline')
-    authUrl.searchParams.set('prompt', 'consent')
+    // 'select_account' forces Google to show the account chooser instead of
+    // silently reusing the browser's signed-in account — essential when a user
+    // connected the wrong Google account and needs to switch. 'consent' is kept
+    // so we always get a refresh token back.
+    authUrl.searchParams.set('prompt', 'select_account consent')
     authUrl.searchParams.set('state', state)
 
     return new Response(JSON.stringify({ url: authUrl.toString() }), {

@@ -1,6 +1,18 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import { CalendarSetupWizard } from '@/components/calendar/CalendarSetupWizard'
+
+/**
+ * Resolve which Google account a connection belongs to from its calendar list.
+ * Google's primary calendar id IS the account's email, so prefer the calendar
+ * flagged primary; fall back to the first calendar if none is flagged.
+ */
+export function pickAccountEmail(
+  calendars: { email?: string; primary?: boolean }[],
+): string | null {
+  const primary = calendars.find((c) => c.primary)
+  return (primary ?? calendars[0])?.email ?? null
+}
 
 export function CalendarSettings() {
   const {
@@ -9,10 +21,29 @@ export function CalendarSettings() {
     isLoading,
     error,
     disconnect,
+    fetchCalendarList,
   } = useGoogleCalendar()
 
   const [isDisconnecting, setIsDisconnecting] = useState(false)
   const [showSetupWizard, setShowSetupWizard] = useState(false)
+  const [accountEmail, setAccountEmail] = useState<string | null>(null)
+
+  // Surface WHICH Google account is connected — the primary calendar's email.
+  // Without this the connection is opaque, which is how a wrong-account connect
+  // can go unnoticed.
+  useEffect(() => {
+    if (!isConnected || needsReconnect) {
+      setAccountEmail(null)
+      return
+    }
+    let cancelled = false
+    fetchCalendarList().then((calendars) => {
+      if (!cancelled) setAccountEmail(pickAccountEmail(calendars))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [isConnected, needsReconnect, fetchCalendarList])
 
   const handleConnect = () => {
     setShowSetupWizard(true)
@@ -77,9 +108,11 @@ export function CalendarSettings() {
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <p className="font-medium text-neutral-800">Connected</p>
-                  <p className="text-sm text-neutral-500">Your Google Calendar events are synced</p>
+                  <p className="text-sm text-neutral-500 truncate">
+                    {accountEmail ?? 'Your Google Calendar events are synced'}
+                  </p>
                 </div>
               </div>
 

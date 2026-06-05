@@ -224,8 +224,17 @@ serve(async (req) => {
       // This prevents shared calendars (e.g. a partner's work calendar)
       // from leaking into the user's view if they haven't explicitly mapped them.
       const allMappedCalendarIds = new Set(allMappings.map(m => m.calendar_id))
-      calendars = calendars.filter(c => allMappedCalendarIds.has(c.id))
-      console.log(`Fetching events from ${calendars.length} mapped calendars (domain: universal)`)
+      const mapped = calendars.filter(c => allMappedCalendarIds.has(c.id))
+      if (mapped.length === 0) {
+        // Safety net: the mappings don't match ANY of this account's calendars
+        // (e.g. stale mappings left over from a previously-connected Google
+        // account). Rather than silently return zero events, show everything —
+        // a blank "universal" view is never the right answer.
+        console.log(`Mappings match no current calendars; falling back to all ${calendars.length} calendars (domain: universal)`)
+      } else {
+        calendars = mapped
+        console.log(`Fetching events from ${calendars.length} mapped calendars (domain: universal)`)
+      }
     } else {
       // No mappings at all: show all calendars (first-time / unconfigured user)
       console.log(`Fetching events from all ${calendars.length} calendars (no domain mappings configured)`)

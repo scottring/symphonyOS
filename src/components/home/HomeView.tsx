@@ -29,6 +29,7 @@ import { CascadingRiverView } from './CascadingRiverView'
 import { TodayView } from '@/components/schedule/TodayView'
 import { UndoToast } from '@/components/undo/UndoToast'
 import { HomeHeader } from '@/components/home/HomeHeader'
+import { CalendarReconnectBanner } from '@/components/home/CalendarReconnectBanner'
 
 interface HomeViewProps {
   tasks: Task[]
@@ -471,6 +472,12 @@ export function HomeView({
             />
           </div>
         )}
+        {/* Surfaces an expired/revoked calendar connection so the empty event
+            state isn't silent. Wrapper collapses (empty:hidden) when the banner
+            renders null, so it adds no padding while connected. */}
+        <div className="px-6 pt-4 empty:hidden">
+          <CalendarReconnectBanner />
+        </div>
         {renderContent()}
       </div>
 

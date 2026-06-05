@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { useSystemHealth, getHealthTextClasses, getHealthMessage } from './useSystemHealth'
 import type { Task } from '@/types/task'
+import type { Project } from '@/types/project'
 
 // Helper to create mock tasks
 function createTask(overrides: Partial<Task> = {}): Task {
@@ -10,6 +11,19 @@ function createTask(overrides: Partial<Task> = {}): Task {
     id: Math.random().toString(36).substring(7),
     title: 'Test Task',
     completed: false,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  }
+}
+
+// Helper to create mock projects
+function createProject(overrides: Partial<Project> = {}): Project {
+  const now = new Date()
+  return {
+    id: Math.random().toString(36).substring(7),
+    name: 'Test Project',
+    status: 'in_progress',
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -248,6 +262,77 @@ describe('useSystemHealth', () => {
       const { result } = renderHook(() => useSystemHealth(tasks))
 
       expect(result.current.score).toBeLessThanOrEqual(100)
+    })
+
+    it('gives full credit for assigned tasks filed into planning buckets', () => {
+      // Regression: bucketed (week/month/quarter) tasks were credited only via
+      // the legacy scheduledFor/deferredUntil fields, so an assigned bucket task
+      // wrongly got 50% credit and the score read low.
+      const tasks = [
+        createTask({ bucket: 'week' as const, assignedTo: 'member-1' }),
+        createTask({ bucket: 'month' as const, assignedTo: 'member-1' }),
+        createTask({ bucket: 'quarter' as const, assignedToAll: ['member-1'] }),
+      ]
+
+      const { result } = renderHook(() => useSystemHealth(tasks))
+
+      expect(result.current.score).toBe(100)
+    })
+
+    it('score responds to assigning a bucketed task', () => {
+      // Regression for "score doesn't update": assigning an owner to a task that
+      // lives in a planning bucket must move the score (50% -> 100%).
+      const unassigned = [createTask({ bucket: 'week' as const })]
+      const assigned = [createTask({ bucket: 'week' as const, assignedTo: 'member-1' })]
+
+      const { result: before } = renderHook(() => useSystemHealth(unassigned))
+      const { result: after } = renderHook(() => useSystemHealth(assigned))
+
+      expect(before.current.score).toBe(50)
+      expect(after.current.score).toBe(100)
+      expect(after.current.score).toBeGreaterThan(before.current.score)
+    })
+  })
+
+  describe('empty projects', () => {
+    it('penalizes an active project with no tasks', () => {
+      const tasks = [createTask({ scheduledFor: new Date('2024-06-20'), assignedTo: 'm1' })]
+      const projects = [createProject()]
+
+      const { result } = renderHook(() => useSystemHealth({ tasks, projects }))
+
+      expect(result.current.emptyProjects).toBe(1)
+      // base 100, -5 empty project penalty
+      expect(result.current.score).toBe(95)
+    })
+
+    it('does not penalize an empty project that has a linked calendar event', () => {
+      const tasks = [createTask({ scheduledFor: new Date('2024-06-20'), assignedTo: 'm1' })]
+      const project = createProject()
+
+      const { result } = renderHook(() =>
+        useSystemHealth({
+          tasks,
+          projects: [project],
+          projectsWithLinkedEvents: new Set([project.id]),
+        })
+      )
+
+      expect(result.current.emptyProjects).toBe(0)
+      expect(result.current.score).toBe(100)
+    })
+
+    it('does not penalize on_hold or completed projects', () => {
+      const tasks = [createTask({ scheduledFor: new Date('2024-06-20'), assignedTo: 'm1' })]
+      const projects = [
+        createProject({ status: 'on_hold' }),
+        createProject({ status: 'completed' }),
+      ]
+
+      const { result } = renderHook(() => useSystemHealth({ tasks, projects }))
+
+      expect(result.current.emptyProjects).toBe(0)
+      expect(result.current.score).toBe(100)
     })
   })
 

@@ -118,12 +118,25 @@ export function useSystemHealth(tasksOrInput: Task[] | SystemHealthInput): Syste
 
     // Calculate score
     const totalItems = incompleteTasks.length
-    const itemsWithHome = scheduledTasks.length + deferredTasks.length
+
+    // A task "has a home" if it's scheduled to a time, filed into a planning
+    // bucket (week/month/quarter), or — for legacy data — deferred to a future
+    // date. This MUST match the union of scheduledTasks + deferredTasks above so
+    // the assignment-credit math below scores the same set; otherwise bucketed
+    // tasks earn no assignment credit and the score reads low and won't move
+    // when you assign them.
+    const itemsWithHomeList = incompleteTasks.filter(t => {
+      if (t.scheduledFor || t.bucket === 'timed') return true
+      if (t.bucket === 'week' || t.bucket === 'month' || t.bucket === 'quarter') return true
+      if (t.deferredUntil && !t.bucket) return new Date(t.deferredUntil) > now
+      return false
+    })
+    const itemsWithHome = itemsWithHomeList.length
 
     // Base score calculation with assignment factor
     // Items without assignment count as 50% (partially clear)
-    const assignedItemsWithHome = incompleteTasks.filter(
-      t => (t.scheduledFor || t.deferredUntil) && (t.assignedTo || t.assignedToAll?.length)
+    const assignedItemsWithHome = itemsWithHomeList.filter(
+      t => t.assignedTo || t.assignedToAll?.length
     ).length
     const unassignedItemsWithHome = itemsWithHome - assignedItemsWithHome
 
