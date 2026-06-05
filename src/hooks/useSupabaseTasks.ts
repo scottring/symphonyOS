@@ -144,48 +144,42 @@ export function useSupabaseTasks() {
   const { members: familyMembers } = useFamilyMembers()
   const { showToast } = useToast()
 
-  // Fetch tasks on mount and when user changes
+  // Fetch tasks. Exposed as `refetch` so an external write (e.g. the assistant
+  // creating a task server-side) can force an immediate refresh, since realtime
+  // is not relied upon for those.
+  const fetchTasks = useCallback(async () => {
+    if (!user) {
+      setTasks([])
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    // RLS policies handle household sharing - no need to filter by user_id.
+    const { data, error: fetchError } = await supabase
+      .from('tasks')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (fetchError) {
+      setError(fetchError.message)
+      setLoading(false)
+      return
+    }
+
+    setTasks(nestSubtasks((data as DbTask[]).map(dbTaskToTask)))
+    setLoading(false)
+  }, [user])
+
+  // Fetch on mount / user change, then subscribe to realtime.
   useEffect(() => {
     if (!user) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing on auth change is valid
       setTasks([])
       setLoading(false)
       return
-    }
-
-    async function fetchTasks() {
-      if (!user) return
-
-      setLoading(true)
-      setError(null)
-
-      // RLS policies handle household sharing - no need to filter by user_id
-      // All tasks visible to this user (their own + household members') will be returned
-      const { data, error: fetchError } = await supabase
-        .from('tasks')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (fetchError) {
-        setError(fetchError.message)
-        setLoading(false)
-        return
-      }
-
-      // Debug: log raw data from DB to check if notes are present
-      logger.debug('[fetchTasks] Raw data from DB, tasks with notes:',
-        (data as DbTask[]).filter(t => t.notes).map(t => ({ id: t.id, title: t.title, notes: t.notes }))
-      )
-
-      const allTasks = (data as DbTask[]).map(dbTaskToTask)
-
-      // Debug: log converted tasks with notes
-      logger.debug('[fetchTasks] Converted tasks with notes:',
-        allTasks.filter(t => t.notes).map(t => ({ id: t.id, title: t.title, notes: t.notes }))
-      )
-
-      setTasks(nestSubtasks(allTasks))
-      setLoading(false)
     }
 
     fetchTasks()
@@ -248,7 +242,7 @@ export function useSupabaseTasks() {
     return () => {
       channel.unsubscribe()
     }
-  }, [user])
+  }, [user, fetchTasks])
 
   // Options for creating linked tasks
   interface AddTaskOptions {
@@ -985,5 +979,5 @@ export function useSupabaseTasks() {
     }
   }, [tasks])
 
-  return { tasks, loading, error, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, scheduleTask, pushTask, setBucket }
+  return { tasks, loading, error, refetch: fetchTasks, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, scheduleTask, pushTask, setBucket }
 }

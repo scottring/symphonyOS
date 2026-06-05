@@ -207,7 +207,7 @@ function App() {
 }
 
 function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
-  const { tasks, loading: tasksLoading, addTask, addSubtask, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask, setBucket } = useSupabaseTasks()
+  const { tasks, loading: tasksLoading, refetch: refetchTasks, addTask, addSubtask, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask, setBucket } = useSupabaseTasks()
   const { goals, getCurrentQuarter } = useGoalsContext()
   const { isConnected, events, fetchEvents, isFetching: eventsFetching, createEvent, updateEvent, deleteEvent, removeEventLocal, restoreEventLocal, connect: connectCalendar } = useGoogleCalendar()
   const attachments = useAttachments()
@@ -217,7 +217,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
   const { toast, showToast, dismissToast } = useToast()
   const { isHidden: isEventHidden, hideEvent } = useHiddenCalendarEvents()
   const chat = useChat()
-  const assistant = useSymphonyAssistant()
+  const assistant = useSymphonyAssistant(refetchTasks)
   const chatSessions = useChatSessions()
   const vaultWrite = useVaultWrite()
   const [chatOpen, setChatOpen] = useState(false)

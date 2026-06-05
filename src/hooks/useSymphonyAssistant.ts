@@ -2,13 +2,25 @@ import { useState, useCallback } from 'react'
 import { streamSymphonyAgent, type AgentApiMessage } from '@/lib/agentStream'
 import type { ChatMessage } from '@/hooks/useChat'
 
+// Tools that mutate task/project data. When the agent uses one, the app needs
+// to refresh so the change shows without a page reload.
+const WRITE_TOOLS = new Set([
+  'symphony_create_task',
+  'symphony_update_task',
+  'symphony_complete_task',
+  'symphony_create_project',
+])
+
 /**
  * Right-rail assistant scoped to Symphony. Talks to the `symphony-agent`
  * edge function, which runs an Anthropic tool-use loop over the user's own
  * Symphony data (RLS-scoped). Conversation is held in React state and sent
  * with each turn; there is no server-side session in v1.
+ *
+ * @param onMutate called after a turn in which the agent wrote data, so the
+ *   caller can refetch (the task list is not realtime for external writes).
  */
-export function useSymphonyAssistant() {
+export function useSymphonyAssistant(onMutate?: () => void) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -45,9 +57,13 @@ export function useSymphonyAssistant() {
       setMessages((prev) => prev.map((m) =>
         m.id === assistantId ? { ...m, content: m.content + chunk } : m))
 
+    let didWrite = false
     await streamSymphonyAgent(apiMessages, {
       onText: appendText,
-      onTool: (name) => setToolActivity((prev) => [...prev, name]),
+      onTool: (name) => {
+        if (WRITE_TOOLS.has(name)) didWrite = true
+        setToolActivity((prev) => [...prev, name])
+      },
       onDone: (reply) => {
         // Fall back to the authoritative final reply if no text streamed.
         setMessages((prev) => prev.map((m) =>
@@ -57,8 +73,9 @@ export function useSymphonyAssistant() {
       onError: (message) => setError(message),
     })
 
+    if (didWrite) onMutate?.()
     setLoading(false)
-  }, [loading, messages])
+  }, [loading, messages, onMutate])
 
   const resetSession = useCallback(() => {
     setMessages([])
