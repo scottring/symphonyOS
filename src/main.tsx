@@ -103,13 +103,14 @@ const useNewTasks =
   typeof window !== 'undefined' &&
   window.localStorage.getItem('symphony.useNewTasks') === '1'
 
-// Element for the cutover routes: gated Shell when the flag is on, else legacy
-// App (which gates itself). Reused across the four cutover routes below.
-const tasksElement = useNewTasks ? (
-  <AuthGate>{() => <Shell />}</AuthGate>
-) : (
-  <App />
-)
+// The gated Shell for the cutover. It MUST be mounted at a root-level splat
+// (`/*`), never at exact paths like `/today`. The Shell renders descendant
+// <Routes> (ShellRoutes -> TasksApp), and TasksApp matches segment-named child
+// routes (`today`, `inbox`, `task/:id`). React Router only passes the remaining
+// path to a descendant <Routes> when the parent route ends in `*`; mounting at
+// exact `/today` consumes the segment and leaves nothing to match, so Today
+// rendered blank. See src/shell/cutoverRouting.test.tsx for the repro + fix.
+const cutoverShell = <AuthGate>{() => <Shell />}</AuthGate>
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -118,10 +119,17 @@ createRoot(document.getElementById('root')!).render(
         <BrowserRouter>
           <GoogleCalendarProvider>
             <Routes>
-              <Route path="/" element={tasksElement} />
-              <Route path="/today" element={tasksElement} />
-              <Route path="/inbox" element={tasksElement} />
-              <Route path="/task/:taskId" element={tasksElement} />
+              {/* Cutover paths (/, /today, /inbox, /task/:id). When the flag is
+                  OFF, legacy App owns them explicitly. When ON, they are served
+                  by the root /* catch-all below (the Shell needs the splat). */}
+              {!useNewTasks && (
+                <>
+                  <Route path="/" element={<App />} />
+                  <Route path="/today" element={<App />} />
+                  <Route path="/inbox" element={<App />} />
+                  <Route path="/task/:taskId" element={<App />} />
+                </>
+              )}
               <Route path="/goals" element={<App />} />
               <Route path="/goals/:goalId" element={<App />} />
               <Route path="/projects" element={<App />} />
@@ -152,7 +160,14 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/home/*" element={<App />} />
               <Route path="/join/:token" element={<JoinHousehold />} />
               <Route path="/calendar-callback" element={<CalendarCallback />} />
-              <Route path="*" element={<NotFound />} />
+              {/* Flag ON: root /* catch-all serves the cutover paths through the
+                  gated Shell (explicit routes above still win by specificity).
+                  Flag OFF: unknown paths fall through to NotFound. */}
+              {useNewTasks ? (
+                <Route path="/*" element={cutoverShell} />
+              ) : (
+                <Route path="*" element={<NotFound />} />
+              )}
             </Routes>
           </GoogleCalendarProvider>
         </BrowserRouter>
