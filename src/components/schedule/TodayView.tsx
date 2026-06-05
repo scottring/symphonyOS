@@ -134,6 +134,7 @@ export function TodayView({
   const ctx = useScheduleActionsContext()
   const {
     onToggleWaiting, onUpdateTask, onPushTask,
+    onGroupTasks,
     onAssignTask, onAssignTaskAll, onAssignEvent, onAssignEventAll,
     onAssignRoutine, onAssignRoutineAll,
     onSkipRoutine, onPushRoutine, onUpdateRoutine,
@@ -179,6 +180,11 @@ export function TodayView({
     }
     clearBulkSelection()
   }, [selectedTaskIds, tasks, onAssignTaskAll, clearBulkSelection])
+  const handleBulkGroup = useCallback(async (name: string, date: Date, isAllDay: boolean) => {
+    if (!onGroupTasks) return
+    await onGroupTasks(Array.from(selectedTaskIds), name, date, isAllDay)
+    clearBulkSelection()
+  }, [selectedTaskIds, onGroupTasks, clearBulkSelection])
 
   // ── Hide-routines toggle (localStorage parity) ────────────────────────────────
   const [hideRoutines, setHideRoutines] = useState<boolean>(() => readHideRoutines())
@@ -816,6 +822,7 @@ export function TodayView({
           onSchedule={handleBulkSchedule}
           onSetContext={handleBulkSetContext}
           onAssign={handleBulkAssign}
+          onGroup={onGroupTasks ? handleBulkGroup : undefined}
           onSendToList={() => {}}
           onCancel={clearBulkSelection}
           familyMembers={familyMembers}
