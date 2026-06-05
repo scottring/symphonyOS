@@ -16,28 +16,29 @@ Both are the *same job*: extend the existing tasks-only selection + toolbar to c
 
 ## The constraint that shapes everything
 
-The three types have genuinely different capabilities. Bulk actions must **adapt to what's selected** and **apply each action only to members that support it** — no silent no-ops, no scary writes.
+The three types have different capabilities, but Symphony already has **local-override** handlers for events (no Google writes), so bulk edits can cover all three more fully than first assumed. Bulk actions **adapt to what's selected** and **apply each action only to members that support it** — no silent no-ops, no writes to Google, no pattern mutation.
 
 | Bulk action | Task | Routine | Event |
 |---|---|---|---|
 | **Group** | ✅ `parentTaskId` | ✅ ref on wrapper | ✅ ref on wrapper |
-| **Set time** | ✅ `scheduledFor` | ✅ today-only instance override (`onPushRoutine`) | ❌ skipped v1 (read-only Google data) |
-| **Set context** | ✅ `context` col | ❌ pattern-wide, surprising | ❌ no field on a Google event |
-| **Set assignee** | ✅ `assignedToAll` | ❌ not modeled on routines yet | ❌ no field on a Google event |
+| **Set time** | ✅ `scheduledFor` | ✅ today-only override (`onPushRoutine`) | ✅ today-only override (`onPushEvent`, local) |
+| **Set context** | ✅ `context` col | ⚠️ skip v1 (pattern-wide only) | ✅ `onUpdateEventContext` (local `event_notes`) |
+| **Set assignee** | ✅ `assignedToAll` | ⚠️ skip v1 (pattern-wide only) | ✅ `onAssignEventAll` (local `event_notes`) |
 | **Defer / Send-to-list** | ✅ | ❌ N/A | ❌ N/A |
 
-**Why events are group-only:** `useGoogleCalendar.updateEvent` only supports time/location and only on calendars you can write to; there is nowhere to store a context/assignee on a synced event. Grouping doesn't touch the event — membership lives on the wrapper — so it's safe.
+**Events are fully editable via local overrides, never Google.** Verified: `onPushEvent` → `reschedule('calendar_event', …)` writes a local `actionable_instances` `deferred_to` (today-only; `grouping.ts` already reads it, lines 47–56) — it is NOT `onUpdateEvent`, which is the separate drag-to-move Google write we don't use here. `onUpdateEventContext` (→ `useEventNotes`) and `onAssignEventAll` (→ `updateEventAssignmentAll`) both persist to the local `event_notes` table. So bulk time/context/assignee on events touch only Symphony's override stores; the synced Google event is never mutated. Grouping likewise never touches the event (membership lives on the wrapper).
 
-**Why "set time" on a routine is today-only:** changing `time_of_day` edits the recurring pattern (every future day). The day-scoped instance reschedule (`onPushRoutine(routineId, date)` → `deferred_to`, already handled in `grouping.ts`) moves just today's occurrence, matching the "today bulk action" mental model. Pattern edits stay in the routine editor.
+**Routine context/assignee are skipped in v1** because routines only have *pattern-level* `context`/`assigned_to` (no per-instance override), so changing them from a "today" bulk bar would silently alter every future occurrence. Routine *time* is fine — `onPushRoutine` is a today-only instance reschedule. Pattern edits stay in the routine editor.
 
-### Decisions locked (brainstorming)
+### Decisions locked (brainstorming + discovered capability)
 - **Heterogeneous groups** (one group, mixed types).
 - **Day-scoped** groups (recurring groups deferred to a later iteration).
-- **Events: group-only** in v1 (no bulk write-back to Google).
-- **Routine "set time" = just today** via instance override.
+- **All bulk edits are day-scoped / local** — no Google writes, no routine pattern mutation.
+- **Events: full bulk edit** (time/context/assignee) via existing local-override handlers.
+- **Routines: time only** in the bulk bar (today-only); context/assignee deferred.
 
 ### Out of scope (v1)
-Recurring groups; bulk write-back to Google events; routine pattern edits from the bulk bar; routine/event context+assignee; nesting groups in groups.
+Recurring groups; bulk write-back to Google events (`onUpdateEvent`); routine pattern edits (context/assignee) from the bulk bar; defer/send-to-list for non-tasks; nesting groups in groups.
 
 ## How the current code works (grounding)
 
@@ -123,13 +124,15 @@ Each handler partitions the selection and applies per-type, then reports skips v
 ```ts
 const { taskIds, eventIds, routineIds } = partitionSelection(selectedKeys)
 ```
-- **Group** (`handleBulkGroup`): `onGroupItems(taskIds, [...events, ...routines as refs], name, date, isAllDay)`. Always available.
-- **Set time** (`handleBulkSchedule`): tasks → `updateTask({scheduledFor,isAllDay,bucket:'timed'})`; routines → `onPushRoutine(routineId, date)` (today-only); events → skip. Toast: `"Time set on N — M events unchanged"` when events present.
-- **Set context**: tasks only; toast skipped count if non-tasks selected.
-- **Set assignee**: tasks only; toast skipped count.
-- **Defer / Send-to-list**: tasks only; toast skipped count.
+- **Group** (`handleBulkGroup`): `onGroupItems(taskIds, [...events, ...routines as refs], name, date, isAllDay)`. Always available, all three types.
+- **Set time** (`handleBulkSchedule`): tasks → `updateTask({scheduledFor,isAllDay,bucket:'timed'})`; routines → `onPushRoutine(routineId, date)`; events → `onPushEvent(eventId, date)`. All today-only/local. No type skipped.
+- **Set context**: tasks → `updateTask({context})`; events → `onUpdateEventContext(eventId, context)`; routines → skip. Toast skipped routine count.
+- **Set assignee**: tasks → `onAssignTaskAll(id, memberIds)`; events → `onAssignEventAll(eventId, memberIds)`; routines → skip. Toast skipped routine count.
+- **Defer / Send-to-list**: tasks only; toast skipped count if non-tasks selected.
 
-**Toolbar affordance:** keep all buttons visible (so the bar doesn't jump), but when the selection contains items an action can't touch, the action still runs on the applicable members and the toast names what it skipped. Group is the only always-fully-applicable action. (Simpler than per-button enable/disable logic, and the toast keeps it honest.)
+These handlers all already exist on `ScheduleActionsContext` (`onPushEvent`, `onUpdateEventContext`, `onAssignEventAll`, `onPushRoutine`, `onAssignTaskAll`) — the work is partitioning the selection and fanning out, not new handler infra.
+
+**Toolbar affordance:** keep all buttons visible (so the bar doesn't jump); when the selection contains items an action can't touch (routine context/assignee, or non-tasks for defer/list), the action still runs on the applicable members and the toast names what it skipped. (Simpler than per-button enable/disable logic, and the toast keeps it honest.)
 
 ### Data flow
 ```
@@ -158,7 +161,7 @@ check-circle on any row (ScheduleItem, now ungated)
 - `src/lib/today/groupTasks.test.ts` (extend) — `groupItems` writes `groupMembers` for events/routines, reparents tasks, and de-dups a member out of a prior wrapper.
 - `src/lib/today/grouping.test.ts` (extend) — a wrapper with a 9am event member + all-day wrapper: member is relocated under the wrapper, marked `isSubtask`, removed from the morning section; dangling ref skipped.
 - `BulkActionToolbar.test.tsx` (extend) — Group available regardless of selection mix.
-- Manual (no logged-in e2e fixture — see memory): select a routine + event + 2 tasks → Group "Morning" → all four nest under one card; Set time on a mixed selection → tasks+routine move, toast says events unchanged.
+- Manual (no logged-in e2e fixture — see memory): select a routine + event + 2 tasks → Group "Morning" → all four nest under one card; Set time on the mixed selection → all four move (tasks via `scheduledFor`, routine+event via today-only instance override); Set context → tasks+event take it, toast says "1 routine skipped"; verify the Google event itself is unchanged (only the local override moved/recolored it).
 
 ## Files touched
 | File | Change |
