@@ -27,7 +27,7 @@ import { sundayOfWeek } from '@/lib/weekHelpers'
 import { detectContextSharingChange } from '@/lib/contextSharingToast'
 import { SHOW_PLANNED_MEALS_ON_TIMELINE } from '@/lib/mealsVisibility'
 import { convertTaskToProject } from '@/lib/convertTaskToProject'
-import { groupTasks, removeFromGroup, ungroupTasks, deleteTaskGroup } from '@/lib/today/groupTasks'
+import { groupTasks, groupItems, removeFromGroup, ungroupTasks, deleteTaskGroup } from '@/lib/today/groupTasks'
 import { DomainPageOutline } from '@/components/domain/DomainPageOutline'
 import { ViewRouter } from '@/components/layout/ViewRouter'
 import { AppShell, type PanelTab } from '@/components/layout/AppShell'
@@ -1083,6 +1083,18 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       )
       if (!wrapperId) showToast("Couldn't create group", 'warning')
     },
+    onGroupItems: async (taskIds, memberRefs, groupName, date, isAllDay) => {
+      const wrapperId = await groupItems(
+        {
+          taskIds, memberRefs, groupName, date, isAllDay,
+          assignedTo: getCurrentUserMember()?.id,
+          context: currentDomain !== 'universal' ? currentDomain : undefined,
+        },
+        { addTask, updateTask, refetch: refetchTasks },
+      )
+      if (!wrapperId) showToast("Couldn't create group", 'warning')
+    },
+    onNotify: (message: string) => showToast(message, 'info'),
     onCreateTaskAt: async (r: TimelineCaptureResult) => {
       const when = r.scheduledFor
       const id = await addTask(r.title, r.contactId, r.projectId, when ?? undefined, {

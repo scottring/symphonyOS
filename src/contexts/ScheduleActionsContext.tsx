@@ -24,6 +24,15 @@ export interface ScheduleActionsValue {
     date: Date,
     isAllDay: boolean,
   ) => Promise<void>
+  onGroupItems?: (
+    taskIds: string[],
+    memberRefs: import('@/types/task').GroupMemberRef[],
+    groupName: string,
+    date: Date,
+    isAllDay: boolean,
+  ) => Promise<void>
+  /** Show a transient toast (e.g. skip-report for bulk actions). Wired to App's toast. */
+  onNotify?: (message: string) => void
   onCreateFollowUp?: (title: string, sourceTaskId: string) => void
 
   // Timeline insert-point create flows (radial wheel picks)
