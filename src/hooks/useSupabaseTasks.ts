@@ -722,6 +722,8 @@ export function useSupabaseTasks() {
     if ('assignedToAll' in updates) dbUpdates.assigned_to_all = updates.assignedToAll ?? null
     if ('projectId' in updates) dbUpdates.project_id = updates.projectId ?? null
     if ('parentTaskId' in updates) dbUpdates.parent_task_id = updates.parentTaskId ?? null
+    // group_members is `jsonb NOT NULL DEFAULT '[]'` — clearing it must write []
+    // (not null), unlike the nullable FK columns above.
     if ('groupMembers' in updates) dbUpdates.group_members = updates.groupMembers ?? []
     if ('linkedEventId' in updates) dbUpdates.linked_event_id = updates.linkedEventId ?? null
     if ('linkedTo' in updates) {
@@ -816,6 +818,8 @@ export function useSupabaseTasks() {
     if ('assignedToAll' in updates) dbUpdates.assigned_to_all = updates.assignedToAll ?? null
     if ('projectId' in updates) dbUpdates.project_id = updates.projectId ?? null
     if ('parentTaskId' in updates) dbUpdates.parent_task_id = updates.parentTaskId ?? null
+    // group_members is `jsonb NOT NULL DEFAULT '[]'` — clearing it must write []
+    // (not null), unlike the nullable FK columns above.
     if ('groupMembers' in updates) dbUpdates.group_members = updates.groupMembers ?? []
     if ('linkedEventId' in updates) dbUpdates.linked_event_id = updates.linkedEventId ?? null
     if ('linkedTo' in updates) {
