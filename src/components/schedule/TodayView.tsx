@@ -152,7 +152,11 @@ export function TodayView({
   const toggleBulkSelect = useCallback((key: string) => {
     setSelectedKeys((prev) => {
       const next = new Set(prev)
-      if (next.has(key)) next.delete(key); else next.add(key)
+      if (next.has(key)) {
+        next.delete(key)
+      } else {
+        next.add(key)
+      }
       return next
     })
   }, [])
@@ -161,7 +165,11 @@ export function TodayView({
     const { taskIds, eventIds, routineIds } = partitionSelection(selectedKeys)
     for (const id of taskIds) onUpdateTask?.(id, { bucket: target, scheduledFor: undefined })
     const skipped = eventIds.length + routineIds.length
-    if (skipped > 0) onNotify?.(`Deferred ${taskIds.length} — ${skipped} non-task item(s) skipped`)
+    if (skipped > 0) {
+      onNotify?.(taskIds.length > 0
+        ? `Deferred ${taskIds.length} — ${skipped} non-task item(s) skipped`
+        : `Nothing deferred — ${skipped} non-task item(s) can't be deferred`)
+    }
     clearBulkSelection()
   }, [selectedKeys, onUpdateTask, onNotify, clearBulkSelection])
 
@@ -207,7 +215,7 @@ export function TodayView({
 
   // Derived set of raw task IDs from selectedKeys — needed by OverdueSection
   // which operates on raw task IDs rather than timeline keys.
-  const selectedTaskKeyIds = useMemo(() => {
+  const overdueSelectedTaskIds = useMemo(() => {
     const s = new Set<string>()
     for (const k of selectedKeys) {
       if (k.startsWith('task-')) s.add(k.slice(5))
@@ -549,7 +557,7 @@ export function TodayView({
                   familyMembers={ctx.familyMembers}
                   onAssignTask={ctx.onAssignTask}
                   onAssignTaskAll={ctx.onAssignTaskAll}
-                  bulkSelectedIds={selectedTaskKeyIds}
+                  bulkSelectedIds={overdueSelectedTaskIds}
                   onToggleBulkSelect={(taskId) => toggleBulkSelect(`task-${taskId}`)}
                   followUpTaskId={followUpTaskId}
                   onToggleWithFollowUp={handleToggleTaskWithFollowUp}
