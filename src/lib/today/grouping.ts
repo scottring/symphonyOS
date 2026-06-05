@@ -88,46 +88,75 @@ export function buildGroupedSections(input: GroupingInput): Record<DaySection, T
   const allItems = [...taskItems, ...eventItems, ...routineItems]
   const sections = groupByDaySection(allItems)
 
-  // Post-process: move subtasks right after their parent task within each section
+  // ── Group relocation ─────────────────────────────────────────────────────
+  // A wrapper's children are task subtasks (parentTaskId) plus event/routine
+  // members (the wrapper's group_members). Members keep their own times, so a
+  // member can land in a different day-section than the wrapper; we pull it out
+  // and emit it right after the wrapper. Order-independent across sections.
+  const byId = new Map<string, TimelineItem>()
+  const originalSection = new Map<string, DaySection>()
   for (const key of Object.keys(sections) as DaySection[]) {
-    const items = sections[key]
-    const subtasks: TimelineItem[] = []
-    const nonSubtasks: TimelineItem[] = []
-
-    for (const item of items) {
-      if (item.isSubtask) {
-        subtasks.push(item)
-      } else {
-        nonSubtasks.push(item)
-      }
+    for (const item of sections[key]) {
+      byId.set(item.id, item)
+      originalSection.set(item.id, key)
     }
+  }
 
-    if (subtasks.length === 0) continue
+  // (2) Mark event/routine members as subtasks of their wrapper.
+  const relocatedIds = new Set<string>() // members pulled from their own time slot
+  for (const item of byId.values()) {
+    if (item.type !== 'task') continue
+    const refs = item.originalTask?.groupMembers
+    if (!refs?.length) continue
+    const wrapperRawId = item.id.replace('task-', '')
+    for (const ref of refs) {
+      const member = byId.get(`${ref.type}-${ref.id}`)
+      if (!member) continue // dangling ref — skip
+      member.isSubtask = true
+      member.parentTaskId = wrapperRawId
+      relocatedIds.add(member.id)
+    }
+  }
 
-    // Rebuild the section: insert subtasks after their parent
+  // (3) Index children (subtasks + members) by wrapper raw id.
+  const childrenByParent = new Map<string, TimelineItem[]>()
+  for (const item of byId.values()) {
+    if (item.isSubtask && item.parentTaskId) {
+      const arr = childrenByParent.get(item.parentTaskId) ?? []
+      arr.push(item)
+      childrenByParent.set(item.parentTaskId, arr)
+    }
+  }
+
+  // (4) Rebuild each section: wrapper then its children; skip children and
+  //     relocated members from their standalone slots.
+  const placed = new Set<string>()
+  for (const key of Object.keys(sections) as DaySection[]) {
     const result: TimelineItem[] = []
-    const placed = new Set<string>()
-
-    for (const item of nonSubtasks) {
+    for (const item of sections[key]) {
+      if (item.isSubtask) continue            // emitted under its parent
+      if (relocatedIds.has(item.id)) continue // member emitted under its wrapper
       result.push(item)
-      // Find subtasks belonging to this parent and insert them right after
-      const taskId = item.id.startsWith('task-') ? item.id.replace('task-', '') : null
-      if (taskId) {
-        for (const sub of subtasks) {
-          if (sub.parentTaskId === taskId) {
-            result.push(sub)
-            placed.add(sub.id)
-          }
+      const rawId = item.type === 'task' ? item.id.replace('task-', '') : null
+      if (rawId) {
+        for (const child of childrenByParent.get(rawId) ?? []) {
+          if (!placed.has(child.id)) { result.push(child); placed.add(child.id) }
         }
       }
     }
-
-    // Any subtasks whose parent isn't in this section — append at end
-    for (const sub of subtasks) {
-      if (!placed.has(sub.id)) result.push(sub)
-    }
-
     sections[key] = result
+  }
+
+  // (5) Orphan children (parent filtered out / not rendered): restore to their
+  //     original section so they never vanish. A relocated member reverts to a
+  //     normal standalone row.
+  for (const arr of childrenByParent.values()) {
+    for (const child of arr) {
+      if (placed.has(child.id)) continue
+      if (relocatedIds.has(child.id)) { child.isSubtask = false; child.parentTaskId = undefined }
+      const sec = originalSection.get(child.id)
+      if (sec) sections[sec].push(child)
+    }
   }
 
   return sections
