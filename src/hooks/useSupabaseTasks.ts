@@ -4,9 +4,9 @@ import { useAuth } from '@/hooks/useAuth'
 import { useFamilyMembers } from './useFamilyMembers'
 import { useToast } from './useToast'
 import { logger } from '@/lib/logger'
-import type { Task, TaskBucket, TaskLink, TaskContext, TaskCategory, LinkedActivity, LinkType, LinkedActivityType } from '@/types/task'
+import type { Task, TaskBucket, TaskLink, TaskContext, TaskCategory, LinkedActivity, LinkType, LinkedActivityType, GroupMemberRef } from '@/types/task'
 
-interface DbTask {
+export interface DbTask {
   id: string
   user_id: string
   title: string
@@ -27,6 +27,7 @@ interface DbTask {
   assigned_to_all: string[] | null
   project_id: string | null
   parent_task_id: string | null
+  group_members: GroupMemberRef[] | null
   linked_event_id: string | null
   // Generalized prep/follow-up linking
   link_type: 'prep' | 'followup' | null
@@ -91,6 +92,7 @@ export function dbTaskToTask(dbTask: DbTask): Task {
       : (dbTask.assigned_to ? [dbTask.assigned_to] : undefined),
     projectId: dbTask.project_id ?? undefined,
     parentTaskId: dbTask.parent_task_id ?? undefined,
+    groupMembers: (dbTask.group_members && dbTask.group_members.length > 0) ? dbTask.group_members : undefined,
     linkedEventId: dbTask.linked_event_id ?? undefined,
     linkedTo,
     linkType: dbTask.link_type ?? undefined,
@@ -720,6 +722,7 @@ export function useSupabaseTasks() {
     if ('assignedToAll' in updates) dbUpdates.assigned_to_all = updates.assignedToAll ?? null
     if ('projectId' in updates) dbUpdates.project_id = updates.projectId ?? null
     if ('parentTaskId' in updates) dbUpdates.parent_task_id = updates.parentTaskId ?? null
+    if ('groupMembers' in updates) dbUpdates.group_members = updates.groupMembers ?? []
     if ('linkedEventId' in updates) dbUpdates.linked_event_id = updates.linkedEventId ?? null
     if ('linkedTo' in updates) {
       dbUpdates.linked_activity_type = updates.linkedTo?.type ?? null
@@ -813,6 +816,7 @@ export function useSupabaseTasks() {
     if ('assignedToAll' in updates) dbUpdates.assigned_to_all = updates.assignedToAll ?? null
     if ('projectId' in updates) dbUpdates.project_id = updates.projectId ?? null
     if ('parentTaskId' in updates) dbUpdates.parent_task_id = updates.parentTaskId ?? null
+    if ('groupMembers' in updates) dbUpdates.group_members = updates.groupMembers ?? []
     if ('linkedEventId' in updates) dbUpdates.linked_event_id = updates.linkedEventId ?? null
     if ('linkedTo' in updates) {
       dbUpdates.linked_activity_type = updates.linkedTo?.type ?? null

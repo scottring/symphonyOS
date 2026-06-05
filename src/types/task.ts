@@ -21,6 +21,9 @@ export interface LinkedActivity {
   id: string // For routine_instance: "{routineId}_{date}", for others: entity id
 }
 
+/** A non-task member of a Today group (events/routines attach to the wrapper here; tasks use parentTaskId). */
+export type GroupMemberRef = { type: 'event' | 'routine'; id: string }
+
 export interface Task {
   id: string
   title: string
@@ -47,6 +50,8 @@ export interface Task {
   projectId?: string // Linked project
   parentTaskId?: string // If set, this is a subtask
   subtasks?: Task[] // Populated on fetch, not stored in DB
+  /** Wrapper-only: events/routines grouped under this task on Today. Tasks attach via parentTaskId. */
+  groupMembers?: GroupMemberRef[]
   linkedEventId?: string // Links prep task to meal event (legacy, use linkedTo instead)
   // Generalized linking for prep/follow-up tasks
   linkedTo?: LinkedActivity
