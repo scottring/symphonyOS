@@ -27,6 +27,7 @@ import { sundayOfWeek } from '@/lib/weekHelpers'
 import { detectContextSharingChange } from '@/lib/contextSharingToast'
 import { SHOW_PLANNED_MEALS_ON_TIMELINE } from '@/lib/mealsVisibility'
 import { convertTaskToProject } from '@/lib/convertTaskToProject'
+import { groupTasks } from '@/lib/today/groupTasks'
 import { DomainPageOutline } from '@/components/domain/DomainPageOutline'
 import { ViewRouter } from '@/components/layout/ViewRouter'
 import { AppShell, type PanelTab } from '@/components/layout/AppShell'
@@ -1068,6 +1069,20 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
         isAllDay: true,
       })
     },
+    onGroupTasks: async (taskIds: string[], groupName: string, date: Date, isAllDay: boolean) => {
+      const wrapperId = await groupTasks(
+        {
+          taskIds,
+          groupName,
+          date,
+          isAllDay,
+          assignedTo: getCurrentUserMember()?.id,
+          context: currentDomain !== 'universal' ? currentDomain : undefined,
+        },
+        { addTask, updateTask },
+      )
+      if (!wrapperId) showToast("Couldn't create group", 'warning')
+    },
     onCreateTaskAt: async (r: TimelineCaptureResult) => {
       const when = r.scheduledFor
       const id = await addTask(r.title, r.contactId, r.projectId, when ?? undefined, {
@@ -1162,7 +1177,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     onStartMeeting: meetingNotes.startMeeting,
     onUpdateEventProject: updateEventProject,
   }), [
-    handleToggleTask, toggleWaiting, handleUpdateTaskWithToast, pushTask, deleteTask, addTask, getCurrentUserMember, currentDomain, handleCreateFollowUp,
+    handleToggleTask, toggleWaiting, handleUpdateTaskWithToast, pushTask, deleteTask, addTask, updateTask, getCurrentUserMember, currentDomain, handleCreateFollowUp,
     addNote, deleteNote, appendToNote, notes,
     addRoutine, deleteRoutine, createEvent, deleteEvent, handleDeleteEvent,
     fmtT, setTlUndo, showToast,
