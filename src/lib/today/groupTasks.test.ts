@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
-import { groupTasks, removeFromGroup, ungroupTasks, deleteTaskGroup } from './groupTasks'
+import { groupTasks, removeFromGroup, ungroupTasks, deleteTaskGroup, groupItems } from './groupTasks'
+import type { GroupMemberRef } from '@/types/task'
 
 describe('groupTasks', () => {
   const date = new Date('2026-06-06T00:00:00')
@@ -121,5 +122,42 @@ describe('deleteTaskGroup', () => {
     expect(deleteTask).toHaveBeenNthCalledWith(2, 'b')
     expect(deleteTask).toHaveBeenNthCalledWith(3, 'wrap-1')
     expect(refetch.mock.invocationCallOrder[0]).toBeGreaterThan(Math.max(...deleteTask.mock.invocationCallOrder))
+  })
+})
+
+describe('groupItems', () => {
+  it('creates a wrapper, reparents tasks, and writes event/routine refs', async () => {
+    const calls: any[] = []
+    const deps = {
+      addTask: async () => 'wrapper-1',
+      updateTask: async (id: string, updates: any) => { calls.push({ id, updates }) },
+      refetch: async () => {},
+    }
+    const memberRefs: GroupMemberRef[] = [
+      { type: 'event', id: 'e1' }, { type: 'routine', id: 'r1' },
+    ]
+    const date = new Date('2026-06-05T00:00:00Z')
+    const wrapperId = await groupItems(
+      { taskIds: ['t1'], memberRefs, groupName: 'Morning', date, isAllDay: true },
+      deps,
+    )
+    expect(wrapperId).toBe('wrapper-1')
+    expect(calls).toContainEqual({ id: 't1', updates: { parentTaskId: 'wrapper-1', scheduledFor: date, isAllDay: true } })
+    expect(calls).toContainEqual({ id: 'wrapper-1', updates: { groupMembers: memberRefs } })
+  })
+
+  it('returns undefined and touches nothing if wrapper creation fails', async () => {
+    const calls: any[] = []
+    const deps = {
+      addTask: async () => undefined,
+      updateTask: async (id: string, u: any) => { calls.push({ id, u }) },
+      refetch: async () => {},
+    }
+    const wrapperId = await groupItems(
+      { taskIds: ['t1'], memberRefs: [], groupName: 'x', date: new Date(), isAllDay: true },
+      deps,
+    )
+    expect(wrapperId).toBeUndefined()
+    expect(calls).toHaveLength(0)
   })
 })

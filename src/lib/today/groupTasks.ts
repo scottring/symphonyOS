@@ -1,4 +1,4 @@
-import type { Task, TaskContext } from '@/types/task'
+import type { Task, TaskContext, GroupMemberRef } from '@/types/task'
 
 /** Options accepted by useSupabaseTasks.addTask (subset used here). */
 interface AddTaskOpts {
@@ -59,6 +59,44 @@ export async function groupTasks(
   }
   // Rebuild the nested tree so the wrapper + its new subtasks render now,
   // not only after a manual page refresh.
+  await deps.refetch?.()
+  return wrapperId
+}
+
+export interface GroupItemsInput {
+  taskIds: string[]
+  memberRefs: GroupMemberRef[]   // events + routines only (tasks use parentTaskId)
+  groupName: string
+  date: Date
+  isAllDay: boolean
+  assignedTo?: string
+  context?: TaskContext | null
+}
+
+/**
+ * Create a wrapper task and attach a mix of members: tasks reparent via
+ * parentTaskId (same as groupTasks); events/routines are recorded as refs in
+ * the wrapper's group_members. grouping.ts relocates all members under the
+ * wrapper card. Returns the wrapper id, or undefined if wrapper creation failed
+ * (in which case nothing is touched).
+ */
+export async function groupItems(
+  input: GroupItemsInput,
+  deps: GroupTasksDeps,
+): Promise<string | undefined> {
+  const { taskIds, memberRefs, groupName, date, isAllDay, assignedTo, context } = input
+  const wrapperId = await deps.addTask(groupName, undefined, undefined, date, {
+    isAllDay,
+    assignedTo,
+    context,
+  })
+  if (!wrapperId) return undefined
+  for (const id of taskIds) {
+    await deps.updateTask(id, { parentTaskId: wrapperId, scheduledFor: date, isAllDay })
+  }
+  if (memberRefs.length > 0) {
+    await deps.updateTask(wrapperId, { groupMembers: memberRefs })
+  }
   await deps.refetch?.()
   return wrapperId
 }
