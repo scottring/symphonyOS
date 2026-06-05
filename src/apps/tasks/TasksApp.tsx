@@ -1,8 +1,10 @@
 // src/apps/tasks/TasksApp.tsx
+import { useMemo, useRef } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ListsProvider } from '@/contexts/ListsContext';
 import { NotesProvider } from '@/contexts/NotesContext';
 import { GoalsProvider } from '@/contexts/GoalsContext';
+import { AppShellChromeContext, type AppShellChromeContextValue } from '@/contexts/AppShellChromeContext';
 import { HomeViewContainer } from './HomeViewContainer';
 import { InboxViewContainer } from './InboxViewContainer';
 import { TaskViewRoute } from './TaskViewRoute';
@@ -21,11 +23,29 @@ import { TaskViewRoute } from './TaskViewRoute';
 // for those paths.
 
 export function TasksApp() {
+  // HomeHeader (rendered by HomeView) consumes AppShellChrome, which the legacy
+  // AppShell provides. The Shell path has no AppShell, so supply a no-op chrome
+  // context here to keep AppShell's fail-fast guardrail intact while letting the
+  // Today masthead render. Chat/help buttons are inert in the Shell for now —
+  // wiring them to the Shell's own chrome is a follow-up.
+  const helpButtonRef = useRef<HTMLButtonElement>(null);
+  const chrome = useMemo<AppShellChromeContextValue>(
+    () => ({
+      chatOpen: false,
+      onChatOpenChange: () => {},
+      helpOpen: false,
+      onHelpOpenChange: () => {},
+      helpButtonRef,
+    }),
+    [],
+  );
+
   return (
-    <GoalsProvider>
-      <ListsProvider>
-        <NotesProvider>
-          <Routes>
+    <AppShellChromeContext.Provider value={chrome}>
+      <GoalsProvider>
+        <ListsProvider>
+          <NotesProvider>
+            <Routes>
             {/* Cutover paths (active when feature flag enabled) */}
             <Route path="/" element={<Navigate to="/today" replace />} />
             <Route path="today" element={<HomeViewContainer />} />
@@ -36,9 +56,10 @@ export function TasksApp() {
             <Route path="tasks-new/today" element={<HomeViewContainer />} />
             <Route path="tasks-new/inbox" element={<InboxViewContainer />} />
             <Route path="tasks-new/task/:taskId" element={<TaskViewRoute />} />
-          </Routes>
-        </NotesProvider>
-      </ListsProvider>
-    </GoalsProvider>
+            </Routes>
+          </NotesProvider>
+        </ListsProvider>
+      </GoalsProvider>
+    </AppShellChromeContext.Provider>
   );
 }

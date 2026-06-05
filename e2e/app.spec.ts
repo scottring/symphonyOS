@@ -34,6 +34,24 @@ test.describe('App', () => {
     await expect(page.getByText("Don't have an account?")).toBeVisible()
   })
 
+  test('renders the Shell Today view without crashing (regression: blank/errored Today)', async ({ page }) => {
+    // /tasks-new/today is the ungated Shell mount of the SAME Today container
+    // (HomeViewContainer) the /today cutover uses, so it exercises the full
+    // Shell -> TasksApp -> HomeViewContainer -> HomeView -> HomeHeader render
+    // path without a login. Guards against both Today regressions found on this
+    // branch: (a) the blank-Today routing bug (Shell mounted at a non-splat
+    // path) and (b) HomeHeader throwing because AppShellChrome context was
+    // absent in the Shell path.
+    await page.goto('/tasks-new/today')
+    // ErrorBoundary fallback must NOT appear.
+    await expect(page.getByText('Something went wrong')).toHaveCount(0)
+    // The Today masthead (HomeHeader) renders its Day/Week/Month view switcher
+    // (mounted more than once in the layout — assert the first). This is Today
+    // *content*, so it also guards the routing-blank regression: a blank Today
+    // would render the shell chrome but no switcher.
+    await expect(page.getByRole('button', { name: 'Week' }).first()).toBeVisible()
+  })
+
   test.skip('insert a task between two timeline items via the radial wheel', async ({ page: _page }) => {
     // Unskip when the Playwright auth fixture lands (see MEMORY: followup_e2e_auth_fixture).
     // 1. log in (fixture) 2. open Today 3. hover gap between two items
