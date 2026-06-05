@@ -93,6 +93,7 @@ export function buildGroupedSections(input: GroupingInput): Record<DaySection, T
   // members (the wrapper's group_members). Members keep their own times, so a
   // member can land in a different day-section than the wrapper; we pull it out
   // and emit it right after the wrapper. Order-independent across sections.
+  // (1) Index every item by id and record its original section.
   const byId = new Map<string, TimelineItem>()
   const originalSection = new Map<string, DaySection>()
   for (const key of Object.keys(sections) as DaySection[]) {
