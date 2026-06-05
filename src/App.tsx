@@ -50,7 +50,7 @@ import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings'
 import { useDetailPanelState } from '@/hooks/useDetailPanelState'
 import { useScheduleFiltering } from '@/hooks/useScheduleFiltering'
 import type { ViewType } from '@/components/layout/Sidebar'
-import type { LinkedActivityType, TaskLink, Task, TaskContext } from '@/types/task'
+import type { LinkedActivityType, TaskLink, Task, TaskContext, GroupMemberRef } from '@/types/task'
 import { useHiddenCalendarEvents } from '@/hooks/useHiddenCalendarEvents'
 import { useMealPlan } from '@/hooks/useMealPlan'
 import { useRecipes } from '@/hooks/useRecipes'
@@ -1083,7 +1083,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
       )
       if (!wrapperId) showToast("Couldn't create group", 'warning')
     },
-    onGroupItems: async (taskIds, memberRefs, groupName, date, isAllDay) => {
+    onGroupItems: async (taskIds: string[], memberRefs: GroupMemberRef[], groupName: string, date: Date, isAllDay: boolean) => {
       const wrapperId = await groupItems(
         {
           taskIds, memberRefs, groupName, date, isAllDay,
