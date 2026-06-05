@@ -1,4 +1,6 @@
 import { createPortal } from 'react-dom'
+import { useState } from 'react'
+import { FolderPlus } from 'lucide-react'
 import type { TaskContext } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
 import type { List, ListCategory } from '@/types/list'
@@ -16,6 +18,7 @@ interface BulkActionToolbarProps {
   onAssign: (memberIds: string[]) => void
   onSendToList: (listId: string) => void
   onCancel: () => void
+  onGroup?: (name: string, date: Date, isAllDay: boolean) => void
   // Pass through data for pickers
   familyMembers?: FamilyMember[]
   lists?: List[]
@@ -31,12 +34,34 @@ export function BulkActionToolbar({
   onAssign,
   onSendToList,
   onCancel,
+  onGroup,
   familyMembers = [],
   lists = [],
   listsByCategory,
   getScheduleItemsForDate,
 }: BulkActionToolbarProps) {
   const isMobile = useMobile()
+
+  const [grouping, setGrouping] = useState(false)
+  const [groupName, setGroupName] = useState('')
+  const [groupDate, setGroupDate] = useState<Date>(() => {
+    const d = new Date(); d.setHours(0, 0, 0, 0); return d
+  })
+  const [groupIsAllDay, setGroupIsAllDay] = useState(true)
+
+  const openGrouping = () => {
+    const d = new Date(); d.setHours(0, 0, 0, 0)
+    setGroupDate(d)
+    setGroupIsAllDay(true)
+    setGroupName('')
+    setGrouping(true)
+  }
+  const submitGroup = () => {
+    const name = groupName.trim()
+    if (!name || !onGroup) return
+    onGroup(name, groupDate, groupIsAllDay)
+    setGrouping(false)
+  }
 
   return createPortal(
     <div
@@ -45,7 +70,7 @@ export function BulkActionToolbar({
       }`}
     >
       <div
-        className={`bg-white rounded-xl border border-neutral-200 shadow-lg ${
+        className={`relative bg-white rounded-xl border border-neutral-200 shadow-lg ${
           isMobile
             ? 'p-3 w-full'
             : 'p-4 max-w-2xl flex items-center gap-4'
@@ -58,6 +83,18 @@ export function BulkActionToolbar({
 
         {/* Actions */}
         <div className={`flex items-center ${isMobile ? 'justify-around' : 'gap-2'}`}>
+          {/* Group — wrap selected tasks into a new parent task */}
+          {onGroup && (
+            <button
+              type="button"
+              onClick={openGrouping}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100 transition-colors"
+            >
+              <FolderPlus className="w-4 h-4" />
+              Group
+            </button>
+          )}
+
           {/* When — one picker covering both specific days and planning
               horizons (This Week / Next Month / Someday), so there aren't two
               competing "when" buttons. */}
@@ -108,6 +145,42 @@ export function BulkActionToolbar({
         >
           Cancel
         </button>
+
+        {/* Name + when popover for "Group" */}
+        {grouping && onGroup && (
+          <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-72 rounded-xl border border-neutral-200 bg-white p-3 shadow-lg">
+            <input
+              autoFocus
+              type="text"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') submitGroup()
+                if (e.key === 'Escape') setGrouping(false)
+              }}
+              placeholder="Name this group"
+              className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:border-primary-400 focus:outline-none"
+            />
+            <div className="mt-2 flex items-center justify-between">
+              <SchedulePopover
+                value={groupDate}
+                isAllDay={groupIsAllDay}
+                onSchedule={(date, isAllDay) => { setGroupDate(date); setGroupIsAllDay(isAllDay) }}
+                onClear={() => {}}
+                getItemsForDate={getScheduleItemsForDate || (() => [])}
+                itemTitle={groupName || 'group'}
+              />
+              <button
+                type="button"
+                onClick={submitGroup}
+                disabled={!groupName.trim()}
+                className="rounded-lg bg-primary-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Create group
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>,
     document.body
