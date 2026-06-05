@@ -16,6 +16,15 @@ export interface GroupTasksDeps {
     options: AddTaskOpts,
   ) => Promise<string | undefined>
   updateTask: (id: string, updates: Partial<Task>) => Promise<void> | void
+  /**
+   * Rebuild the task tree from the source of truth. Required for the group to
+   * appear immediately: `updateTask`'s optimistic path patches a reparented
+   * task in place without re-nesting it under its new parent, so the nested
+   * (parent.subtasks) shape the Today view renders from is only produced by a
+   * full fetch (the same thing a page refresh does). Called once after all
+   * reparents land.
+   */
+  refetch?: () => Promise<void> | void
 }
 
 export interface GroupTasksInput {
@@ -48,5 +57,8 @@ export async function groupTasks(
   for (const id of taskIds) {
     await deps.updateTask(id, { parentTaskId: wrapperId, scheduledFor: date, isAllDay })
   }
+  // Rebuild the nested tree so the wrapper + its new subtasks render now,
+  // not only after a manual page refresh.
+  await deps.refetch?.()
   return wrapperId
 }

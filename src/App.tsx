@@ -1079,7 +1079,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
           assignedTo: getCurrentUserMember()?.id,
           context: currentDomain !== 'universal' ? currentDomain : undefined,
         },
-        { addTask, updateTask },
+        { addTask, updateTask, refetch: refetchTasks },
       )
       if (!wrapperId) showToast("Couldn't create group", 'warning')
     },
@@ -1177,7 +1177,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
     onStartMeeting: meetingNotes.startMeeting,
     onUpdateEventProject: updateEventProject,
   }), [
-    handleToggleTask, toggleWaiting, handleUpdateTaskWithToast, pushTask, deleteTask, addTask, updateTask, getCurrentUserMember, currentDomain, handleCreateFollowUp,
+    handleToggleTask, toggleWaiting, handleUpdateTaskWithToast, pushTask, deleteTask, addTask, updateTask, refetchTasks, getCurrentUserMember, currentDomain, handleCreateFollowUp,
     addNote, deleteNote, appendToNote, notes,
     addRoutine, deleteRoutine, createEvent, deleteEvent, handleDeleteEvent,
     fmtT, setTlUndo, showToast,

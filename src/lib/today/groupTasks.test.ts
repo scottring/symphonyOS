@@ -39,4 +39,38 @@ describe('groupTasks', () => {
     expect(result).toBeUndefined()
     expect(updateTask).not.toHaveBeenCalled()
   })
+
+  // Reparenting via updateTask leaves children flat in client state (the
+  // optimistic path doesn't re-nest a task that's BECOMING a subtask), so the
+  // group wouldn't render until a manual refresh. groupTasks rebuilds the
+  // nested tree by calling the injected refetch after all reparents land.
+  it('refetches once, after reparenting, to rebuild the nested tree', async () => {
+    const addTask = vi.fn().mockResolvedValue('wrapper-1')
+    const updateTask = vi.fn().mockResolvedValue(undefined)
+    const refetch = vi.fn().mockResolvedValue(undefined)
+
+    await groupTasks(
+      { taskIds: ['a', 'b'], groupName: 'g', date, isAllDay: true },
+      { addTask, updateTask, refetch },
+    )
+
+    expect(refetch).toHaveBeenCalledTimes(1)
+    // refetch must run AFTER the last updateTask, not before/interleaved
+    const lastUpdateOrder = Math.max(...updateTask.mock.invocationCallOrder)
+    const refetchOrder = refetch.mock.invocationCallOrder[0]
+    expect(refetchOrder).toBeGreaterThan(lastUpdateOrder)
+  })
+
+  it('does not refetch when wrapper creation fails', async () => {
+    const addTask = vi.fn().mockResolvedValue(undefined)
+    const updateTask = vi.fn().mockResolvedValue(undefined)
+    const refetch = vi.fn().mockResolvedValue(undefined)
+
+    await groupTasks(
+      { taskIds: ['a'], groupName: 'x', date, isAllDay: true },
+      { addTask, updateTask, refetch },
+    )
+
+    expect(refetch).not.toHaveBeenCalled()
+  })
 })
