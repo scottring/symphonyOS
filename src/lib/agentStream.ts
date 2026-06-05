@@ -36,13 +36,18 @@ export interface StreamHandlers {
   onError?: (message: string) => void
 }
 
+export interface AgentApiMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
 /**
- * Open the agent-proxy SSE stream for one message and drive the handlers.
- * Uses the caller's Supabase JWT; the engine secret stays server-side.
+ * Stream the Symphony agent edge function for one conversation turn.
+ * Sends the full message history; the function verifies the caller's JWT
+ * and runs all tool queries RLS-scoped to that user.
  */
-export async function streamAgentChat(
-  message: string,
-  channelId: string,
+export async function streamSymphonyAgent(
+  messages: AgentApiMessage[],
   handlers: StreamHandlers,
 ): Promise<void> {
   const { data: { session } } = await supabase.auth.getSession()
@@ -52,14 +57,15 @@ export async function streamAgentChat(
   }
 
   const res = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agent-proxy`,
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/symphony-agent`,
     {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${session.access_token}`,
+        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ message, channelId }),
+      body: JSON.stringify({ messages }),
     },
   )
 
