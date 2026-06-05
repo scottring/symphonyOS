@@ -9,8 +9,7 @@ import { useSidebarGroupState } from '@/hooks/useSidebarGroupState'
 import { useHomes } from '@/hooks/useHomes'
 import { useSpaces } from '@/hooks/useSpaces'
 import { useLists } from '@/hooks/useLists'
-import { useSystemHealth } from '@/hooks/useSystemHealth'
-import { SidebarClarity } from './SidebarClarity'
+import { WeatherChip } from '@/components/schedule/WeatherChip'
 import type { PinnedItem } from '@/types/pin'
 import type { PinnableEntityType } from '@/types/pin'
 import type { Task } from '@/types/task'
@@ -21,7 +20,6 @@ import { ConceptIcon } from '@/lib/conceptIcons'
 import {
   Sun,
   CalendarRange,
-  CalendarCheck,
   UtensilsCrossed,
   FolderKanban,
   Home,
@@ -102,22 +100,23 @@ export function Sidebar({
 
   const { state: groupState, toggle: toggleGroup, setOpen: openGroup } = useSidebarGroupState()
 
-  // Auto-expand the folder containing the current view. "This Week" and
+  // Auto-expand the group containing the current view. "This Week" and
   // "Calendar" both route to activeView='today', so they can't be detected
-  // here — those folders just keep their persisted open/closed state.
+  // here — the PLAN group just keeps its persisted open/closed state for those.
+  // Group→state-key mapping: PLAN→'plan', HOME→'spaces', MORE→'library'.
   const planActive =
-    activeView === 'projects' || activeView === 'routines' || activeView === 'goals' ||
-    activeView === 'weekly-planning' || activeView === 'meals'
-  const libraryActive =
-    activeView === 'lists' ||
-    activeView === 'contacts' || activeView === 'contact-detail' || activeView === 'history'
-  const spacesActive = activeView === 'home-app'
+    activeView === 'projects' || activeView === 'routines'
+  const homeActive =
+    activeView === 'meals' || activeView === 'home-app' || activeView === 'lists'
+  const moreActive =
+    activeView === 'contacts' || activeView === 'contact-detail' || activeView === 'history' ||
+    location.pathname.startsWith('/jobs')
 
   useEffect(() => {
     if (planActive) openGroup('plan')
-    if (libraryActive) openGroup('library')
-    if (spacesActive) openGroup('spaces')
-  }, [planActive, libraryActive, spacesActive, openGroup])
+    if (homeActive) openGroup('spaces')
+    if (moreActive) openGroup('library')
+  }, [planActive, homeActive, moreActive, openGroup])
 
   const homeAppActive = activeView === 'home-app'
   const listsActive = activeView === 'lists'
@@ -137,12 +136,6 @@ export function Sidebar({
 
   const firstName = (userName || userEmail || '').split(/[\s@]/)[0] || 'there'
   const greetingWord = getGreetingWord()
-
-  const health = useSystemHealth({
-    tasks: entities?.tasks ?? [],
-    projects: entities?.projects ?? [],
-    projectsWithLinkedEvents: new Set(),
-  })
 
   // Nav item helper
   function navItemClass(active: boolean): string {
@@ -212,7 +205,12 @@ export function Sidebar({
         </div>
       )}
 
-      {!collapsed && <SidebarClarity healthColor={health.healthColor} />}
+      {/* Weather — moved here from the Today header (single home, always visible) */}
+      {!collapsed && (
+        <div className="px-5 pb-2">
+          <WeatherChip />
+        </div>
+      )}
 
       {/* Search row. Chat + Wall icons removed in Phase 1 (sidebar restraint);
           chat has its own surfaces and Wall is a rarely-used cross-tab action. */}
@@ -248,8 +246,18 @@ export function Sidebar({
         />
       )}
 
-      {/* Navigation — Today/Inbox pinned at top, the rest in collapsible folders */}
-      <nav className="flex-1 px-3 mt-4 space-y-0.5 overflow-y-auto">
+      {/* Navigation — grouped into TODAY / PLAN / HOME / MORE.
+          TODAY (Today + Inbox) is always visible; the rest are collapsible. */}
+      <nav className="flex-1 px-3 mt-2 space-y-0.5 overflow-y-auto">
+        <div className="border-t border-neutral-200/60 mb-1" />
+
+        {/* ── TODAY (always visible) ── */}
+        {!collapsed && (
+          <p className="px-3.5 pt-3 pb-1 text-[11px] font-medium text-neutral-400 uppercase tracking-wider">
+            Today
+          </p>
+        )}
+
         {/* Today — also forces HomeView D/W/M back to 'today' so clicking
             this link from Week/Workweek/Month returns the user to Day view. */}
         <button
@@ -287,12 +295,9 @@ export function Sidebar({
           )}
         </button>
 
-        {/* Divider between the everyday destinations and the folders */}
-        <div className="border-t border-neutral-200/60 my-3" />
-
-        {/* ── Planning ── */}
+        {/* ── PLAN ── This Week · Projects · Routines · Calendar */}
         <SidebarGroup
-          label="Planning"
+          label="Plan"
           open={groupState.plan}
           onToggle={() => toggleGroup('plan')}
           forceOpen={planActive}
@@ -316,15 +321,6 @@ export function Sidebar({
             {!collapsed && <span>This Week</span>}
           </button>
 
-          {/* Plan the week — weekly planning session view. */}
-          <button
-            onClick={() => onViewChange('weekly-planning')}
-            className={navItemClass(activeView === 'weekly-planning')}
-          >
-            {createElement(CalendarCheck, { className: 'w-5 h-5 shrink-0' })}
-            {!collapsed && <span>Plan the week</span>}
-          </button>
-
           {/* Projects */}
           <button
             onClick={() => onViewChange('projects')}
@@ -343,6 +339,24 @@ export function Sidebar({
             {!collapsed && <span>Routines</span>}
           </button>
 
+          {/* Calendar */}
+          <button
+            onClick={() => onViewChange('today')}
+            className={navItemClass(false)}
+          >
+            {createElement(Calendar, { className: 'w-5 h-5 shrink-0' })}
+            {!collapsed && <span>Calendar</span>}
+          </button>
+        </SidebarGroup>
+
+        {/* ── HOME ── Meals · Lists · House */}
+        <SidebarGroup
+          label="Home"
+          open={groupState.spaces}
+          onToggle={() => toggleGroup('spaces')}
+          forceOpen={homeActive}
+          collapsed={collapsed}
+        >
           {/* Meals */}
           <button
             onClick={() => onViewChange('meals')}
@@ -367,61 +381,7 @@ export function Sidebar({
               </button>
             </>
           )}
-        </SidebarGroup>
 
-        {/* ── Home ── */}
-        <SidebarGroup
-          label="Home"
-          open={groupState.spaces}
-          onToggle={() => toggleGroup('spaces')}
-          forceOpen={spacesActive}
-          collapsed={collapsed}
-        >
-          {/* House (was "Home" — renamed per Scott; same destination) */}
-          <button
-            onClick={() => onViewChange('home-app')}
-            className={navItemClass(homeAppActive)}
-            aria-label="House"
-          >
-            {createElement(Home, { className: 'w-5 h-5 shrink-0' })}
-            {!collapsed && <span>House</span>}
-          </button>
-          {!collapsed && homeAppActive && inlineRooms.map((r) => (
-            <button
-              key={r.id}
-              onClick={() => navigate(`/home/space/${r.id}`)}
-              className={`w-full flex items-center gap-3 pl-9 pr-3.5 py-2 rounded-lg transition-all duration-200 ${location.pathname === `/home/space/${r.id}` ? 'text-primary-700 bg-primary-50/60 font-medium' : 'text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700'}`}
-            >
-              <span className="text-[14px] truncate">{r.name}</span>
-            </button>
-          ))}
-          {!collapsed && homeAppActive && moreRoomsCount > 0 && (
-            <button
-              onClick={() => navigate('/home')}
-              className="w-full flex items-center gap-3 pl-9 pr-3.5 py-1.5 text-[13px] text-neutral-400 hover:text-neutral-600"
-            >
-              All rooms ({rooms.length}) →
-            </button>
-          )}
-
-          {/* Calendar */}
-          <button
-            onClick={() => onViewChange('today')}
-            className={navItemClass(false)}
-          >
-            {createElement(Calendar, { className: 'w-5 h-5 shrink-0' })}
-            {!collapsed && <span>Calendar</span>}
-          </button>
-        </SidebarGroup>
-
-        {/* ── Library ── */}
-        <SidebarGroup
-          label="Library"
-          open={groupState.library}
-          onToggle={() => toggleGroup('library')}
-          forceOpen={libraryActive}
-          collapsed={collapsed}
-        >
           {/* Lists */}
           {FEATURES.lists && (
             <>
@@ -452,6 +412,42 @@ export function Sidebar({
             </>
           )}
 
+          {/* House (was "Home" — renamed per Scott; same destination) */}
+          <button
+            onClick={() => onViewChange('home-app')}
+            className={navItemClass(homeAppActive)}
+            aria-label="House"
+          >
+            {createElement(Home, { className: 'w-5 h-5 shrink-0' })}
+            {!collapsed && <span>House</span>}
+          </button>
+          {!collapsed && homeAppActive && inlineRooms.map((r) => (
+            <button
+              key={r.id}
+              onClick={() => navigate(`/home/space/${r.id}`)}
+              className={`w-full flex items-center gap-3 pl-9 pr-3.5 py-2 rounded-lg transition-all duration-200 ${location.pathname === `/home/space/${r.id}` ? 'text-primary-700 bg-primary-50/60 font-medium' : 'text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700'}`}
+            >
+              <span className="text-[14px] truncate">{r.name}</span>
+            </button>
+          ))}
+          {!collapsed && homeAppActive && moreRoomsCount > 0 && (
+            <button
+              onClick={() => navigate('/home')}
+              className="w-full flex items-center gap-3 pl-9 pr-3.5 py-1.5 text-[13px] text-neutral-400 hover:text-neutral-600"
+            >
+              All rooms ({rooms.length}) →
+            </button>
+          )}
+        </SidebarGroup>
+
+        {/* ── MORE ── Contacts · History · Jobs (+ any registry apps) */}
+        <SidebarGroup
+          label="More"
+          open={groupState.library}
+          onToggle={() => toggleGroup('library')}
+          forceOpen={moreActive}
+          collapsed={collapsed}
+        >
           {/* Contacts */}
           <button
             onClick={() => onViewChange('contacts')}
@@ -469,45 +465,26 @@ export function Sidebar({
             {createElement(History, { className: 'w-5 h-5 shrink-0' })}
             {!collapsed && <span>History</span>}
           </button>
-        </SidebarGroup>
 
-        {/* Apps (registry-driven) */}
-        {(() => {
-          const registryEntries = appRegistry
+          {/* Registry-driven apps (Jobs, …) — folded in from the old Apps group */}
+          {appRegistry
             .filter((a) => a.sidebar)
             .sort((a, b) => a.sidebar!.order - b.sidebar!.order)
-          if (registryEntries.length === 0) return null
-          return (
-            <SidebarGroup
-              label="Apps"
-              open={groupState.apps}
-              onToggle={() => toggleGroup('apps')}
-              collapsed={collapsed}
-            >
-              {registryEntries.map((app) => {
-                const Icon = app.sidebar!.icon
-                const isActive = location.pathname === app.route || location.pathname.startsWith(`${app.route}/`)
-                return (
-                  <button
-                    key={app.id}
-                    onClick={() => navigate(app.route)}
-                    className={`
-                      w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-[15px]
-                      ${isActive
-                        ? 'bg-primary-50 text-primary-700 font-medium'
-                        : 'text-neutral-600 hover:bg-neutral-100/70'
-                      }
-                      ${collapsed ? 'justify-center' : ''}
-                    `}
-                  >
-                    <Icon className="w-5 h-5 shrink-0" />
-                    {!collapsed && <span>{app.sidebar!.label}</span>}
-                  </button>
-                )
-              })}
-            </SidebarGroup>
-          )
-        })()}
+            .map((app) => {
+              const Icon = app.sidebar!.icon
+              const isActive = location.pathname === app.route || location.pathname.startsWith(`${app.route}/`)
+              return (
+                <button
+                  key={app.id}
+                  onClick={() => navigate(app.route)}
+                  className={navItemClass(isActive)}
+                >
+                  <Icon className="w-5 h-5 shrink-0" />
+                  {!collapsed && <span>{app.sidebar!.label}</span>}
+                </button>
+              )
+            })}
+        </SidebarGroup>
       </nav>
 
       {/* Footer: Settings + Sign out + illustration + tagline */}

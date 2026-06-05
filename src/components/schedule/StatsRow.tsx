@@ -1,13 +1,15 @@
 // src/components/schedule/StatsRow.tsx
-import { CheckCircle2 } from 'lucide-react'
+import { ListChecks } from 'lucide-react'
 
 interface StatsRowProps {
   dueToday: number
   doneToday: number
   thisWeek: number
   total?: number          // kept in interface to avoid churn at call sites; not rendered
-  clarityLabel?: string   // kept in interface; not rendered (Clarity moved to sidebar)
+  clarityLabel?: string   // kept in interface; not rendered (clarityTrigger used instead)
   aiAvailable?: boolean   // kept in interface; not rendered
+  /** Interactive Clarity ring + remediation popover, rendered among the stats. */
+  clarityTrigger?: React.ReactNode
   weekTrigger?: React.ReactNode
   /** Glanceable "N to discuss" badge, rendered among the stats. */
   discussionTrigger?: React.ReactNode
@@ -19,19 +21,30 @@ interface StatsRowProps {
   endControls?: React.ReactNode
 }
 
-export function StatsRow({ dueToday, doneToday, weekTrigger, thisWeek, discussionTrigger, weatherTrigger, emailTrigger, endControls }: StatsRowProps) {
+export function StatsRow({ dueToday, doneToday, weekTrigger, thisWeek, clarityTrigger, discussionTrigger, weatherTrigger, emailTrigger, endControls }: StatsRowProps) {
+  const remainingToday = Math.max(0, dueToday - doneToday)
   return (
-    <div className="flex items-center flex-wrap gap-x-5 gap-y-2 text-[13px] text-neutral-500">
-      {/* Done today — desktop only, demoted */}
-      <span className="hidden md:inline-flex items-center gap-1.5 text-[12px] text-neutral-400">
-        <CheckCircle2 className="w-3.5 h-3.5 text-neutral-300" />
-        {doneToday} of {dueToday} done today
+    <div className="flex items-center flex-wrap gap-x-5 gap-y-2 text-[15px] text-neutral-600">
+      {/* Tasks remaining today — checklist icon + count (desktop only, demoted) */}
+      <span
+        className="hidden md:inline-flex items-center gap-1.5 text-[15px] text-neutral-600"
+        title={`${remainingToday} task${remainingToday === 1 ? '' : 's'} remaining today (${doneToday} of ${dueToday} done)`}
+      >
+        <ListChecks className="w-5 h-5 text-neutral-500" />
+        <span className="tabular-nums">{remainingToday}</span>
       </span>
 
       {/* This week — desktop only, demoted */}
       <span className="hidden md:inline-flex items-center gap-1.5 text-[12px] text-neutral-400">
         {weekTrigger ?? <>{thisWeek} {thisWeek === 1 ? 'task' : 'tasks'} this week</>}
       </span>
+
+      {/* Clarity — interactive ring + remediation popover (desktop only) */}
+      {clarityTrigger && (
+        <span className="hidden md:inline-flex items-center gap-1.5">
+          {clarityTrigger}
+        </span>
+      )}
 
       {discussionTrigger && (
         <span className="hidden md:inline-flex items-center gap-1.5">

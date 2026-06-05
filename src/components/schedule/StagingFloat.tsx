@@ -306,7 +306,7 @@ export function StagingFloat({
   // are no week tasks rather than the whole control disappearing.
 
   const triggerClass = inline
-    ? 'inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] text-neutral-500 hover:bg-neutral-100 transition-colors'
+    ? 'inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[15px] text-neutral-600 hover:bg-neutral-100 transition-colors'
     : 'flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-neutral-600 bg-white border border-neutral-200 shadow-sm hover:bg-neutral-50 transition-colors'
 
   return (
@@ -317,9 +317,9 @@ export function StagingFloat({
         onClick={() => setOpen((v) => !v)}
         className={triggerClass}
         aria-label="This week"
+        title="This week"
       >
-        <CalendarRange className="w-3.5 h-3.5" />
-        <span>This week</span>
+        <CalendarRange className="w-5 h-5" />
         <span className="font-semibold tabular-nums">{weekTasks.length}</span>
       </button>
 

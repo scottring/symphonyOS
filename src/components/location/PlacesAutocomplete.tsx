@@ -44,8 +44,17 @@ export function PlacesAutocomplete({
   const [query, setQuery] = useState(initialQuery)
   const [results, setResults] = useState<PlaceAutocompleteResult[]>([])
   const [isSearching, setIsSearching] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
+  const optionRefs = useRef<(HTMLButtonElement | null)[]>([])
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Keep the keyboard-highlighted option scrolled into view.
+  useEffect(() => {
+    if (activeIndex >= 0) {
+      optionRefs.current[activeIndex]?.scrollIntoView({ block: 'nearest' })
+    }
+  }, [activeIndex])
 
   // Focus input when editing starts
   useEffect(() => {
@@ -77,6 +86,7 @@ export function PlacesAutocomplete({
       setIsSearching(true)
       const searchResults = await onSearch(query)
       setResults(searchResults)
+      setActiveIndex(-1)
       setIsSearching(false)
     }, 300)
 
@@ -152,7 +162,29 @@ export function PlacesAutocomplete({
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (results.length === 0) return
+              if (e.key === 'ArrowDown') {
+                e.preventDefault()
+                setActiveIndex((i) => (i < results.length - 1 ? i + 1 : 0))
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault()
+                setActiveIndex((i) => (i <= 0 ? results.length - 1 : i - 1))
+              } else if (e.key === 'Enter') {
+                if (activeIndex >= 0 && results[activeIndex]) {
+                  e.preventDefault()
+                  handleSelectPlace(results[activeIndex])
+                }
+              } else if (e.key === 'Escape') {
+                setResults([])
+                setActiveIndex(-1)
+              }
+            }}
             placeholder={placeholder}
+            role="combobox"
+            aria-expanded={results.length > 0}
+            aria-controls="places-autocomplete-listbox"
+            aria-activedescendant={activeIndex >= 0 ? `place-option-${activeIndex}` : undefined}
             className="w-full pl-9 pr-10 py-3 text-base border border-neutral-200 rounded-xl
                        focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           />
@@ -166,12 +198,23 @@ export function PlacesAutocomplete({
 
       {/* Search results dropdown */}
       {results.length > 0 && (
-        <div className="absolute left-0 right-0 mt-2 bg-white border border-neutral-200 rounded-xl shadow-lg z-20 max-h-64 overflow-auto">
-          {results.map((result) => (
+        <div
+          id="places-autocomplete-listbox"
+          role="listbox"
+          className="absolute left-0 right-0 mt-2 bg-white border border-neutral-200 rounded-xl shadow-lg z-20 max-h-64 overflow-auto"
+        >
+          {results.map((result, index) => (
             <button
               key={result.placeId}
+              ref={(el) => { optionRefs.current[index] = el }}
+              id={`place-option-${index}`}
+              role="option"
+              aria-selected={index === activeIndex}
               onClick={() => handleSelectPlace(result)}
-              className="w-full px-4 py-3 text-left hover:bg-neutral-50 transition-colors first:rounded-t-xl last:rounded-b-xl border-b border-neutral-100 last:border-b-0"
+              onMouseEnter={() => setActiveIndex(index)}
+              className={`w-full px-4 py-3 text-left transition-colors first:rounded-t-xl last:rounded-b-xl border-b border-neutral-100 last:border-b-0 ${
+                index === activeIndex ? 'bg-primary-50' : 'hover:bg-neutral-50'
+              }`}
             >
               <p className="font-medium text-neutral-800 truncate">
                 {result.mainText}

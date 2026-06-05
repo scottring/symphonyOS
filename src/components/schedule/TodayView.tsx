@@ -28,15 +28,15 @@ import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 import { computeAnchorTime } from '@/lib/timelineAnchor'
 
-import { Eye, EyeOff, Repeat, CalendarClock, Mail } from 'lucide-react'
+import { Eye, EyeOff, Repeat, CalendarClock, Mail, Binoculars } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
 import { TodayAddInput } from './TodayAddInput'
 import { TimelineInsertPoint } from './TimelineInsertPoint'
 import { StatsRow } from './StatsRow'
+import { ClarityIndicator } from './ClarityIndicator'
 import { StagingFloat } from './StagingFloat'
-import { WeatherChip } from './WeatherChip'
 import { EveningMealCard } from './EveningMealCard'
 import { EndOfDayCard } from './EndOfDayCard'
 import { ScheduleItem } from './ScheduleItem'
@@ -294,13 +294,44 @@ export function TodayView({
     <button
       type="button"
       onClick={() => navigate('/inbox')}
-      className="inline-flex items-center gap-1.5 text-[13px] text-neutral-500 hover:text-neutral-700 transition-colors"
+      className="inline-flex items-center gap-1.5 text-[15px] text-neutral-600 hover:text-neutral-700 transition-colors"
       aria-label={`${activeEmailCount} email action${activeEmailCount !== 1 ? 's' : ''} in Inbox`}
     >
-      <Mail className="w-4 h-4 text-blue-400" />
+      <Mail className="w-5 h-5 text-blue-500" />
       {activeEmailCount} from email
     </button>
   ) : undefined
+
+  // ── Clarity binoculars + remediation popover for StatsRow ─────────────────────
+  // Interactive Clarity readout restored to the Today header (a static status
+  // glance also lives in the sidebar). Trigger is a binoculars icon with an
+  // explanatory hover tooltip; clicking opens ClarityIndicator's popover.
+  const clarityTrigger = (
+    <ClarityIndicator
+      tasks={tasks}
+      projects={projects}
+      familyMembers={familyMembers}
+      onScrollToInbox={() => navigate('/inbox')}
+      onClearAssigneeFilter={onSelectAssignees ? () => onSelectAssignees([]) : undefined}
+      onOpenProject={ctx.onOpenProject}
+      onAssignTaskAll={onAssignTaskAll}
+      trigger={
+        <span className="group relative inline-flex items-center">
+          <Binoculars
+            className="w-5 h-5 text-neutral-500 group-hover:text-neutral-700 transition-colors"
+            aria-label="Clarity — review what needs attention"
+          />
+          <span
+            role="tooltip"
+            className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 hidden group-hover:block w-56 rounded-lg bg-neutral-800 px-3 py-2 text-[11px] leading-snug text-white shadow-lg"
+          >
+            <span className="font-medium">Clarity</span> — a quick read on how settled your
+            tasks and projects are. Click to see what still needs a home.
+          </span>
+        </span>
+      }
+    />
+  )
 
   // ── Tasks map for parent task lookup ─────────────────────────────────────────
   const tasksMap = useMemo(() => {
@@ -369,9 +400,9 @@ export function TodayView({
           total={tasks.filter((t) => !t.completed).length}
           aiAvailable={false}
           weekTrigger={weekTrigger}
+          clarityTrigger={clarityTrigger}
           discussionTrigger={discussion.length > 0 ? <DiscussionBadge items={discussion} onSelectItem={onSelectItem} /> : undefined}
           emailTrigger={emailNudge}
-          weatherTrigger={<WeatherChip />}
           endControls={
             <>
               {onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
@@ -387,9 +418,9 @@ export function TodayView({
                 onClick={toggleHideRoutines}
                 title={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
                 aria-label={hideRoutines ? 'Show daily' : 'Hide daily'}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm transition-all ${hideRoutines ? 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100' : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100'}`}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[15px] transition-all ${hideRoutines ? 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100' : 'text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100'}`}
               >
-                {createElement(hideRoutines ? EyeOff : Eye, { className: 'w-4 h-4' })}
+                {createElement(hideRoutines ? EyeOff : Eye, { className: 'w-5 h-5' })}
                 <span>{hideRoutines ? 'Show daily' : 'Hide daily'}</span>
               </button>
               {data.isToday && ctx.onOpenPlanning && (
@@ -398,9 +429,9 @@ export function TodayView({
                   onClick={ctx.onOpenPlanning}
                   title="Plan day — drag unscheduled tasks and routines onto the timeline"
                   aria-label="Plan day"
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm text-primary-600 hover:bg-primary-50 transition-all"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[15px] text-primary-600 hover:bg-primary-50 transition-all"
                 >
-                  <CalendarClock className="w-4 h-4" />
+                  <CalendarClock className="w-5 h-5" />
                   <span>Plan day</span>
                 </button>
               )}
