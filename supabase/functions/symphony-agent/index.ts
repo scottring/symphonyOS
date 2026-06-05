@@ -161,6 +161,43 @@ const TOOLS = [
   },
 ]
 
+// ── Scheduling normalization ───────────────────────────────────────
+// The Today view buckets by the app's timezone (America/New_York). An
+// all-day task must be stored at LOCAL midnight expressed in UTC (e.g.
+// 2026-06-06 -> 2026-06-06T04:00:00Z in EDT) or it shifts to the wrong day.
+const APP_TZ = 'America/New_York'
+
+function etOffsetMinutes(dateStr: string): number {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const utcNoon = new Date(Date.UTC(y, m - 1, d, 12))
+  const name = new Intl.DateTimeFormat('en-US', { timeZone: APP_TZ, timeZoneName: 'shortOffset' })
+    .formatToParts(utcNoon).find((p) => p.type === 'timeZoneName')?.value ?? 'GMT-5'
+  const mt = name.match(/GMT([+-])(\d{1,2})(?::?(\d{2}))?/)
+  if (!mt) return -300
+  const sign = mt[1] === '-' ? -1 : 1
+  return sign * (parseInt(mt[2]) * 60 + (mt[3] ? parseInt(mt[3]) : 0))
+}
+
+/** Resolve scheduled_for + is_all_day + bucket from raw tool input. */
+function normalizeSchedule(
+  scheduledFor: unknown,
+  isAllDay: unknown,
+): { scheduled_for: string | null; is_all_day: boolean; bucket: string } {
+  if (!scheduledFor || typeof scheduledFor !== 'string') {
+    return { scheduled_for: null, is_all_day: isAllDay === true, bucket: 'inbox' }
+  }
+  const hasTime = /T\d{2}:\d{2}/.test(scheduledFor)
+  const allDay = typeof isAllDay === 'boolean' ? isAllDay : !hasTime
+  let sf = scheduledFor
+  if (allDay && !hasTime) {
+    const dateStr = scheduledFor.slice(0, 10)
+    const offMin = etOffsetMinutes(dateStr)
+    const utcMs = Date.parse(`${dateStr}T00:00:00Z`) - offMin * 60000
+    sf = new Date(utcMs).toISOString()
+  }
+  return { scheduled_for: sf, is_all_day: allDay, bucket: 'timed' }
+}
+
 // ── Tool executor (RLS-scoped via userSupabase) ────────────────────
 async function runTool(
   db: SupabaseClient,
@@ -188,10 +225,18 @@ async function runTool(
         return `${(data || []).length} tasks:\n${JSON.stringify(data, null, 2)}`
       }
       case 'symphony_create_task': {
-        const bucket = input.scheduled_for ? 'timed' : (input.bucket ?? 'inbox')
-        const { id, ...rest } = input as Record<string, unknown>
+        const { id: _id, scheduled_for, is_all_day, bucket: rawBucket, ...rest } = input as Record<string, unknown>
+        const sched = normalizeSchedule(scheduled_for, is_all_day)
+        const bucket = sched.scheduled_for ? 'timed' : ((rawBucket as string) ?? 'inbox')
         const { data, error } = await db.from('tasks')
-          .insert({ ...rest, bucket, user_id: userId, completed: false })
+          .insert({
+            ...rest,
+            scheduled_for: sched.scheduled_for,
+            is_all_day: sched.is_all_day,
+            bucket,
+            user_id: userId,
+            completed: false,
+          })
           .select().single()
         if (error) throw error
         return JSON.stringify(data, null, 2)
@@ -199,6 +244,17 @@ async function runTool(
       case 'symphony_update_task': {
         const { id, ...updates } = input as Record<string, unknown>
         if (!id) return 'Error: id is required'
+        // Normalize a (re)schedule the same way create does.
+        if ('scheduled_for' in updates) {
+          const sched = normalizeSchedule(updates.scheduled_for, updates.is_all_day)
+          updates.scheduled_for = sched.scheduled_for
+          if (sched.scheduled_for) {
+            updates.is_all_day = sched.is_all_day
+            updates.bucket = 'timed'
+          } else {
+            updates.bucket = (updates.bucket as string) ?? 'inbox'
+          }
+        }
         const { data, error } = await db.from('tasks')
           .update({ ...updates, updated_at: now() }).eq('id', id).select().single()
         if (error) throw error
