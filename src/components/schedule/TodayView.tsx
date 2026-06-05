@@ -8,7 +8,7 @@
  * NOT wired to the route yet — that happens in R4.
  */
 import { createElement, useMemo, useCallback, useRef, useState, useEffect } from 'react'
-import type { Task } from '@/types/task'
+import type { Task, GroupMemberRef } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
@@ -20,6 +20,7 @@ import type { HomeViewType } from '@/types/homeView'
 import { useMobile } from '@/hooks/useMobile'
 import { useTodayData } from '@/hooks/useTodayData'
 import { mergeAssignees } from '@/lib/today/bulkAssign'
+import { partitionSelection } from '@/lib/today/timelineKey'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useProactiveSuggestions } from '@/hooks/useProactiveSuggestions'
 import { useRoutineStats } from '@/hooks/useRoutineStats'
@@ -134,57 +135,85 @@ export function TodayView({
   const ctx = useScheduleActionsContext()
   const {
     onToggleWaiting, onUpdateTask, onPushTask,
-    onGroupTasks,
+    onGroupTasks, onGroupItems,
     onAssignTask, onAssignTaskAll, onAssignEvent, onAssignEventAll,
     onAssignRoutine, onAssignRoutineAll,
     onSkipRoutine, onPushRoutine, onUpdateRoutine,
     onSkipEvent, onPushEvent, onUpdateEventContext,
     onOpenTask, onOpenGuidedChat, onCreateFollowUp,
+    onNotify,
     contactsMap, projectsMap, familyMembers = [],
     eventNotesMap,
   } = ctx
 
-  // ── Bulk multi-select (hover checkbox on task rows → bottom action bar) ──────
-  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(() => new Set())
-  const clearBulkSelection = useCallback(() => setSelectedTaskIds(new Set()), [])
-  const toggleBulkSelect = useCallback((taskId: string) => {
-    setSelectedTaskIds((prev) => {
+  // ── Bulk multi-select (hover checkbox on any row → bottom action bar) ──────
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set())
+  const clearBulkSelection = useCallback(() => setSelectedKeys(new Set()), [])
+  const toggleBulkSelect = useCallback((key: string) => {
+    setSelectedKeys((prev) => {
       const next = new Set(prev)
-      if (next.has(taskId)) next.delete(taskId)
-      else next.add(taskId)
+      if (next.has(key)) next.delete(key); else next.add(key)
       return next
     })
   }, [])
+
   const handleBulkDefer = useCallback((target: 'week' | 'month' | 'quarter') => {
-    if (!onUpdateTask) return
-    for (const id of selectedTaskIds) onUpdateTask(id, { bucket: target, scheduledFor: undefined })
+    const { taskIds, eventIds, routineIds } = partitionSelection(selectedKeys)
+    for (const id of taskIds) onUpdateTask?.(id, { bucket: target, scheduledFor: undefined })
+    const skipped = eventIds.length + routineIds.length
+    if (skipped > 0) onNotify?.(`Deferred ${taskIds.length} — ${skipped} non-task item(s) skipped`)
     clearBulkSelection()
-  }, [selectedTaskIds, onUpdateTask, clearBulkSelection])
+  }, [selectedKeys, onUpdateTask, onNotify, clearBulkSelection])
+
   const handleBulkSchedule = useCallback((date: Date, isAllDay: boolean) => {
-    if (!onUpdateTask) return
-    for (const id of selectedTaskIds) onUpdateTask(id, { bucket: 'timed', scheduledFor: date, isAllDay })
+    const { taskIds, eventIds, routineIds } = partitionSelection(selectedKeys)
+    for (const id of taskIds) onUpdateTask?.(id, { bucket: 'timed', scheduledFor: date, isAllDay })
+    for (const id of routineIds) onPushRoutine?.(id, date)
+    for (const id of eventIds) onPushEvent?.(id, date)
     clearBulkSelection()
-  }, [selectedTaskIds, onUpdateTask, clearBulkSelection])
+  }, [selectedKeys, onUpdateTask, onPushRoutine, onPushEvent, clearBulkSelection])
+
   const handleBulkSetContext = useCallback((context: Task['context']) => {
-    if (!onUpdateTask) return
-    for (const id of selectedTaskIds) onUpdateTask(id, { context })
+    const { taskIds, eventIds, routineIds } = partitionSelection(selectedKeys)
+    for (const id of taskIds) onUpdateTask?.(id, { context })
+    for (const id of eventIds) onUpdateEventContext?.(id, context ?? null)
+    if (routineIds.length > 0) onNotify?.(`Context set — ${routineIds.length} routine(s) skipped (edit the routine to change every day)`)
     clearBulkSelection()
-  }, [selectedTaskIds, onUpdateTask, clearBulkSelection])
+  }, [selectedKeys, onUpdateTask, onUpdateEventContext, onNotify, clearBulkSelection])
+
   // Additive assign: union the chosen members into each task's existing
   // assignees (so "assign these to Iris" adds Iris without dropping Scott),
   // matching the user's "if she isn't already assigned" intent.
   const handleBulkAssign = useCallback((memberIds: string[]) => {
-    if (!onAssignTaskAll) return
-    for (const id of selectedTaskIds) {
-      onAssignTaskAll(id, mergeAssignees(tasks.find((x) => x.id === id), memberIds))
+    const { taskIds, eventIds, routineIds } = partitionSelection(selectedKeys)
+    for (const id of taskIds) {
+      onAssignTaskAll?.(id, mergeAssignees(tasks.find((x) => x.id === id), memberIds))
     }
+    for (const id of eventIds) onAssignEventAll?.(id, memberIds)
+    if (routineIds.length > 0) onNotify?.(`Assigned — ${routineIds.length} routine(s) skipped`)
     clearBulkSelection()
-  }, [selectedTaskIds, tasks, onAssignTaskAll, clearBulkSelection])
+  }, [selectedKeys, tasks, onAssignTaskAll, onAssignEventAll, onNotify, clearBulkSelection])
+
   const handleBulkGroup = useCallback(async (name: string, date: Date, isAllDay: boolean) => {
-    if (!onGroupTasks) return
-    await onGroupTasks(Array.from(selectedTaskIds), name, date, isAllDay)
+    const { taskIds, eventIds, routineIds } = partitionSelection(selectedKeys)
+    const memberRefs: GroupMemberRef[] = [
+      ...eventIds.map((id) => ({ type: 'event' as const, id })),
+      ...routineIds.map((id) => ({ type: 'routine' as const, id })),
+    ]
+    if (onGroupItems) await onGroupItems(taskIds, memberRefs, name, date, isAllDay)
+    else if (onGroupTasks) await onGroupTasks(taskIds, name, date, isAllDay)
     clearBulkSelection()
-  }, [selectedTaskIds, onGroupTasks, clearBulkSelection])
+  }, [selectedKeys, onGroupItems, onGroupTasks, clearBulkSelection])
+
+  // Derived set of raw task IDs from selectedKeys — needed by OverdueSection
+  // which operates on raw task IDs rather than timeline keys.
+  const selectedTaskKeyIds = useMemo(() => {
+    const s = new Set<string>()
+    for (const k of selectedKeys) {
+      if (k.startsWith('task-')) s.add(k.slice(5))
+    }
+    return s
+  }, [selectedKeys])
 
   // ── Hide-routines toggle (localStorage parity) ────────────────────────────────
   const [hideRoutines, setHideRoutines] = useState<boolean>(() => readHideRoutines())
@@ -520,8 +549,8 @@ export function TodayView({
                   familyMembers={ctx.familyMembers}
                   onAssignTask={ctx.onAssignTask}
                   onAssignTaskAll={ctx.onAssignTaskAll}
-                  bulkSelectedIds={selectedTaskIds}
-                  onToggleBulkSelect={toggleBulkSelect}
+                  bulkSelectedIds={selectedTaskKeyIds}
+                  onToggleBulkSelect={(taskId) => toggleBulkSelect(`task-${taskId}`)}
                   followUpTaskId={followUpTaskId}
                   onToggleWithFollowUp={handleToggleTaskWithFollowUp}
                   onFollowUpSubmit={onCreateFollowUp ? handleFollowUpSubmit : undefined}
@@ -682,10 +711,10 @@ export function TodayView({
                         <ScheduleItem
                           item={item}
                           selected={selectedItemId === item.id}
-                          bulkSelectable={item.type === 'task' && !!taskId}
-                          bulkSelected={!!taskId && selectedTaskIds.has(taskId)}
-                          showBulkAffordance={selectedTaskIds.size > 0}
-                          onToggleBulkSelect={taskId ? () => toggleBulkSelect(taskId) : undefined}
+                          bulkSelectable={true}
+                          bulkSelected={selectedKeys.has(item.id)}
+                          showBulkAffordance={selectedKeys.size > 0}
+                          onToggleBulkSelect={() => toggleBulkSelect(item.id)}
                           onSelect={() => handleSelectItem(item.id)}
                           onToggleWaiting={
                             item.type === 'task' && taskId && onToggleWaiting
@@ -840,14 +869,14 @@ export function TodayView({
 
       {/* Bulk action bar — appears when ≥1 task row is selected via the
           hover checkbox. Reuses the shared toolbar (Inbox uses the same). */}
-      {selectedTaskIds.size > 0 && (
+      {selectedKeys.size > 0 && (
         <BulkActionToolbar
-          selectedCount={selectedTaskIds.size}
+          selectedCount={selectedKeys.size}
           onDefer={handleBulkDefer}
           onSchedule={handleBulkSchedule}
           onSetContext={handleBulkSetContext}
           onAssign={handleBulkAssign}
-          onGroup={onGroupTasks ? handleBulkGroup : undefined}
+          onGroup={(onGroupItems || onGroupTasks) ? handleBulkGroup : undefined}
           onSendToList={() => {}}
           onCancel={clearBulkSelection}
           familyMembers={familyMembers}
