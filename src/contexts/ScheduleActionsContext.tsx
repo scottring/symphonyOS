@@ -18,6 +18,12 @@ export interface ScheduleActionsValue {
   onPushTask?: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
   onDeleteTask?: (id: string) => void
   onCreateTask?: (title: string) => void
+  onGroupTasks?: (
+    taskIds: string[],
+    groupName: string,
+    date: Date,
+    isAllDay: boolean,
+  ) => Promise<void>
   onCreateFollowUp?: (title: string, sourceTaskId: string) => void
 
   // Timeline insert-point create flows (radial wheel picks)
