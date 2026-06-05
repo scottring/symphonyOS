@@ -52,6 +52,12 @@ interface TapContextPanelProps {
   onOpenRelated: (kind: MightBeRelevantItem['kind'], id: string) => void
   onToggleSubtask: (id: string) => void
   onAddSubtask: (title: string) => void
+  /** Detach a subtask from this group (becomes standalone). Group management only. */
+  onRemoveSubtask?: (id: string) => void
+  /** Dissolve this group, keeping the tasks. Present only when the task has subtasks. */
+  onUngroup?: () => void
+  /** Delete this group and all its tasks. Present only when the task has subtasks. */
+  onDeleteGroup?: () => void
   onAddLink: (url: string) => void
   onUpdateLocation: (location: string, placeId?: string) => void
   onClearLocation: () => void
@@ -125,6 +131,8 @@ export function TapContextPanel(props: TapContextPanelProps) {
         onClearSchedule={props.onClearSchedule}
         onTogglePin={props.onTogglePin}
         onDelete={props.onDelete}
+        onUngroup={(task.subtasks?.length ?? 0) > 0 ? props.onUngroup : undefined}
+        onDeleteGroup={(task.subtasks?.length ?? 0) > 0 ? props.onDeleteGroup : undefined}
       />
       <PanelClassify
         context={task.context}
@@ -147,6 +155,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
         onToggleSubtask={props.onToggleSubtask}
         onAddSubtask={props.onAddSubtask}
         onOpenSubtask={props.onOpenTask}
+        onRemoveSubtask={props.onRemoveSubtask}
       />
       <PanelPeople
         contact={linked.contact}

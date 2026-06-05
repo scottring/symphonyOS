@@ -1,16 +1,26 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { MoreHorizontal, Pin, PinOff, Trash2 } from 'lucide-react'
+import { MoreHorizontal, Pin, PinOff, Trash2, FolderMinus } from 'lucide-react'
 
 interface PanelMoreMenuProps {
   isPinned: boolean
   onTogglePin: () => void
   onDelete: () => void
+  /**
+   * Group actions — passed only when the task is a group wrapper (has
+   * subtasks). When present, the plain "Delete" is replaced by "Ungroup"
+   * (dissolve, keep tasks) + "Delete group + tasks", because deleting just the
+   * wrapper would orphan its children.
+   */
+  onUngroup?: () => void
+  onDeleteGroup?: () => void
 }
 
-export function PanelMoreMenu({ isPinned, onTogglePin, onDelete }: PanelMoreMenuProps) {
+export function PanelMoreMenu({ isPinned, onTogglePin, onDelete, onUngroup, onDeleteGroup }: PanelMoreMenuProps) {
+  const isGroup = !!onUngroup || !!onDeleteGroup
   const [open, setOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [confirmingGroup, setConfirmingGroup] = useState(false)
   const [pos, setPos] = useState({ top: 0, right: 0 })
   const buttonRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -29,6 +39,7 @@ export function PanelMoreMenu({ isPinned, onTogglePin, onDelete }: PanelMoreMenu
       if (!buttonRef.current?.contains(target) && !menuRef.current?.contains(target)) {
         setOpen(false)
         setConfirming(false)
+        setConfirmingGroup(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -38,6 +49,7 @@ export function PanelMoreMenu({ isPinned, onTogglePin, onDelete }: PanelMoreMenu
   function close() {
     setOpen(false)
     setConfirming(false)
+    setConfirmingGroup(false)
   }
 
   return (
@@ -64,8 +76,42 @@ export function PanelMoreMenu({ isPinned, onTogglePin, onDelete }: PanelMoreMenu
             {isPinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
             <span>{isPinned ? 'Unpin' : 'Pin'}</span>
           </button>
+
+          {/* Group wrapper: Ungroup (keep tasks) instead of a plain delete that
+              would orphan the children. */}
+          {isGroup && onUngroup && (
+            <button
+              onClick={() => { onUngroup(); close() }}
+              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
+            >
+              <FolderMinus className="w-4 h-4" />
+              <span>Ungroup (keep tasks)</span>
+            </button>
+          )}
+
           <div className="border-t border-neutral-100 my-1" />
-          {confirming ? (
+
+          {isGroup ? (
+            onDeleteGroup && (
+              confirmingGroup ? (
+                <button
+                  onClick={() => { onDeleteGroup(); close() }}
+                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-rose-700 bg-rose-50 hover:bg-rose-100 transition-colors font-semibold"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Delete group + tasks</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setConfirmingGroup(true)}
+                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-rose-600 hover:bg-rose-50 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Delete group + tasks</span>
+                </button>
+              )
+            )
+          ) : confirming ? (
             <button
               onClick={() => { onDelete(); close() }}
               className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-rose-700 bg-rose-50 hover:bg-rose-100 transition-colors font-semibold"

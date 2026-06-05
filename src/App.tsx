@@ -27,7 +27,7 @@ import { sundayOfWeek } from '@/lib/weekHelpers'
 import { detectContextSharingChange } from '@/lib/contextSharingToast'
 import { SHOW_PLANNED_MEALS_ON_TIMELINE } from '@/lib/mealsVisibility'
 import { convertTaskToProject } from '@/lib/convertTaskToProject'
-import { groupTasks } from '@/lib/today/groupTasks'
+import { groupTasks, removeFromGroup, ungroupTasks, deleteTaskGroup } from '@/lib/today/groupTasks'
 import { DomainPageOutline } from '@/components/domain/DomainPageOutline'
 import { ViewRouter } from '@/components/layout/ViewRouter'
 import { AppShell, type PanelTab } from '@/components/layout/AppShell'
@@ -1395,6 +1395,17 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
               }}
               onToggleSubtask={(id) => handleToggleTask(id)}
               onAddSubtask={(title) => addSubtask(selectedItem.originalTask!.id, title)}
+              onRemoveSubtask={(id) => { void removeFromGroup(id, { updateTask, refetch: refetchTasks }) }}
+              onUngroup={() => {
+                const t = selectedItem.originalTask!
+                void ungroupTasks(t.id, (t.subtasks ?? []).map((s) => s.id), { updateTask, deleteTask, refetch: refetchTasks })
+                setSelectedItemId(null)
+              }}
+              onDeleteGroup={() => {
+                const t = selectedItem.originalTask!
+                void deleteTaskGroup(t.id, (t.subtasks ?? []).map((s) => s.id), { deleteTask, refetch: refetchTasks })
+                setSelectedItemId(null)
+              }}
               onAddLink={(url) => {
                 const t = selectedItem.originalTask!
                 const next: TaskLink[] = [...(t.links ?? []), { url }]

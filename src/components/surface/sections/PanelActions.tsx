@@ -15,6 +15,9 @@ interface PanelActionsProps {
   onClearSchedule?: () => void
   onTogglePin: () => void
   onDelete: () => void
+  /** Group-wrapper actions, forwarded to the more-menu (present only for a task with subtasks). */
+  onUngroup?: () => void
+  onDeleteGroup?: () => void
 }
 
 export function PanelActions({
@@ -30,6 +33,8 @@ export function PanelActions({
   onClearSchedule,
   onTogglePin,
   onDelete,
+  onUngroup,
+  onDeleteGroup,
 }: PanelActionsProps) {
   return (
     <div className="flex flex-wrap gap-2">
@@ -66,7 +71,13 @@ export function PanelActions({
           </button>
         }
       />
-      <PanelMoreMenu isPinned={isPinned} onTogglePin={onTogglePin} onDelete={onDelete} />
+      <PanelMoreMenu
+        isPinned={isPinned}
+        onTogglePin={onTogglePin}
+        onDelete={onDelete}
+        onUngroup={onUngroup}
+        onDeleteGroup={onDeleteGroup}
+      />
     </div>
   )
 }

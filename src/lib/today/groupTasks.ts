@@ -62,3 +62,51 @@ export async function groupTasks(
   await deps.refetch?.()
   return wrapperId
 }
+
+type UpdateFn = (id: string, updates: Partial<Task>) => Promise<void> | void
+type DeleteFn = (id: string) => Promise<void> | void
+type RefetchFn = () => Promise<void> | void
+
+/**
+ * Remove a single task from its group: detach it from its parent so it returns
+ * to being a standalone task (it keeps its own schedule). Refetch rebuilds the
+ * tree (the optimistic path doesn't promote a detached subtask back to top level).
+ */
+export async function removeFromGroup(
+  taskId: string,
+  deps: { updateTask: UpdateFn; refetch?: RefetchFn },
+): Promise<void> {
+  await deps.updateTask(taskId, { parentTaskId: undefined })
+  await deps.refetch?.()
+}
+
+/**
+ * Dissolve a group but keep its tasks: detach every child first (so none is
+ * orphaned), then delete the now-empty wrapper. Refetch rebuilds the tree.
+ */
+export async function ungroupTasks(
+  wrapperId: string,
+  childIds: string[],
+  deps: { updateTask: UpdateFn; deleteTask: DeleteFn; refetch?: RefetchFn },
+): Promise<void> {
+  for (const id of childIds) {
+    await deps.updateTask(id, { parentTaskId: undefined })
+  }
+  await deps.deleteTask(wrapperId)
+  await deps.refetch?.()
+}
+
+/**
+ * Delete a whole group: every child plus the wrapper. Refetch rebuilds the tree.
+ */
+export async function deleteTaskGroup(
+  wrapperId: string,
+  childIds: string[],
+  deps: { deleteTask: DeleteFn; refetch?: RefetchFn },
+): Promise<void> {
+  for (const id of childIds) {
+    await deps.deleteTask(id)
+  }
+  await deps.deleteTask(wrapperId)
+  await deps.refetch?.()
+}

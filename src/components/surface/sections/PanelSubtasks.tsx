@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { X } from 'lucide-react'
 import type { Task } from '@/types/task'
 import { ConceptIcon } from '@/lib/conceptIcons'
 
@@ -8,6 +9,8 @@ interface PanelSubtasksProps {
   onAddSubtask?: (title: string) => void
   /** Open a subtask in the full task editor (it's a task — gets every picker). */
   onOpenSubtask?: (id: string) => void
+  /** Detach a subtask from this group (it becomes a standalone task again). */
+  onRemoveSubtask?: (id: string) => void
 }
 
 function Checkmark({ completed }: { completed: boolean }) {
@@ -20,7 +23,7 @@ function Checkmark({ completed }: { completed: boolean }) {
   )
 }
 
-export function PanelSubtasks({ subtasks, onToggleSubtask, onAddSubtask, onOpenSubtask }: PanelSubtasksProps) {
+export function PanelSubtasks({ subtasks, onToggleSubtask, onAddSubtask, onOpenSubtask, onRemoveSubtask }: PanelSubtasksProps) {
   const [draft, setDraft] = useState('')
 
   if (subtasks.length === 0 && !onAddSubtask) return null
@@ -58,6 +61,15 @@ export function PanelSubtasks({ subtasks, onToggleSubtask, onAddSubtask, onOpenS
               >
                 {sub.title}
               </button>
+              {onRemoveSubtask && (
+                <button
+                  onClick={() => onRemoveSubtask(sub.id)}
+                  aria-label={`Remove ${sub.title} from group`}
+                  className="flex-shrink-0 p-1 rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/70 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           ) : (
             <button

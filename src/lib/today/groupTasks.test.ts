@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { groupTasks } from './groupTasks'
+import { groupTasks, removeFromGroup, ungroupTasks, deleteTaskGroup } from './groupTasks'
 
 describe('groupTasks', () => {
   const date = new Date('2026-06-06T00:00:00')
@@ -72,5 +72,54 @@ describe('groupTasks', () => {
     )
 
     expect(refetch).not.toHaveBeenCalled()
+  })
+})
+
+describe('removeFromGroup', () => {
+  it('clears the task’s parent then refetches', async () => {
+    const updateTask = vi.fn().mockResolvedValue(undefined)
+    const refetch = vi.fn().mockResolvedValue(undefined)
+
+    await removeFromGroup('child-1', { updateTask, refetch })
+
+    expect(updateTask).toHaveBeenCalledTimes(1)
+    expect(updateTask).toHaveBeenCalledWith('child-1', { parentTaskId: undefined })
+    expect(refetch).toHaveBeenCalledTimes(1)
+    expect(refetch.mock.invocationCallOrder[0]).toBeGreaterThan(updateTask.mock.invocationCallOrder[0])
+  })
+})
+
+describe('ungroupTasks', () => {
+  it('clears every child’s parent, then deletes the wrapper, then refetches', async () => {
+    const updateTask = vi.fn().mockResolvedValue(undefined)
+    const deleteTask = vi.fn().mockResolvedValue(undefined)
+    const refetch = vi.fn().mockResolvedValue(undefined)
+
+    await ungroupTasks('wrap-1', ['a', 'b'], { updateTask, deleteTask, refetch })
+
+    expect(updateTask).toHaveBeenNthCalledWith(1, 'a', { parentTaskId: undefined })
+    expect(updateTask).toHaveBeenNthCalledWith(2, 'b', { parentTaskId: undefined })
+    expect(deleteTask).toHaveBeenCalledTimes(1)
+    expect(deleteTask).toHaveBeenCalledWith('wrap-1')
+    // wrapper deletion happens AFTER children are detached (so they aren't orphaned)
+    expect(deleteTask.mock.invocationCallOrder[0]).toBeGreaterThan(
+      Math.max(...updateTask.mock.invocationCallOrder),
+    )
+    expect(refetch.mock.invocationCallOrder[0]).toBeGreaterThan(deleteTask.mock.invocationCallOrder[0])
+  })
+})
+
+describe('deleteTaskGroup', () => {
+  it('deletes every child and the wrapper, then refetches', async () => {
+    const deleteTask = vi.fn().mockResolvedValue(undefined)
+    const refetch = vi.fn().mockResolvedValue(undefined)
+
+    await deleteTaskGroup('wrap-1', ['a', 'b'], { deleteTask, refetch })
+
+    expect(deleteTask).toHaveBeenCalledTimes(3)
+    expect(deleteTask).toHaveBeenNthCalledWith(1, 'a')
+    expect(deleteTask).toHaveBeenNthCalledWith(2, 'b')
+    expect(deleteTask).toHaveBeenNthCalledWith(3, 'wrap-1')
+    expect(refetch.mock.invocationCallOrder[0]).toBeGreaterThan(Math.max(...deleteTask.mock.invocationCallOrder))
   })
 })
