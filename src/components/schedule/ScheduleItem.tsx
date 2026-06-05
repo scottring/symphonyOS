@@ -473,7 +473,7 @@ export const ScheduleItem = memo(function ScheduleItem({
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onToggleBulkSelect?.() }}
-          aria-label={bulkSelected ? 'Deselect task' : 'Select task'}
+          aria-label={bulkSelected ? 'Deselect item' : 'Select item'}
           aria-pressed={!!bulkSelected}
           className={`absolute left-1 top-1/2 -translate-y-1/2 z-[2] grid place-items-center w-5 h-5 rounded-md border-2 transition-all ${
             bulkSelected

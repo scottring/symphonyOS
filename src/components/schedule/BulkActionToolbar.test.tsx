@@ -55,4 +55,9 @@ describe('BulkActionToolbar — Group action', () => {
     expect(onGroup).toHaveBeenCalledTimes(1)
     expect(onGroup).toHaveBeenCalledWith('Morning run', expect.any(Date), true)
   })
+
+  it('shows the Group action whenever onGroup is provided', () => {
+    render(<BulkActionToolbar {...baseProps} onGroup={() => {}} />)
+    expect(screen.getByRole('button', { name: /group/i })).toBeInTheDocument()
+  })
 })
