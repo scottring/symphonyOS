@@ -74,10 +74,8 @@ if (ACTIVE_THEME === 'kinetic') {
   await import('./index.css')
 }
 
-import App from './App.tsx'
 import { Suspense } from 'react'
 import { CalendarCallback } from './pages/CalendarCallback'
-import { NotFound } from './components/NotFound'
 import { JoinHousehold } from './components/JoinHousehold'
 import { GoogleCalendarProvider } from './hooks/useGoogleCalendar'
 import { DomainProvider } from './hooks/useDomain'
@@ -99,11 +97,8 @@ import { LoadingFallback } from './components/layout/LoadingFallback'
 //
 // /tasks-new/* always routes to Shell regardless of the flag (planned to
 // remove together with the legacy mounts once the cutover completes).
-const useNewTasks =
-  typeof window !== 'undefined' &&
-  window.localStorage.getItem('symphony.useNewTasks') === '1'
-
-// The gated Shell for the cutover. It MUST be mounted at a root-level splat
+// Cutover complete (2026-06): the Shell owns the entire app. App.tsx is retired.
+// The Shell MUST be mounted at a root-level splat
 // (`/*`), never at exact paths like `/today`. The Shell renders descendant
 // <Routes> (ShellRoutes -> TasksApp), and TasksApp matches segment-named child
 // routes (`today`, `inbox`, `task/:id`). React Router only passes the remaining
@@ -119,17 +114,8 @@ createRoot(document.getElementById('root')!).render(
         <BrowserRouter>
           <GoogleCalendarProvider>
             <Routes>
-              {/* Cutover paths (/, /today, /inbox, /task/:id). When the flag is
-                  OFF, legacy App owns them explicitly. When ON, they are served
-                  by the root /* catch-all below (the Shell needs the splat). */}
-              {!useNewTasks && (
-                <>
-                  <Route path="/" element={<App />} />
-                  <Route path="/today" element={<App />} />
-                  <Route path="/inbox" element={<App />} />
-                  <Route path="/task/:taskId" element={<App />} />
-                </>
-              )}
+              {/* /, /today, /inbox, /task/:id are served by the Shell via the
+                  /* catch-all below (explicit routes here win by specificity). */}
               <Route path="/goals/*" element={<Shell />} />
               <Route path="/projects/*" element={<Shell />} />
               <Route path="/routines/*" element={<Shell />} />
@@ -151,14 +137,9 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/lists/*" element={<Shell />} />
               <Route path="/join/:token" element={<JoinHousehold />} />
               <Route path="/calendar-callback" element={<CalendarCallback />} />
-              {/* Flag ON: root /* catch-all serves the cutover paths through the
-                  gated Shell (explicit routes above still win by specificity).
-                  Flag OFF: unknown paths fall through to NotFound. */}
-              {useNewTasks ? (
-                <Route path="/*" element={cutoverShell} />
-              ) : (
-                <Route path="*" element={<NotFound />} />
-              )}
+              {/* The Shell owns the cutover paths (/, /today, /inbox, /task/:id)
+                  and any unmatched path. Explicit routes above win by specificity. */}
+              <Route path="/*" element={cutoverShell} />
             </Routes>
           </GoogleCalendarProvider>
         </BrowserRouter>
