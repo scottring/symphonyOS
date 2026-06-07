@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -30,6 +31,10 @@ import { TodayView } from '@/components/schedule/TodayView'
 import { UndoToast } from '@/components/undo/UndoToast'
 import { HomeHeader } from '@/components/home/HomeHeader'
 import { CalendarReconnectBanner } from '@/components/home/CalendarReconnectBanner'
+import { RhythmNudge } from '@/components/today/RhythmNudge'
+import { ComingUpPeek } from '@/components/today/ComingUpPeek'
+import { useCadenceConfig, getDueSession } from '@/lib/cadence/config'
+import { selectComingUp } from '@/lib/today/comingUp'
 
 interface HomeViewProps {
   tasks: Task[]
@@ -69,6 +74,8 @@ export function HomeView({
   const isMobile = useMobile()
   const { currentAction, pushAction, executeUndo, dismiss } = useUndo()
   const { currentDomain } = useDomain()
+  const navigate = useNavigate()
+  const { config: cadenceConfig } = useCadenceConfig()
 
   // Filter tasks, routines, projects, and events by current domain
   // Specific domains show ONLY matching items — untagged items stay in universal
@@ -98,6 +105,11 @@ export function HomeView({
       return task.context === currentDomain || task.context == null
     })
   }, [tasks, currentDomain, currentUserMemberId])
+
+  // W4 — Today landing: the "coming up" peek summary (over the domain-filtered
+  // tasks) and whether a planning rhythm nudge is due right now.
+  const comingUpSummary = useMemo(() => selectComingUp(filteredTasks, new Date()), [filteredTasks])
+  const dueSession = useMemo(() => getDueSession(cadenceConfig, new Date()), [cadenceConfig])
 
   const filteredRoutines = useMemo(() => {
     if (currentDomain === 'universal') return routines
@@ -486,6 +498,20 @@ export function HomeView({
         <div className="px-6 pt-4 empty:hidden">
           <CalendarReconnectBanner />
         </div>
+        {/* W4 — Today landing: a calm rhythm nudge (only on its day, dismissible)
+            and the quiet "coming up" sliver. Today only; aligned to the column. */}
+        {currentView === 'today' && (
+          <div className="max-w-[940px] w-full mx-auto px-4 md:px-8 pt-3 space-y-3 empty:hidden">
+            <RhythmNudge due={dueSession} onPlan={() => onOpenWeeklyPlanning?.()} />
+            <ComingUpPeek
+              summary={comingUpSummary}
+              now={new Date()}
+              onSelectDay={handleSelectDay}
+              onOpenWeek={() => navigate('/week')}
+              onOpenInbox={() => navigate('/inbox')}
+            />
+          </div>
+        )}
         {renderContent()}
       </div>
 

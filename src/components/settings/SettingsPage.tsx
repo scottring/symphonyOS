@@ -6,6 +6,7 @@ import { WaitlistAdmin } from './WaitlistAdmin'
 import { ThemeSelector } from './ThemeSelector'
 import { useTextSize } from '@/hooks/useTextSize'
 import { HomeAddressSettings } from './HomeAddressSettings'
+import { PlanningRhythmSettings } from './PlanningRhythmSettings'
 import { DemoControls } from './DemoControls'
 import type { FamilyMember } from '@/types/family'
 
@@ -330,6 +331,9 @@ export function SettingsPage({
 
             {/* Home Address */}
             <HomeAddressSettings />
+
+            {/* Planning Rhythm (W4 — cadence config) */}
+            <PlanningRhythmSettings />
 
             {/* People Section */}
             <section>
