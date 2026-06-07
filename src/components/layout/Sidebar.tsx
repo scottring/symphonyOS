@@ -334,8 +334,8 @@ export function Sidebar({
 
           {/* Routines */}
           <button
-            onClick={() => onViewChange('routines')}
-            className={navItemClass(activeView === 'routines')}
+            onClick={() => navigate('/routines')}
+            className={navItemClass(location.pathname.startsWith('/routines'))}
           >
             {createElement(Repeat, { className: 'w-5 h-5 shrink-0' })}
             {!collapsed && <span>Routines</span>}
