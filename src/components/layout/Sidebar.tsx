@@ -107,9 +107,11 @@ export function Sidebar({
   const planActive =
     activeView === 'projects' || activeView === 'routines'
   const homeActive =
-    activeView === 'meals' || activeView === 'home-app' || activeView === 'lists'
+    activeView === 'meals' || activeView === 'home-app' || activeView === 'lists' ||
+    location.pathname.startsWith('/lists')
   const moreActive =
     activeView === 'contacts' || activeView === 'contact-detail' || activeView === 'history' ||
+    location.pathname.startsWith('/history') ||
     location.pathname.startsWith('/jobs')
 
   useEffect(() => {
@@ -119,7 +121,7 @@ export function Sidebar({
   }, [planActive, homeActive, moreActive, openGroup])
 
   const homeAppActive = activeView === 'home-app'
-  const listsActive = activeView === 'lists'
+  const listsActive = activeView === 'lists' || location.pathname.startsWith('/lists')
 
   const { homes } = useHomes()
   const home = homes[0]
@@ -386,8 +388,8 @@ export function Sidebar({
           {FEATURES.lists && (
             <>
               <button
-                onClick={() => onViewChange('lists')}
-                className={navItemClass(activeView === 'lists')}
+                onClick={() => navigate('/lists')}
+                className={navItemClass(listsActive)}
               >
                 {createElement(List, { className: 'w-5 h-5 shrink-0' })}
                 {!collapsed && <span>Lists</span>}
@@ -395,7 +397,7 @@ export function Sidebar({
               {!collapsed && listsActive && inlineLists.map((l) => (
                 <button
                   key={l.id}
-                  onClick={() => onViewChange('lists')}
+                  onClick={() => navigate('/lists')}
                   className="w-full flex items-center gap-3 pl-9 pr-3.5 py-2 rounded-lg text-neutral-500 hover:bg-neutral-100/60 hover:text-neutral-700 transition-all duration-200"
                 >
                   <span className="text-[14px] truncate">{l.icon ? l.icon : <ConceptIcon name="list" size={14} decorative />} {l.title}</span>
@@ -403,7 +405,7 @@ export function Sidebar({
               ))}
               {!collapsed && listsActive && moreListsCount > 0 && (
                 <button
-                  onClick={() => onViewChange('lists')}
+                  onClick={() => navigate('/lists')}
                   className="w-full flex items-center gap-3 pl-9 pr-3.5 py-1.5 text-[13px] text-neutral-400 hover:text-neutral-600"
                 >
                   All lists ({allLists.length}) →
@@ -459,8 +461,8 @@ export function Sidebar({
 
           {/* History */}
           <button
-            onClick={() => onViewChange('history')}
-            className={navItemClass(activeView === 'history')}
+            onClick={() => navigate('/history')}
+            className={navItemClass(location.pathname.startsWith('/history'))}
           >
             {createElement(History, { className: 'w-5 h-5 shrink-0' })}
             {!collapsed && <span>History</span>}
