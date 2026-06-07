@@ -109,4 +109,25 @@ describe('SelectionProvider', () => {
     // because the new path /jobs is owned by 'jobs' app, which owns 'application' not 'task'.
     expect(screen.getByTestId('selection').textContent).toBe('none');
   });
+
+  it('keeps a task selection on /today when tasks is the index app (route "/")', () => {
+    // Regression for the cutover bug: the real tasks app has route '/' + index
+    // but renders Today at /today. findAppForPath must fall back to the index app
+    // for /today, or the selection is stripped and the detail panel never opens.
+    const indexRegistry = createRegistry([
+      { id: 'tasks', route: '/', index: true, Component: () => null, ownsSelectionKinds: ['task'] },
+      fakeApp('jobs', '/jobs', ['application']),
+    ]);
+    render(
+      <MemoryRouter initialEntries={['/today?detail=task:abc']}>
+        <SelectionProvider registry={indexRegistry}>
+          <Routes>
+            <Route path="/today/*" element={<Probe />} />
+            <Route path="/jobs/*" element={<Probe />} />
+          </Routes>
+        </SelectionProvider>
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId('selection').textContent).toBe('task:abc');
+  });
 });

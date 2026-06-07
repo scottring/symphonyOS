@@ -31,11 +31,17 @@ function findAppForPath(
   registry: AppRegistry,
   pathname: string,
 ) {
-  // Match app whose `route` is a prefix of pathname (handles /today/inbox under /today)
-  return registry.find((app) => {
-    if (app.route === '/' || app.route === '') return pathname === '/';
+  // Prefix-match a non-index app (handles /projects/:id under /projects).
+  const match = registry.find((app) => {
+    if (app.route === '/' || app.route === '') return false;
     return pathname === app.route || pathname.startsWith(`${app.route}/`);
   });
+  if (match) return match;
+  // The index app is the fallback — it serves '/', '/today', '/inbox',
+  // '/task/:id' and any otherwise-unmatched path (mirrors ShellRoutes). Without
+  // this, a task selection on '/today' was stripped because no app matched the
+  // path, so the detail panel never opened.
+  return registry.find((app) => app.index);
 }
 
 interface ProviderProps {
