@@ -719,6 +719,10 @@ export function useSupabaseTasks() {
     if ('isAllDay' in updates) dbUpdates.is_all_day = updates.isAllDay ?? null
     if ('isSomeday' in updates) dbUpdates.is_someday = updates.isSomeday ?? false
     if ('context' in updates) dbUpdates.context = updates.context ?? null
+    // Scope follows area unless explicitly set (default-coupling): setting context
+    // to 'family' shares the item with the household (compound). Never auto-unshare.
+    if ('scope' in updates) dbUpdates.scope = updates.scope ?? 'individual'
+    else if ('context' in updates && updates.context === 'family') dbUpdates.scope = 'compound'
     if ('category' in updates) dbUpdates.category = updates.category ?? 'task'
     if ('notes' in updates) dbUpdates.notes = updates.notes ?? null
     if ('links' in updates) dbUpdates.links = updates.links ?? null
@@ -815,6 +819,10 @@ export function useSupabaseTasks() {
     if ('isAllDay' in updates) dbUpdates.is_all_day = updates.isAllDay ?? null
     if ('isSomeday' in updates) dbUpdates.is_someday = updates.isSomeday ?? false
     if ('context' in updates) dbUpdates.context = updates.context ?? null
+    // Scope follows area unless explicitly set (default-coupling): setting context
+    // to 'family' shares the item with the household (compound). Never auto-unshare.
+    if ('scope' in updates) dbUpdates.scope = updates.scope ?? 'individual'
+    else if ('context' in updates && updates.context === 'family') dbUpdates.scope = 'compound'
     if ('category' in updates) dbUpdates.category = updates.category ?? 'task'
     if ('notes' in updates) dbUpdates.notes = updates.notes ?? null
     if ('links' in updates) dbUpdates.links = updates.links ?? null
