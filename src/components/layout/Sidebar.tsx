@@ -2,7 +2,6 @@ import { useEffect, createElement } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { PinnedSection } from '@/components/pins'
 import { useDomain } from '@/hooks/useDomain'
-import { useHomeView } from '@/hooks/useHomeView'
 import { appRegistry } from '@/shell/appRegistry'
 import { SidebarGroup } from './SidebarGroup'
 import { useSidebarGroupState } from '@/hooks/useSidebarGroupState'
@@ -17,14 +16,18 @@ import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { Routine } from '@/types/routine'
 import { ConceptIcon } from '@/lib/conceptIcons'
+import { HORIZONS, type HorizonId } from '@/lib/today/horizons'
 import {
   Sun,
   CalendarRange,
+  CalendarDays,
+  Leaf,
+  Trophy,
+  Moon,
   UtensilsCrossed,
   FolderKanban,
   Home,
   Inbox,
-  Calendar,
   Users2,
   List,
   Repeat,
@@ -33,6 +36,18 @@ import {
   Settings,
   LogOut,
 } from 'lucide-react'
+
+// Icon + route for each rhythm rung, keyed by HorizonId. Labels come from
+// HORIZONS (single source of truth). Today routes to `/` (its rich HomeView);
+// the rest route to their dedicated horizon-scoped views.
+const HORIZON_NAV: Record<HorizonId, { icon: typeof Sun; route: string }> = {
+  today:   { icon: Sun,           route: '/today' },
+  week:    { icon: CalendarRange, route: '/week' },
+  month:   { icon: CalendarDays,  route: '/month' },
+  season:  { icon: Leaf,          route: '/season' },
+  year:    { icon: Trophy,        route: '/year' },
+  someday: { icon: Moon,          route: '/someday' },
+}
 
 const HOME_VIEW_STORAGE_KEY = 'symphony-home-view'
 
@@ -95,33 +110,40 @@ export function Sidebar({
   const navigate = useNavigate()
   const location = useLocation()
   const { currentDomain } = useDomain()
-  const { currentView: homeCurrentView } = useHomeView()
   // currentDomain used for future domain-aware logic; suppress unused warning
   void currentDomain
 
   const { state: groupState, toggle: toggleGroup, setOpen: openGroup } = useSidebarGroupState()
 
-  // Auto-expand the group containing the current view. "This Week" and
-  // "Calendar" both route to activeView='today', so they can't be detected
-  // here — the PLAN group just keeps its persisted open/closed state for those.
-  // Group→state-key mapping: PLAN→'plan', HOME→'spaces', MORE→'library'.
-  const planActive =
+  // The rhythm spine (Phase 2b): Inbox · the horizon rungs · Someday · Library.
+  // The Library group (Projects, Goals, Routines, Meals, Contacts, Lists, House,
+  // History, + registry apps) auto-expands when any of its destinations is the
+  // active route. Group→state-key: LIBRARY→'library'.
+  const libraryActive =
     activeView === 'projects' || activeView === 'routines' ||
+    activeView === 'goals' || activeView === 'meals' ||
+    activeView === 'home-app' || activeView === 'lists' ||
+    activeView === 'contacts' || activeView === 'contact-detail' ||
+    activeView === 'history' ||
     location.pathname.startsWith('/projects') || location.pathname.startsWith('/routines') ||
-    location.pathname.startsWith('/goals')
-  const homeActive =
-    activeView === 'meals' || activeView === 'home-app' || activeView === 'lists' ||
-    location.pathname.startsWith('/lists')
-  const moreActive =
-    activeView === 'contacts' || activeView === 'contact-detail' || activeView === 'history' ||
-    location.pathname.startsWith('/history') ||
+    location.pathname.startsWith('/goals') || location.pathname.startsWith('/meals') ||
+    location.pathname.startsWith('/lists') || location.pathname.startsWith('/contacts') ||
+    location.pathname.startsWith('/history') || location.pathname.startsWith('/home') ||
     location.pathname.startsWith('/jobs')
 
   useEffect(() => {
-    if (planActive) openGroup('plan')
-    if (homeActive) openGroup('spaces')
-    if (moreActive) openGroup('library')
-  }, [planActive, homeActive, moreActive, openGroup])
+    if (libraryActive) openGroup('library')
+  }, [libraryActive, openGroup])
+
+  // Which rhythm rung is active, by pathname (legibility). Today is the rich
+  // HomeView at `/` or `/today`; the rest are their own horizon routes.
+  function isRungActive(id: HorizonId): boolean {
+    const p = location.pathname
+    if (id === 'today') {
+      return p === '/' || p === '/today' || p === '/tasks-new' || p === '/tasks-new/today'
+    }
+    return p === HORIZON_NAV[id].route || p.startsWith(`${HORIZON_NAV[id].route}/`)
+  }
 
   const homeAppActive = activeView === 'home-app'
   const listsActive = activeView === 'lists' || location.pathname.startsWith('/lists')
@@ -251,41 +273,15 @@ export function Sidebar({
         />
       )}
 
-      {/* Navigation — grouped into TODAY / PLAN / HOME / MORE.
-          TODAY (Today + Inbox) is always visible; the rest are collapsible. */}
+      {/* Navigation — the RHYTHM SPINE (Phase 2b).
+          Inbox · the horizon rungs (Today → Someday) · Library (collapsible). */}
       <nav className="flex-1 px-3 mt-2 space-y-0.5 overflow-y-auto">
         <div className="border-t border-neutral-200/60 mb-1" />
 
-        {/* ── TODAY (always visible) ── */}
-        {!collapsed && (
-          <p className="px-3.5 pt-3 pb-1 text-[11px] font-medium text-neutral-400 uppercase tracking-wider">
-            Today
-          </p>
-        )}
-
-        {/* Today — also forces HomeView D/W/M back to 'today' so clicking
-            this link from Week/Workweek/Month returns the user to Day view. */}
-        <button
-          onClick={() => {
-            try {
-              localStorage.setItem(HOME_VIEW_STORAGE_KEY, 'today')
-              window.dispatchEvent(new StorageEvent('storage', {
-                key: HOME_VIEW_STORAGE_KEY,
-                newValue: 'today',
-              }))
-            } catch { /* ignore — falls back to next-mount read */ }
-            onViewChange('today')
-          }}
-          className={navItemClass(activeView === 'today' && homeCurrentView === 'today')}
-        >
-          {createElement(Sun, { className: 'w-5 h-5 shrink-0' })}
-          {!collapsed && <span>Today</span>}
-        </button>
-
-        {/* Inbox */}
+        {/* Inbox — capture catch-all, above the rhythm. */}
         <button
           onClick={() => onViewChange('inbox')}
-          className={navItemClass(activeView === 'inbox')}
+          className={`${navItemClass(activeView === 'inbox')} mt-2`}
         >
           {createElement(Inbox, { className: 'w-5 h-5 shrink-0' })}
           {!collapsed && (
@@ -300,32 +296,52 @@ export function Sidebar({
           )}
         </button>
 
-        {/* ── PLAN ── This Week · Projects · Routines · Calendar */}
+        {/* ── THE RHYTHM ── the horizon ladder you navigate by. */}
+        {!collapsed && (
+          <p className="px-3.5 pt-4 pb-1 text-[11px] font-medium text-neutral-400 uppercase tracking-wider">
+            The Rhythm
+          </p>
+        )}
+        {collapsed && <div className="border-t border-neutral-200/60 my-2" />}
+
+        {HORIZONS.map((h) => {
+          const { icon: Icon, route } = HORIZON_NAV[h.id]
+          return (
+            <button
+              key={h.id}
+              onClick={() => {
+                if (h.id === 'today') {
+                  // Today rung also forces HomeView D/W/M back to 'today' so it
+                  // returns from a Week/Month sub-view, then routes to /today.
+                  try {
+                    localStorage.setItem(HOME_VIEW_STORAGE_KEY, 'today')
+                    window.dispatchEvent(new StorageEvent('storage', {
+                      key: HOME_VIEW_STORAGE_KEY,
+                      newValue: 'today',
+                    }))
+                  } catch { /* ignore — falls back to next-mount read */ }
+                  onViewChange('today')
+                  return
+                }
+                navigate(route)
+              }}
+              className={navItemClass(isRungActive(h.id))}
+            >
+              {createElement(Icon, { className: 'w-5 h-5 shrink-0' })}
+              {!collapsed && <span>{h.label}</span>}
+            </button>
+          )
+        })}
+
+        {/* ── Library ── the non-horizon surfaces, collapsible (not daily clutter). */}
+        <div className="border-t border-neutral-200/60 my-2" />
         <SidebarGroup
-          label="Plan"
-          open={groupState.plan}
-          onToggle={() => toggleGroup('plan')}
-          forceOpen={planActive}
+          label="Library"
+          open={groupState.library}
+          onToggle={() => toggleGroup('library')}
+          forceOpen={libraryActive}
           collapsed={collapsed}
         >
-          {/* This Week — navigates to /today and forces HomeView D/W/M into 'week'. */}
-          <button
-            onClick={() => {
-              try {
-                localStorage.setItem(HOME_VIEW_STORAGE_KEY, 'week')
-                window.dispatchEvent(new StorageEvent('storage', {
-                  key: HOME_VIEW_STORAGE_KEY,
-                  newValue: 'week',
-                }))
-              } catch { /* ignore — falls back to next-mount read */ }
-              onViewChange('today')
-            }}
-            className={navItemClass(activeView === 'today' && (homeCurrentView === 'week' || homeCurrentView === 'workweek'))}
-          >
-            {createElement(CalendarRange, { className: 'w-5 h-5 shrink-0' })}
-            {!collapsed && <span>This Week</span>}
-          </button>
-
           {/* Projects */}
           <button
             onClick={() => navigate('/projects')}
@@ -333,15 +349,6 @@ export function Sidebar({
           >
             {createElement(FolderKanban, { className: 'w-5 h-5 shrink-0' })}
             {!collapsed && <span>Projects</span>}
-          </button>
-
-          {/* Routines */}
-          <button
-            onClick={() => navigate('/routines')}
-            className={navItemClass(location.pathname.startsWith('/routines'))}
-          >
-            {createElement(Repeat, { className: 'w-5 h-5 shrink-0' })}
-            {!collapsed && <span>Routines</span>}
           </button>
 
           {/* Goals */}
@@ -353,24 +360,15 @@ export function Sidebar({
             {!collapsed && <span>Goals</span>}
           </button>
 
-          {/* Calendar */}
+          {/* Routines */}
           <button
-            onClick={() => onViewChange('today')}
-            className={navItemClass(false)}
+            onClick={() => navigate('/routines')}
+            className={navItemClass(location.pathname.startsWith('/routines'))}
           >
-            {createElement(Calendar, { className: 'w-5 h-5 shrink-0' })}
-            {!collapsed && <span>Calendar</span>}
+            {createElement(Repeat, { className: 'w-5 h-5 shrink-0' })}
+            {!collapsed && <span>Routines</span>}
           </button>
-        </SidebarGroup>
 
-        {/* ── HOME ── Meals · Lists · House */}
-        <SidebarGroup
-          label="Home"
-          open={groupState.spaces}
-          onToggle={() => toggleGroup('spaces')}
-          forceOpen={homeActive}
-          collapsed={collapsed}
-        >
           {/* Meals */}
           <button
             onClick={() => onViewChange('meals')}
@@ -395,6 +393,15 @@ export function Sidebar({
               </button>
             </>
           )}
+
+          {/* Contacts */}
+          <button
+            onClick={() => navigate('/contacts')}
+            className={navItemClass(location.pathname.startsWith('/contacts'))}
+          >
+            {createElement(Users2, { className: 'w-5 h-5 shrink-0' })}
+            {!collapsed && <span>Contacts</span>}
+          </button>
 
           {/* Lists */}
           {FEATURES.lists && (
@@ -426,7 +433,7 @@ export function Sidebar({
             </>
           )}
 
-          {/* House (was "Home" — renamed per Scott; same destination) */}
+          {/* House */}
           <button
             onClick={() => onViewChange('home-app')}
             className={navItemClass(homeAppActive)}
@@ -452,24 +459,6 @@ export function Sidebar({
               All rooms ({rooms.length}) →
             </button>
           )}
-        </SidebarGroup>
-
-        {/* ── MORE ── Contacts · History · Jobs (+ any registry apps) */}
-        <SidebarGroup
-          label="More"
-          open={groupState.library}
-          onToggle={() => toggleGroup('library')}
-          forceOpen={moreActive}
-          collapsed={collapsed}
-        >
-          {/* Contacts */}
-          <button
-            onClick={() => navigate('/contacts')}
-            className={navItemClass(location.pathname.startsWith('/contacts'))}
-          >
-            {createElement(Users2, { className: 'w-5 h-5 shrink-0' })}
-            {!collapsed && <span>Contacts</span>}
-          </button>
 
           {/* History */}
           <button
@@ -480,7 +469,7 @@ export function Sidebar({
             {!collapsed && <span>History</span>}
           </button>
 
-          {/* Registry-driven apps (Jobs, …) — folded in from the old Apps group */}
+          {/* Registry-driven apps (Jobs, …) with a sidebar spec. */}
           {appRegistry
             .filter((a) => a.sidebar)
             .sort((a, b) => a.sidebar!.order - b.sidebar!.order)
