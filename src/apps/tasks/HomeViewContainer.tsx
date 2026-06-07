@@ -10,9 +10,16 @@
 // consumes useMealEventsForDate(viewedDate). The legacy App.tsx still has its
 // own copy until full cutover (then the legacy synthesis becomes dead code).
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
+import { useVaultWrite } from '@/hooks/useVaultWrite';
+import { useGoalsContext } from '@/contexts/GoalsContext';
+import { PlanningSession, WeeklyPlanningSession } from '@/components/lazy';
+import { LoadingFallback } from '@/components/layout/LoadingFallback';
+import { isEverydayRoutine, scheduleRoutineOnDate } from '@/lib/routineUtils';
+import type { GoalAction } from '@/types/goal';
+import type { Task } from '@/types/task';
 import { useEventNotes } from '@/hooks/useEventNotes';
 import { useContacts } from '@/hooks/useContacts';
 import { useProjects } from '@/hooks/useProjects';
@@ -33,8 +40,8 @@ import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
 
 export function HomeViewContainer() {
   // Data hooks
-  const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask, getLinkedTasks } = useSupabaseTasks();
-  const { isConnected, events, fetchEvents, isFetching: eventsFetching } = useGoogleCalendar();
+  const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask, setBucket, getLinkedTasks } = useSupabaseTasks();
+  const { isConnected, events, fetchEvents, isFetching: eventsFetching, updateEvent } = useGoogleCalendar();
   const { notes: eventNotesMap, updateEventAssignment, updateEventAssignmentAll, updateEventContext, updateEventProject } = useEventNotes();
   const { contacts, contactsMap, addContact, searchContacts } = useContacts();
   const { projects, projectsMap, addProject } = useProjects();
@@ -52,10 +59,16 @@ export function HomeViewContainer() {
   const { getDomainForCalendar } = useCalendarDomainMappings();
   const { lists, listsByCategory } = useListsContext();
   const { currentDomain } = useDomain();
+  const { goals, getCurrentQuarter } = useGoalsContext();
+  const vaultWrite = useVaultWrite();
   const undo = useUndo();
 
   // UI state local to this container
   const [viewedDate, setViewedDate] = useState<Date>(() => new Date());
+  // Planning overlays. In the Shell these are booleans (the legacy app drove the
+  // weekly session off a `weekly-planning` stateView; the Shell uses local state).
+  const [planningOpen, setPlanningOpen] = useState(false);
+  const [weeklyPlanningOpen, setWeeklyPlanningOpen] = useState(false);
   const { selection, setSelection, clearSelection } = useSelection();
 
   // Map URL selection back to the legacy `selectedItemId` shape HomeView expects
@@ -179,8 +192,43 @@ export function HomeViewContainer() {
     [tasks, addTask, viewedDate, getCurrentUserMember],
   );
 
+  // ── Weekly-planning support (reconstructed from App.tsx) ──
+  // Current-quarter incomplete goal actions, surfaced in the weekly session so
+  // quarterly intentions can be pulled into the week.
+  const weeklyGoalActions = useMemo<GoalAction[]>(() => {
+    const q = getCurrentQuarter();
+    return goals.flatMap(g => g.actions).filter(a => a.quarter === q && !a.completed);
+  }, [goals, getCurrentQuarter]);
+
+  // Persist a completed weekly planning session as a vault note.
+  const saveWeeklyPlanToVault = useCallback(
+    async ({ weekId, priorities, concerns }: { weekId: string; priorities: Task[]; concerns: string }): Promise<{ ok: boolean }> => {
+      const { formatWeeklyNote } = await import('@/components/planning/weekly/weeklyPlanning');
+      const scheduleSummary = priorities
+        .filter(t => t.scheduledFor)
+        .map(t => `- ${t.title} (${new Date(t.scheduledFor as Date).toLocaleDateString()})`)
+        .join('\n');
+      const note = formatWeeklyNote({ weekId, priorities, scheduleSummary, concerns });
+      const result = await vaultWrite.createVaultNote(
+        { title: note.title, content: note.content, path: note.path },
+        `Weekly plan: ${weekId}`,
+      );
+      return { ok: !!result?.success };
+    },
+    [vaultWrite],
+  );
+
+  // Pull a quarterly goal action into the week as a new 'week'-bucket task.
+  const handleAddGoalActionToWeek = useCallback(async (action: GoalAction) => {
+    const id = await addTask(action.description);
+    if (id) await setBucket(id, 'week');
+  }, [addTask, setBucket]);
+
   const scheduleActionsValue = useMemo<ScheduleActionsValue>(
     () => ({
+      // Planning
+      onOpenPlanning: () => setPlanningOpen(true),
+
       // Task actions
       onToggleTask: toggleTask,
       onToggleWaiting: toggleWaiting,
@@ -262,7 +310,60 @@ export function HomeViewContainer() {
         viewedDate={viewedDate}
         onDateChange={setViewedDate}
         currentUserMemberId={getCurrentUserMember()?.id}
+        onOpenWeeklyPlanning={() => setWeeklyPlanningOpen(true)}
       />
+
+      {planningOpen && (
+        <Suspense fallback={<LoadingFallback />}>
+          <PlanningSession
+            tasks={tasks}
+            events={filteredEvents}
+            routines={filteredRoutines}
+            // Untimed, non-daily routines become draggable chips in the drawer.
+            draggableRoutines={allRoutines.filter(r => r.visibility === 'active' && !isEverydayRoutine(r.recurrence_pattern) && !r.time_of_day)}
+            onScheduleRoutine={(routineId, date, time) => {
+              const routine = allRoutines.find(r => r.id === routineId);
+              if (routine) updateRoutine(routineId, scheduleRoutineOnDate(routine, date, time));
+            }}
+            onRescheduleEvent={(event, startTime, endTime) =>
+              updateEvent({
+                eventId: event.google_event_id || event.id,
+                startTime,
+                endTime,
+                calendarId: event.calendar_id || event.calendarId,
+              })
+            }
+            initialDate={viewedDate}
+            onClose={() => setPlanningOpen(false)}
+            onUpdateTask={updateTask}
+            onPushTask={pushTask}
+            familyMembers={familyMembers}
+            eventNotesMap={eventNotesMap}
+          />
+        </Suspense>
+      )}
+
+      {weeklyPlanningOpen && (
+        <Suspense fallback={<LoadingFallback />}>
+          <WeeklyPlanningSession
+            tasks={tasks}
+            events={filteredEvents}
+            routines={filteredRoutines}
+            initialDate={viewedDate}
+            onClose={() => setWeeklyPlanningOpen(false)}
+            onUpdateTask={updateTask}
+            onPushTask={pushTask}
+            onSavePlanToVault={saveWeeklyPlanToVault}
+            goalActions={weeklyGoalActions}
+            onAddGoalAction={handleAddGoalActionToWeek}
+            onSelectDay={(date) => { setViewedDate(date); setWeeklyPlanningOpen(false); }}
+            allRoutines={allRoutines}
+            onUpdateRoutine={updateRoutine}
+            onCompleteTask={toggleTask}
+            onDeleteTask={deleteTask}
+          />
+        </Suspense>
+      )}
     </ScheduleActionsProvider>
   );
 }
