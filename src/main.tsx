@@ -144,7 +144,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/wall-v2/*" element={<Shell />} />
               <Route path="/jobs/*" element={<Shell />} />
               <Route path="/tasks-new/*" element={<Shell />} />
-              <Route path="/morning" element={<App />} />
+              <Route path="/morning/*" element={<Shell />} />
               <Route path="/bedtime" element={<App />} />
               <Route path="/onboarding" element={<Suspense fallback={<LoadingFallback />}><OnboardingFlow /></Suspense>} />
               <Route path="/onboarding/sample" element={<Suspense fallback={<LoadingFallback />}><SamplePlanPage /></Suspense>} />

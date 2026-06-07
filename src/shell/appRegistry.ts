@@ -4,6 +4,7 @@ import { wallAppDef } from '@/apps/wall';
 import { wallV2AppDef } from '@/apps/wall-v2';
 import { jobPipelineAppDef } from '@/apps/job-pipeline';
 import { tasksAppDef } from '@/apps/tasks';
+import { morningAppDef } from '@/apps/morning';
 
 export type AppRegistry = ReadonlyArray<AppDef>;
 
@@ -56,4 +57,5 @@ export const appRegistry: AppRegistry = createRegistry([
   wallV2AppDef,
   jobPipelineAppDef,
   tasksAppDef,
+  morningAppDef,
 ]);
