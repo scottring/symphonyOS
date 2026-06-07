@@ -91,6 +91,29 @@ deciding carried-over.** ≈5-minute flow:
 **Pick-the-list is the core; time-blocking is optional** (most tasks are a list, not
 a calendar entry). After the session, the Today rung shows exactly the committed set.
 
+**The daily session is OPTIONAL by design.** Today is fully usable without it —
+carried-over + today's items render whether or not you "plan." "Plan today" is an
+*invitation* (the dismissible morning nudge + a button on the Today rung), never a
+gate. The same holds for every session: tools you reach for, not walls.
+
+## 5b. Cadence configuration & irregular periods
+
+- **Horizon buckets are curated pools, not rigid date ranges.** "This Week" is
+  whatever you triaged into the `week` bucket — not a strict Sun–Sat query. So an
+  **irregular week absorbs naturally** (travel, a holiday stretch, a week planned
+  late = just "what's in the pool"). There is no auto-rollover that fights you — the
+  **weekly session *is* the rollover** (review what's left = carry-over, add new).
+- **Sessions run on demand.** The rhythm nudge is a *default reminder*, not a lock —
+  open "Plan the [horizon]" any day, and **dismiss/snooze** the nudge when a period
+  is off-pattern.
+- **Configurable anchors (Settings):** the **week-start day** (default Sunday, per
+  the current Sunday-start convention) and the **nudge timing** per session (e.g.
+  weekly Sun 7:15, monthly first Saturday, annual September — from the vault's
+  planning-rhythm-requirements). These drive the date math (Today / overdue /
+  coming-up) and *when* nudges fire; they do **not** constrain the pools.
+- **Not building:** per-instance custom date ranges ("make this one week 10 days").
+  Buckets-as-pools already handles irregularity; custom ranges = complexity (YAGNI).
+
 ## 6. Inbox → triage (the on-ramp)
 
 Capture stays zero-friction (the `+`/Cmd-K FAB from anywhere → lands in Inbox, no

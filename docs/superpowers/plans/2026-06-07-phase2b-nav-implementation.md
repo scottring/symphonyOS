@@ -163,13 +163,13 @@ SELECT 1;
 
 **Files:** Modify the tasks app Today view (`HomeView`/`TodayView`); Create `src/components/today/RhythmNudge.tsx` + `src/components/today/ComingUpPeek.tsx`.
 
-**Behavior:** `RhythmNudge` shows when a session is due (Sunday→weekly, first-Sat→monthly, daily morning) — pure date logic, unit-tested. `ComingUpPeek` (the original "b"): next dated days + "N this week" + "N to sort". **Reuse:** the `selectUpcoming`-style logic from the earlier "coming up" exploration. **Verify:** unit-test the nudge-due + peek selectors; runtime smoke.
+**Behavior:** `RhythmNudge` shows when a session is due — but timing reads **configurable cadence anchors** (Settings: week-start day [default Sunday] + per-session nudge timing), and the nudge is **dismissible/snoozable** (it's a default reminder, not a lock — sessions run on demand). `ComingUpPeek` (the original "b"): next dated days + "N this week" + "N to sort". Also create a small **cadence-config store + Settings panel** (`src/lib/cadence/config.ts` + a Settings section) that the nudge timing + the Today/overdue/coming-up date math read from. **Reuse:** the `selectUpcoming`-style logic from the earlier "coming up" exploration. **Verify:** unit-test the nudge-due logic against config (e.g. week-start=Monday shifts the weekly nudge) + the peek selectors; runtime smoke.
 
 ## W5 — Daily "Plan today" session
 
 **Files:** Create `src/components/planning/daily/PlanTodaySession.tsx`; reuse the wired `PlanningSession` grid for the optional time-block step.
 
-**Behavior:** ≈5-min flow — (1) fixed anchors (today's events) shown; (2) carried-over rows with `do today / push to week / done`; (3) pull-from-week: the `selectHorizonPool(week)` list with checkboxes that set `bucket:'timed', scheduledFor: today`; (4) "Start the day" → optional `PlanningSession` grid. Pick-list is the core; time-block optional. Opened by the Today rhythm nudge + a "Plan today" button on the Today rung. **Verify:** unit-test the pull-into-today mutation shape; runtime smoke (pull 2 from week → appear on Today).
+**Behavior:** ≈5-min flow — (1) fixed anchors (today's events) shown; (2) carried-over rows with `do today / push to week / done`; (3) pull-from-week: the `selectHorizonPool(week)` list with checkboxes that set `bucket:'timed', scheduledFor: today`; (4) "Start the day" → optional `PlanningSession` grid. Pick-list is the core; time-block optional. Opened by the Today rhythm nudge + a "Plan today" button on the Today rung. **OPTIONAL by design** — Today renders carried-over + today's items with or without running the session; the session is an invitation, never a gate (skipping it just means you haven't pulled fresh from the week pool). **Verify:** unit-test the pull-into-today mutation shape; runtime smoke (pull 2 from week → appear on Today; AND Today works fully when the session is skipped).
 
 ## W6 — Inbox/triage rework
 
