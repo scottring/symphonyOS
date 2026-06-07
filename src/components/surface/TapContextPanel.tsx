@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Task, TaskContext } from '@/types/task'
+import type { Task, TaskContext, Scope } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -62,6 +62,8 @@ interface TapContextPanelProps {
   onUpdateLocation: (location: string, placeId?: string) => void
   onClearLocation: () => void
   onContextChange: (context: TaskContext | undefined) => void
+  /** Change who can see the task (individual/couple/compound). Optional. */
+  onScopeChange?: (scope: Scope) => void
   onAssigneesChange: (ids: string[]) => void
   /** Link/change/clear the task's related contact. When omitted, the People section is read-only. */
   onContactChange?: (contactId: string | undefined) => void
@@ -137,6 +139,8 @@ export function TapContextPanel(props: TapContextPanelProps) {
       <PanelClassify
         context={task.context}
         onContextChange={props.onContextChange}
+        scope={task.scope}
+        onScopeChange={props.onScopeChange}
         members={props.familyMembers}
         selectedAssigneeIds={task.assignedToAll ?? (task.assignedTo ? [task.assignedTo] : [])}
         onAssigneesChange={props.onAssigneesChange}

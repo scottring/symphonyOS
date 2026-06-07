@@ -1392,6 +1392,7 @@ function AppContent({ user, signOut }: { user: User; signOut: () => void }) {
               onOpenProject={(id) => handleOpenProject(id)}
               onOpenEvent={(id) => setSelectedItemId(`event-${id}`)}
               onContextChange={(ctx) => updateTask(selectedItem.originalTask!.id, { context: ctx ?? null })}
+              onScopeChange={(scope) => updateTask(selectedItem.originalTask!.id, { scope })}
               onAssigneesChange={(ids) =>
                 updateTask(selectedItem.originalTask!.id, {
                   assignedToAll: ids.length > 0 ? ids : undefined,
