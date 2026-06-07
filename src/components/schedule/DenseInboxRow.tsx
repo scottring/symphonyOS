@@ -1,5 +1,5 @@
 import { memo, useState, useCallback } from 'react'
-import { Trash2, Check } from 'lucide-react'
+import { Trash2, Check, Tag } from 'lucide-react'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import type { Task, TaskContext } from '@/types/task'
 import type { Project } from '@/types/project'
@@ -168,7 +168,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
           of the triage affordances (assignee, when, delete) instead of crowding
           the title. Popover opens right-aligned to stay on-screen. */}
       <div
-        className={`relative shrink-0 mt-1.5 transition-opacity ${
+        className={`relative shrink-0 mt-0.5 transition-opacity ${
           hoverOnlyChrome ? 'opacity-0 group-hover:opacity-100 focus-within:opacity-100' : ''
         }`}
         onClick={(e) => e.stopPropagation()}
@@ -176,10 +176,16 @@ export const DenseInboxRow = memo(function DenseInboxRow({
         <button
           type="button"
           aria-label="Context"
+          title="Context"
           onClick={() => setContextOpen((v) => !v)}
-          className="w-3 h-3 rounded-full border border-neutral-200 hover:scale-110 transition-transform"
-          style={{ background: contextColor ?? 'transparent' }}
-        />
+          className="p-1 rounded-md hover:bg-neutral-100 transition-colors"
+        >
+          <Tag
+            className="w-3.5 h-3.5"
+            style={{ color: contextColor ?? 'var(--color-neutral-400, #a3a3a3)' }}
+            fill={contextColor ? contextColor : 'none'}
+          />
+        </button>
         {contextOpen && (
           <div className="absolute z-40 top-full right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg py-1 min-w-[120px]">
             {CONTEXT_OPTIONS.map((opt) => (
