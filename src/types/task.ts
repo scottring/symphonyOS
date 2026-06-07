@@ -1,3 +1,6 @@
+import type { Scope } from '@/lib/scope'
+export type { Scope }
+
 export interface TaskLink {
   url: string
   title?: string // Fetched page title, falls back to URL if not available
@@ -40,6 +43,7 @@ export interface Task {
   isWaiting?: boolean // True = waiting on someone else (all actions done, pending response)
   waitingSince?: Date // When the task entered waiting state
   context?: TaskContext | null // Context: work, family, personal (null = untagged/private)
+  scope?: Scope // Who can SEE it: individual (private) | couple | compound (household)
   category?: TaskCategory // What kind of family item (default: 'task')
   notes?: string
   links?: TaskLink[]

@@ -6,7 +6,7 @@ function baseRow(overrides: Partial<DbTask> = {}): DbTask {
     id: 't1', title: 'x', completed: false, bucket: 'inbox',
     user_id: 'u1',
     scheduled_for: null, deferred_until: null, defer_count: null,
-    is_all_day: null, is_someday: null, context: null, category: null,
+    is_all_day: null, is_someday: null, context: null, scope: null, category: null,
     notes: null, links: null, phone_number: null, contact_id: null,
     assigned_to: null, assigned_to_all: null, project_id: null,
     parent_task_id: null, linked_event_id: null, link_type: null,
@@ -26,5 +26,10 @@ describe('dbTaskToTask groupMembers', () => {
   it('maps populated group_members refs through', () => {
     const refs = [{ type: 'event' as const, id: 'e1' }, { type: 'routine' as const, id: 'r1' }]
     expect(dbTaskToTask(baseRow({ group_members: refs })).groupMembers).toEqual(refs)
+  })
+
+  it('maps scope, defaulting to individual when the column is null', () => {
+    expect(dbTaskToTask(baseRow({ scope: 'compound' })).scope).toBe('compound')
+    expect(dbTaskToTask(baseRow({ scope: null })).scope).toBe('individual')
   })
 })

@@ -5,6 +5,7 @@ import { useFamilyMembers } from './useFamilyMembers'
 import { useToast } from './useToast'
 import { logger } from '@/lib/logger'
 import type { Task, TaskBucket, TaskLink, TaskContext, TaskCategory, LinkedActivity, LinkType, LinkedActivityType, GroupMemberRef } from '@/types/task'
+import { defaultScopeForArea, type Scope } from '@/lib/scope'
 
 export interface DbTask {
   id: string
@@ -18,6 +19,7 @@ export interface DbTask {
   is_all_day: boolean | null
   is_someday: boolean | null
   context: TaskContext | null
+  scope: Scope | null
   category: string | null
   notes: string | null
   links: (string | TaskLink)[] | null // Can be old string format or new object format
@@ -76,6 +78,7 @@ export function dbTaskToTask(dbTask: DbTask): Task {
     isAllDay: dbTask.is_all_day ?? undefined,
     isSomeday: dbTask.is_someday ?? undefined,
     context: dbTask.context ?? null,
+    scope: dbTask.scope ?? 'individual',
     category: (dbTask.category as TaskCategory) ?? 'task',
     notes: dbTask.notes ?? undefined,
     links: normalizeLinks(dbTask.links),
@@ -254,6 +257,7 @@ export function useSupabaseTasks() {
     assignedToAll?: string[]  // Multiple family member IDs (for shared tasks)
     category?: TaskCategory  // What kind of family item
     context?: TaskContext | null  // Life domain for filtering (null = private/untagged)
+    scope?: Scope  // Who can see it (individual/couple/compound); defaults from area
     location?: string  // Address or place name
     locationPlaceId?: string  // Google Place ID for precise directions
     defaultAssigneeId?: string  // Default assignee if assignedTo is undefined
@@ -297,6 +301,7 @@ export function useSupabaseTasks() {
       assignedToAll: options?.assignedToAll,
       category: options?.category ?? 'task',
       context: options?.context ?? null,
+      scope: options?.scope ?? defaultScopeForArea(options?.context ?? null),
       location: options?.location,
       locationPlaceId: options?.locationPlaceId,
       isAllDay: options?.isAllDay,
@@ -321,6 +326,7 @@ export function useSupabaseTasks() {
         assigned_to_all: options?.assignedToAll ?? null,
         category: options?.category ?? 'task',
         context: options?.context ?? null,
+        scope: options?.scope ?? defaultScopeForArea(options?.context ?? null),
         location: options?.location ?? null,
         location_place_id: options?.locationPlaceId ?? null,
         is_all_day: options?.isAllDay ?? null,
