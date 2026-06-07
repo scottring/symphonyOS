@@ -37,6 +37,7 @@ function deriveActiveView(pathname: string): ViewType {
   if (pathname === '/contacts') return 'contacts';
   if (pathname.startsWith('/contacts/')) return 'contact-detail';
   if (pathname.startsWith('/meals')) return 'meals';
+  if (pathname.startsWith('/agent')) return 'agent';
   if (pathname === '/morning') return 'morning';
   if (pathname === '/bedtime') return 'bedtime';
   if (pathname === '/inbox' || pathname.endsWith('/tasks-new/inbox')) return 'inbox';
@@ -88,6 +89,9 @@ export function ShellLayout({ children }: Props) {
         case 'goals':
           navigate('/goals');
           return;
+        case 'agent':
+          navigate('/agent');
+          return;
         case 'projects':
           navigate('/projects');
           return;
@@ -108,7 +112,7 @@ export function ShellLayout({ children }: Props) {
           navigate('/bedtime');
           return;
         default:
-          // Views like 'agent', 'lists', 'notes', 'history', 'settings',
+          // Views like 'lists', 'notes', 'history', 'settings',
           // 'task-detail' are state-based in App.tsx — under Shell we
           // can't drive them yet, so route home.
           navigate('/');
