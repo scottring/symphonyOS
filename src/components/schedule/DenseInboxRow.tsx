@@ -133,39 +133,6 @@ export const DenseInboxRow = memo(function DenseInboxRow({
         )}
       </div>
 
-      {/* Context dot button — visually redundant with the colored checkbox ring,
-          so we hide it by default in hover-chrome rows and reveal on hover/focus. */}
-      <div
-        className={`relative shrink-0 mt-1.5 transition-opacity ${
-          hoverOnlyChrome ? 'opacity-0 group-hover:opacity-100 focus-within:opacity-100' : ''
-        }`}
-      >
-        <button
-          type="button"
-          aria-label="Context"
-          onClick={() => setContextOpen((v) => !v)}
-          className="w-3 h-3 rounded-full border border-neutral-200 hover:scale-110 transition-transform"
-          style={{ background: contextColor ?? 'transparent' }}
-        />
-        {contextOpen && (
-          <div className="absolute z-30 top-full left-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg py-1 min-w-[120px]">
-            {CONTEXT_OPTIONS.map((opt) => (
-              <button
-                key={opt.label}
-                type="button"
-                className="block w-full text-left px-3 py-1.5 text-sm hover:bg-neutral-50"
-                onClick={() => {
-                  onUpdate({ context: opt.value })
-                  setContextOpen(false)
-                }}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
       {/* Title */}
       <button
         type="button"
@@ -196,6 +163,41 @@ export const DenseInboxRow = memo(function DenseInboxRow({
         />
       )}
 
+
+      {/* Context dot — moved to the trailing controls so it sits with the rest
+          of the triage affordances (assignee, when, delete) instead of crowding
+          the title. Popover opens right-aligned to stay on-screen. */}
+      <div
+        className={`relative shrink-0 mt-1.5 transition-opacity ${
+          hoverOnlyChrome ? 'opacity-0 group-hover:opacity-100 focus-within:opacity-100' : ''
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          aria-label="Context"
+          onClick={() => setContextOpen((v) => !v)}
+          className="w-3 h-3 rounded-full border border-neutral-200 hover:scale-110 transition-transform"
+          style={{ background: contextColor ?? 'transparent' }}
+        />
+        {contextOpen && (
+          <div className="absolute z-40 top-full right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg py-1 min-w-[120px]">
+            {CONTEXT_OPTIONS.map((opt) => (
+              <button
+                key={opt.label}
+                type="button"
+                className="block w-full text-left px-3 py-1.5 text-sm hover:bg-neutral-50"
+                onClick={() => {
+                  onUpdate({ context: opt.value })
+                  setContextOpen(false)
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Assignee avatar */}
       {familyMembers.length > 0 && onAssign && (
