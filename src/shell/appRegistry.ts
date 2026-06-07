@@ -7,6 +7,7 @@ import { tasksAppDef } from '@/apps/tasks';
 import { morningAppDef } from '@/apps/morning';
 import { bedtimeAppDef } from '@/apps/bedtime';
 import { homeAppDef } from '@/apps/home';
+import { mealsAppDef } from '@/apps/meals';
 
 export type AppRegistry = ReadonlyArray<AppDef>;
 
@@ -62,4 +63,5 @@ export const appRegistry: AppRegistry = createRegistry([
   morningAppDef,
   bedtimeAppDef,
   homeAppDef,
+  mealsAppDef,
 ]);
