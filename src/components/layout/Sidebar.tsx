@@ -490,10 +490,10 @@ export function Sidebar({
       {/* Footer: Settings + Sign out + illustration + tagline */}
       <div className={`p-3 border-t border-neutral-100 ${collapsed ? 'text-center' : ''}`}>
         <button
-          onClick={() => onViewChange('settings')}
+          onClick={() => navigate('/settings')}
           className={`
             flex items-center gap-3 px-3 py-2.5 rounded-lg w-full transition-all duration-200 text-[15px]
-            ${activeView === 'settings'
+            ${location.pathname.startsWith('/settings')
               ? 'bg-primary-50 text-primary-700 font-medium'
               : 'text-neutral-600 hover:bg-neutral-100/70'
             }
