@@ -130,8 +130,7 @@ createRoot(document.getElementById('root')!).render(
                   <Route path="/task/:taskId" element={<App />} />
                 </>
               )}
-              <Route path="/goals" element={<App />} />
-              <Route path="/goals/:goalId" element={<App />} />
+              <Route path="/goals/*" element={<Shell />} />
               <Route path="/projects/*" element={<Shell />} />
               <Route path="/routines/*" element={<Shell />} />
               <Route path="/contacts/*" element={<Shell />} />

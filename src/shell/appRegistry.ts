@@ -14,6 +14,7 @@ import { listsAppDef } from '@/apps/lists';
 import { contactsAppDef } from '@/apps/contacts';
 import { routinesAppDef } from '@/apps/routines';
 import { projectsAppDef } from '@/apps/projects';
+import { goalsAppDef } from '@/apps/goals';
 
 export type AppRegistry = ReadonlyArray<AppDef>;
 
@@ -76,4 +77,5 @@ export const appRegistry: AppRegistry = createRegistry([
   contactsAppDef,
   routinesAppDef,
   projectsAppDef,
+  goalsAppDef,
 ]);
