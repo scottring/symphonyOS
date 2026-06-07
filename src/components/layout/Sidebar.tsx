@@ -28,6 +28,7 @@ import {
   Users2,
   List,
   Repeat,
+  Target,
   History,
   Settings,
   LogOut,
@@ -105,7 +106,9 @@ export function Sidebar({
   // here — the PLAN group just keeps its persisted open/closed state for those.
   // Group→state-key mapping: PLAN→'plan', HOME→'spaces', MORE→'library'.
   const planActive =
-    activeView === 'projects' || activeView === 'routines'
+    activeView === 'projects' || activeView === 'routines' ||
+    location.pathname.startsWith('/projects') || location.pathname.startsWith('/routines') ||
+    location.pathname.startsWith('/goals')
   const homeActive =
     activeView === 'meals' || activeView === 'home-app' || activeView === 'lists' ||
     location.pathname.startsWith('/lists')
@@ -339,6 +342,15 @@ export function Sidebar({
           >
             {createElement(Repeat, { className: 'w-5 h-5 shrink-0' })}
             {!collapsed && <span>Routines</span>}
+          </button>
+
+          {/* Goals */}
+          <button
+            onClick={() => navigate('/goals')}
+            className={navItemClass(location.pathname.startsWith('/goals'))}
+          >
+            {createElement(Target, { className: 'w-5 h-5 shrink-0' })}
+            {!collapsed && <span>Goals</span>}
           </button>
 
           {/* Calendar */}
