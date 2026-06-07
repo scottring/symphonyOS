@@ -11,6 +11,7 @@
 // own copy until full cutover (then the legacy synthesis becomes dead code).
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 import { useVaultWrite } from '@/hooks/useVaultWrite';
@@ -70,6 +71,19 @@ export function HomeViewContainer() {
   const [planningOpen, setPlanningOpen] = useState(false);
   const [weeklyPlanningOpen, setWeeklyPlanningOpen] = useState(false);
   const { selection, setSelection, clearSelection } = useSelection();
+
+  // "Plan the week" from the This Week rung routes here with ?plan=week —
+  // open the wired WeeklyPlanningSession, then strip the param so a refresh
+  // doesn't re-open it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('plan') === 'week') {
+      setWeeklyPlanningOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('plan');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   // Map URL selection back to the legacy `selectedItemId` shape HomeView expects
   // (`task-<id>`, `routine-<id>`, etc.). For tasks-new only `task` selections
