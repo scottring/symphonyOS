@@ -86,6 +86,9 @@ export const PlanningSession = lazy(() =>
 export const WeeklyPlanningSession = lazy(() =>
   import('./planning/weekly/WeeklyPlanningSession').then(m => ({ default: m.WeeklyPlanningSession }))
 )
+export const PlanTodaySession = lazy(() =>
+  import('./planning/daily/PlanTodaySession').then(m => ({ default: m.PlanTodaySession }))
+)
 
 // Detail panel (only renders when an item is selected)
 export const DetailPanelRedesign = lazy(() =>

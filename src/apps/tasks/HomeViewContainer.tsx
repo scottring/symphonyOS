@@ -16,7 +16,7 @@ import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 import { useVaultWrite } from '@/hooks/useVaultWrite';
 import { useGoalsContext } from '@/contexts/GoalsContext';
-import { PlanningSession, WeeklyPlanningSession } from '@/components/lazy';
+import { PlanningSession, WeeklyPlanningSession, PlanTodaySession } from '@/components/lazy';
 import { LoadingFallback } from '@/components/layout/LoadingFallback';
 import { isEverydayRoutine, scheduleRoutineOnDate } from '@/lib/routineUtils';
 import type { GoalAction } from '@/types/goal';
@@ -70,6 +70,7 @@ export function HomeViewContainer() {
   // weekly session off a `weekly-planning` stateView; the Shell uses local state).
   const [planningOpen, setPlanningOpen] = useState(false);
   const [weeklyPlanningOpen, setWeeklyPlanningOpen] = useState(false);
+  const [planTodayOpen, setPlanTodayOpen] = useState(false);
   const { selection, setSelection, clearSelection } = useSelection();
 
   // "Plan the week" from the This Week rung routes here with ?plan=week —
@@ -334,6 +335,7 @@ export function HomeViewContainer() {
         onDateChange={setViewedDate}
         currentUserMemberId={getCurrentUserMember()?.id}
         onOpenWeeklyPlanning={() => setWeeklyPlanningOpen(true)}
+        onOpenPlanToday={() => setPlanTodayOpen(true)}
       />
 
       {planningOpen && (
@@ -384,6 +386,20 @@ export function HomeViewContainer() {
             onUpdateRoutine={updateRoutine}
             onCompleteTask={toggleTask}
             onDeleteTask={deleteTask}
+          />
+        </Suspense>
+      )}
+
+      {planTodayOpen && (
+        <Suspense fallback={<LoadingFallback />}>
+          <PlanTodaySession
+            tasks={tasks}
+            events={filteredEvents}
+            viewedDate={viewedDate}
+            onClose={() => setPlanTodayOpen(false)}
+            onPushTask={pushTask}
+            onCompleteTask={toggleTask}
+            onOpenTimeBlock={() => { setPlanTodayOpen(false); setPlanningOpen(true); }}
           />
         </Suspense>
       )}

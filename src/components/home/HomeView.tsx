@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Sun } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -51,6 +52,7 @@ interface HomeViewProps {
   currentUserMemberId?: string
   bothPanelsOpen?: boolean
   onOpenWeeklyPlanning?: () => void
+  onOpenPlanToday?: () => void
 }
 
 export function HomeView({
@@ -68,6 +70,7 @@ export function HomeView({
   currentUserMemberId,
   bothPanelsOpen,
   onOpenWeeklyPlanning,
+  onOpenPlanToday,
 }: HomeViewProps) {
   const ctx = useScheduleActionsContext()
   const { currentView, setCurrentView } = useHomeView()
@@ -501,15 +504,27 @@ export function HomeView({
         {/* W4 — Today landing: a calm rhythm nudge (only on its day, dismissible)
             and the quiet "coming up" sliver. Today only; aligned to the column. */}
         {currentView === 'today' && (
-          <div className="max-w-[940px] w-full mx-auto px-4 md:px-8 pt-3 space-y-3 empty:hidden">
+          <div className="max-w-[940px] w-full mx-auto px-4 md:px-8 pt-3 space-y-3">
             <RhythmNudge due={dueSession} onPlan={() => onOpenWeeklyPlanning?.()} />
-            <ComingUpPeek
-              summary={comingUpSummary}
-              now={new Date()}
-              onSelectDay={handleSelectDay}
-              onOpenWeek={() => navigate('/week')}
-              onOpenInbox={() => navigate('/inbox')}
-            />
+            <div className="flex items-center justify-between gap-3">
+              <ComingUpPeek
+                summary={comingUpSummary}
+                now={new Date()}
+                onSelectDay={handleSelectDay}
+                onOpenWeek={() => navigate('/week')}
+                onOpenInbox={() => navigate('/inbox')}
+              />
+              {onOpenPlanToday && (
+                <button
+                  type="button"
+                  onClick={onOpenPlanToday}
+                  className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors"
+                >
+                  <Sun className="w-4 h-4" />
+                  Plan today
+                </button>
+              )}
+            </div>
           </div>
         )}
         {renderContent()}
