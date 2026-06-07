@@ -157,7 +157,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/meals/tonight" element={<App />} />
               <Route path="/meals/day/:date" element={<App />} />
               <Route path="/meals/cook/:recipeId" element={<App />} />
-              <Route path="/home/*" element={<App />} />
+              <Route path="/home/*" element={<Shell />} />
               <Route path="/join/:token" element={<JoinHousehold />} />
               <Route path="/calendar-callback" element={<CalendarCallback />} />
               {/* Flag ON: root /* catch-all serves the cutover paths through the

@@ -6,6 +6,7 @@ import { jobPipelineAppDef } from '@/apps/job-pipeline';
 import { tasksAppDef } from '@/apps/tasks';
 import { morningAppDef } from '@/apps/morning';
 import { bedtimeAppDef } from '@/apps/bedtime';
+import { homeAppDef } from '@/apps/home';
 
 export type AppRegistry = ReadonlyArray<AppDef>;
 
@@ -60,4 +61,5 @@ export const appRegistry: AppRegistry = createRegistry([
   tasksAppDef,
   morningAppDef,
   bedtimeAppDef,
+  homeAppDef,
 ]);
