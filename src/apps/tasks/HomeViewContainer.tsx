@@ -86,12 +86,15 @@ export function HomeViewContainer() {
   }, [searchParams, setSearchParams]);
 
   // Map URL selection back to the legacy `selectedItemId` shape HomeView expects
-  // (`task-<id>`, `routine-<id>`, etc.). For tasks-new only `task` selections
-  // exist via the URL; clicking a task in HomeView routes through onSelectItem
-  // which we map to setSelection({kind: 'task', id}).
+  // (`task-<id>`, `routine-<id>`, `event-<id>`). The TimelineCard uses this to
+  // highlight the selected row. Meal selections highlight as their underlying
+  // `event-<meal:id>` row (HomeView emits meals as event-prefixed ids).
   const selectedItemId = useMemo(() => {
     if (!selection) return null;
-    if (selection.kind === 'task') return `task-${selection.id}`;
+    if (selection.kind === 'meal') return `event-${selection.id}`;
+    if (selection.kind === 'task' || selection.kind === 'routine' || selection.kind === 'event') {
+      return `${selection.kind}-${selection.id}`;
+    }
     return null;
   }, [selection]);
 
@@ -106,8 +109,14 @@ export function HomeViewContainer() {
       if (dashIdx <= 0) return;
       const kind = itemId.slice(0, dashIdx);
       const id = itemId.slice(dashIdx + 1);
-      // We only own 'task' selections in TasksApp; ignore other kinds for now.
-      if (kind !== 'task') return;
+      // Meals ride on the `event-` prefix with an id of `meal:<entryId>`;
+      // promote them to their own `meal` kind so the meal panel opens.
+      if (kind === 'event' && id.startsWith('meal:')) {
+        setSelection({ kind: 'meal', id });
+        return;
+      }
+      // TasksApp owns task/routine/event/meal; ignore anything else.
+      if (kind !== 'task' && kind !== 'routine' && kind !== 'event') return;
       setSelection({ kind, id });
     },
     [setSelection, clearSelection],

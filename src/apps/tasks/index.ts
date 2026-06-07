@@ -15,5 +15,5 @@ export const tasksAppDef: AppDef = {
   index: true,
   Component: TasksApp,
   DetailPanelComponent: TaskDetailPanel,
-  ownsSelectionKinds: ['task'],
+  ownsSelectionKinds: ['task', 'routine', 'event', 'meal'],
 };
