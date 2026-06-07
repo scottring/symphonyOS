@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { Flame } from 'lucide-react'
-import type { Routine, RoutineVisibility } from '@/types/routine'
+import type { Routine, RoutineVisibility, RecurrencePattern } from '@/types/routine'
 import type { TaskContext } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
 import { PanelHeader } from './sections/PanelHeader'
@@ -8,6 +9,7 @@ import { PanelWhy } from './sections/PanelWhy'
 import { PanelFooter } from './sections/PanelFooter'
 import { ContextPicker } from '@/components/triage/ContextPicker'
 import { MultiAssigneeDropdown } from '@/components/family'
+import { RoutineScheduleEditor } from '@/components/routine/RoutineScheduleEditor'
 import { useRoutineStats } from '@/hooks/useRoutineStats'
 
 function recurrenceSummary(r: Routine): string {
@@ -29,10 +31,13 @@ interface TapRoutinePanelProps {
   routine: Routine
   familyMembers?: FamilyMember[]
   onClose: () => void
+  onRename?: (name: string) => void
   onNotesChange: (next: string) => void
   onContextChange: (context: TaskContext | undefined) => void
   onVisibilityChange: (visibility: RoutineVisibility) => void
   onAssignChange?: (memberIds: string[]) => void
+  /** Persist a recurrence/time-of-day change. time is '' (clear) or 'HH:MM'. */
+  onScheduleChange?: (pattern: RecurrencePattern, timeOfDay: string) => void
 }
 
 export function TapRoutinePanel(props: TapRoutinePanelProps) {
@@ -42,12 +47,13 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
   const assigneeIds = routine.assigned_to_all && routine.assigned_to_all.length > 0
     ? routine.assigned_to_all
     : (routine.assigned_to ? [routine.assigned_to] : [])
+  const [editingSchedule, setEditingSchedule] = useState(false)
 
   return (
     <article className="bg-bg-elevated rounded-2xl p-5 max-w-md w-full">
       <PanelHeader
         title={routine.name}
-        onTitleChange={() => { /* routine rename — out of scope */ }}
+        onTitleChange={(name) => props.onRename?.(name)}
         onClose={props.onClose}
       />
       <PanelMetaRow bucket={recurrenceSummary(routine)} />
@@ -93,6 +99,38 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
             Reference keeps the routine but hides it from Today.
           </p>
         </div>
+
+        {/* Schedule (recurrence + time) — collapsed summary, expands to edit */}
+        {props.onScheduleChange && (
+          <div>
+            {editingSchedule ? (
+              <div className="rounded-xl border border-neutral-200 p-3">
+                <RoutineScheduleEditor
+                  size="sm"
+                  recurrencePattern={routine.recurrence_pattern}
+                  timeOfDay={(routine.time_of_day ?? '').slice(0, 5)}
+                  onChange={({ recurrencePattern, timeOfDay }) =>
+                    props.onScheduleChange?.(recurrencePattern, timeOfDay)
+                  }
+                />
+                <button
+                  onClick={() => setEditingSchedule(false)}
+                  className="mt-3 text-xs font-medium text-neutral-500 hover:text-neutral-700"
+                >
+                  Done
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setEditingSchedule(true)}
+                className="flex items-center justify-between w-full px-3 py-2 rounded-lg bg-neutral-100 text-sm text-neutral-700 hover:bg-neutral-200 transition-colors"
+              >
+                <span>{recurrenceSummary(routine)}</span>
+                <span className="text-xs text-neutral-500">Edit schedule</span>
+              </button>
+            )}
+          </div>
+        )}
       </section>
 
       <PanelWhy

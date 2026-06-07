@@ -204,10 +204,17 @@ function RoutinePanelBody({ id }: { id: string }) {
       routine={routine}
       familyMembers={familyMembers}
       onClose={handleClose}
+      onRename={(name) => updateRoutine(routine.id, { name })}
       onNotesChange={(n) => updateRoutine(routine.id, { description: n })}
       onContextChange={(ctx) => updateRoutine(routine.id, { context: ctx ?? null })}
       onVisibilityChange={(v) => updateRoutine(routine.id, { visibility: v })}
       onAssignChange={(ids) => updateRoutine(routine.id, { assigned_to_all: ids })}
+      onScheduleChange={(pattern, timeOfDay) =>
+        updateRoutine(routine.id, {
+          recurrence_pattern: pattern,
+          time_of_day: timeOfDay || null,
+        })
+      }
     />
   );
 }

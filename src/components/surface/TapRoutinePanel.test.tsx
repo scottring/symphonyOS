@@ -65,4 +65,68 @@ describe('TapRoutinePanel', () => {
     // confirms the picker mounted with our members.
     expect(screen.getAllByRole('button').length).toBeGreaterThan(2)
   })
+
+  it('renames the routine via the header (onRename gets the new name)', () => {
+    const onRename = vi.fn()
+    render(
+      <TapRoutinePanel
+        routine={routine}
+        onClose={vi.fn()}
+        onRename={onRename}
+        onNotesChange={vi.fn()}
+        onContextChange={vi.fn()}
+        onVisibilityChange={vi.fn()}
+      />,
+    )
+    // PanelHeader shows the title as a button; click to enter edit mode.
+    fireEvent.click(screen.getByRole('button', { name: 'Trash night' }))
+    const input = screen.getByDisplayValue('Trash night')
+    fireEvent.change(input, { target: { value: 'Recycling night' } })
+    fireEvent.blur(input)
+    expect(onRename).toHaveBeenCalledWith('Recycling night')
+  })
+
+  it('edits the schedule: changing the day reports a new recurrence pattern', () => {
+    const onScheduleChange = vi.fn()
+    render(
+      <TapRoutinePanel
+        routine={routine}
+        onClose={vi.fn()}
+        onNotesChange={vi.fn()}
+        onContextChange={vi.fn()}
+        onVisibilityChange={vi.fn()}
+        onScheduleChange={onScheduleChange}
+      />,
+    )
+    // Collapsed by default — expand the schedule editor.
+    fireEvent.click(screen.getByRole('button', { name: /Edit schedule/i }))
+    // Routine repeats Tue; toggling Mon on should report days including 'mon'.
+    fireEvent.click(screen.getByRole('button', { name: 'Mon' }))
+    expect(onScheduleChange).toHaveBeenCalledTimes(1)
+    const [pattern, time] = onScheduleChange.mock.calls[0]
+    expect(pattern.type).toBe('weekly')
+    expect(pattern.days).toEqual(expect.arrayContaining(['tue', 'mon']))
+    // Time of day preserved as HH:MM.
+    expect(time).toBe('20:00')
+  })
+
+  it('edits the schedule: changing the time reports the new time of day', () => {
+    const onScheduleChange = vi.fn()
+    render(
+      <TapRoutinePanel
+        routine={routine}
+        onClose={vi.fn()}
+        onNotesChange={vi.fn()}
+        onContextChange={vi.fn()}
+        onVisibilityChange={vi.fn()}
+        onScheduleChange={onScheduleChange}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Edit schedule/i }))
+    const timeInput = screen.getByDisplayValue('20:00')
+    fireEvent.change(timeInput, { target: { value: '07:30' } })
+    expect(onScheduleChange).toHaveBeenCalled()
+    const lastCall = onScheduleChange.mock.calls[onScheduleChange.mock.calls.length - 1]
+    expect(lastCall[1]).toBe('07:30')
+  })
 })

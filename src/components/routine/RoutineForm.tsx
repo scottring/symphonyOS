@@ -1,14 +1,14 @@
 import { useState } from 'react'
-import type { Routine, RecurrencePattern, RecurrenceUnit } from '@/types/actionable'
+import type { Routine, RecurrencePattern } from '@/types/actionable'
 import type { UpdateRoutineInput } from '@/hooks/useRoutines'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
 import { FAMILY_COLORS, type FamilyMemberColor } from '@/types/family'
 import { parseRoutine, parsedRoutineToDb, isValidParsedRoutine } from '@/lib/parseRoutine'
 import { SemanticRoutine } from './SemanticRoutine'
+import { RoutineScheduleEditor } from './RoutineScheduleEditor'
 import { PinButton } from '@/components/pins'
 import { TiptapEditor } from '@/components/notes/TiptapEditor'
-import { TIME_INPUT_LARGE_CLASS } from '@/lib/inputStyles'
 
 interface RoutineFormProps {
   routine: Routine
@@ -25,16 +25,6 @@ interface RoutineFormProps {
   onUnpin?: () => Promise<boolean>
 }
 
-const DAYS = [
-  { key: 'sun', label: 'Sun' },
-  { key: 'mon', label: 'Mon' },
-  { key: 'tue', label: 'Tue' },
-  { key: 'wed', label: 'Wed' },
-  { key: 'thu', label: 'Thu' },
-  { key: 'fri', label: 'Fri' },
-  { key: 'sat', label: 'Sat' },
-]
-
 export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack, onUpdate, onDelete, onToggleVisibility, isPinned, canPin, onPin, onUnpin }: RoutineFormProps) {
   // Determine if this is a NL routine
   const isNLRoutine = !!routine.raw_input
@@ -45,19 +35,12 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
   // State for legacy mode
   const [name, setName] = useState(routine.name)
   const [description, setDescription] = useState(routine.description || '')
-  const [recurrenceType, setRecurrenceType] = useState<RecurrencePattern['type']>(routine.recurrence_pattern.type)
-  const [selectedDays, setSelectedDays] = useState<string[]>(routine.recurrence_pattern.days || [])
-  const [dayOfMonth, setDayOfMonth] = useState<number>(routine.recurrence_pattern.day_of_month || 1)
-  const [weeklyInterval, setWeeklyInterval] = useState<number>(routine.recurrence_pattern.interval || 1)
-  const [startDate, setStartDate] = useState<string>(routine.recurrence_pattern.start_date || '')
-  // since_last: surface N units after each completion
-  const [sinceLastInterval, setSinceLastInterval] = useState<number>(
-    routine.recurrence_pattern.type === 'since_last' ? (routine.recurrence_pattern.interval || 1) : 1,
-  )
-  const [sinceLastUnit, setSinceLastUnit] = useState<RecurrenceUnit>(
-    routine.recurrence_pattern.type === 'since_last' ? (routine.recurrence_pattern.unit || 'weeks') : 'weeks',
-  )
-  const [timeOfDay, setTimeOfDay] = useState(routine.time_of_day || '')
+  // Recurrence + time of day are managed by the shared RoutineScheduleEditor;
+  // we keep the whole pattern + time as state and build the update from them.
+  const [recurrencePattern, setRecurrencePattern] = useState<RecurrencePattern>(routine.recurrence_pattern)
+  const [timeOfDay, setTimeOfDay] = useState((routine.time_of_day || '').slice(0, 5))
+  const recurrenceType = recurrencePattern.type
+  const selectedDays = recurrencePattern.days || []
 
   const [isSaving, setIsSaving] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -79,23 +62,25 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
     }
     if (normalizeEmpty(description) !== normalizeEmpty(routine.description || '')) return true
 
-    if (recurrenceType !== routine.recurrence_pattern.type) return true
-    if (timeOfDay !== (routine.time_of_day || '')) return true
+    if (timeOfDay !== (routine.time_of_day || '').slice(0, 5)) return true
+    // Recurrence pattern: compare structurally (order-independent for days)
+    const orig = routine.recurrence_pattern
+    if (recurrenceType !== orig.type) return true
     if (recurrenceType === 'weekly') {
-      const originalDays = routine.recurrence_pattern.days || []
+      const originalDays = orig.days || []
       if (selectedDays.length !== originalDays.length) return true
       if (!selectedDays.every(d => originalDays.includes(d))) return true
-      if (weeklyInterval !== (routine.recurrence_pattern.interval || 1)) return true
-      if (weeklyInterval > 1 && startDate !== (routine.recurrence_pattern.start_date || '')) return true
+      if ((recurrencePattern.interval || 1) !== (orig.interval || 1)) return true
+      if ((recurrencePattern.interval || 1) > 1 && (recurrencePattern.start_date || '') !== (orig.start_date || '')) return true
     }
     if (recurrenceType === 'monthly') {
-      if (dayOfMonth !== (routine.recurrence_pattern.day_of_month || 1)) return true
+      if ((recurrencePattern.day_of_month || 1) !== (orig.day_of_month || 1)) return true
     }
     if (recurrenceType === 'since_last') {
-      const originalInterval = routine.recurrence_pattern.type === 'since_last' ? (routine.recurrence_pattern.interval || 1) : 1
-      const originalUnit = routine.recurrence_pattern.type === 'since_last' ? (routine.recurrence_pattern.unit || 'weeks') : 'weeks'
-      if (sinceLastInterval !== originalInterval) return true
-      if (sinceLastUnit !== originalUnit) return true
+      const originalInterval = orig.type === 'since_last' ? (orig.interval || 1) : 1
+      const originalUnit = orig.type === 'since_last' ? (orig.unit || 'weeks') : 'weeks'
+      if ((recurrencePattern.interval || 1) !== originalInterval) return true
+      if ((recurrencePattern.unit || 'weeks') !== originalUnit) return true
     }
     return false
   }
@@ -118,27 +103,10 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
       if (!name.trim()) return
 
       setIsSaving(true)
-      const recurrence_pattern: RecurrencePattern = { type: recurrenceType }
-      if (recurrenceType === 'weekly') {
-        recurrence_pattern.days = selectedDays
-        if (weeklyInterval > 1) {
-          recurrence_pattern.interval = weeklyInterval
-          // Default start_date to today if user didn't pick one
-          recurrence_pattern.start_date = startDate || new Date().toISOString().slice(0, 10)
-        }
-      }
-      if (recurrenceType === 'monthly') {
-        recurrence_pattern.day_of_month = dayOfMonth
-      }
-      if (recurrenceType === 'since_last') {
-        recurrence_pattern.interval = sinceLastInterval
-        recurrence_pattern.unit = sinceLastUnit
-      }
-
       await onUpdate(routine.id, {
         name: name.trim(),
         description: description.trim() || null,
-        recurrence_pattern,
+        recurrence_pattern: recurrencePattern,
         time_of_day: timeOfDay || null,
       })
       setIsSaving(false)
@@ -152,12 +120,6 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
 
   const handleToggleVisibility = async () => {
     await onToggleVisibility(routine.id)
-  }
-
-  const toggleDay = (day: string) => {
-    setSelectedDays(prev =>
-      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
-    )
   }
 
   const isActive = routine.visibility === 'active'
@@ -277,172 +239,15 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
                 />
               </div>
 
-              {/* Recurrence Type */}
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-2">Repeats</label>
-                <div className="flex flex-wrap gap-2">
-                  {([
-                    { value: 'daily', label: 'Daily' },
-                    { value: 'weekly', label: 'Weekly' },
-                    { value: 'monthly', label: 'Monthly' },
-                    { value: 'quarterly', label: 'Quarterly' },
-                    { value: 'since_last', label: 'After completion' },
-                  ] as const).map(({ value, label }) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setRecurrenceType(value)}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        recurrenceType === value
-                          ? 'bg-amber-100 text-amber-700'
-                          : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Day selector for weekly */}
-              {recurrenceType === 'weekly' && (
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">On days</label>
-                  <div className="flex gap-2">
-                    {DAYS.map(({ key, label }) => (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => toggleDay(key)}
-                        className={`w-12 h-12 rounded-full text-sm font-medium transition-colors ${
-                          selectedDays.includes(key)
-                            ? 'bg-amber-500 text-white'
-                            : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                  {recurrenceType === 'weekly' && selectedDays.length === 0 && (
-                    <p className="text-sm text-red-500 mt-2">Select at least one day</p>
-                  )}
-
-                  {/* Interval — every N weeks */}
-                  <div className="mt-4 flex items-center gap-3">
-                    <label className="text-sm font-medium text-neutral-700">Every</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={52}
-                      value={weeklyInterval}
-                      onChange={(e) => setWeeklyInterval(Math.max(1, Number(e.target.value) || 1))}
-                      className="w-20 px-3 py-2 rounded-lg border border-neutral-200 bg-white text-neutral-800 text-center
-                                 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                    />
-                    <span className="text-sm text-neutral-600">{weeklyInterval === 1 ? 'week' : 'weeks'}</span>
-                  </div>
-                  {weeklyInterval > 1 && (
-                    <div className="mt-3">
-                      <label className="block text-sm font-medium text-neutral-700 mb-2">
-                        Anchor date <span className="text-neutral-400 font-normal">(a day this routine should occur)</span>
-                      </label>
-                      <input
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        className="px-3 py-2 rounded-lg border border-neutral-200 bg-white text-neutral-800
-                                   focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                      />
-                      <p className="text-xs text-neutral-500 mt-1">
-                        Pick any past or upcoming date when this should occur — future occurrences are spaced from here.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Interval + unit for since_last */}
-              {recurrenceType === 'since_last' && (
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">
-                    Repeat after each completion
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-neutral-600">Every</span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={365}
-                      value={sinceLastInterval}
-                      onChange={(e) => setSinceLastInterval(Math.max(1, Number(e.target.value) || 1))}
-                      className="w-20 px-3 py-2 rounded-lg border border-neutral-200 bg-white text-neutral-800 text-center
-                                 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                    />
-                    <select
-                      value={sinceLastUnit}
-                      onChange={(e) => setSinceLastUnit(e.target.value as RecurrenceUnit)}
-                      className="px-3 py-2 rounded-lg border border-neutral-200 bg-white text-neutral-800
-                                 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                    >
-                      <option value="days">{sinceLastInterval === 1 ? 'day' : 'days'}</option>
-                      <option value="weeks">{sinceLastInterval === 1 ? 'week' : 'weeks'}</option>
-                      <option value="months">{sinceLastInterval === 1 ? 'month' : 'months'}</option>
-                    </select>
-                    <span className="text-sm text-neutral-500">after I check it off</span>
-                  </div>
-                  <p className="text-xs text-neutral-500 mt-2">
-                    Example: a haircut every 6 weeks shows up 6 weeks after the last one,
-                    stays in Today until checked, then resets the timer.
-                  </p>
-                </div>
-              )}
-
-              {/* Day number selector for monthly */}
-              {recurrenceType === 'monthly' && (
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">On day</label>
-                  <select
-                    value={dayOfMonth}
-                    onChange={(e) => setDayOfMonth(Number(e.target.value))}
-                    className="w-full px-4 py-3 rounded-xl border border-neutral-200 bg-white
-                               text-neutral-800
-                               focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                  >
-                    {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
-                      <option key={day} value={day}>
-                        {day}{day === 1 ? 'st' : day === 2 ? 'nd' : day === 3 ? 'rd' : 'th'} of the month
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-neutral-500 mt-2">
-                    For months with fewer days, the routine will occur on the last day of that month
-                  </p>
-                </div>
-              )}
-
-              {/* Time of day */}
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-2">
-                  Time <span className="text-neutral-400 font-normal">(optional)</span>
-                </label>
-                <input
-                  type="time"
-                  step="300"
-                  value={timeOfDay}
-                  onChange={(e) => setTimeOfDay(e.target.value)}
-                  className={`w-full text-neutral-800 ${TIME_INPUT_LARGE_CLASS}`}
-                />
-                {timeOfDay && (
-                  <button
-                    type="button"
-                    onClick={() => setTimeOfDay('')}
-                    className="mt-2 text-sm text-neutral-500 hover:text-neutral-700"
-                  >
-                    Clear time
-                  </button>
-                )}
-              </div>
+              {/* Recurrence + time of day (shared editor) */}
+              <RoutineScheduleEditor
+                recurrencePattern={recurrencePattern}
+                timeOfDay={timeOfDay}
+                onChange={({ recurrencePattern: next, timeOfDay: nextTime }) => {
+                  setRecurrencePattern(next)
+                  setTimeOfDay(nextTime)
+                }}
+              />
             </>
           )}
 
