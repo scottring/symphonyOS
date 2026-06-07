@@ -452,8 +452,8 @@ export function Sidebar({
         >
           {/* Contacts */}
           <button
-            onClick={() => onViewChange('contacts')}
-            className={navItemClass(activeView === 'contacts' || activeView === 'contact-detail')}
+            onClick={() => navigate('/contacts')}
+            className={navItemClass(location.pathname.startsWith('/contacts'))}
           >
             {createElement(Users2, { className: 'w-5 h-5 shrink-0' })}
             {!collapsed && <span>Contacts</span>}

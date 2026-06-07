@@ -11,6 +11,7 @@ import { mealsAppDef } from '@/apps/meals';
 import { settingsAppDef } from '@/apps/settings';
 import { historyAppDef } from '@/apps/history';
 import { listsAppDef } from '@/apps/lists';
+import { contactsAppDef } from '@/apps/contacts';
 
 export type AppRegistry = ReadonlyArray<AppDef>;
 
@@ -70,4 +71,5 @@ export const appRegistry: AppRegistry = createRegistry([
   settingsAppDef,
   historyAppDef,
   listsAppDef,
+  contactsAppDef,
 ]);
