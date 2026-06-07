@@ -230,17 +230,23 @@ export function HomeView({
 
   // Wrap callbacks with undo functionality
   const handleToggleTaskWithUndo = useCallback((taskId: string) => {
-    // Do NOT early-return when the task isn't in the today list: carried-over /
-    // overdue items live outside `filteredTasks` but must still toggle AND
-    // register an undo. (Bug: completing a carried-over task pushed no undo.)
-    const task = filteredTasks.find(t => t.id === taskId)
+    // Read the prior state from the FULL task list, not `filteredTasks`:
+    // carried-over / overdue items are excluded from the today list, so looking
+    // them up there returned undefined and mislabeled the toast.
+    const task = tasks.find(t => t.id === taskId)
     const wasCompleted = task?.completed ?? false
     ctx.onToggleTask(taskId)
+    // Undo sets the EXPLICIT prior state via updateTask — it must NOT call
+    // onToggleTask again. `toggleTask` derives the next value from a snapshot of
+    // `tasks` captured when this handler was built (still showing the task as
+    // incomplete), so a second toggle would re-complete it instead of reverting
+    // — the "undo does nothing" bug. Writing `completed` explicitly is immune to
+    // that stale closure.
     pushAction(
       wasCompleted ? 'Task marked incomplete' : 'Task completed',
-      () => ctx.onToggleTask(taskId)
+      () => ctx.onUpdateTask?.(taskId, { completed: wasCompleted })
     )
-  }, [filteredTasks, ctx.onToggleTask, pushAction])
+  }, [tasks, ctx.onToggleTask, ctx.onUpdateTask, pushAction])
 
   const handleDeleteTaskWithUndo = useCallback((taskId: string) => {
     if (!ctx.onDeleteTask) return

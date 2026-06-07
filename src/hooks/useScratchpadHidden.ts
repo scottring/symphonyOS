@@ -10,11 +10,14 @@ import { useState, useEffect, useCallback } from 'react';
 const STORAGE_KEY = 'symphony-scratchpad-hidden';
 const SYNC_EVENT = 'symphony:scratchpad-hidden-changed';
 
+// Default is HIDDEN (collapsed). The assistant rail must not auto-open on page
+// load and cover the main column — the user opens it deliberately, and that
+// preference (an explicit '0') persists. Any other value (incl. absent) = hidden.
 function readHidden(): boolean {
   try {
-    return localStorage.getItem(STORAGE_KEY) === '1';
+    return localStorage.getItem(STORAGE_KEY) !== '0';
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -38,9 +41,11 @@ export function useScratchpadHidden(): {
   const setHidden = useCallback((v: boolean) => {
     try {
       if (v) {
-        localStorage.setItem(STORAGE_KEY, '1');
-      } else {
+        // Hidden is the default — clear the explicit "open" marker.
         localStorage.removeItem(STORAGE_KEY);
+      } else {
+        // Persist that the user deliberately opened the rail.
+        localStorage.setItem(STORAGE_KEY, '0');
       }
     } catch {
       // Ignore storage errors (private browsing, quota exceeded)
