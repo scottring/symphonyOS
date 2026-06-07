@@ -230,9 +230,11 @@ export function HomeView({
 
   // Wrap callbacks with undo functionality
   const handleToggleTaskWithUndo = useCallback((taskId: string) => {
+    // Do NOT early-return when the task isn't in the today list: carried-over /
+    // overdue items live outside `filteredTasks` but must still toggle AND
+    // register an undo. (Bug: completing a carried-over task pushed no undo.)
     const task = filteredTasks.find(t => t.id === taskId)
-    if (!task) return
-    const wasCompleted = task.completed
+    const wasCompleted = task?.completed ?? false
     ctx.onToggleTask(taskId)
     pushAction(
       wasCompleted ? 'Task marked incomplete' : 'Task completed',

@@ -321,7 +321,7 @@ export function TodayView({
         ctx.onUpdateTask?.(taskId, { bucket: 'timed' as const, scheduledFor: t, isAllDay: true })
       }}
       onSelectTask={(taskId) => onSelectItem(`task-${taskId}`)}
-      onCompleteTask={ctx.onToggleTask}
+      onCompleteTask={onToggleTask}
       onDeferTask={ctx.onPushTask ? (taskId, target: 'month' | 'quarter') => ctx.onPushTask!(taskId, target) : undefined}
       onDeleteTask={ctx.onDeleteTask}
       onUpdateTask={ctx.onUpdateTask}
