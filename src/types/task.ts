@@ -6,7 +6,7 @@ export interface TaskLink {
   title?: string // Fetched page title, falls back to URL if not available
 }
 
-export type TaskBucket = 'inbox' | 'week' | 'month' | 'quarter' | 'timed'
+export type TaskBucket = 'inbox' | 'week' | 'month' | 'quarter' | 'someday' | 'timed'
 
 export type TaskContext = 'work' | 'family' | 'personal'
 
