@@ -54,6 +54,10 @@ interface DenseInboxRowProps {
   selectionMode?: boolean
   isSelected?: boolean
   onToggleSelection?: () => void
+  /** When provided, replaces the flat `quickActions` chips with a richer control
+   *  (e.g. the fan-out TriageWhenMenu). The wrapper's hover-chrome behaviour is
+   *  preserved. */
+  triageMenu?: React.ReactNode
 }
 
 const CONTEXT_OPTIONS: Array<{ value: TaskContext | null; label: string }> = [
@@ -82,6 +86,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
   selectionMode = false,
   isSelected = false,
   onToggleSelection,
+  triageMenu,
 }: DenseInboxRowProps) {
   const [contextOpen, setContextOpen] = useState(false)
 
@@ -211,7 +216,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
           hoverOnlyChrome ? 'opacity-0 group-hover:opacity-100 focus-within:opacity-100' : ''
         }`}
       >
-        {quickActions.map((action) => {
+        {triageMenu ?? quickActions.map((action) => {
           const label = ACTION_LABELS[action.kind]
           if (action.kind === 'note') {
             return (

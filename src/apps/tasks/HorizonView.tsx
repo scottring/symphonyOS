@@ -30,16 +30,19 @@ import { useListsContext } from '@/contexts/ListsContext';
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext';
 import { useUndo } from '@/hooks/useUndo';
 import { useSelection } from '@/shell/providers/SelectionProvider';
-import { DenseInboxRow, type QuickAction } from '@/components/schedule/DenseInboxRow';
+import { DenseInboxRow } from '@/components/schedule/DenseInboxRow';
+import { TriageWhenMenu, type TriageWhen } from '@/components/schedule/TriageWhenMenu';
 import { selectOverdue } from '@/lib/today/taskPools';
 import { selectHorizonPool, HORIZONS, type HorizonId } from '@/lib/today/horizons';
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter';
+import { getBaseDate, getThisEvening, getNextWeekend, getWeekendAfterNext, getNextMonday } from '@/lib/dateHelpers';
 import type { Task } from '@/types/task';
 
-// Triage actions available on each horizon row (re-route into another horizon).
-const HORIZON_ACTIONS: QuickAction[] = [
-  { kind: 'today' }, { kind: 'week' }, { kind: 'month' }, { kind: 'someday' }, { kind: 'delete' },
-];
+// First day of next month at midnight (the "Next month" triage target).
+function firstOfNextMonth(): Date {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth() + 1, 1, 0, 0, 0, 0);
+}
 
 interface HorizonViewProps {
   horizon: HorizonId;
@@ -73,11 +76,16 @@ export function HorizonView({ horizon }: HorizonViewProps) {
   const match = useMemo(() => makeAssigneeFilter([]), []);
 
   // ── The scoped pool + carry-over. THE INVARIANT lives here. ──
-  // Carry-over (overdue dated items) is shown on every horizon as the calm
-  // "carried over" set; the pool is strictly this horizon's bucket.
+  // Carry-over (overdue *dated* items) is a near-term concept: it belongs to
+  // Today (rendered by HomeView) and to the weekly working set ("what you didn't
+  // finish last week"). It must NOT bleed into Month / Season / Year / Someday —
+  // those show only their own pool. (Someday is timeless; nothing is ever
+  // "overdue" into it.) Showing the global overdue set on every horizon was the
+  // bug where the same 5 items appeared as "carried over" everywhere.
+  const showCarryOver = horizon === 'week';
   const carryOver = useMemo(
-    () => selectOverdue(tasks, true, match),
-    [tasks, match],
+    () => (showCarryOver ? selectOverdue(tasks, true, match) : []),
+    [showCarryOver, tasks, match],
   );
   const pool = useMemo(
     () => selectHorizonPool(tasks, horizon, match),
@@ -181,22 +189,25 @@ export function HorizonView({ horizon }: HorizonViewProps) {
     ],
   );
 
-  // ── Inline triage: route a row into another horizon (reuses pushTask/setBucket). ──
-  const applyTriage = useCallback(
-    (task: Task, action: QuickAction) => {
-      if (action.kind === 'today') {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        pushTask(task.id, today);
-      } else if (action.kind === 'week' || action.kind === 'month') {
-        setBucket(task.id, action.kind);
-      } else if (action.kind === 'someday') {
-        setBucket(task.id, 'someday');
-      } else if (action.kind === 'delete') {
-        deleteTask(task.id);
+  // ── Inline triage: route a row to a specific WHEN (reuses pushTask/setBucket).
+  // Dated whens become a scheduled date (pushTask handles bucket=timed + all-day
+  // inference — e.g. "Tonight" at 6pm is not all-day); pool whens set the bucket. ──
+  const applyWhen = useCallback(
+    (task: Task, when: TriageWhen) => {
+      switch (when) {
+        case 'today': pushTask(task.id, getBaseDate(0)); break;
+        case 'tonight': pushTask(task.id, getThisEvening()); break;
+        case 'tomorrow': pushTask(task.id, getBaseDate(1)); break;
+        case 'this-week': setBucket(task.id, 'week'); break;
+        case 'next-week': pushTask(task.id, getNextMonday()); break;
+        case 'this-weekend': pushTask(task.id, getNextWeekend()); break;
+        case 'next-weekend': pushTask(task.id, getWeekendAfterNext()); break;
+        case 'this-month': setBucket(task.id, 'month'); break;
+        case 'next-month': pushTask(task.id, firstOfNextMonth()); break;
+        case 'someday': setBucket(task.id, 'someday'); break;
       }
     },
-    [pushTask, setBucket, deleteTask],
+    [pushTask, setBucket],
   );
 
   const renderRow = useCallback(
@@ -209,8 +220,14 @@ export function HorizonView({ horizon }: HorizonViewProps) {
           project={project}
           projects={projects}
           familyMembers={familyMembers}
-          quickActions={HORIZON_ACTIONS}
-          onQuickAction={(action) => applyTriage(task, action)}
+          quickActions={[]}
+          onQuickAction={() => {}}
+          triageMenu={
+            <TriageWhenMenu
+              onPick={(when) => applyWhen(task, when)}
+              onDelete={() => deleteTask(task.id)}
+            />
+          }
           onToggleComplete={() => toggleTask(task.id)}
           onUpdate={(updates) => updateTask(task.id, updates)}
           onSelect={() => handleSelect(task.id)}
@@ -218,7 +235,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
         />
       );
     },
-    [projects, familyMembers, applyTriage, toggleTask, updateTask, handleSelect, scheduleActions],
+    [projects, familyMembers, applyWhen, deleteTask, toggleTask, updateTask, handleSelect, scheduleActions],
   );
 
   // ── "Plan the [horizon]" — Week wires to the existing WeeklyPlanningSession
