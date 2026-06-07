@@ -325,8 +325,8 @@ export function Sidebar({
 
           {/* Projects */}
           <button
-            onClick={() => onViewChange('projects')}
-            className={navItemClass(activeView === 'projects')}
+            onClick={() => navigate('/projects')}
+            className={navItemClass(location.pathname.startsWith('/projects'))}
           >
             {createElement(FolderKanban, { className: 'w-5 h-5 shrink-0' })}
             {!collapsed && <span>Projects</span>}

@@ -132,8 +132,7 @@ createRoot(document.getElementById('root')!).render(
               )}
               <Route path="/goals" element={<App />} />
               <Route path="/goals/:goalId" element={<App />} />
-              <Route path="/projects" element={<App />} />
-              <Route path="/projects/:projectId" element={<App />} />
+              <Route path="/projects/*" element={<Shell />} />
               <Route path="/routines/*" element={<Shell />} />
               <Route path="/contacts/*" element={<Shell />} />
               <Route path="/family/:memberId" element={<App />} />
