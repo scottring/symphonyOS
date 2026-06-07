@@ -365,12 +365,15 @@ export function InboxView({
   const handleFocusTriage = useCallback((taskId: string, bucket: 'today' | 'week' | 'month' | 'quarter') => {
     const task = filteredTasks.find((t) => t.id === taskId)
     if (!task) return
-    const action: QuickAction =
-      bucket === 'today' ? { kind: 'today' }
-      : bucket === 'quarter' ? { kind: 'someday' }
-      : { kind: bucket }
-    applyTriage(task, action)
-  }, [filteredTasks, applyTriage])
+    // Route through applyWhen so "Someday" lands in the real `someday` bucket
+    // (not the legacy `quarter`) — consistent with the list-mode fan-out.
+    const when: TriageWhen =
+      bucket === 'today' ? 'today'
+      : bucket === 'week' ? 'this-week'
+      : bucket === 'month' ? 'this-month'
+      : 'someday'
+    applyWhen(task, when)
+  }, [filteredTasks, applyWhen])
 
   const handleFocusDelete = useCallback((taskId: string) => {
     const task = filteredTasks.find((t) => t.id === taskId)
