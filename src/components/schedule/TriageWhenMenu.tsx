@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Trash2, ChevronDown } from 'lucide-react'
+import { ConceptIcon } from '@/lib/conceptIcons'
 
 // The full temporal vocabulary a triage row can route into. The granular options
 // fan out from a small set of horizon "groups" so the common case stays one
@@ -49,6 +50,9 @@ const GROUPS: WhenGroup[] = [
 interface TriageWhenMenuProps {
   onPick: (when: TriageWhen) => void
   onDelete: () => void
+  /** When provided, renders a "Note" action (send the item to a note) before
+   *  Delete. Used by the Inbox triage surface. */
+  onNote?: () => void
 }
 
 /**
@@ -58,7 +62,7 @@ interface TriageWhenMenuProps {
  * Picking an option applies it and closes. Single-option groups (Someday) apply
  * directly with no popover.
  */
-export function TriageWhenMenu({ onPick, onDelete }: TriageWhenMenuProps) {
+export function TriageWhenMenu({ onPick, onDelete, onNote }: TriageWhenMenuProps) {
   const [openGroup, setOpenGroup] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -148,6 +152,17 @@ export function TriageWhenMenu({ onPick, onDelete }: TriageWhenMenuProps) {
           </div>
         )
       })}
+
+      {onNote && (
+        <button
+          type="button"
+          aria-label="Send to note"
+          onClick={onNote}
+          className="text-xs px-2.5 py-1 rounded-md font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
+        >
+          <ConceptIcon name="note" decorative /> Note
+        </button>
+      )}
 
       <button
         type="button"

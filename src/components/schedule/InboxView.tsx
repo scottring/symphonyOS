@@ -14,6 +14,8 @@ import { HomeNeedsDetailsSection } from '@/apps/home/inbox/HomeNeedsDetailsSecti
 import { NotePicker, type NotePickerSelection } from '@/components/notes/NotePicker'
 import { formatInboxBullet } from '@/lib/inboxBullet'
 import { DenseInboxRow, type QuickAction } from './DenseInboxRow'
+import { TriageWhenMenu, type TriageWhen } from './TriageWhenMenu'
+import { getBaseDate, getThisEvening, getNextWeekend, getWeekendAfterNext, getNextMonday } from '@/lib/dateHelpers'
 import { EmailActionsBanner } from './EmailActionsBanner'
 import { FocusInboxCard } from './FocusInboxCard'
 import { InboxModeToggle } from './InboxModeToggle'
@@ -315,6 +317,41 @@ export function InboxView({
     }, 220)
   }, [onPushTask, onDeleteTask])
 
+  // Fan-out triage: route an inbox item to a specific WHEN. Mirrors applyTriage's
+  // leaving-animation + undo, but covers the richer temporal vocabulary. Dated
+  // whens go through onPushTask (bucket=timed + all-day inference — "Tonight" at
+  // 6pm stays timed); pool whens set the bucket. Someday uses onUpdateTask since
+  // onPushTask's signature predates the 'someday' bucket.
+  const applyWhen = useCallback((task: Task, when: TriageWhen) => {
+    const previous: Partial<Task> = {
+      bucket: task.bucket,
+      scheduledFor: task.scheduledFor,
+      isAllDay: task.isAllDay,
+    }
+    setLeavingIds((s) => new Set(s).add(task.id))
+    setTimeout(() => {
+      let message = ''
+      const firstOfNextMonth = () => {
+        const d = new Date()
+        return new Date(d.getFullYear(), d.getMonth() + 1, 1, 0, 0, 0, 0)
+      }
+      switch (when) {
+        case 'today': onPushTask?.(task.id, getBaseDate(0)); message = 'Sent to Today'; break
+        case 'tonight': onPushTask?.(task.id, getThisEvening()); message = 'Sent to Tonight'; break
+        case 'tomorrow': onPushTask?.(task.id, getBaseDate(1)); message = 'Sent to Tomorrow'; break
+        case 'this-week': onPushTask?.(task.id, 'week'); message = 'Sent to This Week'; break
+        case 'next-week': onPushTask?.(task.id, getNextMonday()); message = 'Sent to Next Week'; break
+        case 'this-weekend': onPushTask?.(task.id, getNextWeekend()); message = 'Sent to This Weekend'; break
+        case 'next-weekend': onPushTask?.(task.id, getWeekendAfterNext()); message = 'Sent to Next Weekend'; break
+        case 'this-month': onPushTask?.(task.id, 'month'); message = 'Sent to This Month'; break
+        case 'next-month': onPushTask?.(task.id, firstOfNextMonth()); message = 'Sent to Next Month'; break
+        case 'someday': onUpdateTask?.(task.id, { bucket: 'someday', scheduledFor: undefined }); message = 'Sent to Someday'; break
+      }
+      setLeavingIds((s) => { const next = new Set(s); next.delete(task.id); return next })
+      setUndo({ taskId: task.id, message, previous, undoable: true })
+    }, 220)
+  }, [onPushTask, onUpdateTask])
+
   const handleUndo = useCallback(async () => {
     if (!undo) { setUndo(null); return }
     // Only call onUpdateTask if there are actual fields to restore
@@ -359,6 +396,13 @@ export function InboxView({
             }
             applyTriage(task, action)
           }}
+          triageMenu={
+            <TriageWhenMenu
+              onPick={(when) => applyWhen(task, when)}
+              onNote={() => setNotePickerTaskId(task.id)}
+              onDelete={() => applyTriage(task, { kind: 'delete' })}
+            />
+          }
           onToggleComplete={() => onToggleTask?.(task.id)}
           onUpdate={(updates) => onUpdateTask?.(task.id, updates)}
           onSelect={() => (selectionMode ? toggleTaskSelection(task.id) : handleSelect(task.id))}
