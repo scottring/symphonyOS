@@ -16,6 +16,7 @@ import { useMobile } from '@/hooks/useMobile';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useSymphonyAssistant } from '@/hooks/useSymphonyAssistant';
 import { useShellChrome } from './useShellChrome';
+import { useSelection } from './providers/SelectionProvider';
 
 /**
  * ShellLayout wraps Shell-mounted apps with the Symphony app chrome — the
@@ -99,6 +100,10 @@ function ShellLayoutInner({ children }: Props) {
 
   // Chrome data + handlers, sourced from shared hooks (not props).
   const chrome = useShellChrome();
+
+  // When a detail panel (480px fixed-right) is open, reflow content left so the
+  // panel doesn't obscure it.
+  const { selection } = useSelection();
 
   // Mobile/UI chrome state
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
@@ -198,7 +203,7 @@ function ShellLayoutInner({ children }: Props) {
         style={
           isMobile
             ? { paddingBottom: 'calc(2.75rem + env(safe-area-inset-bottom, 0px))' }
-            : { marginRight: rightRailVisible ? '380px' : '0' }
+            : { marginRight: selection ? '480px' : rightRailVisible ? '380px' : '0' }
         }
       >
         {/* Mobile header — logo + sign-out (date nav lives in HomeHeader on Today) */}

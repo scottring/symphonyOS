@@ -11,7 +11,7 @@
 // Vault integration is intentionally NOT wired: onSaveNoteToVault is omitted so
 // the "Save to vault" affordance stays hidden (vault is being removed).
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelection } from '@/shell/providers/SelectionProvider';
 import type { SelectionRef } from '@/shell/types';
@@ -60,11 +60,27 @@ export function TaskDetailPanel({ selection }: { selection: SelectionRef }) {
 
   const handleClose = useCallback(() => clearSelection(), [clearSelection]);
 
+  // Click-outside to close. Clicking another task card still switches: the card's
+  // click fires setSelection after this clears, so it lands on the new task.
+  const panelRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        clearSelection();
+      }
+    }
+    const id = window.setTimeout(() => document.addEventListener('mousedown', onDown), 0);
+    return () => {
+      window.clearTimeout(id);
+      document.removeEventListener('mousedown', onDown);
+    };
+  }, [clearSelection]);
+
   if (!task) {
     // Still loading (or gone) — render the chrome with a small loading state so
     // the panel doesn't flash/crash. SelectionProvider keys a fresh mount per id.
     return (
-      <aside data-testid="task-detail-panel" className={panelClassName}>
+      <aside ref={panelRef} data-testid="task-detail-panel" className={panelClassName}>
         <div className="p-8 text-center text-neutral-500">Loading…</div>
       </aside>
     );
@@ -73,7 +89,7 @@ export function TaskDetailPanel({ selection }: { selection: SelectionRef }) {
   const childIds = (task.subtasks ?? []).map((s) => s.id);
 
   return (
-    <aside data-testid="task-detail-panel" className={panelClassName}>
+    <aside ref={panelRef} data-testid="task-detail-panel" className={panelClassName}>
       <TapContextPanel
         task={task}
         contacts={contacts}
