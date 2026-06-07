@@ -116,11 +116,11 @@ export const DenseInboxRow = memo(function DenseInboxRow({
             aria-checked={isSelected}
             aria-label={`Select ${task.title}`}
             onClick={onToggleSelection}
-            className={`w-5 h-5 rounded-md border-2 grid place-items-center transition-colors ${
+            className={`w-4 h-4 rounded-[4px] border-2 grid place-items-center transition-colors ${
               isSelected ? 'bg-primary-500 border-primary-500 text-white' : 'border-neutral-300 text-transparent hover:border-primary-400'
             }`}
           >
-            <Check className="w-3.5 h-3.5" strokeWidth={3} />
+            <Check className="w-2.5 h-2.5" strokeWidth={3} />
           </button>
         ) : (
           <TaskCheckbox
