@@ -1,7 +1,7 @@
 // src/shell/ShellLayout.tsx
 import { useCallback, useEffect, useMemo, useRef, useState, Suspense, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Sun, CalendarRange, CalendarDays, Inbox as InboxIcon, MoreHorizontal } from 'lucide-react';
 import { Sidebar, type ViewType } from '@/components/layout/Sidebar';
 import { MoreSheet } from '@/components/layout/MoreSheet';
 import { QuickCapture } from '@/components/layout/QuickCapture';
@@ -45,8 +45,6 @@ const SIDEBAR_STORAGE_KEY = 'symphony-sidebar-collapsed';
 
 // Mirrors Shell.tsx — the AI rail is owned by ShellAssistantHost on these paths.
 const TODAY_PATHS = new Set(['/', '/today', '/tasks-new/today', '/tasks-new']);
-
-const SCOTT_EMAILS = new Set(['smkaufman@gmail.com', 'scott.kaufman@stacksdata.com']);
 
 /**
  * Derive ViewType from pathname so the Sidebar's active-item highlight
@@ -337,78 +335,57 @@ function ShellLayoutInner({ children }: Props) {
         </div>
       )}
 
-      {/* Mobile bottom navigation — 4 tabs */}
+      {/* Mobile bottom navigation — the rhythm spine: Today · Week · Month ·
+          Inbox · More. Horizon tabs route directly (they're URL routes, not
+          ViewTypes); active state reads from the pathname. The capture FAB
+          floats separately. Season/Year/Someday + the library live in More. */}
       {isMobile && (
         <nav
           className="fixed bottom-0 left-0 right-0 z-40 bg-bg-elevated/95 backdrop-blur-lg border-t border-neutral-200/50"
           style={{ paddingBottom: 'max(0px, calc(env(safe-area-inset-bottom, 0px) - 8px))' }}
         >
           <div className="flex items-stretch px-1 py-0.5">
-            {/* Agent — only visible to Scott */}
-            {user?.email && SCOTT_EMAILS.has(user.email) && (
+            {[
+              { label: 'Today', Icon: Sun, route: '/today', active: location.pathname === '/' || location.pathname === '/today' },
+              { label: 'Week', Icon: CalendarRange, route: '/week', active: location.pathname.startsWith('/week') },
+              { label: 'Month', Icon: CalendarDays, route: '/month', active: location.pathname.startsWith('/month') },
+            ].map((tab) => (
               <button
-                onClick={() => handleViewChange('agent')}
-                className={`flex-1 min-w-0 flex flex-col items-center gap-0 px-1 py-1 rounded-lg transition-all ${
-                  activeView === 'agent' ? 'text-primary-600' : 'text-neutral-400 hover:text-neutral-600'
+                key={tab.route}
+                onClick={() => navigate(tab.route)}
+                className={`flex-1 min-w-0 flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-lg transition-all ${
+                  tab.active ? 'text-accent-600' : 'text-neutral-400 hover:text-neutral-600'
                 }`}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path
-                    fillRule="evenodd"
-                    d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                <span className={`text-[0.625rem] font-medium ${activeView === 'agent' ? 'font-semibold' : ''}`}>
-                  Michael
-                </span>
+                <tab.Icon className="w-5 h-5" />
+                <span className={`text-[0.625rem] font-medium ${tab.active ? 'font-semibold' : ''}`}>{tab.label}</span>
               </button>
-            )}
+            ))}
 
-            {/* Today */}
+            {/* Inbox — capture catch-all, with unread badge. */}
             <button
-              onClick={() => handleViewChange('today')}
-              className={`flex-1 min-w-0 flex flex-col items-center gap-0 px-1 py-1 rounded-lg transition-all ${
-                activeView === 'today' ? 'text-accent-600' : 'text-neutral-400 hover:text-neutral-600'
+              onClick={() => navigate('/inbox')}
+              className={`relative flex-1 min-w-0 flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-lg transition-all ${
+                location.pathname.startsWith('/inbox') ? 'text-accent-600' : 'text-neutral-400 hover:text-neutral-600'
               }`}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path
-                  fillRule="evenodd"
-                  d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              <span className={`text-[0.625rem] font-medium ${activeView === 'today' ? 'font-semibold' : ''}`}>
-                Today
-              </span>
+              <InboxIcon className="w-5 h-5" />
+              <span className={`text-[0.625rem] font-medium ${location.pathname.startsWith('/inbox') ? 'font-semibold' : ''}`}>Inbox</span>
+              {inboxCount > 0 && (
+                <span className="absolute top-0.5 right-[18%] min-w-[16px] h-[16px] px-1 flex items-center justify-center rounded-full bg-primary-500 text-white text-[9px] font-semibold leading-none">
+                  {inboxCount > 99 ? '99+' : inboxCount}
+                </span>
+              )}
             </button>
 
-            {/* Projects */}
-            <button
-              onClick={() => handleViewChange('projects')}
-              className={`flex-1 min-w-0 flex flex-col items-center gap-0 px-1 py-1 rounded-lg transition-all ${
-                activeView === 'projects' ? 'text-blue-600' : 'text-neutral-400 hover:text-neutral-600'
-              }`}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-              </svg>
-              <span className={`text-[0.625rem] font-medium ${activeView === 'projects' ? 'font-semibold' : ''}`}>
-                Projects
-              </span>
-            </button>
-
-            {/* More → opens MoreSheet */}
+            {/* More → opens MoreSheet (the mobile library). */}
             <button
               onClick={() => setMoreSheetOpen(true)}
-              className={`relative flex-1 min-w-0 flex flex-col items-center gap-0 px-1 py-1 rounded-lg transition-all ${
+              className={`flex-1 min-w-0 flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-lg transition-all ${
                 moreSheetOpen ? 'text-neutral-700' : 'text-neutral-400 hover:text-neutral-600'
               }`}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
-              </svg>
+              <MoreHorizontal className="w-5 h-5" />
               <span className="text-[0.625rem] font-medium">More</span>
             </button>
           </div>
@@ -422,7 +399,6 @@ function ShellLayoutInner({ children }: Props) {
           onClose={() => setMoreSheetOpen(false)}
           onNavigate={handleViewChange}
           activeView={activeView}
-          inboxCount={inboxCount}
         />
       )}
 

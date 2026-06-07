@@ -9,8 +9,6 @@ interface MoreSheetProps {
   onClose: () => void
   onNavigate: (view: ViewType) => void
   activeView: ViewType
-  /** Unread inbox count — shown as a badge on the Inbox entry. */
-  inboxCount?: number
 }
 
 interface NavItem {
@@ -21,15 +19,14 @@ interface NavItem {
   badge?: number
 }
 
-export function MoreSheet({ isOpen, onClose, onNavigate, activeView, inboxCount = 0 }: MoreSheetProps) {
+export function MoreSheet({ isOpen, onClose, onNavigate, activeView }: MoreSheetProps) {
   const items: NavItem[] = [
     {
-      view: 'inbox',
-      label: 'Inbox',
-      badge: inboxCount,
+      view: 'projects',
+      label: 'Projects',
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 2h10v6h-2.586a1 1 0 00-.707.293l-1.414 1.414a1 1 0 01-1.414 0l-1.414-1.414A1 1 0 007.586 11H5V5z" clipRule="evenodd" />
+          <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
         </svg>
       ),
     },
@@ -68,6 +65,15 @@ export function MoreSheet({ isOpen, onClose, onNavigate, activeView, inboxCount 
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
           <path d="M3 2a1 1 0 011 1v5a2 2 0 002 2h.5a.5.5 0 01.5.5V17a1 1 0 11-2 0v-6H5a4 4 0 01-4-4V3a1 1 0 011-1h1zm6 0a1 1 0 011 1v4a3 3 0 01-2 2.83V17a1 1 0 11-2 0V9.83A3 3 0 015 7V3a1 1 0 112 0v4a1 1 0 102 0V3a1 1 0 011-1zm6 0a3 3 0 013 3v6.5a.5.5 0 01-.5.5H16v5a1 1 0 11-2 0V3a1 1 0 011-1z" />
+        </svg>
+      ),
+    },
+    {
+      view: 'contacts',
+      label: 'Contacts',
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
         </svg>
       ),
     },
