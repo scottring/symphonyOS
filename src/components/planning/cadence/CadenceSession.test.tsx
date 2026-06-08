@@ -41,17 +41,21 @@ describe('CadenceSession', () => {
     expect(screen.getByText(/Pull from this season \(1\)/)).toBeInTheDocument()
   })
 
-  it('review rows are triageable: demote into the lower horizon, defer to someday, mark done', async () => {
+  it('review rows get the full triage fan-out + Done', async () => {
     const onSetBucket = vi.fn(); const onCompleteTask = vi.fn()
     const tasks = [task({ id: 'm1', title: 'Open monthly', bucket: 'month' })]
     const { user } = render(
       <CadenceSession {...monthlyProps} tasks={tasks} onPushTask={vi.fn()} onClose={vi.fn()}
-        onSetBucket={onSetBucket} onCompleteTask={onCompleteTask} demote={{ label: 'Into week', bucket: 'week' }} />
+        onSetBucket={onSetBucket} onCompleteTask={onCompleteTask} />
     )
-    await user.click(screen.getByRole('button', { name: 'Into week' }))
-    expect(onSetBucket).toHaveBeenCalledWith('m1', 'week')
+    // Someday chip applies directly.
     await user.click(screen.getByRole('button', { name: 'Someday' }))
     expect(onSetBucket).toHaveBeenCalledWith('m1', 'someday')
+    // Week chip fans out → This week.
+    await user.click(screen.getByRole('button', { name: 'Week' }))
+    await user.click(screen.getByRole('menuitem', { name: 'This week' }))
+    expect(onSetBucket).toHaveBeenCalledWith('m1', 'week')
+    // Done.
     await user.click(screen.getByRole('button', { name: 'Mark done' }))
     expect(onCompleteTask).toHaveBeenCalledWith('m1')
   })
@@ -60,7 +64,7 @@ describe('CadenceSession', () => {
     const tasks = [task({ id: 'm1', title: 'Open monthly', bucket: 'month' })]
     render(<CadenceSession {...monthlyProps} tasks={tasks} onPushTask={vi.fn()} onClose={vi.fn()} />)
     expect(screen.getByText('Open monthly')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Into week' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Someday' })).not.toBeInTheDocument()
   })
 
   it('pulls a picked item down into this horizon (onPushTask id, "month")', async () => {

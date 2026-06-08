@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Trash2, ChevronDown } from 'lucide-react'
+import { Trash2, ChevronDown, Check } from 'lucide-react'
 import { ConceptIcon } from '@/lib/conceptIcons'
 
 // The full temporal vocabulary a triage row can route into. The granular options
@@ -49,10 +49,14 @@ const GROUPS: WhenGroup[] = [
 
 interface TriageWhenMenuProps {
   onPick: (when: TriageWhen) => void
-  onDelete: () => void
+  /** When provided, renders a Delete (trash) action. */
+  onDelete?: () => void
   /** When provided, renders a "Note" action (send the item to a note) before
    *  Delete. Used by the Inbox triage surface. */
   onNote?: () => void
+  /** When provided, renders a Done (check) action — used in planning reviews
+   *  where completing an item is a first-class move. */
+  onComplete?: () => void
 }
 
 /**
@@ -62,7 +66,7 @@ interface TriageWhenMenuProps {
  * Picking an option applies it and closes. Single-option groups (Someday) apply
  * directly with no popover.
  */
-export function TriageWhenMenu({ onPick, onDelete, onNote }: TriageWhenMenuProps) {
+export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete }: TriageWhenMenuProps) {
   const [openGroup, setOpenGroup] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -164,6 +168,19 @@ export function TriageWhenMenu({ onPick, onDelete, onNote }: TriageWhenMenuProps
         </button>
       )}
 
+      {onComplete && (
+        <button
+          type="button"
+          aria-label="Mark done"
+          title="Done"
+          onClick={onComplete}
+          className="p-1.5 rounded-md text-neutral-400 hover:text-primary-700 hover:bg-primary-50 transition-colors"
+        >
+          <Check className="w-3.5 h-3.5" strokeWidth={3} />
+        </button>
+      )}
+
+      {onDelete && (
       <button
         type="button"
         aria-label="Delete"
@@ -173,6 +190,7 @@ export function TriageWhenMenu({ onPick, onDelete, onNote }: TriageWhenMenuProps
       >
         <Trash2 className="w-3.5 h-3.5" />
       </button>
+      )}
     </div>
   )
 }

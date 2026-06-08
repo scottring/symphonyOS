@@ -13,6 +13,8 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { selectOverdue } from '@/lib/today/taskPools'
 import { selectHorizonPool } from '@/lib/today/horizons'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
+import { TriageWhenMenu } from '@/components/schedule/TriageWhenMenu'
+import { applyTriageWhen } from '@/lib/triage/applyWhen'
 
 interface Props {
   tasks: Task[]
@@ -21,6 +23,8 @@ interface Props {
   onClose: () => void
   onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
   onCompleteTask: (id: string) => void
+  /** Move a carried-over item to a pool bucket (powers the full triage fan-out). */
+  onSetBucket: (id: string, bucket: import('@/types/task').TaskBucket) => void
   /** Optional: open the time-block grid (PlanningSession) as a next step. */
   onOpenTimeBlock?: () => void
 }
@@ -55,7 +59,7 @@ function timeLabel(e: CalendarEvent): string {
 }
 
 export function PlanTodaySession({
-  tasks, events, viewedDate, onClose, onPushTask, onCompleteTask, onOpenTimeBlock,
+  tasks, events, viewedDate, onClose, onPushTask, onCompleteTask, onSetBucket, onOpenTimeBlock,
 }: Props) {
   // The session is the user's own planning surface — show everything assigned to
   // anyone (match-all); domain scoping on Today is a separate concern.
@@ -129,27 +133,11 @@ export function PlanTodaySession({
                 {carriedOver.map((t) => (
                   <li key={t.id} className="flex items-center gap-2 rounded-xl border border-neutral-100 bg-white px-3 py-2">
                     <span className="flex-1 min-w-0 text-sm text-neutral-800 truncate">{t.title}</span>
-                    <button
-                      type="button"
-                      onClick={() => onPushTask(t.id, today)}
-                      className="shrink-0 text-xs font-medium px-2.5 py-1 rounded-md bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
-                    >
-                      Do today
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onPushTask(t.id, 'week')}
-                      className="shrink-0 text-xs font-medium px-2.5 py-1 rounded-md bg-neutral-50 text-neutral-600 hover:bg-neutral-100 transition-colors"
-                    >
-                      Push to week
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onCompleteTask(t.id)}
-                      className="shrink-0 text-xs font-medium px-2.5 py-1 rounded-md text-neutral-500 hover:text-primary-700 hover:bg-primary-50 transition-colors"
-                    >
-                      Done
-                    </button>
+                    {/* Full triage fan-out + Done, consistent with every surface. */}
+                    <TriageWhenMenu
+                      onPick={(when) => applyTriageWhen(when, t.id, { onPushTask, onSetBucket })}
+                      onComplete={() => onCompleteTask(t.id)}
+                    />
                   </li>
                 ))}
               </ul>

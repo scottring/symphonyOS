@@ -57,7 +57,6 @@ export function MonthlyPlanningSession({ tasks, onPushTask, onClose, onHandDown,
       handDown={onHandDown ? { label: 'Plan the week', onActivate: onHandDown } : undefined}
       onSetBucket={onSetBucket}
       onCompleteTask={onCompleteTask}
-      demote={{ label: 'Into week', bucket: 'week' }}
       goalActions={goalActions}
       onPullGoalAction={onPullGoalAction}
       links={links}
@@ -92,7 +91,6 @@ export function SeasonalPlanningSession({ tasks, onPushTask, onClose, onHandDown
       handDown={onHandDown ? { label: 'Plan the month', onActivate: onHandDown } : undefined}
       onSetBucket={onSetBucket}
       onCompleteTask={onCompleteTask}
-      demote={{ label: 'Into month', bucket: 'month' }}
       goalActions={goalActions}
       onPullGoalAction={onPullGoalAction}
       financialLabel="Compare actual vs budget, update the plan, make a seasonal budget — in your finance tool"

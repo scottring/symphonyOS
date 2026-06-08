@@ -26,6 +26,7 @@ function task(over: Partial<Task>): Task {
 function setup(tasksOverride?: Task[]) {
   const onPushTask = vi.fn()
   const onCompleteTask = vi.fn()
+  const onSetBucket = vi.fn()
   const onClose = vi.fn()
   const tasks = tasksOverride ?? [
     task({ id: 'w1', title: 'Week one', bucket: 'week' }),
@@ -40,9 +41,10 @@ function setup(tasksOverride?: Task[]) {
       onClose={onClose}
       onPushTask={onPushTask}
       onCompleteTask={onCompleteTask}
+      onSetBucket={onSetBucket}
     />
   )
-  return { onPushTask, onCompleteTask, onClose, ...utils }
+  return { onPushTask, onCompleteTask, onSetBucket, onClose, ...utils }
 }
 
 describe('PlanTodaySession', () => {
@@ -80,14 +82,18 @@ describe('PlanTodaySession', () => {
     expect(onPushTask).toHaveBeenCalledTimes(1)
   })
 
-  it('carried-over "Do today" pushes to today; "Push to week" buckets; "Done" completes', async () => {
-    const { user, onPushTask, onCompleteTask } = setup()
+  it('carried-over rows get the full triage fan-out + Done', async () => {
+    const { user, onSetBucket, onCompleteTask } = setup()
     const row = screen.getByText('Overdue one').closest('li')!
-    await user.click(within(row).getByRole('button', { name: 'Do today' }))
-    expect(onPushTask).toHaveBeenLastCalledWith('od', expect.any(Date))
-    await user.click(within(row).getByRole('button', { name: 'Push to week' }))
-    expect(onPushTask).toHaveBeenLastCalledWith('od', 'week')
-    await user.click(within(row).getByRole('button', { name: 'Done' }))
+    // Someday chip applies directly (pool bucket).
+    await user.click(within(row).getByRole('button', { name: 'Someday' }))
+    expect(onSetBucket).toHaveBeenCalledWith('od', 'someday')
+    // Week chip fans out → This week.
+    await user.click(within(row).getByRole('button', { name: 'Week' }))
+    await user.click(screen.getByRole('menuitem', { name: 'This week' }))
+    expect(onSetBucket).toHaveBeenCalledWith('od', 'week')
+    // Done.
+    await user.click(within(row).getByRole('button', { name: 'Mark done' }))
     expect(onCompleteTask).toHaveBeenCalledWith('od')
   })
 

@@ -8,9 +8,11 @@
 // the financial step is a handoff tick only.
 
 import { useState, useMemo, useCallback } from 'react'
-import { X, ArrowRight, ArrowDownToLine, CircleDollarSign, Check, Target, Plus } from 'lucide-react'
+import { X, ArrowRight, ArrowDownToLine, CircleDollarSign, Target, Plus } from 'lucide-react'
 import type { Task, TaskBucket } from '@/types/task'
 import type { GoalAction } from '@/types/goal'
+import { TriageWhenMenu } from '@/components/schedule/TriageWhenMenu'
+import { applyTriageWhen } from '@/lib/triage/applyWhen'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { usePlanningSession, type PlanningHorizon, type PlanningNotes } from '@/hooks/usePlanningSession'
 
@@ -42,7 +44,6 @@ interface CadenceSessionProps {
    *  ("Into week" for monthly), so reviewing actively builds the plan below. */
   onSetBucket?: (id: string, bucket: TaskBucket) => void
   onCompleteTask?: (id: string) => void
-  demote?: { label: string; bucket: 'week' | 'month' }
   /** Current-quarter goal actions to break into this horizon. Pulling one creates
    *  a LINKED task (carries the action's projectId so the why-chain resolves);
    *  the action persists — it's an umbrella that can spawn several chunks. */
@@ -61,7 +62,7 @@ const SECTION = 'text-[11px] uppercase tracking-wider text-neutral-400 mb-3'
 export function CadenceSession({
   horizon, periodToken, title, periodLabel, tasks, thisBucket,
   pullFromBucket, pullFromLabel, textFields, onPushTask, onClose, handDown,
-  onSetBucket, onCompleteTask, demote, goalActions, onPullGoalAction,
+  onSetBucket, onCompleteTask, goalActions, onPullGoalAction,
   financialLabel, onOpenGoals, links,
 }: CadenceSessionProps) {
   const { notes, patchNotes } = usePlanningSession(horizon, periodToken)
@@ -125,23 +126,14 @@ export function CadenceSession({
                   {inHorizon.map((t) => (
                     <li key={t.id} className="flex items-center gap-2 rounded-xl border border-neutral-100 bg-white px-3 py-2">
                       <span className="flex-1 min-w-0 text-sm text-neutral-800 truncate">{t.title}</span>
-                      {demote && onSetBucket && (
-                        <button type="button" onClick={() => onSetBucket(t.id, demote.bucket)}
-                          className="shrink-0 text-xs font-medium px-2.5 py-1 rounded-md bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors">
-                          {demote.label}
-                        </button>
-                      )}
+                      {/* Full triage fan-out — the same WHEN menu used everywhere
+                          (today/tonight/tomorrow, this/next week + weekend,
+                          this/next month, someday) + a Done action. */}
                       {onSetBucket && (
-                        <button type="button" onClick={() => onSetBucket(t.id, 'someday')}
-                          className="shrink-0 text-xs font-medium px-2.5 py-1 rounded-md bg-neutral-50 text-neutral-600 hover:bg-neutral-100 transition-colors">
-                          Someday
-                        </button>
-                      )}
-                      {onCompleteTask && (
-                        <button type="button" onClick={() => onCompleteTask(t.id)} aria-label="Mark done"
-                          className="shrink-0 p-1.5 rounded-md text-neutral-400 hover:text-primary-700 hover:bg-primary-50 transition-colors">
-                          <Check className="w-3.5 h-3.5" strokeWidth={3} />
-                        </button>
+                        <TriageWhenMenu
+                          onPick={(when) => applyTriageWhen(when, t.id, { onPushTask, onSetBucket })}
+                          onComplete={onCompleteTask ? () => onCompleteTask(t.id) : undefined}
+                        />
                       )}
                     </li>
                   ))}
