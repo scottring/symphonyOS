@@ -1,6 +1,7 @@
 import { Routes, Route, useNavigate, useParams, Navigate } from 'react-router-dom'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
+import { useProjects } from '@/hooks/useProjects'
 import { MemberView } from '@/components/family/MemberView'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 
@@ -21,7 +22,8 @@ function FamilyMemberDetail() {
   const navigate = useNavigate()
   const { memberId } = useParams<{ memberId: string }>()
   const { members } = useFamilyMembers()
-  const { tasks } = useSupabaseTasks()
+  const { tasks, toggleTask, updateTask, deleteTask, pushTask, setBucket } = useSupabaseTasks()
+  const { projects } = useProjects()
 
   const member = members.find((m) => m.id === memberId) ?? null
 
@@ -37,6 +39,13 @@ function FamilyMemberDetail() {
       onBack={() => navigate('/')}
       onSelectTask={(taskId) => navigate(`/task/${taskId}`)}
       onEditInSettings={() => navigate('/settings')}
+      projects={projects}
+      familyMembers={members}
+      onToggleTask={toggleTask}
+      onUpdateTask={updateTask}
+      onDeleteTask={deleteTask}
+      onPushTask={pushTask}
+      onSetBucket={setBucket}
     />
   )
 }

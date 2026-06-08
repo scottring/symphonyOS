@@ -1,8 +1,12 @@
 import { ArrowLeft, Settings as SettingsIcon } from 'lucide-react'
 import type { FamilyMember, FamilyMemberColor } from '@/types/family'
 import { FAMILY_COLORS } from '@/types/family'
-import type { Task } from '@/types/task'
+import type { Task, TaskBucket } from '@/types/task'
+import type { Project } from '@/types/project'
 import { selectMemberTasks } from '@/lib/memberTasks'
+import { DenseInboxRow } from '@/components/schedule/DenseInboxRow'
+import { TriageWhenMenu } from '@/components/schedule/TriageWhenMenu'
+import { applyTriageWhen } from '@/lib/triage/applyWhen'
 
 interface MemberViewProps {
   member: FamilyMember
@@ -10,11 +14,45 @@ interface MemberViewProps {
   onBack: () => void
   onSelectTask: (taskId: string) => void
   onEditInSettings: () => void
+  projects: Project[]
+  familyMembers: FamilyMember[]
+  onToggleTask: (id: string) => void
+  onUpdateTask: (id: string, updates: Partial<Task>) => void
+  onDeleteTask: (id: string) => void
+  onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
+  onSetBucket: (id: string, bucket: TaskBucket) => void
 }
 
-export function MemberView({ member, tasks, onBack, onSelectTask, onEditInSettings }: MemberViewProps) {
+export function MemberView({
+  member, tasks, onBack, onSelectTask, onEditInSettings,
+  projects, familyMembers, onToggleTask, onUpdateTask, onDeleteTask, onPushTask, onSetBucket,
+}: MemberViewProps) {
   const { open, upcoming } = selectMemberTasks(tasks, member.id)
   const colors = FAMILY_COLORS[member.color as FamilyMemberColor] ?? FAMILY_COLORS.blue
+
+  const renderRow = (task: Task) => (
+    <DenseInboxRow
+      key={task.id}
+      task={task}
+      project={projects.find((p) => p.id === task.projectId)}
+      projects={projects}
+      familyMembers={familyMembers}
+      quickActions={[]}
+      onQuickAction={() => {}}
+      triageMenu={
+        <TriageWhenMenu
+          onPick={(when) => applyTriageWhen(when, task.id, { onPushTask, onSetBucket })}
+          onPickDate={(date) => onPushTask(task.id, date)}
+          onComplete={() => onToggleTask(task.id)}
+          onDelete={() => onDeleteTask(task.id)}
+        />
+      }
+      onToggleComplete={() => onToggleTask(task.id)}
+      onUpdate={(updates) => onUpdateTask(task.id, updates)}
+      onSelect={() => onSelectTask(task.id)}
+      onAssign={(memberIds) => onUpdateTask(task.id, { assignedToAll: memberIds })}
+    />
+  )
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
@@ -40,41 +78,14 @@ export function MemberView({ member, tasks, onBack, onSelectTask, onEditInSettin
         {open.length === 0 ? (
           <p className="text-sm text-neutral-400">No open tasks.</p>
         ) : (
-          <ul className="space-y-1">
-            {open.map((task) => (
-              <li key={task.id}>
-                <button
-                  onClick={() => onSelectTask(task.id)}
-                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-neutral-50 text-sm text-neutral-800"
-                >
-                  {task.title}
-                </button>
-              </li>
-            ))}
-          </ul>
+          <div className="space-y-2">{open.map(renderRow)}</div>
         )}
       </section>
 
       {upcoming.length > 0 && (
         <section className="mb-6">
           <h2 className="text-xs font-medium uppercase tracking-wide text-neutral-400 mb-2">Upcoming</h2>
-          <ul className="space-y-1">
-            {upcoming.map((task) => (
-              <li key={task.id}>
-                <button
-                  onClick={() => onSelectTask(task.id)}
-                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-neutral-50 text-sm flex justify-between gap-3"
-                >
-                  <span className="text-neutral-800">{task.title}</span>
-                  {task.scheduledFor && (
-                    <span className="text-neutral-400 shrink-0">
-                      {task.scheduledFor.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                    </span>
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
+          <div className="space-y-2">{upcoming.map(renderRow)}</div>
         </section>
       )}
 
