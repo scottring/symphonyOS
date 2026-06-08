@@ -87,7 +87,7 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail }: Props) {
           />
           <div
             role="menu"
-            className={`absolute right-0 z-50 bg-white rounded-xl border border-neutral-200 shadow-lg ${rescheduling ? 'w-64 p-2' : 'min-w-[176px] py-1'} ${openUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}
+            className={`absolute right-0 z-50 bg-white rounded-xl border border-neutral-200 shadow-lg ${rescheduling ? 'w-80 p-2' : 'min-w-[176px] py-1'} ${openUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}
           >
             {/* Reschedule submenu (tasks): the icon grid, applied immediately —
                 no detail pane, no time-picker step. */}

@@ -22,7 +22,7 @@ const WHENS: { when: TriageWhen; label: string; Icon: typeof Sun }[] = [
 ]
 
 const tileClass =
-  'flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium ' +
+  'flex items-center gap-2 px-2.5 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap ' +
   'text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700 transition-all duration-150'
 
 interface Props {
@@ -49,7 +49,7 @@ export function RescheduleGrid({ onPick, onPickDate }: Props) {
           className={tileClass}
         >
           <Icon className="w-4 h-4 shrink-0" />
-          <span className="truncate">{label}</span>
+          <span>{label}</span>
         </button>
       ))}
       {onPickDate && (
@@ -59,7 +59,7 @@ export function RescheduleGrid({ onPick, onPickDate }: Props) {
           className={`${tileClass} col-span-2`}
         >
           <CalendarPlus className="w-4 h-4 shrink-0" />
-          <span className="truncate">Pick date &amp; time…</span>
+          <span>Pick date &amp; time…</span>
         </button>
       )}
     </div>

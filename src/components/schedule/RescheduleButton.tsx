@@ -69,7 +69,7 @@ export function RescheduleButton({ item }: { item: TimelineItem }) {
           />
           <div
             role="menu"
-            className={`absolute right-0 z-50 w-64 p-2 bg-white rounded-xl border border-neutral-200 shadow-lg ${openUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}
+            className={`absolute right-0 z-50 w-80 p-2 bg-white rounded-xl border border-neutral-200 shadow-lg ${openUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}
           >
             <div className="px-1 pb-2 text-[11px] uppercase tracking-wider text-neutral-400">Reschedule to</div>
             <RescheduleGrid onPick={reschedule} onPickDate={rescheduleToDate} />
