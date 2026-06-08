@@ -117,7 +117,7 @@ export function AssignPicker({ value, contacts, onSearchContacts, onChange, onAd
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-1 z-50 bg-white rounded-xl border border-neutral-200 shadow-lg p-2 min-w-[240px]">
+        <div className="absolute right-0 top-full mt-1 z-50 bg-white rounded-xl border border-neutral-200 shadow-lg p-2 w-72 max-w-[calc(100vw-1.5rem)]">
           <input
             ref={inputRef}
             type="text"
