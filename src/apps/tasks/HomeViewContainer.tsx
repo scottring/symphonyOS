@@ -227,7 +227,7 @@ export function HomeViewContainer() {
   // ── Weekly-planning support (reconstructed from App.tsx) ──
   // Current-quarter incomplete goal actions, surfaced in the weekly session so
   // quarterly intentions can be pulled into the week.
-  const weeklyGoalActions = useMemo<GoalAction[]>(() => {
+  const currentQuarterGoalActions = useMemo<GoalAction[]>(() => {
     const q = getCurrentQuarter();
     return goals.flatMap(g => g.actions).filter(a => a.quarter === q && !a.completed);
   }, [goals, getCurrentQuarter]);
@@ -250,11 +250,19 @@ export function HomeViewContainer() {
     [vaultWrite],
   );
 
-  // Pull a quarterly goal action into the week as a new 'week'-bucket task.
-  const handleAddGoalActionToWeek = useCallback(async (action: GoalAction) => {
-    const id = await addTask(action.description);
-    if (id) await setBucket(id, 'week');
+  // Break a quarterly goal action into a horizon: create a LINKED task (carries
+  // the action's projectId so the why-chain Task → Project → Goal resolves). The
+  // action persists — it's an umbrella that can spawn several chunks over the
+  // quarter, so completing one chunk must NOT complete the action.
+  const pullGoalActionToBucket = useCallback(async (action: GoalAction, bucket: 'week' | 'month' | 'quarter') => {
+    const id = await addTask(action.description, undefined, action.projectId);
+    if (id) await setBucket(id, bucket);
   }, [addTask, setBucket]);
+
+  const handleAddGoalActionToWeek = useCallback(
+    (action: GoalAction) => pullGoalActionToBucket(action, 'week'),
+    [pullGoalActionToBucket],
+  );
 
   const scheduleActionsValue = useMemo<ScheduleActionsValue>(
     () => ({
@@ -387,7 +395,7 @@ export function HomeViewContainer() {
             onUpdateTask={updateTask}
             onPushTask={pushTask}
             onSavePlanToVault={saveWeeklyPlanToVault}
-            goalActions={weeklyGoalActions}
+            goalActions={currentQuarterGoalActions}
             onAddGoalAction={handleAddGoalActionToWeek}
             onSelectDay={(date) => { setViewedDate(date); setWeeklyPlanningOpen(false); }}
             allRoutines={allRoutines}
@@ -423,6 +431,8 @@ export function HomeViewContainer() {
             onHandDown={() => { setMonthlyPlanningOpen(false); setWeeklyPlanningOpen(true); }}
             onSetBucket={setBucket}
             onCompleteTask={toggleTask}
+            goalActions={currentQuarterGoalActions}
+            onPullGoalAction={(a) => pullGoalActionToBucket(a, 'month')}
           />
         </Suspense>
       )}
@@ -435,6 +445,8 @@ export function HomeViewContainer() {
             onHandDown={() => { setSeasonalPlanningOpen(false); setMonthlyPlanningOpen(true); }}
             onSetBucket={setBucket}
             onCompleteTask={toggleTask}
+            goalActions={currentQuarterGoalActions}
+            onPullGoalAction={(a) => pullGoalActionToBucket(a, 'quarter')}
           />
         </Suspense>
       )}

@@ -88,6 +88,26 @@ describe('CadenceSession', () => {
     expect(onActivate).toHaveBeenCalled()
   })
 
+  it('breaks a goal action into this horizon (linked task via onPullGoalAction)', async () => {
+    const onPullGoalAction = vi.fn()
+    const goalActions = [
+      { id: 'ga1', goalId: 'g1', description: 'Renovate backyard', quarter: 'Q2', completed: false, projectId: 'p1', sortOrder: 0, createdAt: new Date() },
+    ]
+    const { user } = render(
+      <CadenceSession {...monthlyProps} tasks={[]} onPushTask={vi.fn()} onClose={vi.fn()}
+        goalActions={goalActions as never} onPullGoalAction={onPullGoalAction} />
+    )
+    expect(screen.getByText(/Break goals down \(1\)/)).toBeInTheDocument()
+    expect(screen.getByText('Renovate backyard')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Plan it/ }))
+    expect(onPullGoalAction).toHaveBeenCalledWith(goalActions[0])
+  })
+
+  it('hides the goals section when there are no goal actions', () => {
+    render(<CadenceSession {...monthlyProps} tasks={[]} onPushTask={vi.fn()} onClose={vi.fn()} goalActions={[]} onPullGoalAction={vi.fn()} />)
+    expect(screen.queryByText(/Break goals down/)).not.toBeInTheDocument()
+  })
+
   it('annual config (no buckets) renders text only, no pull section', () => {
     render(
       <CadenceSession horizon="annual" periodToken="2026" title="Plan the year" periodLabel="2026"

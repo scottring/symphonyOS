@@ -8,8 +8,9 @@
 // the financial step is a handoff tick only.
 
 import { useState, useMemo, useCallback } from 'react'
-import { X, ArrowRight, ArrowDownToLine, CircleDollarSign, Check } from 'lucide-react'
+import { X, ArrowRight, ArrowDownToLine, CircleDollarSign, Check, Target, Plus } from 'lucide-react'
 import type { Task, TaskBucket } from '@/types/task'
+import type { GoalAction } from '@/types/goal'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { usePlanningSession, type PlanningHorizon, type PlanningNotes } from '@/hooks/usePlanningSession'
 
@@ -42,6 +43,11 @@ interface CadenceSessionProps {
   onSetBucket?: (id: string, bucket: TaskBucket) => void
   onCompleteTask?: (id: string) => void
   demote?: { label: string; bucket: 'week' | 'month' }
+  /** Current-quarter goal actions to break into this horizon. Pulling one creates
+   *  a LINKED task (carries the action's projectId so the why-chain resolves);
+   *  the action persists — it's an umbrella that can spawn several chunks. */
+  goalActions?: GoalAction[]
+  onPullGoalAction?: (action: GoalAction) => void
 }
 
 const SECTION = 'text-[11px] uppercase tracking-wider text-neutral-400 mb-3'
@@ -49,7 +55,7 @@ const SECTION = 'text-[11px] uppercase tracking-wider text-neutral-400 mb-3'
 export function CadenceSession({
   horizon, periodToken, title, periodLabel, tasks, thisBucket,
   pullFromBucket, pullFromLabel, textFields, onPushTask, onClose, handDown,
-  onSetBucket, onCompleteTask, demote,
+  onSetBucket, onCompleteTask, demote, goalActions, onPullGoalAction,
 }: CadenceSessionProps) {
   const { notes, patchNotes } = usePlanningSession(horizon, periodToken)
   const matchAll = useMemo(() => makeAssigneeFilter([]), [])
@@ -173,6 +179,25 @@ export function CadenceSession({
                   </button>
                 </>
               )}
+            </section>
+          )}
+
+          {/* Break goals down — current-quarter goal actions. Pulling one creates
+              a linked task in this horizon (a chunk); the goal action persists. */}
+          {goalActions && goalActions.length > 0 && onPullGoalAction && (
+            <section>
+              <h2 className={SECTION}><Target className="w-3.5 h-3.5 inline mr-1" /> Break goals down ({goalActions.length})</h2>
+              <ul className="space-y-2">
+                {goalActions.map((a) => (
+                  <li key={a.id} className="flex items-center gap-2 rounded-xl border border-primary-100 bg-primary-50/30 px-3 py-2">
+                    <span className="flex-1 min-w-0 text-sm text-neutral-800 truncate">{a.description}</span>
+                    <button type="button" onClick={() => onPullGoalAction(a)}
+                      className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-md bg-primary-600 text-white hover:bg-primary-700 transition-colors">
+                      <Plus className="w-3 h-3" /> Plan it
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </section>
           )}
 

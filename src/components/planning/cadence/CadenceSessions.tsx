@@ -6,6 +6,7 @@
 // Scott+Iris requirements (relationships, hopes/fears, fun&joy, review).
 
 import type { Task, TaskBucket } from '@/types/task'
+import type { GoalAction } from '@/types/goal'
 import { CadenceSession } from './CadenceSession'
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -24,9 +25,12 @@ interface BaseProps {
   /** Review-row triage — move an open item to another bucket / mark it done. */
   onSetBucket?: (id: string, bucket: TaskBucket) => void
   onCompleteTask?: (id: string) => void
+  /** Current-quarter goal actions + a handler that breaks one into this horizon. */
+  goalActions?: GoalAction[]
+  onPullGoalAction?: (action: GoalAction) => void
 }
 
-export function MonthlyPlanningSession({ tasks, onPushTask, onClose, onHandDown, onSetBucket, onCompleteTask }: BaseProps) {
+export function MonthlyPlanningSession({ tasks, onPushTask, onClose, onHandDown, onSetBucket, onCompleteTask, goalActions, onPullGoalAction }: BaseProps) {
   const now = new Date()
   return (
     <CadenceSession
@@ -48,11 +52,13 @@ export function MonthlyPlanningSession({ tasks, onPushTask, onClose, onHandDown,
       onSetBucket={onSetBucket}
       onCompleteTask={onCompleteTask}
       demote={{ label: 'Into week', bucket: 'week' }}
+      goalActions={goalActions}
+      onPullGoalAction={onPullGoalAction}
     />
   )
 }
 
-export function SeasonalPlanningSession({ tasks, onPushTask, onClose, onHandDown, onSetBucket, onCompleteTask }: BaseProps) {
+export function SeasonalPlanningSession({ tasks, onPushTask, onClose, onHandDown, onSetBucket, onCompleteTask, goalActions, onPullGoalAction }: BaseProps) {
   const now = new Date()
   const s = seasonIndex(now)
   return (
@@ -76,6 +82,8 @@ export function SeasonalPlanningSession({ tasks, onPushTask, onClose, onHandDown
       onSetBucket={onSetBucket}
       onCompleteTask={onCompleteTask}
       demote={{ label: 'Into month', bucket: 'month' }}
+      goalActions={goalActions}
+      onPullGoalAction={onPullGoalAction}
     />
   )
 }
