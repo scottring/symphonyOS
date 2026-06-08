@@ -59,10 +59,45 @@ describe('ScheduleItemActionsMenu', () => {
     expect(onDeleteEvent).toHaveBeenCalledWith(eventItem.originalEvent)
   })
 
-  it('Reschedule opens the detail panel', () => {
+  it('Reschedule opens the detail panel for an event', () => {
     const onOpenDetail = vi.fn()
     renderMenu(eventItem, {}, onOpenDetail)
     fireEvent.click(screen.getByText('Reschedule'))
+    expect(onOpenDetail).toHaveBeenCalled()
+  })
+
+  it('Reschedule on a TASK expands a one-tap WHEN submenu that applies directly', () => {
+    const taskItem = {
+      id: 'task-7', type: 'task', title: 'Go to sketchers', completed: false,
+      originalTask: { id: '7', title: 'Go to sketchers' },
+    } as unknown as TimelineItem
+    const onPushTask = vi.fn()
+    const onUpdateTask = vi.fn()
+    const onOpenDetail = vi.fn()
+    renderMenu(taskItem, { onPushTask, onUpdateTask }, onOpenDetail)
+
+    // Reschedule expands the submenu (does NOT open the detail panel).
+    fireEvent.click(screen.getByText('Reschedule'))
+    expect(onOpenDetail).not.toHaveBeenCalled()
+
+    // "Next weekend" -> a dated push, applied immediately.
+    fireEvent.click(screen.getByText('Next weekend'))
+    expect(onPushTask).toHaveBeenCalledWith('7', expect.any(Date))
+
+    // Re-open and pick a pool target -> bucket change via updateTask.
+    fireEvent.click(screen.getByLabelText('Item actions'))
+    fireEvent.click(screen.getByText('Reschedule'))
+    fireEvent.click(screen.getByText('Someday'))
+    expect(onUpdateTask).toHaveBeenCalledWith('7', expect.objectContaining({ bucket: 'someday' }))
+  })
+
+  it('a TASK still offers Edit details (full panel)', () => {
+    const taskItem = {
+      id: 'task-8', type: 'task', title: 'x', completed: false, originalTask: { id: '8', title: 'x' },
+    } as unknown as TimelineItem
+    const onOpenDetail = vi.fn()
+    renderMenu(taskItem, {}, onOpenDetail)
+    fireEvent.click(screen.getByText('Edit details'))
     expect(onOpenDetail).toHaveBeenCalled()
   })
 })
