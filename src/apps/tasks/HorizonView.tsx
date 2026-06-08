@@ -225,6 +225,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
           triageMenu={
             <TriageWhenMenu
               onPick={(when) => applyWhen(task, when)}
+              onPickDate={(date) => pushTask(task.id, date)}
               onDelete={() => deleteTask(task.id)}
             />
           }

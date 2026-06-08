@@ -136,6 +136,7 @@ export function PlanTodaySession({
                     {/* Full triage fan-out + Done, consistent with every surface. */}
                     <TriageWhenMenu
                       onPick={(when) => applyTriageWhen(when, t.id, { onPushTask, onSetBucket })}
+                      onPickDate={(date) => onPushTask(t.id, date)}
                       onComplete={() => onCompleteTask(t.id)}
                     />
                   </li>

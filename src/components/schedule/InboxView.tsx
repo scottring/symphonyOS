@@ -352,6 +352,17 @@ export function InboxView({
     }, 220)
   }, [onPushTask, onUpdateTask])
 
+  // Schedule an inbox item to a specific date/time (the "Pick date" triage path).
+  const applyDate = useCallback((task: Task, date: Date) => {
+    const previous: Partial<Task> = { bucket: task.bucket, scheduledFor: task.scheduledFor, isAllDay: task.isAllDay }
+    setLeavingIds((s) => new Set(s).add(task.id))
+    setTimeout(() => {
+      onPushTask?.(task.id, date)
+      setLeavingIds((s) => { const next = new Set(s); next.delete(task.id); return next })
+      setUndo({ taskId: task.id, message: 'Scheduled', previous, undoable: true })
+    }, 220)
+  }, [onPushTask])
+
   const handleUndo = useCallback(async () => {
     if (!undo) { setUndo(null); return }
     // Only call onUpdateTask if there are actual fields to restore
@@ -402,6 +413,7 @@ export function InboxView({
           triageMenu={
             <TriageWhenMenu
               onPick={(when) => applyWhen(task, when)}
+              onPickDate={(date) => applyDate(task, date)}
               onNote={() => setNotePickerTaskId(task.id)}
               onDelete={() => applyTriage(task, { kind: 'delete' })}
             />

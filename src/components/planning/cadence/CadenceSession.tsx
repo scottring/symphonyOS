@@ -132,6 +132,7 @@ export function CadenceSession({
                       {onSetBucket && (
                         <TriageWhenMenu
                           onPick={(when) => applyTriageWhen(when, t.id, { onPushTask, onSetBucket })}
+                          onPickDate={(date) => onPushTask(t.id, date)}
                           onComplete={onCompleteTask ? () => onCompleteTask(t.id) : undefined}
                         />
                       )}

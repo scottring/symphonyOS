@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Trash2, ChevronDown, Check } from 'lucide-react'
+import { Trash2, ChevronDown, Check, CalendarPlus } from 'lucide-react'
 import { ConceptIcon } from '@/lib/conceptIcons'
+import { SpecificDatePicker } from './SpecificDatePicker'
 
 // The full temporal vocabulary a triage row can route into. The granular options
 // fan out from a small set of horizon "groups" so the common case stays one
@@ -57,6 +58,8 @@ interface TriageWhenMenuProps {
   /** When provided, renders a Done (check) action — used in planning reviews
    *  where completing an item is a first-class move. */
   onComplete?: () => void
+  /** When provided, adds a "Pick date" chip for a specific date/time. */
+  onPickDate?: (date: Date, isAllDay: boolean) => void
 }
 
 /**
@@ -66,7 +69,7 @@ interface TriageWhenMenuProps {
  * Picking an option applies it and closes. Single-option groups (Someday) apply
  * directly with no popover.
  */
-export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete }: TriageWhenMenuProps) {
+export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete, onPickDate }: TriageWhenMenuProps) {
   const [openGroup, setOpenGroup] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -156,6 +159,35 @@ export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete }: TriageW
           </div>
         )
       })}
+
+      {/* Pick a specific date/time — opens a small native date+time form. */}
+      {onPickDate && (
+        <div
+          className="relative"
+          onMouseEnter={() => { cancelClose(); setOpenGroup('__date__') }}
+          onMouseLeave={scheduleClose}
+        >
+          <button
+            type="button"
+            aria-label="Pick date"
+            title="Pick a specific date"
+            onClick={() => setOpenGroup('__date__')}
+            className={`flex items-center text-xs px-2 py-1 rounded-md font-medium bg-neutral-50 text-neutral-600 hover:bg-neutral-100 transition-colors ${openGroup === '__date__' ? 'ring-1 ring-primary-300' : ''}`}
+          >
+            <CalendarPlus className="w-3.5 h-3.5" />
+          </button>
+          {openGroup === '__date__' && (
+            <div
+              role="menu"
+              className="absolute z-40 top-full right-0 mt-1 w-56 bg-white border border-neutral-200 rounded-lg shadow-lg p-2"
+              onMouseEnter={cancelClose}
+              onMouseLeave={scheduleClose}
+            >
+              <SpecificDatePicker onSubmit={(date, isAllDay) => { setOpenGroup(null); onPickDate(date, isAllDay) }} />
+            </div>
+          )}
+        </div>
+      )}
 
       {onNote && (
         <button

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { screen } from '@testing-library/react'
+import { screen, fireEvent } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { TriageWhenMenu } from './TriageWhenMenu'
 
@@ -43,6 +43,20 @@ describe('TriageWhenMenu', () => {
     expect(screen.getByRole('menuitem', { name: 'Next weekend' })).toBeInTheDocument()
     await user.click(screen.getByRole('menuitem', { name: 'Next weekend' }))
     expect(onPick).toHaveBeenCalledWith('next-weekend')
+  })
+
+  it('Pick date opens a date form and submits a specific slot', async () => {
+    const onPickDate = vi.fn()
+    const { user } = render(<TriageWhenMenu onPick={vi.fn()} onDelete={vi.fn()} onPickDate={onPickDate} />)
+    await user.click(screen.getByRole('button', { name: 'Pick date' }))
+    fireEvent.change(document.querySelector('input[type="date"]')!, { target: { value: '2026-06-20' } })
+    await user.click(screen.getByRole('button', { name: /Set date/ }))
+    expect(onPickDate).toHaveBeenCalledWith(expect.any(Date), true)
+  })
+
+  it('no Pick date chip when onPickDate is omitted', () => {
+    render(<TriageWhenMenu onPick={vi.fn()} onDelete={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: 'Pick date' })).not.toBeInTheDocument()
   })
 
   it('delete fires onDelete', async () => {
