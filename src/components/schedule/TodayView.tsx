@@ -29,7 +29,7 @@ import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 import { computeAnchorTime } from '@/lib/timelineAnchor'
 
-import { Eye, EyeOff, Repeat, CalendarClock, Mail, Binoculars } from 'lucide-react'
+import { Eye, EyeOff, Repeat, Mail, Binoculars } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
@@ -466,18 +466,9 @@ export function TodayView({
                 {createElement(hideRoutines ? EyeOff : Eye, { className: 'w-5 h-5' })}
                 <span>{hideRoutines ? 'Show daily' : 'Hide daily'}</span>
               </button>
-              {data.isToday && ctx.onOpenPlanning && (
-                <button
-                  type="button"
-                  onClick={ctx.onOpenPlanning}
-                  title="Plan day — drag unscheduled tasks and routines onto the timeline"
-                  aria-label="Plan day"
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[15px] text-primary-600 hover:bg-primary-50 transition-all"
-                >
-                  <CalendarClock className="w-5 h-5" />
-                  <span>Plan day</span>
-                </button>
-              )}
+              {/* Time-blocking moved into the "Plan today" daily-prep flow
+                  (its optional "Time-block the day" step). The standalone
+                  "Plan day" button was a redundant second door — removed. */}
             </>
           }
         />
@@ -516,16 +507,6 @@ export function TodayView({
             >
               <Repeat className="w-4 h-4" />
             </button>
-            {data.isToday && ctx.onOpenPlanning && (
-              <button
-                type="button"
-                onClick={ctx.onOpenPlanning}
-                aria-label="Plan day"
-                className="shrink-0 p-2 rounded-lg text-primary-600 hover:bg-primary-50 transition-colors"
-              >
-                <CalendarClock className="w-4 h-4" />
-              </button>
-            )}
           </div>
         </>
       )}
