@@ -19,6 +19,7 @@ import { useGoalsContext } from '@/contexts/GoalsContext';
 import { PlanningSession, WeeklyPlanningSession, PlanTodaySession, MonthlyPlanningSession, SeasonalPlanningSession, AnnualPlanningSession } from '@/components/lazy';
 import { LoadingFallback } from '@/components/layout/LoadingFallback';
 import { isEverydayRoutine, scheduleRoutineOnDate } from '@/lib/routineUtils';
+import { groupItems } from '@/lib/today/groupTasks';
 import type { GoalAction } from '@/types/goal';
 import type { Task } from '@/types/task';
 import { useEventNotes } from '@/hooks/useEventNotes';
@@ -41,7 +42,7 @@ import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
 
 export function HomeViewContainer() {
   // Data hooks
-  const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask, setBucket, getLinkedTasks } = useSupabaseTasks();
+  const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask, setBucket, getLinkedTasks, refetch } = useSupabaseTasks();
   const { isConnected, events, fetchEvents, isFetching: eventsFetching, updateEvent } = useGoogleCalendar();
   const { notes: eventNotesMap, updateEventAssignment, updateEventAssignmentAll, updateEventContext, updateEventProject } = useEventNotes();
   const { contacts, contactsMap, addContact, searchContacts } = useContacts();
@@ -265,6 +266,22 @@ export function HomeViewContainer() {
     [pullGoalActionToBucket],
   );
 
+  // Bulk-select grouping (Today): wrap a mix of tasks/events/routines into a new
+  // wrapper task. Tasks reparent via parentTaskId; events/routines ride as
+  // group_members refs (grouping.ts relocates them under the wrapper card).
+  const handleGroupItems = useCallback(
+    async (
+      taskIds: string[],
+      memberRefs: import('@/types/task').GroupMemberRef[],
+      groupName: string,
+      date: Date,
+      isAllDay: boolean,
+    ) => {
+      await groupItems({ taskIds, memberRefs, groupName, date, isAllDay }, { addTask, updateTask, refetch });
+    },
+    [addTask, updateTask, refetch],
+  );
+
   const scheduleActionsValue = useMemo<ScheduleActionsValue>(
     () => ({
       // Planning
@@ -278,6 +295,7 @@ export function HomeViewContainer() {
       onDeleteTask: deleteTask,
       onCreateTask: onCreateTaskFromValue,
       onCreateFollowUp: handleCreateFollowUp,
+      onGroupItems: handleGroupItems,
       onOpenTask: (taskId: string) => setSelection({ kind: 'task', id: taskId }),
 
       // Assignment actions
@@ -326,7 +344,7 @@ export function HomeViewContainer() {
       onUpdateEventProject: updateEventProject,
     }),
     [
-      toggleTask, toggleWaiting, updateTask, pushTask, deleteTask, onCreateTaskFromValue, handleCreateFollowUp,
+      toggleTask, toggleWaiting, updateTask, pushTask, deleteTask, onCreateTaskFromValue, handleCreateFollowUp, handleGroupItems,
       setSelection,
       scheduleActions, updateRoutine, updateEventContext, hideEvent,
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
