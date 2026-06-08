@@ -5,6 +5,7 @@ import { Sparkles, Sun, CalendarRange, CalendarDays, Inbox as InboxIcon, MoreHor
 import { Sidebar, type ViewType } from '@/components/layout/Sidebar';
 import { MoreSheet } from '@/components/layout/MoreSheet';
 import { QuickCapture } from '@/components/layout/QuickCapture';
+import { ShellSearch } from './ShellSearch';
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher';
 import { HelpPanel } from '@/components/lazy';
 import { Toast } from '@/components/toast';
@@ -107,12 +108,13 @@ function ShellLayoutInner({ children }: Props) {
   // Mobile/UI chrome state
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const helpButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Global keyboard shortcuts: ⌘K / Ctrl+K opens Quick Add; ⌘\ / Ctrl+\ toggles
-  // the sidebar. Both fire regardless of focus EXCEPT while typing in a field
-  // (so ⌘K inside the Quick Add input doesn't reopen it, etc.).
+  // Global keyboard shortcuts: ⌘K opens Quick Add; ⌘/ opens search; ⌘\ toggles
+  // the sidebar. ⌘\ is ignored while typing in a field (so it doesn't fight text
+  // entry); ⌘K / ⌘/ work anywhere.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
@@ -120,6 +122,9 @@ function ShellLayoutInner({ children }: Props) {
       if (key === 'k') {
         e.preventDefault();
         setQuickAddOpen((o) => !o);
+      } else if (key === '/') {
+        e.preventDefault();
+        setSearchOpen((o) => !o);
       } else if (key === '\\') {
         const el = document.activeElement;
         const typing = el instanceof HTMLElement &&
@@ -316,6 +321,9 @@ function ShellLayoutInner({ children }: Props) {
           onClose={() => setQuickAddOpen(false)}
         />
       )}
+
+      {/* Global search (⌘/) — mounted only while open so it subscribes lazily. */}
+      {searchOpen && <ShellSearch onClose={() => setSearchOpen(false)} />}
 
       {/* Non-Today AI rail (desktop). Today's rail is in Shell.tsx. */}
       {showAiRail && !isMobile && (
