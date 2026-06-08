@@ -4,20 +4,7 @@ import type { TimelineItem } from '@/types/timeline'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { applyTriageWhen } from '@/lib/triage/applyWhen'
 import type { TriageWhen } from './TriageWhenMenu'
-
-// One-tap reschedule targets. Picking one applies immediately (no second
-// time-picker step) — the old detail-pane flow was 3 clicks to reach a 2-step
-// popover that silently no-op'd if you didn't also pick a time.
-const RESCHEDULE_WHENS: { when: TriageWhen; label: string }[] = [
-  { when: 'today', label: 'Today' },
-  { when: 'tonight', label: 'Tonight' },
-  { when: 'tomorrow', label: 'Tomorrow' },
-  { when: 'this-weekend', label: 'This weekend' },
-  { when: 'next-weekend', label: 'Next weekend' },
-  { when: 'next-week', label: 'Next week' },
-  { when: 'this-month', label: 'This month' },
-  { when: 'someday', label: 'Someday' },
-]
+import { RescheduleGrid } from './RescheduleGrid'
 
 interface Props {
   item: TimelineItem
@@ -94,30 +81,20 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail }: Props) {
           />
           <div
             role="menu"
-            className={`absolute right-0 z-50 min-w-[176px] py-1 bg-white rounded-xl border border-neutral-200 shadow-lg ${openUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}
+            className={`absolute right-0 z-50 bg-white rounded-xl border border-neutral-200 shadow-lg ${rescheduling ? 'w-64 p-2' : 'min-w-[176px] py-1'} ${openUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}
           >
-            {/* Reschedule submenu (tasks): one tap to a relative date, applied
-                immediately — no detail pane, no time-picker step. */}
+            {/* Reschedule submenu (tasks): the icon grid, applied immediately —
+                no detail pane, no time-picker step. */}
             {rescheduling ? (
               <>
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setRescheduling(false) }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-neutral-400 hover:bg-neutral-50"
+                  className="flex w-full items-center gap-1.5 px-1 pb-2 text-[11px] uppercase tracking-wider font-medium text-neutral-400 hover:text-neutral-600"
                 >
-                  <ChevronRight className="w-3.5 h-3.5 rotate-180" /> Reschedule to…
+                  <ChevronRight className="w-3.5 h-3.5 rotate-180" /> Reschedule to
                 </button>
-                {RESCHEDULE_WHENS.map((opt) => (
-                  <button
-                    key={opt.when}
-                    type="button"
-                    role="menuitem"
-                    onClick={(e) => { e.stopPropagation(); reschedule(opt.when) }}
-                    className="flex w-full items-center gap-2.5 px-3 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50"
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+                <RescheduleGrid onPick={reschedule} />
               </>
             ) : (
             <>

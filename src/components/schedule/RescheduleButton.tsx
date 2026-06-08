@@ -11,17 +11,7 @@ import type { TimelineItem } from '@/types/timeline'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { applyTriageWhen } from '@/lib/triage/applyWhen'
 import type { TriageWhen } from './TriageWhenMenu'
-
-const WHENS: { when: TriageWhen; label: string }[] = [
-  { when: 'today', label: 'Today' },
-  { when: 'tonight', label: 'Tonight' },
-  { when: 'tomorrow', label: 'Tomorrow' },
-  { when: 'this-weekend', label: 'This weekend' },
-  { when: 'next-weekend', label: 'Next weekend' },
-  { when: 'next-week', label: 'Next week' },
-  { when: 'this-month', label: 'This month' },
-  { when: 'someday', label: 'Someday' },
-]
+import { RescheduleGrid } from './RescheduleGrid'
 
 export function RescheduleButton({ item }: { item: TimelineItem }) {
   const ctx = useScheduleActionsContext()
@@ -73,20 +63,10 @@ export function RescheduleButton({ item }: { item: TimelineItem }) {
           />
           <div
             role="menu"
-            className={`absolute right-0 z-50 min-w-[160px] py-1 bg-white rounded-xl border border-neutral-200 shadow-lg ${openUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}
+            className={`absolute right-0 z-50 w-64 p-2 bg-white rounded-xl border border-neutral-200 shadow-lg ${openUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}
           >
-            <div className="px-3 py-1.5 text-[11px] uppercase tracking-wider text-neutral-400">Reschedule to</div>
-            {WHENS.map((opt) => (
-              <button
-                key={opt.when}
-                type="button"
-                role="menuitem"
-                onClick={(e) => { e.stopPropagation(); reschedule(opt.when) }}
-                className="flex w-full items-center px-3 py-2 text-sm text-neutral-700 hover:bg-primary-50 hover:text-primary-700 transition-colors"
-              >
-                {opt.label}
-              </button>
-            ))}
+            <div className="px-1 pb-2 text-[11px] uppercase tracking-wider text-neutral-400">Reschedule to</div>
+            <RescheduleGrid onPick={reschedule} />
           </div>
         </>
       )}
