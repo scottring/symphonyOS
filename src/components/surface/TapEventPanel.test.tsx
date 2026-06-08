@@ -30,7 +30,6 @@ const baseHandlers = {
   onClose: vi.fn(),
   onNotesChange: vi.fn(),
   onAddPrepTask: vi.fn(),
-  onMore: vi.fn(),
   onAddLink: vi.fn(),
   onOpenTask: vi.fn(),
   onOpenProject: vi.fn(),

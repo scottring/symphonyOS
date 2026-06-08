@@ -23,7 +23,6 @@ interface TapEventPanelProps {
   onClose: () => void
   onNotesChange: (next: string) => void
   onAddPrepTask: (title: string) => void
-  onMore: () => void
   onAddLink: (url: string) => void
   onOpenTask: (id: string) => void
   onOpenProject: (id: string) => void
@@ -116,13 +115,6 @@ export function TapEventPanel(props: TapEventPanelProps) {
             }
           />
         )}
-        <button
-          onClick={props.onMore}
-          aria-label="More actions"
-          className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
-        >
-          ···
-        </button>
       </div>
 
       <PanelLocation

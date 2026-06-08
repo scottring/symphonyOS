@@ -290,7 +290,6 @@ function EventPanelBody({ id }: { id: string }) {
       onClose={handleClose}
       onNotesChange={(html) => updateNote(eventId, html)}
       onAddPrepTask={() => { /* TODO: integrate addPrepTask */ }}
-      onMore={() => {}}
       onAddLink={() => {}}
       onOpenTask={(tid) => navigate(`/today?detail=task:${tid}`)}
       onOpenProject={() => {}}

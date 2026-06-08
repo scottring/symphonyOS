@@ -4,7 +4,6 @@ import type { Routine, RoutineVisibility, RecurrencePattern } from '@/types/rout
 import type { TaskContext } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
 import { PanelHeader } from './sections/PanelHeader'
-import { PanelMetaRow } from './sections/PanelMetaRow'
 import { PanelWhy } from './sections/PanelWhy'
 import { PanelFooter } from './sections/PanelFooter'
 import { ContextPicker } from '@/components/triage/ContextPicker'
@@ -56,7 +55,6 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
         onTitleChange={(name) => props.onRename?.(name)}
         onClose={props.onClose}
       />
-      <PanelMetaRow bucket={recurrenceSummary(routine)} />
 
       <section className="pb-4 mb-4 border-b border-neutral-200 flex flex-col gap-3">
         {/* Who does it + context + streak */}
