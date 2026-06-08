@@ -40,6 +40,7 @@ import { TapRoutinePanel } from '@/components/surface/TapRoutinePanel';
 import { TapEventPanel } from '@/components/surface/TapEventPanel';
 import { TapMealPanel } from '@/components/surface/TapMealPanel';
 import { WhyChain } from '@/components/why/WhyChain';
+import { applyTriageWhen } from '@/lib/triage/applyWhen';
 import type { Task, TaskLink } from '@/types/task';
 
 /** Find a task by id, searching one level of nested subtasks (group children). */
@@ -142,6 +143,19 @@ function TaskPanelBody({ id }: { id: string }) {
       onToggleComplete={() => toggleTask(task.id)}
       onSchedule={(date, isAllDay) =>
         updateTask(task.id, { bucket: 'timed', scheduledFor: date, isAllDay })
+      }
+      onReschedule={(when) =>
+        applyTriageWhen(when, task.id, {
+          onPushTask: (id, target) => {
+            if (target instanceof Date) {
+              const hasTime = target.getHours() !== 0 || target.getMinutes() !== 0
+              updateTask(id, { bucket: 'timed', scheduledFor: target, isAllDay: !hasTime })
+            } else {
+              updateTask(id, { bucket: target, scheduledFor: undefined })
+            }
+          },
+          onSetBucket: (id, bucket) => updateTask(id, { bucket, scheduledFor: undefined, isAllDay: undefined }),
+        })
       }
       onClearSchedule={() =>
         updateTask(task.id, { bucket: 'inbox', scheduledFor: undefined, isAllDay: undefined })

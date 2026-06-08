@@ -42,6 +42,7 @@ interface TapContextPanelProps {
   onSaveNoteToVault?: (content: string) => Promise<{ ok: boolean; url?: string }>
   onToggleComplete: () => void
   onSchedule: (date: Date, isAllDay: boolean) => void
+  onReschedule?: (when: import('@/components/schedule/TriageWhenMenu').TriageWhen) => void
   onClearSchedule?: () => void
   isPinned: boolean
   onTogglePin: () => void
@@ -133,6 +134,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
         isPinned={props.isPinned}
         onToggleComplete={props.onToggleComplete}
         onSchedule={props.onSchedule}
+        onReschedule={props.onReschedule}
         onClearSchedule={props.onClearSchedule}
         onTogglePin={props.onTogglePin}
         onDelete={props.onDelete}
