@@ -41,6 +41,28 @@ describe('CadenceSession', () => {
     expect(screen.getByText(/Pull from this season \(1\)/)).toBeInTheDocument()
   })
 
+  it('review rows are triageable: demote into the lower horizon, defer to someday, mark done', async () => {
+    const onSetBucket = vi.fn(); const onCompleteTask = vi.fn()
+    const tasks = [task({ id: 'm1', title: 'Open monthly', bucket: 'month' })]
+    const { user } = render(
+      <CadenceSession {...monthlyProps} tasks={tasks} onPushTask={vi.fn()} onClose={vi.fn()}
+        onSetBucket={onSetBucket} onCompleteTask={onCompleteTask} demote={{ label: 'Into week', bucket: 'week' }} />
+    )
+    await user.click(screen.getByRole('button', { name: 'Into week' }))
+    expect(onSetBucket).toHaveBeenCalledWith('m1', 'week')
+    await user.click(screen.getByRole('button', { name: 'Someday' }))
+    expect(onSetBucket).toHaveBeenCalledWith('m1', 'someday')
+    await user.click(screen.getByRole('button', { name: 'Mark done' }))
+    expect(onCompleteTask).toHaveBeenCalledWith('m1')
+  })
+
+  it('review list is read-only when no triage handlers are given', () => {
+    const tasks = [task({ id: 'm1', title: 'Open monthly', bucket: 'month' })]
+    render(<CadenceSession {...monthlyProps} tasks={tasks} onPushTask={vi.fn()} onClose={vi.fn()} />)
+    expect(screen.getByText('Open monthly')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Into week' })).not.toBeInTheDocument()
+  })
+
   it('pulls a picked item down into this horizon (onPushTask id, "month")', async () => {
     const onPushTask = vi.fn()
     const tasks = [task({ id: 'q1', title: 'Season item', bucket: 'quarter' })]

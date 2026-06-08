@@ -5,7 +5,7 @@
 // and the opened session refer to the same period. Agendas follow the verbatim
 // Scott+Iris requirements (relationships, hopes/fears, fun&joy, review).
 
-import type { Task } from '@/types/task'
+import type { Task, TaskBucket } from '@/types/task'
 import { CadenceSession } from './CadenceSession'
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -21,9 +21,12 @@ interface BaseProps {
   onClose: () => void
   /** Hand down to the next-lower session. */
   onHandDown?: () => void
+  /** Review-row triage — move an open item to another bucket / mark it done. */
+  onSetBucket?: (id: string, bucket: TaskBucket) => void
+  onCompleteTask?: (id: string) => void
 }
 
-export function MonthlyPlanningSession({ tasks, onPushTask, onClose, onHandDown }: BaseProps) {
+export function MonthlyPlanningSession({ tasks, onPushTask, onClose, onHandDown, onSetBucket, onCompleteTask }: BaseProps) {
   const now = new Date()
   return (
     <CadenceSession
@@ -42,11 +45,14 @@ export function MonthlyPlanningSession({ tasks, onPushTask, onClose, onHandDown 
       onPushTask={onPushTask}
       onClose={onClose}
       handDown={onHandDown ? { label: 'Plan the week', onActivate: onHandDown } : undefined}
+      onSetBucket={onSetBucket}
+      onCompleteTask={onCompleteTask}
+      demote={{ label: 'Into week', bucket: 'week' }}
     />
   )
 }
 
-export function SeasonalPlanningSession({ tasks, onPushTask, onClose, onHandDown }: BaseProps) {
+export function SeasonalPlanningSession({ tasks, onPushTask, onClose, onHandDown, onSetBucket, onCompleteTask }: BaseProps) {
   const now = new Date()
   const s = seasonIndex(now)
   return (
@@ -67,6 +73,9 @@ export function SeasonalPlanningSession({ tasks, onPushTask, onClose, onHandDown
       onPushTask={onPushTask}
       onClose={onClose}
       handDown={onHandDown ? { label: 'Plan the month', onActivate: onHandDown } : undefined}
+      onSetBucket={onSetBucket}
+      onCompleteTask={onCompleteTask}
+      demote={{ label: 'Into month', bucket: 'month' }}
     />
   )
 }

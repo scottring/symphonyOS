@@ -421,6 +421,8 @@ export function HomeViewContainer() {
             onPushTask={pushTask}
             onClose={() => setMonthlyPlanningOpen(false)}
             onHandDown={() => { setMonthlyPlanningOpen(false); setWeeklyPlanningOpen(true); }}
+            onSetBucket={setBucket}
+            onCompleteTask={toggleTask}
           />
         </Suspense>
       )}
@@ -431,6 +433,8 @@ export function HomeViewContainer() {
             onPushTask={pushTask}
             onClose={() => setSeasonalPlanningOpen(false)}
             onHandDown={() => { setSeasonalPlanningOpen(false); setMonthlyPlanningOpen(true); }}
+            onSetBucket={setBucket}
+            onCompleteTask={toggleTask}
           />
         </Suspense>
       )}

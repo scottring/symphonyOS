@@ -8,7 +8,7 @@
 // the financial step is a handoff tick only.
 
 import { useState, useMemo, useCallback } from 'react'
-import { X, ArrowRight, ArrowDownToLine, CircleDollarSign } from 'lucide-react'
+import { X, ArrowRight, ArrowDownToLine, CircleDollarSign, Check } from 'lucide-react'
 import type { Task, TaskBucket } from '@/types/task'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { usePlanningSession, type PlanningHorizon, type PlanningNotes } from '@/hooks/usePlanningSession'
@@ -36,6 +36,12 @@ interface CadenceSessionProps {
   onClose: () => void
   /** Hand down to the next-lower session (monthly → weekly). */
   handDown?: { label: string; onActivate: () => void }
+  /** Review-row triage: move an open item to another bucket / complete it. When
+   *  omitted the review list is read-only. `demote` is the next-lower horizon
+   *  ("Into week" for monthly), so reviewing actively builds the plan below. */
+  onSetBucket?: (id: string, bucket: TaskBucket) => void
+  onCompleteTask?: (id: string) => void
+  demote?: { label: string; bucket: 'week' | 'month' }
 }
 
 const SECTION = 'text-[11px] uppercase tracking-wider text-neutral-400 mb-3'
@@ -43,6 +49,7 @@ const SECTION = 'text-[11px] uppercase tracking-wider text-neutral-400 mb-3'
 export function CadenceSession({
   horizon, periodToken, title, periodLabel, tasks, thisBucket,
   pullFromBucket, pullFromLabel, textFields, onPushTask, onClose, handDown,
+  onSetBucket, onCompleteTask, demote,
 }: CadenceSessionProps) {
   const { notes, patchNotes } = usePlanningSession(horizon, periodToken)
   const matchAll = useMemo(() => makeAssigneeFilter([]), [])
@@ -92,19 +99,43 @@ export function CadenceSession({
       <div className="flex-1 min-h-0 overflow-auto">
         <div className="max-w-[680px] w-full mx-auto px-6 py-6 space-y-8">
 
-          {/* Review — what's already in this horizon. */}
-          <section>
-            <h2 className={SECTION}>In review — {inHorizon.length} open</h2>
-            {inHorizon.length === 0 ? (
-              <p className="text-sm text-neutral-400">Nothing committed to {periodLabel.toLowerCase()} yet.</p>
-            ) : (
-              <ul className="space-y-1.5">
-                {inHorizon.map((t) => (
-                  <li key={t.id} className="text-sm text-neutral-700 truncate">{t.title}</li>
-                ))}
-              </ul>
-            )}
-          </section>
+          {/* Review — what's already in this horizon. Each open item is
+              triageable: demote into the next-lower horizon (build the plan
+              below), defer to Someday, or mark done. */}
+          {thisBucket && (
+            <section>
+              <h2 className={SECTION}>In review — {inHorizon.length} open</h2>
+              {inHorizon.length === 0 ? (
+                <p className="text-sm text-neutral-400">Nothing committed to {periodLabel.toLowerCase()} yet.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {inHorizon.map((t) => (
+                    <li key={t.id} className="flex items-center gap-2 rounded-xl border border-neutral-100 bg-white px-3 py-2">
+                      <span className="flex-1 min-w-0 text-sm text-neutral-800 truncate">{t.title}</span>
+                      {demote && onSetBucket && (
+                        <button type="button" onClick={() => onSetBucket(t.id, demote.bucket)}
+                          className="shrink-0 text-xs font-medium px-2.5 py-1 rounded-md bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors">
+                          {demote.label}
+                        </button>
+                      )}
+                      {onSetBucket && (
+                        <button type="button" onClick={() => onSetBucket(t.id, 'someday')}
+                          className="shrink-0 text-xs font-medium px-2.5 py-1 rounded-md bg-neutral-50 text-neutral-600 hover:bg-neutral-100 transition-colors">
+                          Someday
+                        </button>
+                      )}
+                      {onCompleteTask && (
+                        <button type="button" onClick={() => onCompleteTask(t.id)} aria-label="Mark done"
+                          className="shrink-0 p-1.5 rounded-md text-neutral-400 hover:text-primary-700 hover:bg-primary-50 transition-colors">
+                          <Check className="w-3.5 h-3.5" strokeWidth={3} />
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
 
           {/* Plan — pull from the next-higher pool (the cascade). */}
           {pullFromBucket && (
