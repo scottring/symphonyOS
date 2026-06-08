@@ -157,7 +157,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
       <button
         type="button"
         onClick={onSelect}
-        className={`flex-1 min-w-0 text-left text-sm leading-snug break-words py-0.5 ${
+        className={`flex-1 min-w-[6rem] text-left text-sm leading-snug break-words py-0.5 ${
           task.completed
             ? 'text-neutral-400 line-through'
             : task.isWaiting
@@ -188,8 +188,8 @@ export const DenseInboxRow = memo(function DenseInboxRow({
           of the triage affordances (assignee, when, delete) instead of crowding
           the title. Popover opens right-aligned to stay on-screen. */}
       <div
-        className={`relative shrink-0 mt-0.5 transition-opacity ${
-          hoverOnlyChrome ? 'opacity-0 group-hover:opacity-100 focus-within:opacity-100' : ''
+        className={`relative shrink-0 mt-0.5 ${
+          hoverOnlyChrome ? 'hidden group-hover:block group-focus-within:block' : ''
         }`}
         onClick={(e) => e.stopPropagation()}
       >
@@ -240,8 +240,8 @@ export const DenseInboxRow = memo(function DenseInboxRow({
       {/* Quick action buttons. In hover-chrome mode, hidden until row is
           hovered/focused so the default view stays calm. */}
       <div
-        className={`flex items-center gap-1 shrink-0 mt-0.5 transition-opacity ${
-          hoverOnlyChrome ? 'opacity-0 group-hover:opacity-100 focus-within:opacity-100' : ''
+        className={`items-center gap-1 shrink-0 mt-0.5 ${
+          hoverOnlyChrome ? 'hidden group-hover:flex group-focus-within:flex' : 'flex'
         }`}
       >
         {triageMenu ?? quickActions.map((action) => {

@@ -257,7 +257,7 @@ export function StagingFloat({
   useEffect(() => {
     if (!open || !buttonRef.current) return
     const rect = buttonRef.current.getBoundingClientRect()
-    const PANEL_WIDTH = Math.min(720, window.innerWidth - 24)
+    const PANEL_WIDTH = Math.min(860, window.innerWidth - 24)
     const idealLeft = rect.right - PANEL_WIDTH
     const left = Math.max(12, Math.min(idealLeft, window.innerWidth - PANEL_WIDTH - 12))
     setPos({ top: rect.bottom + 6, left })
@@ -396,7 +396,7 @@ export function StagingFloat({
       {open && pos && createPortal(
         <div
           ref={panelRef}
-          style={{ position: 'fixed', top: pos.top, left: pos.left, width: 'min(720px, calc(100vw - 24px))' }}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, width: 'min(860px, calc(100vw - 24px))' }}
           className="z-50 bg-white rounded-xl border border-neutral-200 shadow-xl p-3 max-h-[70vh] overflow-y-auto"
           role="dialog"
           aria-label="This Week"
