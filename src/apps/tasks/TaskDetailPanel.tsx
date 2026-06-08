@@ -259,6 +259,12 @@ function RoutinePanelBody({ id }: { id: string }) {
           time_of_day: timeOfDay || null,
         })
       }
+      onUpdateLocation={(location, placeId) =>
+        updateRoutine(routine.id, { location, location_place_id: placeId ?? null })
+      }
+      onClearLocation={() =>
+        updateRoutine(routine.id, { location: null, location_place_id: null })
+      }
     />
   );
 }

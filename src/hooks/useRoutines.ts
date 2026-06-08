@@ -32,6 +32,8 @@ export interface UpdateRoutineInput {
   context?: 'work' | 'family' | 'personal' | null
   raw_input?: string | null
   show_on_timeline?: boolean
+  location?: string | null
+  location_place_id?: string | null
   prep_task_templates?: PrepFollowupTemplate[]
   followup_task_templates?: PrepFollowupTemplate[]
 }
@@ -190,6 +192,8 @@ export function useRoutines() {
       if (input.context !== undefined) updates.context = input.context
       if (input.raw_input !== undefined) updates.raw_input = input.raw_input
       if (input.show_on_timeline !== undefined) updates.show_on_timeline = input.show_on_timeline
+      if (input.location !== undefined) updates.location = input.location
+      if (input.location_place_id !== undefined) updates.location_place_id = input.location_place_id
       if (input.prep_task_templates !== undefined) updates.prep_task_templates = input.prep_task_templates
       if (input.followup_task_templates !== undefined) updates.followup_task_templates = input.followup_task_templates
 

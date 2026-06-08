@@ -30,17 +30,18 @@ describe('TapRoutinePanel', () => {
     expect(screen.getByText('Take bins to curb')).toBeInTheDocument()
   })
 
-  it('relabels visibility as "On timeline" / "Reference" with an explanatory hint', () => {
+  it('renders visibility as a labelled on/off switch (checked when active)', () => {
     render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={vi.fn()} />)
-    expect(screen.getByRole('button', { name: 'On timeline' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Reference' })).toBeInTheDocument()
-    expect(screen.getByText(/keeps the routine but hides it from Today/i)).toBeInTheDocument()
+    const sw = screen.getByRole('switch', { name: /show on today's timeline/i })
+    expect(sw).toBeInTheDocument()
+    expect(sw).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByText(/appears on Today at its scheduled time/i)).toBeInTheDocument()
   })
 
-  it('reports visibility changes', () => {
+  it('toggling the switch off reports a reference visibility change', () => {
     const onVisibilityChange = vi.fn()
     render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={onVisibilityChange} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Reference' }))
+    fireEvent.click(screen.getByRole('switch', { name: /show on today's timeline/i }))
     expect(onVisibilityChange).toHaveBeenCalledWith('reference')
   })
 

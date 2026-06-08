@@ -5,10 +5,12 @@ import type { TaskContext } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
 import { PanelHeader } from './sections/PanelHeader'
 import { PanelWhy } from './sections/PanelWhy'
+import { PanelLocation } from './sections/PanelLocation'
 import { PanelFooter } from './sections/PanelFooter'
 import { ContextPicker } from '@/components/triage/ContextPicker'
 import { MultiAssigneeDropdown } from '@/components/family'
 import { RoutineScheduleEditor } from '@/components/routine/RoutineScheduleEditor'
+import { ConceptIcon } from '@/lib/conceptIcons'
 import { useRoutineStats } from '@/hooks/useRoutineStats'
 
 function recurrenceSummary(r: Routine): string {
@@ -18,13 +20,6 @@ function recurrenceSummary(r: Routine): string {
   if (p.type === 'daily') return `Daily${time}`
   return `${p.type}${time}`
 }
-
-// Self-explanatory labels for the visibility toggle: "active" routines show on
-// the Today timeline; "reference" ones are kept but hidden from it.
-const VISIBILITY_OPTIONS: { value: RoutineVisibility; label: string }[] = [
-  { value: 'active', label: 'On timeline' },
-  { value: 'reference', label: 'Reference' },
-]
 
 interface TapRoutinePanelProps {
   routine: Routine
@@ -37,6 +32,9 @@ interface TapRoutinePanelProps {
   onAssignChange?: (memberIds: string[]) => void
   /** Persist a recurrence/time-of-day change. time is '' (clear) or 'HH:MM'. */
   onScheduleChange?: (pattern: RecurrencePattern, timeOfDay: string) => void
+  /** Set/change the routine's location (enables directions). When omitted, the Location section is hidden. */
+  onUpdateLocation?: (location: string, placeId?: string) => void
+  onClearLocation?: () => void
 }
 
 export function TapRoutinePanel(props: TapRoutinePanelProps) {
@@ -47,6 +45,8 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
     ? routine.assigned_to_all
     : (routine.assigned_to ? [routine.assigned_to] : [])
   const [editingSchedule, setEditingSchedule] = useState(false)
+  const [showDirections, setShowDirections] = useState(false)
+  const onTimeline = routine.visibility === 'active'
 
   return (
     <article className="bg-bg-elevated rounded-2xl p-5 max-w-md w-full">
@@ -76,25 +76,32 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
           )}
         </div>
 
-        {/* Show on timeline vs keep as reference */}
+        {/* Show on Today's timeline — a real on/off switch. Off = "reference":
+            the routine is kept but doesn't appear on Today. */}
         <div>
-          <div className="flex gap-1" role="group" aria-label="Show on timeline">
-            {VISIBILITY_OPTIONS.map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => props.onVisibilityChange(value)}
-                aria-label={label}
-                aria-pressed={routine.visibility === value}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  routine.visibility === value ? 'bg-neutral-800 text-white' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm font-medium text-neutral-700">Show on Today's timeline</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={onTimeline}
+              aria-label="Show on Today's timeline"
+              onClick={() => props.onVisibilityChange(onTimeline ? 'reference' : 'active')}
+              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                onTimeline ? 'bg-primary-600' : 'bg-neutral-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                  onTimeline ? 'translate-x-[22px]' : 'translate-x-0.5'
                 }`}
-              >
-                {label}
-              </button>
-            ))}
+              />
+            </button>
           </div>
           <p className="text-xs text-neutral-500 mt-1.5">
-            Reference keeps the routine but hides it from Today.
+            {onTimeline
+              ? 'This routine appears on Today at its scheduled time.'
+              : 'Reference: the routine is kept but hidden from Today (turn on to schedule it back).'}
           </p>
         </div>
 
@@ -130,6 +137,28 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
           </div>
         )}
       </section>
+
+      {props.onUpdateLocation && props.onClearLocation && (
+        <section className="pb-4 mb-4 border-b border-neutral-200">
+          {routine.location && (
+            <button
+              onClick={() => setShowDirections((v) => !v)}
+              aria-expanded={showDirections}
+              className="mb-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
+            >
+              <ConceptIcon name="location" decorative /> Directions {showDirections ? '▾' : '▸'}
+            </button>
+          )}
+          <PanelLocation
+            location={routine.location ?? undefined}
+            locationPlaceId={routine.location_place_id ?? undefined}
+            title={routine.name}
+            showDirections={showDirections}
+            onUpdateLocation={props.onUpdateLocation}
+            onClearLocation={props.onClearLocation}
+          />
+        </section>
+      )}
 
       <PanelWhy
         key={routine.id}

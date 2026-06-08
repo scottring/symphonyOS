@@ -78,6 +78,8 @@ export interface Routine {
   raw_input: string | null // Original natural language input
   show_on_timeline: boolean // Whether to display on Today view (default true)
   context?: 'work' | 'family' | 'personal' | null // Life domain for filtering
+  location?: string | null // Where the routine happens (e.g. school pickup) — enables directions
+  location_place_id?: string | null // Google Place id for the location, when picked from Places
   // Templates for auto-generation of linked tasks
   prep_task_templates?: PrepFollowupTemplate[]
   followup_task_templates?: PrepFollowupTemplate[]
