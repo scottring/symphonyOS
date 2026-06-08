@@ -9,6 +9,7 @@ import { SchedulePopover, ContextPicker, DiscussionPicker, type ScheduleContextI
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
 import { Video, Tag, Check, Pencil } from 'lucide-react'
 import { ScheduleItemActionsMenu } from './ScheduleItemActionsMenu'
+import { RescheduleButton } from './RescheduleButton'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useMobile } from '@/hooks/useMobile'
@@ -683,6 +684,12 @@ export const ScheduleItem = memo(function ScheduleItem({
         {/* Convert to Project button - for tasks */}
         {isTask && !item.completed && (
           <PromoteTaskToProjectButton item={item} />
+        )}
+
+        {/* Dedicated one-tap reschedule (tasks) — its own button so rescheduling
+            doesn't require digging into the '...' menu. */}
+        {variant !== 'minimal' && isTask && !item.completed && (
+          <RescheduleButton item={item} />
         )}
 
         {/* Unified actions menu — always visible (touch + desktop) */}
