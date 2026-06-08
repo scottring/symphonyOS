@@ -238,15 +238,11 @@ export function HorizonView({ horizon }: HorizonViewProps) {
     [projects, familyMembers, applyWhen, deleteTask, toggleTask, updateTask, handleSelect, scheduleActions],
   );
 
-  // ── "Plan the [horizon]" — Week wires to the existing WeeklyPlanningSession
-  // (opened on the Today rung via its own state); others are Phase-3 stubs. ──
+  // ── "Plan the [horizon]" — routes to the Today rung with a ?plan flag; the
+  // HomeViewContainer opens the matching session (week/month/season/year). The
+  // sessions live there so they share one task subscription. ──
   const handlePlan = useCallback(() => {
-    if (horizon === 'week') {
-      // The wired WeeklyPlanningSession lives in HomeViewContainer (Today rung).
-      // Route there with a flag so it opens the weekly session.
-      navigate('/today?plan=week');
-    }
-    // month/season: Phase 3 — stub (no-op beyond the disabled affordance).
+    navigate(`/today?plan=${horizon}`);
   }, [horizon, navigate]);
 
   // ── Year is a goals-level horizon — placeholder pointing at Goals. ──
@@ -280,7 +276,9 @@ export function HorizonView({ horizon }: HorizonViewProps) {
 
   const label = def?.label ?? 'Horizon';
   const total = pool.length + carryOver.length;
-  const planDisabled = horizon !== 'week';
+  // Someday has no planning session (it's a timeless pool); every dated horizon
+  // does (week/month/season/year).
+  const planDisabled = horizon === 'someday';
 
   return (
     <ScheduleActionsProvider value={scheduleActionsValue}>
@@ -295,20 +293,17 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                   : `${pool.length} in this horizon${carryOver.length > 0 ? ` · ${carryOver.length} carried over` : ''}`}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={handlePlan}
-              disabled={planDisabled}
-              title={planDisabled ? 'Planning session coming in Phase 3' : `Plan the ${label.toLowerCase()}`}
-              className={`shrink-0 inline-flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg transition-colors ${
-                planDisabled
-                  ? 'text-neutral-300 cursor-not-allowed'
-                  : 'text-primary-700 bg-primary-50 hover:bg-primary-100'
-              }`}
-            >
-              <CalendarRange className="w-4 h-4" />
-              Plan the {label.replace(/^This /, '').toLowerCase()}
-            </button>
+            {!planDisabled && (
+              <button
+                type="button"
+                onClick={handlePlan}
+                title={`Plan the ${label.replace(/^This /, '').toLowerCase()}`}
+                className="shrink-0 inline-flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg transition-colors text-primary-700 bg-primary-50 hover:bg-primary-100"
+              >
+                <CalendarRange className="w-4 h-4" />
+                Plan the {label.replace(/^This /, '').toLowerCase()}
+              </button>
+            )}
           </header>
 
           {/* Carry-over — calm "carried over" framing, shown on every horizon. */}

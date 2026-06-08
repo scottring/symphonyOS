@@ -38,14 +38,14 @@ export function RhythmNudge({ due, onPlan }: RhythmNudgeProps) {
     <div className="flex items-center gap-3 rounded-xl border border-primary-200 bg-primary-50/60 px-4 py-2.5">
       <CalendarRange className="w-4 h-4 text-primary-600 shrink-0" />
       <p className="text-sm text-primary-900 flex-1 min-w-0">
-        It's a good time to <span className="font-medium">plan the week</span>.
+        It's a good time to <span className="font-medium">plan {due.label}</span>.
       </p>
       <button
         type="button"
         onClick={onPlan}
-        className="shrink-0 text-sm font-medium px-3 py-1.5 rounded-lg bg-primary-600 text-white hover:bg-primary-700 transition-colors"
+        className="shrink-0 text-sm font-medium px-3 py-1.5 rounded-lg bg-primary-600 text-white hover:bg-primary-700 transition-colors capitalize"
       >
-        Plan the week
+        Plan {due.label}
       </button>
       <button
         type="button"

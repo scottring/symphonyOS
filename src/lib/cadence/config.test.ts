@@ -49,7 +49,34 @@ describe('cadence config', () => {
     })
     it('disabled weekly nudge never fires', () => {
       const cfg = { ...DEFAULT_CADENCE, weeklyNudgeEnabled: false }
+      // June 7 2026 is a Sunday but NOT a season start / first Saturday / Sep 1.
       expect(getDueSession(cfg, new Date(2026, 5, 7))).toBeNull()
+    })
+
+    it('annual fires on September 1 and outranks everything', () => {
+      const sep1 = new Date(2026, 8, 1) // Sep 1 2026
+      const due = getDueSession(DEFAULT_CADENCE, sep1)
+      expect(due?.kind).toBe('year')
+      expect(due?.token).toBe('2026')
+    })
+
+    it('seasonal fires on a meteorological season start (Jun 1)', () => {
+      const jun1 = new Date(2026, 5, 1)
+      const due = getDueSession(DEFAULT_CADENCE, jun1)
+      expect(due?.kind).toBe('season')
+      expect(due?.label).toBe('the season')
+    })
+
+    it('monthly fires on the first Saturday', () => {
+      const firstSat = new Date(2026, 5, 6) // Sat Jun 6 2026 (<= 7th)
+      const due = getDueSession(DEFAULT_CADENCE, firstSat)
+      expect(due?.kind).toBe('month')
+    })
+
+    it('a non-first Saturday is not a monthly nudge', () => {
+      const secondSat = new Date(2026, 5, 13) // Sat Jun 13 (> 7th)
+      // Not the weekly day (Sunday default) either → nothing due.
+      expect(getDueSession(DEFAULT_CADENCE, secondSat)).toBeNull()
     })
   })
 })

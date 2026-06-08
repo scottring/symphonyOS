@@ -65,20 +65,56 @@ export function weekToken(now: Date, weekStartsOn: WeekStart): string {
   return `${a.getFullYear()}-${a.getMonth() + 1}-${a.getDate()}`
 }
 
+export type SessionHorizon = 'week' | 'month' | 'season' | 'year'
+
 export interface DueSession {
-  kind: 'week'
-  /** Period token; a dismissal carrying this token hides the nudge until next week. */
+  kind: SessionHorizon
+  /** Human label for the nudge CTA, e.g. "the week". */
+  label: string
+  /** Period token; a dismissal carrying this token hides the nudge for that period. */
   token: string
 }
 
+/** Meteorological-season index (0–3) and a YYYY-Sx token for `now`. */
+function seasonToken(now: Date): string {
+  const s = Math.floor(((now.getMonth() + 1) % 12) / 3) // Dec→0(winter)… keeps Dec with Jan/Feb
+  return `${now.getFullYear()}-S${s}`
+}
+
+/** Is `now` the first calendar day of a meteorological season (Mar/Jun/Sep/Dec 1)? */
+function isSeasonStart(now: Date): boolean {
+  return now.getDate() === 1 && [2, 5, 8, 11].includes(now.getMonth())
+}
+
+/** Is `now` the first Saturday of its month? (The monthly-session anchor.) */
+function isFirstSaturday(now: Date): boolean {
+  return now.getDay() === 6 && now.getDate() <= 7
+}
+
 /**
- * Is a planning nudge due right now? Pure + testable. Weekly nudge fires on the
- * configured day-of-week (e.g. moving week-start to Monday shifts it). Returns
- * null when disabled or not the nudge day. (Monthly/seasonal are Phase 3.)
+ * The highest-priority planning nudge due right now (pure + testable). Priority
+ * annual → seasonal → monthly → weekly, so a season-turn Sunday surfaces the
+ * bigger ritual. Anchors follow the requirements: weekly = configured day,
+ * monthly = first Saturday, seasonal = season's first day, annual = September 1.
+ * Returns null when nothing is due. (Annual/seasonal/monthly anchors are fixed
+ * this phase; only the weekly day is user-configurable.)
  */
 export function getDueSession(config: CadenceConfig, now: Date): DueSession | null {
+  // Annual — September 1.
+  if (now.getMonth() === 8 && now.getDate() === 1) {
+    return { kind: 'year', label: 'the year', token: `${now.getFullYear()}` }
+  }
+  // Seasonal — first day of a meteorological season.
+  if (isSeasonStart(now)) {
+    return { kind: 'season', label: 'the season', token: seasonToken(now) }
+  }
+  // Monthly — first Saturday.
+  if (isFirstSaturday(now)) {
+    return { kind: 'month', label: 'the month', token: `${now.getFullYear()}-${now.getMonth() + 1}` }
+  }
+  // Weekly — the configured day.
   if (config.weeklyNudgeEnabled && now.getDay() === config.weeklyNudgeDay) {
-    return { kind: 'week', token: weekToken(now, config.weekStartsOn) }
+    return { kind: 'week', label: 'the week', token: weekToken(now, config.weekStartsOn) }
   }
   return null
 }

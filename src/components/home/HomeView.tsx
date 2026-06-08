@@ -505,7 +505,7 @@ export function HomeView({
             and the quiet "coming up" sliver. Today only; aligned to the column. */}
         {currentView === 'today' && (
           <div className="max-w-[940px] w-full mx-auto px-4 md:px-8 pt-3 space-y-3">
-            <RhythmNudge due={dueSession} onPlan={() => onOpenWeeklyPlanning?.()} />
+            <RhythmNudge due={dueSession} onPlan={() => { if (dueSession) navigate(`/today?plan=${dueSession.kind}`) }} />
             <div className="flex items-center justify-between gap-3">
               <ComingUpPeek
                 summary={comingUpSummary}

@@ -16,7 +16,7 @@ import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 import { useVaultWrite } from '@/hooks/useVaultWrite';
 import { useGoalsContext } from '@/contexts/GoalsContext';
-import { PlanningSession, WeeklyPlanningSession, PlanTodaySession } from '@/components/lazy';
+import { PlanningSession, WeeklyPlanningSession, PlanTodaySession, MonthlyPlanningSession, SeasonalPlanningSession, AnnualPlanningSession } from '@/components/lazy';
 import { LoadingFallback } from '@/components/layout/LoadingFallback';
 import { isEverydayRoutine, scheduleRoutineOnDate } from '@/lib/routineUtils';
 import type { GoalAction } from '@/types/goal';
@@ -71,19 +71,27 @@ export function HomeViewContainer() {
   const [planningOpen, setPlanningOpen] = useState(false);
   const [weeklyPlanningOpen, setWeeklyPlanningOpen] = useState(false);
   const [planTodayOpen, setPlanTodayOpen] = useState(false);
+  const [monthlyPlanningOpen, setMonthlyPlanningOpen] = useState(false);
+  const [seasonalPlanningOpen, setSeasonalPlanningOpen] = useState(false);
+  const [annualPlanningOpen, setAnnualPlanningOpen] = useState(false);
   const { selection, setSelection, clearSelection } = useSelection();
 
-  // "Plan the week" from the This Week rung routes here with ?plan=week —
-  // open the wired WeeklyPlanningSession, then strip the param so a refresh
-  // doesn't re-open it.
+  // "Plan the …" from a horizon rung (or the rhythm nudge) routes here with
+  // ?plan=week|month|season|year — open the matching session, then strip the
+  // param so a refresh doesn't re-open it.
   const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
-    if (searchParams.get('plan') === 'week') {
-      setWeeklyPlanningOpen(true);
-      const next = new URLSearchParams(searchParams);
-      next.delete('plan');
-      setSearchParams(next, { replace: true });
-    }
+    const plan = searchParams.get('plan');
+    if (!plan) return;
+    if (plan === 'week') setWeeklyPlanningOpen(true);
+    else if (plan === 'month') setMonthlyPlanningOpen(true);
+    else if (plan === 'season') setSeasonalPlanningOpen(true);
+    else if (plan === 'year') setAnnualPlanningOpen(true);
+    else if (plan === 'today') setPlanTodayOpen(true);
+    else return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('plan');
+    setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
   // Map URL selection back to the legacy `selectedItemId` shape HomeView expects
@@ -400,6 +408,39 @@ export function HomeViewContainer() {
             onPushTask={pushTask}
             onCompleteTask={toggleTask}
             onOpenTimeBlock={() => { setPlanTodayOpen(false); setPlanningOpen(true); }}
+          />
+        </Suspense>
+      )}
+
+      {/* Cadence sessions (Phase 3). Hand-down chains the descent:
+          annual → seasonal → monthly → weekly. */}
+      {monthlyPlanningOpen && (
+        <Suspense fallback={<LoadingFallback />}>
+          <MonthlyPlanningSession
+            tasks={tasks}
+            onPushTask={pushTask}
+            onClose={() => setMonthlyPlanningOpen(false)}
+            onHandDown={() => { setMonthlyPlanningOpen(false); setWeeklyPlanningOpen(true); }}
+          />
+        </Suspense>
+      )}
+      {seasonalPlanningOpen && (
+        <Suspense fallback={<LoadingFallback />}>
+          <SeasonalPlanningSession
+            tasks={tasks}
+            onPushTask={pushTask}
+            onClose={() => setSeasonalPlanningOpen(false)}
+            onHandDown={() => { setSeasonalPlanningOpen(false); setMonthlyPlanningOpen(true); }}
+          />
+        </Suspense>
+      )}
+      {annualPlanningOpen && (
+        <Suspense fallback={<LoadingFallback />}>
+          <AnnualPlanningSession
+            tasks={tasks}
+            onPushTask={pushTask}
+            onClose={() => setAnnualPlanningOpen(false)}
+            onHandDown={() => { setAnnualPlanningOpen(false); setSeasonalPlanningOpen(true); }}
           />
         </Suspense>
       )}

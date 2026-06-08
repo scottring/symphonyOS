@@ -89,6 +89,15 @@ export const WeeklyPlanningSession = lazy(() =>
 export const PlanTodaySession = lazy(() =>
   import('./planning/daily/PlanTodaySession').then(m => ({ default: m.PlanTodaySession }))
 )
+export const MonthlyPlanningSession = lazy(() =>
+  import('./planning/cadence/CadenceSessions').then(m => ({ default: m.MonthlyPlanningSession }))
+)
+export const SeasonalPlanningSession = lazy(() =>
+  import('./planning/cadence/CadenceSessions').then(m => ({ default: m.SeasonalPlanningSession }))
+)
+export const AnnualPlanningSession = lazy(() =>
+  import('./planning/cadence/CadenceSessions').then(m => ({ default: m.AnnualPlanningSession }))
+)
 
 // Detail panel (only renders when an item is selected)
 export const DetailPanelRedesign = lazy(() =>
