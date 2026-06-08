@@ -12,7 +12,7 @@ interface PanelPeopleProps {
   contacts?: Contact[]
   onContactChange?: (contactId: string | undefined) => void
   onSearchContacts?: (query: string) => Contact[]
-  onAddContact?: (name: string, details?: { phone?: string; category?: ContactCategory }) => Promise<Contact | null>
+  onAddContact?: (name: string, details?: { phone?: string; category?: ContactCategory; placeId?: string }) => Promise<Contact | null>
 }
 
 export function PanelPeople({

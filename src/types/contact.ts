@@ -24,6 +24,10 @@ export interface Contact {
   // Preferences/facts (freeform, for any category)
   preferences?: string        // "Likes dinosaurs, hates carrots, shoe size 5"
 
+  // Google Place id, set when this contact was created from a Places result.
+  // Used to dedupe: re-picking the same place reuses this contact.
+  placeId?: string
+
   createdAt: Date
   updatedAt: Date
 }

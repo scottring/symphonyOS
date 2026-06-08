@@ -74,7 +74,7 @@ interface TapContextPanelProps {
   /** Link/change/clear the task's related contact. When omitted, the People section is read-only. */
   onContactChange?: (contactId: string | undefined) => void
   onSearchContacts?: (query: string) => Contact[]
-  onAddContact?: (name: string, details?: { phone?: string; category?: import('@/types/contact').ContactCategory }) => Promise<Contact | null>
+  onAddContact?: (name: string, details?: { phone?: string; category?: import('@/types/contact').ContactCategory; placeId?: string }) => Promise<Contact | null>
 }
 
 export function TapContextPanel(props: TapContextPanelProps) {

@@ -191,6 +191,37 @@ describe('useContacts', () => {
     })
   })
 
+  describe('addContact place dedup', () => {
+    it('reuses an existing contact with the same place_id instead of inserting', async () => {
+      mockSupabaseData.push({
+        id: 'lib-1',
+        user_id: 'test-user-id',
+        name: 'New York Public Library',
+        phone: '555-0000',
+        email: null,
+        notes: null,
+        // place_id flows through select('*'); the mock row carries it.
+        ...( { place_id: 'place-nypl' } as Record<string, unknown> ),
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+      } as never)
+
+      const { result } = renderHook(() => useContacts())
+      await waitFor(() => expect(result.current.contacts).toHaveLength(1))
+
+      const returned = await result.current.addContact({
+        name: 'New York Public Library',
+        category: 'service_provider',
+        placeId: 'place-nypl',
+      })
+
+      expect(returned?.id).toBe('lib-1')
+      // No new row was inserted.
+      expect(mockInsert).not.toHaveBeenCalled()
+      expect(result.current.contacts).toHaveLength(1)
+    })
+  })
+
   describe('contactsMap', () => {
     it('provides efficient lookup by ID', async () => {
       mockSupabaseData.push(

@@ -14,6 +14,7 @@ interface DbContact {
   birthday: string | null
   relationship: string | null
   preferences: string | null
+  place_id: string | null
   created_at: string
   updated_at: string
 }
@@ -29,6 +30,7 @@ function dbContactToContact(dbContact: DbContact): Contact {
     birthday: dbContact.birthday ?? undefined,
     relationship: dbContact.relationship ?? undefined,
     preferences: dbContact.preferences ?? undefined,
+    placeId: dbContact.place_id ?? undefined,
     createdAt: new Date(dbContact.created_at),
     updatedAt: new Date(dbContact.updated_at),
   }
@@ -83,8 +85,16 @@ export function useContacts() {
     birthday?: string
     relationship?: string
     preferences?: string
+    placeId?: string
   }) => {
     if (!user) return null
+
+    // Dedupe by Google Place id: re-picking a place we already saved should
+    // reuse that contact rather than create a duplicate.
+    if (contact.placeId) {
+      const existing = contacts.find((c) => c.placeId === contact.placeId)
+      if (existing) return existing
+    }
 
     // Optimistic update
     const tempId = crypto.randomUUID()
@@ -98,6 +108,7 @@ export function useContacts() {
       birthday: contact.birthday,
       relationship: contact.relationship,
       preferences: contact.preferences,
+      placeId: contact.placeId,
       createdAt: new Date(),
       updatedAt: new Date(),
     }
@@ -115,6 +126,7 @@ export function useContacts() {
         birthday: contact.birthday ?? null,
         relationship: contact.relationship ?? null,
         preferences: contact.preferences ?? null,
+        place_id: contact.placeId ?? null,
       })
       .select()
       .single()
@@ -133,7 +145,7 @@ export function useContacts() {
     )
 
     return realContact
-  }, [user])
+  }, [user, contacts])
 
   const updateContact = useCallback(async (id: string, updates: Partial<Contact>) => {
     const contact = contacts.find((c) => c.id === id)

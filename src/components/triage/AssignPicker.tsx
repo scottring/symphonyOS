@@ -7,7 +7,7 @@ interface AssignPickerProps {
   contacts: Contact[]
   onSearchContacts?: (query: string) => Contact[]
   onChange: (contactId: string | undefined) => void
-  onAddContact?: (name: string, details?: { phone?: string; category?: ContactCategory }) => Promise<Contact | null>
+  onAddContact?: (name: string, details?: { phone?: string; category?: ContactCategory; placeId?: string }) => Promise<Contact | null>
 }
 
 export function AssignPicker({ value, contacts, onSearchContacts, onChange, onAddContact }: AssignPickerProps) {
@@ -72,7 +72,20 @@ export function AssignPicker({ value, contacts, onSearchContacts, onChange, onAd
   }
 
   const handleSelectPlace = async (placeId: string) => {
-    if (!onAddContact || isAdding) return
+    if (isAdding) return
+
+    // If we've already saved this exact place as a contact, just reuse it —
+    // no second fetch, no duplicate.
+    const existing = contacts.find((c) => c.placeId === placeId)
+    if (existing) {
+      onChange(existing.id)
+      setIsOpen(false)
+      setSearchQuery('')
+      clearResults()
+      return
+    }
+
+    if (!onAddContact) return
 
     setIsAdding(true)
     const details = await getPlaceDetails(placeId)
@@ -81,6 +94,7 @@ export function AssignPicker({ value, contacts, onSearchContacts, onChange, onAd
       const newContact = await onAddContact(details.name, {
         phone: details.phone,
         category: 'service_provider',
+        placeId,
       })
 
       if (newContact) {
