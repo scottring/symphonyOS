@@ -245,29 +245,39 @@ export function HorizonView({ horizon }: HorizonViewProps) {
     navigate(`/today?plan=${horizon}`);
   }, [horizon, navigate]);
 
-  // ── Year is a goals-level horizon — placeholder pointing at Goals. ──
+  // ── Year is a goals-level horizon — run the annual planning session, with a
+  // door into the full Goals feature for deeper goal-setting. ──
   if (horizon === 'year') {
     return (
       <div className="h-full overflow-y-auto">
         <div className="max-w-[940px] w-full px-4 py-4 md:pl-10 md:pr-8 md:py-8">
           <header className="mb-6">
             <h1 className="font-display text-2xl font-semibold text-neutral-800">This Year</h1>
-            <p className="text-sm text-neutral-500 mt-1">Your annual horizon lives in Goals.</p>
+            <p className="text-sm text-neutral-500 mt-1">The annual horizon — year in review, hopes &amp; fears, and your goals.</p>
           </header>
           <div className="card p-8 text-center">
-            <Target className="w-8 h-8 text-primary-400 mx-auto mb-4" />
-            <p className="font-display text-lg text-neutral-700 mb-2">Plan your year in Goals</p>
+            <CalendarRange className="w-8 h-8 text-primary-400 mx-auto mb-4" />
+            <p className="font-display text-lg text-neutral-700 mb-2">Plan the year</p>
             <p className="text-neutral-500 mb-6">
-              Annual planning is a goals-level session (coming in Phase 3). For now, set your
-              yearly intentions as goals.
+              A reflective session — review the year, set macro hopes &amp; fears, and map the
+              annual calendar. Goals live in the Goals library for ongoing tracking.
             </p>
-            <button
-              type="button"
-              onClick={() => navigate('/goals')}
-              className="btn-primary inline-flex items-center gap-2"
-            >
-              <Target className="w-4 h-4" /> Open Goals
-            </button>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigate('/today?plan=year')}
+                className="btn-primary inline-flex items-center gap-2"
+              >
+                <CalendarRange className="w-4 h-4" /> Plan the year
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/goals')}
+                className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors"
+              >
+                <Target className="w-4 h-4" /> Open Goals
+              </button>
+            </div>
           </div>
         </div>
       </div>
