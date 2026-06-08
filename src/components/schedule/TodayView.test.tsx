@@ -16,6 +16,7 @@ vi.mock('@/hooks/useRecurringEventDetection', () => ({ useRecurringEventDetectio
 vi.mock('@/hooks/useProjects', () => ({ useProjects: () => ({ projects: [], loading: false, addProject: vi.fn(), deleteProject: vi.fn(), updateProject: vi.fn() }) }))
 vi.mock('@/hooks/useNotes', () => ({ useNotes: () => ({ notes: [], loading: false, addNote: vi.fn(), updateNote: vi.fn(), deleteNote: vi.fn() }) }))
 vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ tasks: [], loading: false, addTask: vi.fn(), updateTask: vi.fn(), deleteTask: vi.fn() }) }))
+vi.mock('@/hooks/usePinnedItems', () => ({ usePinnedItems: () => ({ isPinned: () => false, pin: vi.fn(), unpin: vi.fn() }) }))
 vi.mock('@/hooks/useEmailActionItems', () => ({ useEmailActionItems: () => ({ items: [], urgentItems: [], loading: false, acknowledge: vi.fn(), dismiss: vi.fn(), snooze: vi.fn(), markDone: vi.fn(), getByCategory: vi.fn(), refetch: vi.fn() }) }))
 vi.mock('@/hooks/useDomain.tsx', async (importOriginal) => {
   const actual = await importOriginal() as Record<string, unknown>

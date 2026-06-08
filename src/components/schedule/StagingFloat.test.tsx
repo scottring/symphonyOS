@@ -47,6 +47,17 @@ vi.mock('@/hooks/useSupabaseTasks', () => ({
   }),
 }))
 
+const pinSet = new Set<string>()
+const mockPin = vi.fn((_t: string, id: string) => { pinSet.add(id); return Promise.resolve(true) })
+const mockUnpin = vi.fn((_t: string, id: string) => { pinSet.delete(id); return Promise.resolve(true) })
+vi.mock('@/hooks/usePinnedItems', () => ({
+  usePinnedItems: () => ({
+    isPinned: (_t: string, id: string) => pinSet.has(id),
+    pin: mockPin,
+    unpin: mockUnpin,
+  }),
+}))
+
 describe('StagingFloat', () => {
   const baseProps = {
     weekTasks: [
@@ -64,7 +75,7 @@ describe('StagingFloat', () => {
     inline: true,
   }
 
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => { vi.clearAllMocks(); pinSet.clear() })
 
   it('renders the trigger pill with the week count', () => {
     render(<StagingFloat {...baseProps} />)
@@ -130,5 +141,30 @@ describe('StagingFloat', () => {
     render(<StagingFloat {...baseProps} weekTasks={[]} />)
     fireEvent.click(screen.getByRole('button', { name: /this week/i }))
     expect(screen.getByText(/nothing scheduled this week/i)).toBeInTheDocument()
+  })
+
+  it('renders the summary strip with section counts', () => {
+    render(<StagingFloat {...baseProps} />)
+    fireEvent.click(screen.getByRole('button', { name: /this week/i }))
+    // Two project-less week tasks => Standalone + Focus labels present (the
+    // strip plus the section header may each render the label).
+    expect(screen.getAllByText('Standalone').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Focus').length).toBeGreaterThan(0)
+  })
+
+  it('toggles a task into Focus via its star', () => {
+    render(<StagingFloat {...baseProps} />)
+    fireEvent.click(screen.getByRole('button', { name: /this week/i }))
+    fireEvent.click(screen.getByRole('button', { name: /add Week task A to Focus/i }))
+    expect(mockPin).toHaveBeenCalledWith('task', 'w1')
+  })
+
+  it('adds a week task from the inline input on Enter', () => {
+    render(<StagingFloat {...baseProps} />)
+    fireEvent.click(screen.getByRole('button', { name: /this week/i }))
+    const input = screen.getByPlaceholderText(/add a task/i)
+    fireEvent.change(input, { target: { value: 'Buy mulch' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(input).toHaveValue('')
   })
 })

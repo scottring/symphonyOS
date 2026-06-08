@@ -1,5 +1,5 @@
 import { memo, useState, useCallback } from 'react'
-import { Trash2, Check, Tag } from 'lucide-react'
+import { Trash2, Check, Tag, Star } from 'lucide-react'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import type { Task, TaskContext } from '@/types/task'
 import type { Project } from '@/types/project'
@@ -58,6 +58,9 @@ interface DenseInboxRowProps {
    *  (e.g. the fan-out TriageWhenMenu). The wrapper's hover-chrome behaviour is
    *  preserved. */
   triageMenu?: React.ReactNode
+  /** When provided, shows a persistent star toggle (the "Focus" affordance used
+   *  by the This Week dropdown). Filled amber when active. */
+  focusToggle?: { active: boolean; onToggle: () => void }
 }
 
 const CONTEXT_OPTIONS: Array<{ value: TaskContext | null; label: string }> = [
@@ -87,6 +90,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
   isSelected = false,
   onToggleSelection,
   triageMenu,
+  focusToggle,
 }: DenseInboxRowProps) {
   const [contextOpen, setContextOpen] = useState(false)
 
@@ -132,6 +136,22 @@ export const DenseInboxRow = memo(function DenseInboxRow({
           />
         )}
       </div>
+
+      {/* Focus star (This Week dropdown): persistent, filled amber when active. */}
+      {focusToggle && (
+        <button
+          type="button"
+          aria-label={focusToggle.active ? `Remove ${task.title} from Focus` : `Add ${task.title} to Focus`}
+          aria-pressed={focusToggle.active}
+          title={focusToggle.active ? 'In Focus' : 'Add to Focus'}
+          onClick={(e) => { e.stopPropagation(); focusToggle.onToggle() }}
+          className={`shrink-0 mt-0.5 p-0.5 rounded transition-colors ${
+            focusToggle.active ? 'text-amber-500' : 'text-neutral-300 hover:text-amber-400'
+          }`}
+        >
+          <Star className="w-4 h-4" fill={focusToggle.active ? 'currentColor' : 'none'} />
+        </button>
+      )}
 
       {/* Title */}
       <button

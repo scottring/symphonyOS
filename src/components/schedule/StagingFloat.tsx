@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { CalendarRange } from 'lucide-react'
+import { CalendarRange, Star, Folder, Circle, CheckCircle2, ChevronDown, ChevronRight, Plus } from 'lucide-react'
 import type { Task, TaskContext } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
 import { useProjects } from '@/hooks/useProjects'
 import { useNotes } from '@/hooks/useNotes'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
+import { usePinnedItems } from '@/hooks/usePinnedItems'
 import { useDomain } from '@/hooks/useDomain'
 import { NotePicker, type NotePickerSelection } from '@/components/notes/NotePicker'
 import { formatInboxBullet } from '@/lib/inboxBullet'
@@ -93,11 +94,37 @@ export function StagingFloat({
   const [undo, setUndo] = useState<UndoEntry | null>(null)
   const [groupMode, setGroupModeState] = useState<GroupMode>(() => loadGroupMode())
   const [notePickerTaskId, setNotePickerTaskId] = useState<string | null>(null)
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set())
+  const [draft, setDraft] = useState('')
 
   const { addProject, deleteProject } = useProjects()
   const { notes, addNote, updateNote, deleteNote } = useNotes()
   const { addTask, updateTask } = useSupabaseTasks()
+  const { isPinned, pin, unpin } = usePinnedItems()
   const { currentDomain } = useDomain()
+
+  const toggleFocus = useCallback((taskId: string) => {
+    if (isPinned('task', taskId)) void unpin('task', taskId)
+    else void pin('task', taskId)
+  }, [isPinned, pin, unpin])
+
+  const toggleCollapsed = useCallback((key: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
+
+  const addWeekTask = useCallback(async () => {
+    const title = draft.trim()
+    if (!title) return
+    setDraft('')
+    const ctx = currentDomain !== 'universal' ? currentDomain : undefined
+    const id = await addTask(title, undefined, undefined, undefined, { context: ctx })
+    if (id) await updateTask(id, { bucket: 'week' })
+  }, [draft, currentDomain, addTask, updateTask])
 
   // Restore a task snapshot after a note-route deletion — two-step to preserve rich fields
   const restoreTask = useCallback(async (snapshot: Task) => {
@@ -301,6 +328,49 @@ export function StagingFloat({
     setUndo(null)
   }, [undo, onUpdateTask])
 
+  // Derived sections for the structured view. Focus = pinned items (overlay,
+  // not a partition — they still appear under their project/standalone group).
+  const focusTasks = sorted.filter((t) => isPinned('task', t.id))
+  const allGroups = groupTasksByProject(sorted, projects)
+  const projectGroups = allGroups.filter((g) => g.key !== '__none__')
+  const standaloneTasks = allGroups.find((g) => g.key === '__none__')?.tasks ?? []
+  const stats = {
+    focus: focusTasks.length,
+    projects: sorted.filter((t) => t.projectId).length,
+    standalone: standaloneTasks.length,
+    completed: sorted.filter((t) => t.completed).length,
+  }
+
+  const renderRow = (task: Task, project: Project | undefined, showProjectChip: boolean) => (
+    <div key={task.id} className="relative">
+      <DenseInboxRow
+        task={task}
+        project={project}
+        projects={projects}
+        familyMembers={familyMembers}
+        quickActions={WEEK_ACTIONS}
+        isLeaving={leavingIds.has(task.id)}
+        onQuickAction={(action) => applyAction(task, action)}
+        onToggleComplete={() => onCompleteTask?.(task.id)}
+        onUpdate={(updates) => onUpdateTask?.(task.id, updates)}
+        onSelect={() => { onSelectTask(task.id); setOpen(false) }}
+        onCreateProject={makeOnCreateProject(task.id)}
+        showProjectChip={showProjectChip}
+        hoverOnlyChrome
+        focusToggle={{ active: isPinned('task', task.id), onToggle: () => toggleFocus(task.id) }}
+      />
+      {notePickerTaskId === task.id && (
+        <NotePicker
+          task={task}
+          notes={notes}
+          domain={currentDomain}
+          onSelect={(sel) => handleNoteSelect(task, sel)}
+          onClose={() => setNotePickerTaskId(null)}
+        />
+      )}
+    </div>
+  )
+
   // The trigger always renders (even at count 0) so "This Week" stays a
   // stable triage target. The dialog body shows an empty state when there
   // are no week tasks rather than the whole control disappearing.
@@ -363,114 +433,118 @@ export function StagingFloat({
             </div>
           </div>
 
-          {sorted.length === 0 ? (
-            <p className="text-sm text-neutral-400 text-center py-6">Nothing scheduled this week.</p>
-          ) : groupMode === 'project' ? (
-            <div className="space-y-3">
-              {groupTasksByProject(sorted, projects).map(({ key, label, tasks }) => {
-                const groupProject = projects.find((p) => p.id === key)
-                // Progress = completed / total. Prefer all-task scope when
-                // provided (matches the right rail's ACTIVE PROJECTS panel);
-                // fall back to this-week scope so the bar is still meaningful.
-                const progress = computeGroupProgress({
-                  groupKey: key,
-                  scope: allTasks ?? sorted,
-                })
-                return (
-                  <section
-                    key={key}
-                    className="rounded-xl border border-neutral-200/80 bg-white overflow-hidden"
-                  >
-                    <header className="px-4 pt-3 pb-2 flex items-baseline gap-2">
-                      <h4 className="text-[13px] font-medium text-neutral-800 truncate flex-1 min-w-0">
-                        {label}
-                      </h4>
-                      {progress != null && (
-                        <span className="text-[11px] font-medium tabular-nums text-neutral-500 shrink-0">
-                          {progress}%
-                        </span>
-                      )}
-                      <span className="text-[11px] text-neutral-400 tabular-nums shrink-0">
-                        {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}
-                      </span>
-                    </header>
-                    {progress != null && (
-                      <div className="h-1 bg-neutral-100 mx-4">
-                        <div
-                          className="h-full bg-primary-500 transition-all"
-                          style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
-                          aria-hidden
-                        />
-                      </div>
-                    )}
-                    <div className="px-2 pt-2 pb-2 space-y-1.5">
-                      {tasks.map((task) => (
-                        <div key={task.id} className="relative">
-                          <DenseInboxRow
-                            task={task}
-                            project={groupProject}
-                            projects={projects}
-                            familyMembers={familyMembers}
-                            quickActions={WEEK_ACTIONS}
-                            isLeaving={leavingIds.has(task.id)}
-                            onQuickAction={(action) => applyAction(task, action)}
-                            onToggleComplete={() => onCompleteTask?.(task.id)}
-                            onUpdate={(updates) => onUpdateTask?.(task.id, updates)}
-                            onSelect={() => { onSelectTask(task.id); setOpen(false) }}
-                            onCreateProject={makeOnCreateProject(task.id)}
-                            showProjectChip={false}
-                            hoverOnlyChrome
-                          />
-                          {notePickerTaskId === task.id && (
-                            <NotePicker
-                              task={task}
-                              notes={notes}
-                              domain={currentDomain}
-                              onSelect={(sel) => handleNoteSelect(task, sel)}
-                              onClose={() => setNotePickerTaskId(null)}
-                            />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              {sorted.map((task) => {
-                const project = projects.find((p) => p.id === task.projectId)
-                return (
-                  <div key={task.id} className="relative">
-                    <DenseInboxRow
-                      task={task}
-                      project={project}
-                      projects={projects}
-                      familyMembers={familyMembers}
-                      quickActions={WEEK_ACTIONS}
-                      isLeaving={leavingIds.has(task.id)}
-                      onQuickAction={(action) => applyAction(task, action)}
-                      onToggleComplete={() => onCompleteTask?.(task.id)}
-                      onUpdate={(updates) => onUpdateTask?.(task.id, updates)}
-                      onSelect={() => { onSelectTask(task.id); setOpen(false) }}
-                      onCreateProject={makeOnCreateProject(task.id)}
-                      hoverOnlyChrome
-                    />
-                    {notePickerTaskId === task.id && (
-                      <NotePicker
-                        task={task}
-                        notes={notes}
-                        domain={currentDomain}
-                        onSelect={(sel) => handleNoteSelect(task, sel)}
-                        onClose={() => setNotePickerTaskId(null)}
-                      />
-                    )}
-                  </div>
-                )
-              })}
+          {/* Summary strip — Focus / Projects / Standalone / Completed. */}
+          {sorted.length > 0 && (
+            <div className="grid grid-cols-4 gap-2 mb-3 px-1 py-2 rounded-xl bg-neutral-50 border border-neutral-100">
+              <StatCell icon={<Star className="w-4 h-4 text-amber-500" fill="currentColor" />} value={stats.focus} label="Focus" />
+              <StatCell icon={<Folder className="w-4 h-4 text-emerald-600" />} value={stats.projects} label="Projects" />
+              <StatCell icon={<Circle className="w-4 h-4 text-violet-500" />} value={stats.standalone} label="Standalone" />
+              <StatCell icon={<CheckCircle2 className="w-4 h-4 text-neutral-400" />} value={stats.completed} label="Completed" />
             </div>
           )}
+
+          {sorted.length === 0 ? (
+            <p className="text-sm text-neutral-400 text-center py-6">Nothing scheduled this week.</p>
+          ) : groupMode === 'list' ? (
+            <div className="space-y-1.5">
+              {sorted.map((task) => renderRow(task, projects.find((p) => p.id === task.projectId), true))}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* FOCUS — pinned big-rocks (overlay; also shown under their group). */}
+              {focusTasks.length > 0 && (
+                <section>
+                  <SectionHeader
+                    icon={<Star className="w-3.5 h-3.5 text-amber-500" fill="currentColor" />}
+                    label="Focus"
+                    count={focusTasks.length}
+                    color="text-amber-600"
+                  />
+                  <div className="space-y-1.5">
+                    {focusTasks.map((task) => renderRow(task, projects.find((p) => p.id === task.projectId), true))}
+                  </div>
+                </section>
+              )}
+
+              {/* PROJECTS — collapsible groups with progress. */}
+              {projectGroups.length > 0 && (
+                <section>
+                  <SectionHeader
+                    icon={<Folder className="w-3.5 h-3.5 text-emerald-600" />}
+                    label="Projects"
+                    count={projectGroups.length}
+                    color="text-emerald-700"
+                  />
+                  <div className="space-y-2">
+                    {projectGroups.map(({ key, label, tasks }) => {
+                      const groupProject = projects.find((p) => p.id === key)
+                      const progress = computeGroupProgress({ groupKey: key, scope: allTasks ?? sorted })
+                      const isCollapsed = collapsed.has(key)
+                      return (
+                        <section key={key} className="rounded-xl border border-neutral-200/80 bg-white overflow-hidden">
+                          <button
+                            type="button"
+                            onClick={() => toggleCollapsed(key)}
+                            aria-expanded={!isCollapsed}
+                            className="w-full px-3 pt-2.5 pb-2 flex items-center gap-2 text-left hover:bg-neutral-50/60 transition-colors"
+                          >
+                            {isCollapsed ? <ChevronRight className="w-4 h-4 text-neutral-400 shrink-0" /> : <ChevronDown className="w-4 h-4 text-neutral-400 shrink-0" />}
+                            <h4 className="text-[13px] font-medium text-neutral-800 truncate flex-1 min-w-0">{label}</h4>
+                            {progress != null && (
+                              <span className="text-[11px] font-medium tabular-nums text-neutral-500 shrink-0">{progress}%</span>
+                            )}
+                            <span className="text-[11px] text-neutral-400 tabular-nums shrink-0 px-1.5 py-0.5 rounded-full bg-neutral-100">
+                              {tasks.length}
+                            </span>
+                          </button>
+                          {progress != null && !isCollapsed && (
+                            <div className="h-1 bg-neutral-100 mx-3">
+                              <div className="h-full bg-primary-500 transition-all" style={{ width: `${Math.min(100, Math.max(0, progress))}%` }} aria-hidden />
+                            </div>
+                          )}
+                          {!isCollapsed && (
+                            <div className="px-2 pt-2 pb-2 space-y-1.5">
+                              {tasks.map((task) => renderRow(task, groupProject, false))}
+                            </div>
+                          )}
+                        </section>
+                      )
+                    })}
+                  </div>
+                </section>
+              )}
+
+              {/* STANDALONE — week tasks not attached to a project. */}
+              {standaloneTasks.length > 0 && (
+                <section>
+                  <SectionHeader
+                    icon={<Circle className="w-3.5 h-3.5 text-violet-500" />}
+                    label="Standalone"
+                    count={standaloneTasks.length}
+                    color="text-violet-600"
+                  />
+                  <div className="space-y-1.5">
+                    {standaloneTasks.map((task) => renderRow(task, undefined, false))}
+                  </div>
+                </section>
+              )}
+            </div>
+          )}
+
+          {/* Add a task to the week, inline. */}
+          <div className="mt-3 flex items-center gap-2 px-2 py-1.5 rounded-xl border border-neutral-200 bg-white focus-within:border-primary-400 transition-colors">
+            <span className="shrink-0 w-6 h-6 rounded-full bg-primary-600 text-white grid place-items-center">
+              <Plus className="w-4 h-4" />
+            </span>
+            <input
+              type="text"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') void addWeekTask() }}
+              placeholder="Add a task…"
+              className="flex-1 min-w-0 text-sm bg-transparent placeholder:text-neutral-400 focus:outline-none"
+            />
+          </div>
         </div>,
         document.body,
       )}
@@ -483,6 +557,28 @@ export function StagingFloat({
         />
       )}
     </>
+  )
+}
+
+function StatCell({ icon, value, label }: { icon: React.ReactNode; value: number; label: string }) {
+  return (
+    <div className="flex items-center gap-2 px-1">
+      <span className="shrink-0">{icon}</span>
+      <span className="flex flex-col leading-none">
+        <span className="text-base font-semibold tabular-nums text-neutral-800">{value}</span>
+        <span className="text-[11px] text-neutral-500">{label}</span>
+      </span>
+    </div>
+  )
+}
+
+function SectionHeader({ icon, label, count, color }: { icon: React.ReactNode; label: string; count: number; color: string }) {
+  return (
+    <div className="flex items-center gap-1.5 mb-2 px-1">
+      <span className="shrink-0">{icon}</span>
+      <span className={`text-[11px] font-semibold uppercase tracking-wider ${color}`}>{label}</span>
+      <span className="text-[11px] text-neutral-400 tabular-nums">({count})</span>
+    </div>
   )
 }
 
