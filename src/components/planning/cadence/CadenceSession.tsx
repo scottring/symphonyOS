@@ -52,6 +52,8 @@ interface CadenceSessionProps {
   financialLabel?: string
   /** When provided, renders an "Annual goals" section linking to the Goals app. */
   onOpenGoals?: () => void
+  /** "Review & tools" links — e.g. monthly's routines/delegation + shopping lists. */
+  links?: Array<{ label: string; onClick: () => void }>
 }
 
 const SECTION = 'text-[11px] uppercase tracking-wider text-neutral-400 mb-3'
@@ -60,7 +62,7 @@ export function CadenceSession({
   horizon, periodToken, title, periodLabel, tasks, thisBucket,
   pullFromBucket, pullFromLabel, textFields, onPushTask, onClose, handDown,
   onSetBucket, onCompleteTask, demote, goalActions, onPullGoalAction,
-  financialLabel, onOpenGoals,
+  financialLabel, onOpenGoals, links,
 }: CadenceSessionProps) {
   const { notes, patchNotes } = usePlanningSession(horizon, periodToken)
   const matchAll = useMemo(() => makeAssigneeFilter([]), [])
@@ -228,6 +230,22 @@ export function CadenceSession({
                 className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
                 <Target className="w-4 h-4" /> Set this year's goals
               </button>
+            </section>
+          )}
+
+          {/* Review & tools — quick doors into the things this horizon reviews
+              (routines & delegation, shopping lists, …). */}
+          {links && links.length > 0 && (
+            <section>
+              <h2 className={SECTION}>Review &amp; tools</h2>
+              <div className="flex flex-wrap gap-2">
+                {links.map((l) => (
+                  <button key={l.label} type="button" onClick={l.onClick}
+                    className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg text-neutral-600 bg-neutral-50 hover:bg-neutral-100 transition-colors">
+                    {l.label}
+                  </button>
+                ))}
+              </div>
             </section>
           )}
 

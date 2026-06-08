@@ -434,6 +434,10 @@ export function HomeViewContainer() {
             onCompleteTask={toggleTask}
             goalActions={currentQuarterGoalActions}
             onPullGoalAction={(a) => pullGoalActionToBucket(a, 'month')}
+            links={[
+              { label: 'Review routines & delegation', onClick: () => { setMonthlyPlanningOpen(false); navigate('/routines'); } },
+              { label: 'Review shopping lists', onClick: () => { setMonthlyPlanningOpen(false); navigate('/lists'); } },
+            ]}
           />
         </Suspense>
       )}

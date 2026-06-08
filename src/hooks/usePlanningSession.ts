@@ -22,6 +22,9 @@ export interface PlanningNotes {
   longTerm?: string        // five-year / long-term plan
   annualCalendar?: string  // school holidays, trips, key dates
   trips?: string           // yearly trip planning — dates + locations
+  /** Seasonal-horizon fields. */
+  exerciseNutrition?: string // seasonal exercise & nutrition patterns
+  tripChildcare?: string     // specific trip + childcare planning
   /** The financial review is done in an external tool — we only track the tick. */
   financialDone?: boolean
   [key: string]: string | boolean | undefined

@@ -30,9 +30,11 @@ interface BaseProps {
   onPullGoalAction?: (action: GoalAction) => void
   /** Open the Goals app (used by the annual session's goal-setting step). */
   onOpenGoals?: () => void
+  /** "Review & tools" links (monthly: routines/delegation, shopping lists). */
+  links?: Array<{ label: string; onClick: () => void }>
 }
 
-export function MonthlyPlanningSession({ tasks, onPushTask, onClose, onHandDown, onSetBucket, onCompleteTask, goalActions, onPullGoalAction }: BaseProps) {
+export function MonthlyPlanningSession({ tasks, onPushTask, onClose, onHandDown, onSetBucket, onCompleteTask, goalActions, onPullGoalAction, links }: BaseProps) {
   const now = new Date()
   return (
     <CadenceSession
@@ -44,9 +46,11 @@ export function MonthlyPlanningSession({ tasks, onPushTask, onClose, onHandDown,
       thisBucket="month"
       pullFromBucket="quarter"
       pullFromLabel="Pull from this season"
+      // Verbatim monthly agenda. (Big-rock schedule review = the In-review list;
+      // projects/goals = pull-down + break-goals; routines & lists = links below.)
       textFields={[
         { key: 'relationships', label: 'Relationships & parenting', placeholder: 'What needs attention with each other and the kids this month?' },
-        { key: 'concerns', label: 'Concerns & topics', placeholder: 'Bigger-picture, less-urgent things to discuss.' },
+        { key: 'concerns', label: 'Bigger-picture concerns & topics', placeholder: 'Less-urgent things to discuss this month.' },
       ]}
       onPushTask={onPushTask}
       onClose={onClose}
@@ -56,6 +60,8 @@ export function MonthlyPlanningSession({ tasks, onPushTask, onClose, onHandDown,
       demote={{ label: 'Into week', bucket: 'week' }}
       goalActions={goalActions}
       onPullGoalAction={onPullGoalAction}
+      links={links}
+      financialLabel="Update the budget, review expenditures, discuss big budget items — in your finance tool"
     />
   )
 }
@@ -73,10 +79,13 @@ export function SeasonalPlanningSession({ tasks, onPushTask, onClose, onHandDown
       thisBucket="quarter"
       pullFromBucket="someday"
       pullFromLabel="Pull from someday"
+      // Verbatim seasonal agenda (goals/projects = pull-down + break-goals).
       textFields={[
         { key: 'review', label: 'Season in review', placeholder: 'What happened this season — wins and what slipped?' },
         { key: 'hopesFears', label: 'Hopes & fears', placeholder: 'What are you hoping for, and what are you worried about?' },
+        { key: 'exerciseNutrition', label: 'Exercise & nutrition patterns', placeholder: 'How do you want to eat and move this season?' },
         { key: 'funJoy', label: 'Fun & joy audit', placeholder: 'Where did joy come from? What do you want more of?' },
+        { key: 'tripChildcare', label: 'Trip & childcare planning', placeholder: 'Specific trips and the childcare they need.' },
       ]}
       onPushTask={onPushTask}
       onClose={onClose}
@@ -86,6 +95,7 @@ export function SeasonalPlanningSession({ tasks, onPushTask, onClose, onHandDown
       demote={{ label: 'Into month', bucket: 'month' }}
       goalActions={goalActions}
       onPullGoalAction={onPullGoalAction}
+      financialLabel="Compare actual vs budget, update the plan, make a seasonal budget — in your finance tool"
     />
   )
 }
