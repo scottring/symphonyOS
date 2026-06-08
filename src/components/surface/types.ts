@@ -23,4 +23,6 @@ export interface MightBeRelevantItem {
   title: string
   /** Human-readable reason for surfacing — e.g. "same contact · 8 weeks ago" */
   reason: string
+  /** Whether the related item is done — rendered struck-through/greyed. */
+  completed?: boolean
 }

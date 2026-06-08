@@ -26,10 +26,12 @@ export function PanelMightBeRelevant({ items, onOpen }: PanelMightBeRelevantProp
           onClick={() => onOpen(item.kind, item.id)}
           className="flex items-start gap-2 w-full text-left mb-1 py-1.5 px-2 rounded-md bg-white shadow-[inset_0_0_0_1px_#e5e7eb] hover:bg-neutral-50"
         >
-          <span className="w-6 h-6 flex items-center justify-center rounded-md bg-neutral-100 text-sm"><ConceptIcon name={KIND_CONCEPT[item.kind]} decorative /></span>
+          <span className="w-6 h-6 flex items-center justify-center rounded-md bg-neutral-100 text-sm">
+            {item.completed ? <ConceptIcon name="done" decorative /> : <ConceptIcon name={KIND_CONCEPT[item.kind]} decorative />}
+          </span>
           <span className="flex-1">
-            <div className="text-sm text-neutral-800 leading-tight">{item.title}</div>
-            <div className="text-[10px] text-neutral-400 mt-0.5">{item.reason}</div>
+            <div className={`text-sm leading-tight ${item.completed ? 'text-neutral-400 line-through' : 'text-neutral-800'}`}>{item.title}</div>
+            <div className="text-[10px] text-neutral-400 mt-0.5">{item.completed ? `done · ${item.reason}` : item.reason}</div>
           </span>
         </button>
       ))}

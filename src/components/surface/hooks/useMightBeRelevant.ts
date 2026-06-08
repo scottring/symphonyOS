@@ -34,29 +34,21 @@ export function useMightBeRelevant(target: Task, data: MightBeRelevantData): Mig
 
     const targetTokens = new Set([...tokenize(target.title), ...tokenize(target.notes)])
 
-    // 1) same contact
+    // 1) same contact — both are explicitly about the same person; the cleanest signal.
     if (target.contactId) {
       for (const t of data.allTasks) {
         if (seen.has(t.id)) continue
         if (t.contactId === target.contactId) {
-          out.push({ id: t.id, kind: 'task', title: t.title, reason: 'same contact' })
+          out.push({ id: t.id, kind: 'task', title: t.title, completed: t.completed, reason: 'same contact' })
           seen.add(t.id)
         }
       }
     }
 
-    // 2) same assignee / for-person
-    if (target.assignedTo) {
-      for (const t of data.allTasks) {
-        if (seen.has(t.id)) continue
-        if (t.assignedTo === target.assignedTo) {
-          out.push({ id: t.id, kind: 'task', title: t.title, reason: 'same person' })
-          seen.add(t.id)
-        }
-      }
-    }
-
-    // 3) keyword overlap in title or notes
+    // 2) keyword overlap in title or notes — likely about the same thing. Ranked
+    //    above same-assignee because content match is a far better relatedness
+    //    signal than "happens to be assigned to the same person" (Scott's
+    //    complaint was that the list surfaced unrelated tasks).
     if (targetTokens.size > 0) {
       for (const t of data.allTasks) {
         if (seen.has(t.id)) continue
@@ -64,7 +56,7 @@ export function useMightBeRelevant(target: Task, data: MightBeRelevantData): Mig
         const overlap = intersect(targetTokens, candidateTokens)
         if (overlap.length > 0) {
           out.push({
-            id: t.id, kind: 'task', title: t.title,
+            id: t.id, kind: 'task', title: t.title, completed: t.completed,
             reason: `matches "${overlap[0]}"`,
           })
           seen.add(t.id)
@@ -72,6 +64,23 @@ export function useMightBeRelevant(target: Task, data: MightBeRelevantData): Mig
       }
     }
 
-    return out.slice(0, 3)
+    // 3) same assignee / for-person — weakest signal (everything assigned to one
+    //    person matches), so it's last AND limited to OPEN tasks to avoid noise.
+    if (target.assignedTo) {
+      for (const t of data.allTasks) {
+        if (seen.has(t.id)) continue
+        if (t.assignedTo === target.assignedTo && !t.completed) {
+          out.push({ id: t.id, kind: 'task', title: t.title, completed: false, reason: 'same person' })
+          seen.add(t.id)
+        }
+      }
+    }
+
+    // Float open items above completed ones (stable within each group).
+    const ordered = [
+      ...out.filter((i) => !i.completed),
+      ...out.filter((i) => i.completed),
+    ]
+    return ordered.slice(0, 3)
   }, [target, data])
 }

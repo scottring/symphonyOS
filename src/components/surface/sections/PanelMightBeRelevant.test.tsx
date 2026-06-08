@@ -23,6 +23,18 @@ describe('PanelMightBeRelevant', () => {
     expect(screen.getByText(/same contact/i)).toBeInTheDocument()
   })
 
+  it('renders a completed item struck-through with a done prefix', () => {
+    render(
+      <PanelMightBeRelevant
+        items={[{ id: 't1', kind: 'task', title: 'Finished errand', reason: 'same contact', completed: true }]}
+        onOpen={vi.fn()}
+      />
+    )
+    const title = screen.getByText('Finished errand')
+    expect(title.className).toMatch(/line-through/)
+    expect(screen.getByText(/done · same contact/i)).toBeInTheDocument()
+  })
+
   it('calls onOpen with the item kind and id', async () => {
     const onOpen = vi.fn()
     const { user } = render(
