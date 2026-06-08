@@ -13,14 +13,14 @@ describe('PanelActions', () => {
     onDelete: vi.fn(),
   }
 
-  it('renders Done button when not completed', () => {
+  it('renders an outline Complete button when not completed', () => {
     render(<PanelActions {...baseProps} />)
-    expect(screen.getByRole('button', { name: /done/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Complete' })).toBeInTheDocument()
   })
 
-  it('renders Mark incomplete when completed', () => {
+  it('renders Completed (greyed) when completed', () => {
     render(<PanelActions {...baseProps} completed />)
-    expect(screen.getByRole('button', { name: /incomplete|reopen/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /completed/i })).toBeInTheDocument()
   })
 
   it('renders Call button when phoneNumber present', () => {
@@ -34,10 +34,10 @@ describe('PanelActions', () => {
     expect(screen.queryByText(/call/i)).not.toBeInTheDocument()
   })
 
-  it('calls onToggleComplete when Done clicked', async () => {
+  it('calls onToggleComplete when Complete clicked', async () => {
     const onToggleComplete = vi.fn()
     const { user } = render(<PanelActions {...baseProps} onToggleComplete={onToggleComplete} />)
-    await user.click(screen.getByRole('button', { name: /done/i }))
+    await user.click(screen.getByRole('button', { name: 'Complete' }))
     expect(onToggleComplete).toHaveBeenCalledOnce()
   })
 

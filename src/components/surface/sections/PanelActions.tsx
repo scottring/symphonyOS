@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { Check } from 'lucide-react'
 import { PanelMoreMenu } from './PanelMoreMenu'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { RescheduleGrid } from '@/components/schedule/RescheduleGrid'
@@ -55,11 +56,17 @@ export function PanelActions({
 
   return (
     <div className="flex flex-wrap gap-2">
+      {/* Complete: outline (no fill) when open, no checkmark; greyed + checked
+          when done (click to reopen). */}
       <button
         onClick={onToggleComplete}
-        className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-primary-600 text-white hover:bg-primary-700 transition-colors"
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+          completed
+            ? 'border-neutral-200 bg-neutral-100 text-neutral-400 hover:bg-neutral-200'
+            : 'border-primary-600 text-primary-700 hover:bg-primary-50'
+        }`}
       >
-        {completed ? '↺ Reopen' : <><ConceptIcon name="done" decorative /> Done</>}
+        {completed ? <><Check className="w-4 h-4" /> Completed</> : 'Complete'}
       </button>
       {phoneNumber && (
         <a

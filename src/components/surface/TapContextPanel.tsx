@@ -5,7 +5,6 @@ import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { FamilyMember } from '@/types/family'
 import { PanelHeader } from './sections/PanelHeader'
-import { PanelMetaRow } from './sections/PanelMetaRow'
 import { PanelActions } from './sections/PanelActions'
 import { PanelWhy } from './sections/PanelWhy'
 import { PanelSubtasks } from './sections/PanelSubtasks'
@@ -74,11 +73,6 @@ interface TapContextPanelProps {
   onAddContact?: (name: string, details?: { phone?: string; category?: import('@/types/contact').ContactCategory }) => Promise<Contact | null>
 }
 
-function contextToDomain(ctx: TaskContext | null | undefined): 'work' | 'family' | 'personal' | undefined {
-  if (ctx === 'work' || ctx === 'family' || ctx === 'personal') return ctx
-  return undefined
-}
-
 export function TapContextPanel(props: TapContextPanelProps) {
   const { task, allTasks, createdByName } = props
 
@@ -117,12 +111,9 @@ export function TapContextPanel(props: TapContextPanelProps) {
         onTitleChange={props.onTitleChange}
         onClose={props.onClose}
       />
-      <PanelMetaRow
-        bucket={task.bucket || 'inbox'}
-        assigneeName={linked.assignee?.name}
-        createdByName={createdByName}
-        domain={contextToDomain(task.context)}
-      />
+      {/* The read-only "FAMILY · timed · for Iris" meta row was removed — it
+          duplicated (in jargon) the interactive context chooser + who-picker
+          below. The why-chain stays. */}
       {props.whyChain && <div>{props.whyChain}</div>}
       <PanelActions
         completed={task.completed}
