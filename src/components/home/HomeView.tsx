@@ -406,6 +406,7 @@ export function HomeView({
           eventNotesMap={ctx.eventNotesMap}
           familyMembers={ctx.familyMembers}
           selectedAssignees={selectedAssignees}
+          onSelectAssignees={setSelectedAssignees}
           onAssignTask={ctx.onAssignTask}
           onAssignEvent={ctx.onAssignEvent}
           onAssignRoutine={ctx.onAssignRoutine}

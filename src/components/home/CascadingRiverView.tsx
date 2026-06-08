@@ -8,6 +8,7 @@ import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
 import { FAMILY_COLORS, type FamilyMemberColor } from '@/types/family'
 import { DateNavigator } from '@/components/schedule/DateNavigator'
+import { AssigneeFilter } from './AssigneeFilter'
 
 // =============================================================================
 // TYPES
@@ -32,6 +33,9 @@ interface CascadingRiverViewProps {
   eventNotesMap?: Map<string, EventNote>
   familyMembers: FamilyMember[]
   selectedAssignees: string[]
+  /** Change the who-selection — surfaced in the river header so you can drop
+   *  back to a single person (which exits the multi-person river view). */
+  onSelectAssignees?: (ids: string[]) => void
   onAssignTask?: (taskId: string, memberId: string | null) => void
   onAssignEvent?: (eventId: string, memberId: string | null) => void
   onAssignRoutine?: (routineId: string, memberId: string | null) => void
@@ -548,6 +552,7 @@ export function CascadingRiverView({
   eventNotesMap,
   familyMembers,
   selectedAssignees,
+  onSelectAssignees,
   onCompleteRoutine,
   onCompleteEvent,
 }: CascadingRiverViewProps) {
@@ -854,11 +859,23 @@ export function CascadingRiverView({
     <div className="h-full flex flex-col bg-bg-base">
       {/* Header */}
       <div className="flex-shrink-0 px-6 py-4 border-b border-neutral-100">
-        <div className="flex items-center gap-3">
-          <h2 className="font-display text-2xl font-semibold text-neutral-900">
-            {isToday ? `Today is ${formatDate()}` : formatDate()}
-          </h2>
-          <DateNavigator date={viewedDate} onDateChange={onDateChange} showTodayButton={!isToday} />
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <h2 className="font-display text-2xl font-semibold text-neutral-900">
+              {isToday ? `Today is ${formatDate()}` : formatDate()}
+            </h2>
+            <DateNavigator date={viewedDate} onDateChange={onDateChange} showTodayButton={!isToday} />
+          </div>
+          {/* Who-picker — surfaced so you can drop back to a single person (which
+              exits the multi-person river). Without this the picker is hidden. */}
+          {onSelectAssignees && (
+            <AssigneeFilter
+              selectedAssignees={selectedAssignees}
+              onSelectAssignees={onSelectAssignees}
+              assigneesWithTasks={familyMembers}
+              hasUnassignedTasks={false}
+            />
+          )}
         </div>
         <p className="text-sm text-neutral-500 mt-1">
           Viewing {selectedMembers.map(m => m.name).join(' & ')}
