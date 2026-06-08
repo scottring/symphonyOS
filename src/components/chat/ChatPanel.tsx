@@ -258,7 +258,7 @@ export function ChatPanel({
             <p className="text-xs text-neutral-400">
               {mode === 'guided_reflection'
                 ? "I'll ask questions to help you explore this — save the result if it's worth keeping"
-                : "I'll search your vault and Symphony data for context"
+                : "I can manage your tasks, projects, and calendar in Symphony"
               }
             </p>
           </div>
