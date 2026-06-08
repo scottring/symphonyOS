@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { Task, TaskContext, Scope } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
@@ -29,6 +29,8 @@ interface TapContextPanelProps {
   familyMembers: FamilyMember[]
   siblingTaskCandidates: Task[]
   allTasks: Task[]
+  /** Optional why-chain (Task → Project → Goal), rendered under the title. */
+  whyChain?: ReactNode
   /** Optional creator name for the meta row + footer. */
   createdByName?: string
 
@@ -120,6 +122,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
         createdByName={createdByName}
         domain={contextToDomain(task.context)}
       />
+      {props.whyChain && <div>{props.whyChain}</div>}
       <PanelActions
         completed={task.completed}
         phoneNumber={task.phoneNumber || linked.contact?.phone}

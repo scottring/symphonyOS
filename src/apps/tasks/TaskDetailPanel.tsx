@@ -27,6 +27,7 @@ import type { SelectionRef } from '@/shell/types';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useContacts } from '@/hooks/useContacts';
 import { useProjects } from '@/hooks/useProjects';
+import { useGoals } from '@/hooks/useGoals';
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 import { useEventNotes } from '@/hooks/useEventNotes';
 import { useRoutines } from '@/hooks/useRoutines';
@@ -38,6 +39,7 @@ import { TapContextPanel } from '@/components/surface/TapContextPanel';
 import { TapRoutinePanel } from '@/components/surface/TapRoutinePanel';
 import { TapEventPanel } from '@/components/surface/TapEventPanel';
 import { TapMealPanel } from '@/components/surface/TapMealPanel';
+import { WhyChain } from '@/components/why/WhyChain';
 import type { Task, TaskLink } from '@/types/task';
 
 /** Find a task by id, searching one level of nested subtasks (group children). */
@@ -93,6 +95,9 @@ function TaskPanelBody({ id }: { id: string }) {
   const { tasks, addSubtask, deleteTask, toggleTask, updateTask, refetch } = useSupabaseTasks();
   const { contacts, addContact, searchContacts } = useContacts();
   const { projects } = useProjects();
+  // Goals fetched via the hook directly (the global DetailPanel renders outside
+  // GoalsProvider) — powers the why-chain (Task → Project → Goal).
+  const { goals } = useGoals();
   const { events } = useGoogleCalendar();
   const { members: familyMembers } = useFamilyMembers();
   const pinnedItems = usePinnedItems();
@@ -120,6 +125,15 @@ function TaskPanelBody({ id }: { id: string }) {
       familyMembers={familyMembers}
       siblingTaskCandidates={tasks}
       allTasks={tasks}
+      whyChain={
+        <WhyChain
+          task={task}
+          projects={projects}
+          goals={goals}
+          onOpenProject={(pid) => navigate(`/projects/${pid}`)}
+          onOpenGoal={() => navigate('/goals')}
+        />
+      }
       // createdByName not tracked in current data model
       onClose={handleClose}
       onTitleChange={(t) => updateTask(task.id, { title: t })}
