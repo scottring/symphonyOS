@@ -1,14 +1,11 @@
 import { useState, useCallback, useRef } from 'react'
-import { MoreHorizontal, Redo2, Clock, Trash2, ChevronRight, CalendarCog } from 'lucide-react'
+import { MoreHorizontal, Redo2, Clock, Trash2, CalendarCog } from 'lucide-react'
 import type { TimelineItem } from '@/types/timeline'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
-import { applyTriageWhen } from '@/lib/triage/applyWhen'
-import type { TriageWhen } from './TriageWhenMenu'
-import { RescheduleGrid } from './RescheduleGrid'
 
 interface Props {
   item: TimelineItem
-  /** Opens the full detail panel (where reschedule/time editing lives). */
+  /** Opens the full detail panel. */
   onOpenDetail: () => void
 }
 
@@ -17,28 +14,9 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail }: Props) {
   const [open, setOpen] = useState(false)
   const [openUp, setOpenUp] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [rescheduling, setRescheduling] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
 
-  const close = useCallback(() => { setOpen(false); setConfirmDelete(false); setRescheduling(false) }, [])
-
-  // Apply a relative reschedule directly via the shared triage handlers (the
-  // same mutation used across the app — so it actually persists).
-  const reschedule = useCallback((when: TriageWhen) => {
-    const taskId = item.originalTask?.id
-    if (!taskId) return
-    applyTriageWhen(when, taskId, {
-      onPushTask: (id, target) => ctx.onPushTask?.(id, target),
-      onSetBucket: (id, bucket) => ctx.onUpdateTask?.(id, { bucket, scheduledFor: undefined, isAllDay: undefined }),
-    })
-    close()
-  }, [item.originalTask, ctx, close])
-
-  const rescheduleToDate = useCallback((date: Date, isAllDay: boolean) => {
-    const taskId = item.originalTask?.id
-    if (taskId) ctx.onUpdateTask?.(taskId, { bucket: 'timed', scheduledFor: date, isAllDay })
-    close()
-  }, [item.originalTask, ctx, close])
+  const close = useCallback(() => { setOpen(false); setConfirmDelete(false) }, [])
 
   const isTask = item.type === 'task'
   const isEvent = item.type === 'event'
@@ -87,23 +65,8 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail }: Props) {
           />
           <div
             role="menu"
-            className={`absolute right-0 z-50 bg-white rounded-xl border border-neutral-200 shadow-lg ${rescheduling ? 'w-80 p-2' : 'min-w-[176px] py-1'} ${openUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}
+            className={`absolute right-0 z-50 min-w-[176px] py-1 bg-white rounded-xl border border-neutral-200 shadow-lg ${openUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}
           >
-            {/* Reschedule submenu (tasks): the icon grid, applied immediately —
-                no detail pane, no time-picker step. */}
-            {rescheduling ? (
-              <>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); setRescheduling(false) }}
-                  className="flex w-full items-center gap-1.5 px-1 pb-2 text-[11px] uppercase tracking-wider font-medium text-neutral-400 hover:text-neutral-600"
-                >
-                  <ChevronRight className="w-3.5 h-3.5 rotate-180" /> Reschedule to
-                </button>
-                <RescheduleGrid onPick={reschedule} onPickDate={rescheduleToDate} />
-              </>
-            ) : (
-            <>
             {/* Skip today — routines and events */}
             {(isRoutine || isEvent) && !item.completed && !item.skipped && (
               <button
@@ -120,26 +83,10 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail }: Props) {
               </button>
             )}
 
-            {/* Reschedule — tasks expand the one-tap WHEN submenu; routines/events
-                open the detail panel (their reschedule is time/recurrence based). */}
-            <button
-              type="button"
-              role="menuitem"
-              onClick={isTask
-                ? (e) => { e.stopPropagation(); setRescheduling(true) }
-                : run(onOpenDetail)}
-              className="flex w-full items-center justify-between gap-2.5 px-3 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50"
-            >
-              <span className="flex items-center gap-2.5">
-                <Clock className="w-4 h-4 text-neutral-400" />
-                Reschedule
-              </span>
-              {isTask && <ChevronRight className="w-3.5 h-3.5 text-neutral-300" />}
-            </button>
-
-            {/* Edit details — opens the full panel (for tasks; routines/events use
-                Reschedule above). */}
-            {isTask && (
+            {/* Tasks reschedule via the dedicated row button — so the menu only
+                offers Edit details. Routines/events have no dedicated button;
+                their reschedule (time/recurrence) lives in the detail panel. */}
+            {isTask ? (
               <button
                 type="button"
                 role="menuitem"
@@ -148,6 +95,16 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail }: Props) {
               >
                 <CalendarCog className="w-4 h-4 text-neutral-400" />
                 Edit details
+              </button>
+            ) : (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={run(onOpenDetail)}
+                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50"
+              >
+                <Clock className="w-4 h-4 text-neutral-400" />
+                Reschedule
               </button>
             )}
 
@@ -200,8 +157,6 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail }: Props) {
                   Delete routine
                 </button>
               )
-            )}
-            </>
             )}
           </div>
         </>
