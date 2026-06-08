@@ -1,6 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Sun } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -33,9 +32,7 @@ import { UndoToast } from '@/components/undo/UndoToast'
 import { HomeHeader } from '@/components/home/HomeHeader'
 import { CalendarReconnectBanner } from '@/components/home/CalendarReconnectBanner'
 import { RhythmNudge } from '@/components/today/RhythmNudge'
-import { ComingUpPeek } from '@/components/today/ComingUpPeek'
 import { useCadenceConfig, getDueSession } from '@/lib/cadence/config'
-import { selectComingUp } from '@/lib/today/comingUp'
 
 interface HomeViewProps {
   tasks: Task[]
@@ -109,9 +106,7 @@ export function HomeView({
     })
   }, [tasks, currentDomain, currentUserMemberId])
 
-  // W4 — Today landing: the "coming up" peek summary (over the domain-filtered
-  // tasks) and whether a planning rhythm nudge is due right now.
-  const comingUpSummary = useMemo(() => selectComingUp(filteredTasks, new Date()), [filteredTasks])
+  // W4 — Today landing: whether a planning rhythm nudge is due right now.
   const dueSession = useMemo(() => getDueSession(cadenceConfig, new Date()), [cadenceConfig])
 
   const filteredRoutines = useMemo(() => {
@@ -435,6 +430,7 @@ export function HomeView({
         loading={loading}
         viewedDate={viewedDate}
         onDateChange={onDateChange}
+        onOpenPlanToday={onOpenPlanToday}
         projects={filteredProjects}
         selectedAssignees={selectedAssignees}
         onSelectAssignees={setSelectedAssignees}
@@ -502,30 +498,12 @@ export function HomeView({
         <div className="px-6 pt-4 empty:hidden">
           <CalendarReconnectBanner />
         </div>
-        {/* W4 — Today landing: a calm rhythm nudge (only on its day, dismissible)
-            and the quiet "coming up" sliver. Today only; aligned to the column. */}
+        {/* W4 — Today landing: a calm rhythm nudge (only on its day, dismissible).
+            The "coming up" sliver was removed (redundant with the rhythm spine
+            nav) and "Plan today" moved into TodayView's stats row. */}
         {currentView === 'today' && (
-          <div className="max-w-[940px] w-full mx-auto px-4 md:px-8 pt-3 space-y-3">
+          <div className="max-w-[940px] w-full mx-auto px-4 md:px-8 pt-3 empty:hidden">
             <RhythmNudge due={dueSession} onPlan={() => { if (dueSession) navigate(`/today?plan=${dueSession.kind}`) }} />
-            <div className="flex items-center justify-between gap-3">
-              <ComingUpPeek
-                summary={comingUpSummary}
-                now={new Date()}
-                onSelectDay={handleSelectDay}
-                onOpenWeek={() => navigate('/week')}
-                onOpenInbox={() => navigate('/inbox')}
-              />
-              {onOpenPlanToday && (
-                <button
-                  type="button"
-                  onClick={onOpenPlanToday}
-                  className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors"
-                >
-                  <Sun className="w-4 h-4" />
-                  Plan today
-                </button>
-              )}
-            </div>
           </div>
         )}
         {renderContent()}

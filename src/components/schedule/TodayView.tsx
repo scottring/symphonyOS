@@ -29,7 +29,7 @@ import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 import { computeAnchorTime } from '@/lib/timelineAnchor'
 
-import { Eye, EyeOff, Repeat, Mail, Binoculars } from 'lucide-react'
+import { Eye, EyeOff, Repeat, Mail, Binoculars, Sun } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
@@ -67,6 +67,8 @@ interface TodayViewProps {
   loading?: boolean
   viewedDate: Date
   onDateChange: (date: Date) => void
+  /** Opens the optional "Plan today" daily-prep session (shown in the stats row). */
+  onOpenPlanToday?: () => void
   // Undo-wrapped handlers from HomeView
   onToggleTask: (taskId: string) => void
   onCompleteRoutine?: (routineId: string, completed: boolean) => void
@@ -118,6 +120,7 @@ export function TodayView({
   onCompleteEvent,
   loading: _loading,
   viewedDate,
+  onOpenPlanToday,
   selectedAssignees,
   onSelectAssignees,
   assigneesWithTasks,
@@ -466,9 +469,17 @@ export function TodayView({
                 {createElement(hideRoutines ? EyeOff : Eye, { className: 'w-5 h-5' })}
                 <span>{hideRoutines ? 'Show daily' : 'Hide daily'}</span>
               </button>
-              {/* Time-blocking moved into the "Plan today" daily-prep flow
-                  (its optional "Time-block the day" step). The standalone
-                  "Plan day" button was a redundant second door — removed. */}
+              {data.isToday && onOpenPlanToday && (
+                <button
+                  type="button"
+                  onClick={onOpenPlanToday}
+                  title="Plan today — review carried-over and pull from the week"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[15px] text-primary-600 hover:bg-primary-50 transition-all"
+                >
+                  <Sun className="w-5 h-5" />
+                  <span>Plan today</span>
+                </button>
+              )}
             </>
           }
         />
