@@ -1,7 +1,9 @@
-import { useState } from 'react'
-import { X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { CalendarClock, X } from 'lucide-react'
 import type { Task } from '@/types/task'
 import { ConceptIcon } from '@/lib/conceptIcons'
+import { RescheduleGrid } from '@/components/schedule/RescheduleGrid'
+import type { TriageWhen } from '@/components/schedule/TriageWhenMenu'
 
 interface PanelSubtasksProps {
   subtasks: Task[]
@@ -11,6 +13,57 @@ interface PanelSubtasksProps {
   onOpenSubtask?: (id: string) => void
   /** Detach a subtask from this group (it becomes a standalone task again). */
   onRemoveSubtask?: (id: string) => void
+  /** Relative reschedule of a single subtask (today / weekend / this week / …). */
+  onRescheduleSubtask?: (id: string, when: TriageWhen) => void
+  /** Schedule a single subtask for a specific date/time. */
+  onScheduleSubtask?: (id: string, date: Date, isAllDay: boolean) => void
+}
+
+/** A subtask is itself a Task, so it can be triaged independently of its group.
+ *  One-tap calendar control → the shared icon grid (applies immediately). */
+function SubtaskReschedule({
+  subtask,
+  onReschedule,
+  onSchedule,
+}: {
+  subtask: Task
+  onReschedule: (id: string, when: TriageWhen) => void
+  onSchedule?: (id: string, date: Date, isAllDay: boolean) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [open])
+
+  return (
+    <div className="relative flex-shrink-0" ref={ref}>
+      <button
+        type="button"
+        aria-label={`Reschedule ${subtask.title}`}
+        title="Reschedule"
+        onClick={() => setOpen((o) => !o)}
+        className="p-1 rounded-md text-neutral-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+      >
+        <CalendarClock className="w-3.5 h-3.5" />
+      </button>
+      {open && (
+        <div className="absolute right-0 z-50 mt-1 w-80 p-2 bg-white rounded-xl border border-neutral-200 shadow-lg">
+          <div className="px-1 pb-2 text-[11px] uppercase tracking-wider text-neutral-400">Reschedule to</div>
+          <RescheduleGrid
+            onPick={(when) => { setOpen(false); onReschedule(subtask.id, when) }}
+            onPickDate={onSchedule ? (date, isAllDay) => { setOpen(false); onSchedule(subtask.id, date, isAllDay) } : undefined}
+          />
+        </div>
+      )}
+    </div>
+  )
 }
 
 function Checkmark({ completed }: { completed: boolean }) {
@@ -23,7 +76,7 @@ function Checkmark({ completed }: { completed: boolean }) {
   )
 }
 
-export function PanelSubtasks({ subtasks, onToggleSubtask, onAddSubtask, onOpenSubtask, onRemoveSubtask }: PanelSubtasksProps) {
+export function PanelSubtasks({ subtasks, onToggleSubtask, onAddSubtask, onOpenSubtask, onRemoveSubtask, onRescheduleSubtask, onScheduleSubtask }: PanelSubtasksProps) {
   const [draft, setDraft] = useState('')
 
   if (subtasks.length === 0 && !onAddSubtask) return null
@@ -61,6 +114,13 @@ export function PanelSubtasks({ subtasks, onToggleSubtask, onAddSubtask, onOpenS
               >
                 {sub.title}
               </button>
+              {onRescheduleSubtask && !sub.completed && (
+                <SubtaskReschedule
+                  subtask={sub}
+                  onReschedule={onRescheduleSubtask}
+                  onSchedule={onScheduleSubtask}
+                />
+              )}
               {onRemoveSubtask && (
                 <button
                   onClick={() => onRemoveSubtask(sub.id)}

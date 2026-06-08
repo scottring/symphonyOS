@@ -75,4 +75,35 @@ describe('PanelSubtasks', () => {
       expect(onToggleSubtask).toHaveBeenCalledWith('s1')
     })
   })
+
+  describe('per-subtask triage', () => {
+    it('reschedules a single open subtask via the icon grid', async () => {
+      const onRescheduleSubtask = vi.fn()
+      const subs = [createMockTask({ id: 's1', title: 'Buy groceries', completed: false })]
+      const { user } = render(
+        <PanelSubtasks
+          subtasks={subs}
+          onToggleSubtask={vi.fn()}
+          onOpenSubtask={vi.fn()}
+          onRescheduleSubtask={onRescheduleSubtask}
+        />,
+      )
+      await user.click(screen.getByRole('button', { name: /reschedule Buy groceries/i }))
+      await user.click(screen.getByRole('menuitem', { name: 'Today' }))
+      expect(onRescheduleSubtask).toHaveBeenCalledWith('s1', 'today')
+    })
+
+    it('does not offer reschedule on a completed subtask', () => {
+      const subs = [createMockTask({ id: 's1', title: 'Done step', completed: true })]
+      render(
+        <PanelSubtasks
+          subtasks={subs}
+          onToggleSubtask={vi.fn()}
+          onOpenSubtask={vi.fn()}
+          onRescheduleSubtask={vi.fn()}
+        />,
+      )
+      expect(screen.queryByRole('button', { name: /reschedule Done step/i })).not.toBeInTheDocument()
+    })
+  })
 })

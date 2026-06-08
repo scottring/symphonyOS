@@ -56,6 +56,10 @@ interface TapContextPanelProps {
   onAddSubtask: (title: string) => void
   /** Detach a subtask from this group (becomes standalone). Group management only. */
   onRemoveSubtask?: (id: string) => void
+  /** Triage a single subtask (relative when). */
+  onRescheduleSubtask?: (id: string, when: import('@/components/schedule/TriageWhenMenu').TriageWhen) => void
+  /** Triage a single subtask to a specific date/time. */
+  onScheduleSubtask?: (id: string, date: Date, isAllDay: boolean) => void
   /** Dissolve this group, keeping the tasks. Present only when the task has subtasks. */
   onUngroup?: () => void
   /** Delete this group and all its tasks. Present only when the task has subtasks. */
@@ -156,6 +160,8 @@ export function TapContextPanel(props: TapContextPanelProps) {
         onAddSubtask={props.onAddSubtask}
         onOpenSubtask={props.onOpenTask}
         onRemoveSubtask={props.onRemoveSubtask}
+        onRescheduleSubtask={props.onRescheduleSubtask}
+        onScheduleSubtask={props.onScheduleSubtask}
       />
       <PanelPeople
         contact={linked.contact}

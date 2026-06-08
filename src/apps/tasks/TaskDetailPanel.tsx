@@ -183,6 +183,22 @@ function TaskPanelBody({ id }: { id: string }) {
       onRemoveSubtask={(sid) => {
         void removeFromGroup(sid, { updateTask, refetch });
       }}
+      onRescheduleSubtask={(sid, when) =>
+        applyTriageWhen(when, sid, {
+          onPushTask: (id, target) => {
+            if (target instanceof Date) {
+              const hasTime = target.getHours() !== 0 || target.getMinutes() !== 0
+              updateTask(id, { bucket: 'timed', scheduledFor: target, isAllDay: !hasTime })
+            } else {
+              updateTask(id, { bucket: target, scheduledFor: undefined })
+            }
+          },
+          onSetBucket: (id, bucket) => updateTask(id, { bucket, scheduledFor: undefined, isAllDay: undefined }),
+        })
+      }
+      onScheduleSubtask={(sid, date, isAllDay) =>
+        updateTask(sid, { bucket: 'timed', scheduledFor: date, isAllDay })
+      }
       onUngroup={() => {
         void ungroupTasks(task.id, childIds, { updateTask, deleteTask, refetch });
         handleClose();
