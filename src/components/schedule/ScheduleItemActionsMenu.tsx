@@ -34,6 +34,12 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail }: Props) {
     close()
   }, [item.originalTask, ctx, close])
 
+  const rescheduleToDate = useCallback((date: Date, isAllDay: boolean) => {
+    const taskId = item.originalTask?.id
+    if (taskId) ctx.onUpdateTask?.(taskId, { bucket: 'timed', scheduledFor: date, isAllDay })
+    close()
+  }, [item.originalTask, ctx, close])
+
   const isTask = item.type === 'task'
   const isEvent = item.type === 'event'
   const isRoutine = item.type === 'routine'
@@ -94,7 +100,7 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail }: Props) {
                 >
                   <ChevronRight className="w-3.5 h-3.5 rotate-180" /> Reschedule to
                 </button>
-                <RescheduleGrid onPick={reschedule} />
+                <RescheduleGrid onPick={reschedule} onPickDate={rescheduleToDate} />
               </>
             ) : (
             <>

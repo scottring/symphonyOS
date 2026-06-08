@@ -34,4 +34,31 @@ describe('RescheduleButton', () => {
     fireEvent.click(screen.getByText('Someday'))
     expect(onUpdateTask).toHaveBeenCalledWith('7', expect.objectContaining({ bucket: 'someday' }))
   })
+
+  it('Pick date & time → schedules a specific timed date', () => {
+    const onUpdateTask = vi.fn()
+    renderBtn({ onUpdateTask })
+    fireEvent.click(screen.getByLabelText('Reschedule'))
+    fireEvent.click(screen.getByText(/Pick date/i))
+    fireEvent.change(document.querySelector('input[type="date"]')!, { target: { value: '2026-06-20' } })
+    fireEvent.change(document.querySelector('input[type="time"]')!, { target: { value: '14:30' } })
+    fireEvent.click(screen.getByText('Set date & time'))
+    expect(onUpdateTask).toHaveBeenCalledWith('7', expect.objectContaining({ bucket: 'timed', isAllDay: false }))
+    const [, updates] = onUpdateTask.mock.calls[0]
+    const d = updates.scheduledFor as Date
+    expect(d.getFullYear()).toBe(2026)
+    expect(d.getMonth()).toBe(5) // June
+    expect(d.getDate()).toBe(20)
+    expect(d.getHours()).toBe(14)
+  })
+
+  it('Pick date with no time → all-day', () => {
+    const onUpdateTask = vi.fn()
+    renderBtn({ onUpdateTask })
+    fireEvent.click(screen.getByLabelText('Reschedule'))
+    fireEvent.click(screen.getByText(/Pick date/i))
+    fireEvent.change(document.querySelector('input[type="date"]')!, { target: { value: '2026-06-20' } })
+    fireEvent.click(screen.getByText('Set date (all day)'))
+    expect(onUpdateTask).toHaveBeenCalledWith('7', expect.objectContaining({ bucket: 'timed', isAllDay: true }))
+  })
 })

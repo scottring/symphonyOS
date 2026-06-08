@@ -30,6 +30,12 @@ export function RescheduleButton({ item }: { item: TimelineItem }) {
     setOpen(false)
   }, [item.originalTask, ctx])
 
+  const rescheduleToDate = useCallback((date: Date, isAllDay: boolean) => {
+    const taskId = item.originalTask?.id
+    if (taskId) ctx.onUpdateTask?.(taskId, { bucket: 'timed', scheduledFor: date, isAllDay })
+    setOpen(false)
+  }, [item.originalTask, ctx])
+
   return (
     <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
       <button
@@ -66,7 +72,7 @@ export function RescheduleButton({ item }: { item: TimelineItem }) {
             className={`absolute right-0 z-50 w-64 p-2 bg-white rounded-xl border border-neutral-200 shadow-lg ${openUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}
           >
             <div className="px-1 pb-2 text-[11px] uppercase tracking-wider text-neutral-400">Reschedule to</div>
-            <RescheduleGrid onPick={reschedule} />
+            <RescheduleGrid onPick={reschedule} onPickDate={rescheduleToDate} />
           </div>
         </>
       )}
