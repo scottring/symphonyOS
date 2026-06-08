@@ -110,6 +110,29 @@ function ShellLayoutInner({ children }: Props) {
   const [helpOpen, setHelpOpen] = useState(false);
   const helpButtonRef = useRef<HTMLButtonElement>(null);
 
+  // Global keyboard shortcuts: ⌘K / Ctrl+K opens Quick Add; ⌘\ / Ctrl+\ toggles
+  // the sidebar. Both fire regardless of focus EXCEPT while typing in a field
+  // (so ⌘K inside the Quick Add input doesn't reopen it, etc.).
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const key = e.key.toLowerCase();
+      if (key === 'k') {
+        e.preventDefault();
+        setQuickAddOpen((o) => !o);
+      } else if (key === '\\') {
+        const el = document.activeElement;
+        const typing = el instanceof HTMLElement &&
+          (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+        if (typing) return;
+        e.preventDefault();
+        setSidebarCollapsed((c) => !c);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   // Non-Today AI rail (Today's rail is owned by Shell.tsx's ShellAssistantHost).
   const [chatOpen, setChatOpen] = useState(false);
   const assistant = useSymphonyAssistant();
