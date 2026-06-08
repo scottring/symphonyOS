@@ -33,7 +33,17 @@ export function ShellSearch({ onClose }: { onClose: () => void }) {
   const handleSelect = (result: SearchResult) => {
     close();
     switch (result.type) {
-      case 'task': setSelection({ kind: 'task', id: result.id }); break;
+      case 'task': {
+        // Jump the main view to the task's scheduled day (so it's in context),
+        // then open its detail panel — both via the URL in one navigation.
+        const task = tasks.find((t) => t.id === result.id);
+        const d = task?.scheduledFor ? new Date(task.scheduledFor) : null;
+        const dateParam = d
+          ? `date=${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}&`
+          : '';
+        navigate(`/today?${dateParam}detail=task:${result.id}`);
+        break;
+      }
       case 'routine': setSelection({ kind: 'routine', id: result.id }); break;
       case 'project': navigate(`/projects/${result.id}`); break;
       case 'contact': navigate(`/contacts/${result.id}`); break;

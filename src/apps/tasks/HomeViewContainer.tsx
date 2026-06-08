@@ -96,6 +96,18 @@ export function HomeViewContainer() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
+  // ?date=YYYY-MM-DD (e.g. from search → "jump to this task's day") sets the
+  // viewed day, then strips the param (keeps ?detail so the panel stays open).
+  useEffect(() => {
+    const dateParam = searchParams.get('date');
+    if (!dateParam) return;
+    const [y, m, d] = dateParam.split('-').map(Number);
+    if (y && m && d) setViewedDate(new Date(y, m - 1, d));
+    const next = new URLSearchParams(searchParams);
+    next.delete('date');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   // Map URL selection back to the legacy `selectedItemId` shape HomeView expects
   // (`task-<id>`, `routine-<id>`, `event-<id>`). The TimelineCard uses this to
   // highlight the selected row. Meal selections highlight as their underlying
