@@ -48,6 +48,10 @@ interface CadenceSessionProps {
    *  the action persists — it's an umbrella that can spawn several chunks. */
   goalActions?: GoalAction[]
   onPullGoalAction?: (action: GoalAction) => void
+  /** Override the financial-handoff copy (annual = long-term + big-expense). */
+  financialLabel?: string
+  /** When provided, renders an "Annual goals" section linking to the Goals app. */
+  onOpenGoals?: () => void
 }
 
 const SECTION = 'text-[11px] uppercase tracking-wider text-neutral-400 mb-3'
@@ -56,6 +60,7 @@ export function CadenceSession({
   horizon, periodToken, title, periodLabel, tasks, thisBucket,
   pullFromBucket, pullFromLabel, textFields, onPushTask, onClose, handDown,
   onSetBucket, onCompleteTask, demote, goalActions, onPullGoalAction,
+  financialLabel, onOpenGoals,
 }: CadenceSessionProps) {
   const { notes, patchNotes } = usePlanningSession(horizon, periodToken)
   const matchAll = useMemo(() => makeAssigneeFilter([]), [])
@@ -215,6 +220,17 @@ export function CadenceSession({
             </section>
           ))}
 
+          {/* Annual goals — link out to the Goals app (annual is goals-level). */}
+          {onOpenGoals && (
+            <section>
+              <h2 className={SECTION}><Target className="w-3.5 h-3.5 inline mr-1" /> Annual goals</h2>
+              <button type="button" onClick={onOpenGoals}
+                className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
+                <Target className="w-4 h-4" /> Set this year's goals
+              </button>
+            </section>
+          )}
+
           {/* Financial handoff — money lives in your finance tool, not Symphony. */}
           <section>
             <h2 className={SECTION}>Financial review</h2>
@@ -226,7 +242,7 @@ export function CadenceSession({
                 {notes.financialDone && <ArrowRight className="w-2.5 h-2.5 rotate-90" strokeWidth={3} />}
               </span>
               <CircleDollarSign className="w-4 h-4 text-neutral-400 shrink-0" />
-              <span className="flex-1 text-sm text-neutral-700">Do your financial review in your finance tool</span>
+              <span className="flex-1 text-sm text-neutral-700">{financialLabel ?? 'Do your financial review in your finance tool'}</span>
             </button>
           </section>
         </div>

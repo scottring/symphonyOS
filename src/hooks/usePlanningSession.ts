@@ -18,6 +18,10 @@ export interface PlanningNotes {
   hopesFears?: string
   funJoy?: string
   relationships?: string
+  /** Annual-horizon fields (the verbatim agenda). */
+  longTerm?: string        // five-year / long-term plan
+  annualCalendar?: string  // school holidays, trips, key dates
+  trips?: string           // yearly trip planning — dates + locations
   /** The financial review is done in an external tool — we only track the tick. */
   financialDone?: boolean
   [key: string]: string | boolean | undefined

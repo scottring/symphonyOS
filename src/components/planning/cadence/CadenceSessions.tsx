@@ -28,6 +28,8 @@ interface BaseProps {
   /** Current-quarter goal actions + a handler that breaks one into this horizon. */
   goalActions?: GoalAction[]
   onPullGoalAction?: (action: GoalAction) => void
+  /** Open the Goals app (used by the annual session's goal-setting step). */
+  onOpenGoals?: () => void
 }
 
 export function MonthlyPlanningSession({ tasks, onPushTask, onClose, onHandDown, onSetBucket, onCompleteTask, goalActions, onPullGoalAction }: BaseProps) {
@@ -88,7 +90,7 @@ export function SeasonalPlanningSession({ tasks, onPushTask, onClose, onHandDown
   )
 }
 
-export function AnnualPlanningSession({ tasks, onPushTask, onClose, onHandDown }: BaseProps) {
+export function AnnualPlanningSession({ tasks, onPushTask, onClose, onHandDown, onOpenGoals }: BaseProps) {
   const now = new Date()
   return (
     <CadenceSession
@@ -99,14 +101,20 @@ export function AnnualPlanningSession({ tasks, onPushTask, onClose, onHandDown }
       tasks={tasks}
       thisBucket={null}
       pullFromBucket={null}
+      // The verbatim annual agenda (Scott + Iris).
       textFields={[
-        { key: 'review', label: 'Year in review', placeholder: 'Wins and opportunities from the year.' },
+        { key: 'review', label: 'Year in review — wins & opportunities', placeholder: 'What went well this year, and where were the opportunities?' },
         { key: 'hopesFears', label: 'Macro hopes & fears', placeholder: 'The big-picture hopes and fears for the year ahead.' },
-        { key: 'concerns', label: 'Annual calendar & trips', placeholder: 'School holidays, trip dates and possible locations.' },
+        { key: 'longTerm', label: 'Long-term plan (5-year)', placeholder: 'Where are you headed over the next five years?' },
+        { key: 'annualCalendar', label: 'Annual calendar', placeholder: 'School holidays, key dates, the shape of the year.' },
+        { key: 'trips', label: 'Yearly trip planning', placeholder: 'Trips — dates and possible locations.' },
+        { key: 'funJoy', label: 'Fun & joy audit', placeholder: 'Where did joy come from this year? What do you want more of?' },
       ]}
       onPushTask={onPushTask}
       onClose={onClose}
       handDown={onHandDown ? { label: 'Plan the season', onActivate: onHandDown } : undefined}
+      onOpenGoals={onOpenGoals}
+      financialLabel="Long-term & big-expense financial planning (5–20 yr) — do it in your finance tool"
     />
   )
 }

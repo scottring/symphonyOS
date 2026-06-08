@@ -118,4 +118,17 @@ describe('CadenceSession', () => {
     expect(screen.getByText('Year in review')).toBeInTheDocument()
     expect(screen.queryByText(/Pull/)).not.toBeInTheDocument()
   })
+
+  it('annual goals link + custom financial copy', async () => {
+    const onOpenGoals = vi.fn()
+    const { user } = render(
+      <CadenceSession horizon="annual" periodToken="2026" title="Plan the year" periodLabel="2026"
+        tasks={[]} thisBucket={null} pullFromBucket={null}
+        textFields={[]} onPushTask={vi.fn()} onClose={vi.fn()}
+        onOpenGoals={onOpenGoals} financialLabel="Long-term & big-expense planning" />
+    )
+    expect(screen.getByText('Long-term & big-expense planning')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Set this year's goals/ }))
+    expect(onOpenGoals).toHaveBeenCalled()
+  })
 })

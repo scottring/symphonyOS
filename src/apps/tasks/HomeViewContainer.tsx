@@ -11,7 +11,7 @@
 // own copy until full cutover (then the legacy synthesis becomes dead code).
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 import { useVaultWrite } from '@/hooks/useVaultWrite';
@@ -80,6 +80,7 @@ export function HomeViewContainer() {
   // ?plan=week|month|season|year — open the matching session, then strip the
   // param so a refresh doesn't re-open it.
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   useEffect(() => {
     const plan = searchParams.get('plan');
     if (!plan) return;
@@ -457,6 +458,7 @@ export function HomeViewContainer() {
             onPushTask={pushTask}
             onClose={() => setAnnualPlanningOpen(false)}
             onHandDown={() => { setAnnualPlanningOpen(false); setSeasonalPlanningOpen(true); }}
+            onOpenGoals={() => { setAnnualPlanningOpen(false); navigate('/goals'); }}
           />
         </Suspense>
       )}
