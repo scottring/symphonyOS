@@ -296,6 +296,26 @@ describe.skip('useSupabaseTasks', () => {
       expect(taskId).toBeUndefined()
     })
 
+    it('passes phoneNumber through to the insert payload', async () => {
+      const { result } = renderHook(() => useSupabaseTasks())
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false)
+      })
+
+      await act(async () => {
+        await result.current.addTask('Call Macmillan Guitars', 'c1', undefined, new Date(), {
+          phoneNumber: '410-555-0142',
+        })
+      })
+
+      expect(mockInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          phone_number: '410-555-0142',
+        })
+      )
+    })
+
     it('rolls back optimistic update on server error', async () => {
       const { result } = renderHook(() => useSupabaseTasks())
 

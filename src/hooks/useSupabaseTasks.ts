@@ -263,6 +263,7 @@ export function useSupabaseTasks() {
     defaultAssigneeId?: string  // Default assignee if assignedTo is undefined
     isAllDay?: boolean  // Whether the task is all-day (no specific time)
     parentTaskId?: string  // Link as follow-up to a parent task (for context lineage)
+    phoneNumber?: string  // Tap-to-call number (e.g. resolved from a linked contact)
   }
 
   const addTask = useCallback(async (
@@ -306,6 +307,7 @@ export function useSupabaseTasks() {
       locationPlaceId: options?.locationPlaceId,
       isAllDay: options?.isAllDay,
       parentTaskId: options?.parentTaskId,
+      phoneNumber: options?.phoneNumber,
     }
     setTasks((prev) => [optimisticTask, ...prev])
 
@@ -331,6 +333,7 @@ export function useSupabaseTasks() {
         location_place_id: options?.locationPlaceId ?? null,
         is_all_day: options?.isAllDay ?? null,
         parent_task_id: options?.parentTaskId ?? null,
+        phone_number: options?.phoneNumber ?? null,
       })
       .select()
       .single()
