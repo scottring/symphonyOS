@@ -22,6 +22,7 @@ import { isEverydayRoutine, scheduleRoutineOnDate } from '@/lib/routineUtils';
 import { groupItems } from '@/lib/today/groupTasks';
 import type { GoalAction } from '@/types/goal';
 import type { Task } from '@/types/task';
+import type { TimelineCaptureResult } from '@/components/schedule/TimelineQuickInput';
 import { useEventNotes } from '@/hooks/useEventNotes';
 import { useContacts } from '@/hooks/useContacts';
 import { useProjects } from '@/hooks/useProjects';
@@ -217,6 +218,24 @@ export function HomeViewContainer() {
     [addTask, getCurrentUserMember, currentDomain],
   );
 
+  // Inline timeline "+" create: the TimelineInsertPoint quick-input captures a
+  // title + anchor time. Create a real task at that time (addTask buckets it as
+  // 'timed' whenever scheduledFor is set, so it lands on the timeline rather
+  // than vanishing). Without this handler wired through context the inline add
+  // was a silent no-op.
+  const onCreateTaskAt = useCallback(
+    async (r: TimelineCaptureResult) => {
+      await addTask(r.title, r.contactId, r.projectId, r.scheduledFor ?? undefined, {
+        assignedTo: getCurrentUserMember()?.id,
+        assignedToAll: r.assignedMemberIds,
+        context: currentDomain !== 'universal' ? currentDomain : undefined,
+        // A timed anchor means a specific time-of-day, so it is not all-day.
+        isAllDay: r.scheduledFor ? false : undefined,
+      });
+    },
+    [addTask, getCurrentUserMember, currentDomain],
+  );
+
   const handleCreateFollowUp = useCallback(
     async (title: string, sourceTaskId: string) => {
       const sourceTask = tasks.find(t => t.id === sourceTaskId);
@@ -306,6 +325,7 @@ export function HomeViewContainer() {
       onPushTask: pushTask,
       onDeleteTask: deleteTask,
       onCreateTask: onCreateTaskFromValue,
+      onCreateTaskAt,
       onCreateFollowUp: handleCreateFollowUp,
       onGroupItems: handleGroupItems,
       onOpenTask: (taskId: string) => setSelection({ kind: 'task', id: taskId }),
@@ -356,7 +376,7 @@ export function HomeViewContainer() {
       onUpdateEventProject: updateEventProject,
     }),
     [
-      toggleTask, toggleWaiting, updateTask, pushTask, deleteTask, onCreateTaskFromValue, handleCreateFollowUp, handleGroupItems,
+      toggleTask, toggleWaiting, updateTask, pushTask, deleteTask, onCreateTaskFromValue, onCreateTaskAt, handleCreateFollowUp, handleGroupItems,
       setSelection,
       scheduleActions, updateRoutine, updateEventContext, hideEvent,
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
