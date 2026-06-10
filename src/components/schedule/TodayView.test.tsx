@@ -35,7 +35,19 @@ vi.mock('@/hooks/useTimelineInsert', () => ({
   }),
 }))
 
-const ctxValue = { onToggleTask: vi.fn(), projects: [], contacts: [], familyMembers: [], lists: [] }
+const ctxValue = {
+  onToggleTask: vi.fn(),
+  projects: [],
+  contacts: [],
+  familyMembers: [],
+  lists: [],
+  // Smart-capture context fields — provided but undefined by default so the
+  // "Add to today" row doesn't render unless a test explicitly passes them.
+  parserContext: { projects: [], contacts: [], familyMembers: [] } as import('@/lib/quickInputParser').ParserContext,
+  currentDomain: 'personal' as const,
+  resolverContext: { contacts: [], aliases: [] } as import('@/lib/entityResolver').ResolverContext,
+  getRecentTaskForContact: () => null,
+}
 
 // Use the actual current date so computeIsToday() returns true for today-mode tests
 const TODAY = new Date()
@@ -100,9 +112,9 @@ describe('TodayView', () => {
     expect(screen.getByRole('button', { name: /show daily/i })).toBeInTheDocument()
   })
 
-  it('renders the inline "Add to today" pill and expanding+submitting fires onCreateTask', async () => {
-    const onCreateTask = vi.fn()
-    const { user } = renderView({}, { onCreateTask })
+  it('renders the inline "Add to today" pill and expanding+submitting fires onCreateTaskParsed', async () => {
+    const onCreateTaskParsed = vi.fn()
+    const { user } = renderView({}, { onCreateTaskParsed })
     // TodayAddInput starts collapsed — shows an "Add to today" button pill.
     // jsdom renders both desktop (hidden md:block) and mobile (md:hidden) variants
     // since CSS media queries are not applied; click the first one to expand.
@@ -113,7 +125,9 @@ describe('TodayView', () => {
     const inputs = screen.getAllByPlaceholderText(/add to today/i)
     expect(inputs.length).toBeGreaterThan(0)
     await user.type(inputs[0], 'New thing{Enter}')
-    expect(onCreateTask).toHaveBeenCalledWith('New thing')
+    expect(onCreateTaskParsed).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'New thing' }),
+    )
   })
 
   it('renders the rich OverdueSection (its own header) for overdue tasks', () => {

@@ -21,6 +21,9 @@ import { LoadingFallback } from '@/components/layout/LoadingFallback';
 import { isEverydayRoutine, scheduleRoutineOnDate } from '@/lib/routineUtils';
 import { groupItems } from '@/lib/today/groupTasks';
 import { parseQuickInput } from '@/lib/quickInputParser';
+import type { ParserContext } from '@/lib/quickInputParser';
+import type { ResolverContext } from '@/lib/entityResolver';
+import type { TodayCaptureResult } from '@/components/schedule/TodayAddInput';
 import type { GoalAction } from '@/types/goal';
 import type { Task } from '@/types/task';
 import type { TimelineCaptureResult } from '@/components/schedule/TimelineQuickInput';
@@ -38,6 +41,7 @@ import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings';
 import { useListsContext } from '@/contexts/ListsContext';
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext';
 import { useUndo } from '@/hooks/useUndo';
+import { useResolutionLearning } from '@/hooks/useResolutionLearning';
 import { HomeView } from '@/components/home';
 import { useSelection } from '@/shell/providers/SelectionProvider';
 import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
@@ -66,6 +70,7 @@ export function HomeViewContainer() {
   const { goals, getCurrentQuarter } = useGoalsContext();
   const vaultWrite = useVaultWrite();
   const undo = useUndo();
+  const { aliases, recordOutcome } = useResolutionLearning();
 
   // UI state local to this container
   const [viewedDate, setViewedDate] = useState<Date>(() => new Date());
@@ -229,6 +234,53 @@ export function HomeViewContainer() {
     [addTask, getCurrentUserMember, currentDomain, projects, contacts, familyMembers],
   );
 
+  const parserContext = useMemo<ParserContext>(
+    () => ({ projects, contacts, familyMembers }),
+    [projects, contacts, familyMembers],
+  );
+
+  const resolverContext = useMemo<ResolverContext>(
+    () => ({
+      contacts: contacts.map((c) => ({ id: c.id, name: c.name, phone: c.phone ?? undefined })),
+      aliases,
+    }),
+    [contacts, aliases],
+  );
+
+  const getRecentTaskForContact = useCallback(
+    (contactId: string) => {
+      const recent = tasks
+        .filter((t) => t.contactId === contactId)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+      return recent ? { title: recent.title, date: recent.createdAt } : null;
+    },
+    [tasks],
+  );
+
+  const onCreateTaskParsed = useCallback(
+    async (r: TodayCaptureResult) => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const taskId = await addTask(r.title, r.contactId, r.projectId, r.scheduledFor ?? today, {
+        assignedTo: r.assignedMemberIds?.[0] ?? getCurrentUserMember()?.id,
+        assignedToAll: r.assignedMemberIds,
+        context: currentDomain !== 'universal' ? currentDomain : undefined,
+        category: r.category,
+        isAllDay: r.scheduledFor ? false : true,
+        phoneNumber: r.phoneNumber,
+      });
+      if (r.resolution) {
+        recordOutcome({
+          inputText: r.resolution.inputText,
+          suggestion: r.resolution.suggestion,
+          action: r.resolution.action,
+          taskId,
+        });
+      }
+    },
+    [addTask, getCurrentUserMember, currentDomain, recordOutcome],
+  );
+
   // Inline timeline "+" create: the TimelineInsertPoint quick-input captures a
   // title + anchor time. Create a real task at that time (addTask buckets it as
   // 'timed' whenever scheduledFor is set, so it lands on the timeline rather
@@ -375,6 +427,11 @@ export function HomeViewContainer() {
       onPushTask: pushTask,
       onDeleteTask: deleteTask,
       onCreateTask: onCreateTaskFromValue,
+      onCreateTaskParsed,
+      parserContext,
+      currentDomain,
+      resolverContext,
+      getRecentTaskForContact,
       onCreateTaskAt,
       onCreateEventAt,
       onCreateRoutineAt,
@@ -430,7 +487,7 @@ export function HomeViewContainer() {
       onUpdateEventProject: updateEventProject,
     }),
     [
-      toggleTask, toggleWaiting, updateTask, pushTask, deleteTask, onCreateTaskFromValue, onCreateTaskAt, onCreateEventAt, onCreateRoutineAt, handleCreateFollowUp, handleGroupItems,
+      toggleTask, toggleWaiting, updateTask, pushTask, deleteTask, onCreateTaskFromValue, onCreateTaskParsed, parserContext, currentDomain, resolverContext, getRecentTaskForContact, onCreateTaskAt, onCreateEventAt, onCreateRoutineAt, handleCreateFollowUp, handleGroupItems,
       setSelection,
       scheduleActions, updateRoutine, updateEventContext, updateEventSharedWithFamily, dismissShareNudge, hideEvent,
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,

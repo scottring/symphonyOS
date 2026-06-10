@@ -509,16 +509,28 @@ export function TodayView({
           Desktop: full-width add input. Mobile: same input but flanked by the
           assignee + show-daily filters on the right, so the whole filter row
           is folded into this one to save vertical space. */}
-      {data.isToday && ctx.onCreateTask && (
+      {data.isToday && (ctx.onCreateTaskParsed ?? ctx.onCreateTask) && (
         <>
           {/* Desktop: just the add input */}
           <div className="hidden md:block mb-4">
-            <TodayAddInput onAdd={ctx.onCreateTask} />
+            <TodayAddInput
+              onAdd={ctx.onCreateTaskParsed!}
+              parserContext={ctx.parserContext!}
+              currentDomain={ctx.currentDomain ?? 'universal'}
+              resolver={ctx.resolverContext!}
+              getRecentTaskForContact={ctx.getRecentTaskForContact}
+            />
           </div>
           {/* Mobile: combined add + filters */}
           <div className="md:hidden mb-2 px-3 flex items-center gap-2">
             <div className="flex-1 min-w-0">
-              <TodayAddInput onAdd={ctx.onCreateTask} />
+              <TodayAddInput
+                onAdd={ctx.onCreateTaskParsed!}
+                parserContext={ctx.parserContext!}
+                currentDomain={ctx.currentDomain ?? 'universal'}
+                resolver={ctx.resolverContext!}
+                getRecentTaskForContact={ctx.getRecentTaskForContact}
+              />
             </div>
             {onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
               <AssigneeFilter

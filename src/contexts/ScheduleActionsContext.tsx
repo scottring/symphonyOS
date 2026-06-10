@@ -9,6 +9,9 @@ import type { Routine } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
 import type { MeetingAttendee } from '@/hooks/useMeetingNotes'
 import type { TimelineCaptureResult } from '@/components/schedule/TimelineQuickInput'
+import type { TodayCaptureResult } from '@/components/schedule/TodayAddInput'
+import type { ParserContext } from '@/lib/quickInputParser'
+import type { ResolverContext } from '@/lib/entityResolver'
 
 export interface ScheduleActionsValue {
   // Task actions
@@ -111,6 +114,15 @@ export interface ScheduleActionsValue {
 
   /** Reschedule a Google Calendar event (drag-to-move). Accepts new start + end (durations preserved by caller). */
   onUpdateEvent?: (eventId: string, updates: { startTime: Date; endTime: Date }) => Promise<void> | void
+
+  /** Structured create from the smart Add-to-Today input. */
+  onCreateTaskParsed?: (r: TodayCaptureResult) => void | Promise<void>
+  /** Stable parser context for parse-aware inputs. */
+  parserContext?: ParserContext
+  currentDomain?: 'work' | 'family' | 'personal' | 'universal'
+  /** Resolver inputs for implicit entity resolution. */
+  resolverContext?: ResolverContext
+  getRecentTaskForContact?: (contactId: string) => { title: string; date: Date } | null
 }
 
 const ScheduleActionsContext = createContext<ScheduleActionsValue | null>(null)
