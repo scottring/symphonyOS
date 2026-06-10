@@ -1,28 +1,105 @@
-import { useState, useCallback, useRef } from 'react'
-import { Plus } from 'lucide-react'
+// src/components/schedule/TodayAddInput.tsx
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
+import { Plus, Check, X, Phone } from 'lucide-react'
+import type { ParserContext } from '@/lib/quickInputParser'
+import type { ResolverContext, ContactSuggestion } from '@/lib/entityResolver'
+import { useQuickParse } from '@/hooks/useQuickParse'
+import type { ResolutionAction } from '@/hooks/useResolutionLearning'
+import type { TaskCategory } from '@/types/task'
 
-interface TodayAddInputProps {
-  onAdd: (title: string) => void
+type Domain = 'work' | 'family' | 'personal' | 'universal'
+
+export interface TodayCaptureResult {
+  title: string
+  scheduledFor: Date | null      // null → caller defaults to "today, all-day"
+  category?: TaskCategory
+  projectId?: string
+  contactId?: string
+  assignedMemberIds?: string[]
+  phoneNumber?: string
+  /** Present only when a suggestion was shown — feeds resolution_log. */
+  resolution?: {
+    inputText: string
+    suggestion: ContactSuggestion
+    action: ResolutionAction
+  }
 }
 
-export function TodayAddInput({ onAdd }: TodayAddInputProps) {
+interface TodayAddInputProps {
+  onAdd: (r: TodayCaptureResult) => void
+  parserContext: ParserContext
+  currentDomain: Domain
+  resolver: ResolverContext
+  getRecentTaskForContact?: (contactId: string) => { title: string; date: Date } | null
+}
+
+/** Debounce a value — used to keep the suggestion line from flickering per keystroke. */
+function useDebouncedValue<T>(value: T, ms: number): T {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), ms)
+    return () => clearTimeout(t)
+  }, [value, ms])
+  return debounced
+}
+
+export function TodayAddInput({ onAdd, parserContext, currentDomain, resolver, getRecentTaskForContact }: TodayAddInputProps) {
   const [expanded, setExpanded] = useState(false)
   const [value, setValue] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // Stable ctx identity for useQuickParse's parse memo.
+  const ctx = useMemo(
+    () => parserContext,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [parserContext.projects, parserContext.contacts, parserContext.familyMembers],
+  )
+
+  const debouncedValue = useDebouncedValue(value, 150)
+  const qp = useQuickParse(debouncedValue, ctx, currentDomain, resolver)
+  const { suggestion, suggestionState, suggestionApplied } = qp
+
+  const recentTask = useMemo(
+    () => (suggestion && getRecentTaskForContact ? getRecentTaskForContact(suggestion.contactId) : null),
+    [suggestion, getRecentTaskForContact],
+  )
+
   const expand = useCallback(() => {
     setExpanded(true)
-    // Auto-focus on next tick so the element is rendered first
     setTimeout(() => inputRef.current?.focus(), 0)
   }, [])
+
+  const reset = useCallback(() => {
+    setValue('')
+    setExpanded(false)
+    qp.resetOverrides()
+    qp.resetSuggestion()
+  }, [qp])
 
   const handleSubmit = useCallback(() => {
     const trimmed = value.trim()
     if (!trimmed) return
-    onAdd(trimmed)
-    setValue('')
-    setExpanded(false)
-  }, [value, onAdd])
+    const p = qp.effectiveParsed
+    const attachPhone = suggestionApplied && suggestion?.callIntent && suggestion.phone
+      ? suggestion.phone
+      : undefined
+    const action: ResolutionAction | null = !suggestion
+      ? null
+      : suggestionApplied
+        ? (suggestionState === 'accepted' ? 'accepted' : 'auto_applied')
+        : suggestionState === 'dismissed' ? 'dismissed' : 'ignored'
+    onAdd({
+      title: p.title?.trim() || trimmed,
+      scheduledFor: p.dueDate ?? null,
+      category: p.category,
+      projectId: p.projectId,
+      contactId: p.contactId,
+      assignedMemberIds: p.assignedMemberIds,
+      phoneNumber: attachPhone,
+      resolution: suggestion && action ? { inputText: trimmed, suggestion, action } : undefined,
+    })
+    reset()
+  }, [value, qp, suggestion, suggestionState, suggestionApplied, onAdd, reset])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -30,17 +107,18 @@ export function TodayAddInput({ onAdd }: TodayAddInputProps) {
       handleSubmit()
     }
     if (e.key === 'Escape') {
-      setValue('')
-      setExpanded(false)
+      // Esc cascade: dismiss a visible suggestion first; second Esc clears/collapses.
+      if (suggestion && suggestionState !== 'dismissed') {
+        qp.dismissSuggestion()
+        return
+      }
+      reset()
       inputRef.current?.blur()
     }
-  }, [handleSubmit])
+  }, [handleSubmit, suggestion, suggestionState, qp, reset])
 
   const handleBlur = useCallback(() => {
-    // Collapse when focus leaves and there is no value
-    if (!value.trim()) {
-      setExpanded(false)
-    }
+    if (!value.trim()) setExpanded(false)
   }, [value])
 
   if (!expanded) {
@@ -57,31 +135,75 @@ export function TodayAddInput({ onAdd }: TodayAddInputProps) {
     )
   }
 
+  const showSuggestion = !!suggestion && suggestionState !== 'dismissed'
+
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-lg border border-primary-300 bg-white shadow-sm transition-all duration-200">
-      <span className="text-lg leading-none text-primary-500">+</span>
-      <input
-        ref={inputRef}
-        type="text"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onBlur={handleBlur}
-        placeholder="Add to today..."
-        className="flex-1 bg-transparent text-sm text-neutral-800 placeholder:text-neutral-400 outline-none"
-      />
-      {value.trim() && (
-        <button
-          type="button"
-          onMouseDown={(e) => {
-            // Prevent blur from firing before the click registers
-            e.preventDefault()
-          }}
-          onClick={handleSubmit}
-          className="px-2.5 py-1 rounded-lg bg-primary-500 text-white text-xs font-semibold hover:bg-primary-600 transition-colors"
+    <div className="rounded-lg border border-primary-300 bg-white shadow-sm transition-all duration-200">
+      <div className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2">
+        <span className="text-lg leading-none text-primary-500">+</span>
+        <input
+          ref={inputRef}
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={handleBlur}
+          placeholder="Add to today..."
+          className="flex-1 bg-transparent text-sm text-neutral-800 placeholder:text-neutral-400 outline-none"
+        />
+        {value.trim() && (
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={handleSubmit}
+            className="px-2.5 py-1 rounded-lg bg-primary-500 text-white text-xs font-semibold hover:bg-primary-600 transition-colors"
+          >
+            Add
+          </button>
+        )}
+      </div>
+
+      {showSuggestion && (
+        <div
+          className={`flex items-start gap-2 px-3 pb-2 md:px-4 min-h-[44px] ${suggestionApplied ? '' : 'opacity-60'}`}
         >
-          Add
-        </button>
+          {suggestionApplied ? (
+            <Check className="w-3.5 h-3.5 mt-0.5 text-primary-500 shrink-0" />
+          ) : (
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => qp.acceptSuggestion()}
+              className="text-xs text-primary-600 font-medium shrink-0 mt-0.5"
+            >
+              tap to link
+            </button>
+          )}
+          <div className="flex-1 text-xs text-neutral-600 leading-snug">
+            <span className="font-medium text-neutral-800">{suggestion.contactName}</span>
+            {suggestion.phone && (
+              <span className="ml-1.5 inline-flex items-center gap-0.5">
+                <Phone className="w-3 h-3 inline" /> {suggestion.phone}
+              </span>
+            )}
+            {recentTask && (
+              <div className="text-neutral-400">
+                last: {recentTask.title} · {recentTask.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </div>
+            )}
+          </div>
+          {suggestionApplied && (
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => qp.dismissSuggestion()}
+              aria-label="Unlink suggestion"
+              className="p-1 text-neutral-400 hover:text-neutral-600"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       )}
     </div>
   )
