@@ -91,6 +91,19 @@ function getGreetingWord(): string {
   return 'evening'
 }
 
+// Derive a friendly first name for the greeting. A stored display name with a
+// space is a real human name → use its first token. Otherwise the stored name
+// may be a username (e.g. "smkaufman"), so fall back to the email local-part:
+// scott.kaufman → Scott.
+function deriveFirstName(name?: string, email?: string): string {
+  const trimmed = (name || '').trim()
+  const pick = trimmed.includes(' ')
+    ? trimmed.split(/\s+/)[0]
+    : (email || trimmed).split('@')[0].split(/[._-]/)[0]
+  if (!pick) return 'there'
+  return pick.charAt(0).toUpperCase() + pick.slice(1)
+}
+
 export function Sidebar({
   collapsed,
   onToggle,
@@ -161,7 +174,7 @@ export function Sidebar({
     : []
   const moreListsCount = listsActive ? Math.max(0, allLists.length - 5) : 0
 
-  const firstName = (userName || userEmail || '').split(/[\s@]/)[0] || 'there'
+  const firstName = deriveFirstName(userName, userEmail)
   const greetingWord = getGreetingWord()
 
   // Nav item helper
@@ -187,7 +200,7 @@ export function Sidebar({
         <div className={`flex items-center gap-2 ${collapsed ? 'justify-center w-full' : ''}`}>
           <img src="/symphony-logo.jpg" alt="Symphony" className="w-7 h-7 rounded-full object-cover shrink-0" />
           {!collapsed && (
-            <span className="font-display text-2xl font-semibold text-neutral-900">Symphony</span>
+            <span className="font-display text-2xl font-light text-neutral-900">Symphony</span>
           )}
         </div>
         {!collapsed && (

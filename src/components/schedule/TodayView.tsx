@@ -24,6 +24,7 @@ import { partitionSelection } from '@/lib/today/timelineKey'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useProactiveSuggestions } from '@/hooks/useProactiveSuggestions'
 import { useRoutineStats } from '@/hooks/useRoutineStats'
+import { useSystemHealth, getHealthTextClasses } from '@/hooks/useSystemHealth'
 import { useRecurringEventDetection } from '@/hooks/useRecurringEventDetection'
 import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
@@ -352,6 +353,10 @@ export function TodayView({
   // Interactive Clarity readout restored to the Today header (a static status
   // glance also lives in the sidebar). Trigger is a binoculars icon with an
   // explanatory hover tooltip; clicking opens ClarityIndicator's popover.
+  // The binoculars are color-coded by clarity level (green = excellent/good,
+  // amber = fair, orange = needs attention) using the same health computation.
+  const clarityHealth = useSystemHealth({ tasks, projects })
+  const clarityColorClass = getHealthTextClasses(clarityHealth.healthColor)
   const clarityTrigger = (
     <ClarityIndicator
       tasks={tasks}
@@ -364,7 +369,7 @@ export function TodayView({
       trigger={
         <span className="group relative inline-flex items-center">
           <Binoculars
-            className="w-5 h-5 text-neutral-500 group-hover:text-neutral-700 transition-colors"
+            className={`w-5 h-5 ${clarityColorClass} group-hover:opacity-70 transition-opacity`}
             aria-label="Clarity — review what needs attention"
           />
           <span
