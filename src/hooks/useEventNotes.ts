@@ -16,6 +16,8 @@ export interface EventNote {
   eventTitle?: string | null // Stored event title for display
   eventStartTime?: Date | null // Stored event start time for display
   context?: TaskContext | null // Domain context override (work/family/personal)
+  sharedWithFamily?: boolean // Surfaced on the shared family timeline
+  shareNudgeDismissed?: boolean // "Share to family" nudge dismissed for this event
   createdAt: Date
   updatedAt: Date
 }
@@ -32,6 +34,8 @@ interface DbEventNote {
   event_title: string | null
   event_start_time: string | null
   context: string | null
+  shared_with_family: boolean
+  share_nudge_dismissed: boolean
   created_at: string
   updated_at: string
 }
@@ -48,6 +52,8 @@ function dbNoteToEventNote(dbNote: DbEventNote): EventNote {
     eventTitle: dbNote.event_title,
     eventStartTime: dbNote.event_start_time ? new Date(dbNote.event_start_time) : null,
     context: dbNote.context as TaskContext | null,
+    sharedWithFamily: dbNote.shared_with_family ?? false,
+    shareNudgeDismissed: dbNote.share_nudge_dismissed ?? false,
     createdAt: new Date(dbNote.created_at),
     updatedAt: new Date(dbNote.updated_at),
   }
@@ -539,6 +545,70 @@ export function useEventNotes() {
     }
   }, [user, notes])
 
+  // Set/clear whether an event is shared on the family timeline
+  const updateEventSharedWithFamily = useCallback(async (googleEventId: string, shared: boolean) => {
+    if (!user) return
+    const existingNote = notes.get(googleEventId)
+    const optimistic: EventNote = existingNote
+      ? { ...existingNote, sharedWithFamily: shared, updatedAt: new Date() }
+      : {
+          id: '', googleEventId, notes: null, assignedToAll: [],
+          sharedWithFamily: shared, createdAt: new Date(), updatedAt: new Date(),
+        }
+    setNotes((prev) => new Map(prev).set(googleEventId, optimistic))
+
+    const { data, error: upsertError } = await supabase
+      .from('event_notes')
+      .upsert(
+        { user_id: user.id, google_event_id: googleEventId, shared_with_family: shared },
+        { onConflict: 'user_id,google_event_id' },
+      )
+      .select()
+      .single()
+
+    if (upsertError) {
+      if (existingNote) setNotes((prev) => new Map(prev).set(googleEventId, existingNote))
+      setError(upsertError.message)
+      return
+    }
+    if (data) {
+      const realNote = dbNoteToEventNote(data as DbEventNote)
+      setNotes((prev) => new Map(prev).set(googleEventId, realNote))
+    }
+  }, [user, notes])
+
+  // Mark the "share to family" nudge dismissed for an event (so it won't re-nag)
+  const dismissShareNudge = useCallback(async (googleEventId: string) => {
+    if (!user) return
+    const existingNote = notes.get(googleEventId)
+    const optimistic: EventNote = existingNote
+      ? { ...existingNote, shareNudgeDismissed: true, updatedAt: new Date() }
+      : {
+          id: '', googleEventId, notes: null, assignedToAll: [],
+          shareNudgeDismissed: true, createdAt: new Date(), updatedAt: new Date(),
+        }
+    setNotes((prev) => new Map(prev).set(googleEventId, optimistic))
+
+    const { data, error: upsertError } = await supabase
+      .from('event_notes')
+      .upsert(
+        { user_id: user.id, google_event_id: googleEventId, share_nudge_dismissed: true },
+        { onConflict: 'user_id,google_event_id' },
+      )
+      .select()
+      .single()
+
+    if (upsertError) {
+      if (existingNote) setNotes((prev) => new Map(prev).set(googleEventId, existingNote))
+      setError(upsertError.message)
+      return
+    }
+    if (data) {
+      const realNote = dbNoteToEventNote(data as DbEventNote)
+      setNotes((prev) => new Map(prev).set(googleEventId, realNote))
+    }
+  }, [user, notes])
+
   // Get event notes linked to a specific project
   const getEventNotesForProject = useCallback(async (projectId: string): Promise<EventNote[]> => {
     if (!user) return []
@@ -586,5 +656,7 @@ export function useEventNotes() {
     getNote,
     getEventNotesForProject,
     updateEventContext,
+    updateEventSharedWithFamily,
+    dismissShareNudge,
   }
 }

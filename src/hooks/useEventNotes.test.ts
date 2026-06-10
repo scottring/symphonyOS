@@ -734,4 +734,30 @@ describe('useEventNotes', () => {
       expect(note?.updatedAt.toISOString()).toBe('2024-06-16T12:45:00.000Z')
     })
   })
+
+  it('updateEventSharedWithFamily upserts and reflects the flag', async () => {
+    mockUpsertResult = {
+      id: 'n1', user_id: mockUser.id, google_event_id: 'evt-1', notes: null,
+      assigned_to: null, assigned_to_all: null, recipe_url: null, project_id: null,
+      event_title: null, event_start_time: null, context: 'work',
+      shared_with_family: true, share_nudge_dismissed: false,
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }
+    const { result } = renderHook(() => useEventNotes())
+    await act(async () => { await result.current.updateEventSharedWithFamily('evt-1', true) })
+    expect(result.current.getNote('evt-1')?.sharedWithFamily).toBe(true)
+  })
+
+  it('dismissShareNudge upserts and reflects the flag', async () => {
+    mockUpsertResult = {
+      id: 'n2', user_id: mockUser.id, google_event_id: 'evt-2', notes: null,
+      assigned_to: null, assigned_to_all: null, recipe_url: null, project_id: null,
+      event_title: null, event_start_time: null, context: 'work',
+      shared_with_family: false, share_nudge_dismissed: true,
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }
+    const { result } = renderHook(() => useEventNotes())
+    await act(async () => { await result.current.dismissShareNudge('evt-2') })
+    expect(result.current.getNote('evt-2')?.shareNudgeDismissed).toBe(true)
+  })
 })
