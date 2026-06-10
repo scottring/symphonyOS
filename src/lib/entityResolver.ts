@@ -40,7 +40,7 @@ const APPLY_THRESHOLD = 0.9
 const GHOST_THRESHOLD = 0.6
 const TIE_MARGIN = 0.05
 const MIN_FUZZY_CHARS = 5
-const FUSE_OPTIONS = { keys: ['name'], includeScore: true, threshold: 0.35, ignoreLocation: true } as const
+const FUSE_OPTIONS = { keys: ['name'], includeScore: true, threshold: 0.35, ignoreLocation: true }
 
 export function normalizeEntityText(s: string): string {
   return s.toLowerCase().replace(/[.,!?'"]/g, '').replace(/\s+/g, ' ').trim()
