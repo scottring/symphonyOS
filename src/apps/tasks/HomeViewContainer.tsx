@@ -44,7 +44,7 @@ import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
 export function HomeViewContainer() {
   // Data hooks
   const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask, setBucket, getLinkedTasks, refetch } = useSupabaseTasks();
-  const { isConnected, events, fetchEvents, isFetching: eventsFetching, updateEvent } = useGoogleCalendar();
+  const { isConnected, events, fetchEvents, isFetching: eventsFetching, updateEvent, createEvent } = useGoogleCalendar();
   const { notes: eventNotesMap, updateEventAssignment, updateEventAssignmentAll, updateEventContext, updateEventProject, updateEventSharedWithFamily, dismissShareNudge } = useEventNotes();
   const { contacts, contactsMap, addContact, searchContacts } = useContacts();
   const { projects, projectsMap, addProject } = useProjects();
@@ -236,6 +236,45 @@ export function HomeViewContainer() {
     [addTask, getCurrentUserMember, currentDomain],
   );
 
+  // Inline timeline "+" create for the EVENT kind: make a real calendar event
+  // at the captured anchor time (default 1h duration), then refetch the day so
+  // it shows immediately. Without this the inline event create was a no-op.
+  const onCreateEventAt = useCallback(
+    async (r: TimelineCaptureResult) => {
+      const start = r.scheduledFor ?? viewedDate;
+      const end = new Date(start.getTime() + 60 * 60 * 1000);
+      await createEvent({
+        title: r.title,
+        startTime: start,
+        endTime: end,
+        allDay: !r.scheduledFor,
+      });
+      // Refresh the viewed day's events so the new one appears right away.
+      const startOfDay = new Date(viewedDate); startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(viewedDate); endOfDay.setHours(23, 59, 59, 999);
+      await fetchEvents(startOfDay, endOfDay);
+    },
+    [createEvent, fetchEvents, viewedDate],
+  );
+
+  // Inline timeline "+" create for the ROUTINE kind: a routine needs a
+  // recurrence pattern that doesn't fit a one-line input, so (mirroring
+  // WeekViewV2) build a natural-language string from the title + anchor and
+  // hand off to the routine builder, which parses recurrence.
+  const onCreateRoutineAt = useCallback(
+    (r: TimelineCaptureResult) => {
+      const anchor = r.scheduledFor ?? viewedDate;
+      const weekday = anchor.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+      const timeStr = anchor
+        .toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+        .toLowerCase()
+        .replace(/\s/g, '');
+      const initialNl = `${r.title} every ${weekday} at ${timeStr}`;
+      navigate(`/routines/new?initial=${encodeURIComponent(initialNl)}`);
+    },
+    [navigate, viewedDate],
+  );
+
   const handleCreateFollowUp = useCallback(
     async (title: string, sourceTaskId: string) => {
       const sourceTask = tasks.find(t => t.id === sourceTaskId);
@@ -326,6 +365,8 @@ export function HomeViewContainer() {
       onDeleteTask: deleteTask,
       onCreateTask: onCreateTaskFromValue,
       onCreateTaskAt,
+      onCreateEventAt,
+      onCreateRoutineAt,
       onCreateFollowUp: handleCreateFollowUp,
       onGroupItems: handleGroupItems,
       onOpenTask: (taskId: string) => setSelection({ kind: 'task', id: taskId }),
@@ -378,7 +419,7 @@ export function HomeViewContainer() {
       onUpdateEventProject: updateEventProject,
     }),
     [
-      toggleTask, toggleWaiting, updateTask, pushTask, deleteTask, onCreateTaskFromValue, onCreateTaskAt, handleCreateFollowUp, handleGroupItems,
+      toggleTask, toggleWaiting, updateTask, pushTask, deleteTask, onCreateTaskFromValue, onCreateTaskAt, onCreateEventAt, onCreateRoutineAt, handleCreateFollowUp, handleGroupItems,
       setSelection,
       scheduleActions, updateRoutine, updateEventContext, updateEventSharedWithFamily, dismissShareNudge, hideEvent,
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
