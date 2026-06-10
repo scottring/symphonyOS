@@ -165,7 +165,11 @@ export function adaptTimelineEvent(
     icon,
     tint,
     title: item.title,
-    subtitle: item.location || (item.type === 'routine' ? 'Routine' : item.type === 'event' ? 'Event' : 'Task'),
+    // Teams/Zoom put the join URL in the location field; show a friendly
+    // "Video call" label instead of a raw URL (which also blows out the row).
+    subtitle: /^https?:\/\//i.test(item.location ?? '')
+      ? 'Video call'
+      : item.location || (item.type === 'routine' ? 'Routine' : item.type === 'event' ? 'Event' : 'Task'),
     meta: durationMeta(item),
     members: memberBubbles,
     completed: item.completed,
