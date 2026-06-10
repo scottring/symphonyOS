@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useQuickParse } from './useQuickParse'
-import { resolveContact } from '@/lib/entityResolver'
 import type { ResolverContext } from '@/lib/entityResolver'
 
 const ctx = { projects: [{ id: 'p1', name: 'Garden' }], contacts: [{ id: 'c1', name: 'Iris' }], familyMembers: [{ id: 'm1', name: 'Scott' }] }
