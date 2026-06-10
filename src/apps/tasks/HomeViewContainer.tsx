@@ -20,6 +20,7 @@ import { PlanningSession, WeeklyPlanningSession, PlanTodaySession, MonthlyPlanni
 import { LoadingFallback } from '@/components/layout/LoadingFallback';
 import { isEverydayRoutine, scheduleRoutineOnDate } from '@/lib/routineUtils';
 import { groupItems } from '@/lib/today/groupTasks';
+import { parseQuickInput } from '@/lib/quickInputParser';
 import type { GoalAction } from '@/types/goal';
 import type { Task } from '@/types/task';
 import type { TimelineCaptureResult } from '@/components/schedule/TimelineQuickInput';
@@ -206,16 +207,26 @@ export function HomeViewContainer() {
   }, [eventNotesMap]);
 
   const onCreateTaskFromValue = useCallback(
-    async (title: string) => {
+    async (raw: string) => {
+      // Natural-language parse the quick-add text: pull out date/time, project,
+      // contact, assignees, and category, leaving a clean title. e.g.
+      // "call macmillan guitars at 930am" → title "call macmillan guitars",
+      // scheduled today 9:30am. An explicit time/date wins over the default
+      // "today, all-day"; with no date we keep the original add-to-today behavior.
+      const parsed = parseQuickInput(raw, { projects, contacts, familyMembers });
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      await addTask(title, undefined, undefined, today, {
-        assignedTo: getCurrentUserMember()?.id,
+      const scheduledFor = parsed.dueDate ?? today;
+      await addTask(parsed.title || raw, parsed.contactId, parsed.projectId, scheduledFor, {
+        assignedTo: parsed.assignedMemberIds?.[0] ?? getCurrentUserMember()?.id,
+        assignedToAll: parsed.assignedMemberIds,
         context: currentDomain !== 'universal' ? currentDomain : undefined,
-        isAllDay: true,
+        category: parsed.category,
+        // A parsed time means a specific time-of-day → not all-day.
+        isAllDay: parsed.dueDate ? false : true,
       });
     },
-    [addTask, getCurrentUserMember, currentDomain],
+    [addTask, getCurrentUserMember, currentDomain, projects, contacts, familyMembers],
   );
 
   // Inline timeline "+" create: the TimelineInsertPoint quick-input captures a
