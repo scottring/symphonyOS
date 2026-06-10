@@ -67,6 +67,8 @@ export interface ScheduleActionsValue {
   onPushEvent?: (eventId: string, date: Date) => void
   onDeleteEvent?: (event: CalendarEvent) => void
   onUpdateEventContext?: (eventId: string, context: TaskContext | null) => void
+  onShareEventWithFamily?: (googleEventId: string) => void
+  onDismissShareNudge?: (googleEventId: string) => void
   onHideEvent?: (googleEventId: string, title?: string, calendarId?: string) => Promise<boolean>
 
   // Reference data

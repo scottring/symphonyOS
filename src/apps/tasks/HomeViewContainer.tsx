@@ -45,7 +45,7 @@ export function HomeViewContainer() {
   // Data hooks
   const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask, setBucket, getLinkedTasks, refetch } = useSupabaseTasks();
   const { isConnected, events, fetchEvents, isFetching: eventsFetching, updateEvent } = useGoogleCalendar();
-  const { notes: eventNotesMap, updateEventAssignment, updateEventAssignmentAll, updateEventContext, updateEventProject } = useEventNotes();
+  const { notes: eventNotesMap, updateEventAssignment, updateEventAssignmentAll, updateEventContext, updateEventProject, updateEventSharedWithFamily, dismissShareNudge } = useEventNotes();
   const { contacts, contactsMap, addContact, searchContacts } = useContacts();
   const { projects, projectsMap, addProject } = useProjects();
   const {
@@ -350,6 +350,8 @@ export function HomeViewContainer() {
       onSkipEvent: scheduleActions.onSkipEvent,
       onPushEvent: scheduleActions.onPushEvent,
       onUpdateEventContext: updateEventContext,
+      onShareEventWithFamily: (id: string) => updateEventSharedWithFamily(id, true),
+      onDismissShareNudge: (id: string) => dismissShareNudge(id),
       onHideEvent: hideEvent,
 
       // Reference data
@@ -378,7 +380,7 @@ export function HomeViewContainer() {
     [
       toggleTask, toggleWaiting, updateTask, pushTask, deleteTask, onCreateTaskFromValue, onCreateTaskAt, handleCreateFollowUp, handleGroupItems,
       setSelection,
-      scheduleActions, updateRoutine, updateEventContext, hideEvent,
+      scheduleActions, updateRoutine, updateEventContext, updateEventSharedWithFamily, dismissShareNudge, hideEvent,
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
       eventNotesMap, eventContextOverrides,
       addProject, searchContacts, addContact, getDomainForCalendar,
