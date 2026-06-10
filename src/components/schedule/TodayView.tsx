@@ -42,6 +42,7 @@ import { StagingFloat } from './StagingFloat'
 import { EveningMealCard } from './EveningMealCard'
 import { EndOfDayCard } from './EndOfDayCard'
 import { ScheduleItem } from './ScheduleItem'
+import { ShareToFamilyNudge } from './ShareToFamilyNudge'
 import { OverdueSection } from './OverdueSection'
 import { BulkActionToolbar } from './BulkActionToolbar'
 import { TimelineNoteComposer } from './TimelineNoteComposer'
@@ -53,6 +54,7 @@ import { DiscussionBadge } from './DiscussionBadge'
 import { daySectionMeta } from '@/lib/daySectionMeta'
 import { parseMealTitle } from '@/lib/mealTitle'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
+import { useShareToFamilyNudges } from '@/lib/today/shareNudges'
 
 // ─── Props: identical to TodayScheduleProps ───────────────────────────────────
 
@@ -392,6 +394,19 @@ export function TodayView({
     }
     return map
   }, [tasks])
+
+  // Share-to-family nudges keyed by event id, for inline rendering below events.
+  const shareNudges = useShareToFamilyNudges(
+    events,
+    ctx.eventNotesMap,
+    ctx.eventContextOverrides,
+    ctx.getDomainForCalendar,
+  )
+  const shareNudgeByEventId = useMemo(() => {
+    const m = new Map<string, (typeof shareNudges)[number]>()
+    for (const n of shareNudges) m.set(n.eventId, n)
+    return m
+  }, [shareNudges])
 
   // ── Follow-up task state: tracks which task just got completed → show follow-up input ──
   const [followUpTaskId, setFollowUpTaskId] = useState<string | null>(null)
@@ -829,6 +844,17 @@ export function TodayView({
                           onDismissSuggestion={proactive.dismissSuggestion}
                           onOpenGuidedChat={onOpenGuidedChat}
                         />
+                        {item.type === 'event' && (() => {
+                          const nudge = shareNudgeByEventId.get(item.id.replace('event-', ''))
+                          if (!nudge) return null
+                          return (
+                            <ShareToFamilyNudge
+                              contextLabel={nudge.context}
+                              onAdd={() => ctx.onShareEventWithFamily?.(nudge.eventId)}
+                              onDismiss={() => ctx.onDismissShareNudge?.(nudge.eventId)}
+                            />
+                          )
+                        })()}
                         </div>
                         </div>
                       )
