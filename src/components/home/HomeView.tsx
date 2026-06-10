@@ -6,6 +6,7 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { resolveEventContext } from '@/lib/today/eventContext'
+import { isEventVisibleToFamily } from '@/lib/today/eventVisibility'
 import { useHomeView } from '@/hooks/useHomeView'
 import { useMobile } from '@/hooks/useMobile'
 import { useUndo } from '@/hooks/useUndo'
@@ -136,9 +137,14 @@ export function HomeView({
     if (currentDomain === 'universal') return events
     return events.filter(event => {
       const resolved = resolveEventContext(event, ctx.eventContextOverrides, ctx.getDomainForCalendar)
+      // Family view also includes work/personal events explicitly shared with family.
+      if (currentDomain === 'family') {
+        const note = ctx.eventNotesMap?.get(event.google_event_id || event.id)
+        return isEventVisibleToFamily(resolved, !!note?.sharedWithFamily)
+      }
       return resolved === currentDomain || resolved == null
     })
-  }, [events, currentDomain, ctx.eventContextOverrides, ctx.getDomainForCalendar])
+  }, [events, currentDomain, ctx.eventContextOverrides, ctx.getDomainForCalendar, ctx.eventNotesMap])
 
   // Assignee filter state — persisted, and defaulted to the logged-in person
   // ("my tasks") so each member sees their own world first and can tap to
