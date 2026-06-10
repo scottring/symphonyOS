@@ -11,6 +11,7 @@ import type { FamilyMember } from '@/types/family';
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar';
 import type { WallDayData } from '@/hooks/useWallData';
 import {
+  adaptGlanceForMember,
   adaptScheduleBand,
   adaptTimelineSections,
   adaptUpcoming,
@@ -604,5 +605,68 @@ describe('adaptOverdueSection', () => {
     const section = adaptOverdueSection([noStart, ok], [], now);
     expect(section!.events).toHaveLength(1);
     expect(section!.events[0].id).toBe(ok.id);
+  });
+});
+
+describe('adaptGlanceForMember', () => {
+  const now = new Date(2026, 4, 20, 8, 0);
+  const member: FamilyMember = {
+    id: 'm', name: 'Mia', initials: 'MK', color: 'blue',
+  } as FamilyMember;
+
+  function dayWith(items: TimelineItem[]): WallDayData {
+    return makeDay({
+      isToday: true,
+      items: { allday: [], morning: items, afternoon: [], evening: [], unscheduled: [] },
+    });
+  }
+
+  it("excludes everyday routines (>4×/week) — they're daily-rhythm noise, not a glance signal", () => {
+    const daily = makeItem({
+      id: 'r-tidy', type: 'routine', title: 'Tidy room', assignedTo: 'm',
+      startTime: new Date(2026, 4, 20, 9, 0), recurrencePattern: { type: 'daily' },
+    });
+    expect(adaptGlanceForMember(member, dayWith([daily]), now)).toBeNull();
+  });
+
+  it('excludes weekday-only weeklies (Mon–Fri = 5×/week, still >4)', () => {
+    const weekdays = makeItem({
+      id: 'r-pack', type: 'routine', title: 'Pack lunch', assignedTo: 'm',
+      startTime: new Date(2026, 4, 20, 9, 0),
+      recurrencePattern: { type: 'weekly', days: ['mon', 'tue', 'wed', 'thu', 'fri'] },
+    });
+    expect(adaptGlanceForMember(member, dayWith([weekdays]), now)).toBeNull();
+  });
+
+  it('keeps low-cadence routines (≤4×/week) — a weekly chore is still a real glance signal', () => {
+    const weekly = makeItem({
+      id: 'r-meals', type: 'routine', title: 'Plan meals', assignedTo: 'm',
+      startTime: new Date(2026, 4, 20, 9, 0),
+      recurrencePattern: { type: 'weekly', days: ['wed'] },
+    });
+    const card = adaptGlanceForMember(member, dayWith([weekly]), now);
+    expect(card?.primary).toBe('Plan meals');
+  });
+
+  it('keeps events and tasks regardless of any routine filtering', () => {
+    const event = makeItem({
+      id: 'e-soccer', type: 'event', title: 'Soccer', assignedTo: 'm',
+      startTime: new Date(2026, 4, 20, 16, 0),
+    });
+    const card = adaptGlanceForMember(member, dayWith([event]), now);
+    expect(card?.primary).toBe('Soccer');
+  });
+
+  it('falls through to the next eligible item when an everyday routine would have been first', () => {
+    const daily = makeItem({
+      id: 'r-tidy', type: 'routine', title: 'Tidy room', assignedTo: 'm',
+      startTime: new Date(2026, 4, 20, 9, 0), recurrencePattern: { type: 'daily' },
+    });
+    const event = makeItem({
+      id: 'e-soccer', type: 'event', title: 'Soccer', assignedTo: 'm',
+      startTime: new Date(2026, 4, 20, 16, 0),
+    });
+    const card = adaptGlanceForMember(member, dayWith([daily, event]), now);
+    expect(card?.primary).toBe('Soccer');
   });
 });

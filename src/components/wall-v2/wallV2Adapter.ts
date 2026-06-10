@@ -471,6 +471,10 @@ export function adaptGlanceForMember(
   for (const section of ['morning', 'afternoon', 'evening', 'allday'] as const) {
     for (const item of today.items[section] ?? []) {
       if (item.assignedTo !== member.id) continue;
+      // Skip high-frequency routines (>4×/week — daily, or weekday-only
+      // weeklies). They're the day's background rhythm ("brush teeth"), not a
+      // glance-worthy signal, so they shouldn't headline a member's card.
+      if (item.type === 'routine' && isEverydayRoutine(item.recurrencePattern)) continue;
       if (item.startTime && item.startTime < now) continue;
       if (!next || (item.startTime && next.startTime && item.startTime < next.startTime)) {
         next = item;
