@@ -33,7 +33,7 @@ export function WallV2EventCard({ event, onTap, onToggleComplete }: Props) {
   };
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 min-w-0">
       {completable && (
         <button
           type="button"

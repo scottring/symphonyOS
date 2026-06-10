@@ -48,7 +48,7 @@ export function WallV2ScheduleBand({ band, onTapEvent, onToggleComplete }: Props
           )}
 
           {band.timed.map((event) => (
-            <div key={event.id} className="grid grid-cols-[4.5rem_1fr] gap-3 items-center">
+            <div key={event.id} className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-3 items-center">
               <div className="text-right text-[1.05rem] font-black text-stone-700 dark:text-stone-200 tabular-nums leading-tight">
                 {event.time ?? ''}
               </div>
