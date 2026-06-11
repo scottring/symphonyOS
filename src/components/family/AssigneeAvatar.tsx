@@ -1,9 +1,10 @@
+import type { MouseEvent } from 'react'
 import { FAMILY_COLORS, type FamilyMember, type FamilyMemberColor } from '@/types/family'
 
 interface AssigneeAvatarProps {
   member: FamilyMember | undefined
   size?: 'sm' | 'md' | 'lg'
-  onClick?: () => void
+  onClick?: (e: MouseEvent) => void
   className?: string
 }
 

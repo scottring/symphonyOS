@@ -409,7 +409,7 @@ export const ScheduleItem = memo(function ScheduleItem({
             <Tag className="w-4 h-4 text-orange-400" style={projectColor ? { color: projectColor } : undefined} />
           )}
           {familyMembers.length > 0 && onAssignAll ? (
-            <div onClick={(e) => { e.stopPropagation(); if (panelOpen && onClosePanel) onClosePanel() }}>
+            <div onClick={(e) => e.stopPropagation()}>
               <MultiAssigneeDropdown
                 members={familyMembers}
                 selectedIds={assignedToAll}
@@ -419,7 +419,7 @@ export const ScheduleItem = memo(function ScheduleItem({
               />
             </div>
           ) : familyMembers.length > 0 && onAssign ? (
-            <div onClick={(e) => { e.stopPropagation(); if (panelOpen && onClosePanel) onClosePanel() }}>
+            <div onClick={(e) => e.stopPropagation()}>
               <AssigneeDropdown
                 members={familyMembers}
                 selectedId={assignedTo}
@@ -749,14 +749,7 @@ export const ScheduleItem = memo(function ScheduleItem({
           {/* Assignee avatar — context is conveyed by the chip elsewhere on
               the row, so the avatar stays clean (no ring). */}
           {familyMembers.length > 0 && onAssignAll ? (
-            <div
-              onClick={(e) => {
-                e.stopPropagation()
-                if (panelOpen && onClosePanel) {
-                  onClosePanel()
-                }
-              }}
-            >
+            <div onClick={(e) => e.stopPropagation()}>
               <MultiAssigneeDropdown
                 members={familyMembers}
                 selectedIds={assignedToAll}
@@ -766,14 +759,7 @@ export const ScheduleItem = memo(function ScheduleItem({
               />
             </div>
           ) : familyMembers.length > 0 && onAssign && (
-            <div
-              onClick={(e) => {
-                e.stopPropagation()
-                if (panelOpen && onClosePanel) {
-                  onClosePanel()
-                }
-              }}
-            >
+            <div onClick={(e) => e.stopPropagation()}>
               <AssigneeDropdown
                 members={familyMembers}
                 selectedId={assignedTo}

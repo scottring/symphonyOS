@@ -100,6 +100,7 @@ export function MultiAssigneeDropdown({
   const menuContent = isOpen ? (
     <div
       ref={menuRef}
+      onClick={(e) => e.stopPropagation()}
       className="fixed z-[9999] bg-white rounded-xl shadow-lg border border-neutral-200 py-2 min-w-[220px] animate-fade-in-up"
       style={{
         ...(menuPosition.placeAbove
@@ -192,7 +193,7 @@ export function MultiAssigneeDropdown({
     <div ref={triggerRef} className="relative">
       {/* Trigger: stacked avatars or empty state */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen) }}
         className={`
           flex items-center -space-x-2 cursor-pointer hover:opacity-80 transition-opacity
           ${selectedMembers.length === 0 ? 'opacity-50' : ''}

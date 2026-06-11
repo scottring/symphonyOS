@@ -77,6 +77,7 @@ export function AssigneeDropdown({ members, selectedId, onSelect, size = 'md' }:
   const menuContent = isOpen ? (
     <div
       ref={menuRef}
+      onClick={(e) => e.stopPropagation()}
       className="fixed z-[9999] bg-white rounded-xl shadow-lg border border-neutral-200 py-2 min-w-[180px] animate-fade-in-up"
       style={{
         ...(menuPosition.placeAbove
@@ -151,7 +152,7 @@ export function AssigneeDropdown({ members, selectedId, onSelect, size = 'md' }:
       <AssigneeAvatar
         member={selectedMember}
         size={size}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen) }}
       />
       {menuContent && createPortal(menuContent, document.body)}
     </div>
