@@ -17,6 +17,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { normalizeScheduledFor } from '../src/lib/scheduledFor'
 
 // --- Config ---
 
@@ -68,7 +69,10 @@ function toDbTask(input: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(input)) {
     if (v === undefined) continue
-    result[map[k] ?? k] = v
+    const dbKey = map[k] ?? k
+    // Date-only strings must become local midnight (the app's convention) —
+    // raw "YYYY-MM-DD" stores UTC midnight, rendering a day early in US zones.
+    result[dbKey] = dbKey === 'scheduled_for' ? normalizeScheduledFor(v) : v
   }
   return result
 }
@@ -363,9 +367,9 @@ server.tool(
   {},
   async () => {
     const { data, error } = await supabase
-      .from('household_members')
-      .select('id, name, role, avatar_url')
-      .order('name')
+      .from('family_members')
+      .select('id, name, initials, color, member_type, role_label')
+      .order('display_order')
 
     if (error) return { content: [{ type: 'text' as const, text: `Error: ${error.message}` }] }
     return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] }
