@@ -215,6 +215,37 @@ describe('ContextPicker', () => {
     })
   })
 
+  describe('click containment', () => {
+    // Regression: context-label clicks used to bubble to ancestor row
+    // handlers, which open/toggle the detail panel — clicking the tag opened
+    // or closed the side panel instead of the picker (reported 2026-06-12,
+    // same defect class as the 2026-06-11 assignee fix).
+    it('does not propagate trigger clicks to ancestors', () => {
+      const ancestorClick = vi.fn()
+      render(
+        <div onClick={ancestorClick}>
+          <ContextPicker onChange={mockOnChange} />
+        </div>
+      )
+      fireEvent.click(screen.getByRole('button', { name: 'Set context' }))
+      expect(ancestorClick).not.toHaveBeenCalled()
+      expect(screen.getByText('Work')).toBeInTheDocument()
+    })
+
+    it('selecting a context fires onChange and does not reach ancestors', () => {
+      const ancestorClick = vi.fn()
+      render(
+        <div onClick={ancestorClick}>
+          <ContextPicker onChange={mockOnChange} />
+        </div>
+      )
+      fireEvent.click(screen.getByRole('button', { name: 'Set context' }))
+      fireEvent.click(screen.getByText('Work'))
+      expect(mockOnChange).toHaveBeenCalledWith('work')
+      expect(ancestorClick).not.toHaveBeenCalled()
+    })
+  })
+
   describe('accessibility', () => {
     it('trigger button has accessible label', () => {
       render(<ContextPicker onChange={mockOnChange} />)

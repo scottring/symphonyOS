@@ -74,6 +74,7 @@ export function ContextPicker({ value, onChange }: ContextPickerProps) {
   const menuContent = isOpen ? (
     <div
       ref={menuRef}
+      onClick={(e) => e.stopPropagation()}
       className="fixed z-[9999] bg-white rounded-xl border border-neutral-200 shadow-lg p-2 min-w-[120px] animate-fade-in-up"
       style={{
         top: menuPosition.top,
@@ -114,7 +115,7 @@ export function ContextPicker({ value, onChange }: ContextPickerProps) {
   return (
     <div ref={triggerRef} className="relative">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen) }}
         className={`p-2 rounded-lg transition-colors hover:bg-neutral-100 ${hasValue ? '' : 'tag-needs-context'}`}
         aria-label="Set context"
         title={hasValue ? undefined : 'Untagged — tap to set Work / Family / Personal'}

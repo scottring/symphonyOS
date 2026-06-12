@@ -496,12 +496,7 @@ export const ScheduleItem = memo(function ScheduleItem({
         ) : (isTask && onSchedule) || ((isRoutine || item.type === 'event') && onPush) ? (
           <div
             className="w-16 shrink-0 relative"
-            onClick={(e) => {
-              e.stopPropagation()
-              if (panelOpen && onClosePanel) {
-                onClosePanel()
-              }
-            }}
+            onClick={(e) => e.stopPropagation()}
           >
             <SchedulePopover
               value={item.startTime ?? undefined}
@@ -708,12 +703,7 @@ export const ScheduleItem = memo(function ScheduleItem({
                   ? 'transition-opacity'
                   : 'opacity-0 group-hover:opacity-100 transition-opacity'
               }
-              onClick={(e) => {
-                e.stopPropagation()
-                if (panelOpen && onClosePanel) {
-                  onClosePanel()
-                }
-              }}
+              onClick={(e) => e.stopPropagation()}
             >
               <ContextPicker
                 value={item.context ?? undefined}
@@ -726,12 +716,7 @@ export const ScheduleItem = memo(function ScheduleItem({
           {isTask && onUpdateDiscussion && (
             <div
               className="transition-opacity"
-              onClick={(e) => {
-                e.stopPropagation()
-                if (panelOpen && onClosePanel) {
-                  onClosePanel()
-                }
-              }}
+              onClick={(e) => e.stopPropagation()}
             >
               <DiscussionPicker
                 flagged={item.needsDiscussion ?? false}

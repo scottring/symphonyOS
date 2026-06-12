@@ -49,7 +49,7 @@ import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
 export function HomeViewContainer() {
   // Data hooks
   const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask, setBucket, getLinkedTasks, refetch } = useSupabaseTasks();
-  const { isConnected, events, fetchEvents, isFetching: eventsFetching, updateEvent, createEvent } = useGoogleCalendar();
+  const { isConnected, events, fetchEvents, isFetching: eventsFetching, updateEvent, createEvent, deleteEvent, removeEventLocal, restoreEventLocal } = useGoogleCalendar();
   const { notes: eventNotesMap, updateEventAssignment, updateEventAssignmentAll, updateEventContext, updateEventProject, updateEventSharedWithFamily, dismissShareNudge } = useEventNotes();
   const { contacts, contactsMap, addContact, searchContacts } = useContacts();
   const { projects, projectsMap, addProject } = useProjects();
@@ -415,6 +415,23 @@ export function HomeViewContainer() {
     [addTask, updateTask, refetch],
   );
 
+  // Optimistic event delete: drop from the local cache immediately, restore
+  // on failure. Google keeps deleted events in calendar trash (~30 days), so
+  // a confirmed delete is still recoverable from the Calendar web UI.
+  const handleDeleteEvent = useCallback(
+    (event: import('@/hooks/useGoogleCalendar').CalendarEvent) => {
+      removeEventLocal(event.id);
+      deleteEvent({
+        eventId: event.google_event_id ?? event.id,
+        calendarId: event.calendar_id,
+      }).catch((err) => {
+        console.error('Failed to delete event:', err);
+        restoreEventLocal(event);
+      });
+    },
+    [deleteEvent, removeEventLocal, restoreEventLocal],
+  );
+
   const scheduleActionsValue = useMemo<ScheduleActionsValue>(
     () => ({
       // Planning
@@ -462,6 +479,7 @@ export function HomeViewContainer() {
       onShareEventWithFamily: (id: string) => updateEventSharedWithFamily(id, true),
       onDismissShareNudge: (id: string) => dismissShareNudge(id),
       onHideEvent: hideEvent,
+      onDeleteEvent: handleDeleteEvent,
 
       // Reference data
       contactsMap,
@@ -489,7 +507,7 @@ export function HomeViewContainer() {
     [
       toggleTask, toggleWaiting, updateTask, pushTask, deleteTask, onCreateTaskFromValue, onCreateTaskParsed, parserContext, currentDomain, resolverContext, getRecentTaskForContact, onCreateTaskAt, onCreateEventAt, onCreateRoutineAt, handleCreateFollowUp, handleGroupItems,
       setSelection,
-      scheduleActions, updateRoutine, updateEventContext, updateEventSharedWithFamily, dismissShareNudge, hideEvent,
+      scheduleActions, updateRoutine, updateEventContext, updateEventSharedWithFamily, dismissShareNudge, hideEvent, handleDeleteEvent,
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
       eventNotesMap, eventContextOverrides,
       addProject, searchContacts, addContact, getDomainForCalendar,
