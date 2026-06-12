@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, createContext, useContext, type React
 import { supabase } from '@/lib/supabase'
 import { logger } from '@/lib/logger'
 import { getRecurringBaseId } from './useHiddenCalendarEvents'
+import { filterOutEvent } from './calendarEventCache'
 
 export interface CreateEventParams {
   title: string
@@ -493,13 +494,16 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
   // Optimistically remove an event from the local cache.
   // Caller is responsible for orchestrating any undo + the actual API call.
   const removeEventLocal = useCallback((eventId: string) => {
-    setEvents(prev => prev.filter(e => e.id !== eventId && e.google_event_id !== eventId))
+    setEvents(prev => filterOutEvent(prev, eventId))
   }, [])
 
   // Restore a previously removed event into the local cache.
   const restoreEventLocal = useCallback((event: CalendarEvent) => {
     setEvents(prev => {
-      const exists = prev.some(e => e.id === event.id)
+      // Match on google_event_id first — cached events from the edge function
+      // have no `id` field, and undefined === undefined would false-positive.
+      const key = event.google_event_id ?? event.id
+      const exists = key != null && prev.some(e => (e.google_event_id ?? e.id) === key)
       if (exists) return prev
       return [...prev, event]
     })

@@ -420,9 +420,14 @@ export function HomeViewContainer() {
   // a confirmed delete is still recoverable from the Calendar web UI.
   const handleDeleteEvent = useCallback(
     (event: import('@/hooks/useGoogleCalendar').CalendarEvent) => {
-      removeEventLocal(event.id);
+      // google_event_id is the reliable key: events from the edge function
+      // carry no db `id` (undefined), and removing by undefined wiped the
+      // whole local cache (2026-06-12 incident).
+      const eventId = event.google_event_id ?? event.id;
+      if (!eventId) return;
+      removeEventLocal(eventId);
       deleteEvent({
-        eventId: event.google_event_id ?? event.id,
+        eventId,
         calendarId: event.calendar_id,
       }).catch((err) => {
         console.error('Failed to delete event:', err);
