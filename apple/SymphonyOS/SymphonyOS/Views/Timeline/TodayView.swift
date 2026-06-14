@@ -72,7 +72,9 @@ struct TodayView: View {
                 QuickCaptureBar(userId: auth.currentUser?.id ?? UUID())
             }
         }
+        #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
+        #endif
         .onAppear { rebuildTimeline() }
         .onChange(of: appState.selectedDate) { _, _ in rebuildTimeline() }
         .onChange(of: appState.domainFilter) { _, _ in rebuildTimeline() }

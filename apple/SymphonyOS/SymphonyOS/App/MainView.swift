@@ -44,6 +44,7 @@ struct iOSMainView: View {
         }
         .tint(Color.primaryTint)
         .onAppear {
+            #if os(iOS)
             // Warm tab bar appearance matching Nordic Journal
             let appearance = UITabBarAppearance()
             appearance.configureWithDefaultBackground()
@@ -51,6 +52,7 @@ struct iOSMainView: View {
             appearance.shadowColor = UIColor(Color.textTertiary.opacity(0.1))
             UITabBar.appearance().standardAppearance = appearance
             UITabBar.appearance().scrollEdgeAppearance = appearance
+            #endif
         }
     }
 }

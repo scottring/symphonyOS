@@ -46,3 +46,7 @@ playwright-report/
 
 # Brainstorming visual companion
 .superpowers/
+
+# native iOS build artifacts
+apple/SymphonyOS/.build/
+apple/SymphonyOS/Package.resolved

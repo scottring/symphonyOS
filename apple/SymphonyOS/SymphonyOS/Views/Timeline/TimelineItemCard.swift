@@ -7,6 +7,8 @@ struct TimelineItemCard: View {
     let userId: UUID
 
     @State private var isCompleted: Bool
+    @State private var showContextPicker = false
+    @State private var showDetail = false
 
     init(item: TimelineItem, modelContext: ModelContext, userId: UUID) {
         self.item = item
@@ -26,6 +28,64 @@ struct TimelineItemCard: View {
     }
 
     var body: some View {
+        SlideRow(
+            onComplete: {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { isCompleted.toggle() }
+                toggleCompletion()
+            },
+            actions: slideActions
+        ) {
+            cardContent
+        }
+        .sheet(isPresented: $showContextPicker) {
+            if let task = fetchTask() {
+                ContextPickerSheet(task: task, modelContext: modelContext)
+                    .presentationDetents([.height(260)])
+            }
+        }
+        .sheet(isPresented: $showDetail) {
+            if let task = fetchTask() {
+                NavigationStack {
+                    TaskDetailView(task: task)
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done") { showDetail = false }
+                            }
+                        }
+                }
+                .presentationDetents([.large, .medium])
+            }
+        }
+    }
+
+    /// Right-swipe actions. Task-only (routines/events just complete via left swipe).
+    private var slideActions: [SlideAction] {
+        guard item.type == .task else { return [] }
+        return [
+            SlideAction(label: "Push", systemImage: "arrow.right", tint: Self.pushAmber) {
+                if let task = fetchTask() {
+                    TaskViewModel(modelContext: modelContext).schedule(task, for: Date().addingDays(1))
+                }
+            },
+            SlideAction(label: "Context", systemImage: "tag", tint: Self.neutralSlate) {
+                showContextPicker = true
+            },
+            SlideAction(label: "More", systemImage: "ellipsis", tint: .blue) {
+                showDetail = true
+            },
+        ]
+    }
+
+    private func fetchTask() -> SymphonyTask? {
+        guard item.type == .task else { return nil }
+        let descriptor = FetchDescriptor<SymphonyTask>()
+        return (try? modelContext.fetch(descriptor))?.first { $0.id == item.entityId }
+    }
+
+    private static let pushAmber = Color(red: 0.88, green: 0.64, blue: 0.23)
+    private static let neutralSlate = Color(red: 0.42, green: 0.40, blue: 0.36)
+
+    private var cardContent: some View {
         HStack(spacing: 0) {
             // Left accent bar — context colored
             RoundedRectangle(cornerRadius: 2)

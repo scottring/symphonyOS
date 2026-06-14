@@ -79,10 +79,41 @@ struct InboxTaskRow: View {
     let modelContext: ModelContext
     let userId: UUID
 
-    @State private var showSchedulePicker = false
-    @State private var showContextPicker = false
+    @State private var showDetail = false
 
     var body: some View {
+        SlideRow(
+            onComplete: {
+                TaskViewModel(modelContext: modelContext).toggleComplete(task)
+            },
+            actions: [
+                SlideAction(label: "Today", systemImage: "sun.max", tint: Self.todayAmber) {
+                    TaskViewModel(modelContext: modelContext).schedule(task, for: Date())
+                },
+                SlideAction(label: "Tomorrow", systemImage: "arrow.right", tint: .blue) {
+                    TaskViewModel(modelContext: modelContext).schedule(task, for: Date().addingDays(1))
+                },
+                SlideAction(label: "More", systemImage: "ellipsis", tint: Self.neutralSlate) {
+                    showDetail = true
+                },
+            ]
+        ) {
+            rowContent
+        }
+        .sheet(isPresented: $showDetail) {
+            NavigationStack {
+                TaskDetailView(task: task)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { showDetail = false }
+                        }
+                    }
+            }
+            .presentationDetents([.large, .medium])
+        }
+    }
+
+    private var rowContent: some View {
         HStack(spacing: 12) {
             // Completion
             Button {
@@ -106,66 +137,19 @@ struct InboxTaskRow: View {
 
             Spacer()
 
-            // Triage icons
-            HStack(spacing: 12) {
-                // Schedule
-                Button {
-                    showSchedulePicker = true
-                } label: {
-                    Image(systemName: "calendar")
-                        .font(.system(size: 16))
-                        .foregroundStyle(Color.textTertiary)
-                }
-                .buttonStyle(.plain)
-
-                // Context
-                Button {
-                    showContextPicker = true
-                } label: {
-                    Image(systemName: "tag")
-                        .font(.system(size: 16))
-                        .foregroundStyle(contextColor)
-                }
-                .buttonStyle(.plain)
+            // Context shown as a colored dot (per the mobile design spec)
+            if task.context != nil {
+                Circle()
+                    .fill(contextColor)
+                    .frame(width: 10, height: 10)
             }
         }
         .padding(12)
         .cardStyle(padding: 0)
-        .swipeActions(edge: .leading) {
-            Button {
-                let vm = TaskViewModel(modelContext: modelContext)
-                vm.toggleComplete(task)
-            } label: {
-                Label("Done", systemImage: "checkmark")
-            }
-            .tint(.green)
-        }
-        .swipeActions(edge: .trailing) {
-            Button {
-                let vm = TaskViewModel(modelContext: modelContext)
-                vm.schedule(task, for: Date().addingDays(1))
-            } label: {
-                Label("Tomorrow", systemImage: "arrow.right")
-            }
-            .tint(.blue)
-
-            Button {
-                let vm = TaskViewModel(modelContext: modelContext)
-                vm.markSomeday(task)
-            } label: {
-                Label("Someday", systemImage: "tray.and.arrow.down")
-            }
-            .tint(.orange)
-        }
-        .sheet(isPresented: $showSchedulePicker) {
-            SchedulePickerSheet(task: task, modelContext: modelContext)
-                .presentationDetents([.medium])
-        }
-        .sheet(isPresented: $showContextPicker) {
-            ContextPickerSheet(task: task, modelContext: modelContext)
-                .presentationDetents([.height(200)])
-        }
     }
+
+    private static let todayAmber = Color(red: 0.88, green: 0.64, blue: 0.23)
+    private static let neutralSlate = Color(red: 0.42, green: 0.40, blue: 0.36)
 
     private var contextColor: Color {
         switch task.context {
