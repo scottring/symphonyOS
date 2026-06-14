@@ -5,6 +5,7 @@ import { Sparkles, Sun, CalendarRange, CalendarDays, Inbox as InboxIcon, MoreHor
 import { Sidebar, type ViewType } from '@/components/layout/Sidebar';
 import { MoreSheet } from '@/components/layout/MoreSheet';
 import { QuickCapture } from '@/components/layout/QuickCapture';
+import { NewVersionBanner } from '@/components/layout/NewVersionBanner';
 import { ShellSearch } from './ShellSearch';
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher';
 import { HelpPanel } from '@/components/lazy';
@@ -208,6 +209,10 @@ function ShellLayoutInner({ children }: Props) {
 
   return (
     <div className="h-screen flex overflow-hidden overflow-x-hidden bg-bg-base w-full max-w-[100vw]">
+      {/* "New version available — reload" banner: shows when a newer build
+          deployed while this tab stayed open (stale-tab guard). */}
+      <NewVersionBanner />
+
       {/* Desktop sidebar (nordic theme — kinetic sidebar is retired) */}
       {!isMobile && (
         <Sidebar
