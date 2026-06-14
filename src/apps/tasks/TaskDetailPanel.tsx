@@ -56,6 +56,28 @@ function findTask(tasks: Task[], id: string): Task | null {
 const panelClassName =
   'fixed right-0 top-0 z-30 h-screen w-full md:w-[480px] border-l border-neutral-200 bg-bg-elevated overflow-y-auto shadow-xl';
 
+// Selectors for elements whose mousedown must NOT dismiss the open detail panel:
+// interactive controls, selectable cards, and popovers that render outside the
+// panel DOM (card action buttons + their portaled menus, and the panel's own
+// portaled popovers). Without this, pressing a card's Reschedule/Add-Project/⋯/
+// Context button while the panel is open is read as a "click away" and just
+// closes the panel instead of running the action (and the panel should stay
+// open through the interaction).
+const PANEL_KEEPALIVE_SELECTOR =
+  '[data-selectable], [data-panel-keepalive], button, a, input, textarea, select, [role="menu"], [role="menuitem"], [role="dialog"], [role="listbox"], [role="option"]';
+
+/**
+ * True when a mousedown on `target` (which is outside `panelEl`) should dismiss
+ * the panel — i.e. it landed on genuinely neutral chrome, not on a card, a
+ * control, or a popover. Exported for unit testing.
+ */
+export function shouldDismissPanel(target: HTMLElement | null, panelEl: HTMLElement | null): boolean {
+  if (!target) return false;
+  if (panelEl && panelEl.contains(target)) return false;
+  if (target.closest(PANEL_KEEPALIVE_SELECTOR)) return false;
+  return true;
+}
+
 /**
  * Shared side-panel chrome: the fixed right-side aside + click-outside-to-close.
  * Every kind renders through this so the close behavior is identical (and so
@@ -67,7 +89,7 @@ function PanelChrome({ children }: { children: React.ReactNode }) {
   const panelRef = useRef<HTMLElement>(null);
   useEffect(() => {
     function onDown(e: MouseEvent) {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+      if (shouldDismissPanel(e.target as HTMLElement | null, panelRef.current)) {
         clearSelection();
       }
     }
