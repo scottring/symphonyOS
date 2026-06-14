@@ -5,6 +5,7 @@ import { useFamilyMembers } from './useFamilyMembers'
 import { useToast } from './useToast'
 import { logger } from '@/lib/logger'
 import type { Task, TaskBucket, TaskLink, TaskContext, TaskCategory, LinkedActivity, LinkType, LinkedActivityType, GroupMemberRef } from '@/types/task'
+import type { TaskDirections } from '@/types/directions'
 import { defaultScopeForArea, type Scope } from '@/lib/scope'
 
 export interface DbTask {
@@ -38,6 +39,7 @@ export interface DbTask {
   estimated_duration: number | null
   location: string | null
   location_place_id: string | null
+  directions: TaskDirections | null
   is_waiting: boolean | null
   waiting_since: string | null
   needs_discussion: boolean | null
@@ -102,6 +104,7 @@ export function dbTaskToTask(dbTask: DbTask): Task {
     estimatedDuration: dbTask.estimated_duration ?? undefined,
     location: dbTask.location ?? undefined,
     locationPlaceId: dbTask.location_place_id ?? undefined,
+    directions: dbTask.directions ?? undefined,
     isWaiting: dbTask.is_waiting ?? undefined,
     waitingSince: dbTask.waiting_since ? new Date(dbTask.waiting_since) : undefined,
     needsDiscussion: dbTask.needs_discussion ?? undefined,
@@ -747,6 +750,7 @@ export function useSupabaseTasks() {
     if ('estimatedDuration' in updates) dbUpdates.estimated_duration = updates.estimatedDuration ?? null
     if ('location' in updates) dbUpdates.location = updates.location ?? null
     if ('locationPlaceId' in updates) dbUpdates.location_place_id = updates.locationPlaceId ?? null
+    if ('directions' in updates) dbUpdates.directions = updates.directions ?? null
     if ('isWaiting' in updates) dbUpdates.is_waiting = updates.isWaiting ?? false
     if ('waitingSince' in updates) dbUpdates.waiting_since = updates.waitingSince?.toISOString() ?? null
     if ('needsDiscussion' in updates) dbUpdates.needs_discussion = updates.needsDiscussion ?? false
@@ -847,6 +851,7 @@ export function useSupabaseTasks() {
     if ('estimatedDuration' in updates) dbUpdates.estimated_duration = updates.estimatedDuration ?? null
     if ('location' in updates) dbUpdates.location = updates.location ?? null
     if ('locationPlaceId' in updates) dbUpdates.location_place_id = updates.locationPlaceId ?? null
+    if ('directions' in updates) dbUpdates.directions = updates.directions ?? null
     if ('isWaiting' in updates) dbUpdates.is_waiting = updates.isWaiting ?? false
     if ('waitingSince' in updates) dbUpdates.waiting_since = updates.waitingSince?.toISOString() ?? null
     if ('needsDiscussion' in updates) dbUpdates.needs_discussion = updates.needsDiscussion ?? false

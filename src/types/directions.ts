@@ -42,3 +42,15 @@ export interface PlaceAutocompleteResult {
   mainText: string
   secondaryText: string
 }
+
+/**
+ * Persisted directions for a task — the user's chosen starting point, any
+ * intermediate stops, and the travel mode. Stored as JSONB on the task so the
+ * route survives reopening the detail panel and syncs across desktop/mobile.
+ * The destination is derived from the task's `location`, so it is NOT stored here.
+ */
+export interface TaskDirections {
+  origin?: RouteStop
+  stops?: RouteStop[]
+  travelMode?: TravelMode
+}

@@ -236,6 +236,7 @@ function TaskPanelBody({ id }: { id: string }) {
       onUpdateLocation={(location, placeId) =>
         updateTask(task.id, { location, locationPlaceId: placeId })
       }
+      onDirectionsChange={(directions) => updateTask(task.id, { directions })}
       onClearLocation={() =>
         updateTask(task.id, { location: undefined, locationPlaceId: undefined })
       }

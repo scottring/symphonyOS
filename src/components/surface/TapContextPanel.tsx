@@ -67,6 +67,8 @@ interface TapContextPanelProps {
   onAddLink: (url: string) => void
   onUpdateLocation: (location: string, placeId?: string) => void
   onClearLocation: () => void
+  /** Persist the task's route (origin/stops/mode). Omit to keep directions ephemeral. */
+  onDirectionsChange?: (directions: import('@/types/directions').TaskDirections) => void
   onContextChange: (context: TaskContext | undefined) => void
   /** Change who can see the task (individual/couple/compound). Optional. */
   onScopeChange?: (scope: Scope) => void
@@ -152,6 +154,8 @@ export function TapContextPanel(props: TapContextPanelProps) {
         showDirections={showDirections}
         onUpdateLocation={props.onUpdateLocation}
         onClearLocation={props.onClearLocation}
+        directions={task.directions}
+        onDirectionsChange={props.onDirectionsChange}
       />
       <PanelWhy key={task.id} label="Notes" notes={task.notes} onChange={props.onNotesChange} onSaveToVault={props.onSaveNoteToVault} />
       <PanelSubtasks

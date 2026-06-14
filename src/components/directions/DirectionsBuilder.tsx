@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import type { RouteStop, TravelMode, DirectionsContext, PlaceAutocompleteResult } from '@/types/directions'
+import { useState, useEffect, useRef } from 'react'
+import type { RouteStop, TravelMode, DirectionsContext, PlaceAutocompleteResult, TaskDirections } from '@/types/directions'
 import { useDirections, formatDuration, formatDistance } from '@/hooks/useDirections'
 import { StopItem } from './StopItem'
 import { AddStopInput } from './AddStopInput'
@@ -46,6 +46,11 @@ interface DirectionsBuilderProps {
     address: string
     placeId?: string
   }
+  /** Previously-saved route, used to seed origin/stops/mode on open. */
+  initialDirections?: TaskDirections
+  /** Called whenever the user changes origin, stops, or travel mode, so the
+   *  route can be persisted (survives reopen + syncs to mobile). */
+  onDirectionsChange?: (directions: TaskDirections) => void
 }
 
 /**
@@ -56,11 +61,15 @@ export function DirectionsBuilder({
   destination,
   eventTitle,
   defaultOrigin,
+  initialDirections,
+  onDirectionsChange,
 }: DirectionsBuilderProps) {
   const { isCalculating, error, result, calculateRoute, searchPlaces, getPlaceDetails, buildMapsUrl } = useDirections()
 
-  // State - Origin can be changed via location picker
+  // State - Origin can be changed via location picker. Seeded from a previously
+  // saved route when present, else from the saved home / default.
   const [origin, setOrigin] = useState<RouteStop>(() => {
+    if (initialDirections?.origin) return initialDirections.origin
     const savedHome = getSavedHomeLocation()
     return {
       id: 'origin',
@@ -87,8 +96,8 @@ export function DirectionsBuilder({
     order: 999,
   }))
 
-  const [stops, setStops] = useState<RouteStop[]>([])
-  const [travelMode, setTravelMode] = useState<TravelMode>('driving')
+  const [stops, setStops] = useState<RouteStop[]>(() => initialDirections?.stops ?? [])
+  const [travelMode, setTravelMode] = useState<TravelMode>(() => initialDirections?.travelMode ?? 'driving')
 
   // Calculate route when parameters change
   useEffect(() => {
@@ -100,6 +109,21 @@ export function DirectionsBuilder({
     }
     calculateRoute(context)
   }, [origin, destinationStop, stops, travelMode, calculateRoute])
+
+  // Persist the route whenever the user changes origin/stops/mode. We snapshot
+  // the mount state and skip the first run so simply opening the builder (which
+  // seeds defaults) doesn't write a no-op route; every later change persists the
+  // full current route via onDirectionsChange.
+  const mountSnapshot = useRef<string | null>(null)
+  useEffect(() => {
+    const current = JSON.stringify({ origin, stops, travelMode })
+    if (mountSnapshot.current === null) {
+      mountSnapshot.current = current
+      return
+    }
+    if (current === mountSnapshot.current) return
+    onDirectionsChange?.({ origin, stops, travelMode })
+  }, [origin, stops, travelMode, onDirectionsChange])
 
   const handleAddStop = (newStop: Omit<RouteStop, 'id' | 'order'>) => {
     const stop: RouteStop = {

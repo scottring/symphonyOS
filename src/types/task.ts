@@ -1,4 +1,5 @@
 import type { Scope } from '@/lib/scope'
+import type { TaskDirections } from '@/types/directions'
 export type { Scope }
 
 export interface TaskLink {
@@ -63,6 +64,7 @@ export interface Task {
   estimatedDuration?: number // Duration in minutes (default 30 in UI)
   location?: string // Address or place name for location-based tasks
   locationPlaceId?: string // Google Place ID for precise directions
+  directions?: TaskDirections // Persisted route: starting point + stops + travel mode
   // Needs-discussion flag — surfaces on family kiosk's For Discussion list
   needsDiscussion?: boolean
   discussionNote?: string
