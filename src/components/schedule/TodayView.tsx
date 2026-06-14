@@ -42,6 +42,7 @@ import { StagingFloat } from './StagingFloat'
 import { EveningMealCard } from './EveningMealCard'
 import { EndOfDayCard } from './EndOfDayCard'
 import { ScheduleItem } from './ScheduleItem'
+import { DayNavCluster } from './DayNavCluster'
 import { ShareToFamilyNudge } from './ShareToFamilyNudge'
 import { OverdueSection } from './OverdueSection'
 import { BulkActionToolbar } from './BulkActionToolbar'
@@ -123,6 +124,7 @@ export function TodayView({
   onCompleteEvent,
   loading: _loading,
   viewedDate,
+  onDateChange,
   onOpenPlanToday,
   selectedAssignees,
   onSelectAssignees,
@@ -456,6 +458,13 @@ export function TodayView({
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="max-w-[940px] w-full mx-auto px-0 py-2 md:px-8 md:py-8">
+      {/* Date masthead with prev/next-day nav — mobile only. Desktop renders
+          DayNavCluster in HomeHeader above the view; mobile had no date header,
+          so surface the same control (it's responsive) here. */}
+      <div className="md:hidden px-3 mb-2">
+        <DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} />
+      </div>
+
       {/* Stats + function bar — desktop only. Mobile combines the filters
           into the Add-to-today row below to save vertical space. */}
       <div className="hidden md:block mb-6">

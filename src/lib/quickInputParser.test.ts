@@ -127,6 +127,43 @@ describe('parseQuickInput', () => {
   })
 })
 
+describe('ambiguous bare date keywords (topic words, not scheduling)', () => {
+  it('does NOT schedule on a bare "weekend" and keeps the title intact', () => {
+    // The reported bug: "text karen walker re weekend" got rescheduled to Sat
+    // and lost the word "weekend" from the title.
+    const result = parseQuickInput('text karen walker re weekend', mockContext)
+    expect(result.dueDate).toBeUndefined()
+    expect(result.title).toBe('text karen walker re weekend')
+  })
+
+  it('does NOT schedule on a bare month name ("May invoices")', () => {
+    const result = parseQuickInput('May invoices', mockContext)
+    expect(result.dueDate).toBeUndefined()
+    expect(result.title).toBe('May invoices')
+  })
+
+  it('still parses "tomorrow" (unambiguous relative date)', () => {
+    const result = parseQuickInput('call mom tomorrow', mockContext)
+    expect(result.dueDate).toBeDefined()
+    expect(result.title).toBe('call mom')
+  })
+
+  it('still parses a weekend WITH a cue ("this weekend")', () => {
+    const result = parseQuickInput('clean garage this weekend', mockContext)
+    expect(result.dueDate).toBeDefined()
+  })
+
+  it('still parses a weekday with an explicit time ("next friday 1pm")', () => {
+    const result = parseQuickInput('lunch next friday 1pm', mockContext)
+    expect(result.dueDate).toBeDefined()
+  })
+
+  it('still parses a month WITH a day number ("May 15")', () => {
+    const result = parseQuickInput('pay rent May 15', mockContext)
+    expect(result.dueDate).toBeDefined()
+  })
+})
+
 describe('category prefix parsing', () => {
   it('parses event: prefix', () => {
     const result = parseQuickInput('event: dentist tomorrow', mockContext)

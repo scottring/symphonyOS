@@ -25,6 +25,27 @@ export interface ParserContext {
   familyMembers?: Array<{ id: string; name: string }>
 }
 
+// Bare keywords chrono-node will happily read as a date but which are, far more
+// often, topic words: "text Karen re weekend", "May invoices", "the March
+// numbers". Treating them as scheduling intent silently reschedules the task and
+// strips the word from the title — a real reported data-loss bug. We only reject
+// them when they appear ALONE (no time, no number); a real scheduling cue keeps
+// the match strong because chrono includes the cue in the matched text
+// ("this weekend", "next May", "May 15"), so it's no longer a bare keyword.
+const AMBIGUOUS_BARE_DATE = new Set([
+  'weekend', 'weekends',
+  'january', 'february', 'march', 'april', 'may', 'june', 'july',
+  'august', 'september', 'october', 'november', 'december',
+])
+
+function isWeakDateMatch(match: chrono.ParsedResult): boolean {
+  const text = match.text.trim().toLowerCase()
+  // Strong if it pins an explicit time ("Friday 1pm") or carries a number
+  // ("May 15", "6/15") — those signal real intent.
+  if (match.start.isCertain('hour') || /\d/.test(text)) return false
+  return AMBIGUOUS_BARE_DATE.has(text)
+}
+
 export function parseQuickInput(
   input: string,
   context: ParserContext
@@ -83,13 +104,14 @@ export function parseQuickInput(
     }
   }
 
-  // 1. Extract dates using chrono-node
-  const dateResults = chrono.parse(workingText)
-  if (dateResults.length > 0) {
-    const match = dateResults[0]
-    result.dueDate = match.start.date()
-    result.dueDateMatch = match.text
-    workingText = workingText.replace(match.text, '').trim()
+  // 1. Extract dates using chrono-node — skipping weak/ambiguous bare keywords
+  //    (see isWeakDateMatch) so topic words like "weekend" or "May" don't
+  //    hijack scheduling and mangle the title.
+  const dateMatch = chrono.parse(workingText).find((m) => !isWeakDateMatch(m))
+  if (dateMatch) {
+    result.dueDate = dateMatch.start.date()
+    result.dueDateMatch = dateMatch.text
+    workingText = workingText.replace(dateMatch.text, '').trim()
   }
 
   // 2. Check for explicit contact markers FIRST (before projects)
