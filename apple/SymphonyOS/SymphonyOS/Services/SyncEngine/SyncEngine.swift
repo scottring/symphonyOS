@@ -3,10 +3,13 @@ import SwiftData
 import Supabase
 import Realtime
 import Network
+import OSLog
 
 /// Coordinates bidirectional sync between SwiftData (local) and Supabase (remote).
 /// Actor isolation prevents race conditions.
 actor SyncEngine {
+    static let syncLog = Logger(subsystem: "com.symphonyos.app", category: "sync")
+
     private let modelContainer: ModelContainer
     private var realtimeChannels: [RealtimeChannelV2] = []
     private var networkMonitor: NWPathMonitor?
@@ -40,6 +43,14 @@ actor SyncEngine {
     /// Start sync for the given user. Call after login.
     func start(userId: UUID) async {
         self.userId = userId
+        // Diagnostic + safeguard: force the auth session to load so PostgREST
+        // requests carry the user's JWT (anon requests return 0 rows under RLS).
+        do {
+            let session = try await supabase.auth.session
+            Self.syncLog.info("auth at sync: user=\(session.user.id.uuidString, privacy: .public) tokenLen=\(session.accessToken.count)")
+        } catch {
+            Self.syncLog.error("auth at sync: NO SESSION (\(error.localizedDescription, privacy: .public)) — requests will be anon")
+        }
         startNetworkMonitoring()
         await performInitialSync()
         await subscribeToRealtime()
@@ -95,33 +106,27 @@ actor SyncEngine {
         isSyncing = true
         defer { isSyncing = false }
 
-        let context = ModelContext(modelContainer)
-
-        // Pull each table
-        await pullTable("households", as: Household.self, userId: userId, context: context)
-        await pullTable("user_profiles", as: UserProfile.self, userId: userId, context: context)
-        await pullTable("family_members", as: FamilyMember.self, userId: userId, context: context)
-        await pullTable("contacts", as: Contact.self, userId: userId, context: context)
-        await pullTable("projects", as: Project.self, userId: userId, context: context)
-        await pullTable("tasks", as: SymphonyTask.self, userId: userId, context: context)
-        await pullTable("routines", as: Routine.self, userId: userId, context: context)
-        await pullTable("actionable_instances", as: ActionableInstance.self, userId: userId, context: context)
-        await pullTable("weekly_templates", as: WeeklyTemplate.self, userId: userId, context: context)
-        await pullTable("playbook_blocks", as: PlaybookBlock.self, userId: userId, context: context)
-        await pullTable("playbook_instances", as: PlaybookInstance.self, userId: userId, context: context)
-        await pullTable("family_rules", as: FamilyRule.self, userId: userId, context: context)
-        await pullTable("responsibilities", as: Responsibility.self, userId: userId, context: context)
-
-        do {
-            try context.save()
-        } catch {
-            print("[SyncEngine] Error saving initial sync: \(error)")
-        }
+        // Each table pulls + saves independently, so one bad row/table can't
+        // roll back the entire sync (the previous single-shared-context save did).
+        await pullTable("households", as: Household.self, userId: userId)
+        await pullTable("user_profiles", as: UserProfile.self, userId: userId)
+        await pullTable("family_members", as: FamilyMember.self, userId: userId)
+        await pullTable("contacts", as: Contact.self, userId: userId)
+        await pullTable("projects", as: Project.self, userId: userId)
+        await pullTable("tasks", as: SymphonyTask.self, userId: userId)
+        await pullTable("routines", as: Routine.self, userId: userId)
+        await pullTable("actionable_instances", as: ActionableInstance.self, userId: userId)
+        await pullTable("weekly_templates", as: WeeklyTemplate.self, userId: userId)
+        await pullTable("playbook_blocks", as: PlaybookBlock.self, userId: userId)
+        await pullTable("playbook_instances", as: PlaybookInstance.self, userId: userId)
+        await pullTable("family_rules", as: FamilyRule.self, userId: userId)
+        await pullTable("responsibilities", as: Responsibility.self, userId: userId)
     }
 
     // MARK: - Pull
 
-    private func pullTable<T: PersistentModel>(_ table: String, as type: T.Type, userId: UUID, context: ModelContext) async {
+    private func pullTable<T: PersistentModel>(_ table: String, as type: T.Type, userId: UUID) async {
+        let context = ModelContext(modelContainer)
         do {
             let rows: [[String: AnyJSON]] = try await supabase
                 .from(table)
@@ -129,13 +134,16 @@ actor SyncEngine {
                 .execute()
                 .value
 
+            var inserted = 0
             for row in rows {
-                if let model = RowMapper.toModel(type, from: row) {
-                    context.insert(model)
-                }
+                guard let model = RowMapper.toModel(type, from: row) else { continue }
+                context.insert(model)
+                inserted += 1
             }
+            try context.save()
+            Self.syncLog.info("pull \(table, privacy: .public): fetched \(rows.count) inserted \(inserted) (skipped \(rows.count - inserted))")
         } catch {
-            print("[SyncEngine] Error pulling \(table): \(error)")
+            Self.syncLog.error("pull \(table, privacy: .public) FAILED: \(error.localizedDescription, privacy: .public)")
         }
     }
 

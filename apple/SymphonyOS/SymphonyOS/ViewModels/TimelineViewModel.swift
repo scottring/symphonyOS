@@ -153,6 +153,12 @@ final class TimelineViewModel {
     private func shouldShowRoutine(_ routine: Routine, on date: Date) -> Bool {
         guard routine.visibility == "active" else { return false }
 
+        // Mirror the web app: hide high-frequency routines (daily, or weekly/
+        // specific-days covering all of Mon–Fri = >4×/week). Daily-rhythm chores
+        // are noise on the timeline, not glanceable commitments. Lower-frequency
+        // routines (weekend-only, ordinary weekly, monthly…) still show.
+        if Self.isEverydayRoutine(routine.recurrencePattern) { return false }
+
         let pattern = routine.recurrencePattern
         switch pattern.type {
         case "daily":
@@ -165,6 +171,24 @@ final class TimelineViewModel {
                 return Calendar.current.component(.day, from: date) == dom
             }
             return false
+        default:
+            return false
+        }
+    }
+
+    /// True when a routine effectively recurs every weekday (>=5×/week):
+    /// `daily`, or `weekly`/`specific_days` whose days cover all of Mon–Fri.
+    /// Ported from the web app's `isEverydayRoutine` (lib/routineUtils.ts).
+    /// Day keys are normalized to their first 3 lowercase chars so both
+    /// "mon" and "monday" forms match.
+    static func isEverydayRoutine(_ pattern: RecurrencePattern) -> Bool {
+        switch pattern.type {
+        case "daily":
+            return true
+        case "weekly", "specific_days":
+            guard let days = pattern.days else { return false }
+            let set = Set(days.map { String($0.lowercased().prefix(3)) })
+            return ["mon", "tue", "wed", "thu", "fri"].allSatisfy { set.contains($0) }
         default:
             return false
         }
