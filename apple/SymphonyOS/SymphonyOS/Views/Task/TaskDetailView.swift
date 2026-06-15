@@ -78,6 +78,22 @@ struct TaskDetailView: View {
                     }
                 }
 
+                // Assigned to
+                if !familyMembers.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Assigned to", systemImage: "person.2")
+                            .font(.bodySmallBold)
+                            .foregroundStyle(Color.textSecondary)
+
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 116), spacing: 8)],
+                                  alignment: .leading, spacing: 8) {
+                            ForEach(sortedMembers, id: \.id) { member in
+                                assigneeChip(member)
+                            }
+                        }
+                    }
+                }
+
                 // Project
                 if !projects.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
@@ -135,6 +151,35 @@ struct TaskDetailView: View {
                     #endif
                 }
 
+                // Location + directions
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Location", systemImage: "mappin.and.ellipse")
+                        .font(.bodySmallBold)
+                        .foregroundStyle(Color.textSecondary)
+
+                    TextField("Address or place", text: Binding(
+                        get: { task.location ?? "" },
+                        set: { task.location = $0.isEmpty ? nil : $0; markDirty() }
+                    ))
+                    .font(.bodyMedium)
+
+                    if let loc = task.location, !loc.isEmpty {
+                        Button {
+                            openLocation(loc)
+                        } label: {
+                            Label(isMeetingLink(loc) ? "Join meeting" : "Get directions",
+                                  systemImage: isMeetingLink(loc) ? "video" : "arrow.triangle.turn.up.right.diamond")
+                                .font(.bodySmallBold)
+                                .foregroundStyle(Color.primaryTint)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(Color.primaryTint.opacity(0.12))
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
                 // Delete
                 Button(role: .destructive) {
                     let vm = TaskViewModel(modelContext: modelContext)
@@ -170,6 +215,80 @@ struct TaskDetailView: View {
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Assignees
+
+    private var sortedMembers: [FamilyMember] {
+        familyMembers.sorted { $0.displayOrder < $1.displayOrder }
+    }
+
+    private var assignedSet: Set<UUID> {
+        if let all = task.assignedToAll, !all.isEmpty { return Set(all) }
+        if let one = task.assignedTo { return [one] }
+        return []
+    }
+
+    private func toggleAssignee(_ member: FamilyMember) {
+        var set = assignedSet
+        if set.contains(member.id) { set.remove(member.id) } else { set.insert(member.id) }
+        let arr = Array(set)
+        task.assignedToAll = arr.isEmpty ? nil : arr
+        task.assignedTo = arr.first
+        markDirty()
+    }
+
+    @ViewBuilder
+    private func assigneeChip(_ member: FamilyMember) -> some View {
+        let isAssigned = assignedSet.contains(member.id)
+        let color = Color.memberColor(member.color)
+        Button {
+            toggleAssignee(member)
+        } label: {
+            HStack(spacing: 6) {
+                Text(member.initials)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 22, height: 22)
+                    .background(color)
+                    .clipShape(Circle())
+                Text(member.name)
+                    .font(.bodySmall)
+                    .foregroundStyle(Color.textPrimary)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(isAssigned ? color.opacity(0.16) : Color.bgElevated)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(isAssigned ? color.opacity(0.55) : Color.textTertiary.opacity(0.15), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Location
+
+    private func isMeetingLink(_ s: String) -> Bool {
+        let l = s.lowercased()
+        return l.hasPrefix("http") && (l.contains("zoom") || l.contains("meet.google")
+            || l.contains("teams.microsoft") || l.contains("webex"))
+    }
+
+    private func openLocation(_ location: String) {
+        #if os(iOS)
+        let url: URL?
+        if isMeetingLink(location) {
+            url = URL(string: location)
+        } else {
+            let q = location.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+            url = URL(string: "http://maps.apple.com/?daddr=\(q)")
+        }
+        if let url { UIApplication.shared.open(url) }
+        #endif
     }
 
     private func markDirty() {

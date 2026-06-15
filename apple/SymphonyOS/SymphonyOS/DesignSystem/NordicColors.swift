@@ -51,6 +51,26 @@ extension Color {
     static let blockHousehold = Color(hue: 175/360, saturation: 0.45, brightness: 0.45)
 }
 
+// MARK: - Family member colors
+// Family members store a named color ("blue", "teal", …), not a hex string.
+
+extension Color {
+    static func memberColor(_ name: String) -> Color {
+        switch name.lowercased() {
+        case "blue":   return Color(hue: 220/360, saturation: 0.55, brightness: 0.60)
+        case "purple": return Color(hue: 270/360, saturation: 0.48, brightness: 0.60)
+        case "teal":   return Color(hue: 175/360, saturation: 0.50, brightness: 0.50)
+        case "orange": return Color(hue: 25/360,  saturation: 0.70, brightness: 0.65)
+        case "green":  return Color(hue: 145/360, saturation: 0.45, brightness: 0.50)
+        case "red":    return Color(hue: 0/360,   saturation: 0.55, brightness: 0.60)
+        case "pink":   return Color(hue: 340/360, saturation: 0.50, brightness: 0.65)
+        case "yellow": return Color(hue: 45/360,  saturation: 0.70, brightness: 0.68)
+        case "indigo": return Color(hue: 245/360, saturation: 0.50, brightness: 0.60)
+        default:       return .primaryTint
+        }
+    }
+}
+
 // MARK: - Semantic Colors
 
 extension ShapeStyle where Self == Color {
