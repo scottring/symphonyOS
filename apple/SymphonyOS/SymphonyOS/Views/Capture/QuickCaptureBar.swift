@@ -3,9 +3,13 @@ import SwiftData
 
 struct QuickCaptureBar: View {
     let userId: UUID
+    /// When set (the Today screen), an undated capture schedules for this day.
+    var defaultDate: Date? = nil
     @Environment(\.modelContext) private var modelContext
     @State private var title = ""
     @FocusState private var isFocused: Bool
+
+    private var placeholder: String { defaultDate != nil ? "Add to today…" : "Add a task…" }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -16,7 +20,7 @@ struct QuickCaptureBar: View {
                 .symbolRenderingMode(.hierarchical)
 
             // Text field
-            TextField("Add a task...", text: $title)
+            TextField(placeholder, text: $title)
                 .font(.bodyMedium)
                 .foregroundStyle(Color.textPrimary)
                 .focused($isFocused)
@@ -66,14 +70,62 @@ struct QuickCaptureBar: View {
         let trimmed = title.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
 
+        // Natural-language date parsing: "call mom friday 3pm" → title "call mom",
+        // scheduled Fri 3pm. No date found → inbox, unless we're on Today (then it
+        // lands on the viewed day).
+        let parsed = CaptureParser.parse(trimmed)
+        var scheduled = parsed.date
+        var allDay = parsed.date != nil ? !parsed.hasTime : false
+        if scheduled == nil, let day = defaultDate {
+            scheduled = day
+            allDay = true
+        }
+
         let vm = TaskViewModel(modelContext: modelContext)
-        _ = vm.createTask(title: trimmed, userId: userId)
+        _ = vm.createTask(title: parsed.title, userId: userId, scheduledFor: scheduled, isAllDay: allDay)
 
         #if os(iOS)
-        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-        impactFeedback.impactOccurred()
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         #endif
 
         title = ""
+    }
+}
+
+// MARK: - Capture parsing
+
+/// Parses a captured/spoken string into a clean title + an optional date using
+/// the built-in NSDataDetector. "call mom tomorrow at 3pm" → ("call mom",
+/// tomorrow 3pm, hasTime: true). No date → (original text, nil, false).
+enum CaptureParser {
+    struct Result {
+        let title: String
+        let date: Date?
+        let hasTime: Bool
+    }
+
+    static func parse(_ raw: String) -> Result {
+        let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty,
+              let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.date.rawValue) else {
+            return Result(title: text, date: nil, hasTime: false)
+        }
+        let full = NSRange(text.startIndex..<text.endIndex, in: text)
+        guard let match = detector.matches(in: text, options: [], range: full).first,
+              let date = match.date else {
+            return Result(title: text, date: nil, hasTime: false)
+        }
+
+        var cleaned = text
+        if let r = Range(match.range, in: text) { cleaned.removeSubrange(r) }
+        cleaned = cleaned
+            .replacingOccurrences(of: "  ", with: " ")
+            .trimmingCharacters(in: CharacterSet(charactersIn: " ,.-\t"))
+
+        let matched = (text as NSString).substring(with: match.range).lowercased()
+        let hasTime = matched.contains(":") || matched.contains("am") || matched.contains("pm")
+            || matched.range(of: #"\b\d{1,2}\s*o'?clock\b"#, options: .regularExpression) != nil
+
+        return Result(title: cleaned.isEmpty ? text : cleaned, date: date, hasTime: hasTime)
     }
 }

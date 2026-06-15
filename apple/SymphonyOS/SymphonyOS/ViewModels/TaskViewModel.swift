@@ -13,13 +13,15 @@ final class TaskViewModel {
 
     // MARK: - Create
 
-    func createTask(title: String, userId: UUID, scheduledFor: Date? = nil, context: String? = nil) -> SymphonyTask {
+    func createTask(title: String, userId: UUID, scheduledFor: Date? = nil, isAllDay: Bool = false, context: String? = nil) -> SymphonyTask {
         let task = SymphonyTask(
             userId: userId,
             title: title,
             scheduledFor: scheduledFor,
             context: context
         )
+        task.isAllDay = isAllDay
+        task.bucket = scheduledFor != nil ? "timed" : "inbox"
         modelContext.insert(task)
         queueChange(tableName: "tasks", recordId: task.id, type: "insert")
         try? modelContext.save()
