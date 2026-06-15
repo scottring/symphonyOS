@@ -187,16 +187,32 @@ actor SyncEngine {
 
     private func pushChange(_ change: PendingChange, context: ModelContext) async throws {
         switch change.changeType {
-        case "insert", "update":
-            // Serialize the CURRENT local entity and upsert it. (The old code keyed
-            // off change.payload, which was never populated — so nothing ever pushed
-            // and every iOS edit was silently dropped on the next pull.)
+        case "insert":
+            // INSERT for a brand-new local row (its user_id is the current user, so
+            // the INSERT policy's `auth.uid() = user_id` check passes). Upsert keeps
+            // it idempotent on retry.
             guard let row = Self.serializeRow(table: change.tableName, id: change.recordId, context: context) else { return }
             try await supabase
                 .from(change.tableName)
                 .upsert(AnyJSON.object(row))
                 .execute()
-            Self.syncLog.info("pushed \(change.changeType, privacy: .public) \(change.tableName, privacy: .public)")
+            Self.syncLog.info("pushed insert \(change.tableName, privacy: .public)")
+
+        case "update":
+            // Plain UPDATE — NOT upsert. The tasks INSERT policy requires
+            // auth.uid() == user_id, so upserting a household member's task (which
+            // you can edit but don't own) is rejected by the insert check. A bare
+            // UPDATE only evaluates the UPDATE policy, which allows household edits.
+            // Drop id/user_id so we never try to change ownership.
+            guard var row = Self.serializeRow(table: change.tableName, id: change.recordId, context: context) else { return }
+            row.removeValue(forKey: "id")
+            row.removeValue(forKey: "user_id")
+            try await supabase
+                .from(change.tableName)
+                .update(AnyJSON.object(row))
+                .eq("id", value: change.recordId.uuidString)
+                .execute()
+            Self.syncLog.info("pushed update \(change.tableName, privacy: .public)")
 
         case "delete":
             try await supabase
