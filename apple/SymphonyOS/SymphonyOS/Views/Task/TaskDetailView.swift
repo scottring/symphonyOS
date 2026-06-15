@@ -10,6 +10,7 @@ struct TaskDetailView: View {
 
     @Query private var projects: [Project]
     @Query private var familyMembers: [FamilyMember]
+    @Query private var contacts: [Contact]
 
     @State private var placeSuggestions: [PlacePrediction] = []
     @State private var placeSearchTask: Task<Void, Never>?
@@ -141,7 +142,40 @@ struct TaskDetailView: View {
                     )
                 }
 
-                // Phone number
+                // Linked contact (e.g. a place/service provider). The web stores
+                // the place's phone on the contact, not the task — surface it here.
+                if let contact = linkedContact {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Contact", systemImage: "person.crop.circle")
+                            .font(.bodySmallBold)
+                            .foregroundStyle(Color.textSecondary)
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(contact.name)
+                                    .font(.bodyMedium)
+                                    .foregroundStyle(Color.textPrimary)
+                                if let phone = contact.phone, !phone.isEmpty {
+                                    Text(phone)
+                                        .font(.bodySmall)
+                                        .foregroundStyle(Color.textSecondary)
+                                }
+                            }
+                            Spacer()
+                            if let phone = contact.phone, !phone.isEmpty {
+                                Button { call(phone) } label: {
+                                    Image(systemName: "phone.fill")
+                                        .foregroundStyle(.white)
+                                        .padding(10)
+                                        .background(Color.primaryTint)
+                                        .clipShape(Circle())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+
+                // Phone number (manual, task-level)
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Phone", systemImage: "phone")
                         .font(.bodySmallBold)
@@ -332,6 +366,20 @@ struct TaskDetailView: View {
             url = URL(string: "http://maps.apple.com/?daddr=\(q)")
         }
         if let url { UIApplication.shared.open(url) }
+        #endif
+    }
+
+    // MARK: - Linked contact
+
+    private var linkedContact: Contact? {
+        guard let cid = task.contactId else { return nil }
+        return contacts.first { $0.id == cid }
+    }
+
+    private func call(_ phone: String) {
+        #if os(iOS)
+        let digits = phone.filter { $0.isNumber || $0 == "+" }
+        if let url = URL(string: "tel:\(digits)") { UIApplication.shared.open(url) }
         #endif
     }
 
