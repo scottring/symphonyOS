@@ -192,7 +192,9 @@ struct TodayView: View {
             playbookInstances: playbookInstances,
             date: appState.selectedDate,
             domainFilter: appState.domainFilter,
-            showCoaching: !appState.hideCoaching
+            // Playbook "coaching" blocks (Solo Morning, Get Ready Relay, …) are
+            // relics — keep them off the timeline.
+            showCoaching: false
         )
     }
 }

@@ -115,21 +115,7 @@ struct InboxTaskRow: View {
 
     private var rowContent: some View {
         HStack(spacing: 12) {
-            // Completion
-            Button {
-                let vm = TaskViewModel(modelContext: modelContext)
-                vm.toggleComplete(task)
-                #if os(iOS)
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                #endif
-            } label: {
-                Image(systemName: task.completed ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 22))
-                    .foregroundStyle(task.completed ? Color.primaryTint : Color.textTertiary)
-            }
-            .buttonStyle(.plain)
-
-            // Title
+            // Title (completion is via swipe-left now — no checkbox)
             Text(task.title)
                 .font(.bodyMedium)
                 .foregroundStyle(Color.textPrimary)

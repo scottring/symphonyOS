@@ -95,18 +95,7 @@ struct TimelineItemCard: View {
 
             // Main content
             HStack(spacing: 12) {
-                // Completion toggle
-                Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        isCompleted.toggle()
-                    }
-                    toggleCompletion()
-                } label: {
-                    checkboxView
-                }
-                .buttonStyle(.plain)
-
-                // Content column
+                // Content column (completion is via swipe-left now — no checkbox)
                 VStack(alignment: .leading, spacing: 3) {
                     // Title row
                     HStack(spacing: 6) {
