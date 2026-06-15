@@ -83,6 +83,11 @@ struct InboxTaskRow: View {
     let userId: UUID
 
     @State private var showDetail = false
+    @Query private var familyMembers: [FamilyMember]
+
+    private var assignedMemberIds: [UUID] {
+        task.assignedToAll ?? (task.assignedTo.map { [$0] } ?? [])
+    }
 
     var body: some View {
         SlideRow(
@@ -126,11 +131,19 @@ struct InboxTaskRow: View {
 
             Spacer()
 
-            // Context shown as a colored dot (per the mobile design spec)
-            if task.context != nil {
-                Circle()
-                    .fill(contextColor)
-                    .frame(width: 10, height: 10)
+            HStack(spacing: 8) {
+                if task.location != nil {
+                    Image(systemName: "mappin")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.textTertiary)
+                }
+                // Context shown as a colored dot (per the mobile design spec)
+                if task.context != nil {
+                    Circle()
+                        .fill(contextColor)
+                        .frame(width: 10, height: 10)
+                }
+                AssigneeAvatars(memberIds: assignedMemberIds, members: familyMembers, size: 20)
             }
         }
         .padding(12)

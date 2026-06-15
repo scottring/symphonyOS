@@ -9,6 +9,7 @@ struct TimelineItemCard: View {
     @State private var isCompleted: Bool
     @State private var showContextPicker = false
     @State private var showDetail = false
+    @Query private var familyMembers: [FamilyMember]
 
     init(item: TimelineItem, modelContext: ModelContext, userId: UUID) {
         self.item = item
@@ -127,6 +128,18 @@ struct TimelineItemCard: View {
                 }
 
                 Spacer(minLength: 0)
+
+                // Trailing: location pin + assignee avatars
+                if item.location != nil || !item.assignedTo.isEmpty {
+                    HStack(spacing: 6) {
+                        if item.location != nil {
+                            Image(systemName: "mappin")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color.textTertiary)
+                        }
+                        AssigneeAvatars(memberIds: item.assignedTo, members: familyMembers)
+                    }
+                }
             }
             .padding(.leading, 12)
             .padding(.trailing, 14)
@@ -267,6 +280,43 @@ struct ContextBadge: View {
         case "family": .contextFamily
         case "personal": .contextPersonal
         default: .textTertiary
+        }
+    }
+}
+
+// MARK: - Assignee Avatars
+
+/// Overlapping initial-circles for the assigned family members (up to 3, then +N).
+struct AssigneeAvatars: View {
+    let memberIds: [UUID]
+    let members: [FamilyMember]
+    var size: CGFloat = 22
+
+    var body: some View {
+        let assigned = members
+            .filter { memberIds.contains($0.id) }
+            .sorted { $0.displayOrder < $1.displayOrder }
+        if !assigned.isEmpty {
+            HStack(spacing: -6) {
+                ForEach(assigned.prefix(3), id: \.id) { member in
+                    Text(member.initials)
+                        .font(.system(size: size * 0.42, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: size, height: size)
+                        .background(Color.memberColor(member.color))
+                        .clipShape(Circle())
+                        .overlay(Circle().strokeBorder(Color.bgElevated, lineWidth: 1.5))
+                }
+                if assigned.count > 3 {
+                    Text("+\(assigned.count - 3)")
+                        .font(.system(size: size * 0.38, weight: .bold))
+                        .foregroundStyle(Color.textSecondary)
+                        .frame(width: size, height: size)
+                        .background(Color.bgSurface)
+                        .clipShape(Circle())
+                        .overlay(Circle().strokeBorder(Color.bgElevated, lineWidth: 1.5))
+                }
+            }
         }
     }
 }

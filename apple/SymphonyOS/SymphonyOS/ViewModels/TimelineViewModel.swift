@@ -67,7 +67,9 @@ final class TimelineViewModel {
                 isAllDay: task.isAllDay,
                 completed: task.completed,
                 context: task.context,
-                entityId: task.id
+                entityId: task.id,
+                assignedTo: task.assignedToAll ?? (task.assignedTo.map { [$0] } ?? []),
+                location: task.location
             ))
         }
 
@@ -97,7 +99,8 @@ final class TimelineViewModel {
                 isAllDay: false,
                 completed: instanceStatus == "completed",
                 context: routine.context,
-                entityId: routine.id
+                entityId: routine.id,
+                assignedTo: routine.assignedTo.map { [$0] } ?? []
             ))
         }
 
@@ -217,6 +220,8 @@ struct TimelineItem: Identifiable {
     let context: String?
     let entityId: UUID
     var blockType: String? = nil
+    var assignedTo: [UUID] = []
+    var location: String? = nil
 
     enum ItemType: String {
         case task
