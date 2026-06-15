@@ -2,9 +2,15 @@ import SwiftUI
 import SwiftData
 import AppIntents
 import Supabase
+#if canImport(UIKit)
+import UIKit
+#endif
 
 @main
 struct SymphonyApp: App {
+    #if os(iOS)
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    #endif
     @State private var authService = AuthService()
     @State private var appState = AppState()
 
@@ -117,3 +123,38 @@ struct SymphonyShortcuts: AppShortcutsProvider {
         )
     }
 }
+
+// MARK: - Push notifications (device token registration)
+//
+// Captures the APNs device token and stores it in `device_tokens` so a server
+// can target this device. Inert until the app has the Push Notifications
+// capability + paid provisioning (free signing → didFailToRegister, ignored).
+
+#if os(iOS)
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication,
+                     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        let token = deviceToken.map { String(format: "%02x", $0) }.joined()
+        Task { await PushTokens.store(token) }
+    }
+    func application(_ application: UIApplication,
+                     didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        // Expected without the Push capability / paid provisioning — ignore.
+    }
+}
+
+enum PushTokens {
+    /// Ask iOS for an APNs token. Call once the user is signed in.
+    static func register() {
+        UIApplication.shared.registerForRemoteNotifications()
+    }
+
+    static func store(_ token: String) async {
+        guard let userId = try? await supabase.auth.session.user.id else { return }
+        struct Row: Encodable { let user_id: String; let token: String; let platform: String }
+        try? await supabase.from("device_tokens")
+            .upsert(Row(user_id: userId.uuidString, token: token, platform: "ios"), onConflict: "token")
+            .execute()
+    }
+}
+#endif

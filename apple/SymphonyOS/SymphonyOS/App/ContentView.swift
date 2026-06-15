@@ -41,6 +41,9 @@ struct ContentView: View {
         Task {
             await engine.start(userId: userId)
         }
+        #if os(iOS)
+        PushTokens.register()   // no-op until the Push capability is added
+        #endif
     }
 
     private func stopSync() {
