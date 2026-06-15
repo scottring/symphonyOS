@@ -26,6 +26,7 @@ struct ContentView: View {
             }
         }
         .task {
+            NotificationManager.requestAuthorization()
             // Handle initial session restore
             if auth.isAuthenticated, let user = auth.currentUser {
                 startSync(userId: user.id)

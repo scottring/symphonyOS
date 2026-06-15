@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UserNotifications
 
 struct TodayView: View {
     @Environment(AppState.self) private var appState
@@ -189,6 +190,38 @@ struct TodayView: View {
             // relics — keep them off the timeline.
             showCoaching: false
         )
+        NotificationManager.reconcile(allTasks)
+    }
+}
+
+// MARK: - Local notifications
+
+/// Schedules a local reminder at each timed task's time. No server/APNs needed —
+/// works on any signing configuration.
+enum NotificationManager {
+    static func requestAuthorization() {
+        UNUserNotificationCenter.current()
+            .requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+    }
+
+    /// Reconcile scheduled reminders with the current tasks: one per timed,
+    /// future, incomplete task. Re-built each call so reschedules are reflected.
+    static func reconcile(_ tasks: [SymphonyTask]) {
+        let center = UNUserNotificationCenter.current()
+        let now = Date()
+        let due = tasks.filter { !$0.completed && !$0.isAllDay && ($0.scheduledFor ?? .distantPast) > now }
+
+        center.removeAllPendingNotificationRequests()
+        for task in due {
+            guard let when = task.scheduledFor else { continue }
+            let content = UNMutableNotificationContent()
+            content.title = task.title
+            if let ctx = task.context { content.subtitle = ctx.capitalized }
+            content.sound = .default
+            let comps = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: when)
+            let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+            center.add(UNNotificationRequest(identifier: task.id.uuidString, content: content, trigger: trigger))
+        }
     }
 }
 
