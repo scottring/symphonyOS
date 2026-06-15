@@ -130,7 +130,7 @@ actor SyncEngine {
         await pullTable("family_members", as: FamilyMember.self, userId: userId)
         await pullTable("contacts", as: Contact.self, userId: userId)
         await pullTable("projects", as: Project.self, userId: userId)
-        await pullTable("tasks", as: SymphonyTask.self, userId: userId)
+        await pullTable("tasks", as: SymphonyTask.self, userId: userId, reconcile: false)
         await pullTable("routines", as: Routine.self, userId: userId)
         await pullTable("actionable_instances", as: ActionableInstance.self, userId: userId)
         await pullTable("weekly_templates", as: WeeklyTemplate.self, userId: userId)
@@ -142,7 +142,7 @@ actor SyncEngine {
 
     // MARK: - Pull
 
-    private func pullTable<T: PersistentModel>(_ table: String, as type: T.Type, userId: UUID) async {
+    private func pullTable<T: PersistentModel>(_ table: String, as type: T.Type, userId: UUID, reconcile: Bool = true) async {
         let context = ModelContext(modelContainer)
         do {
             let rows: [[String: AnyJSON]] = try await supabase
@@ -157,8 +157,28 @@ actor SyncEngine {
                 context.insert(model)
                 inserted += 1
             }
+
+            // Reconcile deletions: drop local rows that no longer exist on the
+            // server (stale duplicates, deleted people, etc.). Only for
+            // server-owned tables — NOT tasks, which can have locally-created
+            // rows that haven't pushed yet.
+            var deleted = 0
+            if reconcile {
+                let serverIds = Set(rows.compactMap { $0["id"]?.stringValue?.lowercased() })
+                if let locals = try? context.fetch(FetchDescriptor<T>()) {
+                    for item in locals {
+                        let mirror = Mirror(reflecting: item)
+                        guard let idValue = mirror.children.first(where: { $0.label == "id" })?.value as? UUID else { continue }
+                        if !serverIds.contains(idValue.uuidString.lowercased()) {
+                            context.delete(item)
+                            deleted += 1
+                        }
+                    }
+                }
+            }
+
             try context.save()
-            Self.syncLog.info("pull \(table, privacy: .public): fetched \(rows.count) inserted \(inserted) (skipped \(rows.count - inserted))")
+            Self.syncLog.info("pull \(table, privacy: .public): fetched \(rows.count) inserted \(inserted) deleted \(deleted)")
         } catch {
             Self.syncLog.error("pull \(table, privacy: .public) FAILED: \(error.localizedDescription, privacy: .public)")
         }

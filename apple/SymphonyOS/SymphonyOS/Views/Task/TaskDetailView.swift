@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Supabase
 
 struct TaskDetailView: View {
     @Bindable var task: SymphonyTask
@@ -9,6 +10,9 @@ struct TaskDetailView: View {
 
     @Query private var projects: [Project]
     @Query private var familyMembers: [FamilyMember]
+
+    @State private var placeSuggestions: [PlacePrediction] = []
+    @State private var placeSearchTask: Task<Void, Never>?
 
     var body: some View {
         ScrollView {
@@ -125,6 +129,8 @@ struct TaskDetailView: View {
                         set: { task.notes = $0.isEmpty ? nil : $0; markDirty() }
                     ))
                     .font(.bodyMedium)
+                    .foregroundStyle(Color.textPrimary)
+                    .scrollContentBackground(.hidden)   // let our bgElevated show (TextEditor draws its own otherwise)
                     .frame(minHeight: 100)
                     .padding(8)
                     .background(Color.bgElevated)
@@ -146,6 +152,7 @@ struct TaskDetailView: View {
                         set: { task.phoneNumber = $0.isEmpty ? nil : $0; markDirty() }
                     ))
                     .font(.bodyMedium)
+                    .foregroundStyle(Color.textPrimary)
                     #if os(iOS)
                     .keyboardType(.phonePad)
                     #endif
@@ -159,9 +166,45 @@ struct TaskDetailView: View {
 
                     TextField("Address or place", text: Binding(
                         get: { task.location ?? "" },
-                        set: { task.location = $0.isEmpty ? nil : $0; markDirty() }
+                        set: { newValue in
+                            task.location = newValue.isEmpty ? nil : newValue
+                            task.locationPlaceId = nil   // manual typing clears the resolved place
+                            markDirty()
+                            searchPlaces(newValue)
+                        }
                     ))
                     .font(.bodyMedium)
+                    .foregroundStyle(Color.textPrimary)
+                    .autocorrectionDisabled()
+                    #if os(iOS)
+                    .textInputAutocapitalization(.words)
+                    #endif
+
+                    // Google Places suggestions (via the places-proxy edge function)
+                    ForEach(placeSuggestions) { prediction in
+                        Button {
+                            task.location = prediction.description
+                            task.locationPlaceId = prediction.placeId
+                            placeSuggestions = []
+                            placeSearchTask?.cancel()
+                            markDirty()
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "mappin.circle")
+                                    .foregroundStyle(Color.textTertiary)
+                                Text(prediction.description)
+                                    .font(.bodySmall)
+                                    .foregroundStyle(Color.textPrimary)
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.leading)
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.vertical, 7)
+                            .padding(.horizontal, 4)
+                        }
+                        .buttonStyle(.plain)
+                        Divider()
+                    }
 
                     if let loc = task.location, !loc.isEmpty {
                         Button {
@@ -177,6 +220,7 @@ struct TaskDetailView: View {
                                 .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
+                        .padding(.top, 2)
                     }
                 }
 
@@ -291,11 +335,70 @@ struct TaskDetailView: View {
         #endif
     }
 
+    // MARK: - Places autocomplete
+
+    private func searchPlaces(_ query: String) {
+        placeSearchTask?.cancel()
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard q.count >= 3 else {
+            placeSuggestions = []
+            return
+        }
+        placeSearchTask = Task {
+            try? await Task.sleep(nanoseconds: 300_000_000)   // debounce typing
+            if Task.isCancelled { return }
+            let results = await PlacesService.autocomplete(q)
+            if Task.isCancelled { return }
+            await MainActor.run { placeSuggestions = results }
+        }
+    }
+
     private func markDirty() {
         task.updatedAt = Date()
         task.syncStatus = .pending
         // Enqueue a sync change so detail-sheet edits actually push to the server.
         modelContext.insert(PendingChange(tableName: "tasks", recordId: task.id, changeType: "update"))
         try? modelContext.save()
+    }
+}
+
+// MARK: - Google Places (via the places-proxy edge function, same as the web)
+
+struct PlacePrediction: Identifiable {
+    let id = UUID()
+    let placeId: String
+    let description: String
+}
+
+enum PlacesService {
+    static func autocomplete(_ input: String) async -> [PlacePrediction] {
+        struct Body: Encodable {
+            let action = "autocomplete"
+            let input: String
+        }
+        do {
+            let resp: PlacesAutocompleteResponse = try await supabase.functions.invoke(
+                "places-proxy",
+                options: FunctionInvokeOptions(body: Body(input: input))
+            )
+            return (resp.suggestions ?? []).compactMap { s in
+                guard let p = s.placePrediction else { return nil }
+                return PlacePrediction(placeId: p.placeId, description: p.text.text)
+            }
+        } catch {
+            return []
+        }
+    }
+}
+
+private struct PlacesAutocompleteResponse: Decodable {
+    let suggestions: [Suggestion]?
+    struct Suggestion: Decodable {
+        let placePrediction: Prediction?
+    }
+    struct Prediction: Decodable {
+        let placeId: String
+        let text: PredText
+        struct PredText: Decodable { let text: String }
     }
 }
