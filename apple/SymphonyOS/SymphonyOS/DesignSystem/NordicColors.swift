@@ -4,18 +4,20 @@ import SwiftUI
 
 extension Color {
     // MARK: Background
-    static let bgBase = Color(hue: 45/360, saturation: 0.30, brightness: 0.98)
-    static let bgElevated = Color(hue: 43/360, saturation: 0.25, brightness: 0.95)
-    static let bgSurface = Color(hue: 40/360, saturation: 0.20, brightness: 0.92)
+    // Brighter, cleaner cream — most of the old "dim/yellow" look was saturation,
+    // not brightness, so pull saturation down and brightness up.
+    static let bgBase = Color(hue: 45/360, saturation: 0.11, brightness: 0.99)
+    static let bgElevated = Color(hue: 43/360, saturation: 0.08, brightness: 0.965)
+    static let bgSurface = Color(hue: 40/360, saturation: 0.11, brightness: 0.94)
 
     // MARK: Primary (Deep teal-forest)
     static let primaryTint = Color(hue: 168/360, saturation: 0.45, brightness: 0.30)
     static let primaryLight = Color(hue: 168/360, saturation: 0.35, brightness: 0.45)
 
-    // MARK: Text
-    static let textPrimary = Color(hue: 30/360, saturation: 0.10, brightness: 0.15)
-    static let textSecondary = Color(hue: 30/360, saturation: 0.08, brightness: 0.40)
-    static let textTertiary = Color(hue: 30/360, saturation: 0.06, brightness: 0.55)
+    // MARK: Text — darker for stronger contrast against the brighter cream.
+    static let textPrimary = Color(hue: 30/360, saturation: 0.12, brightness: 0.11)
+    static let textSecondary = Color(hue: 30/360, saturation: 0.10, brightness: 0.29)
+    static let textTertiary = Color(hue: 30/360, saturation: 0.08, brightness: 0.42)
 
     // MARK: Context / Domain
     static let contextWork = Color(hue: 220/360, saturation: 0.55, brightness: 0.55)

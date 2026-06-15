@@ -29,6 +29,9 @@ final class SymphonyTask {
     var deferCount: Int
     var isAllDay: Bool
     var isSomeday: Bool
+    /// Triage bucket — mirrors the web: "inbox" | "week" | "month" | "quarter" |
+    /// "someday" | "timed". The inbox is bucket == "inbox" (NOT "no date").
+    var bucket: String?
     var estimatedDuration: Int? // minutes
 
     // Context

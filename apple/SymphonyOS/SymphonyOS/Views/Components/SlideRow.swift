@@ -126,16 +126,15 @@ struct SlideRow<Content: View>: View {
     }
 
     private var dragGesture: some Gesture {
-        DragGesture(minimumDistance: 10, coordinateSpace: .local)
+        DragGesture(minimumDistance: 24, coordinateSpace: .local)
             .onChanged { value in
                 let w = value.translation.width
                 let h = value.translation.height
                 if axisHorizontal == nil {
-                    // Wait for a bit of movement, then only claim the drag if it
-                    // clearly leads horizontally — otherwise leave it to the
-                    // ScrollView so vertical scrolling stays smooth everywhere.
-                    guard abs(w) > 12 || abs(h) > 12 else { return }
-                    axisHorizontal = abs(w) > abs(h) + 8
+                    // Only claim the drag if it clearly leads horizontally — a higher
+                    // minimumDistance lets the ScrollView win ordinary vertical pans
+                    // first, so scrolling works anywhere on a row, not just the gaps.
+                    axisHorizontal = abs(w) > abs(h) + 6
                 }
                 guard axisHorizontal == true else { return }
 

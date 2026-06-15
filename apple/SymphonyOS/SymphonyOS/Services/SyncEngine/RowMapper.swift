@@ -54,6 +54,7 @@ enum RowMapper {
         task.deferCount = row.int("defer_count") ?? 0
         task.isAllDay = row.bool("is_all_day") ?? false
         task.isSomeday = row.bool("is_someday") ?? false
+        task.bucket = row.string("bucket")
         task.estimatedDuration = row.int("estimated_duration")
         task.context = row.string("context")
         task.category = row.string("category")

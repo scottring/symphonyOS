@@ -57,18 +57,11 @@ struct TodayView: View {
                             }
                         }
 
-                        // Unscheduled (inbox) section
-                        if !viewModel.inboxTasks.isEmpty {
-                            InboxSectionView(
-                                title: "Unscheduled",
-                                tasks: viewModel.inboxTasks,
-                                modelContext: modelContext,
-                                userId: auth.currentUser?.id ?? UUID()
-                            )
-                        }
+                        // NOTE: no inbox/"Unscheduled" section here — the web Today
+                        // page doesn't show the inbox; it lives in the Inbox tab.
 
                         // Empty state
-                        if viewModel.timelineItems.isEmpty && viewModel.inboxTasks.isEmpty && viewModel.carriedOverTasks.isEmpty {
+                        if viewModel.timelineItems.isEmpty && viewModel.carriedOverTasks.isEmpty {
                             emptyState
                                 .padding(.top, 60)
                         }

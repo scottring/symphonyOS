@@ -49,11 +49,11 @@ final class TimelineViewModel {
                 // Not scheduled for this day (domain filter already applied above):
                 //   • no date           → Unscheduled (inbox)
                 //   • past date + today → Carried over (overdue), mirrors web OverdueSection
-                if !task.isSomeday && !task.completed {
+                if !task.completed {
                     if let s = task.scheduledFor {
                         if isToday && s < startOfDay { carried.append(task) }
-                    } else {
-                        inbox.append(task)
+                    } else if task.bucket == "inbox" {
+                        inbox.append(task)   // true inbox only; week/month/someday excluded
                     }
                 }
                 continue

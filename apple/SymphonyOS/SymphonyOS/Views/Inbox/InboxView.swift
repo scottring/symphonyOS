@@ -6,8 +6,11 @@ struct InboxView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
 
+    // Inbox = bucket "inbox" (matches the web). Items triaged to week/month/
+    // someday have a non-inbox bucket even when they have no date, so they no
+    // longer leak in here.
     @Query(filter: #Predicate<SymphonyTask> {
-        $0.scheduledFor == nil && !$0.isSomeday && !$0.completed && $0.parentTaskId == nil
+        $0.bucket == "inbox" && !$0.completed && $0.parentTaskId == nil
     }, sort: \SymphonyTask.createdAt, order: .reverse)
     private var inboxTasks: [SymphonyTask]
 
