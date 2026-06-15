@@ -33,6 +33,10 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_PREVIEWS: YES
+        # The entitlements file holds macOS App Sandbox keys, which are invalid on
+        # iOS and break device signing. Apply them only for the macOS SDK; iOS uses
+        # the default entitlements from its provisioning profile.
+        "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": SymphonyOS/App/SymphonyOS.entitlements
       configs:
         Debug:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
@@ -41,11 +45,6 @@ targets:
     dependencies:
       - package: Supabase
         product: Supabase
-    entitlements:
-      path: SymphonyOS/App/SymphonyOS.entitlements
-      properties:
-        com.apple.security.app-sandbox: true
-        com.apple.security.network.client: true
 
   SymphonyOSTests:
     type: bundle.unit-test
