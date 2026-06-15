@@ -16,6 +16,7 @@ actor SyncEngine {
     private var isOnline = true
     private var isSyncing = false
     private var userId: UUID?
+    private var pushTask: Task<Void, Never>?
 
     // Tables we sync (in dependency order)
     static let syncedTables: [(tableName: String, modelType: any PersistentModel.Type)] = [
@@ -54,11 +55,27 @@ actor SyncEngine {
         startNetworkMonitoring()
         await performInitialSync()
         await subscribeToRealtime()
+        startPushLoop()
+    }
+
+    /// Periodically flush local edits up to Supabase. Edits enqueue a PendingChange;
+    /// this loop pushes them within a few seconds (previously push only ran on a
+    /// network reconnect, so edits effectively never synced).
+    private func startPushLoop() {
+        pushTask?.cancel()
+        pushTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 4_000_000_000)
+                await self?.pushPendingChanges()
+            }
+        }
     }
 
     /// Stop sync. Call on logout.
     func stop() async {
         self.userId = nil
+        pushTask?.cancel()
+        pushTask = nil
         for channel in realtimeChannels {
             await channel.unsubscribe()
         }
@@ -150,23 +167,17 @@ actor SyncEngine {
     // MARK: - Push
 
     private func pushChange(_ change: PendingChange, context: ModelContext) async throws {
-        guard let payload = change.payload else { return }
-
         switch change.changeType {
-        case "insert":
-            let dict = try JSONSerialization.jsonObject(with: payload) as? [String: Any] ?? [:]
+        case "insert", "update":
+            // Serialize the CURRENT local entity and upsert it. (The old code keyed
+            // off change.payload, which was never populated — so nothing ever pushed
+            // and every iOS edit was silently dropped on the next pull.)
+            guard let row = Self.serializeRow(table: change.tableName, id: change.recordId, context: context) else { return }
             try await supabase
                 .from(change.tableName)
-                .insert(AnyJSON.object(dict.mapValues { AnyJSON.from($0) }))
+                .upsert(AnyJSON.object(row))
                 .execute()
-
-        case "update":
-            let dict = try JSONSerialization.jsonObject(with: payload) as? [String: Any] ?? [:]
-            try await supabase
-                .from(change.tableName)
-                .update(AnyJSON.object(dict.mapValues { AnyJSON.from($0) }))
-                .eq("id", value: change.recordId.uuidString)
-                .execute()
+            Self.syncLog.info("pushed \(change.changeType, privacy: .public) \(change.tableName, privacy: .public)")
 
         case "delete":
             try await supabase
@@ -174,10 +185,68 @@ actor SyncEngine {
                 .delete()
                 .eq("id", value: change.recordId.uuidString)
                 .execute()
+            Self.syncLog.info("pushed delete \(change.tableName, privacy: .public)")
 
         default:
             break
         }
+    }
+
+    // MARK: - Model → Row serialization (for push)
+
+    private static let isoOut = ISO8601DateFormatter()
+
+    static func serializeRow(table: String, id: UUID, context: ModelContext) -> [String: AnyJSON]? {
+        switch table {
+        case "tasks":
+            let descriptor = FetchDescriptor<SymphonyTask>()
+            guard let t = (try? context.fetch(descriptor))?.first(where: { $0.id == id }) else { return nil }
+            return taskRow(t)
+        default:
+            return nil   // other tables aren't edited from iOS yet
+        }
+    }
+
+    private static func taskRow(_ t: SymphonyTask) -> [String: AnyJSON] {
+        func s(_ v: String?) -> AnyJSON { v.map { .string($0) } ?? .null }
+        func i(_ v: Int?) -> AnyJSON { v.map { .integer($0) } ?? .null }
+        func d(_ v: Date?) -> AnyJSON { v.map { .string(isoOut.string(from: $0)) } ?? .null }
+        func u(_ v: UUID?) -> AnyJSON { v.map { .string($0.uuidString) } ?? .null }
+        func us(_ v: [UUID]?) -> AnyJSON { v.map { .array($0.map { .string($0.uuidString) }) } ?? .null }
+        func j<T: Encodable>(_ v: T?) -> AnyJSON {
+            guard let v, let data = try? JSONEncoder().encode(v),
+                  let any = try? JSONDecoder().decode(AnyJSON.self, from: data) else { return .null }
+            return any
+        }
+        return [
+            "id": .string(t.id.uuidString),
+            "user_id": .string(t.userId.uuidString),
+            "title": .string(t.title),
+            "completed": .bool(t.completed),
+            "scheduled_for": d(t.scheduledFor),
+            "deferred_until": d(t.deferredUntil),
+            "defer_count": .integer(t.deferCount),
+            "is_all_day": .bool(t.isAllDay),
+            "is_someday": .bool(t.isSomeday),
+            "bucket": s(t.bucket),
+            "estimated_duration": i(t.estimatedDuration),
+            "context": s(t.context),
+            "category": s(t.category),
+            "notes": s(t.notes),
+            "links": j(t.links),
+            "phone_number": s(t.phoneNumber),
+            "location": s(t.location),
+            "location_place_id": s(t.locationPlaceId),
+            "contact_id": u(t.contactId),
+            "assigned_to": u(t.assignedTo),
+            "assigned_to_all": us(t.assignedToAll),
+            "project_id": u(t.projectId),
+            "parent_task_id": u(t.parentTaskId),
+            "linked_to": j(t.linkedTo),
+            "link_type": s(t.linkType),
+            "created_at": .string(isoOut.string(from: t.createdAt)),
+            "updated_at": .string(isoOut.string(from: Date())),
+        ]
     }
 
     // MARK: - Realtime Subscriptions

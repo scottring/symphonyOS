@@ -294,6 +294,8 @@ struct TaskDetailView: View {
     private func markDirty() {
         task.updatedAt = Date()
         task.syncStatus = .pending
+        // Enqueue a sync change so detail-sheet edits actually push to the server.
+        modelContext.insert(PendingChange(tableName: "tasks", recordId: task.id, changeType: "update"))
         try? modelContext.save()
     }
 }
