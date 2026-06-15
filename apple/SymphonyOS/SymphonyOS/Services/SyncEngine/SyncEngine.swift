@@ -167,9 +167,8 @@ actor SyncEngine {
                 let serverIds = Set(rows.compactMap { $0["id"]?.stringValue?.lowercased() })
                 if let locals = try? context.fetch(FetchDescriptor<T>()) {
                     for item in locals {
-                        let mirror = Mirror(reflecting: item)
-                        guard let idValue = mirror.children.first(where: { $0.label == "id" })?.value as? UUID else { continue }
-                        if !serverIds.contains(idValue.uuidString.lowercased()) {
+                        guard let identifiable = item as? HasUUID else { continue }
+                        if !serverIds.contains(identifiable.id.uuidString.lowercased()) {
                             context.delete(item)
                             deleted += 1
                         }
@@ -393,10 +392,7 @@ actor SyncEngine {
         do {
             let results = try context.fetch(descriptor)
             for item in results {
-                // Check id via reflection since we can't use protocol with associated type
-                let mirror = Mirror(reflecting: item)
-                if let idValue = mirror.children.first(where: { $0.label == "id" })?.value as? UUID,
-                   idValue == id {
+                if let identifiable = item as? HasUUID, identifiable.id == id {
                     context.delete(item)
                     return
                 }
@@ -449,3 +445,25 @@ extension AnyJSON {
         }
     }
 }
+
+// MARK: - Stable id access for reconciliation
+//
+// SwiftData @Model instances don't expose stored properties via Mirror (they're
+// backed by a hidden store), so the sync engine reads `id` through this protocol
+// instead of reflection — which silently returned nil before, making deletion
+// reconciliation a no-op (stale duplicates like a second "Iris" never cleared).
+protocol HasUUID { var id: UUID { get } }
+
+extension SymphonyTask: HasUUID {}
+extension Project: HasUUID {}
+extension Routine: HasUUID {}
+extension Contact: HasUUID {}
+extension FamilyMember: HasUUID {}
+extension ActionableInstance: HasUUID {}
+extension WeeklyTemplate: HasUUID {}
+extension PlaybookBlock: HasUUID {}
+extension PlaybookInstance: HasUUID {}
+extension FamilyRule: HasUUID {}
+extension Responsibility: HasUUID {}
+extension Household: HasUUID {}
+extension UserProfile: HasUUID {}
