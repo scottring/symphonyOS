@@ -112,9 +112,14 @@ struct SlideRow<Content: View>: View {
             }
 
             // Foreground content — carries its own background.
+            // NOTE: no `.contentShape(Rectangle())` here. `.offset` shifts the
+            // card's rendering right to reveal the action panel, but contentShape
+            // would keep its hit area at the original full width — sitting on top
+            // of the action buttons and swallowing their taps (the row would just
+            // collapse instead of running the action). The card's own opaque
+            // background is the hit area, which correctly follows the offset.
             content
                 .offset(x: translateX)
-                .contentShape(Rectangle())
                 .simultaneousGesture(dragGesture)
                 .onTapGestureCompat { if showActions { close() } }
         }

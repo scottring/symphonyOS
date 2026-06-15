@@ -7,12 +7,15 @@ import SwiftUI
 final class TimelineViewModel {
     var timelineItems: [TimelineItem] = []
     var inboxTasks: [SymphonyTask] = []
+    /// Overdue, incomplete tasks (scheduled before today) — the "Carried over" section.
+    var carriedOverTasks: [SymphonyTask] = []
 
+    // Order mirrors the web app's section order (all-day first, then by time of day).
     enum TimeSection: String, CaseIterable {
+        case allDay = "All Day"
         case morning = "Morning"
         case afternoon = "Afternoon"
         case evening = "Evening"
-        case allDay = "All Day"
     }
 
     func buildTimeline(
@@ -27,9 +30,11 @@ final class TimelineViewModel {
     ) {
         var items: [TimelineItem] = []
         var inbox: [SymphonyTask] = []
+        var carried: [SymphonyTask] = []
 
         let cal = Calendar.current
         let startOfDay = cal.startOfDay(for: date)
+        let isToday = cal.isDateInToday(date)
 
         // Tasks scheduled for this date
         for task in tasks {
@@ -41,10 +46,12 @@ final class TimelineViewModel {
 
             guard let scheduled = task.scheduledFor,
                   cal.isDate(scheduled, inSameDayAs: date) else {
-                // Unscheduled, not someday → inbox
-                if task.scheduledFor == nil && !task.isSomeday && !task.completed {
-                    if let contextValue = domainFilter.contextValue {
-                        if task.context == contextValue { inbox.append(task) }
+                // Not scheduled for this day (domain filter already applied above):
+                //   • no date           → Unscheduled (inbox)
+                //   • past date + today → Carried over (overdue), mirrors web OverdueSection
+                if !task.isSomeday && !task.completed {
+                    if let s = task.scheduledFor {
+                        if isToday && s < startOfDay { carried.append(task) }
                     } else {
                         inbox.append(task)
                     }
@@ -139,6 +146,9 @@ final class TimelineViewModel {
 
         self.timelineItems = items
         self.inboxTasks = inbox
+        self.carriedOverTasks = carried.sorted {
+            ($0.scheduledFor ?? .distantPast) < ($1.scheduledFor ?? .distantPast)
+        }
     }
 
     func section(for item: TimelineItem) -> TimeSection {
@@ -146,7 +156,7 @@ final class TimelineViewModel {
         guard let time = item.startTime else { return .morning }
         let hour = Calendar.current.component(.hour, from: time)
         if hour < 12 { return .morning }
-        if hour < 17 { return .afternoon }
+        if hour < 18 { return .afternoon }   // web uses an 18:00 afternoon/evening cutoff
         return .evening
     }
 

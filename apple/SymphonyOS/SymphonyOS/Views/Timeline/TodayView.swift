@@ -34,7 +34,17 @@ struct TodayView: View {
                 // Timeline
                 ScrollView {
                     LazyVStack(spacing: 0) {
-                        // Sections
+                        // Carried over (overdue) — mirrors the web's OverdueSection, at the top.
+                        if !viewModel.carriedOverTasks.isEmpty {
+                            InboxSectionView(
+                                title: "Carried over",
+                                tasks: viewModel.carriedOverTasks,
+                                modelContext: modelContext,
+                                userId: auth.currentUser?.id ?? UUID()
+                            )
+                        }
+
+                        // Time-of-day sections (All Day, Morning, Afternoon, Evening)
                         ForEach(TimelineViewModel.TimeSection.allCases, id: \.self) { section in
                             let sectionItems = viewModel.timelineItems.filter { viewModel.section(for: $0) == section }
                             if !sectionItems.isEmpty {
@@ -47,9 +57,10 @@ struct TodayView: View {
                             }
                         }
 
-                        // Inbox section
+                        // Unscheduled (inbox) section
                         if !viewModel.inboxTasks.isEmpty {
                             InboxSectionView(
+                                title: "Unscheduled",
                                 tasks: viewModel.inboxTasks,
                                 modelContext: modelContext,
                                 userId: auth.currentUser?.id ?? UUID()
@@ -57,7 +68,7 @@ struct TodayView: View {
                         }
 
                         // Empty state
-                        if viewModel.timelineItems.isEmpty && viewModel.inboxTasks.isEmpty {
+                        if viewModel.timelineItems.isEmpty && viewModel.inboxTasks.isEmpty && viewModel.carriedOverTasks.isEmpty {
                             emptyState
                                 .padding(.top, 60)
                         }
@@ -217,6 +228,7 @@ struct TimelineSectionView: View {
 // MARK: - Inbox Section
 
 struct InboxSectionView: View {
+    var title: String = "Unscheduled"
     let tasks: [SymphonyTask]
     let modelContext: ModelContext
     let userId: UUID
@@ -224,7 +236,7 @@ struct InboxSectionView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .center) {
-                Text("Inbox")
+                Text(title)
                     .font(.captionBold)
                     .foregroundStyle(Color.primaryTint.opacity(0.6))
                     .textCase(.uppercase)
