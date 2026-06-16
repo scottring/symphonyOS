@@ -26,7 +26,8 @@ final class TimelineViewModel {
         playbookInstances: [PlaybookInstance],
         date: Date,
         domainFilter: DomainFilter,
-        showCoaching: Bool
+        showCoaching: Bool,
+        eventItems: [TimelineItem] = []
     ) {
         var items: [TimelineItem] = []
         var inbox: [SymphonyTask] = []
@@ -136,6 +137,11 @@ final class TimelineViewModel {
                 ))
             }
         }
+
+        // Google Calendar events (already mapped to TimelineItems by
+        // GoogleCalendarService). Events bypass the domain filter — they mirror the
+        // wall/kiosk, which shows every calendar regardless of work/family/personal.
+        items.append(contentsOf: eventItems)
 
         // Sort: all-day first, then by time, then untimed
         items.sort { a, b in

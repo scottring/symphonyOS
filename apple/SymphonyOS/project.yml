@@ -30,7 +30,12 @@ targets:
         INFOPLIST_FILE: SymphonyOS/App/Info.plist
         PRODUCT_NAME: Symphony
         MARKETING_VERSION: "1.0.0"
-        CURRENT_PROJECT_VERSION: "1"
+        CURRENT_PROJECT_VERSION: "6"
+        # Signing team lives here (not just in the generated pbxproj) so `xcodegen`
+        # regeneration is safe and reproducible — regenerating no longer wipes the
+        # team. Actual cert/profile is resolved at archive time via the App Store
+        # Connect API key + -allowProvisioningUpdates.
+        DEVELOPMENT_TEAM: XT33G7U496
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_PREVIEWS: YES
         # The entitlements file holds macOS App Sandbox keys, which are invalid on

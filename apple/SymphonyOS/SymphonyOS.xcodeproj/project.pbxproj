@@ -35,8 +35,11 @@
 		71F02D60795DFA30FE1D8E16 /* ContactListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BB546AEA1DD397A0999083E /* ContactListView.swift */; };
 		7726C3A546FB6B4FE09495A9 /* View+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = D19E4BEB2CD68FA6F5256F36 /* View+Extensions.swift */; };
 		7A62D622BA88818CE3D4F8BE /* Responsibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 472A2A149D3307ED84982544 /* Responsibility.swift */; };
+		7B3914ADD95F6F5B95EA377F /* GoogleCalendarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 692BB44DC5FA145FA412DB96 /* GoogleCalendarService.swift */; };
 		98E7592BB31BDA426F553216 /* ProjectDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F78B0DC6BEC5E61D5289ABA6 /* ProjectDetailView.swift */; };
+		9E7990B3FEE174CECCB7444E /* SafariView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BC4EC7581B16A756929F754 /* SafariView.swift */; };
 		9F7F645DDEABED299DE4578C /* SyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EBED2D101D6AFAD857742E3 /* SyncEngine.swift */; };
+		A04D19140224352F7967DA60 /* CalendarSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CCEA1013A6E197978F4C424 /* CalendarSettingsView.swift */; };
 		A08B7D0D23E567D4D9E509E1 /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 936EBEFDA2D82A91BDC6877A /* Typography.swift */; };
 		A45E5B852E01AFA612AC9EA9 /* FamilyRulesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F4D6DCD44B9569D9A00BD12 /* FamilyRulesView.swift */; };
 		A5D8A8346B621F57B8565CF3 /* DomainFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27058614DEA3A0A75E46BF59 /* DomainFilter.swift */; };
@@ -85,6 +88,7 @@
 		092BB44BAB79A5C7BC3022FB /* PlaybookBlock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybookBlock.swift; sourceTree = "<group>"; };
 		09BD930B3AFC90435DE5E822 /* SlideRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlideRow.swift; sourceTree = "<group>"; };
 		0B6DCA8E5B9A0200DBB46513 /* SymphonyOSUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SymphonyOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		0CCEA1013A6E197978F4C424 /* CalendarSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarSettingsView.swift; sourceTree = "<group>"; };
 		0E4D95EEAD58A126302E8231 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		0F4D6DCD44B9569D9A00BD12 /* FamilyRulesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyRulesView.swift; sourceTree = "<group>"; };
 		12B34400FA4BE790C66C54FD /* QuickCaptureBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickCaptureBar.swift; sourceTree = "<group>"; };
@@ -106,6 +110,8 @@
 		52420F36177A3E0B1C256DAF /* SymphonyOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SymphonyOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		527B3D33FF88A9A84A5DD5F8 /* Household.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Household.swift; sourceTree = "<group>"; };
 		5FB4D96D411C7D7D86349E97 /* SymphonyOSTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymphonyOSTests.swift; sourceTree = "<group>"; };
+		692BB44DC5FA145FA412DB96 /* GoogleCalendarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleCalendarService.swift; sourceTree = "<group>"; };
+		6BC4EC7581B16A756929F754 /* SafariView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariView.swift; sourceTree = "<group>"; };
 		6E12BCB3F98A56A73FBB104A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		6EDBFA798FD6D2D5865079BE /* PlaybookViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybookViewModel.swift; sourceTree = "<group>"; };
 		70C0823D3F322CA3D99EC0A4 /* WeeklyTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyTemplate.swift; sourceTree = "<group>"; };
@@ -238,6 +244,7 @@
 				B9226E1CF4B413ACEF22DDCA /* AuthService.swift */,
 				3730D9C9BBB2E49EC7898D72 /* CalendarService.swift */,
 				27058614DEA3A0A75E46BF59 /* DomainFilter.swift */,
+				692BB44DC5FA145FA412DB96 /* GoogleCalendarService.swift */,
 				1D08C8E525AA8CAF264A73A1 /* SupabaseClient.swift */,
 			);
 			path = Services;
@@ -364,6 +371,7 @@
 		C43941B4318CB29B6600177B /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				6BC4EC7581B16A756929F754 /* SafariView.swift */,
 				09BD930B3AFC90435DE5E822 /* SlideRow.swift */,
 			);
 			path = Components;
@@ -388,6 +396,7 @@
 		E90CA601739DCB7E1F3E47C5 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				0CCEA1013A6E197978F4C424 /* CalendarSettingsView.swift */,
 				F95E01EADA6CAD09DF1A9B0A /* SettingsView.swift */,
 			);
 			path = Settings;
@@ -487,6 +496,9 @@
 					63FECB6215C3D26DE6C002D4 = {
 						TestTargetID = F267C25A11DCDC99A00B62A0;
 					};
+					F267C25A11DCDC99A00B62A0 = {
+						DevelopmentTeam = XT33G7U496;
+					};
 				};
 			};
 			buildConfigurationList = 77B7A78821F82EEA9206D757 /* Build configuration list for PBXProject "SymphonyOS" */;
@@ -540,6 +552,7 @@
 				CD119D61EA774D4915017DF0 /* AuthService.swift in Sources */,
 				BAC9271B1175D9367F5C5D30 /* AuthView.swift in Sources */,
 				3BE91A454D973F0FC966AA6B /* CalendarService.swift in Sources */,
+				A04D19140224352F7967DA60 /* CalendarSettingsView.swift in Sources */,
 				E0B9D195877BF64C575CC6B0 /* CardStyle.swift in Sources */,
 				38A50C4687C8342D2B6F0DE0 /* Contact.swift in Sources */,
 				71F02D60795DFA30FE1D8E16 /* ContactListView.swift in Sources */,
@@ -551,6 +564,7 @@
 				FB97C68042921BA69DA1E83A /* FamilyMember.swift in Sources */,
 				D49972694197D5B12E60A90B /* FamilyRule.swift in Sources */,
 				A45E5B852E01AFA612AC9EA9 /* FamilyRulesView.swift in Sources */,
+				7B3914ADD95F6F5B95EA377F /* GoogleCalendarService.swift in Sources */,
 				6B06FC18C6E07F67F06CE80F /* Household.swift in Sources */,
 				BF88A69DE3576ADBEA6AC909 /* InboxView.swift in Sources */,
 				B6A3F79EF2C00858CB49FA78 /* KeyboardShortcuts.swift in Sources */,
@@ -570,6 +584,7 @@
 				07094B11FD0EFD2BC3927820 /* RoutineDetailView.swift in Sources */,
 				47E06813C2F26251F785910B /* RoutineListView.swift in Sources */,
 				64B72D487929953D9BF0468B /* RowMapper.swift in Sources */,
+				9E7990B3FEE174CECCB7444E /* SafariView.swift in Sources */,
 				F13311D96ED0C89151D9A8B7 /* SettingsView.swift in Sources */,
 				A936C12D2B64DE7CFB1471C6 /* SlideRow.swift in Sources */,
 				0C4A58B20B67EBDA3028040D /* SupabaseClient.swift in Sources */,
@@ -619,7 +634,8 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = SymphonyOS/App/SymphonyOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 6;
+				DEVELOPMENT_TEAM = XT33G7U496;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = SymphonyOS/App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -665,7 +681,8 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = SymphonyOS/App/SymphonyOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 6;
+				DEVELOPMENT_TEAM = XT33G7U496;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = SymphonyOS/App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

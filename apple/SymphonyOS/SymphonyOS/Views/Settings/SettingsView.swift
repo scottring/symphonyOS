@@ -20,6 +20,15 @@ struct SettingsView: View {
                 }
             }
 
+            // Integrations
+            Section("Integrations") {
+                NavigationLink {
+                    CalendarSettingsView()
+                } label: {
+                    Label("Google Calendar", systemImage: "calendar")
+                }
+            }
+
             // Coaching
             Section("Coaching") {
                 Toggle("Show Coaching Blocks", isOn: Binding(

@@ -7,6 +7,7 @@ struct TodayView: View {
     @Environment(AuthService.self) private var auth
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel = TimelineViewModel()
+    @State private var calendar = GoogleCalendarService()
 
     // SwiftData queries
     @Query private var allTasks: [SymphonyTask]
@@ -81,10 +82,16 @@ struct TodayView: View {
         .toolbar(.hidden, for: .navigationBar)
         #endif
         .onAppear { rebuildTimeline() }
-        .onChange(of: appState.selectedDate) { _, _ in rebuildTimeline() }
+        .task { await calendar.fetchEvents(for: appState.selectedDate) }
+        .onChange(of: appState.selectedDate) { _, _ in
+            rebuildTimeline()
+            Task { await calendar.fetchEvents(for: appState.selectedDate) }
+        }
         .onChange(of: appState.domainFilter) { _, _ in rebuildTimeline() }
         .onChange(of: allTasks.count) { _, _ in rebuildTimeline() }
         .onChange(of: playbookInstances.count) { _, _ in rebuildTimeline() }
+        // Google events arrived (or changed) → fold them into the timeline.
+        .onChange(of: calendar.eventItems.count) { _, _ in rebuildTimeline() }
     }
 
     // MARK: - Editorial Header
@@ -188,7 +195,8 @@ struct TodayView: View {
             domainFilter: appState.domainFilter,
             // Playbook "coaching" blocks (Solo Morning, Get Ready Relay, …) are
             // relics — keep them off the timeline.
-            showCoaching: false
+            showCoaching: false,
+            eventItems: calendar.eventItems
         )
         NotificationManager.reconcile(allTasks)
     }

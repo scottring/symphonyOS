@@ -239,6 +239,20 @@ struct MoreView: View {
             }
 
             Section {
+                NavigationLink {
+                    CalendarSettingsView()
+                } label: {
+                    Label("Calendar", systemImage: "calendar")
+                }
+
+                NavigationLink {
+                    SettingsView()
+                } label: {
+                    Label("Settings", systemImage: "gear")
+                }
+            }
+
+            Section {
                 Toggle("Show Coaching", isOn: Binding(
                     get: { !appState.hideCoaching },
                     set: { appState.hideCoaching = !$0 }
