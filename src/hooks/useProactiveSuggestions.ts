@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { isQuietHours } from '@/lib/quietHours'
 import type {
   ProactiveSuggestion,
   ProactiveSuggestionRow,
@@ -8,8 +9,8 @@ import type {
 } from '@/types/proactiveSuggestion'
 import { rowToSuggestion } from '@/types/proactiveSuggestion'
 
-const POLL_INTERVAL_MS = 12 * 60 * 1000 // 12 minutes — realtime covers new rows; poll is a safety net
-const ENGINE_INTERVAL_MS = 4 * 60 * 60 * 1000 // 4 hours
+const POLL_INTERVAL_MS = 30 * 60 * 1000 // 30 minutes — realtime covers new rows; poll is a safety net
+const ENGINE_INTERVAL_MS = 6 * 60 * 60 * 1000 // 6 hours (was 4h) — cut AI engine spend
 const ENGINE_KEY = 'proactive-engine-last-run'
 
 export function useProactiveSuggestions() {
@@ -152,7 +153,13 @@ export function useProactiveSuggestions() {
   useEffect(() => {
     if (!user) return
 
-    const interval = setInterval(fetchSuggestions, POLL_INTERVAL_MS)
+    // Skip polls for backgrounded tabs and overnight — a forgotten open tab
+    // should not keep hitting the backend around the clock.
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return
+      if (isQuietHours()) return
+      fetchSuggestions()
+    }, POLL_INTERVAL_MS)
     return () => clearInterval(interval)
   }, [user, fetchSuggestions])
 

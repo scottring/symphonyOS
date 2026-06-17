@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { isQuietHours } from '@/lib/quietHours'
 import type { EmailActionItem, EmailActionCategory } from '@/types/emailAction'
 
-const POLL_INTERVAL_MS = 8 * 60 * 1000 // 8 minutes — realtime covers new items; poll is a safety net
-const SCAN_INTERVAL_MS = 2 * 60 * 60 * 1000 // 2 hours
+const POLL_INTERVAL_MS = 20 * 60 * 1000 // 20 minutes — realtime covers new items; poll is a safety net
+const SCAN_INTERVAL_MS = 4 * 60 * 60 * 1000 // 4 hours (was 2h) — cut email-scanner AI spend
 const SCAN_KEY = 'email-scanner-last-run'
 
 export function useEmailActionItems() {
@@ -117,7 +118,11 @@ export function useEmailActionItems() {
       runScanner()
     })
 
-    const interval = setInterval(fetchItems, POLL_INTERVAL_MS)
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return
+      if (isQuietHours()) return
+      fetchItems()
+    }, POLL_INTERVAL_MS)
 
     // Realtime subscription
     const channel = supabase

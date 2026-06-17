@@ -18,8 +18,8 @@ export interface KioskCard {
   created_at: string
 }
 
-const POLL_INTERVAL_MS = 3 * 60 * 1000 // 3 minutes
-const AGENT_RUN_INTERVAL_MS = 4 * 60 * 60 * 1000 // 4 hours
+const POLL_INTERVAL_MS = 12 * 60 * 1000 // 12 minutes (was 3) — glance display, no need to poll so often
+const AGENT_RUN_INTERVAL_MS = 8 * 60 * 60 * 1000 // 8 hours (was 4h) — cut kiosk-agent (gpt-4o) spend
 const AGENT_RUN_KEY = 'kiosk-agent-last-run'
 
 export function useKioskCards() {
@@ -50,6 +50,10 @@ export function useKioskCards() {
 
   // Trigger the kiosk-agent edge function (rate-limited to every 4 hours)
   const runAgent = useCallback(async () => {
+    // Don't run the (gpt-4o) agent overnight — the always-on wall is unread while
+    // everyone sleeps, so an overnight run is pure spend nobody sees.
+    if (isQuietHours()) return
+
     const lastRun = localStorage.getItem(AGENT_RUN_KEY)
     if (lastRun) {
       const elapsed = Date.now() - parseInt(lastRun, 10)
