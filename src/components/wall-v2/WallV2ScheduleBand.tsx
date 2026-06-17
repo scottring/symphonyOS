@@ -5,17 +5,19 @@
 // time-led rows (large time gutter + reused event card). This is the wall's
 // Level-1/2 information: "what's actually happening today and when."
 
-import { CalendarClock } from 'lucide-react';
+import { CalendarClock, CalendarX2 } from 'lucide-react';
 import { WallV2EventCard } from './WallV2EventCard';
 import type { WallV2ScheduleBandData } from './types';
 
 interface Props {
   band: WallV2ScheduleBandData;
+  /** Calendar fetch failed (not merely empty) — show a reconnect hint, not "no appointments". */
+  calendarUnavailable?: boolean;
   onTapEvent?: (id: string) => void;
   onToggleComplete?: (id: string, completed: boolean) => void;
 }
 
-export function WallV2ScheduleBand({ band, onTapEvent, onToggleComplete }: Props) {
+export function WallV2ScheduleBand({ band, calendarUnavailable, onTapEvent, onToggleComplete }: Props) {
   const empty = band.allDay.length === 0 && band.timed.length === 0;
 
   return (
@@ -25,7 +27,12 @@ export function WallV2ScheduleBand({ band, onTapEvent, onToggleComplete }: Props
         Schedule
       </div>
 
-      {empty ? (
+      {empty && calendarUnavailable ? (
+        <div className="flex items-center gap-2 text-[1rem] font-bold text-amber-700 dark:text-amber-400 py-2">
+          <CalendarX2 className="w-5 h-5 shrink-0" />
+          Calendar unavailable — reconnect Google Calendar
+        </div>
+      ) : empty ? (
         <div className="text-[1rem] font-bold text-stone-500 dark:text-stone-400 py-2">
           No appointments today
         </div>

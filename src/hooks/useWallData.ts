@@ -47,6 +47,8 @@ export interface UseWallDataReturn {
   days: WallDayData[]
   familyMembers: FamilyMember[]
   calendarEvents: CalendarEvent[]
+  /** True when the calendar fetch failed (not merely empty) — surface a reconnect hint. */
+  calendarUnavailable: boolean
   screenTimeSummaries: ChildScreenTimeSummary[]
   overdueTasks: TimelineItem[]
   /** Raw Task[] for surfaces (e.g. WallNow) that need real Task shape, not TimelineItem. */
@@ -90,6 +92,7 @@ export function useWallData(): UseWallDataReturn {
   const [days, setDays] = useState<WallDayData[]>([])
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([])
   const [calendarEventsState, setCalendarEventsState] = useState<CalendarEvent[]>([])
+  const [calendarUnavailable, setCalendarUnavailable] = useState(false)
   const [screenTimeSummaries, setScreenTimeSummaries] = useState<ChildScreenTimeSummary[]>([])
   const [overdueTasks, setOverdueTasks] = useState<TimelineItem[]>([])
   const [allTasks, setAllTasks] = useState<Task[]>([])
@@ -103,6 +106,10 @@ export function useWallData(): UseWallDataReturn {
     if (!user) return
 
     try {
+      // Track whether the calendar fetch *failed* (vs genuinely returned no events),
+      // so the wall can surface a "calendar unavailable" state instead of silently
+      // showing an empty schedule (which masked a rotted kiosk session, 2026-06-17).
+      let calendarFailed = false
       const { startDate, endDate, dates } = getDateRange()
       const startStr = toDateString(startDate)
       const endStr = toDateString(dates[6])
@@ -164,7 +171,10 @@ export function useWallData(): UseWallDataReturn {
 
         // 7. Calendar events (family calendars only for kiosk — excludes work)
         isConnected
-          ? fetchEvents(startDate, endDate, 'family').catch(() => [] as CalendarEvent[])
+          ? fetchEvents(startDate, endDate, 'family').catch(() => {
+              calendarFailed = true
+              return [] as CalendarEvent[]
+            })
           : Promise.resolve([] as CalendarEvent[]),
 
         // 8–10. Screen time data (today only)
@@ -381,6 +391,7 @@ export function useWallData(): UseWallDataReturn {
       if (mountedRef.current) {
         setDays(wallDays)
         setCalendarEventsState(events)
+        setCalendarUnavailable(calendarFailed)
         setScreenTimeSummaries(stSummaries)
         setOverdueTasks(overdueItems)
         setAllTasks(tasks)
@@ -426,5 +437,5 @@ export function useWallData(): UseWallDataReturn {
     }
   }, [fetchAllData])
 
-  return { days, familyMembers, calendarEvents: calendarEventsState, screenTimeSummaries, overdueTasks, tasks: allTasks, inboxCount, loading, error, lastRefresh, refetch: fetchAllData }
+  return { days, familyMembers, calendarEvents: calendarEventsState, calendarUnavailable, screenTimeSummaries, overdueTasks, tasks: allTasks, inboxCount, loading, error, lastRefresh, refetch: fetchAllData }
 }

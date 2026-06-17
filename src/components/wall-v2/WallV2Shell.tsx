@@ -496,6 +496,7 @@ export function WallV2Shell() {
           <div className="min-h-0 flex-1">
             <WallV2Timeline
               band={scheduleBand}
+              calendarUnavailable={wallData.calendarUnavailable}
               sections={timeline}
               onTapEvent={handleTapEvent}
               onToggleComplete={handleToggleComplete}

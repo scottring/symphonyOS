@@ -11,6 +11,13 @@ describe('WallV2ScheduleBand', () => {
     expect(screen.getByText('No appointments today')).toBeInTheDocument();
   });
 
+  it('shows a reconnect hint (not "no appointments") when the calendar fetch failed', () => {
+    const band: WallV2ScheduleBandData = { allDay: [], timed: [] };
+    render(<WallV2ScheduleBand band={band} calendarUnavailable />);
+    expect(screen.queryByText('No appointments today')).not.toBeInTheDocument();
+    expect(screen.getByText(/Calendar unavailable/i)).toBeInTheDocument();
+  });
+
   it('renders timed rows with their time gutter', () => {
     const band: WallV2ScheduleBandData = {
       allDay: [],
