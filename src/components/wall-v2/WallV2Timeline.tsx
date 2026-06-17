@@ -13,18 +13,21 @@ import type { WallV2TimelineSection, WallV2ScheduleBandData } from './types';
 
 interface Props {
   band: WallV2ScheduleBandData;
+  calendarUnavailable?: boolean;
   sections: WallV2TimelineSection[];
   onTapEvent?: (id: string) => void;
   onToggleComplete?: (id: string, completed: boolean) => void;
   onTapFullDay?: () => void;
 }
 
-export function WallV2Timeline({ band, sections, onTapEvent, onToggleComplete, onTapFullDay }: Props) {
+export function WallV2Timeline({ band, calendarUnavailable, sections, onTapEvent, onToggleComplete, onTapFullDay }: Props) {
   // The wall is a Pi touchscreen that delivers touch as mouse events, so native
   // touch scrolling never fires — drive scroll from pointer drag instead.
   const scrollRef = useDragScroll<HTMLDivElement>();
   const bandEmpty = band.allDay.length === 0 && band.timed.length === 0;
-  const everythingEmpty = bandEmpty && sections.length === 0;
+  // A failed calendar fetch must not read as the calm "nothing scheduled" state —
+  // keep the band visible so its reconnect hint shows.
+  const everythingEmpty = bandEmpty && sections.length === 0 && !calendarUnavailable;
   return (
     <div className="bg-white/70 dark:bg-stone-900/60 border border-stone-200/70 dark:border-stone-700/60 rounded-3xl p-5 flex flex-col gap-4 h-full min-h-0">
       <div className="text-[0.72rem] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400 shrink-0">
@@ -57,6 +60,7 @@ export function WallV2Timeline({ band, sections, onTapEvent, onToggleComplete, o
             from and above the home-rhythm sections below. */}
         <WallV2ScheduleBand
           band={band}
+          calendarUnavailable={calendarUnavailable}
           onTapEvent={onTapEvent}
           onToggleComplete={onToggleComplete}
         />
