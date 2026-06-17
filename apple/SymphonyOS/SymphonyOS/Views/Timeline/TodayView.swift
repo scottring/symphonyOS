@@ -8,6 +8,9 @@ struct TodayView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel = TimelineViewModel()
     @State private var calendar = GoogleCalendarService()
+    @State private var showSearch = false
+    @State private var searchText = ""
+    @FocusState private var searchFocused: Bool
 
     // SwiftData queries
     @Query private var allTasks: [SymphonyTask]
@@ -28,6 +31,14 @@ struct TodayView: View {
                     .padding(.top, 8)
                     .padding(.bottom, 4)
 
+                // Search field — drops down from the search icon in the header
+                if showSearch {
+                    searchField
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 8)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+
                 // Domain switcher
                 DomainSwitcher()
                     .padding(.horizontal, 20)
@@ -36,6 +47,9 @@ struct TodayView: View {
                 // Timeline
                 ScrollView {
                     LazyVStack(spacing: 0) {
+                        if isSearching {
+                            searchResultsContent
+                        } else {
                         // Carried over (overdue) — mirrors the web's OverdueSection, at the top.
                         if !viewModel.carriedOverTasks.isEmpty {
                             InboxSectionView(
@@ -67,6 +81,7 @@ struct TodayView: View {
                             emptyState
                                 .padding(.top, 60)
                         }
+                        } // end: not searching
                     }
                     .padding(.bottom, 80) // Space for quick capture bar
                 }
@@ -113,6 +128,23 @@ struct TodayView: View {
 
             // Right: Day navigation arrows
             HStack(spacing: 12) {
+                // Search — drops down a search field below the header
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showSearch.toggle()
+                        if !showSearch { searchText = "" }
+                    }
+                    searchFocused = showSearch
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(showSearch ? Color.primaryTint : Color.textTertiary)
+                        .frame(width: 32, height: 32)
+                        .background(Color.bgSurface.opacity(0.6))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         appState.goToPreviousDay()
@@ -158,6 +190,68 @@ struct TodayView: View {
                 }
                 .buttonStyle(.plain)
             }
+        }
+    }
+
+    // MARK: - Search
+
+    private var isSearching: Bool {
+        showSearch && !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var searchResults: [SymphonyTask] {
+        let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !q.isEmpty else { return [] }
+        return allTasks
+            .filter { $0.title.lowercased().contains(q) || ($0.notes?.lowercased().contains(q) ?? false) }
+            .sorted { $0.title.lowercased() < $1.title.lowercased() }
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 14))
+                .foregroundStyle(Color.textTertiary)
+            TextField("Search tasks…", text: $searchText)
+                .font(.bodyMedium)
+                .foregroundStyle(Color.textPrimary)
+                .focused($searchFocused)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+            if !searchText.isEmpty {
+                Button { searchText = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.textTertiary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Color.bgSurface, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    @ViewBuilder
+    private var searchResultsContent: some View {
+        if searchResults.isEmpty {
+            VStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 28))
+                    .foregroundStyle(Color.textTertiary)
+                Text("No matches")
+                    .font(.bodyMedium)
+                    .foregroundStyle(Color.textSecondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, 60)
+        } else {
+            InboxSectionView(
+                title: "Results",
+                tasks: searchResults,
+                modelContext: modelContext,
+                userId: auth.currentUser?.id ?? UUID()
+            )
         }
     }
 
