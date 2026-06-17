@@ -167,9 +167,9 @@ private struct CaptureSheet: View {
                 ScanReviewSheet(
                     image: review.image,
                     initial: review.extraction,
-                    onSave: { title, due, notes, context in
+                    onSave: { title, scheduledFor, notes, context in
                         pendingReview = nil
-                        saveScan(data: review.data, title: title, due: due, notes: notes, context: context)
+                        saveScan(data: review.data, title: title, scheduledFor: scheduledFor, notes: notes, context: context)
                     },
                     onCancel: { pendingReview = nil }
                 )
@@ -200,16 +200,16 @@ private struct CaptureSheet: View {
         pendingReview = PendingReview(image: ui, data: jpeg, extraction: extraction)
     }
 
-    private func saveScan(data: Data, title: String, due: Date?, notes: String?, context: String?) {
+    private func saveScan(data: Data, title: String, scheduledFor: Date?, notes: String?, context: String?) {
         let vm = TaskViewModel(modelContext: modelContext)
         let finalTitle = title.isEmpty ? "Scanned document" : title
-        let task = vm.createTask(title: finalTitle, userId: userId, context: context)
+        let task = vm.createTask(
+            title: finalTitle, userId: userId,
+            scheduledFor: scheduledFor, isAllDay: scheduledFor != nil, context: context
+        )
 
-        var noteParts: [String] = []
-        if let due { noteParts.append("Due: \(Self.ymd.string(from: due))") }
-        if let notes, !notes.isEmpty { noteParts.append(notes) }
-        if !noteParts.isEmpty {
-            task.notes = noteParts.joined(separator: "\n")
+        if let notes, !notes.isEmpty {
+            task.notes = notes
             try? modelContext.save()
         }
 
@@ -230,13 +230,6 @@ private struct CaptureSheet: View {
         }
         dismiss()
     }
-
-    private static let ymd: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.timeZone = .current
-        return f
-    }()
 }
 
 // MARK: - macOS Split View

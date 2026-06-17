@@ -4,13 +4,15 @@ import SwiftUI
 struct ScanReviewSheet: View {
     let image: UIImage
     let initial: ScanExtraction?
-    /// (title, dueDate?, notes?, context?)
+    /// (title, scheduledFor?, notes?, context?) — scheduledFor nil ⇒ Inbox.
     let onSave: (String, Date?, String?, String?) -> Void
     let onCancel: () -> Void
 
+    enum Destination: Hashable { case inbox, today, date }
+
     @State private var title = ""
-    @State private var hasDueDate = false
-    @State private var dueDate = Date()
+    @State private var destination: Destination = .inbox
+    @State private var date = Date()
     @State private var notes = ""
     @State private var context: String? = nil
 
@@ -26,9 +28,16 @@ struct ScanReviewSheet: View {
                 }
                 Section("Task") {
                     TextField("Title", text: $title)
-                    Toggle("Due date", isOn: $hasDueDate)
-                    if hasDueDate {
-                        DatePicker("Due", selection: $dueDate, displayedComponents: .date)
+                }
+                Section("Add to") {
+                    Picker("Add to", selection: $destination) {
+                        Text("Inbox").tag(Destination.inbox)
+                        Text("Today").tag(Destination.today)
+                        Text("Date").tag(Destination.date)
+                    }
+                    .pickerStyle(.segmented)
+                    if destination == .date {
+                        DatePicker("Date", selection: $date, displayedComponents: .date)
                     }
                 }
                 Section("Notes") {
@@ -52,7 +61,7 @@ struct ScanReviewSheet: View {
                     Button("Save") {
                         onSave(
                             title.trimmingCharacters(in: .whitespacesAndNewlines),
-                            hasDueDate ? dueDate : nil,
+                            scheduledFor,
                             notes.isEmpty ? nil : notes,
                             context
                         )
@@ -64,13 +73,22 @@ struct ScanReviewSheet: View {
         }
     }
 
+    private var scheduledFor: Date? {
+        switch destination {
+        case .inbox: return nil
+        case .today: return Calendar.current.startOfDay(for: Date())
+        case .date:  return Calendar.current.startOfDay(for: date)
+        }
+    }
+
     private func prefill() {
         if let t = initial?.title, !t.isEmpty { title = t } else { title = "Scanned document" }
         notes = initial?.notes ?? ""
         context = initial?.context
+        // If the AI found an explicit date, default to scheduling on that date.
         if let d = initial?.dueDate, let parsed = Self.dateFormatter.date(from: d) {
-            hasDueDate = true
-            dueDate = parsed
+            destination = .date
+            date = parsed
         }
     }
 
