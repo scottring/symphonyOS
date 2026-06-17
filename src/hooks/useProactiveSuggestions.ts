@@ -11,7 +11,6 @@ import { rowToSuggestion } from '@/types/proactiveSuggestion'
 
 const POLL_INTERVAL_MS = 30 * 60 * 1000 // 30 minutes — realtime covers new rows; poll is a safety net
 const ENGINE_INTERVAL_MS = 6 * 60 * 60 * 1000 // 6 hours (was 4h) — cut AI engine spend
-const ENGINE_KEY = 'proactive-engine-last-run'
 
 export function useProactiveSuggestions() {
   const { user } = useAuth()
@@ -138,15 +137,18 @@ export function useProactiveSuggestions() {
       return
     }
 
-    const lastRun = localStorage.getItem(ENGINE_KEY)
-    const shouldRun = !lastRun || (Date.now() - parseInt(lastRun, 10)) > ENGINE_INTERVAL_MS
-
-    if (shouldRun) {
-      localStorage.setItem(ENGINE_KEY, Date.now().toString())
-      runEngine()
-    } else {
-      fetchSuggestions()
-    }
+    // Shared, cross-device claim: exactly one device/tab runs the engine per
+    // interval (replaces per-device localStorage gating, which multiplied the
+    // AI spend by the number of open devices/tabs).
+    supabase
+      .rpc('claim_engine_run', {
+        p_key: `proactive-engine:${user.id}`,
+        p_interval_seconds: ENGINE_INTERVAL_MS / 1000,
+      })
+      .then(({ data: claimed }) => {
+        if (claimed) runEngine()
+        else fetchSuggestions()
+      })
   }, [user, runEngine, fetchSuggestions])
 
   // Poll for updates

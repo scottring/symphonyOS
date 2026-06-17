@@ -6,7 +6,6 @@ import type { EmailActionItem, EmailActionCategory } from '@/types/emailAction'
 
 const POLL_INTERVAL_MS = 20 * 60 * 1000 // 20 minutes — realtime covers new items; poll is a safety net
 const SCAN_INTERVAL_MS = 4 * 60 * 60 * 1000 // 4 hours (was 2h) — cut email-scanner AI spend
-const SCAN_KEY = 'email-scanner-last-run'
 
 export function useEmailActionItems() {
   const { user } = useAuth()
@@ -80,20 +79,21 @@ export function useEmailActionItems() {
 
   // Trigger the email-scanner edge function (rate-limited to every 2 hours)
   const runScanner = useCallback(async () => {
-    const lastRun = localStorage.getItem(SCAN_KEY)
-    if (lastRun) {
-      const elapsed = Date.now() - parseInt(lastRun, 10)
-      if (elapsed < SCAN_INTERVAL_MS) return
-    }
-
     // Only scan during waking hours (6 AM - 9 PM)
     const hour = new Date().getHours()
     if (hour < 6 || hour >= 21) return
 
     try {
-      localStorage.setItem(SCAN_KEY, Date.now().toString())
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.access_token) return
+
+      // Shared, cross-device claim — exactly one device runs the scanner per
+      // interval (replaces per-device localStorage gating).
+      const { data: claimed } = await supabase.rpc('claim_engine_run', {
+        p_key: `email-scanner:${session.user.id}`,
+        p_interval_seconds: SCAN_INTERVAL_MS / 1000,
+      })
+      if (!claimed) return
 
       const { error } = await supabase.functions.invoke('email-scanner', {
         headers: { Authorization: `Bearer ${session.access_token}` },

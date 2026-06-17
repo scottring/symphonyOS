@@ -20,7 +20,6 @@ export interface KioskCard {
 
 const POLL_INTERVAL_MS = 12 * 60 * 1000 // 12 minutes (was 3) — glance display, no need to poll so often
 const AGENT_RUN_INTERVAL_MS = 8 * 60 * 60 * 1000 // 8 hours (was 4h) — cut kiosk-agent (gpt-4o) spend
-const AGENT_RUN_KEY = 'kiosk-agent-last-run'
 
 export function useKioskCards() {
   const { user } = useAuth()
@@ -54,17 +53,17 @@ export function useKioskCards() {
     // everyone sleeps, so an overnight run is pure spend nobody sees.
     if (isQuietHours()) return
 
-    const lastRun = localStorage.getItem(AGENT_RUN_KEY)
-    if (lastRun) {
-      const elapsed = Date.now() - parseInt(lastRun, 10)
-      if (elapsed < AGENT_RUN_INTERVAL_MS) return
-    }
-
     try {
-      localStorage.setItem(AGENT_RUN_KEY, Date.now().toString())
-
       const { data: { session: currentSession } } = await supabase.auth.getSession()
       if (!currentSession?.access_token) return
+
+      // Shared, cross-device claim — exactly one device runs the agent per
+      // interval (replaces per-device localStorage gating).
+      const { data: claimed } = await supabase.rpc('claim_engine_run', {
+        p_key: `kiosk-agent:${currentSession.user.id}`,
+        p_interval_seconds: AGENT_RUN_INTERVAL_MS / 1000,
+      })
+      if (!claimed) return
 
       const { data, error } = await supabase.functions.invoke('kiosk-agent', {
         headers: { Authorization: `Bearer ${currentSession.access_token}` },
@@ -94,12 +93,10 @@ export function useKioskCards() {
   useEffect(() => {
     mountedRef.current = true
 
-    // On mount: fetch cards, then run agent if no cards exist
+    // On mount: fetch cards, then attempt an agent run (the shared claim gate
+    // lets exactly one device run per interval; the first-ever run claims
+    // immediately, so a cold start still populates cards).
     fetchCards().then(() => {
-      // If no cards in DB, clear rate limit so agent runs immediately
-      if (cards.length === 0) {
-        localStorage.removeItem(AGENT_RUN_KEY)
-      }
       runAgent()
     })
 
@@ -109,7 +106,6 @@ export function useKioskCards() {
       mountedRef.current = false
       clearInterval(interval)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchCards, runAgent])
 
   return { cards, loading, dismissCard, refetchCards: fetchCards, runAgentNow: runAgent }
