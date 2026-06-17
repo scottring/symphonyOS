@@ -104,8 +104,12 @@ actor SyncEngine {
                 } catch {
                     change.attempts += 1
                     change.lastAttemptAt = Date()
+                    // Surface the failure — silent push errors hid a schema drift
+                    // (phantom columns) that dropped every iOS write for days.
+                    Self.syncLog.error("push \(change.tableName, privacy: .public) \(change.changeType, privacy: .public) FAILED (attempt \(change.attempts)): \(error.localizedDescription, privacy: .public)")
                     // Keep in queue for retry (up to 10 attempts)
                     if change.attempts >= 10 {
+                        Self.syncLog.error("DROPPING \(change.tableName, privacy: .public) \(change.changeType, privacy: .public) after 10 failed attempts")
                         context.delete(change)
                     }
                 }
@@ -262,7 +266,6 @@ actor SyncEngine {
             "deferred_until": d(t.deferredUntil),
             "defer_count": .integer(t.deferCount),
             "is_all_day": .bool(t.isAllDay),
-            "is_someday": .bool(t.isSomeday),
             "bucket": s(t.bucket),
             "estimated_duration": i(t.estimatedDuration),
             "context": s(t.context),
@@ -277,7 +280,6 @@ actor SyncEngine {
             "assigned_to_all": us(t.assignedToAll),
             "project_id": u(t.projectId),
             "parent_task_id": u(t.parentTaskId),
-            "linked_to": j(t.linkedTo),
             "link_type": s(t.linkType),
             "created_at": .string(isoOut.string(from: t.createdAt)),
             "updated_at": .string(isoOut.string(from: Date())),
