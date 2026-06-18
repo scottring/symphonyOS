@@ -212,6 +212,17 @@ export function useWallData(): UseWallDataReturn {
 
       if (!mountedRef.current) return
 
+      // Surface per-query failures. PostgREST returns { data, error } rather than
+      // throwing, so a failed query would otherwise become silent empty data and
+      // the wall would render a partial schedule with no indication anything broke.
+      // We still render whatever data did arrive (graceful degradation) but set the
+      // error so the already-rendered banner tells the family the wall is stale.
+      const dataError = [
+        membersRes, tasksRes, routinesRes, instancesRes, contactsRes,
+        milestonesRes, stBudgetsRes, stEntriesRes, stAdjustmentsRes,
+        overdueRes, inboxCountRes, routineCompletionsRes,
+      ].find((r) => r.error)?.error?.message ?? null
+
       const members = (membersRes.data || []) as FamilyMember[]
       setFamilyMembers(members)
 
@@ -396,7 +407,7 @@ export function useWallData(): UseWallDataReturn {
         setOverdueTasks(overdueItems)
         setAllTasks(tasks)
         setInboxCount(inboxCountRes.count ?? 0)
-        setError(null)
+        setError(dataError)
         setLastRefresh(new Date())
         setLoading(false)
       }
