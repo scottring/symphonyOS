@@ -146,7 +146,7 @@ actor SyncEngine {
 
     // MARK: - Pull
 
-    private func pullTable<T: PersistentModel>(_ table: String, as type: T.Type, userId: UUID, reconcile: Bool = true) async {
+    private func pullTable<T: PersistentModel & HasUUID>(_ table: String, as type: T.Type, userId: UUID, reconcile: Bool = true) async {
         let context = ModelContext(modelContainer)
         do {
             let rows: [[String: AnyJSON]] = try await supabase
@@ -155,32 +155,41 @@ actor SyncEngine {
                 .execute()
                 .value
 
+            let serverIds = Set(rows.compactMap { $0["id"]?.stringValue?.lowercased() })
+
+            // Phase 1: delete any local row we're about to replace (same id), plus —
+            // for server-owned tables — rows that no longer exist on the server
+            // (stale duplicates, deleted people, etc.). NOT tasks for the latter,
+            // which can have locally-created rows that haven't pushed yet.
+            //
+            // We delete-then-insert (with a save between the phases) rather than a
+            // bare insert because SwiftData's implicit unique-id upsert does NOT
+            // reliably overwrite an existing row's fields — so a server change like
+            // a task completed on the web was silently dropped on any device that
+            // already had that task locally.
+            var deleted = 0
+            if let locals = try? context.fetch(FetchDescriptor<T>()) {
+                for item in locals {
+                    let idStr = item.id.uuidString.lowercased()
+                    if serverIds.contains(idStr) {
+                        context.delete(item)            // replaced by the fresh row below
+                    } else if reconcile {
+                        context.delete(item)            // gone from server
+                        deleted += 1
+                    }
+                }
+            }
+            try context.save()
+
+            // Phase 2: insert the fresh server rows.
             var inserted = 0
             for row in rows {
                 guard let model = RowMapper.toModel(type, from: row) else { continue }
                 context.insert(model)
                 inserted += 1
             }
-
-            // Reconcile deletions: drop local rows that no longer exist on the
-            // server (stale duplicates, deleted people, etc.). Only for
-            // server-owned tables — NOT tasks, which can have locally-created
-            // rows that haven't pushed yet.
-            var deleted = 0
-            if reconcile {
-                let serverIds = Set(rows.compactMap { $0["id"]?.stringValue?.lowercased() })
-                if let locals = try? context.fetch(FetchDescriptor<T>()) {
-                    for item in locals {
-                        guard let identifiable = item as? HasUUID else { continue }
-                        if !serverIds.contains(identifiable.id.uuidString.lowercased()) {
-                            context.delete(item)
-                            deleted += 1
-                        }
-                    }
-                }
-            }
-
             try context.save()
+
             Self.syncLog.info("pull \(table, privacy: .public): fetched \(rows.count) inserted \(inserted) deleted \(deleted)")
         } catch {
             Self.syncLog.error("pull \(table, privacy: .public) FAILED: \(error.localizedDescription, privacy: .public)")
@@ -331,48 +340,44 @@ actor SyncEngine {
     private func handleInsertOrUpdate(table: String, record: [String: AnyJSON], context: ModelContext) {
         switch table {
         case "tasks":
-            if let model = RowMapper.toModel(SymphonyTask.self, from: record) {
-                context.insert(model)
-            }
+            if let model = RowMapper.toModel(SymphonyTask.self, from: record) { upsert(model, context: context) }
         case "projects":
-            if let model = RowMapper.toModel(Project.self, from: record) {
-                context.insert(model)
-            }
+            if let model = RowMapper.toModel(Project.self, from: record) { upsert(model, context: context) }
         case "routines":
-            if let model = RowMapper.toModel(Routine.self, from: record) {
-                context.insert(model)
-            }
+            if let model = RowMapper.toModel(Routine.self, from: record) { upsert(model, context: context) }
         case "contacts":
-            if let model = RowMapper.toModel(Contact.self, from: record) {
-                context.insert(model)
-            }
+            if let model = RowMapper.toModel(Contact.self, from: record) { upsert(model, context: context) }
         case "family_members":
-            if let model = RowMapper.toModel(FamilyMember.self, from: record) {
-                context.insert(model)
-            }
+            if let model = RowMapper.toModel(FamilyMember.self, from: record) { upsert(model, context: context) }
         case "actionable_instances":
-            if let model = RowMapper.toModel(ActionableInstance.self, from: record) {
-                context.insert(model)
-            }
+            if let model = RowMapper.toModel(ActionableInstance.self, from: record) { upsert(model, context: context) }
         case "playbook_blocks":
-            if let model = RowMapper.toModel(PlaybookBlock.self, from: record) {
-                context.insert(model)
-            }
+            if let model = RowMapper.toModel(PlaybookBlock.self, from: record) { upsert(model, context: context) }
         case "playbook_instances":
-            if let model = RowMapper.toModel(PlaybookInstance.self, from: record) {
-                context.insert(model)
-            }
+            if let model = RowMapper.toModel(PlaybookInstance.self, from: record) { upsert(model, context: context) }
         case "family_rules":
-            if let model = RowMapper.toModel(FamilyRule.self, from: record) {
-                context.insert(model)
-            }
+            if let model = RowMapper.toModel(FamilyRule.self, from: record) { upsert(model, context: context) }
         case "responsibilities":
-            if let model = RowMapper.toModel(Responsibility.self, from: record) {
-                context.insert(model)
-            }
+            if let model = RowMapper.toModel(Responsibility.self, from: record) { upsert(model, context: context) }
         default:
             break
         }
+    }
+
+    /// Replace any locally-stored row with the same id, then insert the fresh
+    /// model. SwiftData's implicit unique-constraint upsert does NOT reliably
+    /// overwrite an existing row's fields (especially across ModelContexts), so a
+    /// realtime UPDATE — e.g. a task checked off on the web — was being dropped on
+    /// devices that already had the row. Deleting (and saving) before inserting
+    /// guarantees the local row matches the server and avoids a unique-constraint
+    /// conflict within a single transaction.
+    private func upsert<T: PersistentModel & HasUUID>(_ model: T, context: ModelContext) {
+        let targetId = model.id
+        if let existing = try? context.fetch(FetchDescriptor<T>()).first(where: { $0.id == targetId }) {
+            context.delete(existing)
+            try? context.save()
+        }
+        context.insert(model)
     }
 
     private func handleDelete(table: String, oldRecord: [String: AnyJSON], context: ModelContext) {
