@@ -42,6 +42,9 @@ final class TaskViewModel {
         task.scheduledFor = date
         task.isAllDay = isAllDay
         task.isSomeday = false
+        // Move it out of the inbox once it has a date (the inbox is bucket=="inbox",
+        // independent of scheduledFor) — otherwise it shows in both Today and Inbox.
+        task.bucket = date != nil ? "timed" : "inbox"
         task.updatedAt = Date()
         task.syncStatus = .pending
         queueChange(tableName: "tasks", recordId: task.id, type: "update")
@@ -77,6 +80,7 @@ final class TaskViewModel {
     func markSomeday(_ task: SymphonyTask) {
         task.isSomeday = true
         task.scheduledFor = nil
+        task.bucket = "someday"   // out of the inbox bucket, into someday
         task.updatedAt = Date()
         task.syncStatus = .pending
         queueChange(tableName: "tasks", recordId: task.id, type: "update")
