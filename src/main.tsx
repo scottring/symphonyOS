@@ -14,8 +14,10 @@ if (import.meta.env.PROD && import.meta.env.VITE_SENTRY_DSN) {
         blockAllMedia: true,
       }),
     ],
-    // Performance Monitoring
-    tracesSampleRate: 1.0, // Capture 100% of transactions for beta (reduce later)
+    // Performance Monitoring — sample 20% of transactions (errors are still
+    // captured at 100% regardless; this only trims performance-trace volume/cost
+    // ahead of opening the app up beyond the household).
+    tracesSampleRate: 0.2,
     // Session Replay
     replaysSessionSampleRate: 0.1, // 10% of sessions
     replaysOnErrorSampleRate: 1.0, // 100% of sessions with errors
