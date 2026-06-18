@@ -63,9 +63,11 @@ private struct LaunchScreen: View {
         ZStack {
             Color.bgBase.ignoresSafeArea()
             VStack(spacing: 16) {
-                Image(systemName: "music.note.list")
-                    .font(.system(size: 48))
-                    .foregroundStyle(Color.primaryTint)
+                Image("TreeLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 104, height: 104)
+                    .clipShape(Circle())
                 Text("Symphony")
                     .font(.displayLarge)
                     .foregroundStyle(Color.textPrimary)

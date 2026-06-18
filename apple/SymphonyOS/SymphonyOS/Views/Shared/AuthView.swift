@@ -15,9 +15,11 @@ struct AuthView: View {
                 VStack(spacing: 32) {
                     // Header
                     VStack(spacing: 8) {
-                        Image(systemName: "music.note.list")
-                            .font(.system(size: 44))
-                            .foregroundStyle(Color.primaryTint)
+                        Image("TreeLogo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 96, height: 96)
+                            .clipShape(Circle())
 
                         Text("Symphony")
                             .font(.displayLarge)
