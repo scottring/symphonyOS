@@ -14,6 +14,7 @@ function makeChain(returnData: unknown) {
   const chain: any = {
     select: vi.fn(() => chain),
     eq: vi.fn(() => chain),
+    order: vi.fn(() => chain),
     then: (resolve: any) => resolve({ data: returnData, error: null }),
     maybeSingle: vi.fn(() => Promise.resolve({ data: returnData, error: null })),
   }
@@ -31,10 +32,10 @@ const plan: MealPlan = {
   createdAt: new Date(), updatedAt: new Date(),
 }
 
-// FIXME(pre-existing-from-main): see docs/superpowers/specs/2026-05-05-symphony-shell-apps-and-job-app.md "Pre-existing test carve-out"
-// Times out — the per-test supabase mock chain doesn't match the actual call pattern
-// in useGroceryStatus, so loading never resolves to false within the waitFor window.
-describe.skip('useGroceryStatus', () => {
+// Revived 2026-06: the supabase mock chain now matches useGroceryStatus's actual
+// call pattern (lists.maybeSingle, list_items, then a stores lists.order query —
+// the missing .order() was what made loading hang).
+describe('useGroceryStatus', () => {
   beforeEach(() => {
     vi.mocked(__mockFrom as any).mockReset()
   })
@@ -44,7 +45,8 @@ describe.skip('useGroceryStatus', () => {
     vi.mocked(__mockFrom as any).mockImplementation(() => {
       n += 1
       if (n === 1) return makeChain({ id: 'groceries-list-id' })  // lists.maybeSingle
-      return makeChain([{ text: 'milk' }, { text: 'eggs' }])  // list_items
+      if (n === 2) return makeChain([{ text: 'milk' }, { text: 'eggs' }])  // list_items
+      return makeChain([])  // stores: lists.select('id,title').eq().order()
     })
     const { result } = renderHook(() => useGroceryStatus(plan, recipes))
     await waitFor(() => expect(result.current.loading).toBe(false))
