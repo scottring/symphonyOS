@@ -1235,6 +1235,43 @@ footer {
 }
 
 /* ============================================
+   EXPLAINER (SEE IT IN MOTION) SECTION
+   ============================================ */
+.explainer-section {
+  background: var(--bg-deep);
+  position: relative;
+}
+
+.explainer-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+}
+
+.explainer-frame {
+  margin: 56px auto 0;
+  max-width: 960px;
+  width: 100%;
+  aspect-ratio: 1200 / 800;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #285C44;
+  border: 1px solid var(--card-border);
+  box-shadow: 0 20px 60px rgba(40, 92, 68, 0.22), 0 4px 16px var(--card-shadow);
+}
+
+.explainer-frame iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+/* ============================================
    FEATURES GRID SECTION
    ============================================ */
 .features-section {
@@ -1910,6 +1947,22 @@ footer {
         </div><!-- /iphone-screen -->
       </div><!-- /iphone-body -->
     </div><!-- /iphone-wrapper -->
+  </div>
+</section>
+
+<!-- ========== EXPLAINER / SEE IT IN MOTION ========== -->
+<section class="explainer-section" id="explainer">
+  <div class="container">
+    <div class="animate-on-scroll" style="text-align:center;">
+      <div class="section-eyebrow">See it in motion</div>
+      <h2 class="section-heading">Watch Symphony<br><em style="font-style:italic;color:var(--amber)">come to life.</em></h2>
+      <p class="section-sub" style="margin:0 auto;text-align:center;">
+        A two-minute walk through how a plain list becomes a coached, narrative day.
+      </p>
+    </div>
+    <div class="explainer-frame animate-on-scroll">
+      <iframe src="explainer.html" title="Symphony explainer" loading="lazy" allowfullscreen></iframe>
+    </div>
   </div>
 </section>
 
