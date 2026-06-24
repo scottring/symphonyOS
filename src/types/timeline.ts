@@ -1,7 +1,7 @@
 import type { Task, TaskLink, TaskCategory } from './task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, RecurrencePattern } from './actionable'
-export type TimelineItemType = 'task' | 'event' | 'routine'
+export type TimelineItemType = 'task' | 'event' | 'routine' | 'routine-collection'
 
 export interface TimelineItem {
   id: string
@@ -39,6 +39,10 @@ export interface TimelineItem {
   attendees?: { email: string; displayName?: string; responseStatus?: string; self?: boolean }[]
   // Routine-specific
   recurrencePattern?: RecurrencePattern
+  // Routine-collection-specific
+  collectionProgress?: { done: number; total: number }
+  collectionNextUp?: { stepId: string; stepName: string; time: string | null; doseSlot: number | null }
+  steps?: TimelineItem[] // pre-built per-dose step items; present only on 'routine-collection'
   // Derived display state
   isOverdue?: boolean // True when item is past-due and incomplete
   // Original data for actions
