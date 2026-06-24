@@ -79,6 +79,7 @@ export interface Routine {
   image_url?: string | null // per-exercise image (fidelity B); null in v1
   raw_input: string | null // Original natural language input
   show_on_timeline: boolean // Whether to display on Today view (default true)
+  pin_to_timeline?: boolean // Always show on Today even when "hide daily routines" is on (tracked obligations, e.g. PT exercises)
   context?: 'work' | 'family' | 'personal' | null // Life domain for filtering
   project_id?: string | null // Optional link to the program/project this routine belongs to
   location?: string | null // Where the routine happens (e.g. school pickup) — enables directions

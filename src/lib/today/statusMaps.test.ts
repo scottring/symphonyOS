@@ -34,4 +34,14 @@ describe('statusMaps', () => {
     expect(selectVisibleRoutines([daily, weekly, hidden], false).map(r => r.id)).toEqual(['d', 'w'])
     expect(selectVisibleRoutines([daily, weekly, hidden], true).map(r => r.id)).toEqual(['w'])
   })
+  it('hideRoutines keeps pinned and dosed everyday routines on Today', () => {
+    const plainDaily = { id: 'd', show_on_timeline: true, recurrence_pattern: { type: 'daily' } } as unknown as Routine
+    const pinned = { id: 'p', show_on_timeline: true, recurrence_pattern: { type: 'daily' }, pin_to_timeline: true } as unknown as Routine
+    const dosed = { id: 'x', show_on_timeline: true, recurrence_pattern: { type: 'daily' }, times_per_day: ['09:00', '18:00'] } as unknown as Routine
+    // With hideRoutines on, the plain daily is swept but pinned + dosed survive.
+    expect(selectVisibleRoutines([plainDaily, pinned, dosed], true).map(r => r.id)).toEqual(['p', 'x'])
+    // A pinned routine that is explicitly hidden (show_on_timeline false) still stays off.
+    const pinnedButHidden = { id: 'ph', show_on_timeline: false, recurrence_pattern: { type: 'daily' }, pin_to_timeline: true } as unknown as Routine
+    expect(selectVisibleRoutines([pinnedButHidden], true)).toEqual([])
+  })
 })
