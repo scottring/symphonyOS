@@ -78,6 +78,41 @@ describe('buildGroupedSections', () => {
     expect(sections.morning?.filter(i => i.id === 'routine-rt1' && !i.isSubtask)).toEqual([])
   })
 
+  it('dosed routine yields one timeline item per dose, completion per slot', () => {
+    const date = new Date('2026-06-24T00:00:00Z')
+    const r = {
+      id: 'rx', name: 'Median nerve glide', time_of_day: null,
+      recurrence_pattern: { type: 'daily' }, assigned_to: null, assigned_to_all: null,
+      times_per_day: ['09:00', '18:00'],
+    } as any
+    const inst = { entity_id: 'rx#0', status: 'completed', routine_id: 'rx' } as any
+    const sections = buildGroupedSections({
+      timedTasks: [], events: [], routines: [r], viewedDate: date,
+      routineStatusMap: new Map([['rx#0', inst]]),
+      eventStatusMap: new Map(), match: matchAll,
+    })
+    const items = Object.values(sections).flat().filter((i) => i.type === 'routine' && i.title === 'Median nerve glide')
+    expect(items.map((i) => i.id).sort()).toEqual(['routine-rx#0', 'routine-rx#1'])
+    expect(items.find((i) => i.id === 'routine-rx#0')!.completed).toBe(true)
+    expect(items.find((i) => i.id === 'routine-rx#1')!.completed).toBeFalsy()
+  })
+
+  it('non-dosed routine still produces a single routine-<id> item (back-compat)', () => {
+    const date = new Date('2026-06-24T00:00:00Z')
+    const r = {
+      id: 'r1', name: 'Morning stretch', time_of_day: '07:00',
+      recurrence_pattern: { type: 'daily' }, assigned_to: null, assigned_to_all: null,
+      times_per_day: null,
+    } as any
+    const sections = buildGroupedSections({
+      timedTasks: [], events: [], routines: [r], viewedDate: date,
+      routineStatusMap: new Map(), eventStatusMap: new Map(), match: matchAll,
+    })
+    const items = Object.values(sections).flat().filter((i) => i.type === 'routine' && i.title === 'Morning stretch')
+    expect(items).toHaveLength(1)
+    expect(items[0].id).toBe('routine-r1')
+  })
+
   it('skips a dangling member ref (member not present)', () => {
     const date = new Date('2026-06-05T00:00:00Z')
     const wrapper = {

@@ -6,6 +6,7 @@ import type { DaySection } from '@/lib/timeUtils'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import { groupByDaySection } from '@/lib/timeUtils'
 import { resolveEventContext } from './eventContext'
+import { expandRoutineDoses, routineStatusKey } from './doseExpansion'
 
 export interface GroupingInput {
   timedTasks: Task[]
@@ -58,32 +59,41 @@ export function buildGroupedSections(input: GroupingInput): Record<DaySection, T
     })
     .filter((item) => match(item.assignedTo))
 
-  // Map and filter routines by assignee
+  // Map and filter routines by assignee; expand dosed routines into one item per dose
   const routineItems = routines
     .filter((routine) => match(routine.assigned_to, routine.assigned_to_all))
-    .map((routine) => {
-      const item = routineToTimelineItem(routine, viewedDate)
-      const instance = routineStatusMap.get(routine.id)
-      if (instance?.status === 'completed') item.completed = true
-      else if (instance?.status === 'skipped') item.skipped = true
-      // Override time if rescheduled
-      // This applies when:
-      // 1. Same-day reschedule (status='pending', deferred_to is a time change)
-      // 2. Cross-day reschedule showing on target day (status='deferred', viewing the deferred_to date)
-      if (instance?.deferred_to) {
-        const deferredTime = new Date(instance.deferred_to)
-        const deferredDateStr = deferredTime.toISOString().split('T')[0]
-        const viewedDateStr = viewedDate.toISOString().split('T')[0]
-
-        // Apply time override if:
-        // - Same-day time change (pending status)
-        // - Or this is a deferred routine and we're viewing the target date
-        if (instance.status === 'pending' || (instance.status === 'deferred' && deferredDateStr === viewedDateStr)) {
-          item.startTime = deferredTime
+    .flatMap((routine) =>
+      expandRoutineDoses(routine).map((dose) => {
+        const item = routineToTimelineItem(routine, viewedDate)
+        item.id = dose.slotId
+        if (dose.time) {
+          const [h, m] = dose.time.split(':').map(Number)
+          const start = new Date(viewedDate)
+          start.setHours(h, m, 0, 0)
+          item.startTime = start
         }
-      }
-      return item
-    })
+        const instance = routineStatusMap.get(routineStatusKey(routine.id, dose.slotIndex))
+        if (instance?.status === 'completed') item.completed = true
+        else if (instance?.status === 'skipped') item.skipped = true
+        // Override time if rescheduled (only applies to non-dosed routines via bare id)
+        // This applies when:
+        // 1. Same-day reschedule (status='pending', deferred_to is a time change)
+        // 2. Cross-day reschedule showing on target day (status='deferred', viewing the deferred_to date)
+        if (instance?.deferred_to) {
+          const deferredTime = new Date(instance.deferred_to)
+          const deferredDateStr = deferredTime.toISOString().split('T')[0]
+          const viewedDateStr = viewedDate.toISOString().split('T')[0]
+
+          // Apply time override if:
+          // - Same-day time change (pending status)
+          // - Or this is a deferred routine and we're viewing the target date
+          if (instance.status === 'pending' || (instance.status === 'deferred' && deferredDateStr === viewedDateStr)) {
+            item.startTime = deferredTime
+          }
+        }
+        return item
+      }),
+    )
 
   const allItems = [...taskItems, ...eventItems, ...routineItems]
   const sections = groupByDaySection(allItems)
