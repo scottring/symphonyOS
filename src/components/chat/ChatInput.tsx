@@ -16,6 +16,7 @@ export function ChatInput({ onSend, loading = false, placeholder = 'Ask about th
   const fileRef = useRef<HTMLInputElement>(null)
   const [pending, setPending] = useState<ChatAttachment | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const { user } = useAuth()
 
   // Auto-focus on mount
@@ -34,9 +35,12 @@ export function ChatInput({ onSend, loading = false, placeholder = 'Ask about th
 
   const attach = useCallback(async (file: File) => {
     if (!user || !isAllowedFileType(file.type)) return
+    setUploadError(null)
     setUploading(true)
     try {
       setPending(await uploadChatFile(file, user.id))
+    } catch {
+      setUploadError('Could not attach file. Try again.')
     } finally {
       setUploading(false)
     }
@@ -47,6 +51,7 @@ export function ChatInput({ onSend, loading = false, placeholder = 'Ask about th
     onSend(value.trim(), pending ?? undefined)
     setValue('')
     setPending(null)
+    if (fileRef.current) fileRef.current.value = ''
   }, [value, pending, loading, uploading, onSend])
 
   const handleKeyDown = useCallback(
@@ -65,11 +70,16 @@ export function ChatInput({ onSend, loading = false, placeholder = 'Ask about th
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) attach(f) }}
     >
+      {/* Upload error */}
+      {uploadError && (
+        <div className="text-xs text-red-600 px-2 py-1">{uploadError}</div>
+      )}
+
       {/* Attachment preview chip */}
       {pending && (
         <div className="flex items-center gap-2 text-xs text-neutral-600 px-2 py-1 bg-neutral-100 rounded-md">
           <span className="truncate flex-1">{pending.fileName}</span>
-          <button onClick={() => setPending(null)} aria-label="Remove attachment">
+          <button onClick={() => { setPending(null); setUploadError(null) }} aria-label="Remove attachment">
             <X className="w-3 h-3" />
           </button>
         </div>
