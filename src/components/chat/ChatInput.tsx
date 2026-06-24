@@ -64,6 +64,29 @@ export function ChatInput({ onSend, loading = false, placeholder = 'Ask about th
     [handleSubmit]
   )
 
+  // Paste a screenshot (or any image) straight from the clipboard.
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      const items = e.clipboardData?.items
+      if (!items) return
+      for (const item of Array.from(items)) {
+        if (item.kind === 'file' && item.type.startsWith('image/')) {
+          const file = item.getAsFile()
+          if (file) {
+            e.preventDefault()
+            // Clipboard images often arrive unnamed; give them a real filename.
+            const named = file.name
+              ? file
+              : new File([file], `screenshot-${Date.now()}.png`, { type: file.type || 'image/png' })
+            attach(named)
+          }
+          return
+        }
+      }
+    },
+    [attach]
+  )
+
   return (
     <div
       className="flex flex-col gap-1.5 p-3 border-t border-neutral-200 bg-white"
@@ -122,6 +145,7 @@ export function ChatInput({ onSend, loading = false, placeholder = 'Ask about th
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           placeholder={placeholder}
           disabled={loading || uploading}
           rows={1}
