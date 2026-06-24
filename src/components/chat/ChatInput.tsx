@@ -24,12 +24,16 @@ export function ChatInput({ onSend, loading = false, placeholder = 'Ask about th
     inputRef.current?.focus()
   }, [])
 
-  // Auto-resize textarea
+  // Auto-resize textarea. Starts paragraph-sized (~5 lines) and grows with
+  // content up to a taller cap before scrolling, so the composer reads as a
+  // place to write a paragraph, not a one-line search box.
+  const MIN_HEIGHT = 112 // ~5 lines
+  const MAX_HEIGHT = 280
   useEffect(() => {
     const el = inputRef.current
     if (el) {
       el.style.height = 'auto'
-      el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+      el.style.height = Math.min(Math.max(el.scrollHeight, MIN_HEIGHT), MAX_HEIGHT) + 'px'
     }
   }, [value])
 
@@ -155,7 +159,7 @@ export function ChatInput({ onSend, loading = false, placeholder = 'Ask about th
           onPaste={handlePaste}
           placeholder={placeholder}
           disabled={loading || uploading}
-          rows={1}
+          rows={4}
           className="flex-1 resize-none rounded-xl border border-neutral-200 px-3 py-2 text-sm
             focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400
             disabled:opacity-50 placeholder:text-neutral-400"
