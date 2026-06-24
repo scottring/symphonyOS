@@ -36,9 +36,14 @@ export interface StreamHandlers {
   onError?: (message: string) => void
 }
 
+export type AgentContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'image'; source: { type: 'url'; url: string } }
+  | { type: 'document'; source: { type: 'url'; url: string } }
+
 export interface AgentApiMessage {
   role: 'user' | 'assistant'
-  content: string
+  content: string | AgentContentBlock[]
 }
 
 /**

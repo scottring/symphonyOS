@@ -4,13 +4,14 @@ import { ChatInput } from './ChatInput'
 import { VaultDraftCard } from './VaultDraftCard'
 import { MealRequestCards } from './MealRequestCards'
 import type { ChatMessage as ChatMessageType, EntityContext, ChatMode, ChatSession } from '@/types/chat'
+import type { ChatAttachment } from './ChatAttachment'
 
 interface ChatPanelProps {
   messages: ChatMessageType[]
   loading: boolean
   error: string | null
   entityContext: EntityContext | null
-  onSend: (message: string) => void
+  onSend: (message: string, attachment?: ChatAttachment) => void
   onClear: () => void
   onClose: () => void
   onSourceClick?: (noteId: string) => void
@@ -315,7 +316,7 @@ export function ChatPanel({
 
       {/* Input */}
       <ChatInput
-        onSend={onSend}
+        onSend={(msg, attachment) => onSend(msg, attachment)}
         loading={loading}
         placeholder={placeholder}
       />

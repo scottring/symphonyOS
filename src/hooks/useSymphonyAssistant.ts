@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { streamSymphonyAgent, type AgentApiMessage } from '@/lib/agentStream'
 import type { ChatMessage } from '@/types/chat'
+import type { ChatAttachment } from '@/components/chat/ChatAttachment'
 
 // Tools that mutate task/project data. When the agent uses one, the app needs
 // to refresh so the change shows without a page reload.
@@ -9,6 +10,7 @@ const WRITE_TOOLS = new Set([
   'symphony_update_task',
   'symphony_complete_task',
   'symphony_create_project',
+  'symphony_create_routine',
 ])
 
 /**
@@ -26,21 +28,32 @@ export function useSymphonyAssistant(onMutate?: () => void) {
   const [error, setError] = useState<string | null>(null)
   const [toolActivity, setToolActivity] = useState<string[]>([])
 
-  const sendMessage = useCallback(async (text: string) => {
-    if (!text.trim() || loading) return
+  const sendMessage = useCallback(async (text: string, attachment?: ChatAttachment) => {
+    if ((!text.trim() && !attachment) || loading) return
+
+    // Build the content for this turn: blocks array if there's an attachment, plain string otherwise.
+    const content: AgentApiMessage['content'] = attachment
+      ? [
+          { type: 'text' as const, text: text.trim() || 'Set this up.' },
+          attachment.fileType === 'application/pdf'
+            ? { type: 'document' as const, source: { type: 'url' as const, url: attachment.url } }
+            : { type: 'image' as const, source: { type: 'url' as const, url: attachment.url } },
+        ]
+      : text.trim()
 
     // Build the API history from prior turns + this one (before the placeholder).
+    // Prior turns are displayed ChatMessages whose .content is always a string — safe to filter/map.
     const apiMessages: AgentApiMessage[] = [
       ...messages
         .filter((m) => m.content.trim().length > 0)
         .map((m) => ({ role: m.role, content: m.content })),
-      { role: 'user' as const, content: text.trim() },
+      { role: 'user' as const, content },
     ]
 
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
-      content: text.trim(),
+      content: text.trim() || (attachment ? attachment.fileName : ''),
       timestamp: new Date(),
     }
     const assistantId = crypto.randomUUID()
