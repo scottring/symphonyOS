@@ -70,7 +70,7 @@ export function ChatInput({ onSend, loading = false, placeholder = 'Ask about th
       const items = e.clipboardData?.items
       if (!items) return
       for (const item of Array.from(items)) {
-        if (item.kind === 'file' && item.type.startsWith('image/')) {
+        if (item.type.startsWith('image/')) {
           const file = item.getAsFile()
           if (file) {
             e.preventDefault()
@@ -101,6 +101,13 @@ export function ChatInput({ onSend, loading = false, placeholder = 'Ask about th
       {/* Attachment preview chip */}
       {pending && (
         <div className="flex items-center gap-2 text-xs text-neutral-600 px-2 py-1 bg-neutral-100 rounded-md">
+          {pending.fileType.startsWith('image/') && (
+            <img
+              src={pending.url}
+              alt={pending.fileName}
+              className="w-10 h-10 rounded object-cover flex-none border border-neutral-200"
+            />
+          )}
           <span className="truncate flex-1">{pending.fileName}</span>
           <button onClick={() => { setPending(null); setUploadError(null) }} aria-label="Remove attachment">
             <X className="w-3 h-3" />
