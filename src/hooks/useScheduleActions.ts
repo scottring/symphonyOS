@@ -88,7 +88,8 @@ export function useScheduleActions({
   }, [updateRoutine])
 
   const onCompleteRoutine = useCallback(async (routineId: string, completed: boolean) => {
-    const routine = allRoutines.find(r => r.id === routineId)
+    const bareId = routineId.split('#')[0]
+    const routine = allRoutines.find(r => r.id === bareId)
     const routineName = routine?.name || 'Routine'
 
     if (completed) {
@@ -104,7 +105,8 @@ export function useScheduleActions({
   }, [allRoutines, viewedDate, markDone, undoDone, refreshDateInstances, pushAction])
 
   const onSkipRoutine = useCallback(async (routineId: string) => {
-    const routine = allRoutines.find(r => r.id === routineId)
+    const bareId = routineId.split('#')[0]
+    const routine = allRoutines.find(r => r.id === bareId)
     const routineName = routine?.name || 'Routine'
 
     await skip('routine', routineId, viewedDate)

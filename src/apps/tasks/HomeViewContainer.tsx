@@ -19,6 +19,7 @@ import { useGoalsContext } from '@/contexts/GoalsContext';
 import { PlanningSession, WeeklyPlanningSession, PlanTodaySession, MonthlyPlanningSession, SeasonalPlanningSession, AnnualPlanningSession } from '@/components/lazy';
 import { LoadingFallback } from '@/components/layout/LoadingFallback';
 import { isEverydayRoutine, scheduleRoutineOnDate } from '@/lib/routineUtils';
+import { parseRoutineTimelineId } from '@/lib/today/doseExpansion';
 import { groupItems } from '@/lib/today/groupTasks';
 import { parseQuickInput } from '@/lib/quickInputParser';
 import type { ParserContext } from '@/lib/quickInputParser';
@@ -147,7 +148,10 @@ export function HomeViewContainer() {
       }
       // TasksApp owns task/routine/event/meal; ignore anything else.
       if (kind !== 'task' && kind !== 'routine' && kind !== 'event') return;
-      setSelection({ kind, id });
+      // For routines, strip any dose slot so the panel looks up the routine row
+      // by its real UUID. (e.g. "rx#0" → "rx"). Completion stays slotted.
+      const resolvedId = kind === 'routine' ? parseRoutineTimelineId(itemId).routineId : id;
+      setSelection({ kind, id: resolvedId });
     },
     [setSelection, clearSelection],
   );

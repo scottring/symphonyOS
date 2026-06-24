@@ -46,3 +46,19 @@ describe('expandRoutineDoses', () => {
     ])
   })
 })
+
+describe('dosed routine → bare id for detail panel lookup', () => {
+  it('slotted timeline id yields bare routineId (not rx#0) for row lookup', () => {
+    // If handleSelectItem stripped on the first dash instead of using
+    // parseRoutineTimelineId, id would be "rx#0" and routines.find would fail.
+    const slotted = 'routine-rx#0'
+    const { routineId } = parseRoutineTimelineId(slotted)
+    expect(routineId).toBe('rx')
+    expect(routineId).not.toContain('#')
+  })
+  it('bare timeline id also yields bare routineId', () => {
+    const bare = 'routine-rx'
+    const { routineId } = parseRoutineTimelineId(bare)
+    expect(routineId).toBe('rx')
+  })
+})
