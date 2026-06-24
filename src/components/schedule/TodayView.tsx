@@ -756,6 +756,7 @@ export function TodayView({
                             : { routineId: '', slot: null }
                           const routineEntityId = slot === null ? bareRoutineId : `${bareRoutineId}#${slot}`
                           return (
+                            <>
                         <ScheduleItem
                           item={item}
                           selected={selectedItemId === item.id}
@@ -883,6 +884,7 @@ export function TodayView({
                             />
                           )
                         })()}
+                            </>
                           )
                         })()}
                         </div>
