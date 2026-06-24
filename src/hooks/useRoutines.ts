@@ -8,6 +8,8 @@ export interface CreateRoutineInput {
   description?: string
   recurrence_pattern?: RecurrencePattern
   time_of_day?: string // HH:MM format
+  times_per_day?: string[] // when set, routine recurs N times/day
+  image_url?: string | null
   visibility?: RoutineVisibility
   default_assignee?: string | null  // Used for generating recurring instances
   assigned_to?: string | null  // Current assignment (if null, uses defaultFallbackAssignee)
@@ -24,6 +26,8 @@ export interface UpdateRoutineInput {
   description?: string | null
   recurrence_pattern?: RecurrencePattern
   time_of_day?: string | null
+  times_per_day?: string[] | null
+  image_url?: string | null
   visibility?: RoutineVisibility
   paused_until?: string | null
   default_assignee?: string | null
@@ -151,6 +155,8 @@ export function useRoutines() {
           description: input.description?.trim() || null,
           recurrence_pattern: input.recurrence_pattern || { type: 'daily' },
           time_of_day: input.time_of_day || null,
+          times_per_day: input.times_per_day ?? null,
+          image_url: input.image_url ?? null,
           visibility: input.visibility || 'active',
           default_assignee: input.default_assignee || null,
           assigned_to: effectiveAssignedTo,
@@ -185,6 +191,8 @@ export function useRoutines() {
       if (input.description !== undefined) updates.description = input.description?.trim() || null
       if (input.recurrence_pattern !== undefined) updates.recurrence_pattern = input.recurrence_pattern
       if (input.time_of_day !== undefined) updates.time_of_day = input.time_of_day
+      if (input.times_per_day !== undefined) updates.times_per_day = input.times_per_day
+      if (input.image_url !== undefined) updates.image_url = input.image_url
       if (input.visibility !== undefined) updates.visibility = input.visibility
       if (input.default_assignee !== undefined) updates.default_assignee = input.default_assignee
       if (input.assigned_to !== undefined) updates.assigned_to = input.assigned_to
