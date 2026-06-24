@@ -113,6 +113,37 @@ describe('buildGroupedSections', () => {
     expect(items[0].id).toBe('routine-r1')
   })
 
+  it('a collection renders as one routine-collection item; steps are not top-level', () => {
+    const date = new Date('2026-06-24T00:00:00')
+    const hep = { id: 'hep', user_id: 'u', name: 'Shoulder HEP', recurrence_pattern: { type: 'daily' },
+      parent_routine_id: null, assigned_to: null, assigned_to_all: null, show_on_timeline: true } as any
+    const step = { id: 'chin', user_id: 'u', name: 'Chin Tuck', recurrence_pattern: { type: 'daily' },
+      parent_routine_id: 'hep', times_per_day: ['09:00'], assigned_to: null, assigned_to_all: null, show_on_timeline: true } as any
+    const g = buildGroupedSections({
+      timedTasks: [], events: [], routines: [hep, step], viewedDate: date,
+      routineStatusMap: new Map(), eventStatusMap: new Map(), match: matchAll,
+    })
+    const flat = Object.values(g).flat()
+    const coll = flat.filter(i => i.type === 'routine-collection')
+    expect(coll.map(i => i.id)).toEqual(['routine-collection-hep'])
+    // the step does NOT appear as its own top-level routine item
+    expect(flat.some(i => i.id === 'routine-chin#0')).toBe(false)
+    expect(coll[0].steps?.map(s => s.id)).toEqual(['routine-chin#0'])
+  })
+
+  it('a standalone routine still renders unchanged (backward-compat)', () => {
+    const date = new Date('2026-06-24T00:00:00')
+    const solo = { id: 'solo', user_id: 'u', name: 'Take meds', recurrence_pattern: { type: 'daily' },
+      parent_routine_id: null, time_of_day: '08:00', assigned_to: null, assigned_to_all: null, show_on_timeline: true } as any
+    const g = buildGroupedSections({
+      timedTasks: [], events: [], routines: [solo], viewedDate: date,
+      routineStatusMap: new Map(), eventStatusMap: new Map(), match: matchAll,
+    })
+    const flat = Object.values(g).flat()
+    expect(flat.find(i => i.type === 'routine')?.id).toBe('routine-solo')
+    expect(flat.some(i => i.type === 'routine-collection')).toBe(false)
+  })
+
   it('skips a dangling member ref (member not present)', () => {
     const date = new Date('2026-06-05T00:00:00Z')
     const wrapper = {
