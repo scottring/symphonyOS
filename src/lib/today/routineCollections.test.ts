@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { Routine } from '@/types/actionable'
-import { groupRoutineSteps } from './routineCollections'
+import { groupRoutineSteps, buildCollectionItem } from './routineCollections'
+import type { ActionableInstance } from '@/types/actionable'
 
 function r(over: Partial<Routine>): Routine {
   return {
@@ -37,5 +38,38 @@ describe('groupRoutineSteps', () => {
     const lateB = r({ id: 'lb', name: 'A', parent_routine_id: 'p', step_order: null, time_of_day: '07:00' })
     const { collections } = groupRoutineSteps([parent, lateA, lateB, ordered])
     expect(collections[0].steps.map(s => s.id)).toEqual(['o', 'lb', 'la']) // ordered; then null by time then name
+  })
+})
+
+describe('buildCollectionItem', () => {
+  const date = new Date('2026-06-24T00:00:00')
+  it('one collapsed item; progress counts doses; next-up is earliest incomplete', () => {
+    const collection = {
+      ...r({ id: 'hep', name: 'Shoulder HEP' }),
+      steps: [
+        r({ id: 'chin', name: 'Chin Tuck', parent_routine_id: 'hep', times_per_day: ['07:00', '13:00'] }),
+        r({ id: 'med', name: 'Median Nerve Glide', parent_routine_id: 'hep', times_per_day: ['09:00'] }),
+      ],
+    }
+    // chin#0 (07:00) completed; chin#1 (13:00) + med#0 (09:00) pending
+    const status = new Map<string, ActionableInstance>([
+      ['chin#0', { entity_type: 'routine', entity_id: 'chin#0', status: 'completed' } as ActionableInstance],
+    ])
+    const item = buildCollectionItem(collection as any, date, status)
+    expect(item.type).toBe('routine-collection')
+    expect(item.id).toBe('routine-collection-hep')
+    expect(item.collectionProgress).toEqual({ done: 1, total: 3 })
+    expect(item.collectionNextUp?.time).toBe('09:00') // earliest incomplete across steps
+    expect(item.collectionNextUp?.stepName).toBe('Median Nerve Glide')
+    expect(item.steps?.map(s => s.id).sort()).toEqual(['routine-chin#0', 'routine-chin#1', 'routine-med#0'])
+    expect(item.completed).toBe(false)
+  })
+  it('all doses done → completed, anchored at earliest dose', () => {
+    const collection = { ...r({ id: 'c', name: 'C' }), steps: [r({ id: 's', name: 'S', parent_routine_id: 'c', time_of_day: '08:00' })] }
+    const status = new Map<string, ActionableInstance>([['s', { entity_type: 'routine', entity_id: 's', status: 'completed' } as ActionableInstance]])
+    const item = buildCollectionItem(collection as any, date, status)
+    expect(item.completed).toBe(true)
+    expect(item.collectionProgress).toEqual({ done: 1, total: 1 })
+    expect(item.collectionNextUp).toBeUndefined()
   })
 })
