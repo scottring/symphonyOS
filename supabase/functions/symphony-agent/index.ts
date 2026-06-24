@@ -34,7 +34,14 @@ Symphony domain model:
 - When unsure which context or date the user means, ask one short question rather than guessing.
 - Dates are ISO (YYYY-MM-DD). Today's date is provided in the first user message.
 
-Keep replies tight. Summary first, offer to expand.`
+Keep replies tight. Summary first, offer to expand.
+
+When the user attaches a document describing a recurring protocol (e.g. a physical-therapy home exercise program):
+- Read it. Extract each distinct item, its instructions, and how many times per day it is done.
+- First create a project to hold the program (symphony_create_project), context "personal".
+- Then create one routine per item (symphony_create_routine), setting times_per_day when an item is done more than once a day.
+- Before creating anything, list what you found (item -> frequency) and ask the user to confirm. Only write after they confirm.
+- If a frequency is unclear, ask rather than guessing. Never invent a cadence the document does not state.`
 
 // ── Tool schemas (Anthropic tool-use format) ───────────────────────
 const CONTEXT_ENUM = ['work', 'family', 'personal']
@@ -158,6 +165,23 @@ const TOOLS = [
     name: 'symphony_daily_summary',
     description: "Summary of today's tasks, inbox count, waiting items, and overdue. Good for a briefing.",
     input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'symphony_create_routine',
+    description: 'Create a recurring routine. For a protocol/exercise done multiple times a day, set times_per_day (array of HH:MM). recurrence_pattern defaults to daily. Link it to a program with project_id.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        description: { type: 'string', description: 'instructions shown when expanded' },
+        recurrence_pattern: { type: 'object', description: 'defaults to {"type":"daily"}' },
+        times_per_day: { type: 'array', items: { type: 'string' }, description: 'HH:MM list, e.g. ["09:00","18:00"]' },
+        time_of_day: { type: 'string', description: 'HH:MM for a once-a-day routine' },
+        context: { type: 'string', enum: CONTEXT_ENUM },
+        image_url: { type: 'string' },
+      },
+      required: ['name'],
+    },
   },
 ]
 
@@ -315,6 +339,20 @@ async function runTool(
           overdue: { count: overdueT.data?.length ?? 0, tasks: overdueT.data ?? [] },
         }, null, 2)
       }
+      case 'symphony_create_routine': {
+        const { recurrence_pattern, ...rest } = input as Record<string, unknown>
+        const { data, error } = await db.from('routines')
+          .insert({
+            ...rest,
+            recurrence_pattern: recurrence_pattern ?? { type: 'daily' },
+            visibility: 'active',
+            show_on_timeline: true,
+            user_id: userId,
+          })
+          .select().single()
+        if (error) throw error
+        return JSON.stringify(data, null, 2)
+      }
       default:
         return `Error: unknown tool ${name}`
     }
@@ -388,8 +426,14 @@ Deno.serve(async (req) => {
   if (!Array.isArray(incoming) || incoming.length === 0) return json({ error: 'messages is required' }, 400)
 
   const today = new Date().toISOString().split('T')[0]
-  const convo: Array<{ role: string; content: unknown }> = incoming.map((m: { role: string; content: string }, i: number) =>
-    i === 0 ? { role: m.role, content: `(Today is ${today}.)\n\n${m.content}` } : { role: m.role, content: m.content },
+  const datePrefix = `(Today is ${today}.)`
+  const convo: Array<{ role: string; content: unknown }> = incoming.map(
+    (m: { role: string; content: unknown }, i: number) => {
+      if (i !== 0) return { role: m.role, content: m.content }
+      if (typeof m.content === 'string') return { role: m.role, content: `${datePrefix}\n\n${m.content}` }
+      // array content: prepend the date as its own text block
+      return { role: m.role, content: [{ type: 'text', text: datePrefix }, ...(m.content as unknown[])] }
+    },
   )
 
   const stream = new ReadableStream({
