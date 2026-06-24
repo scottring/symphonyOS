@@ -43,6 +43,7 @@ import { StagingFloat } from './StagingFloat'
 import { EveningMealCard } from './EveningMealCard'
 import { EndOfDayCard } from './EndOfDayCard'
 import { ScheduleItem } from './ScheduleItem'
+import { RoutineCollectionRow } from './RoutineCollectionRow'
 import { DayNavCluster } from './DayNavCluster'
 import { ShareToFamilyNudge } from './ShareToFamilyNudge'
 import { OverdueSection } from './OverdueSection'
@@ -741,6 +742,25 @@ export function TodayView({
                                 onSelect={() => onSelectItem(item.id)}
                               />
                             </div>
+                          </div>
+                        )
+                      }
+
+                      // Routine collection — collapsed row with per-step completion
+                      if (item.type === 'routine-collection') {
+                        return (
+                          <div key={item.id} data-item-id={item.id}>
+                            {showInsert && insertBefore}
+                            <RoutineCollectionRow
+                              item={item}
+                              onSelect={() => handleSelectItem(item.id)}
+                              onCompleteStep={(stepTimelineId, completed) => {
+                                if (!onCompleteRoutine) return
+                                const { routineId, slot } = parseRoutineTimelineId(stepTimelineId)
+                                const entityId = slot === null ? routineId : `${routineId}#${slot}`
+                                onCompleteRoutine(entityId, completed)
+                              }}
+                            />
                           </div>
                         )
                       }
