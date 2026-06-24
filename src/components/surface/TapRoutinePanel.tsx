@@ -4,6 +4,7 @@ import type { Routine, RoutineVisibility, RecurrencePattern } from '@/types/rout
 import type { TaskContext } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
 import { PanelHeader } from './sections/PanelHeader'
+import { PanelMedia } from './sections/PanelMedia'
 import { PanelWhy } from './sections/PanelWhy'
 import { PanelLocation } from './sections/PanelLocation'
 import { PanelFooter } from './sections/PanelFooter'
@@ -166,6 +167,14 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
         notes={routine.description ?? undefined}
         onChange={props.onNotesChange}
       />
+
+      {/* Routine image — sourceDoc omitted: routines don't carry project_id today;
+          source PDF is still reachable from the Project view. */}
+      {routine.image_url && (
+        <section className="pb-4 mb-4 border-b border-neutral-200">
+          <PanelMedia imageUrl={routine.image_url} />
+        </section>
+      )}
 
       <PanelFooter
         createdAt={new Date(routine.created_at)}
