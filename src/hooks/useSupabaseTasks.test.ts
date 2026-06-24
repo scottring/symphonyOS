@@ -14,6 +14,14 @@ vi.mock('@/hooks/useAuth', () => ({
   }),
 }))
 
+// useSupabaseTasks depends on useFamilyMembers (added after this suite was first
+// written, which is why the suite had been skipped). The hook only reads
+// `members`, so a minimal mock keeps the suite focused on task CRUD and avoids
+// useFamilyMembers' seed effect hitting the (unmocked) supabase.auth.getUser.
+vi.mock('@/hooks/useFamilyMembers', () => ({
+  useFamilyMembers: () => ({ members: [] }),
+}))
+
 // Mock Supabase data storage - this needs to be in module scope for vi.mock
 interface MockDbTask {
   id: string
@@ -96,10 +104,18 @@ vi.mock('@/lib/supabase', () => ({
       },
       update: (data: Partial<MockDbTask>) => {
         mockUpdate(data)
+        // updateTask() chains .eq().select() and reads { data, error }, while
+        // toggleTask()/deleteTask() await .eq() directly for { error }. Return a
+        // thenable that supports both shapes.
         return {
           eq: (field: string, value: string) => {
             mockEq(field, value)
-            return Promise.resolve({ error: mockError })
+            const updated = mockSupabaseData.length ? [mockSupabaseData[0]] : [{}]
+            return {
+              select: () => Promise.resolve({ data: updated, error: mockError, status: 200, count: updated.length }),
+              then: (resolve: (v: { error: typeof mockError }) => unknown) =>
+                resolve({ error: mockError }),
+            }
           },
         }
       },
@@ -113,10 +129,20 @@ vi.mock('@/lib/supabase', () => ({
         }
       },
     }),
+    // Realtime subscription (added to the hook after this suite was written).
+    // A no-op chainable channel keeps the subscribe effect from throwing.
+    channel: () => {
+      const channelMock = {
+        on: () => channelMock,
+        subscribe: () => channelMock,
+        unsubscribe: () => {},
+      }
+      return channelMock
+    },
   },
 }))
 
-describe.skip('useSupabaseTasks', () => {
+describe('useSupabaseTasks', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockSupabaseData.length = 0
@@ -667,7 +693,12 @@ describe.skip('useSupabaseTasks', () => {
       expect(result.current.tasks[0].isAllDay).toBe(false)
     })
 
-    it('clears deferredUntil when scheduling', async () => {
+    // FIXME(behavior-drift): scheduleTask no longer clears deferred_until on the
+    // client (see scheduleTask — it only sets bucket/scheduledFor/isAllDay). This
+    // test asserts removed client behavior. Left skipped pending a product
+    // decision: is client-side defer tracking gone for good (e.g. moved to a DB
+    // trigger / dropped for the "carried over" model) or a regression?
+    it.skip('clears deferredUntil when scheduling', async () => {
       mockSupabaseData.push(createMockDbTask({
         id: 'task-1',
         deferred_until: '2024-06-01'
@@ -712,7 +743,10 @@ describe.skip('useSupabaseTasks', () => {
       expect(result.current.tasks[0].scheduledFor).toBeDefined()
     })
 
-    it('increments deferCount', async () => {
+    // FIXME(behavior-drift): pushTask no longer increments defer_count on the
+    // client (see pushTask — it sets bucket/scheduledFor/isAllDay only). Same
+    // open product question as the skipped scheduleTask test above.
+    it.skip('increments deferCount', async () => {
       mockSupabaseData.push(createMockDbTask({
         id: 'task-1',
         scheduled_for: '2024-06-15T10:00:00Z',
@@ -734,7 +768,9 @@ describe.skip('useSupabaseTasks', () => {
       expect(result.current.tasks[0].deferCount).toBe(3)
     })
 
-    it('sets deferredUntil for inbox tasks', async () => {
+    // FIXME(behavior-drift): pushTask no longer sets deferred_until on the client.
+    // Same open product question as the two skipped defer tests above.
+    it.skip('sets deferredUntil for inbox tasks', async () => {
       mockSupabaseData.push(createMockDbTask({
         id: 'task-1',
         scheduled_for: null // inbox task
@@ -846,7 +882,9 @@ describe.skip('useSupabaseTasks', () => {
       expect(task.deferredUntil).toBeUndefined()
       expect(task.deferCount).toBeUndefined()
       expect(task.isAllDay).toBeUndefined()
-      expect(task.context).toBeUndefined()
+      // context is nullable in the Task model (null = no domain); dbTaskToTask
+      // maps a null DB value to null, not undefined.
+      expect(task.context).toBeNull()
       expect(task.notes).toBeUndefined()
       expect(task.links).toBeUndefined()
       expect(task.phoneNumber).toBeUndefined()

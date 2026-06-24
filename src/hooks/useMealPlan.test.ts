@@ -47,10 +47,10 @@ vi.mock('@/contexts/GeneratePlanContext', () => ({
   }),
 }))
 
-// FIXME(pre-existing-from-main): see docs/superpowers/specs/2026-05-05-symphony-shell-apps-and-job-app.md "Pre-existing test carve-out"
-// useMealPlan now consumes useGeneratePlanContext (lifted state); these tests render the hook
-// without wrapping it in GeneratePlanProvider, so the context throws on every test.
-describe.skip('useMealPlan', () => {
+// Revived 2026-06: useMealPlan consumes useGeneratePlanContext (lifted state).
+// The context is mocked above (see the GeneratePlanContext vi.mock), so the hook
+// runs without needing a GeneratePlanProvider wrapper.
+describe('useMealPlan', () => {
   beforeEach(() => {
     vi.mocked(__mockFrom as any).mockReset()
   })

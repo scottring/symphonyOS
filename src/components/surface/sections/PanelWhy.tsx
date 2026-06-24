@@ -1,5 +1,6 @@
 import { useState, lazy, Suspense } from 'react'
 import { Maximize2, Minimize2 } from 'lucide-react'
+import DOMPurify from 'dompurify'
 
 const TiptapEditor = lazy(() =>
   import('@/components/notes/TiptapEditor').then(m => ({ default: m.TiptapEditor }))
@@ -144,7 +145,7 @@ export function PanelWhy({ notes, onChange, label = 'Why', onSaveToVault }: Pane
           className="w-full text-left text-sm italic text-neutral-600 border-l-2 border-neutral-300 pl-3 py-1 hover:text-neutral-900"
         >
           {notes
-            ? <div dangerouslySetInnerHTML={{ __html: notes }} className="prose-sm" />
+            ? <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(notes) }} className="prose-sm" />
             : <span className="not-italic text-neutral-400">Add notes…</span>}
         </button>
       )}

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useFamilyMembers } from './useFamilyMembers'
-import { useToast } from './useToast'
+import { showToast } from './useToast'
 import { logger } from '@/lib/logger'
 import type { Task, TaskBucket, TaskLink, TaskContext, TaskCategory, LinkedActivity, LinkType, LinkedActivityType, GroupMemberRef } from '@/types/task'
 import type { TaskDirections } from '@/types/directions'
@@ -150,7 +150,6 @@ export function useSupabaseTasks() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { members: familyMembers } = useFamilyMembers()
-  const { showToast } = useToast()
 
   // Fetch tasks. Exposed as `refetch` so an external write (e.g. the assistant
   // creating a task server-side) can force an immediate refresh, since realtime
@@ -173,6 +172,7 @@ export function useSupabaseTasks() {
 
     if (fetchError) {
       setError(fetchError.message)
+      showToast("Couldn't load tasks — check your connection", 'error', 5000)
       setLoading(false)
       return
     }
@@ -345,6 +345,7 @@ export function useSupabaseTasks() {
       // Rollback on error
       setTasks((prev) => prev.filter((t) => t.id !== tempId))
       setError(insertError.message)
+      showToast('Failed to add task', 'error', 4000)
       return undefined
     }
 
@@ -421,6 +422,7 @@ export function useSupabaseTasks() {
         )
       )
       setError(insertError.message)
+      showToast('Failed to add subtask', 'error', 4000)
       return undefined
     }
 
@@ -505,6 +507,7 @@ export function useSupabaseTasks() {
           )
         )
         setError(updateError.message)
+        showToast('Failed to update task', 'error', 4000)
       }
     } else {
       // Toggle parent task
@@ -554,6 +557,7 @@ export function useSupabaseTasks() {
           prev.map((t) => (t.id === id ? task : t))
         )
         setError(updateError.message)
+        showToast('Failed to update task', 'error', 4000)
         return
       }
 
@@ -667,6 +671,7 @@ export function useSupabaseTasks() {
         setTasks((prev) => [...prev, taskToDelete])
       }
       setError(deleteError.message)
+      showToast('Failed to delete task', 'error', 4000)
     }
   }, [findTaskById, findParentOfSubtask])
 
@@ -790,7 +795,7 @@ export function useSupabaseTasks() {
     } else {
       console.warn('[updateTask] DB update returned no data!')
     }
-  }, [tasks, familyMembers, showToast, findTaskById, findParentOfSubtask])
+  }, [tasks, familyMembers, findTaskById, findParentOfSubtask])
 
   // Bulk update multiple tasks at once
   const updateTasksBulk = useCallback(async (taskIds: string[], updates: Partial<Task>) => {
@@ -873,6 +878,7 @@ export function useSupabaseTasks() {
       // Rollback all tasks
       setTasks(prev => prev.map(t => rollbackMap.get(t.id) || t))
       setError(updateError.message)
+      showToast('Failed to update tasks', 'error', 4000)
       throw updateError
     }
   }, [tasks])
@@ -976,6 +982,7 @@ export function useSupabaseTasks() {
       // Rollback on error
       setTasks((prev) => prev.filter((t) => t.id !== tempId))
       setError(insertError.message)
+      showToast('Failed to add task', 'error', 4000)
       return undefined
     }
 
