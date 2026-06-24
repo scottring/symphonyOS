@@ -82,6 +82,8 @@ export interface Routine {
   pin_to_timeline?: boolean // Always show on Today even when "hide daily routines" is on (tracked obligations, e.g. PT exercises)
   context?: 'work' | 'family' | 'personal' | null // Life domain for filtering
   project_id?: string | null // Optional link to the program/project this routine belongs to
+  parent_routine_id?: string | null // When set, this routine is a Step of that collection
+  step_order?: number | null // Ordering within a parent collection; null sorts last
   location?: string | null // Where the routine happens (e.g. school pickup) — enables directions
   location_place_id?: string | null // Google Place id for the location, when picked from Places
   // Templates for auto-generation of linked tasks
@@ -89,6 +91,11 @@ export interface Routine {
   followup_task_templates?: PrepFollowupTemplate[]
   created_at: string
   updated_at: string
+}
+
+/** A routine collection with its ordered Steps attached (derived, not stored). */
+export interface RoutineWithSteps extends Routine {
+  steps: Routine[]
 }
 
 // Defer options based on context

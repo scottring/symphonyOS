@@ -18,6 +18,8 @@ export interface CreateRoutineInput {
   followup_task_templates?: PrepFollowupTemplate[]
   context?: 'work' | 'family' | 'personal'
   project_id?: string | null
+  parent_routine_id?: string | null
+  step_order?: number | null
   pin_to_timeline?: boolean // always show on Today, even when "hide daily" is on
   // Fallback assignee if assigned_to is undefined (not null)
   defaultFallbackAssignee?: string
@@ -44,6 +46,8 @@ export interface UpdateRoutineInput {
   prep_task_templates?: PrepFollowupTemplate[]
   followup_task_templates?: PrepFollowupTemplate[]
   project_id?: string | null
+  parent_routine_id?: string | null
+  step_order?: number | null
 }
 
 export function useRoutines() {
@@ -169,6 +173,8 @@ export function useRoutines() {
           followup_task_templates: input.followup_task_templates || [],
           context: input.context || null,
           project_id: input.project_id ?? null,
+          parent_routine_id: input.parent_routine_id ?? null,
+          step_order: input.step_order ?? null,
           pin_to_timeline: input.pin_to_timeline ?? false,
         })
         .select()
@@ -211,6 +217,8 @@ export function useRoutines() {
       if (input.prep_task_templates !== undefined) updates.prep_task_templates = input.prep_task_templates
       if (input.followup_task_templates !== undefined) updates.followup_task_templates = input.followup_task_templates
       if (input.project_id !== undefined) updates.project_id = input.project_id
+      if (input.parent_routine_id !== undefined) updates.parent_routine_id = input.parent_routine_id
+      if (input.step_order !== undefined) updates.step_order = input.step_order
       if (input.pin_to_timeline !== undefined) updates.pin_to_timeline = input.pin_to_timeline
 
       const { error: updateError } = await supabase
