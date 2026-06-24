@@ -17,6 +17,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useMobile } from '@/hooks/useMobile';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useSymphonyAssistant } from '@/hooks/useSymphonyAssistant';
+import { useScratchpadHidden } from '@/hooks/useScratchpadHidden';
 import { useShellChrome } from './useShellChrome';
 import { useSelection } from './providers/SelectionProvider';
 
@@ -207,6 +208,14 @@ function ShellLayoutInner({ children }: Props) {
   // The AI rail is shared with main content margin so content isn't covered.
   const rightRailVisible = showAiRail;
 
+  // Today's assistant rail is owned by Shell.tsx (ShellAssistantHost, 420px wide)
+  // and its visibility is the shared scratchpad-hidden state. When it's open on
+  // Today, reflow the main column left by the rail width instead of letting the
+  // fixed overlay cover it. (Detail-pane `selection` takes precedence below,
+  // matching ShellAssistantHost which hides the rail while a detail pane is open.)
+  const { hidden: scratchpadHidden } = useScratchpadHidden();
+  const todayRailVisible = isToday && !scratchpadHidden && !isMobile;
+
   return (
     <div className="h-screen flex overflow-hidden overflow-x-hidden bg-bg-base w-full max-w-[100vw]">
       {/* "New version available — reload" banner: shows when a newer build
@@ -238,7 +247,7 @@ function ShellLayoutInner({ children }: Props) {
         style={
           isMobile
             ? { paddingBottom: 'calc(2.75rem + env(safe-area-inset-bottom, 0px))' }
-            : { marginRight: selection ? '480px' : rightRailVisible ? '380px' : '0' }
+            : { marginRight: selection ? '480px' : rightRailVisible ? '380px' : todayRailVisible ? '420px' : '0' }
         }
       >
         {/* Mobile header — logo + sign-out (date nav lives in HomeHeader on Today) */}

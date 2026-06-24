@@ -5,6 +5,7 @@ import { ListsProvider } from '@/contexts/ListsContext';
 import { NotesProvider } from '@/contexts/NotesContext';
 import { GoalsProvider } from '@/contexts/GoalsContext';
 import { AppShellChromeContext, type AppShellChromeContextValue } from '@/contexts/AppShellChromeContext';
+import { useScratchpadHidden } from '@/hooks/useScratchpadHidden';
 import { HomeViewContainer } from './HomeViewContainer';
 import { InboxViewContainer } from './InboxViewContainer';
 import { TaskViewRoute } from './TaskViewRoute';
@@ -24,21 +25,21 @@ import { WeekView, MonthView, SeasonView, YearView, SomedayView } from './Horizo
 // for those paths.
 
 export function TasksApp() {
-  // HomeHeader (rendered by HomeView) consumes AppShellChrome, which the legacy
-  // AppShell provides. The Shell path has no AppShell, so supply a no-op chrome
-  // context here to keep AppShell's fail-fast guardrail intact while letting the
-  // Today masthead render. Chat/help buttons are inert in the Shell for now —
-  // wiring them to the Shell's own chrome is a follow-up.
+  // HomeHeader (rendered by HomeView) consumes AppShellChrome. The Today AI
+  // button toggles the right-rail assistant, whose shared visibility lives in
+  // useScratchpadHidden (the same state Shell.tsx's ShellAssistantHost reads),
+  // so the masthead button and the rail stay in sync. Help stays inert here.
   const helpButtonRef = useRef<HTMLButtonElement>(null);
+  const { hidden, setHidden } = useScratchpadHidden();
   const chrome = useMemo<AppShellChromeContextValue>(
     () => ({
-      chatOpen: false,
-      onChatOpenChange: () => {},
+      chatOpen: !hidden,
+      onChatOpenChange: (open: boolean) => setHidden(!open),
       helpOpen: false,
       onHelpOpenChange: () => {},
       helpButtonRef,
     }),
-    [],
+    [hidden, setHidden],
   );
 
   return (
