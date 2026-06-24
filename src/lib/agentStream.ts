@@ -28,12 +28,20 @@ export function parseSSEChunk(buffer: string): { events: AgentStreamEvent[]; res
   return { events, rest }
 }
 
+export interface AttachmentMeta {
+  storagePath: string
+  fileName: string
+  fileType: string
+  fileSize: number
+}
+
 export interface StreamHandlers {
   onText?: (text: string) => void
   onTool?: (name: string) => void
   onSession?: (sessionId: string) => void
   onDone?: (reply: string, sessionId: string | null) => void
   onError?: (message: string) => void
+  attachment?: AttachmentMeta
 }
 
 export type AgentContentBlock =
@@ -70,7 +78,7 @@ export async function streamSymphonyAgent(
         apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify({ messages, ...(handlers.attachment ? { attachment: handlers.attachment } : {}) }),
     },
   )
 

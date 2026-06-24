@@ -4,6 +4,8 @@ export interface ChatAttachment {
   url: string
   fileType: string
   fileName: string
+  storagePath: string
+  fileSize: number
 }
 
 export async function uploadChatFile(file: File, userId: string): Promise<ChatAttachment> {
@@ -18,5 +20,5 @@ export async function uploadChatFile(file: File, userId: string): Promise<ChatAt
     .from('attachments')
     .createSignedUrl(path, 3600)
   if (signErr || !data) throw signErr ?? new Error('Could not sign url')
-  return { url: data.signedUrl, fileType: file.type, fileName: file.name }
+  return { url: data.signedUrl, fileType: file.type, fileName: file.name, storagePath: path, fileSize: file.size }
 }

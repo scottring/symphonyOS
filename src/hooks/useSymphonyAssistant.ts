@@ -11,6 +11,7 @@ const WRITE_TOOLS = new Set([
   'symphony_complete_task',
   'symphony_create_project',
   'symphony_create_routine',
+  'symphony_attach_source',
 ])
 
 /**
@@ -71,6 +72,17 @@ export function useSymphonyAssistant(onMutate?: () => void) {
         m.id === assistantId ? { ...m, content: m.content + chunk } : m))
 
     let didWrite = false
+    // Pass attachment metadata to the edge function so the agent can call
+    // symphony_attach_source to register the uploaded PDF on the project.
+    const attachmentMeta = attachment
+      ? {
+          storagePath: attachment.storagePath,
+          fileName: attachment.fileName,
+          fileType: attachment.fileType,
+          fileSize: attachment.fileSize,
+        }
+      : undefined
+
     await streamSymphonyAgent(apiMessages, {
       onText: appendText,
       onTool: (name) => {
@@ -84,6 +96,7 @@ export function useSymphonyAssistant(onMutate?: () => void) {
             ? { ...m, content: reply } : m))
       },
       onError: (message) => setError(message),
+      attachment: attachmentMeta,
     })
 
     if (didWrite) onMutate?.()

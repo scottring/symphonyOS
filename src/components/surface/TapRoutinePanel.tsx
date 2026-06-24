@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Flame } from 'lucide-react'
 import type { Routine, RoutineVisibility, RecurrencePattern } from '@/types/routine'
 import type { TaskContext } from '@/types/task'
@@ -13,6 +13,7 @@ import { MultiAssigneeDropdown } from '@/components/family'
 import { RoutineScheduleEditor } from '@/components/routine/RoutineScheduleEditor'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { useRoutineStats } from '@/hooks/useRoutineStats'
+import { useAttachments } from '@/hooks/useAttachments'
 
 function recurrenceSummary(r: Routine): string {
   const p = r.recurrence_pattern
@@ -48,6 +49,15 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
   const [editingSchedule, setEditingSchedule] = useState(false)
   const [showDirections, setShowDirections] = useState(false)
   const onTimeline = routine.visibility === 'active'
+
+  // Load source document from the parent project (if any)
+  const { getAttachments, getSignedUrl, fetchAttachments } = useAttachments()
+  useEffect(() => {
+    if (routine.project_id) {
+      fetchAttachments('project', routine.project_id)
+    }
+  }, [routine.project_id, fetchAttachments])
+  const projectDoc = routine.project_id ? getAttachments('project', routine.project_id)[0] : undefined
 
   return (
     <article className="bg-bg-elevated rounded-2xl p-5 max-w-md w-full">
@@ -168,11 +178,18 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
         onChange={props.onNotesChange}
       />
 
-      {/* Routine image — sourceDoc omitted: routines don't carry project_id today;
-          source PDF is still reachable from the Project view. */}
-      {routine.image_url && (
+      {(routine.image_url || projectDoc) && (
         <section className="pb-4 mb-4 border-b border-neutral-200">
-          <PanelMedia imageUrl={routine.image_url} />
+          <PanelMedia
+            imageUrl={routine.image_url}
+            sourceDoc={projectDoc ? {
+              fileName: projectDoc.fileName,
+              onOpen: async () => {
+                const url = await getSignedUrl(projectDoc.storagePath)
+                if (url) window.open(url, '_blank', 'noopener')
+              },
+            } : undefined}
+          />
         </section>
       )}
 

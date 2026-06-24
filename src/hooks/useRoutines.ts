@@ -17,6 +17,7 @@ export interface CreateRoutineInput {
   prep_task_templates?: PrepFollowupTemplate[]
   followup_task_templates?: PrepFollowupTemplate[]
   context?: 'work' | 'family' | 'personal'
+  project_id?: string | null
   // Fallback assignee if assigned_to is undefined (not null)
   defaultFallbackAssignee?: string
 }
@@ -40,6 +41,7 @@ export interface UpdateRoutineInput {
   location_place_id?: string | null
   prep_task_templates?: PrepFollowupTemplate[]
   followup_task_templates?: PrepFollowupTemplate[]
+  project_id?: string | null
 }
 
 export function useRoutines() {
@@ -164,6 +166,7 @@ export function useRoutines() {
           prep_task_templates: input.prep_task_templates || [],
           followup_task_templates: input.followup_task_templates || [],
           context: input.context || null,
+          project_id: input.project_id ?? null,
         })
         .select()
         .single()
@@ -204,6 +207,7 @@ export function useRoutines() {
       if (input.location_place_id !== undefined) updates.location_place_id = input.location_place_id
       if (input.prep_task_templates !== undefined) updates.prep_task_templates = input.prep_task_templates
       if (input.followup_task_templates !== undefined) updates.followup_task_templates = input.followup_task_templates
+      if (input.project_id !== undefined) updates.project_id = input.project_id
 
       const { error: updateError } = await supabase
         .from('routines')

@@ -38,10 +38,9 @@ Keep replies tight. Summary first, offer to expand.
 
 When the user attaches a document describing a recurring protocol (e.g. a physical-therapy home exercise program):
 - Read it. Extract each distinct item, its instructions, and how many times per day it is done.
-- First create a project to hold the program (symphony_create_project), context "personal".
-- Then create one routine per item (symphony_create_routine), setting times_per_day when an item is done more than once a day.
 - Before creating anything, list what you found (item -> frequency) and ask the user to confirm. Only write after they confirm.
-- If a frequency is unclear, ask rather than guessing. Never invent a cadence the document does not state.`
+- If a frequency is unclear, ask rather than guessing. Never invent a cadence the document does not state.
+- After the user confirms: (1) create a project with symphony_create_project (context "personal"); (2) if the user attached a document, call symphony_attach_source with the project id to register the source PDF on the project; (3) create one routine per item with symphony_create_routine, setting project_id to the program's project id and times_per_day when an item is done more than once a day.`
 
 // ── Tool schemas (Anthropic tool-use format) ───────────────────────
 const CONTEXT_ENUM = ['work', 'family', 'personal']
@@ -179,8 +178,20 @@ const TOOLS = [
         time_of_day: { type: 'string', description: 'HH:MM for a once-a-day routine' },
         context: { type: 'string', enum: CONTEXT_ENUM },
         image_url: { type: 'string' },
+        project_id: { type: 'string', description: 'id of the program/project this exercise belongs to' },
       },
       required: ['name'],
+    },
+  },
+  {
+    name: 'symphony_attach_source',
+    description: 'Attach the document the user shared in this message to a project as its source document. Call this once, after creating the project, when the user attached a file.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        project_id: { type: 'string' },
+      },
+      required: ['project_id'],
     },
   },
 ]
@@ -222,12 +233,20 @@ function normalizeSchedule(
   return { scheduled_for: sf, is_all_day: allDay, bucket: 'timed' }
 }
 
+interface AttachmentMeta {
+  storagePath: string
+  fileName: string
+  fileType: string
+  fileSize: number
+}
+
 // ── Tool executor (RLS-scoped via userSupabase) ────────────────────
 async function runTool(
   db: SupabaseClient,
   userId: string,
   name: string,
   input: Record<string, unknown>,
+  attachment: AttachmentMeta | null,
 ): Promise<string> {
   const now = () => new Date().toISOString()
   try {
@@ -353,6 +372,23 @@ async function runTool(
         if (error) throw error
         return JSON.stringify(data, null, 2)
       }
+      case 'symphony_attach_source': {
+        if (!attachment) return 'Error: No document was attached to this message.'
+        if (!input.project_id) return 'Error: project_id is required'
+        const { data, error } = await db.from('attachments')
+          .insert({
+            user_id: userId,
+            entity_type: 'project',
+            entity_id: input.project_id,
+            file_name: attachment.fileName,
+            file_type: attachment.fileType,
+            file_size: attachment.fileSize,
+            storage_path: attachment.storagePath,
+          })
+          .select().single()
+        if (error) throw error
+        return JSON.stringify(data, null, 2)
+      }
       default:
         return `Error: unknown tool ${name}`
     }
@@ -422,7 +458,9 @@ Deno.serve(async (req) => {
   if (authErr || !user) return json({ error: 'Unauthorized' }, 401)
   const db = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
 
-  const { messages: incoming } = await req.json().catch(() => ({ messages: null }))
+  const body = await req.json().catch(() => ({}))
+  const incoming = body.messages
+  const attachment: AttachmentMeta | null = body.attachment ?? null
   if (!Array.isArray(incoming) || incoming.length === 0) return json({ error: 'messages is required' }, 400)
 
   const today = new Date().toISOString().split('T')[0]
@@ -451,7 +489,7 @@ Deno.serve(async (req) => {
               send({ type: 'text', text: block.text })
             } else if (block.type === 'tool_use' && block.name) {
               send({ type: 'tool', name: block.name })
-              const result = await runTool(db, user.id, block.name, block.input ?? {})
+              const result = await runTool(db, user.id, block.name, block.input ?? {}, attachment)
               toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
             }
           }

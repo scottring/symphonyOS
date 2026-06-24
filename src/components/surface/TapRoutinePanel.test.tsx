@@ -10,6 +10,20 @@ vi.mock('@/hooks/useRoutineStats', () => ({
   useRoutineStats: () => ({ getStats: () => ({ currentStreak: 5 }), loading: false, stats: new Map(), refetch: vi.fn() }),
 }))
 
+// useAttachments needs auth/supabase; mock it out for render-only tests.
+vi.mock('@/hooks/useAttachments', () => ({
+  useAttachments: () => ({
+    attachments: new Map(),
+    isLoading: false,
+    error: null,
+    uploadAttachment: vi.fn(),
+    deleteAttachment: vi.fn(),
+    fetchAttachments: vi.fn().mockResolvedValue([]),
+    getAttachments: vi.fn().mockReturnValue([]),
+    getSignedUrl: vi.fn().mockResolvedValue(null),
+  }),
+}))
+
 const routine: Routine = {
   id: 'r1', user_id: 'u1', name: 'Trash night', description: 'Take bins to curb',
   default_assignee: null, assigned_to: null, assigned_to_all: null,
