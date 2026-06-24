@@ -754,6 +754,7 @@ export function TodayView({
                             <RoutineCollectionRow
                               item={item}
                               onSelect={() => handleSelectItem(item.id)}
+                              onSelectStep={(stepId) => handleSelectItem(stepId)}
                               onCompleteStep={(stepTimelineId, completed) => {
                                 if (!onCompleteRoutine) return
                                 const { routineId, slot } = parseRoutineTimelineId(stepTimelineId)

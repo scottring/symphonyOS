@@ -34,6 +34,16 @@ describe('statusMaps', () => {
     expect(selectVisibleRoutines([daily, weekly, hidden], false).map(r => r.id)).toEqual(['d', 'w'])
     expect(selectVisibleRoutines([daily, weekly, hidden], true).map(r => r.id)).toEqual(['w'])
   })
+  it('hideRoutines keeps collection parent and its steps visible when hide-daily is ON', () => {
+    const parent = { id: 'col-parent', show_on_timeline: true, recurrence_pattern: { type: 'daily' } } as unknown as Routine
+    const step = { id: 'col-step', show_on_timeline: true, recurrence_pattern: { type: 'daily' }, parent_routine_id: 'col-parent', times_per_day: ['09:00'] } as unknown as Routine
+    const plainDaily = { id: 'plain', show_on_timeline: true, recurrence_pattern: { type: 'daily' } } as unknown as Routine
+    const result = selectVisibleRoutines([parent, step, plainDaily], true)
+    const ids = result.map(r => r.id)
+    expect(ids).toContain('col-parent')
+    expect(ids).toContain('col-step')
+    expect(ids).not.toContain('plain')
+  })
   it('hideRoutines keeps pinned and dosed everyday routines on Today', () => {
     const plainDaily = { id: 'd', show_on_timeline: true, recurrence_pattern: { type: 'daily' } } as unknown as Routine
     const pinned = { id: 'p', show_on_timeline: true, recurrence_pattern: { type: 'daily' }, pin_to_timeline: true } as unknown as Routine

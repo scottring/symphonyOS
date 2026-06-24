@@ -41,5 +41,11 @@ function isPinnedToTimeline(r: Routine): boolean {
 export function selectVisibleRoutines(routines: Routine[], hideRoutines: boolean): Routine[] {
   const showable = routines.filter(r => r.show_on_timeline !== false)
   if (!hideRoutines) return showable
-  return showable.filter(r => isPinnedToTimeline(r) || !isEverydayRoutine(r.recurrence_pattern))
+  const parentIds = new Set(showable.filter(r => r.parent_routine_id).map(r => r.parent_routine_id))
+  return showable.filter(r =>
+    r.parent_routine_id != null ||           // a Step — the collection decides visibility
+    parentIds.has(r.id) ||                   // a collection parent — keep so its steps group
+    isPinnedToTimeline(r) ||
+    !isEverydayRoutine(r.recurrence_pattern),
+  )
 }

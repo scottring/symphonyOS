@@ -5,6 +5,7 @@ import type { TimelineItem } from '@/types/timeline'
 interface Props {
   item: TimelineItem // type === 'routine-collection'
   onSelect: () => void
+  onSelectStep: (stepTimelineId: string) => void
   onCompleteStep: (stepEntityId: string, completed: boolean) => void
 }
 
@@ -16,7 +17,7 @@ function fmt(t: string | null): string {
   return `${hr}:${String(m).padStart(2, '0')} ${ampm}`
 }
 
-export function RoutineCollectionRow({ item, onSelect, onCompleteStep }: Props) {
+export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteStep }: Props) {
   const [open, setOpen] = useState(false)
   const p = item.collectionProgress ?? { done: 0, total: 0 }
   const nextUp = item.collectionNextUp
@@ -47,7 +48,7 @@ export function RoutineCollectionRow({ item, onSelect, onCompleteStep }: Props) 
               </button>
               <span
                 className={`text-sm flex-1 truncate ${step.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}
-                onClick={onSelect}
+                onClick={() => onSelectStep(step.id)}
               >
                 {step.title}
               </span>
