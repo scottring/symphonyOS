@@ -75,6 +75,8 @@ export interface Routine {
   paused_until: string | null // When set, routine auto-resumes after this timestamp
   recurrence_pattern: RecurrencePattern
   time_of_day: string | null // HH:MM:SS format
+  times_per_day?: string[] | null // e.g. ['09:00','18:00']; when set, recurs N times/day
+  image_url?: string | null // per-exercise image (fidelity B); null in v1
   raw_input: string | null // Original natural language input
   show_on_timeline: boolean // Whether to display on Today view (default true)
   context?: 'work' | 'family' | 'personal' | null // Life domain for filtering

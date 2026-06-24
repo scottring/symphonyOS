@@ -1,5 +1,5 @@
 // Entity types that can have attachments
-export type AttachmentEntityType = 'task' | 'project' | 'event_note' | 'instance_note' | 'note'
+export type AttachmentEntityType = 'task' | 'project' | 'event_note' | 'instance_note' | 'note' | 'routine'
 
 // ============================================================================
 // Attachment
