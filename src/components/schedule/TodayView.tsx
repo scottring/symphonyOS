@@ -17,6 +17,7 @@ import type { TimelineCaptureResult } from '@/components/schedule/TimelineQuickI
 import type { ParserContext } from '@/lib/quickInputParser'
 import type { HomeViewType } from '@/types/homeView'
 
+import { parseRoutineTimelineId } from '@/lib/today/doseExpansion'
 import { useMobile } from '@/hooks/useMobile'
 import { useTodayData } from '@/hooks/useTodayData'
 import { mergeAssignees } from '@/lib/today/bulkAssign'
@@ -749,6 +750,12 @@ export function TodayView({
                         <div key={item.id} className={isGroupChild ? '-mt-1' : undefined}>
                         {showInsert && insertBefore}
                         <div data-item-id={item.id} className={groupCardClass || undefined} {...(isFirstItem ? { 'data-today-first': '' } : {})}>
+                        {(() => {
+                          const { routineId: bareRoutineId, slot } = item.type === 'routine'
+                            ? parseRoutineTimelineId(item.id)
+                            : { routineId: '', slot: null }
+                          const routineEntityId = slot === null ? bareRoutineId : `${bareRoutineId}#${slot}`
+                          return (
                         <ScheduleItem
                           item={item}
                           selected={selectedItemId === item.id}
@@ -766,7 +773,7 @@ export function TodayView({
                             if (item.type === 'task' && taskId) {
                               onToggleTask(taskId)
                             } else if (item.type === 'routine' && onCompleteRoutine) {
-                              onCompleteRoutine(item.id.replace('routine-', ''), !item.completed)
+                              onCompleteRoutine(routineEntityId, !item.completed)
                             } else if (item.type === 'event' && onCompleteEvent) {
                               onCompleteEvent(item.id.replace('event-', ''), !item.completed)
                             }
@@ -775,7 +782,7 @@ export function TodayView({
                             item.type === 'task' && taskId && onPushTask
                               ? (target) => onPushTask(taskId, target)
                               : item.type === 'routine' && onPushRoutine
-                              ? (date) => { if (date instanceof Date) onPushRoutine(item.id.replace('routine-', ''), date) }
+                              ? (date) => { if (date instanceof Date) onPushRoutine(bareRoutineId, date) }
                               : item.type === 'event' && onPushEvent
                               ? (date) => { if (date instanceof Date) onPushEvent(item.id.replace('event-', ''), date) }
                               : undefined
@@ -787,7 +794,7 @@ export function TodayView({
                           }
                           onSkip={
                             item.type === 'routine' && onSkipRoutine
-                              ? () => onSkipRoutine(item.id.replace('routine-', ''))
+                              ? () => onSkipRoutine(routineEntityId)
                               : item.type === 'event' && onSkipEvent
                               ? () => onSkipEvent(item.id.replace('event-', ''))
                               : undefined
@@ -806,7 +813,7 @@ export function TodayView({
                               : item.type === 'event' && onAssignEvent
                               ? (memberId) => onAssignEvent(item.id.replace('event-', ''), memberId)
                               : item.type === 'routine' && onAssignRoutine
-                              ? (memberId) => onAssignRoutine(item.id.replace('routine-', ''), memberId)
+                              ? (memberId) => onAssignRoutine(bareRoutineId, memberId)
                               : undefined
                           }
                           assignedToAll={
@@ -824,14 +831,14 @@ export function TodayView({
                               : item.type === 'event' && onAssignEventAll
                               ? (memberIds) => onAssignEventAll(item.id.replace('event-', ''), memberIds)
                               : item.type === 'routine' && onAssignRoutineAll
-                              ? (memberIds) => onAssignRoutineAll(item.id.replace('routine-', ''), memberIds)
+                              ? (memberIds) => onAssignRoutineAll(bareRoutineId, memberIds)
                               : undefined
                           }
                           onContextChange={
                             item.type === 'task' && taskId && onUpdateTask
                               ? (context) => onUpdateTask(taskId, { context })
                               : item.type === 'routine' && onUpdateRoutine
-                              ? (context) => onUpdateRoutine(item.id.replace('routine-', ''), { context })
+                              ? (context) => onUpdateRoutine(bareRoutineId, { context })
                               : item.type === 'event' && onUpdateEventContext
                               ? (context) => onUpdateEventContext(item.id.replace('event-', ''), context ?? null)
                               : undefined
@@ -851,7 +858,7 @@ export function TodayView({
                           variant={item.type === 'routine' ? 'minimal' : 'full'}
                           routineStreak={
                             item.type === 'routine'
-                              ? getRoutineStats(item.id.replace('routine-', ''))?.currentStreak
+                              ? getRoutineStats(bareRoutineId)?.currentStreak
                               : undefined
                           }
                           suggestions={(() => {
@@ -874,6 +881,8 @@ export function TodayView({
                               onAdd={() => ctx.onShareEventWithFamily?.(nudge.eventId)}
                               onDismiss={() => ctx.onDismissShareNudge?.(nudge.eventId)}
                             />
+                          )
+                        })()}
                           )
                         })()}
                         </div>
