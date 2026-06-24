@@ -168,7 +168,7 @@ const TOOLS = [
   },
   {
     name: 'symphony_create_routine',
-    description: 'Create a recurring routine. For a protocol/exercise done multiple times a day, set times_per_day (array of HH:MM). recurrence_pattern defaults to daily. Link it to a program with project_id.',
+    description: 'Create a recurring routine. For a protocol/exercise done multiple times a day, set times_per_day (array of HH:MM). recurrence_pattern defaults to daily.',
     input_schema: {
       type: 'object',
       properties: {
