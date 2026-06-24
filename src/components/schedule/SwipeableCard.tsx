@@ -273,7 +273,7 @@ export const SwipeableCard = memo(function SwipeableCard({
 
           {/* Type icon - non-interactive indicator */}
           <div className="w-5 shrink-0 flex items-center justify-center">
-            <TypeIcon type={item.type} completed={item.completed} isWaiting={item.isWaiting} contextColor={contextColor} />
+            <TypeIcon type={item.type === 'routine-collection' ? 'routine' : item.type} completed={item.completed} isWaiting={item.isWaiting} contextColor={contextColor} />
           </div>
 
           {/* Title */}

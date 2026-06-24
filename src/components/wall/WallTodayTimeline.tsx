@@ -57,7 +57,7 @@ function getTimelineNodes(todayData: WallDayData | undefined): TimelineNode[] {
         sortKey,
         title: item.title.toUpperCase(),
         completed: !!item.completed,
-        type: item.type,
+        type: item.type === 'routine-collection' ? 'routine' : item.type,
         colorClass: NODE_COLORS[colorIdx % NODE_COLORS.length],
         isPast: sortKey >= 0 && sortKey < nowMinutes,
       })

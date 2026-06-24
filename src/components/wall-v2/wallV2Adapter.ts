@@ -161,7 +161,7 @@ export function adaptTimelineEvent(
   const memberBubbles = assigned ? [memberBubble(assigned)] : undefined;
   return {
     id: item.id,
-    kind: item.type,
+    kind: item.type === 'routine-collection' ? 'routine' : item.type,
     icon,
     tint,
     title: item.title,
