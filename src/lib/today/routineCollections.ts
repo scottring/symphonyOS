@@ -1,6 +1,5 @@
 import type { Routine, RoutineWithSteps, ActionableInstance } from '@/types/actionable'
-import type { TimelineItem } from '@/types/timeline'
-import { routineToTimelineItem } from '@/types/timeline'
+import type { TimelineItem, CollectionDose, CollectionStepGroup } from '@/types/timeline'
 import { expandRoutineDoses, routineStatusKey } from './doseExpansion'
 
 function stepSort(a: Routine, b: Routine): number {
@@ -42,26 +41,22 @@ export function buildCollectionItem(
   viewedDate: Date,
   routineStatusMap: Map<string, ActionableInstance>,
 ): TimelineItem {
-  const stepItems: TimelineItem[] = []
+  const collectionSteps: CollectionStepGroup[] = []
   let earliest: { time: string; stepId: string; stepName: string; doseSlot: number | null } | null = null
   let nextUp: { time: string | null; stepId: string; stepName: string; doseSlot: number | null } | null = null
   let total = 0
   let done = 0
 
+  // One entry per exercise (step); its doses are grouped so the name shows once
+  // instead of once per dose.
   for (const step of collection.steps) {
+    const doses: CollectionDose[] = []
+    let stepDone = 0
     for (const dose of expandRoutineDoses(step)) {
       total += 1
-      const item = routineToTimelineItem(step, viewedDate)
-      item.id = dose.slotId
-      if (dose.time) {
-        const [h, m] = dose.time.split(':').map(Number)
-        const start = new Date(viewedDate)
-        start.setHours(h, m, 0, 0)
-        item.startTime = start
-      }
       const completed = routineStatusMap.get(routineStatusKey(step.id, dose.slotIndex))?.status === 'completed'
-      if (completed) { item.completed = true; done += 1 }
-      stepItems.push(item)
+      if (completed) { done += 1; stepDone += 1 }
+      doses.push({ id: dose.slotId, time: dose.time, completed })
 
       if (dose.time && (!earliest || dose.time < earliest.time)) {
         earliest = { time: dose.time, stepId: step.id, stepName: step.name, doseSlot: dose.slotIndex }
@@ -70,6 +65,7 @@ export function buildCollectionItem(
         nextUp = { time: dose.time, stepId: step.id, stepName: step.name, doseSlot: dose.slotIndex }
       }
     }
+    collectionSteps.push({ stepId: step.id, name: step.name, progress: { done: stepDone, total: doses.length }, doses })
   }
 
   const allDone = total > 0 && done === total
@@ -95,6 +91,6 @@ export function buildCollectionItem(
     collectionNextUp: nextUp
       ? { stepId: nextUp.stepId, stepName: nextUp.stepName, time: nextUp.time, doseSlot: nextUp.doseSlot }
       : undefined,
-    steps: stepItems,
+    collectionSteps,
   }
 }

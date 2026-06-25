@@ -61,7 +61,13 @@ describe('buildCollectionItem', () => {
     expect(item.collectionProgress).toEqual({ done: 1, total: 3 })
     expect(item.collectionNextUp?.time).toBe('09:00') // earliest incomplete across steps
     expect(item.collectionNextUp?.stepName).toBe('Median Nerve Glide')
-    expect(item.steps?.map(s => s.id).sort()).toEqual(['routine-chin#0', 'routine-chin#1', 'routine-med#0'])
+    // One entry per exercise (name shows once), with its doses grouped — not one row per dose.
+    expect(item.collectionSteps?.map(s => s.name)).toEqual(['Chin Tuck', 'Median Nerve Glide'])
+    expect(item.collectionSteps?.[0].doses.map(d => d.id)).toEqual(['routine-chin#0', 'routine-chin#1'])
+    expect(item.collectionSteps?.[0].doses[0].completed).toBe(true) // chin#0 completed
+    expect(item.collectionSteps?.[0].doses[1].completed).toBe(false) // chin#1 pending
+    expect(item.collectionSteps?.[0].progress).toEqual({ done: 1, total: 2 })
+    expect(item.collectionSteps?.[1].doses.map(d => d.id)).toEqual(['routine-med#0'])
     expect(item.completed).toBe(false)
   })
   it('all doses done → completed, anchored at earliest dose', () => {

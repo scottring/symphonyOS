@@ -3,6 +3,21 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, RecurrencePattern } from './actionable'
 export type TimelineItemType = 'task' | 'event' | 'routine' | 'routine-collection'
 
+/** One dose of a collection step (an exercise done N times/day). `id` is the slotted timeline id used for completion. */
+export interface CollectionDose {
+  id: string
+  time: string | null
+  completed: boolean
+}
+
+/** A collection step (exercise) with its doses grouped, so the name shows once instead of once per dose. */
+export interface CollectionStepGroup {
+  stepId: string // bare routine id of the exercise
+  name: string
+  progress: { done: number; total: number }
+  doses: CollectionDose[]
+}
+
 export interface TimelineItem {
   id: string
   type: TimelineItemType
@@ -42,7 +57,7 @@ export interface TimelineItem {
   // Routine-collection-specific
   collectionProgress?: { done: number; total: number }
   collectionNextUp?: { stepId: string; stepName: string; time: string | null; doseSlot: number | null }
-  steps?: TimelineItem[] // pre-built per-dose step items; present only on 'routine-collection'
+  collectionSteps?: CollectionStepGroup[] // one entry per exercise (NOT per dose); present only on 'routine-collection'
   // Derived display state
   isOverdue?: boolean // True when item is past-due and incomplete
   // Original data for actions
