@@ -63,6 +63,19 @@ async function refreshAccessToken(
   return tokenData.access_token
 }
 
+// Known video-meeting domains whose join link may be buried in the event body.
+const MEETING_DOMAIN_RE =
+  /(teams\.microsoft\.com|teams\.live\.com|zoom\.us|meet\.google\.com|webex\.com|gotomeet|gotomeeting\.com|bluejeans\.com|whereby\.com|chime\.aws|meet\.lync\.com)/i
+
+/** Pull the first video-meeting join URL out of an event description (HTML body). */
+function extractMeetingUrlFromText(text?: string | null): string | null {
+  if (!text) return null
+  const urls = text.match(/https?:\/\/[^\s"'<>)]+/gi)
+  if (!urls) return null
+  const found = urls.find((u) => MEETING_DOMAIN_RE.test(u))
+  return found ? found.replace(/[.,;]+$/, '') : null
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -282,12 +295,15 @@ serve(async (req) => {
             : event.end.dateTime!
 
           // Extract the video join URL. Prefer hangoutLink (Google Meet, canonical
-          // for Google-managed video) and fall back to the first 'video' entryPoint
-          // for Zoom / Webex / Teams add-ons surfaced via conferenceData.
+          // for Google-managed video), then the first 'video' entryPoint for
+          // Zoom / Webex / Teams add-ons surfaced via conferenceData, then a join
+          // link found in the description body — Outlook-origin Teams invites often
+          // put the link ONLY in the description, not conferenceData.
           const videoEntryPoint = event.conferenceData?.entryPoints?.find(
             (ep) => ep.entryPointType === 'video' && ep.uri,
           )
-          const meetingUrl = event.hangoutLink || videoEntryPoint?.uri || null
+          const meetingUrl =
+            event.hangoutLink || videoEntryPoint?.uri || extractMeetingUrlFromText(event.description) || null
 
           return {
             user_id: user.id,
