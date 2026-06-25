@@ -186,18 +186,21 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
   }
 
   // Collection/step panel state
-  const [open, setOpen] = useState<{ kind: 'collection' | 'step'; id: string } | null>(null)
+  const [open, setOpen] = useState<{ kind: 'routine' | 'standalone-step' | 'step'; id: string } | null>(null)
 
   // Derive open panel data fresh each render so edits reflect immediately
   const { collections, standalone } = groupRoutineSteps(routines)
-  const openCollection =
-    open?.kind === 'collection'
+  // Resolve the routine item for both 'routine' and 'standalone-step' kinds
+  const openRoutineItem =
+    open?.kind === 'routine' || open?.kind === 'standalone-step'
       ? (collections.find(c => c.id === open.id)
          ?? (() => {
               const r = routines.find(x => x.id === open.id && !x.parent_routine_id)
               return r ? { ...r, steps: [] as import('@/types/actionable').Routine[] } : undefined
             })())
       : undefined
+  // Only show the Steps section when the panel was opened as a routine (group)
+  const openWithSteps = open?.kind === 'routine'
   const openStep = open?.kind === 'step'
     ? collections.flatMap(c => c.steps).find(s => s.id === open.id)
     : undefined
@@ -429,7 +432,7 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
     const card = (
       <button
         key={routine.id}
-        onClick={() => !selecting && setOpen({ kind: 'collection', id: routine.id })}
+        onClick={() => !selecting && setOpen({ kind: 'standalone-step', id: routine.id })}
         className={`w-full flex items-center gap-4 p-5 rounded-2xl border transition-all duration-200 text-left group ${
           isPaused
             ? 'bg-neutral-50 border-neutral-100 hover:border-neutral-200 hover:shadow-sm opacity-60'
@@ -551,7 +554,7 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
                   const name = window.prompt('Name the new routine')?.trim()
                   if (!name) return
                   const created = await onCreateCollection(name)
-                  if (created) setOpen({ kind: 'collection', id: created.id })
+                  if (created) setOpen({ kind: 'routine', id: created.id })
                 } else {
                   onCreateRoutine()
                 }
@@ -627,7 +630,7 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
                   const name = window.prompt('Name the new routine')?.trim()
                   if (!name) return
                   const created = await onCreateCollection(name)
-                  if (created) setOpen({ kind: 'collection', id: created.id })
+                  if (created) setOpen({ kind: 'routine', id: created.id })
                 } else {
                   onCreateRoutine()
                 }
@@ -649,7 +652,7 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
               {collections.map((collection, index) => (
                 <button
                   key={collection.id}
-                  onClick={() => setOpen({ kind: 'collection', id: collection.id })}
+                  onClick={() => setOpen({ kind: 'routine', id: collection.id })}
                   className="w-full flex items-center gap-4 p-5 rounded-2xl border bg-white border-neutral-100
                              hover:border-amber-200 hover:shadow-md transition-all duration-200 text-left group"
                   style={{ animationDelay: `${index * 50}ms` }}
@@ -769,29 +772,31 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
       )}
 
       {/* Collection / Step panel overlay */}
-      {(openCollection || openStep) && (
+      {(openRoutineItem || openStep) && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
           onClick={() => setOpen(null)}
         >
           <div onClick={e => e.stopPropagation()}>
-            {openCollection && (
+            {openRoutineItem && (
               <TapRoutinePanel
-                key={openCollection.id}
-                routine={openCollection}
+                key={openRoutineItem.id}
+                routine={openRoutineItem}
                 familyMembers={familyMembers}
                 onClose={() => setOpen(null)}
-                onRename={name => onUpdateRoutine(openCollection.id, { name })}
-                onContextChange={context => onUpdateRoutine(openCollection.id, { context: context ?? null })}
-                onVisibilityChange={visibility => onUpdateRoutine(openCollection.id, { visibility })}
-                onAssignChange={memberIds => onUpdateRoutine(openCollection.id, { assigned_to_all: memberIds })}
+                onRename={name => onUpdateRoutine(openRoutineItem.id, { name })}
+                onContextChange={context => onUpdateRoutine(openRoutineItem.id, { context: context ?? null })}
+                onVisibilityChange={visibility => onUpdateRoutine(openRoutineItem.id, { visibility })}
+                onAssignChange={memberIds => onUpdateRoutine(openRoutineItem.id, { assigned_to_all: memberIds })}
                 onScheduleChange={(pattern, timeOfDay) =>
-                  onUpdateRoutine(openCollection.id, { recurrence_pattern: pattern, time_of_day: timeOfDay || null })}
-                onNotesChange={description => onUpdateRoutine(openCollection.id, { description })}
-                steps={openCollection.steps}
-                onSelectStep={s => setOpen({ kind: 'step', id: s.id })}
-                onAddStep={name => onAddStep(openCollection.id, name)}
-                onReorderSteps={onReorderSteps}
+                  onUpdateRoutine(openRoutineItem.id, { recurrence_pattern: pattern, time_of_day: timeOfDay || null })}
+                onNotesChange={description => onUpdateRoutine(openRoutineItem.id, { description })}
+                {...(openWithSteps ? {
+                  steps: openRoutineItem.steps,
+                  onSelectStep: (s: import('@/types/actionable').Routine) => setOpen({ kind: 'step', id: s.id }),
+                  onAddStep: (name: string) => onAddStep(openRoutineItem.id, name),
+                  onReorderSteps,
+                } : {})}
               />
             )}
             {openStep && parentOfOpenStep && (
@@ -799,12 +804,12 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
                 key={openStep.id}
                 step={openStep}
                 parentName={parentOfOpenStep.name}
-                onClose={() => setOpen({ kind: 'collection', id: parentOfOpenStep.id })}
+                onClose={() => setOpen({ kind: 'routine', id: parentOfOpenStep.id })}
                 onRename={name => onUpdateRoutine(openStep.id, { name })}
                 onDosesChange={times => onUpdateRoutine(openStep.id, { times_per_day: times })}
                 onNotesChange={description => onUpdateRoutine(openStep.id, { description })}
                 onScheduleChange={pattern => onUpdateRoutine(openStep.id, { recurrence_pattern: pattern })}
-                onPromote={() => { onPromoteStep(openStep.id); setOpen({ kind: 'collection', id: parentOfOpenStep.id }) }}
+                onPromote={() => { onPromoteStep(openStep.id); setOpen({ kind: 'routine', id: parentOfOpenStep.id }) }}
               />
             )}
           </div>

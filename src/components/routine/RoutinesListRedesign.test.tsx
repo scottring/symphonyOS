@@ -50,11 +50,12 @@ describe('RoutinesListRedesign two-level', () => {
     expect(screen.getByText(/2 steps/i)).toBeInTheDocument()
   })
 
-  it('clicking a standalone routine opens the unified TapRoutinePanel editor', async () => {
+  it('clicking a standalone routine opens the unified TapRoutinePanel editor (no steps section)', async () => {
     setup()
     fireEvent.click(screen.getByText('Trash night'))
-    // TapRoutinePanel shows the "Add a step" input from RoutineStepsSection
-    await waitFor(() => expect(screen.getByLabelText(/add a step/i)).toBeInTheDocument())
+    // TapRoutinePanel opens — title visible in panel header; standalone = no steps section
+    await waitFor(() => expect(screen.getAllByText('Trash night').length).toBeGreaterThanOrEqual(1))
+    expect(screen.queryByLabelText(/add a step/i)).not.toBeInTheDocument()
   })
 
   it('group mode: selecting two standalone routines and grouping reports their ids', () => {
@@ -104,6 +105,29 @@ describe('RoutinesListRedesign two-level', () => {
     expect(onCreateCollection).toHaveBeenCalledWith('Morning')
     // Panel should open — the collection editor contains the "Add a step" input
     await waitFor(() => expect(screen.getByLabelText(/add a step/i)).toBeInTheDocument())
+  })
+
+  it('clicking a STANDALONE step opens the editor WITHOUT a steps section', async () => {
+    // routines: one standalone 'flat' (no parent, no children)
+    const rs = [r('flat', 'Brush teeth')]
+    render(<RoutinesListRedesign
+      routines={rs} onCreateRoutine={vi.fn()} onUpdateRoutine={vi.fn()}
+      onAddStep={vi.fn()} onReorderSteps={vi.fn()} onPromoteStep={vi.fn()}
+      onCreateCollection={vi.fn()} onGroupIntoCollection={vi.fn()} />)
+    fireEvent.click(screen.getByText('Brush teeth'))
+    // editor opens (name shown as editable header) but NO add-step affordance
+    expect((await screen.findAllByText('Brush teeth')).length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByLabelText(/add a step/i)).not.toBeInTheDocument()
+  })
+
+  it('clicking a ROUTINE (group) opens the editor WITH a steps section', async () => {
+    const rs = [r('c1', 'School AM'), r('s1', 'Brush teeth', { parent_routine_id: 'c1', step_order: 0 })]
+    render(<RoutinesListRedesign
+      routines={rs} onCreateRoutine={vi.fn()} onUpdateRoutine={vi.fn()}
+      onAddStep={vi.fn()} onReorderSteps={vi.fn()} onPromoteStep={vi.fn()}
+      onCreateCollection={vi.fn()} onGroupIntoCollection={vi.fn()} />)
+    fireEvent.click(screen.getByText('School AM'))
+    expect(await screen.findByLabelText(/add a step/i)).toBeInTheDocument()
   })
 })
 
