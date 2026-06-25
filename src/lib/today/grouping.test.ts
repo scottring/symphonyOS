@@ -128,7 +128,9 @@ describe('buildGroupedSections', () => {
     expect(coll.map(i => i.id)).toEqual(['routine-collection-hep'])
     // the step does NOT appear as its own top-level routine item
     expect(flat.some(i => i.id === 'routine-chin#0')).toBe(false)
-    expect(coll[0].steps?.map(s => s.id)).toEqual(['routine-chin#0'])
+    // the step lives nested in the collection (one exercise group, its doses inside)
+    expect(coll[0].collectionSteps?.map(s => s.name)).toEqual(['Chin Tuck'])
+    expect(coll[0].collectionSteps?.[0].doses.map(d => d.id)).toEqual(['routine-chin#0'])
   })
 
   it('a standalone routine still renders unchanged (backward-compat)', () => {
