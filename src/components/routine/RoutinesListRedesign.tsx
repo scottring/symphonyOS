@@ -54,6 +54,8 @@ interface RoutinesListProps {
   onAddStep: (collectionId: string, name: string) => void
   onReorderSteps: (writes: { id: string; step_order: number }[]) => void
   onPromoteStep: (stepId: string) => void
+  onCreateCollection?: (name: string) => void
+  onGroupIntoCollection?: (name: string, routineIds: string[]) => void
 }
 
 function formatRecurrence(routine: Routine): string {
@@ -167,9 +169,22 @@ function SectionHeader({ title, count, collapsed, onToggle }: SectionHeaderProps
   )
 }
 
-export function RoutinesListRedesign({ routines, contacts = [], familyMembers = [], onSelectRoutine, onCreateRoutine, onUpdateRoutine, onAddStep, onReorderSteps, onPromoteStep }: RoutinesListProps) {
+export function RoutinesListRedesign({ routines, contacts = [], familyMembers = [], onSelectRoutine, onCreateRoutine, onUpdateRoutine, onAddStep, onReorderSteps, onPromoteStep, onCreateCollection, onGroupIntoCollection }: RoutinesListProps) {
   // Pause modal state
   const [pauseModalRoutine, setPauseModalRoutine] = useState<Routine | null>(null)
+
+  // Multi-select state
+  const [selecting, setSelecting] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+
+  const toggleSelected = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   // Collection/step panel state
   const [open, setOpen] = useState<{ kind: 'collection' | 'step'; id: string } | null>(null)
@@ -402,13 +417,13 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
   }
 
   // Render a single routine card
-  const renderRoutineCard = (routine: Routine, index: number, isPaused = false) => {
+  const renderRoutineCard = (routine: Routine, index: number, isPaused = false, isStandalone = false) => {
     const members = getRoutineMembers(routine)
 
-    return (
+    const card = (
       <button
         key={routine.id}
-        onClick={() => onSelectRoutine(routine)}
+        onClick={() => !selecting && onSelectRoutine(routine)}
         className={`w-full flex items-center gap-4 p-5 rounded-2xl border transition-all duration-200 text-left group ${
           isPaused
             ? 'bg-neutral-50 border-neutral-100 hover:border-neutral-200 hover:shadow-sm opacity-60'
@@ -475,6 +490,24 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
         </svg>
       </button>
     )
+
+    // When in select mode and this is a standalone row, wrap with a checkbox
+    if (selecting && isStandalone) {
+      return (
+        <div key={routine.id} className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            aria-label={`Select ${routine.name}`}
+            checked={selected.has(routine.id)}
+            onChange={() => toggleSelected(routine.id)}
+            className="w-5 h-5 rounded border-neutral-300 text-amber-500 focus:ring-amber-500 flex-shrink-0 cursor-pointer"
+          />
+          <div className="flex-1">{card}</div>
+        </div>
+      )
+    }
+
+    return card
   }
 
   return (
@@ -494,17 +527,42 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
             </p>
           </div>
 
-          <button
-            onClick={onCreateRoutine}
-            className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white rounded-xl font-medium
-                       hover:bg-amber-600 active:bg-amber-700 transition-colors shadow-sm
-                       hover:shadow-md"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-            </svg>
-            New Routine
-          </button>
+          <div className="flex items-center gap-2">
+            {onCreateCollection && (
+              <button
+                onClick={() => {
+                  const name = window.prompt('Name the new collection')?.trim()
+                  if (name) onCreateCollection(name)
+                }}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white text-amber-700 border border-amber-300 rounded-xl font-medium
+                           hover:bg-amber-50 active:bg-amber-100 transition-colors shadow-sm"
+              >
+                New collection
+              </button>
+            )}
+            <button
+              aria-label="Select"
+              onClick={() => { setSelecting(v => !v); setSelected(new Set()) }}
+              className={`px-4 py-2.5 rounded-xl font-medium border transition-colors shadow-sm ${
+                selecting
+                  ? 'bg-amber-100 text-amber-800 border-amber-300'
+                  : 'bg-white text-neutral-700 border-neutral-200 hover:border-neutral-300'
+              }`}
+            >
+              Select
+            </button>
+            <button
+              onClick={onCreateRoutine}
+              className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white rounded-xl font-medium
+                         hover:bg-amber-600 active:bg-amber-700 transition-colors shadow-sm
+                         hover:shadow-md"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+              </svg>
+              New Routine
+            </button>
+          </div>
         </div>
 
         {/* Sort and Group Controls */}
@@ -619,7 +677,7 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
               <>
                 <SectionHeader title="Active" count={activeRoutines.length} />
                 <div className="space-y-3 stagger-in">
-                  {processedActiveRoutines.routines.map((routine, index) => renderRoutineCard(routine, index))}
+                  {processedActiveRoutines.routines.map((routine, index) => renderRoutineCard(routine, index, false, true))}
                 </div>
               </>
             )}
@@ -643,7 +701,7 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
                         </span>
                       </div>
                       <div className="space-y-3 stagger-in">
-                        {groupRoutines.map((routine, index) => renderRoutineCard(routine, index))}
+                        {groupRoutines.map((routine, index) => renderRoutineCard(routine, index, false, true))}
                       </div>
                     </section>
                   )
@@ -664,12 +722,31 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
             />
             {pausedExpanded && (
               <div className="space-y-3 stagger-in">
-                {referenceRoutines.map((routine, index) => renderRoutineCard(routine, index, true))}
+                {referenceRoutines.map((routine, index) => renderRoutineCard(routine, index, true, true))}
               </div>
             )}
           </section>
         )}
       </div>
+
+      {/* Group into routine action bar */}
+      {selecting && selected.size >= 2 && onGroupIntoCollection && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
+          <button
+            onClick={() => {
+              const name = window.prompt('Name this routine collection')?.trim()
+              if (!name) return
+              onGroupIntoCollection(name, Array.from(selected))
+              setSelecting(false)
+              setSelected(new Set())
+            }}
+            className="flex items-center gap-2 px-6 py-3 bg-amber-500 text-white rounded-2xl font-medium
+                       shadow-lg hover:bg-amber-600 active:bg-amber-700 transition-colors"
+          >
+            Group into routine
+          </button>
+        </div>
+      )}
 
       {/* Pause Routine Modal */}
       {pauseModalRoutine && (

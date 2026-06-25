@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { RoutinesListRedesign } from './RoutinesListRedesign'
 import type { Routine } from '@/types/actionable'
 
@@ -42,5 +42,21 @@ describe('RoutinesListRedesign two-level', () => {
     const { onSelectRoutine } = setup()
     fireEvent.click(screen.getByText('Trash night'))
     expect(onSelectRoutine).toHaveBeenCalledWith(expect.objectContaining({ id: 'flat' }))
+  })
+
+  it('group mode: selecting two standalone routines and grouping reports their ids', () => {
+    const onGroupIntoCollection = vi.fn()
+    vi.spyOn(window, 'prompt').mockReturnValue('Morning')
+    // Two standalone routines so we can select both
+    const rs = [r('a', 'Make bed'), r('b', 'Brush teeth')]
+    render(<RoutinesListRedesign
+      routines={rs} onSelectRoutine={vi.fn()} onCreateRoutine={vi.fn()} onUpdateRoutine={vi.fn()}
+      onAddStep={vi.fn()} onReorderSteps={vi.fn()} onPromoteStep={vi.fn()}
+      onCreateCollection={vi.fn()} onGroupIntoCollection={onGroupIntoCollection} />)
+    fireEvent.click(screen.getByRole('button', { name: /^select$/i }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /select make bed/i }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /select brush teeth/i }))
+    fireEvent.click(screen.getByRole('button', { name: /group into routine/i }))
+    expect(onGroupIntoCollection).toHaveBeenCalledWith('Morning', expect.arrayContaining(['a', 'b']))
   })
 })
