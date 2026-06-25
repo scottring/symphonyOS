@@ -48,7 +48,6 @@ interface RoutinesListProps {
   routines: Routine[]
   contacts?: Contact[]
   familyMembers?: FamilyMember[]
-  onSelectRoutine: (routine: Routine) => void
   onCreateRoutine: () => void
   onUpdateRoutine: (id: string, updates: UpdateRoutineInput) => Promise<boolean> | void
   onAddStep: (collectionId: string, name: string) => void
@@ -169,7 +168,7 @@ function SectionHeader({ title, count, collapsed, onToggle }: SectionHeaderProps
   )
 }
 
-export function RoutinesListRedesign({ routines, contacts = [], familyMembers = [], onSelectRoutine, onCreateRoutine, onUpdateRoutine, onAddStep, onReorderSteps, onPromoteStep, onCreateCollection, onGroupIntoCollection }: RoutinesListProps) {
+export function RoutinesListRedesign({ routines, contacts = [], familyMembers = [], onCreateRoutine, onUpdateRoutine, onAddStep, onReorderSteps, onPromoteStep, onCreateCollection, onGroupIntoCollection }: RoutinesListProps) {
   // Pause modal state
   const [pauseModalRoutine, setPauseModalRoutine] = useState<Routine | null>(null)
 

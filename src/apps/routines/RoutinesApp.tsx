@@ -70,7 +70,6 @@ function RoutinesIndex() {
         routines={filtered}
         contacts={contacts}
         familyMembers={familyMembers}
-        onSelectRoutine={(routine) => navigate(`/routines/${routine.id}`)}
         onCreateRoutine={() => navigate('/routines/new')}
         onUpdateRoutine={updateRoutine}
         onAddStep={handleAddStep}

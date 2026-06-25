@@ -31,7 +31,7 @@ const routines: Routine[] = [
 
 function setup(overrides = {}) {
   const props = {
-    routines, onSelectRoutine: vi.fn(), onCreateRoutine: vi.fn(), onUpdateRoutine: vi.fn(),
+    routines, onCreateRoutine: vi.fn(), onUpdateRoutine: vi.fn(),
     onAddStep: vi.fn(), onReorderSteps: vi.fn(), onPromoteStep: vi.fn(), ...overrides,
   }
   render(<RoutinesListRedesign {...props} />)
@@ -63,7 +63,7 @@ describe('RoutinesListRedesign two-level', () => {
     // Two standalone routines so we can select both
     const rs = [r('a', 'Make bed'), r('b', 'Brush teeth')]
     render(<RoutinesListRedesign
-      routines={rs} onSelectRoutine={vi.fn()} onCreateRoutine={vi.fn()} onUpdateRoutine={vi.fn()}
+      routines={rs} onCreateRoutine={vi.fn()} onUpdateRoutine={vi.fn()}
       onAddStep={vi.fn()} onReorderSteps={vi.fn()} onPromoteStep={vi.fn()}
       onCreateCollection={vi.fn()} onGroupIntoCollection={onGroupIntoCollection} />)
     fireEvent.click(screen.getByRole('button', { name: /^select$/i }))
@@ -89,7 +89,7 @@ describe('RoutinesListRedesign two-level', () => {
     const onCreateCollection = vi.fn().mockResolvedValue(createdRoutine)
     vi.spyOn(window, 'prompt').mockReturnValue('Morning')
     render(<RoutinesListRedesign
-      routines={[createdRoutine]} onSelectRoutine={vi.fn()} onCreateRoutine={vi.fn()} onUpdateRoutine={vi.fn()}
+      routines={[createdRoutine]} onCreateRoutine={vi.fn()} onUpdateRoutine={vi.fn()}
       onAddStep={vi.fn()} onReorderSteps={vi.fn()} onPromoteStep={vi.fn()}
       onCreateCollection={onCreateCollection} />)
     await act(async () => {
