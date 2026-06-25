@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { List, ChevronRight } from 'lucide-react'
 import type { Routine, RecurrencePattern } from '@/types/actionable'
 import type { UpdateRoutineInput } from '@/hooks/useRoutines'
 import { parseRoutine } from '@/lib/parseRoutine'
@@ -589,9 +590,7 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
                 >
                   {/* Collection icon */}
                   <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-amber-100 group-hover:bg-amber-200 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                    </svg>
+                    <List className="w-6 h-6 text-amber-600" />
                   </div>
 
                   {/* Content */}
@@ -605,14 +604,7 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
                   </div>
 
                   {/* Chevron */}
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="w-5 h-5 text-neutral-300 group-hover:text-amber-400 group-hover:translate-x-1 transition-all flex-shrink-0"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                  </svg>
+                  <ChevronRight className="w-5 h-5 text-neutral-300 group-hover:text-amber-400 group-hover:translate-x-1 transition-all flex-shrink-0" />
                 </button>
               ))}
             </div>
