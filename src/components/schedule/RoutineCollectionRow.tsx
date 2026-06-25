@@ -46,6 +46,23 @@ export function RoutineCollectionRow({ item, onSelectStep, onCompleteStep }: Pro
       </button>
       {open && (
         <div className="border-t border-neutral-100 px-3 py-2 space-y-2.5">
+          {/* Mark-all-done: complete every remaining dose across all steps in one tap. */}
+          {!item.completed && (item.collectionSteps ?? []).some(g => g.doses.some(d => !d.completed)) && (
+            <div className="flex justify-end">
+              <button
+                onClick={() => {
+                  for (const g of item.collectionSteps ?? []) {
+                    for (const d of g.doses) {
+                      if (!d.completed) onCompleteStep(d.id, true)
+                    }
+                  }
+                }}
+                className="text-xs text-primary-600 hover:text-primary-700"
+              >
+                Mark all done
+              </button>
+            </div>
+          )}
           {/* One row per exercise; its doses are tappable pills (filled = done). */}
           {(item.collectionSteps ?? []).map(group => {
             const stepDone = group.progress.done === group.progress.total && group.progress.total > 0
