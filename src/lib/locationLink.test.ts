@@ -60,11 +60,39 @@ describe('locationLink', () => {
       expect(result.kind).toBe('maps')
     })
 
-    it('does not match scheme-less zoom.us text as URL', () => {
-      // Defensive: a user might type "zoom.us" as plain text without scheme;
-      // we only treat fully-formed URLs as URLs.
-      const result = locationLink('zoom.us')
+    it('does not falsely treat a physical address containing "teams" as virtual', () => {
+      const result = locationLink('123 Teams Drive, Springfield')
       expect(result.kind).toBe('maps')
+    })
+  })
+
+  describe('virtual meetings without a bare URL (Teams/Zoom/Meet labels)', () => {
+    it('treats a "Microsoft Teams Meeting" label as virtual, not a physical address', () => {
+      const result = locationLink('Microsoft Teams Meeting')
+      expect(result.kind).toBe('virtual')
+      expect(result.href).toBe('')
+    })
+
+    it('extracts a meeting URL embedded after a label', () => {
+      const result = locationLink('Microsoft Teams Meeting https://teams.microsoft.com/l/meetup-join/xyz')
+      expect(result.kind).toBe('url')
+      expect(result.href).toBe('https://teams.microsoft.com/l/meetup-join/xyz')
+    })
+
+    it('uses the event meetingUrl when the location is a bare virtual label', () => {
+      const result = locationLink('Microsoft Teams Meeting', null, 'https://teams.microsoft.com/l/meetup-join/abc')
+      expect(result.kind).toBe('url')
+      expect(result.href).toBe('https://teams.microsoft.com/l/meetup-join/abc')
+    })
+
+    it('treats a scheme-less "zoom.us" / "Zoom Meeting" label as virtual', () => {
+      expect(locationLink('zoom.us').kind).toBe('virtual')
+      expect(locationLink('Zoom Meeting').kind).toBe('virtual')
+    })
+
+    it('treats "Google Meet" and "Webex" labels as virtual', () => {
+      expect(locationLink('Google Meet').kind).toBe('virtual')
+      expect(locationLink('Webex').kind).toBe('virtual')
     })
   })
 

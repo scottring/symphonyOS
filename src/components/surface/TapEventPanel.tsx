@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Video } from 'lucide-react'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Task } from '@/types/task'
 import { PanelHeader } from './sections/PanelHeader'
@@ -10,6 +11,7 @@ import { PanelFooter } from './sections/PanelFooter'
 import { useEntityRelations } from './hooks/useEntityRelations'
 import type { MightBeRelevantItem } from './types'
 import { PanelLocation } from './sections/PanelLocation'
+import { locationLink } from '@/lib/locationLink'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { SchedulePopover } from '@/components/triage/SchedulePopover'
 import { computeEventReschedule } from '@/components/planning/planningReschedule'
@@ -70,6 +72,13 @@ export function TapEventPanel(props: TapEventPanelProps) {
   const eventId = event.google_event_id ?? event.id
   const calendarId = event.calendar_id ?? event.calendarId
 
+  // Classify the location so a video meeting (Teams/Zoom/Meet) never renders
+  // as a physical address with a Directions/Maps affordance.
+  const locLink = locationLink(event.location, undefined, event.meeting_url ?? event.meetingUrl)
+  const isPhysicalLocation = locLink.kind === 'maps'
+  const joinUrl = locLink.kind === 'url' ? locLink.href : null
+  const isVirtualMeeting = locLink.kind === 'url' || locLink.kind === 'virtual'
+
   // SchedulePopover yields the new start as a full Date; reuse the planning
   // reschedule math so the event keeps its original duration.
   const handleReschedule = (date: Date) => {
@@ -94,7 +103,10 @@ export function TapEventPanel(props: TapEventPanelProps) {
         bucket={formatTime(startTime)}
       />
       <div className="flex flex-wrap gap-2 pb-4 mb-4 border-b border-neutral-200">
-        {event.location && (
+        {/* Physical address → Directions toggle. Video meeting → Join link (or a
+            non-clickable label when no join URL is known). Never offer directions
+            to a Teams/Zoom/Meet "location". */}
+        {event.location && isPhysicalLocation && (
           <button
             onClick={() => setShowDirections((v) => !v)}
             aria-expanded={showDirections}
@@ -102,6 +114,21 @@ export function TapEventPanel(props: TapEventPanelProps) {
           >
             <ConceptIcon name="location" decorative /> Directions {showDirections ? '▾' : '▸'}
           </button>
+        )}
+        {event.location && joinUrl && (
+          <a
+            href={joinUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
+          >
+            <Video className="w-4 h-4" aria-hidden /> Join meeting
+          </a>
+        )}
+        {event.location && isVirtualMeeting && !joinUrl && (
+          <span className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-500">
+            {event.location}
+          </span>
         )}
         {props.onReschedule && (
           <SchedulePopover
@@ -117,13 +144,17 @@ export function TapEventPanel(props: TapEventPanelProps) {
         )}
       </div>
 
-      <PanelLocation
-        location={event.location ?? undefined}
-        title={event.title}
-        showDirections={showDirections}
-        onUpdateLocation={(addr) => props.onUpdateEventLocation?.(eventId, addr, calendarId)}
-        onClearLocation={() => props.onUpdateEventLocation?.(eventId, null, calendarId)}
-      />
+      {/* Location editor: for physical addresses or to add one. A virtual
+          meeting is handled by the Join/label chip above, not a Places field. */}
+      {!isVirtualMeeting && (
+        <PanelLocation
+          location={event.location ?? undefined}
+          title={event.title}
+          showDirections={isPhysicalLocation && showDirections}
+          onUpdateLocation={(addr) => props.onUpdateEventLocation?.(eventId, addr, calendarId)}
+          onClearLocation={() => props.onUpdateEventLocation?.(eventId, null, calendarId)}
+        />
+      )}
 
       <PanelWhy
         key={event.id}

@@ -765,26 +765,37 @@ export const ScheduleItem = memo(function ScheduleItem({
                 URL-shaped locations (Zoom/Meet/Teams) open the meeting URL
                 directly; physical locations open Google Maps directions. */}
             {item.location && (() => {
-              const link = locationLink(item.location, item.locationPlaceId)
+              const link = locationLink(item.location, item.locationPlaceId, item.meetingUrl)
               if (link.kind === 'empty') return null
-              const isUrl = link.kind === 'url'
+              const isMeeting = link.kind === 'url' || link.kind === 'virtual'
+              const chipClass = 'inline-flex items-center gap-1 px-1.5 py-0.5 text-primary-600 hover:text-primary-700 rounded text-[11px] font-medium transition-all opacity-0 group-hover:opacity-100 max-w-[220px]'
+              const icon = isMeeting ? (
+                <Video className="w-3 h-3 shrink-0" aria-hidden />
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                </svg>
+              )
+              // A virtual meeting with no join URL is a label, never a directions link.
+              if (link.kind === 'virtual') {
+                return (
+                  <span className={chipClass} title="Video meeting">
+                    {icon}
+                    <span className="truncate">{item.location}</span>
+                  </span>
+                )
+              }
               return (
                 <a
                   href={link.href}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-primary-600 hover:text-primary-700 rounded text-[11px] font-medium transition-all opacity-0 group-hover:opacity-100 max-w-[220px]"
-                  title={isUrl ? 'Open meeting link' : 'Get directions'}
+                  className={chipClass}
+                  title={isMeeting ? 'Open meeting link' : 'Get directions'}
                 >
-                  {isUrl ? (
-                    <Video className="w-3 h-3 shrink-0" aria-hidden />
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                  <span className="truncate">{isUrl ? 'Join meeting' : item.location}</span>
+                  {icon}
+                  <span className="truncate">{link.kind === 'url' ? 'Join meeting' : item.location}</span>
                 </a>
               )
             })()}
