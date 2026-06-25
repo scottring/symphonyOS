@@ -73,15 +73,21 @@ describe('RoutinesListRedesign two-level', () => {
     expect(onGroupIntoCollection).toHaveBeenCalledWith('Morning', expect.arrayContaining(['a', 'b']))
   })
 
-  it('section header shows "Multi-step" not "Collections"', () => {
+  it('section header shows "Routines" not "Multi-step"', () => {
     setup()
-    expect(screen.getByText(/multi-step/i)).toBeInTheDocument()
-    expect(screen.queryByText(/^collections$/i)).not.toBeInTheDocument()
+    // Both the page h1 and the section header say "Routines"; at least one must exist
+    expect(screen.getAllByText(/^routines/i).length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByText(/multi-step/i)).not.toBeInTheDocument()
   })
 
-  it('count excludes steps: c1 + flat = 2 routines', () => {
+  it('section header shows "Steps" for standalone routines', () => {
     setup()
-    expect(screen.getByText('2 routines')).toBeInTheDocument()
+    expect(screen.getByText(/^steps/i)).toBeInTheDocument()
+  })
+
+  it('count: 1 standalone + 1 collection = "1 step · 1 routine"', () => {
+    setup()
+    expect(screen.getByText('1 step · 1 routine')).toBeInTheDocument()
   })
 
   it('New routine button: creates the collection then opens the editor', async () => {

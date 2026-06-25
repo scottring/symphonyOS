@@ -529,7 +529,7 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
               Routines
             </h1>
             <p className="text-sm text-neutral-500 mt-1">
-              {(() => { const n = collections.length + standalone.length; return `${n} routine${n !== 1 ? 's' : ''}` })()}
+              {`${standalone.length} step${standalone.length !== 1 ? 's' : ''} · ${collections.length} routine${collections.length !== 1 ? 's' : ''}`}
             </p>
           </div>
 
@@ -644,7 +644,7 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
         {/* Collections — two-level rendering */}
         {collections.length > 0 && (
           <div className="mb-10">
-            <SectionHeader title="Multi-step" count={collections.length} />
+            <SectionHeader title="Routines" count={collections.length} />
             <div className="space-y-3 stagger-in">
               {collections.map((collection, index) => (
                 <button
@@ -680,10 +680,11 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
         {/* Active Routines (standalone only) */}
         {activeRoutines.length > 0 && (
           <div className="mb-10">
+            <SectionHeader title="Steps" count={standalone.length} />
             {/* When not grouped, show simple list */}
             {!processedActiveRoutines.grouped && (
               <>
-                <SectionHeader title="Active" count={activeRoutines.length} />
+
                 <div className="space-y-3 stagger-in">
                   {processedActiveRoutines.routines.map((routine, index) => renderRoutineCard(routine, index, false, true))}
                 </div>
