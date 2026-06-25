@@ -10,10 +10,11 @@ const step: Routine = {
   created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
 } as Routine
 
-function setup(overrides = {}) {
+function setup(overrides: Record<string, unknown> = {}) {
   const props = {
     step, parentName: 'Shoulder HEP', onClose: vi.fn(), onRename: vi.fn(),
-    onDosesChange: vi.fn(), onNotesChange: vi.fn(), onPromote: vi.fn(), ...overrides,
+    onDosesChange: vi.fn(), onNotesChange: vi.fn(), onPromote: vi.fn(),
+    onScheduleChange: vi.fn(), ...overrides,
   }
   render(<TapStepPanel {...props} />)
   return props
@@ -40,7 +41,35 @@ describe('TapStepPanel', () => {
 
   it('promotes the step to standalone', () => {
     const { onPromote } = setup()
-    fireEvent.click(screen.getByRole('button', { name: /remove from collection/i }))
+    fireEvent.click(screen.getByRole('button', { name: /remove from routine/i }))
     expect(onPromote).toHaveBeenCalled()
+  })
+
+  it('shows "Same as routine" by default for an inheriting (daily) step', () => {
+    setup({ step: { ...step, recurrence_pattern: { type: 'daily' } } as Routine })
+    expect(screen.getByRole('button', { name: /same as routine/i })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('switching to specific days and picking a day reports a weekly pattern', () => {
+    const onScheduleChange = vi.fn()
+    setup({ step: { ...step, recurrence_pattern: { type: 'daily' } } as Routine, onScheduleChange })
+    fireEvent.click(screen.getByRole('button', { name: /specific days/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Mon$/i }))
+    expect(onScheduleChange).toHaveBeenCalled()
+    const arg = onScheduleChange.mock.calls.at(-1)![0]
+    expect(arg.type).toBe('weekly')
+    expect(arg.days).toContain('mon')
+  })
+
+  it('choosing "Same as routine" reverts to an inheriting daily pattern', () => {
+    const onScheduleChange = vi.fn()
+    setup({ step: { ...step, recurrence_pattern: { type: 'weekly', days: ['mon'] } } as Routine, onScheduleChange })
+    fireEvent.click(screen.getByRole('button', { name: /same as routine/i }))
+    expect(onScheduleChange).toHaveBeenCalledWith({ type: 'daily' })
+  })
+
+  it('labels the promote action "Remove from routine"', () => {
+    setup()
+    expect(screen.getByRole('button', { name: /remove from routine/i })).toBeInTheDocument()
   })
 })

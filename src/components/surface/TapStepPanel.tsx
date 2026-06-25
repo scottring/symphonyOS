@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { Link2Off } from 'lucide-react'
-import type { Routine } from '@/types/actionable'
+import type { Routine, RecurrencePattern } from '@/types/actionable'
+import { WEEKDAY_KEYS } from '@/lib/routineUtils'
 import { PanelHeader } from './sections/PanelHeader'
 import { PanelWhy } from './sections/PanelWhy'
 import { DosePills } from './sections/DosePills'
@@ -12,11 +14,17 @@ interface TapStepPanelProps {
   onDosesChange: (times: string[]) => void
   onNotesChange: (next: string) => void
   onPromote: () => void
+  onScheduleChange?: (pattern: RecurrencePattern) => void
 }
 
 export function TapStepPanel(props: TapStepPanelProps) {
   const { step, parentName } = props
   const times = (step.times_per_day ?? []).map(t => t.slice(0, 5))
+
+  const rp = step.recurrence_pattern
+  const initOverridden = !!(rp && (rp.type === 'weekly' || rp.type === 'specific_days') && rp.days?.length)
+  const [overridden, setOverridden] = useState(initOverridden)
+  const [days, setDays] = useState<string[]>(initOverridden ? rp!.days! : [])
 
   return (
     <article className="bg-bg-elevated rounded-2xl p-5 max-w-md w-full">
@@ -31,6 +39,61 @@ export function TapStepPanel(props: TapStepPanelProps) {
         <DosePills times={times} onChange={props.onDosesChange} />
       </section>
 
+      {props.onScheduleChange && (
+        <section className="pb-4 mb-4 border-b border-neutral-200">
+          <h3 className="text-sm font-medium text-neutral-700 mb-2">Days</h3>
+          <div className="flex gap-2 mb-3">
+            <button
+              type="button"
+              aria-pressed={!overridden}
+              onClick={() => {
+                setOverridden(false)
+                setDays([])
+                props.onScheduleChange!({ type: 'daily' })
+              }}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium ${!overridden ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-700'}`}
+            >
+              Same as routine
+            </button>
+            <button
+              type="button"
+              aria-pressed={overridden}
+              onClick={() => {
+                setOverridden(true)
+                props.onScheduleChange!({ type: 'weekly', days })
+              }}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium ${overridden ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-700'}`}
+            >
+              Specific days
+            </button>
+          </div>
+          {overridden && (
+            <div className="flex flex-wrap gap-1.5">
+              {WEEKDAY_KEYS.map(k => {
+                const on = days.includes(k)
+                const label = k.charAt(0).toUpperCase() + k.slice(1)
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    aria-label={label}
+                    aria-pressed={on}
+                    onClick={() => {
+                      const next = on ? days.filter(d => d !== k) : [...days, k]
+                      setDays(next)
+                      props.onScheduleChange!({ type: 'weekly', days: next })
+                    }}
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium ${on ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600'}`}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </section>
+      )}
+
       <PanelWhy key={step.id} label="Instructions" notes={step.description ?? undefined} onChange={props.onNotesChange} />
 
       <button
@@ -38,7 +101,7 @@ export function TapStepPanel(props: TapStepPanelProps) {
         onClick={props.onPromote}
         className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-neutral-600 hover:text-red-600"
       >
-        <Link2Off className="w-4 h-4" /> Remove from collection
+        <Link2Off className="w-4 h-4" /> Remove from routine
       </button>
     </article>
   )
