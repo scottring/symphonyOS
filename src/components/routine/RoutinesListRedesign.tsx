@@ -685,15 +685,12 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
         {/* Active Routines (standalone only) */}
         {activeRoutines.length > 0 && (
           <div className="mb-10">
-            <SectionHeader title="Steps" count={standalone.length} />
+            <SectionHeader title="Steps" count={activeRoutines.length} />
             {/* When not grouped, show simple list */}
             {!processedActiveRoutines.grouped && (
-              <>
-
-                <div className="space-y-3 stagger-in">
-                  {processedActiveRoutines.routines.map((routine, index) => renderRoutineCard(routine, index, false, true))}
-                </div>
-              </>
+              <div className="space-y-3 stagger-in">
+                {processedActiveRoutines.routines.map((routine, index) => renderRoutineCard(routine, index, false, true))}
+              </div>
             )}
 
             {/* When grouped, show sections */}

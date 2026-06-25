@@ -160,6 +160,22 @@ describe('RoutinesListRedesign two-level', () => {
     expect(onCreateCollection).toHaveBeenCalledWith('New routine')
     expect(await screen.findByLabelText(/add a step/i)).toBeInTheDocument() // routine-mode: steps section
   })
+
+  it('Steps header count reflects only ACTIVE steps, not paused', () => {
+    // One active standalone step and one paused standalone step
+    const rs = [
+      r('a', 'Brush teeth', { visibility: 'active' }),
+      r('b', 'Floss', { visibility: 'reference' }),
+    ]
+    render(<RoutinesListRedesign
+      routines={rs} onCreateRoutine={vi.fn()} onUpdateRoutine={vi.fn()}
+      onAddStep={vi.fn()} onReorderSteps={vi.fn()} onPromoteStep={vi.fn()} />)
+    // Verify the active step is rendered
+    expect(screen.getByText('Brush teeth')).toBeInTheDocument()
+    // Get the page text content and verify Steps header shows (1) not (2)
+    const text = document.body.textContent || ''
+    expect(text).toMatch(/Steps\s+\(1\)/)
+  })
 })
 
 afterEach(() => vi.restoreAllMocks())
