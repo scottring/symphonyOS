@@ -27,7 +27,7 @@ export function DosePills({ times, onChange }: DosePillsProps) {
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap gap-2">
         {times.map(t => (
-          <span key={t} className="inline-flex items-center gap-1 rounded-full bg-primary-50 text-primary-700 text-sm px-2.5 py-1">
+          <span key={norm(t)} className="inline-flex items-center gap-1 rounded-full bg-primary-50 text-primary-700 text-sm px-2.5 py-1">
             {norm(t)}
             <button type="button" aria-label={`Remove ${norm(t)}`} onClick={() => remove(t)} className="hover:text-primary-900">
               <X className="w-3.5 h-3.5" />

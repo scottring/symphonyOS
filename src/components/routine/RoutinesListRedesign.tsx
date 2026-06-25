@@ -54,7 +54,7 @@ interface RoutinesListProps {
   onAddStep: (collectionId: string, name: string) => void
   onReorderSteps: (writes: { id: string; step_order: number }[]) => void
   onPromoteStep: (stepId: string) => void
-  onCreateCollection?: (name: string) => void
+  onCreateCollection?: (name: string) => Promise<import('@/types/actionable').Routine | null> | void
   onGroupIntoCollection?: (name: string, routineIds: string[]) => void
 }
 
@@ -191,7 +191,14 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
 
   // Derive open panel data fresh each render so edits reflect immediately
   const { collections, standalone } = groupRoutineSteps(routines)
-  const openCollection = open?.kind === 'collection' ? collections.find(c => c.id === open.id) : undefined
+  const openCollection =
+    open?.kind === 'collection'
+      ? (collections.find(c => c.id === open.id)
+         ?? (() => {
+              const r = routines.find(x => x.id === open.id && !x.parent_routine_id)
+              return r ? { ...r, steps: [] as import('@/types/actionable').Routine[] } : undefined
+            })())
+      : undefined
   const openStep = open?.kind === 'step'
     ? collections.flatMap(c => c.steps).find(s => s.id === open.id)
     : undefined
@@ -530,9 +537,11 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
           <div className="flex items-center gap-2">
             {onCreateCollection && (
               <button
-                onClick={() => {
+                onClick={async () => {
                   const name = window.prompt('Name the new collection')?.trim()
-                  if (name) onCreateCollection(name)
+                  if (!name || !onCreateCollection) return
+                  const created = await onCreateCollection(name)
+                  if (created) setOpen({ kind: 'collection', id: created.id })
                 }}
                 className="flex items-center gap-2 px-4 py-2.5 bg-white text-amber-700 border border-amber-300 rounded-xl font-medium
                            hover:bg-amber-50 active:bg-amber-100 transition-colors shadow-sm"

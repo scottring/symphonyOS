@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { RoutinesListRedesign } from './RoutinesListRedesign'
 import type { Routine } from '@/types/actionable'
@@ -59,4 +59,22 @@ describe('RoutinesListRedesign two-level', () => {
     fireEvent.click(screen.getByRole('button', { name: /group into routine/i }))
     expect(onGroupIntoCollection).toHaveBeenCalledWith('Morning', expect.arrayContaining(['a', 'b']))
   })
+
+  it('New collection: creates the collection then opens the editor', async () => {
+    const createdRoutine = r('newc', 'Morning', { parent_routine_id: undefined })
+    const onCreateCollection = vi.fn().mockResolvedValue(createdRoutine)
+    vi.spyOn(window, 'prompt').mockReturnValue('Morning')
+    render(<RoutinesListRedesign
+      routines={[createdRoutine]} onSelectRoutine={vi.fn()} onCreateRoutine={vi.fn()} onUpdateRoutine={vi.fn()}
+      onAddStep={vi.fn()} onReorderSteps={vi.fn()} onPromoteStep={vi.fn()}
+      onCreateCollection={onCreateCollection} />)
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /new collection/i }))
+    })
+    expect(onCreateCollection).toHaveBeenCalledWith('Morning')
+    // Panel should open — the collection editor contains the "Add a step" input
+    await waitFor(() => expect(screen.getByLabelText(/add a step/i)).toBeInTheDocument())
+  })
 })
+
+afterEach(() => vi.restoreAllMocks())

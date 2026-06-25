@@ -55,7 +55,7 @@ function RoutinesIndex() {
   }, [updateRoutine])
 
   const handleCreateCollection = useCallback(async (name: string) => {
-    await addRoutine({ name })
+    return addRoutine({ name })
   }, [addRoutine])
 
   const handleGroupIntoCollection = useCallback(async (name: string, ids: string[]) => {

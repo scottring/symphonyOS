@@ -76,7 +76,7 @@ export function TapCollectionPanel(props: TapCollectionPanelProps) {
               timeOfDay={(collection.time_of_day ?? '').slice(0, 5)}
               onChange={({ recurrencePattern, timeOfDay }) => props.onScheduleChange(recurrencePattern, timeOfDay)}
             />
-            <button onClick={() => setEditingSchedule(false)} className="mt-3 text-xs font-medium text-neutral-500 hover:text-neutral-700">Done</button>
+            <button type="button" onClick={() => setEditingSchedule(false)} className="mt-3 text-xs font-medium text-neutral-500 hover:text-neutral-700">Done</button>
           </div>
         ) : (
           <button onClick={() => setEditingSchedule(true)} className="flex items-center justify-between w-full px-3 py-2 rounded-lg bg-neutral-100 text-sm text-neutral-700 hover:bg-neutral-200">
