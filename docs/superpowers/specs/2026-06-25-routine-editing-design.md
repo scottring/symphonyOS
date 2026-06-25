@@ -191,3 +191,39 @@ A "collection" is just a routine that has steps; user-facing copy must use one v
 Collection-level assignee editing; move-step-between-collections; unifying the two routine editors
 (legacy `RoutineForm` for parentless routines vs the step-capable panel) — a parentless routine still
 can't gain its first step from the list without going through New routine. Tracked as follow-up.
+
+---
+
+## Addendum 2 (2026-06-25) — "Step is the atom; Routine is a group of steps"
+
+Supersedes the one-noun "Routine is the atom" framing. The recurring confusion ("where do I
+create a standalone step?") came from the SAME object having two names by position: "routine"
+when loose, "step" when nested. Fix = ONE name for the atom: **Step**.
+
+### Model (NO schema change — label follows structure)
+- A `routines` row with **no children** = a **Step** (standalone if no parent; a nested step if it has a parent).
+- A `routines` row **with children** = a **Routine** (a named group of steps).
+- `groupRoutineSteps` already returns this split: `standalone` = Steps, `collections` = Routines.
+
+### UI
+- **Routines page** = two parts: **ROUTINES** (groups, was "Multi-step") + **STEPS** (loose items, keep the
+  existing time-band/sort/group controls). Count = "X steps · Y routines".
+- **Two create buttons:** **`+ New step`** → opens a STEP editor (name, schedule, context, assignee,
+  visibility, notes; **no** Steps section — a step is atomic). **`+ New routine`** → opens a ROUTINE editor
+  (same fields **+** Steps section to build the group). Both create via the existing add-routine path; they
+  differ only in the editor mode they open. Replace the `window.prompt` with a default name + inline rename
+  in the panel header (kills the clunky prompt).
+- **Editor routing (one panel, mode by structure):**
+  - Routine (has children) or `+ New routine` → `TapRoutinePanel` WITH step handlers (Steps section shows).
+  - Standalone Step (no children) or `+ New step` → `TapRoutinePanel` WITHOUT step handlers (no Steps section).
+  - Nested step (clicked from inside a routine) → `TapStepPanel` (lightweight: dose pills, per-step days, instructions; inherits context/assignee).
+- **Wording is now consistent:** the atom is a "step" everywhere; "Combine into a routine" / "Remove from
+  routine" read correctly (group steps into a routine; pull a step out).
+- A standalone step does NOT gain steps in place (a step is atomic); to make a routine, use `+ New routine`
+  or multi-select "Combine into a routine". (An in-place "make this a routine" affordance is a future option.)
+
+### Unchanged
+- Today and the wall keep their current rendering (items + expandable groups) — only the Routines page splits
+  Steps vs Routines. Internal code/table names stay `routine`/`routines` (label-only change). 2-level, no nesting.
+- Open follow-ups still open: suppress 0-applicable-step routine from Today; legacy `RoutineForm`/NL create at
+  `/routines/new` + `/:routineId` (URL-reachable only).
