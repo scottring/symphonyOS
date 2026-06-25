@@ -92,9 +92,8 @@ describe('RoutinesListRedesign two-level', () => {
   })
 
   it('New routine button: creates the collection then opens the editor', async () => {
-    const createdRoutine = r('newc', 'Morning', { parent_routine_id: undefined })
+    const createdRoutine = r('newc', 'Morning Routine', { parent_routine_id: undefined })
     const onCreateCollection = vi.fn().mockResolvedValue(createdRoutine)
-    vi.spyOn(window, 'prompt').mockReturnValue('Morning')
     render(<RoutinesListRedesign
       routines={[createdRoutine]} onCreateRoutine={vi.fn()} onUpdateRoutine={vi.fn()}
       onAddStep={vi.fn()} onReorderSteps={vi.fn()} onPromoteStep={vi.fn()}
@@ -102,7 +101,7 @@ describe('RoutinesListRedesign two-level', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /new routine/i }))
     })
-    expect(onCreateCollection).toHaveBeenCalledWith('Morning')
+    expect(onCreateCollection).toHaveBeenCalledWith('New routine')
     // Panel should open — the collection editor contains the "Add a step" input
     await waitFor(() => expect(screen.getByLabelText(/add a step/i)).toBeInTheDocument())
   })
@@ -128,6 +127,38 @@ describe('RoutinesListRedesign two-level', () => {
       onCreateCollection={vi.fn()} onGroupIntoCollection={vi.fn()} />)
     fireEvent.click(screen.getByText('School AM'))
     expect(await screen.findByLabelText(/add a step/i)).toBeInTheDocument()
+  })
+
+  it('"+ New step" creates a step and opens the step-mode editor (no steps section)', async () => {
+    const created = r('newstep', 'New step')
+    const onCreateCollection = vi.fn().mockResolvedValue(created)
+    render(<RoutinesListRedesign
+      routines={[created]} onCreateRoutine={vi.fn()} onUpdateRoutine={vi.fn()}
+      onAddStep={vi.fn()} onReorderSteps={vi.fn()} onPromoteStep={vi.fn()}
+      onCreateCollection={onCreateCollection} onGroupIntoCollection={vi.fn()} />)
+    // Header "New step" is the first button matching the name; the standalone card also matches
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole('button', { name: /new step/i })[0])
+    })
+    expect(onCreateCollection).toHaveBeenCalledWith('New step')
+    // Panel opens — name appears at least twice (card + panel header)
+    await waitFor(() => expect(screen.getAllByText('New step').length).toBeGreaterThanOrEqual(2))
+    expect(screen.queryByLabelText(/add a step/i)).not.toBeInTheDocument() // step-mode: no steps section
+  })
+
+  it('"+ New routine" creates a routine and opens the routine-mode editor (with steps section)', async () => {
+    const created = r('newrt', 'New routine')
+    const onCreateCollection = vi.fn().mockResolvedValue(created)
+    render(<RoutinesListRedesign
+      routines={[created]} onCreateRoutine={vi.fn()} onUpdateRoutine={vi.fn()}
+      onAddStep={vi.fn()} onReorderSteps={vi.fn()} onPromoteStep={vi.fn()}
+      onCreateCollection={onCreateCollection} onGroupIntoCollection={vi.fn()} />)
+    // Header "New routine" is the first button matching the name; the standalone card also matches
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole('button', { name: /new routine/i })[0])
+    })
+    expect(onCreateCollection).toHaveBeenCalledWith('New routine')
+    expect(await screen.findByLabelText(/add a step/i)).toBeInTheDocument() // routine-mode: steps section
   })
 })
 

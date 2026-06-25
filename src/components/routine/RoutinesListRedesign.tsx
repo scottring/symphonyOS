@@ -168,7 +168,7 @@ function SectionHeader({ title, count, collapsed, onToggle }: SectionHeaderProps
   )
 }
 
-export function RoutinesListRedesign({ routines, contacts = [], familyMembers = [], onCreateRoutine, onUpdateRoutine, onAddStep, onReorderSteps, onPromoteStep, onCreateCollection, onGroupIntoCollection }: RoutinesListProps) {
+export function RoutinesListRedesign({ routines, contacts = [], familyMembers = [], onCreateRoutine: _onCreateRoutine, onUpdateRoutine, onAddStep, onReorderSteps, onPromoteStep, onCreateCollection, onGroupIntoCollection }: RoutinesListProps) {
   // Pause modal state
   const [pauseModalRoutine, setPauseModalRoutine] = useState<Routine | null>(null)
 
@@ -550,14 +550,21 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
             </button>
             <button
               onClick={async () => {
-                if (onCreateCollection) {
-                  const name = window.prompt('Name the new routine')?.trim()
-                  if (!name) return
-                  const created = await onCreateCollection(name)
-                  if (created) setOpen({ kind: 'routine', id: created.id })
-                } else {
-                  onCreateRoutine()
-                }
+                if (!onCreateCollection) return
+                const created = await onCreateCollection('New step')
+                if (created) setOpen({ kind: 'standalone-step', id: created.id })
+              }}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white text-neutral-700 rounded-xl font-medium
+                         border border-neutral-200 hover:border-neutral-300 transition-colors shadow-sm"
+            >
+              <Plus className="w-5 h-5" />
+              New step
+            </button>
+            <button
+              onClick={async () => {
+                if (!onCreateCollection) return
+                const created = await onCreateCollection('New routine')
+                if (created) setOpen({ kind: 'routine', id: created.id })
               }}
               className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white rounded-xl font-medium
                          hover:bg-amber-600 active:bg-amber-700 transition-colors shadow-sm
@@ -622,24 +629,19 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
             </div>
             <h2 className="font-display text-xl font-semibold text-neutral-700 mb-2">No routines yet</h2>
             <p className="text-neutral-500 mb-6 max-w-sm mx-auto">
-              Routines are recurring tasks that repeat on a schedule. Create your first routine to get started.
+              Build a routine by grouping steps, or add a standalone step to get started.
             </p>
             <button
               onClick={async () => {
-                if (onCreateCollection) {
-                  const name = window.prompt('Name the new routine')?.trim()
-                  if (!name) return
-                  const created = await onCreateCollection(name)
-                  if (created) setOpen({ kind: 'routine', id: created.id })
-                } else {
-                  onCreateRoutine()
-                }
+                if (!onCreateCollection) return
+                const created = await onCreateCollection('New step')
+                if (created) setOpen({ kind: 'standalone-step', id: created.id })
               }}
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-white rounded-xl font-medium
                          hover:bg-amber-600 transition-colors shadow-sm"
             >
               <Plus className="w-5 h-5" />
-              Create your first routine
+              Create your first step
             </button>
           </div>
         )}
