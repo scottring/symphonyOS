@@ -11,6 +11,7 @@ import { PanelFooter } from './sections/PanelFooter'
 import { ContextPicker } from '@/components/triage/ContextPicker'
 import { MultiAssigneeDropdown } from '@/components/family'
 import { RoutineScheduleEditor } from '@/components/routine/RoutineScheduleEditor'
+import { RoutineStepsSection } from './sections/RoutineStepsSection'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { useRoutineStats } from '@/hooks/useRoutineStats'
 import { useAttachments } from '@/hooks/useAttachments'
@@ -37,6 +38,11 @@ interface TapRoutinePanelProps {
   /** Set/change the routine's location (enables directions). When omitted, the Location section is hidden. */
   onUpdateLocation?: (location: string, placeId?: string) => void
   onClearLocation?: () => void
+  /** Optional steps (child routines). When all four are provided, the Steps section is rendered. */
+  steps?: Routine[]
+  onSelectStep?: (step: Routine) => void
+  onAddStep?: (name: string) => void
+  onReorderSteps?: (writes: { id: string; step_order: number }[]) => void
 }
 
 export function TapRoutinePanel(props: TapRoutinePanelProps) {
@@ -148,6 +154,17 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
           </div>
         )}
       </section>
+
+      {props.steps && props.onSelectStep && props.onAddStep && props.onReorderSteps && (
+        <section className="pb-4 mb-4 border-b border-neutral-200">
+          <RoutineStepsSection
+            steps={props.steps}
+            onSelectStep={props.onSelectStep}
+            onAddStep={props.onAddStep}
+            onReorderSteps={props.onReorderSteps}
+          />
+        </section>
+      )}
 
       {props.onUpdateLocation && props.onClearLocation && (
         <section className="pb-4 mb-4 border-b border-neutral-200">

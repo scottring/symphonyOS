@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import { TapRoutinePanel } from './TapRoutinePanel'
-import type { Routine } from '@/types/routine'
+import type { Routine } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
 
 // The panel reads streaks via useRoutineStats (which needs auth/supabase).
@@ -143,5 +143,22 @@ describe('TapRoutinePanel', () => {
     expect(onScheduleChange).toHaveBeenCalled()
     const lastCall = onScheduleChange.mock.calls[onScheduleChange.mock.calls.length - 1]
     expect(lastCall[1]).toBe('07:30')
+  })
+
+  it('renders a Steps section when step handlers + steps are provided', () => {
+    const steps = [{ ...routine, id: 'st1', name: 'Chin tuck', parent_routine_id: routine.id } as Routine]
+    render(
+      <TapRoutinePanel
+        routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={vi.fn()}
+        steps={steps} onSelectStep={vi.fn()} onAddStep={vi.fn()} onReorderSteps={vi.fn()}
+      />,
+    )
+    expect(screen.getByText('Chin tuck')).toBeInTheDocument()
+    expect(screen.getByLabelText(/add a step/i)).toBeInTheDocument()
+  })
+
+  it('does NOT render a Steps section when step handlers are absent (Today-tap parity)', () => {
+    render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={vi.fn()} />)
+    expect(screen.queryByLabelText(/add a step/i)).not.toBeInTheDocument()
   })
 })
