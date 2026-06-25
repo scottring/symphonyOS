@@ -160,3 +160,34 @@ collections.
 6. Multi-select "Group into routine" + "New empty collection."
 7. Promote/move (re-parent) controls.
 8. Tests (selectors, CRUD, panels, grouping, reorder) + backward-compat checks.
+
+---
+
+## Addendum (2026-06-25) — per-step day override + one-noun terminology
+
+Two decisions taken with Scott after the first build shipped to preview:
+
+### 1. Per-step day scheduling (revises Fork C)
+Fork C said steps inherit recurrence with no override. We now add an **optional per-step day
+override, default inherit**:
+- A step with no override shows whenever the routine runs (inherits the parent's days).
+- A step may carry its own weekly days; then it only appears on those days.
+- This solves shower-night vs non-shower-night bedtime as **one** routine (Shower → Tue/Thu/Sun,
+  Wash face → Mon/Wed/Fri/Sat, the rest inherit) — no duplicate routines.
+- **No schema change**: a step is a routine row that already has `recurrence_pattern`. "Override"
+  = `recurrence_pattern.type` is `weekly`/`specific_days` with `days`; otherwise (`daily`) = inherit.
+- Today filters a routine's steps to those matching the viewed date; progress counts only the
+  applicable steps. (Earlier "variants + Duplicate routine" idea is **dropped** — superseded by this.)
+
+### 2. One-noun terminology (Routine + Steps; "Collection" removed)
+A "collection" is just a routine that has steps; user-facing copy must use one vocabulary:
+- Drop the word "Collection" everywhere user-facing. Single `+ New routine` button (opens the
+  step-capable editor; the AI natural-language quick-add is retired from the header, still at the route).
+- Count = top-level routines only (steps excluded). Section header "Collections" → "Multi-step".
+- "Group into routine" → "Combine into a routine". "Remove from collection" → "Remove from routine".
+- Internal code identifiers (`kind:'collection'`, `routine-collection` type, component names) stay.
+
+### Deferred (unchanged)
+Collection-level assignee editing; move-step-between-collections; unifying the two routine editors
+(legacy `RoutineForm` for parentless routines vs the step-capable panel) — a parentless routine still
+can't gain its first step from the list without going through New routine. Tracked as follow-up.
