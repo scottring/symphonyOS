@@ -3,6 +3,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { RoutinesListRedesign } from './RoutinesListRedesign'
 import type { Routine } from '@/types/actionable'
 
+// Mock hooks pulled in by TapRoutinePanel so tests don't need Supabase auth
+vi.mock('@/hooks/useRoutineStats', () => ({
+  useRoutineStats: () => ({ getStats: () => undefined }),
+}))
+vi.mock('@/hooks/useAttachments', () => ({
+  useAttachments: () => ({
+    getAttachments: () => [],
+    getSignedUrl: vi.fn(),
+    fetchAttachments: vi.fn(),
+  }),
+}))
+
 function r(id: string, name: string, extra: Partial<Routine> = {}): Routine {
   return {
     id, user_id: 'u1', name, recurrence_pattern: { type: 'daily' }, visibility: 'active',
@@ -38,10 +50,11 @@ describe('RoutinesListRedesign two-level', () => {
     expect(screen.getByText(/2 steps/i)).toBeInTheDocument()
   })
 
-  it('clicking a standalone routine uses the existing onSelectRoutine path', () => {
-    const { onSelectRoutine } = setup()
+  it('clicking a standalone routine opens the unified TapRoutinePanel editor', async () => {
+    setup()
     fireEvent.click(screen.getByText('Trash night'))
-    expect(onSelectRoutine).toHaveBeenCalledWith(expect.objectContaining({ id: 'flat' }))
+    // TapRoutinePanel shows the "Add a step" input from RoutineStepsSection
+    await waitFor(() => expect(screen.getByLabelText(/add a step/i)).toBeInTheDocument())
   })
 
   it('group mode: selecting two standalone routines and grouping reports their ids', () => {

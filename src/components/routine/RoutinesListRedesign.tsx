@@ -9,7 +9,7 @@ import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
 import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
 import { groupRoutineSteps } from '@/lib/today/routineCollections'
-import { TapCollectionPanel } from '@/components/surface/TapCollectionPanel'
+import { TapRoutinePanel } from '@/components/surface/TapRoutinePanel'
 import { TapStepPanel } from '@/components/surface/TapStepPanel'
 
 // Sort and group options
@@ -430,7 +430,7 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
     const card = (
       <button
         key={routine.id}
-        onClick={() => !selecting && onSelectRoutine(routine)}
+        onClick={() => !selecting && setOpen({ kind: 'collection', id: routine.id })}
         className={`w-full flex items-center gap-4 p-5 rounded-2xl border transition-all duration-200 text-left group ${
           isPaused
             ? 'bg-neutral-50 border-neutral-100 hover:border-neutral-200 hover:shadow-sm opacity-60'
@@ -776,14 +776,19 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
         >
           <div onClick={e => e.stopPropagation()}>
             {openCollection && (
-              <TapCollectionPanel
-                collection={openCollection}
+              <TapRoutinePanel
+                key={openCollection.id}
+                routine={openCollection}
+                familyMembers={familyMembers}
                 onClose={() => setOpen(null)}
                 onRename={name => onUpdateRoutine(openCollection.id, { name })}
                 onContextChange={context => onUpdateRoutine(openCollection.id, { context: context ?? null })}
-                onScheduleChange={(recurrence_pattern, timeOfDay) =>
-                  onUpdateRoutine(openCollection.id, { recurrence_pattern, time_of_day: timeOfDay || null })}
+                onVisibilityChange={visibility => onUpdateRoutine(openCollection.id, { visibility })}
+                onAssignChange={memberIds => onUpdateRoutine(openCollection.id, { assigned_to_all: memberIds })}
+                onScheduleChange={(pattern, timeOfDay) =>
+                  onUpdateRoutine(openCollection.id, { recurrence_pattern: pattern, time_of_day: timeOfDay || null })}
                 onNotesChange={description => onUpdateRoutine(openCollection.id, { description })}
+                steps={openCollection.steps}
                 onSelectStep={s => setOpen({ kind: 'step', id: s.id })}
                 onAddStep={name => onAddStep(openCollection.id, name)}
                 onReorderSteps={onReorderSteps}
