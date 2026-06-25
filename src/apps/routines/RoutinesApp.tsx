@@ -1,4 +1,4 @@
-import { Suspense, useMemo } from 'react'
+import { Suspense, useCallback, useMemo } from 'react'
 import {
   Routes,
   Route,
@@ -13,6 +13,8 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { usePinnedItems } from '@/hooks/usePinnedItems'
 import { useDomain } from '@/hooks/useDomain'
 import { RoutinesList, RoutineForm, RoutineInput } from '@/components/lazy'
+import { groupRoutineSteps } from '@/lib/today/routineCollections'
+import { nextStepOrder } from '@/lib/today/stepOrdering'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 
 /**
@@ -29,7 +31,7 @@ import { LoadingFallback } from '@/components/layout/LoadingFallback'
 function RoutinesIndex() {
   const navigate = useNavigate()
   const { currentDomain } = useDomain()
-  const { routines, updateRoutine } = useRoutines()
+  const { routines, addRoutine, updateRoutine } = useRoutines()
   const { contacts } = useContacts()
   const { members: familyMembers } = useFamilyMembers()
 
@@ -37,6 +39,30 @@ function RoutinesIndex() {
     currentDomain === 'universal'
       ? routines
       : routines.filter((r) => r.context === currentDomain)
+
+  const handleAddStep = useCallback(async (collectionId: string, name: string) => {
+    const { collections } = groupRoutineSteps(routines)
+    const steps = collections.find(c => c.id === collectionId)?.steps ?? []
+    await addRoutine({ name, parent_routine_id: collectionId, step_order: nextStepOrder(steps) })
+  }, [routines, addRoutine])
+
+  const handleReorderSteps = useCallback(async (writes: { id: string; step_order: number }[]) => {
+    await Promise.all(writes.map(w => updateRoutine(w.id, { step_order: w.step_order })))
+  }, [updateRoutine])
+
+  const handlePromoteStep = useCallback(async (stepId: string) => {
+    await updateRoutine(stepId, { parent_routine_id: null, step_order: null })
+  }, [updateRoutine])
+
+  const handleCreateCollection = useCallback(async (name: string) => {
+    await addRoutine({ name })
+  }, [addRoutine])
+
+  const handleGroupIntoCollection = useCallback(async (name: string, ids: string[]) => {
+    const parent = await addRoutine({ name })
+    if (!parent) return
+    await Promise.all(ids.map((id, i) => updateRoutine(id, { parent_routine_id: parent.id, step_order: i })))
+  }, [addRoutine, updateRoutine])
 
   return (
     <Suspense fallback={<LoadingFallback />}>
@@ -47,6 +73,11 @@ function RoutinesIndex() {
         onSelectRoutine={(routine) => navigate(`/routines/${routine.id}`)}
         onCreateRoutine={() => navigate('/routines/new')}
         onUpdateRoutine={updateRoutine}
+        onAddStep={handleAddStep}
+        onReorderSteps={handleReorderSteps}
+        onPromoteStep={handlePromoteStep}
+        onCreateCollection={handleCreateCollection}
+        onGroupIntoCollection={handleGroupIntoCollection}
       />
     </Suspense>
   )
