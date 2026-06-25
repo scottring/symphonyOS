@@ -1,6 +1,7 @@
 import type { Routine, RoutineWithSteps, ActionableInstance } from '@/types/actionable'
 import type { TimelineItem, CollectionDose, CollectionStepGroup } from '@/types/timeline'
 import { expandRoutineDoses, routineStatusKey } from './doseExpansion'
+import { stepAppliesOnDate } from './stepSchedule'
 
 function stepSort(a: Routine, b: Routine): number {
   const ao = a.step_order, bo = b.step_order
@@ -49,7 +50,8 @@ export function buildCollectionItem(
 
   // One entry per exercise (step); its doses are grouped so the name shows once
   // instead of once per dose.
-  for (const step of collection.steps) {
+  const applicableSteps = collection.steps.filter(step => stepAppliesOnDate(step, viewedDate))
+  for (const step of applicableSteps) {
     const doses: CollectionDose[] = []
     let stepDone = 0
     for (const dose of expandRoutineDoses(step)) {

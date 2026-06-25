@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import type { Routine } from '@/types/actionable'
 import { groupRoutineSteps, buildCollectionItem } from './routineCollections'
 import type { ActionableInstance } from '@/types/actionable'
+import { weekdayKeyForDate, WEEKDAY_KEYS } from '@/lib/routineUtils'
 
 function r(over: Partial<Routine>): Routine {
   return {
@@ -77,5 +78,27 @@ describe('buildCollectionItem', () => {
     expect(item.completed).toBe(true)
     expect(item.collectionProgress).toEqual({ done: 1, total: 1 })
     expect(item.collectionNextUp).toBeUndefined()
+  })
+  it('buildCollectionItem excludes steps whose day-override does not match the viewed date', () => {
+    const viewed = new Date(2026, 0, 5) // Monday
+    const key = weekdayKeyForDate(viewed)
+    const otherKey = WEEKDAY_KEYS.find(k => k !== key)!
+    const mk = (id: string, rp: Routine['recurrence_pattern']): Routine => ({
+      ...r({ id, name: id, parent_routine_id: 'c1', step_order: 0, recurrence_pattern: rp }),
+    })
+    const collection = {
+      ...r({ id: 'c1', name: 'Bedtime', recurrence_pattern: { type: 'daily' } }),
+      steps: [
+        mk('always', { type: 'daily' }),                       // inherits → shows
+        mk('today', { type: 'weekly', days: [key] }),           // matches → shows
+        mk('other', { type: 'weekly', days: [otherKey] }),      // excluded
+      ],
+    }
+    const item = buildCollectionItem(collection as any, viewed, new Map())
+    const ids = item.collectionSteps!.map(s => s.stepId)
+    expect(ids).toContain('always')
+    expect(ids).toContain('today')
+    expect(ids).not.toContain('other')
+    expect(item.collectionProgress.total).toBe(2)
   })
 })
