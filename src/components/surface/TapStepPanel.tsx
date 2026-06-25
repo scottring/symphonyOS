@@ -31,7 +31,7 @@ export function TapStepPanel(props: TapStepPanelProps) {
       <PanelHeader title={step.name} onTitleChange={props.onRename} onClose={props.onClose} />
 
       <p className="text-xs text-neutral-500 mb-4">
-        Context, people and schedule are <span className="font-medium">inherited from {parentName}</span>.
+        Context and people are <span className="font-medium">inherited from {parentName}</span>.
       </p>
 
       <section className="pb-4 mb-4 border-b border-neutral-200">
@@ -60,7 +60,8 @@ export function TapStepPanel(props: TapStepPanelProps) {
               aria-pressed={overridden}
               onClick={() => {
                 setOverridden(true)
-                props.onScheduleChange!({ type: 'weekly', days })
+                // Do NOT persist: entering "Specific days" with no days chosen is
+                // a transient local mode. Only persist once the user picks a day.
               }}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium ${overridden ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-700'}`}
             >
@@ -81,7 +82,13 @@ export function TapStepPanel(props: TapStepPanelProps) {
                     onClick={() => {
                       const next = on ? days.filter(d => d !== k) : [...days, k]
                       setDays(next)
-                      props.onScheduleChange!({ type: 'weekly', days: next })
+                      if (next.length > 0) {
+                        props.onScheduleChange!({ type: 'weekly', days: next })
+                      } else {
+                        // Last day removed → revert to inherit (stay in overridden
+                        // local mode so toggles remain visible mid-edit)
+                        props.onScheduleChange!({ type: 'daily' })
+                      }
                     }}
                     className={`px-2.5 py-1 rounded-full text-xs font-medium ${on ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600'}`}
                   >

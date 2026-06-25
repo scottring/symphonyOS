@@ -28,9 +28,11 @@ describe('TapStepPanel', () => {
     expect(screen.getByText('18:00')).toBeInTheDocument()
   })
 
-  it('shows the inherited parent as read-only context', () => {
+  it('shows the inherited parent as read-only context (without "schedule")', () => {
     setup()
+    expect(screen.getByText(/Context and people are/i)).toBeInTheDocument()
     expect(screen.getByText(/inherited from Shoulder HEP/i)).toBeInTheDocument()
+    expect(screen.queryByText(/schedule/i)).not.toBeInTheDocument()
   })
 
   it('removing a dose reports the remaining times', () => {
@@ -71,5 +73,24 @@ describe('TapStepPanel', () => {
   it('labels the promote action "Remove from routine"', () => {
     setup()
     expect(screen.getByRole('button', { name: /remove from routine/i })).toBeInTheDocument()
+  })
+
+  it('clicking "Specific days" alone does NOT call onScheduleChange with empty weekly days', () => {
+    const onScheduleChange = vi.fn()
+    setup({ step: { ...step, recurrence_pattern: { type: 'daily' } } as Routine, onScheduleChange })
+    fireEvent.click(screen.getByRole('button', { name: /specific days/i }))
+    // onScheduleChange must not have been called with {type:'weekly', days:[]}
+    const emptyWeeklyCalls = onScheduleChange.mock.calls.filter(
+      ([arg]) => arg.type === 'weekly' && Array.isArray(arg.days) && arg.days.length === 0
+    )
+    expect(emptyWeeklyCalls).toHaveLength(0)
+  })
+
+  it('removing the last specific day reverts to {type:"daily"} (inherit)', () => {
+    const onScheduleChange = vi.fn()
+    setup({ step: { ...step, recurrence_pattern: { type: 'weekly', days: ['mon'] } } as Routine, onScheduleChange })
+    // Toggle Mon off — it is the only day, so removing it should call daily
+    fireEvent.click(screen.getByRole('button', { name: /^Mon$/i }))
+    expect(onScheduleChange).toHaveBeenCalledWith({ type: 'daily' })
   })
 })
