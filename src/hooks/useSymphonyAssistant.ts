@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { streamSymphonyAgent, type AgentApiMessage } from '@/lib/agentStream'
 import type { ChatMessage } from '@/types/chat'
 import type { ChatAttachment } from '@/components/chat/ChatAttachment'
+import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 
 // Tools that mutate task/project data. When the agent uses one, the app needs
 // to refresh so the change shows without a page reload.
@@ -28,6 +29,7 @@ export function useSymphonyAssistant(onMutate?: () => void) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [toolActivity, setToolActivity] = useState<string[]>([])
+  const { getCurrentUserMember } = useFamilyMembers()
 
   const sendMessage = useCallback(async (text: string, attachment?: ChatAttachment) => {
     if ((!text.trim() && !attachment) || loading) return
@@ -97,6 +99,7 @@ export function useSymphonyAssistant(onMutate?: () => void) {
       },
       onError: (message) => setError(message),
       attachment: attachmentMeta,
+      currentMemberId: getCurrentUserMember()?.id,
     })
 
     if (didWrite) onMutate?.()

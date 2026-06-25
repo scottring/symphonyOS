@@ -247,6 +247,7 @@ async function runTool(
   name: string,
   input: Record<string, unknown>,
   attachment: AttachmentMeta | null,
+  currentMemberId: string | null,
 ): Promise<string> {
   const now = () => new Date().toISOString()
   try {
@@ -360,15 +361,27 @@ async function runTool(
       }
       case 'symphony_create_routine': {
         const { recurrence_pattern, ...rest } = input as Record<string, unknown>
-        const { data, error } = await db.from('routines')
-          .insert({
-            ...rest,
-            recurrence_pattern: recurrence_pattern ?? { type: 'daily' },
-            visibility: 'active',
-            show_on_timeline: true,
-            user_id: userId,
-          })
-          .select().single()
+        const row: Record<string, unknown> = {
+          ...rest,
+          recurrence_pattern: recurrence_pattern ?? { type: 'daily' },
+          visibility: 'active',
+          show_on_timeline: true,
+          user_id: userId,
+        }
+        // Assign a personal routine to the caller so it passes the Today
+        // "my tasks" filter (otherwise unassigned routines are hidden). Family
+        // routines stay unassigned/shared. Only fills when not explicitly set.
+        const ctx = row.context
+        if (row.assigned_to == null && currentMemberId && (ctx === 'personal' || ctx == null)) {
+          row.assigned_to = currentMemberId
+          row.assigned_to_all = [currentMemberId]
+        }
+        // Pin dosed routines (an N-times-per-day protocol like PT) so the
+        // "hide daily" toggle can't sweep them off Today.
+        if (row.pin_to_timeline == null && Array.isArray(row.times_per_day) && row.times_per_day.length > 0) {
+          row.pin_to_timeline = true
+        }
+        const { data, error } = await db.from('routines').insert(row).select().single()
         if (error) throw error
         return JSON.stringify(data, null, 2)
       }
@@ -461,6 +474,7 @@ Deno.serve(async (req) => {
   const body = await req.json().catch(() => ({}))
   const incoming = body.messages
   const attachment: AttachmentMeta | null = body.attachment ?? null
+  const currentMemberId: string | null = typeof body.currentMemberId === 'string' ? body.currentMemberId : null
   if (!Array.isArray(incoming) || incoming.length === 0) return json({ error: 'messages is required' }, 400)
 
   const today = new Date().toISOString().split('T')[0]
@@ -489,7 +503,7 @@ Deno.serve(async (req) => {
               send({ type: 'text', text: block.text })
             } else if (block.type === 'tool_use' && block.name) {
               send({ type: 'tool', name: block.name })
-              const result = await runTool(db, user.id, block.name, block.input ?? {}, attachment)
+              const result = await runTool(db, user.id, block.name, block.input ?? {}, attachment, currentMemberId)
               toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
             }
           }

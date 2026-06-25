@@ -42,6 +42,10 @@ export interface StreamHandlers {
   onDone?: (reply: string, sessionId: string | null) => void
   onError?: (message: string) => void
   attachment?: AttachmentMeta
+  /** The caller's own family-member id, so the agent can assign personal
+   *  routines to them (otherwise they're unassigned and the Today "my tasks"
+   *  filter hides them). */
+  currentMemberId?: string
 }
 
 export type AgentContentBlock =
@@ -78,7 +82,11 @@ export async function streamSymphonyAgent(
         apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ messages, ...(handlers.attachment ? { attachment: handlers.attachment } : {}) }),
+      body: JSON.stringify({
+        messages,
+        ...(handlers.attachment ? { attachment: handlers.attachment } : {}),
+        ...(handlers.currentMemberId ? { currentMemberId: handlers.currentMemberId } : {}),
+      }),
     },
   )
 
