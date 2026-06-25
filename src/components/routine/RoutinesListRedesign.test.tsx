@@ -56,11 +56,22 @@ describe('RoutinesListRedesign two-level', () => {
     fireEvent.click(screen.getByRole('button', { name: /^select$/i }))
     fireEvent.click(screen.getByRole('checkbox', { name: /select make bed/i }))
     fireEvent.click(screen.getByRole('checkbox', { name: /select brush teeth/i }))
-    fireEvent.click(screen.getByRole('button', { name: /group into routine/i }))
+    fireEvent.click(screen.getByRole('button', { name: /combine into a routine/i }))
     expect(onGroupIntoCollection).toHaveBeenCalledWith('Morning', expect.arrayContaining(['a', 'b']))
   })
 
-  it('New collection: creates the collection then opens the editor', async () => {
+  it('section header shows "Multi-step" not "Collections"', () => {
+    setup()
+    expect(screen.getByText(/multi-step/i)).toBeInTheDocument()
+    expect(screen.queryByText(/^collections$/i)).not.toBeInTheDocument()
+  })
+
+  it('count excludes steps: c1 + flat = 2 routines', () => {
+    setup()
+    expect(screen.getByText('2 routines')).toBeInTheDocument()
+  })
+
+  it('New routine button: creates the collection then opens the editor', async () => {
     const createdRoutine = r('newc', 'Morning', { parent_routine_id: undefined })
     const onCreateCollection = vi.fn().mockResolvedValue(createdRoutine)
     vi.spyOn(window, 'prompt').mockReturnValue('Morning')
@@ -69,7 +80,7 @@ describe('RoutinesListRedesign two-level', () => {
       onAddStep={vi.fn()} onReorderSteps={vi.fn()} onPromoteStep={vi.fn()}
       onCreateCollection={onCreateCollection} />)
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /new collection/i }))
+      fireEvent.click(screen.getByRole('button', { name: /new routine/i }))
     })
     expect(onCreateCollection).toHaveBeenCalledWith('Morning')
     // Panel should open — the collection editor contains the "Add a step" input

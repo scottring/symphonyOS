@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { List, ChevronRight } from 'lucide-react'
+import { List, ChevronRight, Plus } from 'lucide-react'
 import type { Routine, RecurrencePattern } from '@/types/actionable'
 import type { UpdateRoutineInput } from '@/hooks/useRoutines'
 import { parseRoutine } from '@/lib/parseRoutine'
@@ -530,25 +530,11 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
               Routines
             </h1>
             <p className="text-sm text-neutral-500 mt-1">
-              {routines.length} routine{routines.length !== 1 ? 's' : ''}
+              {(() => { const n = collections.length + standalone.length; return `${n} routine${n !== 1 ? 's' : ''}` })()}
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            {onCreateCollection && (
-              <button
-                onClick={async () => {
-                  const name = window.prompt('Name the new collection')?.trim()
-                  if (!name || !onCreateCollection) return
-                  const created = await onCreateCollection(name)
-                  if (created) setOpen({ kind: 'collection', id: created.id })
-                }}
-                className="flex items-center gap-2 px-4 py-2.5 bg-white text-amber-700 border border-amber-300 rounded-xl font-medium
-                           hover:bg-amber-50 active:bg-amber-100 transition-colors shadow-sm"
-              >
-                New collection
-              </button>
-            )}
             <button
               aria-label="Select"
               onClick={() => { setSelecting(v => !v); setSelected(new Set()) }}
@@ -561,15 +547,22 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
               Select
             </button>
             <button
-              onClick={onCreateRoutine}
+              onClick={async () => {
+                if (onCreateCollection) {
+                  const name = window.prompt('Name the new routine')?.trim()
+                  if (!name) return
+                  const created = await onCreateCollection(name)
+                  if (created) setOpen({ kind: 'collection', id: created.id })
+                } else {
+                  onCreateRoutine()
+                }
+              }}
               className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white rounded-xl font-medium
                          hover:bg-amber-600 active:bg-amber-700 transition-colors shadow-sm
                          hover:shadow-md"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-              </svg>
-              New Routine
+              <Plus className="w-5 h-5" />
+              New routine
             </button>
           </div>
         </div>
@@ -630,13 +623,20 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
               Routines are recurring tasks that repeat on a schedule. Create your first routine to get started.
             </p>
             <button
-              onClick={onCreateRoutine}
+              onClick={async () => {
+                if (onCreateCollection) {
+                  const name = window.prompt('Name the new routine')?.trim()
+                  if (!name) return
+                  const created = await onCreateCollection(name)
+                  if (created) setOpen({ kind: 'collection', id: created.id })
+                } else {
+                  onCreateRoutine()
+                }
+              }}
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-white rounded-xl font-medium
                          hover:bg-amber-600 transition-colors shadow-sm"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-              </svg>
+              <Plus className="w-5 h-5" />
               Create your first routine
             </button>
           </div>
@@ -645,7 +645,7 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
         {/* Collections — two-level rendering */}
         {collections.length > 0 && (
           <div className="mb-10">
-            <SectionHeader title="Collections" count={collections.length} />
+            <SectionHeader title="Multi-step" count={collections.length} />
             <div className="space-y-3 stagger-in">
               {collections.map((collection, index) => (
                 <button
@@ -743,7 +743,7 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
           <button
             onClick={() => {
-              const name = window.prompt('Name this routine collection')?.trim()
+              const name = window.prompt('Name this routine')?.trim()
               if (!name) return
               onGroupIntoCollection(name, Array.from(selected))
               setSelecting(false)
@@ -752,7 +752,7 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
             className="flex items-center gap-2 px-6 py-3 bg-amber-500 text-white rounded-2xl font-medium
                        shadow-lg hover:bg-amber-600 active:bg-amber-700 transition-colors"
           >
-            Group into routine
+            Combine into a routine
           </button>
         </div>
       )}
@@ -791,12 +791,14 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
             )}
             {openStep && parentOfOpenStep && (
               <TapStepPanel
+                key={openStep.id}
                 step={openStep}
                 parentName={parentOfOpenStep.name}
                 onClose={() => setOpen({ kind: 'collection', id: parentOfOpenStep.id })}
                 onRename={name => onUpdateRoutine(openStep.id, { name })}
                 onDosesChange={times => onUpdateRoutine(openStep.id, { times_per_day: times })}
                 onNotesChange={description => onUpdateRoutine(openStep.id, { description })}
+                onScheduleChange={pattern => onUpdateRoutine(openStep.id, { recurrence_pattern: pattern })}
                 onPromote={() => { onPromoteStep(openStep.id); setOpen({ kind: 'collection', id: parentOfOpenStep.id }) }}
               />
             )}
