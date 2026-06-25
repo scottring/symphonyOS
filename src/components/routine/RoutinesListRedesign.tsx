@@ -7,6 +7,9 @@ import { PauseRoutineModal } from './PauseRoutineModal'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
 import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
+import { groupRoutineSteps } from '@/lib/today/routineCollections'
+import { TapCollectionPanel } from '@/components/surface/TapCollectionPanel'
+import { TapStepPanel } from '@/components/surface/TapStepPanel'
 
 // Sort and group options
 type SortOption = 'time' | 'assignee' | 'frequency' | 'alphabetical'
@@ -46,7 +49,10 @@ interface RoutinesListProps {
   familyMembers?: FamilyMember[]
   onSelectRoutine: (routine: Routine) => void
   onCreateRoutine: () => void
-  onUpdateRoutine: (id: string, updates: UpdateRoutineInput) => Promise<boolean>
+  onUpdateRoutine: (id: string, updates: UpdateRoutineInput) => Promise<boolean> | void
+  onAddStep: (collectionId: string, name: string) => void
+  onReorderSteps: (writes: { id: string; step_order: number }[]) => void
+  onPromoteStep: (stepId: string) => void
 }
 
 function formatRecurrence(routine: Routine): string {
@@ -160,9 +166,20 @@ function SectionHeader({ title, count, collapsed, onToggle }: SectionHeaderProps
   )
 }
 
-export function RoutinesListRedesign({ routines, contacts = [], familyMembers = [], onSelectRoutine, onCreateRoutine, onUpdateRoutine }: RoutinesListProps) {
+export function RoutinesListRedesign({ routines, contacts = [], familyMembers = [], onSelectRoutine, onCreateRoutine, onUpdateRoutine, onAddStep, onReorderSteps, onPromoteStep }: RoutinesListProps) {
   // Pause modal state
   const [pauseModalRoutine, setPauseModalRoutine] = useState<Routine | null>(null)
+
+  // Collection/step panel state
+  const [open, setOpen] = useState<{ kind: 'collection' | 'step'; id: string } | null>(null)
+
+  // Derive open panel data fresh each render so edits reflect immediately
+  const { collections, standalone } = groupRoutineSteps(routines)
+  const openCollection = open?.kind === 'collection' ? collections.find(c => c.id === open.id) : undefined
+  const openStep = open?.kind === 'step'
+    ? collections.flatMap(c => c.steps).find(s => s.id === open.id)
+    : undefined
+  const parentOfOpenStep = openStep ? collections.find(c => c.steps.some(s => s.id === openStep.id)) : undefined
   // Load sort/group preferences from localStorage
   const [sortBy, setSortBy] = useState<SortOption>(() => {
     const saved = localStorage.getItem('routines-sort')
@@ -342,8 +359,9 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
     }
   }
 
-  const activeRoutines = routines.filter(r => r.visibility === 'active')
-  const referenceRoutines = routines.filter(r => r.visibility === 'reference')
+  // standalone routines only (collections handled separately above)
+  const activeRoutines = standalone.filter(r => r.visibility === 'active')
+  const referenceRoutines = standalone.filter(r => r.visibility === 'reference')
 
   // Apply sorting and grouping to active routines
   const processedActiveRoutines = (() => {
@@ -556,7 +574,52 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
           </div>
         )}
 
-        {/* Active Routines */}
+        {/* Collections — two-level rendering */}
+        {collections.length > 0 && (
+          <div className="mb-10">
+            <SectionHeader title="Collections" count={collections.length} />
+            <div className="space-y-3 stagger-in">
+              {collections.map((collection, index) => (
+                <button
+                  key={collection.id}
+                  onClick={() => setOpen({ kind: 'collection', id: collection.id })}
+                  className="w-full flex items-center gap-4 p-5 rounded-2xl border bg-white border-neutral-100
+                             hover:border-amber-200 hover:shadow-md transition-all duration-200 text-left group"
+                  style={{ animationDelay: `${index * 50}ms` }}
+                >
+                  {/* Collection icon */}
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-amber-100 group-hover:bg-amber-200 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                    </svg>
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-neutral-800 truncate group-hover:text-amber-700 transition-colors">
+                      {collection.name}
+                    </div>
+                    <div className="text-sm text-neutral-500">
+                      {collection.steps.length} steps
+                    </div>
+                  </div>
+
+                  {/* Chevron */}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="w-5 h-5 text-neutral-300 group-hover:text-amber-400 group-hover:translate-x-1 transition-all flex-shrink-0"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Active Routines (standalone only) */}
         {activeRoutines.length > 0 && (
           <div className="mb-10">
             {/* When not grouped, show simple list */}
@@ -625,6 +688,42 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
           onClose={() => setPauseModalRoutine(null)}
           onPause={handlePauseRoutines}
         />
+      )}
+
+      {/* Collection / Step panel overlay */}
+      {(openCollection || openStep) && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+          onClick={() => setOpen(null)}
+        >
+          <div onClick={e => e.stopPropagation()}>
+            {openCollection && (
+              <TapCollectionPanel
+                collection={openCollection}
+                onClose={() => setOpen(null)}
+                onRename={name => onUpdateRoutine(openCollection.id, { name })}
+                onContextChange={context => onUpdateRoutine(openCollection.id, { context: context ?? null })}
+                onScheduleChange={(recurrence_pattern, timeOfDay) =>
+                  onUpdateRoutine(openCollection.id, { recurrence_pattern, time_of_day: timeOfDay || null })}
+                onNotesChange={description => onUpdateRoutine(openCollection.id, { description })}
+                onSelectStep={s => setOpen({ kind: 'step', id: s.id })}
+                onAddStep={name => onAddStep(openCollection.id, name)}
+                onReorderSteps={onReorderSteps}
+              />
+            )}
+            {openStep && parentOfOpenStep && (
+              <TapStepPanel
+                step={openStep}
+                parentName={parentOfOpenStep.name}
+                onClose={() => setOpen({ kind: 'collection', id: parentOfOpenStep.id })}
+                onRename={name => onUpdateRoutine(openStep.id, { name })}
+                onDosesChange={times => onUpdateRoutine(openStep.id, { times_per_day: times })}
+                onNotesChange={description => onUpdateRoutine(openStep.id, { description })}
+                onPromote={() => { onPromoteStep(openStep.id); setOpen({ kind: 'collection', id: parentOfOpenStep.id }) }}
+              />
+            )}
+          </div>
+        </div>
       )}
     </div>
   )
