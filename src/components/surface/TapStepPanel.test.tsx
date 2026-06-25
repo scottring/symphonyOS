@@ -93,4 +93,17 @@ describe('TapStepPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Mon$/i }))
     expect(onScheduleChange).toHaveBeenCalledWith({ type: 'daily' })
   })
+
+  it('clicking "Same as routine" from "Specific days" mode resets local state immediately', () => {
+    const onScheduleChange = vi.fn()
+    setup({ step: { ...step, recurrence_pattern: { type: 'weekly', days: ['mon'] } } as Routine, onScheduleChange })
+    // Initially in "Specific days" mode (overridden=true), Mon button visible
+    expect(screen.getByRole('button', { name: /^Mon$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /same as routine/i })).toHaveAttribute('aria-pressed', 'false')
+    // Click "Same as routine"
+    fireEvent.click(screen.getByRole('button', { name: /same as routine/i }))
+    // Now "Same as routine" button should be pressed, and day buttons should disappear
+    expect(screen.getByRole('button', { name: /same as routine/i })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('button', { name: /^Mon$/i })).not.toBeInTheDocument()
+  })
 })
