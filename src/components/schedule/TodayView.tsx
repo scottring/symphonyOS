@@ -38,6 +38,8 @@ import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { TodayAddInput } from './TodayAddInput'
 import { TimelineInsertPoint } from './TimelineInsertPoint'
 import { StatsRow } from './StatsRow'
+import { TodayProgress } from './TodayProgress'
+import { NeedsYourOK } from './NeedsYourOK'
 import { ClarityIndicator } from './ClarityIndicator'
 import { StagingFloat } from './StagingFloat'
 import { EveningMealCard } from './EveningMealCard'
@@ -467,6 +469,15 @@ export function TodayView({
         <DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} />
       </div>
 
+      {/* Needs your OK — COS-proposed actions awaiting approval. Top of Today
+          so the assistant's proposals are the first thing you can clear in a
+          tap. Renders nothing when the queue is empty. */}
+      {data.isToday && (
+        <div className="px-3 md:px-0">
+          <NeedsYourOK />
+        </div>
+      )}
+
       {/* Stats + function bar — desktop only. Mobile combines the filters
           into the Add-to-today row below to save vertical space. */}
       <div className="hidden md:block mb-6">
@@ -565,13 +576,25 @@ export function TodayView({
         </>
       )}
 
+      {/* Today's momentum — how far you've come, not just what's left. Becomes
+          a quiet celebration when everything actionable is done. */}
+      <div className="px-3 md:px-0">
+        <TodayProgress
+          completedCount={data.counts.completedCount}
+          actionableCount={data.counts.actionableCount}
+          isToday={data.isToday}
+        />
+      </div>
+
       {/* Task list — wrapped in a card on desktop; on mobile the rows go
           full-width (no card, no border, no inner padding) to match the
           compact list the pre-redesign mobile had. */}
       <div ref={listRef} className="md:card md:rounded-2xl md:border md:border-neutral-200/70 md:px-5 md:py-4">
         {data.counts.totalItems === 0 ? (
           <div className="text-center py-16">
-            <p className="font-display text-xl text-neutral-700">Your day is clear</p>
+            <p className="font-display text-xl text-neutral-700">
+              {data.isToday && data.counts.completedCount > 0 ? 'All cleared — nicely done' : 'Your day is clear'}
+            </p>
           </div>
         ) : (
           <div className="space-y-6">

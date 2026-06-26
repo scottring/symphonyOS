@@ -148,6 +148,7 @@ Deno.serve(async (req) => {
           user.id,
           existing.action_type,
           actionPayload,
+          authHeader,
         )
       } catch (err) {
         finalStatus = 'failed'
@@ -194,16 +195,18 @@ async function executeAction(
   userId: string,
   actionType: string,
   payload: Record<string, unknown>,
+  authHeader: string,
 ): Promise<Record<string, unknown>> {
   switch (actionType) {
     case 'send_email':
-      return executeSendEmail(payload)
+    case 'draft_email':
+      return executeSendEmail(payload, authHeader, actionType)
 
     case 'create_task':
       return executeCreateTask(serviceSupabase, userId, payload)
 
     case 'schedule_meeting':
-      return executeScheduleMeeting(payload)
+      return executeScheduleMeeting(payload, authHeader)
 
     case 'update_contact':
       return executeUpdateContact(userSupabase, payload)
@@ -219,20 +222,67 @@ async function executeAction(
   }
 }
 
-// Placeholder — will integrate with email sending service
+// Create a Gmail DRAFT via the gmail-send function. SAFE BY DEFAULT: even an
+// approved email action only creates a draft the user reviews + sends from
+// Gmail. It will ONLY actually send when action_type is 'send_email' AND the
+// payload explicitly carries confirmed_send === true. 'draft_email' never sends.
 async function executeSendEmail(
   payload: Record<string, unknown>,
+  authHeader: string,
+  actionType: string,
 ): Promise<Record<string, unknown>> {
-  console.log('Send email action executed (placeholder):', {
-    to: payload.to,
-    subject: payload.subject,
-  })
-  return {
-    status: 'placeholder',
-    message: 'Email sending not yet implemented. Logged for manual action.',
-    to: payload.to,
-    subject: payload.subject,
+  const to = payload.to as string
+  const subject = payload.subject as string
+  const emailBody = (payload.body as string) ?? (payload.content as string)
+
+  if (!to || !subject || !emailBody) {
+    throw new Error('Email requires "to", "subject", and "body" in payload')
   }
+
+  const allowSend = actionType === 'send_email' && payload.confirmed_send === true
+  const mode: 'send' | 'draft' = allowSend ? 'send' : 'draft'
+
+  const result = await invokeFunction('gmail-send', authHeader, {
+    to,
+    subject,
+    body: emailBody,
+    threadId: payload.thread_id,
+    inReplyTo: payload.in_reply_to,
+    mode,
+  })
+
+  return {
+    mode,
+    sent: mode === 'send',
+    draftId: result.draftId ?? null,
+    messageId: result.messageId ?? null,
+    to,
+    subject,
+  }
+}
+
+// Call a sibling edge function with the user's auth, returning its JSON body.
+async function invokeFunction(
+  name: string,
+  authHeader: string,
+  body: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+  const res = await fetch(`${supabaseUrl}/functions/v1/${name}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: authHeader,
+      apikey: anonKey,
+    },
+    body: JSON.stringify(body),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok || data.error) {
+    throw new Error(`${name} failed: ${data.error || res.status}`)
+  }
+  return data
 }
 
 // Create a task in the tasks table
@@ -266,19 +316,33 @@ async function executeCreateTask(
   return { task_id: data.id, title: data.title }
 }
 
-// Placeholder — will integrate with Google Calendar API
+// Create a calendar event via the google-calendar-create-event function.
 async function executeScheduleMeeting(
   payload: Record<string, unknown>,
+  authHeader: string,
 ): Promise<Record<string, unknown>> {
-  console.log('Schedule meeting action executed (placeholder):', {
-    title: payload.title,
-    start_time: payload.start_time,
-    attendees: payload.attendees,
+  const title = payload.title as string
+  const startTime = (payload.start_time as string) ?? (payload.start as string)
+  const endTime = (payload.end_time as string) ?? (payload.end as string)
+
+  if (!title || !startTime) {
+    throw new Error('Meeting requires "title" and "start_time" in payload')
+  }
+
+  const result = await invokeFunction('google-calendar-create-event', authHeader, {
+    title,
+    description: payload.description ?? '',
+    start: startTime,
+    end: endTime ?? startTime,
+    location: payload.location ?? '',
+    attendees: payload.attendees ?? [],
   })
+
   return {
-    status: 'placeholder',
-    message: 'Meeting scheduling not yet implemented. Logged for manual action.',
-    title: payload.title,
+    created: true,
+    event_id: result.id ?? result.eventId ?? null,
+    title,
+    start_time: startTime,
   }
 }
 

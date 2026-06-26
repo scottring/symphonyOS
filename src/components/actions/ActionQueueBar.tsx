@@ -18,6 +18,7 @@ const ACTION_TYPE_CONFIG: Record<
   { icon: typeof Mail; label: string; color: string }
 > = {
   send_email: { icon: Mail, label: 'Email', color: 'text-blue-600' },
+  draft_email: { icon: Mail, label: 'Draft', color: 'text-blue-600' },
   create_task: { icon: CheckSquare, label: 'Task', color: 'text-primary-600' },
   schedule_meeting: { icon: Calendar, label: 'Meeting', color: 'text-purple-600' },
   update_contact: { icon: UserCog, label: 'Contact', color: 'text-amber-600' },

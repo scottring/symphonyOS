@@ -123,8 +123,11 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Parse request body
-    const { to, subject, body, threadId, inReplyTo } = await req.json()
+    // Parse request body. mode 'draft' (default for action-queue) creates a
+    // Gmail draft the user reviews + sends themselves — nothing leaves the
+    // outbox automatically. mode 'send' actually sends (explicit, user-initiated).
+    const { to, subject, body, threadId, inReplyTo, mode } = await req.json()
+    const sendMode: 'send' | 'draft' = mode === 'draft' ? 'draft' : 'send'
 
     if (!to || !subject || !body) {
       return new Response(JSON.stringify({ error: 'Missing required fields: to, subject, body' }), {
@@ -188,12 +191,45 @@ Deno.serve(async (req) => {
     // Base64url encode the MIME message
     const encodedMessage = base64urlEncode(mimeMessage)
 
-    // Send via Gmail API
-    const sendBody: Record<string, string> = { raw: encodedMessage }
+    const message: Record<string, string> = { raw: encodedMessage }
     if (threadId) {
-      sendBody.threadId = threadId
+      message.threadId = threadId
     }
 
+    // DRAFT mode: create a Gmail draft (drafts.create). Safe — never sends.
+    if (sendMode === 'draft') {
+      const draftRes = await fetch(
+        'https://gmail.googleapis.com/gmail/v1/users/me/drafts',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ message }),
+        }
+      )
+      const draftData = await draftRes.json()
+      if (draftData.error) {
+        return new Response(JSON.stringify({
+          error: `Gmail draft failed: ${draftData.error.message || JSON.stringify(draftData.error)}`,
+        }), {
+          status: draftRes.status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response(JSON.stringify({
+        success: true,
+        mode: 'draft',
+        draftId: draftData.id,
+        messageId: draftData.message?.id,
+        threadId: draftData.message?.threadId,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // SEND mode: actually send (explicit, user-initiated).
     const sendRes = await fetch(
       'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
       {
@@ -202,7 +238,7 @@ Deno.serve(async (req) => {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(sendBody),
+        body: JSON.stringify(message),
       }
     )
 
@@ -219,6 +255,7 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
+      mode: 'send',
       messageId: sendData.id,
       threadId: sendData.threadId,
     }), {

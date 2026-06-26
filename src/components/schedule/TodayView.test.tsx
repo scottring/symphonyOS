@@ -18,6 +18,7 @@ vi.mock('@/hooks/useNotes', () => ({ useNotes: () => ({ notes: [], loading: fals
 vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ tasks: [], loading: false, addTask: vi.fn(), updateTask: vi.fn(), deleteTask: vi.fn() }) }))
 vi.mock('@/hooks/usePinnedItems', () => ({ usePinnedItems: () => ({ isPinned: () => false, pin: vi.fn(), unpin: vi.fn() }) }))
 vi.mock('@/hooks/useEmailActionItems', () => ({ useEmailActionItems: () => ({ items: [], urgentItems: [], loading: false, acknowledge: vi.fn(), dismiss: vi.fn(), snooze: vi.fn(), markDone: vi.fn(), getByCategory: vi.fn(), refetch: vi.fn() }) }))
+vi.mock('@/hooks/useActionQueue', () => ({ useActionQueue: () => ({ actions: [], loading: false, approveAction: vi.fn(), rejectAction: vi.fn(), pendingCount: 0, refetch: vi.fn() }) }))
 vi.mock('@/hooks/useDomain.tsx', async (importOriginal) => {
   const actual = await importOriginal() as Record<string, unknown>
   return { ...actual, useDomain: () => ({ currentDomain: 'universal', setDomain: vi.fn() }) }
