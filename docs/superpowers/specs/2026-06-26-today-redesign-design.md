@@ -43,7 +43,9 @@ Replace the Morning/Afternoon/Evening **section-bucket** rendering in `TodayView
 This is the highest-risk slice and gets its **own implementation plan**. The hour-rail is a layout transform over the existing item list — no change to data fetching.
 
 ### 5. Routines & Habits overview (M) — new
-A bottom panel with **Morning / Afternoon / Evening** columns, each showing a scheduled count and the routines in that part of day, collapsible (the mockup shows a "Collapse" control). Sourced from the same routine data the timeline uses, grouped by part-of-day. Read-first; quick-toggle (mark done) is a nice-to-have, deferred unless trivial. New component: `RoutinesHabitsPanel`.
+A bottom panel with **Morning / Afternoon / Evening** columns, each showing a scheduled count and the routines in that part of day, collapsible (the mockup shows a "Collapse" control). Sourced from the same routine data the timeline uses, grouped by part-of-day. Each routine row has a **quick mark-done toggle** (check it off directly from the panel).
+
+**Shared completion state (important):** the panel's toggle reuses the *same* per-day routine-completion mechanism the timeline already uses (`actionable_instances` / the existing routine-complete handler) — it does not introduce a parallel state. Checking a routine off in the panel reflects in the timeline group, and vice versa; both read the same completion source. New component: `RoutinesHabitsPanel`.
 
 ## Architecture / boundaries
 
@@ -71,5 +73,5 @@ A bottom panel with **Morning / Afternoon / Evening** columns, each showing a sc
 
 ## Open questions for review
 
-- **Focus persistence:** is a per-item `is_focus` star the right model, or should "focus" be derived (e.g. top-priority/next-N) with no new flag? Default in this spec is a persisted star with fallback.
-- **Routines & Habits panel:** include quick mark-done toggles, or read-only overview for v1? Default: read-only v1.
+- **Focus persistence:** is a per-item `is_focus` star the right model, or should "focus" be derived (e.g. top-priority/next-N) with no new flag? Default in this spec is a persisted star with fallback. **(Still open — proceeding on the star default unless changed.)**
+- ~~**Routines & Habits panel:** read-only vs quick mark-done.~~ **Resolved: quick mark-done toggles, sharing the timeline's per-day completion state (§5).**
