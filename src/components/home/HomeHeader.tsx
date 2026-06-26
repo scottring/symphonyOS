@@ -91,7 +91,9 @@ export function HomeHeader(props: HomeHeaderProps) {
     <header className="mb-6 px-3 md:px-0">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between md:gap-4">
         {currentView === 'today' ? (
-          <DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} />
+          <div className="flex flex-col items-center">
+            <DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} />
+          </div>
         ) : (
           <div className="flex items-center gap-2 min-w-0 justify-center md:justify-start">
             <button
