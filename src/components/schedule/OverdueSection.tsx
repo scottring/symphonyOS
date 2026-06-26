@@ -1,4 +1,5 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { RotateCcw, ChevronDown } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
@@ -67,6 +68,8 @@ export function OverdueSection({
   onOpenGuidedChat,
 }: OverdueSectionProps) {
   const isMobile = useMobile()
+  // Default collapsed so Carried Over recedes — expand on demand
+  const [expanded, setExpanded] = useState(false)
 
   // Sort: incomplete first (oldest at top), then completed at bottom
   const sortedTasks = useMemo(() => [...tasks].sort((a, b) => {
@@ -86,56 +89,139 @@ export function OverdueSection({
     }
   }
 
+  // Compact strip: "↺ Carried over (N) · first title · second title"
+  const previewTitles = sortedTasks
+    .filter(t => !t.completed)
+    .slice(0, 2)
+    .map(t => t.title)
+
+  const stripLabel = [
+    `Carried over (${tasks.length})`,
+    ...previewTitles,
+  ].join(' · ')
+
   return (
     <div
       role="region"
       aria-label="Carried over tasks"
-      className="mb-10 animate-fade-in-up"
+      className="mb-6 animate-fade-in-up"
     >
-      {/* Section header — calm, plain. These are obligations, not emergencies. */}
-      <h3 className="time-group-header mb-4" style={{ color: 'hsl(220 9% 46%)' }}>
-        Carried over
-      </h3>
+      {/* Compact strip — low visual weight; click to expand */}
+      <button
+        type="button"
+        onClick={() => setExpanded(prev => !prev)}
+        aria-expanded={expanded}
+        className="flex items-center gap-1.5 w-full text-left group"
+      >
+        <RotateCcw
+          size={11}
+          className="shrink-0 text-neutral-400"
+          aria-hidden="true"
+        />
+        <span className="text-[13px] text-neutral-400 leading-none truncate flex-1">
+          {stripLabel}
+        </span>
+        <ChevronDown
+          size={12}
+          className={`shrink-0 text-neutral-300 transition-transform duration-150 ${expanded ? 'rotate-180' : ''}`}
+          aria-hidden="true"
+        />
+      </button>
 
-      <div className="timeline-group timeline-group--tight stagger-in">
-        {sortedTasks.map((task, index) => {
-          const item = taskToTimelineItem(task)
-          const taskId = task.id
-          const contactName = task.contactId && contactsMap?.get(task.contactId)?.name
-          const projectName = task.projectId && projectsMap?.get(task.projectId)?.name
-          const overdueLabel = task.scheduledFor
-            ? formatOverdueDate(new Date(task.scheduledFor))
-            : undefined
+      {/* Full list — only rendered when expanded */}
+      {expanded && (
+        <div className="mt-3 timeline-group timeline-group--tight stagger-in">
+          {sortedTasks.map((task, index) => {
+            const item = taskToTimelineItem(task)
+            const taskId = task.id
+            const contactName = task.contactId && contactsMap?.get(task.contactId)?.name
+            const projectName = task.projectId && projectsMap?.get(task.projectId)?.name
+            const overdueLabel = task.scheduledFor
+              ? formatOverdueDate(new Date(task.scheduledFor))
+              : undefined
 
-          // Deduplicate: only show date label on first item of each date group
-          const prevTask = index > 0 ? sortedTasks[index - 1] : null
-          const prevLabel = prevTask?.scheduledFor
-            ? formatOverdueDate(new Date(prevTask.scheduledFor))
-            : undefined
-          const shouldHideTime = index > 0 && overdueLabel === prevLabel
+            // Deduplicate: only show date label on first item of each date group
+            const prevTask = index > 0 ? sortedTasks[index - 1] : null
+            const prevLabel = prevTask?.scheduledFor
+              ? formatOverdueDate(new Date(prevTask.scheduledFor))
+              : undefined
+            const shouldHideTime = index > 0 && overdueLabel === prevLabel
 
-          // Only show as indented subtask if parent is also visible in this list
-          const parentVisible = task.parentTaskId ? sortedTasks.some(t => t.id === task.parentTaskId) : false
+            // Only show as indented subtask if parent is also visible in this list
+            const parentVisible = task.parentTaskId ? sortedTasks.some(t => t.id === task.parentTaskId) : false
 
-          if (isMobile) {
+            if (isMobile) {
+              return (
+                <div key={task.id} className={parentVisible ? 'ml-6 border-l-2 border-neutral-200 pl-2' : ''}>
+                  <SwipeableCard
+                    item={item}
+                    selected={selectedItemId === `task-${task.id}`}
+                    onSelect={() => onSelectTask(`task-${task.id}`)}
+                    onComplete={() => handleToggle(taskId, !!task.completed)}
+                    onToggleWaiting={onToggleWaiting ? () => onToggleWaiting(taskId) : undefined}
+                    onDefer={onPushTask ? (target: Date | 'week' | 'month' | 'quarter') => onPushTask(taskId, target) : undefined}
+                    familyMembers={familyMembers}
+                    assignedTo={task.assignedTo}
+                    assignedToAll={task.assignedToAll ?? []}
+                    onAssignAll={
+                      onAssignTaskAll
+                        ? (memberIds) => onAssignTaskAll(taskId, memberIds)
+                        : undefined
+                    }
+                    onOpenDetail={() => onSelectTask(`task-${task.id}`)}
+                  />
+                  {followUpTaskId === taskId && onFollowUpSubmit && onFollowUpDismiss && (
+                    <FollowUpInput
+                      sourceTask={task}
+                      onSubmit={(title) => onFollowUpSubmit(title, taskId)}
+                      onDismiss={onFollowUpDismiss}
+                      projectName={projectName || undefined}
+                    />
+                  )}
+                </div>
+              )
+            }
+
             return (
-              <div key={task.id} className={parentVisible ? 'ml-6 border-l-2 border-neutral-200 pl-2' : ''}>
-                <SwipeableCard
+              <OverdueCard
+                key={task.id}
+                parentVisible={parentVisible}
+              >
+                <ScheduleItem
                   item={item}
                   selected={selectedItemId === `task-${task.id}`}
+                  bulkSelectable
+                  bulkSelected={bulkSelectedIds?.has(task.id)}
+                  showBulkAffordance={(bulkSelectedIds?.size ?? 0) > 0}
+                  onToggleBulkSelect={onToggleBulkSelect ? () => onToggleBulkSelect(task.id) : undefined}
                   onSelect={() => onSelectTask(`task-${task.id}`)}
-                  onComplete={() => handleToggle(taskId, !!task.completed)}
                   onToggleWaiting={onToggleWaiting ? () => onToggleWaiting(taskId) : undefined}
-                  onDefer={onPushTask ? (target: Date | 'week' | 'month' | 'quarter') => onPushTask(taskId, target) : undefined}
+                  onToggleComplete={() => handleToggle(taskId, !!task.completed)}
+                  onPush={onPushTask ? (target: Date | 'week' | 'month' | 'quarter') => onPushTask(taskId, target) : undefined}
+                  onSchedule={onUpdateTask ? (date: Date, isAllDay: boolean) => onUpdateTask(taskId, { bucket: 'timed', scheduledFor: date, isAllDay }) : undefined}
+                  contactName={contactName || undefined}
+                  projectName={projectName || undefined}
+                  projectId={task.projectId || undefined}
                   familyMembers={familyMembers}
                   assignedTo={task.assignedTo}
                   assignedToAll={task.assignedToAll ?? []}
+                  onAssign={
+                    onAssignTask
+                      ? (memberId) => onAssignTask(taskId, memberId)
+                      : undefined
+                  }
                   onAssignAll={
                     onAssignTaskAll
                       ? (memberIds) => onAssignTaskAll(taskId, memberIds)
                       : undefined
                   }
-                  onOpenDetail={() => onSelectTask(`task-${task.id}`)}
+                  onContextChange={onUpdateTask ? (context) => onUpdateTask(taskId, { context }) : undefined}
+                  onUpdateDiscussion={onUpdateTask ? (next) => onUpdateTask(taskId, next) : undefined}
+                  isOverdue={!task.completed}
+                  overdueLabel={task.completed ? undefined : overdueLabel}
+                  hideTime={shouldHideTime}
+                  panelOpen={panelOpen}
+                  onClosePanel={onClosePanel}
                 />
                 {followUpTaskId === taskId && onFollowUpSubmit && onFollowUpDismiss && (
                   <FollowUpInput
@@ -145,63 +231,11 @@ export function OverdueSection({
                     projectName={projectName || undefined}
                   />
                 )}
-              </div>
+              </OverdueCard>
             )
-          }
-
-          return (
-            <OverdueCard
-              key={task.id}
-              parentVisible={parentVisible}
-            >
-              <ScheduleItem
-                item={item}
-                selected={selectedItemId === `task-${task.id}`}
-                bulkSelectable
-                bulkSelected={bulkSelectedIds?.has(task.id)}
-                showBulkAffordance={(bulkSelectedIds?.size ?? 0) > 0}
-                onToggleBulkSelect={onToggleBulkSelect ? () => onToggleBulkSelect(task.id) : undefined}
-                onSelect={() => onSelectTask(`task-${task.id}`)}
-                onToggleWaiting={onToggleWaiting ? () => onToggleWaiting(taskId) : undefined}
-                onToggleComplete={() => handleToggle(taskId, !!task.completed)}
-                onPush={onPushTask ? (target: Date | 'week' | 'month' | 'quarter') => onPushTask(taskId, target) : undefined}
-                onSchedule={onUpdateTask ? (date: Date, isAllDay: boolean) => onUpdateTask(taskId, { bucket: 'timed', scheduledFor: date, isAllDay }) : undefined}
-                contactName={contactName || undefined}
-                projectName={projectName || undefined}
-                projectId={task.projectId || undefined}
-                familyMembers={familyMembers}
-                assignedTo={task.assignedTo}
-                assignedToAll={task.assignedToAll ?? []}
-                onAssign={
-                  onAssignTask
-                    ? (memberId) => onAssignTask(taskId, memberId)
-                    : undefined
-                }
-                onAssignAll={
-                  onAssignTaskAll
-                    ? (memberIds) => onAssignTaskAll(taskId, memberIds)
-                    : undefined
-                }
-                onContextChange={onUpdateTask ? (context) => onUpdateTask(taskId, { context }) : undefined}
-                onUpdateDiscussion={onUpdateTask ? (next) => onUpdateTask(taskId, next) : undefined}
-                isOverdue={!task.completed}
-                overdueLabel={task.completed ? undefined : overdueLabel}
-                hideTime={shouldHideTime}
-                panelOpen={panelOpen}
-                onClosePanel={onClosePanel}
-              />
-              {followUpTaskId === taskId && onFollowUpSubmit && onFollowUpDismiss && (
-                <FollowUpInput
-                  sourceTask={task}
-                  onSubmit={(title) => onFollowUpSubmit(title, taskId)}
-                  onDismiss={onFollowUpDismiss}
-                  projectName={projectName || undefined}
-                />
-              )}
-            </OverdueCard>
-          )
-        })}
-      </div>
+          })}
+        </div>
+      )}
     </div>
   )
 }
