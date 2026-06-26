@@ -40,6 +40,11 @@ export function StatsRow({ dueToday, doneToday, weekTrigger, thisWeek, clarityTr
           <span className="inline-flex items-center gap-1.5"><Star className="w-5 h-5 text-neutral-500" /><span className="tabular-nums">{focusCount ?? 0}</span> focus items</span>
           <span className="inline-flex items-center gap-1.5"><Repeat className="w-5 h-5 text-neutral-500" /><span className="tabular-nums">{routinesCount ?? 0}</span> routines</span>
           <span className="inline-flex items-center gap-1.5"><Mail className="w-5 h-5 text-neutral-500" /><span className="tabular-nums">{emailCount ?? 0}</span> from email</span>
+          {discussionTrigger && (
+            <span className="inline-flex items-center gap-1.5">
+              {discussionTrigger}
+            </span>
+          )}
         </div>
       ) : (
         /* ── Legacy tasks-remaining / week block ── */

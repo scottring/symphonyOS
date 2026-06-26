@@ -70,16 +70,16 @@ describe('TodayView', () => {
   it('renders the stats row (HomeHeader date label is now in HomeView, not TodayView)', () => {
     // The date label (e.g. "Tuesday, May 19, 2026") moved to HomeHeader which is
     // rendered by HomeView — it is not in TodayView's subtree. TodayView's own
-    // stable landmark is the StatsRow "tasks remaining today" control (the
-    // "N of N done today" text became a checklist icon + count with a tooltip).
+    // stable landmark in the redesigned four-count StatsRow is the "from email"
+    // label (always rendered by StatsRow when eventsCount is provided).
     renderView()
-    expect(screen.getByTitle(/remaining today/i)).toBeInTheDocument()
+    expect(screen.getByText(/from email/i)).toBeInTheDocument()
   })
   it('renders exactly one stats row (regression guard vs the duplicate-row defect)', () => {
-    // Use the "remaining today" control — always rendered by StatsRow and unique
-    // to it — as the duplicate-row sentinel.
+    // Use the "from email" label — always rendered exactly once by the redesigned
+    // four-count StatsRow — as the duplicate-row sentinel.
     renderView()
-    expect(screen.getAllByTitle(/remaining today/i)).toHaveLength(1)
+    expect(screen.getAllByText(/from email/i)).toHaveLength(1)
   })
   it('shows the empty state when there are no items', () => {
     renderView()
@@ -90,9 +90,14 @@ describe('TodayView', () => {
     expect(screen.queryByRole('button', { name: 'Week' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Month' })).not.toBeInTheDocument()
   })
-  it('renders the This Week staging trigger', () => {
+  it('renders the redesigned four-count stats (events / focus items / routines / from email)', () => {
+    // TodayView always passes eventsCount to StatsRow, activating the four-count
+    // layout introduced in the Today redesign. Verify all four count labels render.
     renderView()
-    expect(screen.getByRole('button', { name: /this week/i })).toBeInTheDocument()
+    expect(screen.getByText(/events/i)).toBeInTheDocument()
+    expect(screen.getByText(/focus items/i)).toBeInTheDocument()
+    expect(screen.getByText(/routines/i)).toBeInTheDocument()
+    expect(screen.getByText(/from email/i)).toBeInTheDocument()
   })
   it('renders the assignee filter and a routine show/hide toggle', () => {
     renderView({ assigneesWithTasks: [{ id: 'm1', name: 'Iris' } as never], hasUnassignedTasks: true })
@@ -250,11 +255,15 @@ describe('TodayView', () => {
     expect(screen.getByText(/to discuss/i)).toBeInTheDocument()
   })
 
-  it('renders the Clarity binoculars in the content stats row', () => {
-    // Clarity was restored to the Today header as a binoculars icon with an
-    // explanatory hover tooltip; the static status glance still lives in the sidebar.
+  it('redesigned stats row does not render Clarity or week trigger (legacy elements removed)', () => {
+    // The Today redesign replaced the legacy stats row (tasks-remaining / this-week /
+    // Clarity / discussion / email triggers) with a four-count layout. Clarity and
+    // the week trigger were intentionally removed from the stats bar; this test guards
+    // against accidentally re-introducing them. The four-count layout is present instead.
     renderView()
-    expect(screen.getByLabelText(/clarity/i)).toBeInTheDocument()
+    expect(screen.getByText(/from email/i)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/clarity/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /this week/i })).not.toBeInTheDocument()
   })
 
   it('renders the Morning section header on mobile in italic serif', () => {
