@@ -614,8 +614,10 @@ export function TodayView({
 
       {/* Focus Today row — 3-card strip of next timed items (slice-1 fallback).
           Shown on desktop only; hidden on mobile to preserve the compact list.
-          Mounts above the schedule, below the add-input, per the redesign mockup. */}
-      <div className="hidden md:block mb-4">
+          Mounts above the schedule, below the add-input, per the redesign mockup.
+          Extra vertical room (mt-4 mb-8) lets it read as the hero before the
+          schedule card — the eye lands here first, then moves down to detail. */}
+      <div className="hidden md:block mt-4 mb-8">
         <FocusTodayRow
           items={focusItems}
           totalEvents={timelineEventCount}
@@ -674,7 +676,7 @@ export function TodayView({
               const meta = daySectionMeta(section)
               return (
                 <section key={section}>
-                  <h3 className="hidden md:flex items-center gap-2 text-[11px] uppercase tracking-wider font-semibold text-neutral-400 mb-3 px-3 md:px-0">
+                  <h3 className="hidden md:flex items-center gap-2 text-[12px] uppercase tracking-wide font-medium text-neutral-400 mb-3 px-3 md:px-0">
                     {createElement(meta.Icon, { className: 'w-4 h-4 text-amber-500 shrink-0' })}
                     <span>{meta.label}</span>
                     {meta.range && (
