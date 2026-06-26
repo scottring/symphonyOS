@@ -1,5 +1,6 @@
 import { Star } from 'lucide-react'
 import type { TimelineItem } from '@/types/timeline'
+import { relativeStart } from '@/lib/today/relativeStart'
 
 export interface FocusTodayRowProps {
   items: TimelineItem[]
@@ -17,22 +18,44 @@ export function FocusTodayRow({ items, totalEvents, onSelectItem }: FocusTodayRo
   if (items.length === 0) return null
   return (
     <section className="mt-4">
-      <div className="flex items-center gap-1.5 mb-2 text-neutral-600">
+      <div className="flex items-center gap-1.5 mb-3 text-neutral-600">
         <Star className="w-4 h-4 text-amber-500" />
-        <span className="text-[12px] font-medium tracking-wide text-neutral-500">FOCUS TODAY</span>
+        <span className="text-[12px] font-medium tracking-wide text-neutral-500">HIGHLIGHTS</span>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {items.map((i) => (
-          <button key={i.id} type="button" onClick={() => onSelectItem(i.id)}
-            className="card text-left p-4 border-l-4 border-l-primary-400 hover:shadow-md transition">
-            <div className="text-[12px] text-neutral-400">{timeLabel(i)}</div>
-            <div className="text-[15px] font-medium text-neutral-800 mt-1">{i.title}</div>
-            {i.location && <div className="text-[12px] text-neutral-500 mt-1">{i.location}</div>}
-            {i.meetingUrl && <div className="text-[12px] text-neutral-500 mt-1">Video call</div>}
-          </button>
-        ))}
+        {items.map((item) => {
+          const rel = item.startTime ? relativeStart(item.startTime, new Date()) : ''
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => onSelectItem(item.id)}
+              className="card text-left p-6 border-l-4 border-l-primary-400
+                         shadow-md hover:shadow-lg transition-shadow
+                         ring-1 ring-neutral-200/60"
+            >
+              <div className="text-[12px] text-neutral-400 font-medium">{timeLabel(item)}</div>
+              {rel && (
+                <div className="text-[11px] text-primary-600 font-medium mt-0.5 tracking-wide">
+                  {rel}
+                </div>
+              )}
+              <div className="text-[17px] md:text-[18px] font-medium text-neutral-800 mt-2 leading-snug">
+                {item.title}
+              </div>
+              {item.location && (
+                <div className="text-[12px] text-neutral-500 mt-2">{item.location}</div>
+              )}
+              {item.meetingUrl && (
+                <div className="text-[12px] text-neutral-500 mt-2">Video call</div>
+              )}
+            </button>
+          )
+        })}
       </div>
-      <div className="text-[12px] text-neutral-400 mt-2">{items.length} focus items · {totalEvents} total events</div>
+      <div className="text-[12px] text-neutral-400 mt-2">
+        {items.length} highlights · {totalEvents} total events
+      </div>
     </section>
   )
 }
