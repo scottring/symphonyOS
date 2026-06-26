@@ -91,5 +91,6 @@ export function computeTodayData(input: TodayDataInput): TodayData {
     grouped,
     sectionsOrder: SECTIONS_ORDER,
     counts: { completedCount, incompleteOverdue, actionableCount, totalItems, progressPercent },
+    routineStatusMap,
   }
 }

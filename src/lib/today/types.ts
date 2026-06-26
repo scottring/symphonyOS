@@ -49,6 +49,8 @@ export interface TodayData {
   grouped: Record<DaySection, TimelineItem[]>
   sectionsOrder: DaySection[]
   counts: TodayCounts
+  /** Keyed by entity_id (bare routineId or routineId#slot). status === 'completed' means done for the day. */
+  routineStatusMap: Map<string, ActionableInstance>
 }
 
 export const SECTIONS_ORDER: DaySection[] = ['allday', 'morning', 'afternoon', 'evening', 'unscheduled']
@@ -62,4 +64,5 @@ export const EMPTY_TODAY_DATA: TodayData = {
   grouped: { allday: [], morning: [], afternoon: [], evening: [], unscheduled: [] },
   sectionsOrder: SECTIONS_ORDER,
   counts: { completedCount: 0, incompleteOverdue: 0, actionableCount: 0, totalItems: 0, progressPercent: 0 },
+  routineStatusMap: new Map(),
 }

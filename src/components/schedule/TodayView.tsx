@@ -36,6 +36,7 @@ import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
 import { TodayAddInput } from './TodayAddInput'
+import { RoutinesHabitsPanel } from './RoutinesHabitsPanel'
 import { TimelineInsertPoint } from './TimelineInsertPoint'
 import { StatsRow } from './StatsRow'
 import { ClarityIndicator } from './ClarityIndicator'
@@ -950,6 +951,17 @@ export function TodayView({
       <div className="mt-5 hidden md:block">
         <EndOfDayCard onOpenReview={() => {}} />
       </div>
+
+      {/* Routines & Habits panel — shown below the schedule when routines exist.
+          isCompleted reads the same routineStatusMap that the timeline uses (built
+          in computeTodayData → exposed on data) so completion state is shared. */}
+      {(routines?.length ?? 0) > 0 && (
+        <RoutinesHabitsPanel
+          routines={routines ?? []}
+          isCompleted={(id) => data.routineStatusMap.get(id)?.status === 'completed'}
+          onToggle={(id, completed) => onCompleteRoutine?.(id, completed)}
+        />
+      )}
 
       {/* Bulk action bar — appears when ≥1 task row is selected via the
           hover checkbox. Reuses the shared toolbar (Inbox uses the same). */}
