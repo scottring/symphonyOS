@@ -104,6 +104,8 @@ interface TodayViewProps {
   // D/W/M view switcher — threaded from HomeView
   currentHomeView?: HomeViewType
   onHomeViewChange?: (view: HomeViewType) => void
+  // Current user's family-member id — passed to ScheduleItem to suppress self-assignment chip
+  currentUserMemberId?: string
 }
 
 // ─── Meal detection ────────────────────────────────────────────────────────────
@@ -141,6 +143,7 @@ export function TodayView({
   onAppendNoteAt: onAppendNoteAtProp,
   onLinkNote: onLinkNoteProp,
   timelineNotes: timelineNotesProp,
+  currentUserMemberId,
 }: TodayViewProps) {
   // ── Context ──────────────────────────────────────────────────────────────────
   const isMobile = useMobile()
@@ -948,6 +951,7 @@ export function TodayView({
                           onActSuggestion={proactive.actOnSuggestion}
                           onDismissSuggestion={proactive.dismissSuggestion}
                           onOpenGuidedChat={onOpenGuidedChat}
+                          currentMemberId={currentUserMemberId}
                         />
                         {item.type === 'event' && (() => {
                           const nudge = shareNudgeByEventId.get(item.id.replace('event-', ''))

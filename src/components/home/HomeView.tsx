@@ -448,6 +448,7 @@ export function HomeView({
         onUpdateTasksBulk={handleUpdateTasksBulk}
         currentHomeView={currentView}
         onHomeViewChange={handleViewChange}
+        currentUserMemberId={currentUserMemberId}
       />
     )
   }

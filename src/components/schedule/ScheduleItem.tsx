@@ -21,6 +21,7 @@ import { MobileTypeTile } from './MobileTypeTile'
 import { DOMAIN_COLORS } from '@/lib/domainColors'
 import { rowSubtitle } from '@/lib/rowSubtitle'
 import { locationLink } from '@/lib/locationLink'
+import { shouldShowAssignee } from '@/lib/today/assigneeVisibility'
 
 // Nordic Journal calendar icon - minimal, elegant design
 // Uses the event's context color (Work/Family/Personal) or falls back to primary teal-forest
@@ -156,6 +157,8 @@ interface ScheduleItemProps {
   onActSuggestion?: (suggestionId: string, detail?: string, outcome?: string) => void
   onDismissSuggestion?: (suggestionId: string) => void
   onOpenGuidedChat?: (entityType: 'task' | 'contact' | 'project' | 'event', entityId: string, entityName: string, prompt?: string) => void
+  // Current user's family-member id — used to hide self-assignment chip
+  currentMemberId?: string | null
 }
 
 // Warm muted color tokens for overdue styling
@@ -234,6 +237,7 @@ export const ScheduleItem = memo(function ScheduleItem({
   variant = 'full',
   hideTime,
   routineStreak,
+  currentMemberId,
 }: ScheduleItemProps) {
   const isMobile = useMobile()
   // Hover state powers the smooth expanding banner (location-only metadata row).
@@ -245,6 +249,12 @@ export const ScheduleItem = memo(function ScheduleItem({
   const isEvent = item.type === 'event'
   const isActionable = isTask || isRoutine || isEvent // Events are now checkable
   const contextColor = item.context ? DOMAIN_COLORS[item.context]?.dot : undefined
+  // Whether to show the assignee chip at rest (always-visible).
+  // Hidden when item is unassigned or assigned only to the current user — no disambiguation needed.
+  // The chip/dropdown is still reachable on desktop via hover (opacity transition), and on
+  // mobile via the edit panel (swipe-left → Edit). This preserves full reassignment capability.
+  const assignedIds = assignedToAll && assignedToAll.length > 0 ? assignedToAll : (assignedTo ?? null)
+  const showAssigneeAtRest = shouldShowAssignee(assignedIds, currentMemberId ?? null)
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -408,7 +418,8 @@ export const ScheduleItem = memo(function ScheduleItem({
           {projectName && (
             <Tag className="w-4 h-4 text-orange-400" style={projectColor ? { color: projectColor } : undefined} />
           )}
-          {familyMembers.length > 0 && onAssignAll ? (
+          {/* Assignee chip hidden on mobile when self-only/unassigned — edit via swipe-left → detail panel */}
+          {showAssigneeAtRest && familyMembers.length > 0 && onAssignAll ? (
             <div onClick={(e) => e.stopPropagation()}>
               <MultiAssigneeDropdown
                 members={familyMembers}
@@ -418,7 +429,7 @@ export const ScheduleItem = memo(function ScheduleItem({
                 label={item.type === 'event' ? "Who's attending?" : "Who's responsible?"}
               />
             </div>
-          ) : familyMembers.length > 0 && onAssign ? (
+          ) : showAssigneeAtRest && familyMembers.length > 0 && onAssign ? (
             <div onClick={(e) => e.stopPropagation()}>
               <AssigneeDropdown
                 members={familyMembers}
@@ -731,10 +742,14 @@ export const ScheduleItem = memo(function ScheduleItem({
             </div>
           )}
 
-          {/* Assignee avatar — context is conveyed by the chip elsewhere on
-              the row, so the avatar stays clean (no ring). */}
+          {/* Assignee avatar — hidden at rest when unassigned or assigned only to
+              the current user (self-evident; no disambiguation). Appears on hover so
+              the user can still reassign. The row menu is the other reassign path. */}
           {familyMembers.length > 0 && onAssignAll ? (
-            <div onClick={(e) => e.stopPropagation()}>
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className={showAssigneeAtRest ? undefined : 'opacity-0 group-hover:opacity-100 transition-opacity'}
+            >
               <MultiAssigneeDropdown
                 members={familyMembers}
                 selectedIds={assignedToAll}
@@ -744,7 +759,10 @@ export const ScheduleItem = memo(function ScheduleItem({
               />
             </div>
           ) : familyMembers.length > 0 && onAssign && (
-            <div onClick={(e) => e.stopPropagation()}>
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className={showAssigneeAtRest ? undefined : 'opacity-0 group-hover:opacity-100 transition-opacity'}
+            >
               <AssigneeDropdown
                 members={familyMembers}
                 selectedId={assignedTo}
