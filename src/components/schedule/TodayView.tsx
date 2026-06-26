@@ -344,6 +344,19 @@ export function TodayView({
 
   // ── Email nudge for StatsRow ──────────────────────────────────────────────
   const activeEmailCount = emailActions.items.filter(i => i.status === 'new').length
+
+  // ── Four-count stats: derive from data.grouped so they match the timeline ─
+  // data.grouped is already filtered for viewedDate + selectedAssignees +
+  // hideRoutines (via computeTodayData → filteredEvents + visibleRoutines).
+  // Raw events/routines props include all days/hidden items — wrong for counts.
+  const timelineEventCount = useMemo(
+    () => data.sectionsOrder.reduce((n, s) => n + (data.grouped[s]?.filter(i => i.type === 'event').length ?? 0), 0),
+    [data],
+  )
+  const timelineRoutineCount = useMemo(
+    () => data.sectionsOrder.reduce((n, s) => n + (data.grouped[s]?.filter(i => i.type === 'routine' || i.type === 'routine-collection').length ?? 0), 0),
+    [data],
+  )
   const emailNudge = data.isToday && activeEmailCount > 0 ? (
     <button
       type="button"
@@ -481,6 +494,10 @@ export function TodayView({
           clarityTrigger={clarityTrigger}
           discussionTrigger={discussion.length > 0 ? <DiscussionBadge items={discussion} onSelectItem={onSelectItem} /> : undefined}
           emailTrigger={emailNudge}
+          eventsCount={timelineEventCount}
+          focusCount={0}
+          routinesCount={timelineRoutineCount}
+          emailCount={activeEmailCount}
           endControls={
             <>
               {onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (

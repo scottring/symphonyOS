@@ -1,5 +1,5 @@
 // src/components/schedule/StatsRow.tsx
-import { ListChecks } from 'lucide-react'
+import { ListChecks, CalendarDays, Star, Repeat, Mail } from 'lucide-react'
 
 interface StatsRowProps {
   dueToday: number
@@ -19,52 +19,73 @@ interface StatsRowProps {
   emailTrigger?: React.ReactNode
   /** Rendered at the trailing end of the bar (assignee filter + show-daily toggle) */
   endControls?: React.ReactNode
+  // ── Four-count Today layout ───────────────────────────────────────────────
+  /** When provided, switches to the redesigned four-stat group (events / focus
+   *  items / routines / from email) instead of the legacy tasks-remaining/week
+   *  block. Existing callers that omit this prop are unaffected. */
+  eventsCount?: number
+  focusCount?: number
+  routinesCount?: number
+  emailCount?: number
 }
 
-export function StatsRow({ dueToday, doneToday, weekTrigger, thisWeek, clarityTrigger, discussionTrigger, weatherTrigger, emailTrigger, endControls }: StatsRowProps) {
+export function StatsRow({ dueToday, doneToday, weekTrigger, thisWeek, clarityTrigger, discussionTrigger, weatherTrigger, emailTrigger, endControls, eventsCount, focusCount, routinesCount, emailCount }: StatsRowProps) {
   const remainingToday = Math.max(0, dueToday - doneToday)
   return (
     <div className="flex items-center flex-wrap gap-x-5 gap-y-2 text-[15px] text-neutral-600">
-      {/* Tasks remaining today — checklist icon + count (desktop only, demoted) */}
-      <span
-        className="hidden md:inline-flex items-center gap-1.5 text-[15px] text-neutral-600"
-        title={`${remainingToday} task${remainingToday === 1 ? '' : 's'} remaining today (${doneToday} of ${dueToday} done)`}
-      >
-        <ListChecks className="w-5 h-5 text-neutral-500" />
-        <span className="tabular-nums">{remainingToday}</span>
-      </span>
+      {eventsCount !== undefined ? (
+        /* ── Four-count Today layout (redesign) ── */
+        <div className="flex items-center flex-wrap gap-x-5 gap-y-2 text-[15px] text-neutral-600">
+          <span className="inline-flex items-center gap-1.5"><CalendarDays className="w-5 h-5 text-neutral-500" /><span className="tabular-nums">{eventsCount}</span> events</span>
+          <span className="inline-flex items-center gap-1.5"><Star className="w-5 h-5 text-neutral-500" /><span className="tabular-nums">{focusCount ?? 0}</span> focus items</span>
+          <span className="inline-flex items-center gap-1.5"><Repeat className="w-5 h-5 text-neutral-500" /><span className="tabular-nums">{routinesCount ?? 0}</span> routines</span>
+          <span className="inline-flex items-center gap-1.5"><Mail className="w-5 h-5 text-neutral-500" /><span className="tabular-nums">{emailCount ?? 0}</span> from email</span>
+        </div>
+      ) : (
+        /* ── Legacy tasks-remaining / week block ── */
+        <>
+          {/* Tasks remaining today — checklist icon + count (desktop only, demoted) */}
+          <span
+            className="hidden md:inline-flex items-center gap-1.5 text-[15px] text-neutral-600"
+            title={`${remainingToday} task${remainingToday === 1 ? '' : 's'} remaining today (${doneToday} of ${dueToday} done)`}
+          >
+            <ListChecks className="w-5 h-5 text-neutral-500" />
+            <span className="tabular-nums">{remainingToday}</span>
+          </span>
 
-      {/* This week — desktop only, demoted */}
-      <span className="hidden md:inline-flex items-center gap-1.5 text-[12px] text-neutral-400">
-        {weekTrigger ?? <>{thisWeek} {thisWeek === 1 ? 'task' : 'tasks'} this week</>}
-      </span>
+          {/* This week — desktop only, demoted */}
+          <span className="hidden md:inline-flex items-center gap-1.5 text-[12px] text-neutral-400">
+            {weekTrigger ?? <>{thisWeek} {thisWeek === 1 ? 'task' : 'tasks'} this week</>}
+          </span>
 
-      {/* Clarity — interactive ring + remediation popover (desktop only) */}
-      {clarityTrigger && (
-        <span className="hidden md:inline-flex items-center gap-1.5">
-          {clarityTrigger}
-        </span>
+          {/* Clarity — interactive ring + remediation popover (desktop only) */}
+          {clarityTrigger && (
+            <span className="hidden md:inline-flex items-center gap-1.5">
+              {clarityTrigger}
+            </span>
+          )}
+
+          {discussionTrigger && (
+            <span className="hidden md:inline-flex items-center gap-1.5">
+              {discussionTrigger}
+            </span>
+          )}
+
+          {emailTrigger && (
+            <span className="hidden md:inline-flex items-center gap-1.5">
+              {emailTrigger}
+            </span>
+          )}
+
+          {weatherTrigger && (
+            <span className="hidden md:inline-flex items-center gap-1.5">
+              {weatherTrigger}
+            </span>
+          )}
+        </>
       )}
 
-      {discussionTrigger && (
-        <span className="hidden md:inline-flex items-center gap-1.5">
-          {discussionTrigger}
-        </span>
-      )}
-
-      {emailTrigger && (
-        <span className="hidden md:inline-flex items-center gap-1.5">
-          {emailTrigger}
-        </span>
-      )}
-
-      {weatherTrigger && (
-        <span className="hidden md:inline-flex items-center gap-1.5">
-          {weatherTrigger}
-        </span>
-      )}
-
-      {/* End controls: assignee filter + show-daily toggle */}
+      {/* End controls: assignee filter + show-daily toggle — always rendered */}
       {endControls && (
         <span className="inline-flex items-center gap-2 ml-auto">
           {endControls}
