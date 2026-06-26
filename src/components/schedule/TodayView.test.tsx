@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { screen } from '@testing-library/react'
+import { screen, fireEvent } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext'
 import { TodayView } from './TodayView'
@@ -155,6 +155,12 @@ describe('TodayView', () => {
     } as never)
     // OverdueSection renders a role="region" aria-label="Carried over tasks" wrapper
     expect(screen.getByRole('region', { name: /carried over tasks/i })).toBeInTheDocument()
+    // At rest the strip button is visible and collapsed (strip label includes task title preview)
+    const stripButton = screen.getByRole('button', { name: /carried over/i })
+    expect(stripButton).toBeInTheDocument()
+    // Expand the strip to reveal the rich content (task rows)
+    fireEvent.click(stripButton)
+    // After expanding, the full task title is visible in the expanded list
     expect(screen.getByText('Overdue task title')).toBeInTheDocument()
   })
 
@@ -182,11 +188,17 @@ describe('TodayView', () => {
     )
     // CarriedOver (overdue) section renders with its aria-label region
     expect(screen.getByRole('region', { name: /carried over tasks/i })).toBeInTheDocument()
+    // At rest the collapsed strip button shows "Carried over (N) · title" label
+    const stripButton = screen.getByRole('button', { name: /carried over/i })
+    expect(stripButton).toBeInTheDocument()
+    // Expand the strip to reveal the rich task rows with full wiring
+    fireEvent.click(stripButton)
+    // After expanding, the task title is visible in the list
     expect(screen.getByText('Wired overdue task')).toBeInTheDocument()
-    // The "Carried over" h3 heading is present — rendered by OverdueSection
-    expect(screen.getByText('Carried over')).toBeInTheDocument()
+    // The strip button's accessible name still contains "Carried over" (it stays in DOM)
+    expect(screen.getByRole('button', { name: /carried over/i })).toBeInTheDocument()
     // onToggleWaiting was passed into context — ScheduleItem renders a waiting toggle
-    // when onToggleWaiting is provided; verify it's reachable (no prop-threading crash)
+    // when onToggleWaiting is provided; verify prop-threading didn't crash the render
     expect(screen.getByRole('region', { name: /carried over tasks/i })).toBeInTheDocument()
   })
 
