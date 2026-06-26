@@ -34,6 +34,12 @@ Symphony domain model:
 - When unsure which context or date the user means, ask one short question rather than guessing.
 - Dates are ISO (YYYY-MM-DD). Today's date is provided in the first user message.
 
+Routines vs tasks:
+- A routine is a recurring item (e.g. "Feed Jax dinner", "Walk Jax", "Kids morning routine"). Routines are NOT tasks. To find a routine, use symphony_list_routines, never symphony_list_tasks.
+- Routines can be grouped into collections. A "step" is just a routine whose parent_routine_id points at a parent routine; step_order sets its order within the parent.
+- To GROUP existing routines into a collection (e.g. "group Feed Jax dinner and Walk Jax into Jax Evening Routine"): (1) symphony_list_routines to find each one and get its id; (2) symphony_create_routine to make the parent collection; (3) symphony_update_routine on each existing routine, setting parent_routine_id to the parent's id and step_order (0, 1, 2...). Do NOT recreate routines that already exist; fold the existing ones in.
+- When folding a routine in, change ONLY parent_routine_id and step_order. Do NOT modify its recurrence_pattern, time_of_day, name, context, or any other field. Preserve each routine's existing schedule exactly. Never assert or "restore" a schedule the data does not show, and never invent one. Report only the changes you actually made.
+
 Keep replies tight. Summary first, offer to expand.
 
 When the user attaches a document describing a recurring protocol (e.g. a physical-therapy home exercise program):
@@ -181,6 +187,36 @@ const TOOLS = [
         project_id: { type: 'string', description: 'id of the program/project this exercise belongs to' },
       },
       required: ['name'],
+    },
+  },
+  {
+    name: 'symphony_list_routines',
+    description: 'List recurring routines (NOT tasks). Filter by context or search (name substring). Returns id, name, context, parent_routine_id, step_order, recurrence_pattern, and timing. Use this to find existing routines before grouping them.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        context: { type: 'string', enum: CONTEXT_ENUM },
+        search: { type: 'string', description: 'name substring' },
+      },
+    },
+  },
+  {
+    name: 'symphony_update_routine',
+    description: 'Update a routine by id. Set parent_routine_id (plus step_order) to fold this routine into a parent routine as a step, or null to detach it. Also rename, change context, time_of_day, etc.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        name: { type: 'string' },
+        description: { type: 'string' },
+        context: { type: ['string', 'null'], enum: [...CONTEXT_ENUM, null] },
+        recurrence_pattern: { type: 'object' },
+        time_of_day: { type: ['string', 'null'], description: 'HH:MM' },
+        times_per_day: { type: 'array', items: { type: 'string' } },
+        parent_routine_id: { type: ['string', 'null'], description: 'id of the parent routine collection this is a step of' },
+        step_order: { type: ['number', 'null'], description: 'order within the parent collection' },
+      },
+      required: ['id'],
     },
   },
   {
@@ -382,6 +418,24 @@ async function runTool(
           row.pin_to_timeline = true
         }
         const { data, error } = await db.from('routines').insert(row).select().single()
+        if (error) throw error
+        return JSON.stringify(data, null, 2)
+      }
+      case 'symphony_list_routines': {
+        let q = db.from('routines')
+          .select('id, name, context, parent_routine_id, step_order, recurrence_pattern, time_of_day, times_per_day, visibility')
+          .order('name')
+        if (input.context) q = q.eq('context', input.context)
+        if (input.search) q = q.ilike('name', `%${input.search}%`)
+        const { data, error } = await q
+        if (error) throw error
+        return `${(data || []).length} routines:\n${JSON.stringify(data, null, 2)}`
+      }
+      case 'symphony_update_routine': {
+        const { id, ...updates } = input as Record<string, unknown>
+        if (!id) return 'Error: id is required'
+        const { data, error } = await db.from('routines')
+          .update(updates).eq('id', id).select().single()
         if (error) throw error
         return JSON.stringify(data, null, 2)
       }
