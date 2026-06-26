@@ -18,7 +18,7 @@ const corsHeaders = {
 }
 
 const MODEL = 'claude-sonnet-4-6'
-const MAX_TURNS = 8
+const MAX_TURNS = 14
 
 const SYSTEM_PROMPT = `You are the assistant inside Symphony, Scott's task, project, and routine manager. You help manage tasks, projects, and contacts using the tools available to you.
 
@@ -26,6 +26,12 @@ Rules:
 - You operate ONLY within Symphony. You have no access to files, email, the vault, or the web. If asked to do something outside Symphony, say so plainly and stop.
 - No em dashes. No AI cliches. No sycophancy. Be direct and action-oriented.
 - Just do it; don't narrate what you are about to do. After acting, confirm briefly.
+
+Grounding and verification (important):
+- Only state facts you have actually read from a tool result. Never assert a prior value, schedule, date, or history you have not looked up. If you are not sure, look it up or say you don't know. Do not invent.
+- The user's data spans tasks, routines, projects, contacts, lists, notes, and calendar events. Before acting on "X", check the right entity type: a recurring item like "Feed Jax dinner" is a routine (symphony_list_routines), not a task. Look it up before assuming it doesn't exist.
+- After ANY write (create / update / complete / delete / add / check), VERIFY before you claim success: read the affected item back with the matching list_/get_ tool and confirm the fields you intended actually changed. If the change did not take or a value looks wrong, say so and retry or ask. Never report a change you have not verified.
+- When updating an item, change only the fields the user asked about. Do not modify unrelated fields (schedule, time, name, context) as a side effect.
 
 Symphony domain model:
 - Tasks have a context: work, family, or personal. An unscheduled task (bucket "inbox") needs triage; a scheduled task has bucket "timed" and a scheduled_for date.
@@ -88,8 +94,18 @@ const TOOLS = [
         phone_number: { type: 'string' },
         location: { type: 'string' },
         estimated_duration: { type: 'number', description: 'minutes' },
+        parent_task_id: { type: 'string', description: 'id of the parent task to make this a subtask of' },
       },
       required: ['title'],
+    },
+  },
+  {
+    name: 'symphony_delete_task',
+    description: 'Delete a task by id. Permanent. Prefer symphony_complete_task to mark done; only delete when the user wants it removed.',
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
     },
   },
   {
@@ -148,6 +164,22 @@ const TOOLS = [
         phone_number: { type: 'string' },
       },
       required: ['name'],
+    },
+  },
+  {
+    name: 'symphony_update_project',
+    description: 'Update a project by id: name, status, notes, context, or phone_number. Set status to "completed" to finish it.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        name: { type: 'string' },
+        status: { type: 'string', enum: ['not_started', 'in_progress', 'on_hold', 'completed'] },
+        notes: { type: ['string', 'null'] },
+        context: { type: ['string', 'null'], enum: [...CONTEXT_ENUM, null] },
+        phone_number: { type: ['string', 'null'] },
+      },
+      required: ['id'],
     },
   },
   {
@@ -216,6 +248,141 @@ const TOOLS = [
         parent_routine_id: { type: ['string', 'null'], description: 'id of the parent routine collection this is a step of' },
         step_order: { type: ['number', 'null'], description: 'order within the parent collection' },
       },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'symphony_create_contact',
+    description: 'Create a contact (a person or service provider). category is one of family/friend/service_provider/professional/school/medical/other.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        phone: { type: 'string' },
+        email: { type: 'string' },
+        category: { type: 'string' },
+        notes: { type: 'string' },
+        relationship: { type: 'string' },
+        birthday: { type: 'string', description: 'YYYY-MM-DD' },
+        context: { type: 'string', enum: CONTEXT_ENUM },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'symphony_update_contact',
+    description: 'Update a contact by id: name, phone, email, category, notes, relationship, birthday, or context.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        name: { type: 'string' },
+        phone: { type: ['string', 'null'] },
+        email: { type: ['string', 'null'] },
+        category: { type: 'string' },
+        notes: { type: ['string', 'null'] },
+        relationship: { type: ['string', 'null'] },
+        birthday: { type: ['string', 'null'] },
+        context: { type: ['string', 'null'], enum: [...CONTEXT_ENUM, null] },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'symphony_list_lists',
+    description: "List the user's lists (e.g. grocery, packing, watchlist). Filter by category or search (title). Use symphony_get_list_items to see what is on a list.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        category: { type: 'string' },
+        search: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'symphony_get_list_items',
+    description: 'Get the items on a list by list_id (from symphony_list_lists).',
+    input_schema: {
+      type: 'object',
+      properties: { list_id: { type: 'string' } },
+      required: ['list_id'],
+    },
+  },
+  {
+    name: 'symphony_create_list',
+    description: 'Create a new list. visibility is "self" (private) or "family" (shared).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        category: { type: 'string' },
+        visibility: { type: 'string', enum: ['self', 'family'] },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    name: 'symphony_add_list_item',
+    description: 'Add an item to a list (e.g. "add milk to the grocery list"). Look up the list with symphony_list_lists first to get its id.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        list_id: { type: 'string' },
+        text: { type: 'string' },
+        note: { type: 'string' },
+      },
+      required: ['list_id', 'text'],
+    },
+  },
+  {
+    name: 'symphony_check_list_item',
+    description: 'Mark a list item done or not done by id.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        completed: { type: 'boolean' },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'symphony_delete_list_item',
+    description: 'Remove an item from a list by id. Permanent.',
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'symphony_create_note',
+    description: 'Capture a note (a thought, meeting note, or reference). type defaults to quick_capture.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        content: { type: 'string' },
+        type: { type: 'string', enum: ['quick_capture', 'meeting_note', 'general', 'task_note'] },
+        context: { type: 'string', enum: CONTEXT_ENUM },
+      },
+      required: ['content'],
+    },
+  },
+  {
+    name: 'symphony_list_events',
+    description: 'List calendar events for a day (defaults to today). Read-only. Use for "what is on my calendar".',
+    input_schema: {
+      type: 'object',
+      properties: { date: { type: 'string', description: 'YYYY-MM-DD; defaults to today' } },
+    },
+  },
+  {
+    name: 'symphony_delete_routine',
+    description: 'Delete a routine by id. Permanent. (Pausing a routine is not yet supported via the assistant.)',
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'string' } },
       required: ['id'],
     },
   },
@@ -379,17 +546,20 @@ async function runTool(
       case 'symphony_daily_summary': {
         const today = new Date().toISOString().split('T')[0]
         const start = `${today}T00:00:00`, end = `${today}T23:59:59`
-        const [todayT, inboxT, waitingT, overdueT] = await Promise.all([
+        const [todayT, inboxT, waitingT, overdueT, eventsT] = await Promise.all([
           db.from('tasks').select('id, title, completed, scheduled_for, context, category, is_waiting')
             .eq('bucket', 'timed').gte('scheduled_for', start).lte('scheduled_for', end).order('scheduled_for'),
           db.from('tasks').select('id, title, context, created_at').eq('bucket', 'inbox').eq('completed', false),
           db.from('tasks').select('id, title, context').eq('is_waiting', true).eq('completed', false),
           db.from('tasks').select('id, title, scheduled_for, context')
             .eq('bucket', 'timed').eq('completed', false).lt('scheduled_for', start),
+          db.from('calendar_events').select('id, title, start_time, end_time, all_day, location, meeting_url')
+            .gte('start_time', start).lte('start_time', end).order('start_time'),
         ])
         return JSON.stringify({
           date: today,
           today: { total: todayT.data?.length ?? 0, remaining: todayT.data?.filter((t) => !t.completed).length ?? 0, tasks: todayT.data ?? [] },
+          events: { count: eventsT.data?.length ?? 0, events: eventsT.data ?? [] },
           inbox: { count: inboxT.data?.length ?? 0, tasks: inboxT.data ?? [] },
           waiting: { count: waitingT.data?.length ?? 0, tasks: waitingT.data ?? [] },
           overdue: { count: overdueT.data?.length ?? 0, tasks: overdueT.data ?? [] },
@@ -438,6 +608,112 @@ async function runTool(
           .update(updates).eq('id', id).select().single()
         if (error) throw error
         return JSON.stringify(data, null, 2)
+      }
+      case 'symphony_delete_task': {
+        if (!input.id) return 'Error: id is required'
+        const { error } = await db.from('tasks').delete().eq('id', input.id)
+        if (error) throw error
+        return `Task ${input.id} deleted.`
+      }
+      case 'symphony_update_project': {
+        const { id, ...updates } = input as Record<string, unknown>
+        if (!id) return 'Error: id is required'
+        const { data, error } = await db.from('projects')
+          .update({ ...updates, updated_at: now() }).eq('id', id).select().single()
+        if (error) throw error
+        return JSON.stringify(data, null, 2)
+      }
+      case 'symphony_create_contact': {
+        const { data, error } = await db.from('contacts')
+          .insert({ ...input, user_id: userId }).select().single()
+        if (error) throw error
+        return JSON.stringify(data, null, 2)
+      }
+      case 'symphony_update_contact': {
+        const { id, ...updates } = input as Record<string, unknown>
+        if (!id) return 'Error: id is required'
+        const { data, error } = await db.from('contacts')
+          .update({ ...updates, updated_at: now() }).eq('id', id).select().single()
+        if (error) throw error
+        return JSON.stringify(data, null, 2)
+      }
+      case 'symphony_list_lists': {
+        let q = db.from('lists').select('id, title, category, visibility, icon')
+          .order('sort_order', { ascending: true, nullsFirst: false })
+        if (input.category) q = q.eq('category', input.category)
+        if (input.search) q = q.ilike('title', `%${input.search}%`)
+        const { data, error } = await q
+        if (error) throw error
+        return `${(data || []).length} lists:\n${JSON.stringify(data, null, 2)}`
+      }
+      case 'symphony_get_list_items': {
+        if (!input.list_id) return 'Error: list_id is required'
+        const { data, error } = await db.from('list_items')
+          .select('id, text, note, completed, sort_order, parent_item_id')
+          .eq('list_id', input.list_id)
+          .order('sort_order', { ascending: true, nullsFirst: false })
+        if (error) throw error
+        return `${(data || []).length} items:\n${JSON.stringify(data, null, 2)}`
+      }
+      case 'symphony_create_list': {
+        const { data, error } = await db.from('lists')
+          .insert({ title: input.title, category: input.category, visibility: input.visibility ?? 'self', user_id: userId })
+          .select().single()
+        if (error) throw error
+        return JSON.stringify(data, null, 2)
+      }
+      case 'symphony_add_list_item': {
+        if (!input.list_id || !input.text) return 'Error: list_id and text are required'
+        const { data, error } = await db.from('list_items')
+          .insert({ list_id: input.list_id, text: input.text, note: input.note, user_id: userId, completed: false })
+          .select().single()
+        if (error) throw error
+        return JSON.stringify(data, null, 2)
+      }
+      case 'symphony_check_list_item': {
+        if (!input.id) return 'Error: id is required'
+        const completed = input.completed === undefined ? true : !!input.completed
+        const { data, error } = await db.from('list_items')
+          .update({ completed, completed_at: completed ? now() : null, updated_at: now() })
+          .eq('id', input.id).select().single()
+        if (error) throw error
+        return JSON.stringify(data, null, 2)
+      }
+      case 'symphony_delete_list_item': {
+        if (!input.id) return 'Error: id is required'
+        const { error } = await db.from('list_items').delete().eq('id', input.id)
+        if (error) throw error
+        return `Item ${input.id} deleted.`
+      }
+      case 'symphony_create_note': {
+        // Never SELECT * on notes (embedding column would time out) — pick columns.
+        const { data, error } = await db.from('notes')
+          .insert({
+            title: input.title ?? null,
+            content: input.content,
+            type: input.type ?? 'quick_capture',
+            context: input.context ?? null,
+            source: 'assistant',
+            user_id: userId,
+          })
+          .select('id, title, type, context, created_at').single()
+        if (error) throw error
+        return JSON.stringify(data, null, 2)
+      }
+      case 'symphony_list_events': {
+        const date = typeof input.date === 'string' ? input.date : new Date().toISOString().split('T')[0]
+        const { data, error } = await db.from('calendar_events')
+          .select('id, title, start_time, end_time, all_day, location, meeting_url')
+          .gte('start_time', `${date}T00:00:00`).lte('start_time', `${date}T23:59:59`)
+          .order('start_time')
+        if (error) throw error
+        return `${(data || []).length} events on ${date}:\n${JSON.stringify(data, null, 2)}`
+      }
+      case 'symphony_delete_routine': {
+        if (!input.id) return 'Error: id is required'
+        const { error } = await db.from('routines').delete().eq('id', input.id)
+        if (error) throw error
+        return `Routine ${input.id} deleted.`
       }
       case 'symphony_attach_source': {
         if (!attachment) return 'Error: No document was attached to this message.'
