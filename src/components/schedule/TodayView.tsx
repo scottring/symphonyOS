@@ -35,6 +35,8 @@ import { Eye, EyeOff, Repeat, Mail, Binoculars, Sun } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
+import { FocusTodayRow } from './FocusTodayRow'
+import { selectFocusItems } from '@/lib/today/selectFocusItems'
 import { TodayAddInput } from './TodayAddInput'
 import { RoutinesHabitsPanel } from './RoutinesHabitsPanel'
 import { TimelineInsertPoint } from './TimelineInsertPoint'
@@ -357,6 +359,13 @@ export function TodayView({
     () => data.sectionsOrder.reduce((n, s) => n + (data.grouped[s]?.filter(i => i.type === 'routine' || i.type === 'routine-collection').length ?? 0), 0),
     [data],
   )
+  // Flat list of all timeline items (same order and filtering as the schedule renders from).
+  // Source: data.grouped / data.sectionsOrder from useTodayData (TodayView.tsx:281,353).
+  const timelineItems = useMemo(
+    () => data.sectionsOrder.flatMap((s) => data.grouped[s] ?? []),
+    [data],
+  )
+  const focusItems = useMemo(() => selectFocusItems(timelineItems), [timelineItems])
   const emailNudge = data.isToday && activeEmailCount > 0 ? (
     <button
       type="button"
@@ -495,7 +504,7 @@ export function TodayView({
           discussionTrigger={discussion.length > 0 ? <DiscussionBadge items={discussion} onSelectItem={onSelectItem} /> : undefined}
           emailTrigger={emailNudge}
           eventsCount={timelineEventCount}
-          focusCount={0}
+          focusCount={focusItems.length}
           routinesCount={timelineRoutineCount}
           emailCount={activeEmailCount}
           endControls={
@@ -582,6 +591,17 @@ export function TodayView({
           </div>
         </>
       )}
+
+      {/* Focus Today row — 3-card strip of next timed items (slice-1 fallback).
+          Shown on desktop only; hidden on mobile to preserve the compact list.
+          Mounts above the schedule, below the add-input, per the redesign mockup. */}
+      <div className="hidden md:block mb-4">
+        <FocusTodayRow
+          items={focusItems}
+          totalEvents={timelineEventCount}
+          onSelectItem={(id) => onSelectItem(id)}
+        />
+      </div>
 
       {/* Task list — wrapped in a card on desktop; on mobile the rows go
           full-width (no card, no border, no inner padding) to match the
