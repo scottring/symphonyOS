@@ -366,6 +366,23 @@ export function TodayView({
     [data],
   )
   const focusItems = useMemo(() => selectFocusItems(timelineItems), [timelineItems])
+
+  // Exclude dosed (times_per_day non-empty) and collection-step (parent_routine_id
+  // non-null) routines from the overview panel. Both types are keyed differently in
+  // routineStatusMap — dosed routines use slotted keys like "id#0", "id#1"; steps
+  // are collapsed under their parent collection. The panel's bare-id isCompleted
+  // lookup would always read as incomplete and onToggle would write orphan
+  // instances the timeline never reads. Full dose-aware panel support is deferred.
+  const panelRoutines = useMemo(
+    () =>
+      (routines ?? []).filter(
+        (r) =>
+          (r.times_per_day == null || r.times_per_day.length === 0) &&
+          r.parent_routine_id == null,
+      ),
+    [routines],
+  )
+
   const emailNudge = data.isToday && activeEmailCount > 0 ? (
     <button
       type="button"
@@ -991,10 +1008,13 @@ export function TodayView({
 
       {/* Routines & Habits panel — shown below the schedule when routines exist.
           isCompleted reads the same routineStatusMap that the timeline uses (built
-          in computeTodayData → exposed on data) so completion state is shared. */}
-      {(routines?.length ?? 0) > 0 && (
+          in computeTodayData → exposed on data) so completion state is shared.
+          panelRoutines (computed above the return) excludes dosed/collection-step
+          routines whose completion keys differ from bare routine id — see comment
+          on panelRoutines declaration for details. */}
+      {panelRoutines.length > 0 && (
         <RoutinesHabitsPanel
-          routines={routines ?? []}
+          routines={panelRoutines}
           isCompleted={(id) => data.routineStatusMap.get(id)?.status === 'completed'}
           onToggle={(id, completed) => onCompleteRoutine?.(id, completed)}
         />
