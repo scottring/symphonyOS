@@ -25,7 +25,7 @@ export function TodayProgress({ completedCount, actionableCount, isToday }: Toda
   if (r.empty) return null
 
   return (
-    <div className="mb-5 flex items-center gap-3">
+    <div className="mb-3 flex items-center gap-3">
       {r.complete ? (
         <CheckCircle2 className="w-5 h-5 text-primary-600 shrink-0" />
       ) : (

@@ -48,12 +48,8 @@ export function progressReward(completedCount: number, actionableCount: number):
   else if (pct < 67) headline = 'Building momentum'
   else headline = 'Almost there'
 
-  const detail =
-    completed === 0
-      ? `${actionableCount} on you today`
-      : remaining <= 2
-        ? `${remaining} to go`
-        : `${completed} of ${actionableCount} done`
+  // Consistent, practical count — the unified header owns the numbers.
+  const detail = `${completed} of ${actionableCount} done`
 
   return { headline, detail, pct, complete: false, empty: false }
 }

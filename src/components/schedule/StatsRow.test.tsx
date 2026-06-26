@@ -3,28 +3,40 @@ import { describe, it, expect } from 'vitest'
 import { render, screen } from '@/test/test-utils'
 import { StatsRow } from './StatsRow'
 
-// Note: the AI-suggestions segment was removed in the Today redesign.
+// StatsRow is now a controls-only strip: the numeric counts (remaining today,
+// this week) moved into the unified TodayProgress header. StatsRow carries only
+// the interactive triggers + end-controls.
 
 describe('StatsRow', () => {
-  it('shows tasks remaining today as a count, with a descriptive tooltip', () => {
-    // The "N of M done today" text was replaced by a checklist icon + remaining count.
+  it('renders the controls strip container', () => {
     render(<StatsRow dueToday={2} doneToday={0} thisWeek={17} />)
-    expect(screen.getByTitle('2 tasks remaining today (0 of 2 done)')).toBeInTheDocument()
-    expect(screen.getByText('17 tasks this week')).toBeInTheDocument()
+    expect(screen.getByTestId('today-controls')).toBeInTheDocument()
   })
-  it('uses singular "task" in the remaining tooltip for a count of 1', () => {
-    render(<StatsRow dueToday={1} doneToday={0} thisWeek={1} />)
-    expect(screen.getByTitle('1 task remaining today (0 of 1 done)')).toBeInTheDocument()
-    expect(screen.getByText('1 task this week')).toBeInTheDocument()
+
+  it('no longer renders the raw remaining/this-week counts (they live in the header now)', () => {
+    render(<StatsRow dueToday={2} doneToday={0} thisWeek={17} />)
+    expect(screen.queryByTitle(/remaining today/i)).not.toBeInTheDocument()
+    expect(screen.queryByText('17 tasks this week')).not.toBeInTheDocument()
   })
-  it('subtracts done from due to compute remaining', () => {
-    render(<StatsRow dueToday={4} doneToday={1} thisWeek={2} />)
-    expect(screen.getByTitle('3 tasks remaining today (1 of 4 done)')).toBeInTheDocument()
-  })
+
   it('renders the clarityTrigger when provided', () => {
-    render(
-      <StatsRow dueToday={1} doneToday={0} thisWeek={1} clarityTrigger={<span>Clarity Good</span>} />,
-    )
+    render(<StatsRow dueToday={1} doneToday={0} thisWeek={1} clarityTrigger={<span>Clarity Good</span>} />)
     expect(screen.getByText('Clarity Good')).toBeInTheDocument()
+  })
+
+  it('renders the weekTrigger, emailTrigger and endControls when provided', () => {
+    render(
+      <StatsRow
+        dueToday={1}
+        doneToday={0}
+        thisWeek={1}
+        weekTrigger={<span>This Week</span>}
+        emailTrigger={<span>4 from email</span>}
+        endControls={<button>Show daily</button>}
+      />,
+    )
+    expect(screen.getByText('This Week')).toBeInTheDocument()
+    expect(screen.getByText('4 from email')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show daily' })).toBeInTheDocument()
   })
 })

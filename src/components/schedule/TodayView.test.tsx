@@ -68,19 +68,19 @@ function renderView(props: Record<string, unknown> = {}, ctxOverrides: Record<st
 }
 
 describe('TodayView', () => {
-  it('renders the stats row (HomeHeader date label is now in HomeView, not TodayView)', () => {
+  it('renders the controls strip (HomeHeader date label is now in HomeView, not TodayView)', () => {
     // The date label (e.g. "Tuesday, May 19, 2026") moved to HomeHeader which is
-    // rendered by HomeView — it is not in TodayView's subtree. TodayView's own
-    // stable landmark is the StatsRow "tasks remaining today" control (the
-    // "N of N done today" text became a checklist icon + count with a tooltip).
+    // rendered by HomeView — it is not in TodayView's subtree. The numeric counts
+    // moved into the unified TodayProgress header; the StatsRow is now a
+    // controls-only strip, identified by data-testid="today-controls".
     renderView()
-    expect(screen.getByTitle(/remaining today/i)).toBeInTheDocument()
+    expect(screen.getByTestId('today-controls')).toBeInTheDocument()
   })
-  it('renders exactly one stats row (regression guard vs the duplicate-row defect)', () => {
-    // Use the "remaining today" control — always rendered by StatsRow and unique
-    // to it — as the duplicate-row sentinel.
+  it('renders exactly one controls strip (regression guard vs the duplicate-row defect)', () => {
+    // The controls strip is always rendered by StatsRow and unique to it — use
+    // it as the duplicate-row sentinel.
     renderView()
-    expect(screen.getAllByTitle(/remaining today/i)).toHaveLength(1)
+    expect(screen.getAllByTestId('today-controls')).toHaveLength(1)
   })
   it('shows the empty state when there are no items', () => {
     renderView()

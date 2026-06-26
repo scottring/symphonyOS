@@ -1,5 +1,7 @@
 // src/components/schedule/StatsRow.tsx
-import { ListChecks } from 'lucide-react'
+// Controls-only strip: the unified Today header (TodayProgress) now owns the
+// numeric counts, so this row carries just the interactive triggers and
+// end-controls (Clarity, discussion, email nudge, assignee filter, toggles).
 
 interface StatsRowProps {
   dueToday: number
@@ -21,23 +23,15 @@ interface StatsRowProps {
   endControls?: React.ReactNode
 }
 
-export function StatsRow({ dueToday, doneToday, weekTrigger, thisWeek, clarityTrigger, discussionTrigger, weatherTrigger, emailTrigger, endControls }: StatsRowProps) {
-  const remainingToday = Math.max(0, dueToday - doneToday)
+export function StatsRow({ weekTrigger, clarityTrigger, discussionTrigger, weatherTrigger, emailTrigger, endControls }: StatsRowProps) {
   return (
-    <div className="flex items-center flex-wrap gap-x-5 gap-y-2 text-[15px] text-neutral-600">
-      {/* Tasks remaining today — checklist icon + count (desktop only, demoted) */}
-      <span
-        className="hidden md:inline-flex items-center gap-1.5 text-[15px] text-neutral-600"
-        title={`${remainingToday} task${remainingToday === 1 ? '' : 's'} remaining today (${doneToday} of ${dueToday} done)`}
-      >
-        <ListChecks className="w-5 h-5 text-neutral-500" />
-        <span className="tabular-nums">{remainingToday}</span>
-      </span>
-
-      {/* This week — desktop only, demoted */}
-      <span className="hidden md:inline-flex items-center gap-1.5 text-[12px] text-neutral-400">
-        {weekTrigger ?? <>{thisWeek} {thisWeek === 1 ? 'task' : 'tasks'} this week</>}
-      </span>
+    <div data-testid="today-controls" className="flex items-center flex-wrap gap-x-5 gap-y-2 text-[15px] text-neutral-600">
+      {/* This week staging trigger — desktop only, demoted */}
+      {weekTrigger && (
+        <span className="hidden md:inline-flex items-center gap-1.5 text-[12px] text-neutral-400">
+          {weekTrigger}
+        </span>
+      )}
 
       {/* Clarity — interactive ring + remediation popover (desktop only) */}
       {clarityTrigger && (

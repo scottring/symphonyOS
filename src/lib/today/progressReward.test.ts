@@ -23,10 +23,10 @@ describe('progressReward', () => {
     expect(progressReward(1, 1).detail).toBe('You cleared the one thing today.')
   })
 
-  it('greets a fresh day with the count on you', () => {
+  it('greets a fresh day with a consistent count', () => {
     const r = progressReward(0, 4)
     expect(r.headline).toBe('Here’s today')
-    expect(r.detail).toBe('4 on you today')
+    expect(r.detail).toBe('0 of 4 done')
     expect(r.pct).toBe(0)
   })
 
@@ -36,8 +36,8 @@ describe('progressReward', () => {
     expect(progressReward(5, 6).headline).toBe('Almost there')          // 83%
   })
 
-  it('switches to "N to go" in the home stretch', () => {
-    expect(progressReward(4, 6).detail).toBe('2 to go')
+  it('reports a consistent "X of Y done" detail throughout', () => {
+    expect(progressReward(4, 6).detail).toBe('4 of 6 done')
     expect(progressReward(2, 6).detail).toBe('2 of 6 done')
   })
 

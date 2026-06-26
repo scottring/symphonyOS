@@ -478,8 +478,18 @@ export function TodayView({
         </div>
       )}
 
-      {/* Stats + function bar — desktop only. Mobile combines the filters
-          into the Add-to-today row below to save vertical space. */}
+      {/* Unified Today header — the momentum band owns the numbers + reward,
+          and the controls strip (StatsRow) sits directly beneath it. */}
+      <div className="px-3 md:px-0">
+        <TodayProgress
+          completedCount={data.counts.completedCount}
+          actionableCount={data.counts.actionableCount}
+          isToday={data.isToday}
+        />
+      </div>
+
+      {/* Controls strip — desktop only. Mobile folds the filters into the
+          Add-to-today row below to save vertical space. */}
       <div className="hidden md:block mb-6">
         <StatsRow
           dueToday={data.counts.actionableCount}
@@ -575,16 +585,6 @@ export function TodayView({
           </div>
         </>
       )}
-
-      {/* Today's momentum — how far you've come, not just what's left. Becomes
-          a quiet celebration when everything actionable is done. */}
-      <div className="px-3 md:px-0">
-        <TodayProgress
-          completedCount={data.counts.completedCount}
-          actionableCount={data.counts.actionableCount}
-          isToday={data.isToday}
-        />
-      </div>
 
       {/* Task list — wrapped in a card on desktop; on mobile the rows go
           full-width (no card, no border, no inner padding) to match the
