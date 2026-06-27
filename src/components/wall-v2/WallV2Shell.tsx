@@ -27,6 +27,7 @@ import { WallV2AtAGlance } from './WallV2AtAGlance';
 import { WallV2Timeline } from './WallV2Timeline';
 import { WallV2RightColumn } from './WallV2RightColumn';
 import { WallV2ActionDock } from './WallV2ActionDock';
+import { CallerIdTakeover } from './CallerIdTakeover';
 import { MOCK_ACTIONS } from './wallV2Mock';
 import {
   adaptGlanceForMember,
@@ -584,6 +585,9 @@ export function WallV2Shell() {
           onExit={() => setGuestMode(false)}
         />
       )}
+
+      {/* Caller-ID takeover — full-screen when the kid phone has a live call. */}
+      <CallerIdTakeover />
     </div>
   );
 }

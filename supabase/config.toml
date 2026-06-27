@@ -271,6 +271,12 @@ verify_jwt = false
 [functions.vault-sync]
 verify_jwt = false
 
+# Kid-phone call bridge: authenticated via x-kidphone-secret shared secret, not
+# a Supabase JWT (the kid-phone Firebase function has no Supabase session). JWT
+# verification must stay off or the webhook 401s at the gateway.
+[functions.kid-phone-call]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
