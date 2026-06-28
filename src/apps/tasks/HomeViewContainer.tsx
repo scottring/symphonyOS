@@ -41,6 +41,7 @@ import { useDomain } from '@/hooks/useDomain';
 import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings';
 import { useListsContext } from '@/contexts/ListsContext';
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext';
+import { withDefaultEventAssignees } from '@/components/home/eventAssigneeDefaults';
 import { useUndo } from '@/hooks/useUndo';
 import { useResolutionLearning } from '@/hooks/useResolutionLearning';
 import { HomeView } from '@/components/home';
@@ -171,6 +172,17 @@ export function HomeViewContainer() {
   // has its own copy of this synthesis; that becomes dead code post-cutover.
   const mealEvents = useMealEventsForDate(viewedDate);
   const eventsWithMeals = useMemo(() => [...events, ...mealEvents], [events, mealEvents]);
+
+  // Synced calendar events carry no Symphony assignee, and the schedule views
+  // (Today/Day/Week/Month) hide events whose assignee isn't selected — so a
+  // freshly-synced event vanishes for everyone until manually assigned. Each
+  // member only syncs their OWN Google calendars, so default an unassigned
+  // event's assignee to the current member. Feeding this into the shared
+  // ScheduleActions context covers every view at once. See eventAssigneeDefaults.
+  const eventNotesMapWithDefaults = useMemo(
+    () => withDefaultEventAssignees(eventNotesMap, events, getCurrentUserMember()?.id),
+    [eventNotesMap, events, getCurrentUserMember],
+  );
 
   // Schedule filtering (events/routines/instances filtered to viewed date + domain)
   const { filteredEvents, filteredRoutines, dateInstances, refreshDateInstances } = useScheduleFiltering({
@@ -498,7 +510,7 @@ export function HomeViewContainer() {
       familyMembers,
       lists,
       listsByCategory,
-      eventNotesMap,
+      eventNotesMap: eventNotesMapWithDefaults,
       eventContextOverrides,
 
       // List/contact actions
@@ -518,7 +530,7 @@ export function HomeViewContainer() {
       setSelection,
       scheduleActions, updateRoutine, updateEventContext, updateEventSharedWithFamily, dismissShareNudge, hideEvent, handleDeleteEvent,
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
-      eventNotesMap, eventContextOverrides,
+      eventNotesMapWithDefaults, eventContextOverrides,
       addProject, searchContacts, addContact, getDomainForCalendar,
       refreshDateInstances, updateEventProject,
     ],

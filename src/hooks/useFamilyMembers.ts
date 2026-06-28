@@ -50,6 +50,23 @@ export function useFamilyMembers() {
         return
       }
 
+      // Guard against duplicate seeding. The local `members` check above is not
+      // enough: it can be transiently empty during an in-flight/failed fetch,
+      // and `seedingRef` is per hook-instance, so multiple mounted instances
+      // would each seed a second "self". Re-check the DB directly — if this user
+      // already has ANY member row, adopt it instead of inserting a duplicate.
+      // (This is what produced 5 "<email-prefix>" duplicates on 2026-06-27.)
+      const { data: existing } = await supabase
+        .from('family_members')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('display_order', { ascending: true })
+      if (existing && existing.length > 0) {
+        setMembers(existing)
+        seedingRef.current = false
+        return
+      }
+
       // Only seed the current user - they'll add family in onboarding
       const userName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Me'
       const initials = userName.split(/\s+/).map((w: string) => w[0]).join('').substring(0, 2).toUpperCase()
