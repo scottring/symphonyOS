@@ -45,17 +45,29 @@ function approveVerb(item: ActionQueueItem): string {
 }
 
 export function NeedsYourOK() {
-  const { actions, approveAction, rejectAction } = useActionQueue()
+  const { actions, approveAction, rejectAction, refetch } = useActionQueue()
   const [busyId, setBusyId] = useState<string | null>(null)
+  // Locally hide rows we've resolved, so the strip updates instantly instead of
+  // waiting on a realtime UPDATE (which the table may not even publish).
+  const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set())
 
-  if (actions.length === 0) return null
+  const visible = actions.filter((a) => !resolvedIds.has(a.id))
+  if (visible.length === 0) return null
 
   const run = async (id: string, fn: () => Promise<unknown>) => {
     setBusyId(id)
+    setResolvedIds((prev) => new Set(prev).add(id)) // optimistic remove
     try {
       await fn()
+      refetch() // reconcile with server truth
     } catch (err) {
       logger.error('Action resolve failed:', err)
+      // roll back the optimistic removal so the row comes back
+      setResolvedIds((prev) => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
     } finally {
       setBusyId(null)
     }
@@ -68,11 +80,11 @@ export function NeedsYourOK() {
         <h3 className="text-[11px] uppercase tracking-wider font-semibold text-primary-700/80">
           Needs your OK
         </h3>
-        <span className="text-[11px] text-primary-600/70 tabular-nums">{actions.length}</span>
+        <span className="text-[11px] text-primary-600/70 tabular-nums">{visible.length}</span>
       </div>
 
       <ul className="space-y-1.5">
-        {actions.map((item) => {
+        {visible.map((item) => {
           const Icon = ACTION_ICON[item.action_type] ?? Sparkles
           const busy = busyId === item.id
           return (
