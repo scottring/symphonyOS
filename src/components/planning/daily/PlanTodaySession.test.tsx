@@ -4,8 +4,28 @@ import { render } from '@/test/test-utils'
 import { PlanTodaySession } from './PlanTodaySession'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
+import type { Routine } from '@/types/actionable'
 
 const viewedDate = new Date(2026, 5, 10, 9, 0, 0) // Wed Jun 10
+
+function makeRoutine(over: Partial<Routine> & Pick<Routine, 'name' | 'recurrence_pattern'>): Routine {
+  return {
+    id: over.name.replace(/\s+/g, '-').toLowerCase(),
+    user_id: 'u1',
+    description: null,
+    default_assignee: null,
+    assigned_to: null,
+    assigned_to_all: null,
+    visibility: 'active',
+    paused_until: null,
+    time_of_day: null,
+    raw_input: null,
+    show_on_timeline: true,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+    ...over,
+  } as Routine
+}
 
 function task(over: Partial<Task>): Task {
   return {
@@ -24,11 +44,12 @@ function task(over: Partial<Task>): Task {
   }
 }
 
-function setup(tasksOverride?: Task[], contacts: Contact[] = []) {
+function setup(tasksOverride?: Task[], contacts: Contact[] = [], routines: Routine[] = []) {
   const onPushTask = vi.fn()
   const onCompleteTask = vi.fn()
   const onSetBucket = vi.fn()
   const onClose = vi.fn()
+  const onUpdateRoutine = vi.fn()
   const tasks = tasksOverride ?? [
     task({ id: 'w1', title: 'Week one', bucket: 'week' }),
     task({ id: 'od', title: 'Overdue one', bucket: 'timed', scheduledFor: new Date(2020, 0, 1), isAllDay: false }),
@@ -43,9 +64,11 @@ function setup(tasksOverride?: Task[], contacts: Contact[] = []) {
       onCompleteTask={onCompleteTask}
       onSetBucket={onSetBucket}
       contacts={contacts}
+      routines={routines}
+      onUpdateRoutine={onUpdateRoutine}
     />
   )
-  return { onPushTask, onCompleteTask, onSetBucket, onClose, ...utils }
+  return { onPushTask, onCompleteTask, onSetBucket, onClose, onUpdateRoutine, ...utils }
 }
 
 describe('PlanTodaySession', () => {
@@ -95,5 +118,29 @@ describe('PlanTodaySession', () => {
     setup([task({ id: 'w1', title: 'Only week', bucket: 'week' })])
     expect(screen.queryByText('Carried over')).not.toBeInTheDocument()
     expect(screen.getByText('Only week')).toBeInTheDocument()
+  })
+
+  it('includes non-daily untimed routines due that day in the pile', () => {
+    const weekly = makeRoutine({ name: 'Food shopping', recurrence_pattern: { type: 'weekly', days: ['wed'] } })
+    setup([], [], [weekly])
+    expect(screen.getByText('Food shopping')).toBeInTheDocument()
+    expect(screen.getByText('Routine')).toBeInTheDocument() // origin tag
+  })
+
+  it('excludes daily routines (the standing rhythm) and routines not due today', () => {
+    const daily = makeRoutine({ name: 'Brush teeth', recurrence_pattern: { type: 'daily' } })
+    const otherDay = makeRoutine({ name: 'Sunday reset', recurrence_pattern: { type: 'weekly', days: ['sun'] } })
+    setup([], [], [daily, otherDay])
+    expect(screen.queryByText('Brush teeth')).not.toBeInTheDocument()
+    expect(screen.queryByText('Sunday reset')).not.toBeInTheDocument()
+  })
+
+  it('placing a routine sets its time_of_day to the slot hour', async () => {
+    const weekly = makeRoutine({ name: 'Food shopping', recurrence_pattern: { type: 'weekly', days: ['wed'] } })
+    const { user, onUpdateRoutine } = setup([], [], [weekly])
+    await user.click(screen.getByRole('button', { name: 'Morning' }))
+    expect(onUpdateRoutine).toHaveBeenCalledWith('food-shopping', { time_of_day: '09:00:00' })
+    // optimistically moves into "taking shape"
+    expect(screen.getByText('1 placed · 0 to go')).toBeInTheDocument()
   })
 })

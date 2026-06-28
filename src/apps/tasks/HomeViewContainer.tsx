@@ -619,6 +619,8 @@ export function HomeViewContainer() {
             onSetBucket={setBucket}
             onOpenTimeBlock={() => { setPlanTodayOpen(false); setPlanningOpen(true); }}
             contacts={contacts}
+            routines={allRoutines}
+            onUpdateRoutine={(id, input) => updateRoutine(id, input)}
           />
         </Suspense>
       )}

@@ -5,23 +5,44 @@
 // staged materials ("Bring"), and the AI only *suggests* a slot. Never a gate —
 // Today works fully whether or not you run this.
 //
-// Two columns: left = the "To place" pile (carried-over + this-week items),
-// right = "Your day taking shape" (placed items grouped Morning/Afternoon/
-// Evening, plus fixed calendar anchors). Tapping a slot places the item.
+// The pile holds what's NOT yet placed for the day: carried-over tasks, this
+// week's task pool, AND non-daily routines due today (weekend routines, weekly
+// chores — the ones that otherwise never surface to plan around). Daily routines
+// are the day's standing rhythm, so they aren't in the pile.
+//
+// Two columns: left = the "To place" pile, right = "Your day taking shape"
+// (placed items grouped Morning/Afternoon/Evening + fixed calendar anchors).
+// Placing a task sets its scheduled time; placing a routine sets its time_of_day.
 
 import { useState, useMemo, useCallback } from 'react'
 import { X, CalendarClock } from 'lucide-react'
 import type { Task, TaskBucket } from '@/types/task'
 import type { Contact } from '@/types/contact'
+import type { Routine } from '@/types/actionable'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { TimeOfDay } from '@/lib/timeUtils'
+import type { TimelineItem } from '@/types/timeline'
 import { selectOverdue } from '@/lib/today/taskPools'
 import { selectHorizonPool } from '@/lib/today/horizons'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
-import { taskToTimelineItem } from '@/types/timeline'
+import { getRoutinesForDatePure } from '@/lib/routineUtils'
+import { taskToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import { deriveMaterials } from '@/components/surface/hooks/useStagedMaterials'
-import { suggestSlot, slotTime } from '@/lib/planning/suggestSlot'
+import { suggestSlot, slotTime, slotTimeOfDay, timeOfDayToSlot } from '@/lib/planning/suggestSlot'
 import { PlanItemCard, type ItemOrigin } from './PlanItemCard'
+
+/** One thing to place: a task or a non-daily routine, normalized for the pile. */
+interface PlanItem {
+  kind: 'task' | 'routine'
+  id: string
+  title: string
+  origin: ItemOrigin
+  category?: string | null
+  timelineItem: TimelineItem
+}
+
+/** A placed entry rendered in "taking shape". */
+interface PlacedEntry { id: string; title: string; slot: TimeOfDay; timeLabel: string }
 
 interface Props {
   tasks: Task[]
@@ -36,6 +57,10 @@ interface Props {
   onOpenTimeBlock?: () => void
   /** Contacts for resolving staged phone/person materials. */
   contacts?: Contact[]
+  /** Active routines — non-daily ones due today appear in the pile to be placed. */
+  routines?: Routine[]
+  /** Place a non-daily routine into a slot by setting its time_of_day. */
+  onUpdateRoutine?: (id: string, input: { time_of_day?: string | null }) => void | Promise<unknown>
 }
 
 const SECTION_META: { slot: TimeOfDay; label: string; range: string }[] = [
@@ -55,6 +80,15 @@ function hourToSlot(hour: number): TimeOfDay {
   if (hour < 18) return 'afternoon'
   return 'evening'
 }
+function timeToken(d: Date): string {
+  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+}
+/** Format a routine "HH:MM[:SS]" time-of-day for display. */
+function todLabel(timeOfDay: string): string {
+  const [h, m] = timeOfDay.split(':').map(Number)
+  const d = new Date(); d.setHours(h, m || 0, 0, 0)
+  return timeToken(d)
+}
 
 const evStart = (e: CalendarEvent): string | undefined => e.startTime ?? e.start_time
 const evAllDay = (e: CalendarEvent): boolean => Boolean(e.allDay ?? e.all_day)
@@ -66,12 +100,10 @@ function eventsOnDate(events: CalendarEvent[], date: Date): CalendarEvent[] {
     .filter((e) => { const raw = evStart(e); if (!raw) return false; const s = new Date(raw); return s >= start && s < end })
     .sort((a, b) => new Date(evStart(a)!).getTime() - new Date(evStart(b)!).getTime())
 }
-function timeToken(d: Date): string {
-  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
-}
 
 export function PlanTodaySession({
-  tasks, events, viewedDate, onClose, onPushTask, onSetBucket, onOpenTimeBlock, contacts = [],
+  tasks, events, viewedDate, onClose, onPushTask, onSetBucket, onOpenTimeBlock,
+  contacts = [], routines = [], onUpdateRoutine,
 }: Props) {
   const matchAll = useMemo(() => makeAssigneeFilter([]), [])
   const contactsById = useMemo(
@@ -82,37 +114,68 @@ export function PlanTodaySession({
   const carriedOver = useMemo(() => selectOverdue(tasks, true, matchAll), [tasks, matchAll])
   const weekPool = useMemo(() => selectHorizonPool(tasks, 'week', matchAll), [tasks, matchAll])
 
+  // Routines due on the viewed day. Non-daily + untimed ones go in the pile to be
+  // placed; daily routines are the standing rhythm (not "to place"). Reference
+  // (hidden) routines are excluded.
+  const dueRoutines = useMemo(() => getRoutinesForDatePure(routines, viewedDate), [routines, viewedDate])
+  const pileRoutines = useMemo(
+    () => dueRoutines.filter(
+      (r) => r.recurrence_pattern?.type !== 'daily' && !r.time_of_day && r.visibility !== 'reference',
+    ),
+    [dueRoutines],
+  )
+
   // Session-local decisions (optimistic — reflected before the async write lands).
   const [chosenSlotById, setChosenSlotById] = useState<Record<string, TimeOfDay>>({})
+  const [chosenRoutineSlotById, setChosenRoutineSlotById] = useState<Record<string, TimeOfDay>>({})
   const [notToday, setNotToday] = useState<Set<string>>(() => new Set())
 
-  // The pile: carried-over first, then this-week, tagged with origin. Deduped.
-  const pile = useMemo(() => {
+  // The pile: carried-over, then this-week tasks, then non-daily routines.
+  const pile = useMemo<PlanItem[]>(() => {
     const seen = new Set<string>()
-    const rows: { task: Task; origin: ItemOrigin }[] = []
-    for (const t of carriedOver) { if (!seen.has(t.id)) { seen.add(t.id); rows.push({ task: t, origin: 'carried_over' }) } }
-    for (const t of weekPool) { if (!seen.has(t.id)) { seen.add(t.id); rows.push({ task: t, origin: 'week' }) } }
+    const rows: PlanItem[] = []
+    const pushTaskRow = (t: Task, origin: ItemOrigin) => {
+      if (seen.has(t.id)) return
+      seen.add(t.id)
+      rows.push({ kind: 'task', id: t.id, title: t.title, origin, category: t.category, timelineItem: taskToTimelineItem(t) })
+    }
+    for (const t of carriedOver) pushTaskRow(t, 'carried_over')
+    for (const t of weekPool) pushTaskRow(t, 'week')
+    for (const r of pileRoutines) {
+      if (seen.has(r.id)) continue
+      seen.add(r.id)
+      rows.push({ kind: 'routine', id: r.id, title: r.name, origin: 'routine', timelineItem: routineToTimelineItem(r, viewedDate) })
+    }
     return rows
-  }, [carriedOver, weekPool])
+  }, [carriedOver, weekPool, pileRoutines, viewedDate])
 
-  // Placed map: tasks already timed-today (from props), overlaid with this
-  // session's choices. Keyed by id → dedup is automatic.
+  // Placed: tasks timed-today + routines timed today, overlaid with this session's
+  // choices. Keyed by id → dedup automatic.
   const placedMap = useMemo(() => {
-    const map = new Map<string, { task: Task; slot: TimeOfDay }>()
+    const map = new Map<string, PlacedEntry>()
     for (const t of tasks) {
       if (t.completed || t.bucket !== 'timed' || t.isAllDay || !t.scheduledFor) continue
       if (!sameDay(new Date(t.scheduledFor), viewedDate)) continue
-      map.set(t.id, { task: t, slot: hourToSlot(new Date(t.scheduledFor).getHours()) })
+      const d = new Date(t.scheduledFor)
+      map.set(t.id, { id: t.id, title: t.title, slot: hourToSlot(d.getHours()), timeLabel: timeToken(d) })
+    }
+    for (const r of dueRoutines) {
+      if (r.recurrence_pattern?.type === 'daily' || !r.time_of_day || r.visibility === 'reference') continue
+      map.set(r.id, { id: r.id, title: r.name, slot: timeOfDayToSlot(r.time_of_day), timeLabel: todLabel(r.time_of_day) })
     }
     for (const [id, slot] of Object.entries(chosenSlotById)) {
       const t = tasks.find((x) => x.id === id)
-      if (t) map.set(id, { task: t, slot })
+      if (t) map.set(id, { id, title: t.title, slot, timeLabel: timeToken(slotTime(viewedDate, slot)) })
+    }
+    for (const [id, slot] of Object.entries(chosenRoutineSlotById)) {
+      const r = routines.find((x) => x.id === id)
+      if (r) map.set(id, { id, title: r.name, slot, timeLabel: timeToken(slotTime(viewedDate, slot)) })
     }
     return map
-  }, [tasks, viewedDate, chosenSlotById])
+  }, [tasks, dueRoutines, routines, viewedDate, chosenSlotById, chosenRoutineSlotById])
 
   const visiblePile = useMemo(
-    () => pile.filter(({ task }) => !placedMap.has(task.id) && !notToday.has(task.id)),
+    () => pile.filter((it) => !placedMap.has(it.id) && !notToday.has(it.id)),
     [pile, placedMap, notToday],
   )
 
@@ -122,21 +185,25 @@ export function PlanTodaySession({
   const toGo = visiblePile.length
   const progressPct = placedCount + toGo === 0 ? 100 : Math.round((placedCount / (placedCount + toGo)) * 100)
 
-  const pickSlot = useCallback((id: string, slot: TimeOfDay) => {
-    setChosenSlotById((prev) => ({ ...prev, [id]: slot }))
-    onPushTask(id, slotTime(viewedDate, slot))
-  }, [onPushTask, viewedDate])
+  const pickSlot = useCallback((item: PlanItem, slot: TimeOfDay) => {
+    if (item.kind === 'task') {
+      setChosenSlotById((prev) => ({ ...prev, [item.id]: slot }))
+      onPushTask(item.id, slotTime(viewedDate, slot))
+    } else {
+      setChosenRoutineSlotById((prev) => ({ ...prev, [item.id]: slot }))
+      void onUpdateRoutine?.(item.id, { time_of_day: slotTimeOfDay(slot) })
+    }
+  }, [onPushTask, onUpdateRoutine, viewedDate])
 
-  const markNotToday = useCallback((id: string) => {
-    setNotToday((prev) => new Set(prev).add(id))
-    onSetBucket(id, 'week')
+  const markNotToday = useCallback((item: PlanItem) => {
+    setNotToday((prev) => new Set(prev).add(item.id))
+    // Tasks move back to the week pool; routines just drop from the pile this
+    // session (we don't retime a recurring routine to dismiss one occurrence).
+    if (item.kind === 'task') onSetBucket(item.id, 'week')
   }, [onSetBucket])
 
   const placedBySlot = useCallback(
-    (slot: TimeOfDay) => Array.from(placedMap.values())
-      .filter((p) => p.slot === slot)
-      .sort((a, b) => (a.task.scheduledFor && b.task.scheduledFor
-        ? new Date(a.task.scheduledFor).getTime() - new Date(b.task.scheduledFor).getTime() : 0)),
+    (slot: TimeOfDay) => Array.from(placedMap.values()).filter((p) => p.slot === slot),
     [placedMap],
   )
 
@@ -176,16 +243,16 @@ export function PlanTodaySession({
             {visiblePile.length === 0 ? (
               <p className="text-sm text-neutral-400 py-8 text-center">Nothing left to place. Your day is set.</p>
             ) : (
-              visiblePile.map(({ task, origin }) => (
+              visiblePile.map((it) => (
                 <PlanItemCard
-                  key={task.id}
-                  task={task}
-                  origin={origin}
-                  materials={deriveMaterials(taskToTimelineItem(task), { contactsById })}
-                  suggestion={suggestSlot(task)}
-                  chosenSlot={chosenSlotById[task.id]}
-                  onPickSlot={(slot) => pickSlot(task.id, slot)}
-                  onNotToday={() => markNotToday(task.id)}
+                  key={`${it.kind}-${it.id}`}
+                  title={it.title}
+                  origin={it.origin}
+                  materials={deriveMaterials(it.timelineItem, { contactsById })}
+                  suggestion={suggestSlot({ category: it.category, title: it.title })}
+                  chosenSlot={it.kind === 'task' ? chosenSlotById[it.id] : chosenRoutineSlotById[it.id]}
+                  onPickSlot={(slot) => pickSlot(it, slot)}
+                  onNotToday={() => markNotToday(it)}
                 />
               ))
             )}
@@ -226,13 +293,11 @@ export function PlanTodaySession({
                       </div>
                     ) : (
                       <ul className="space-y-1">
-                        {items.map(({ task }) => (
-                          <li key={task.id} className="flex items-center gap-2 rounded-lg bg-neutral-50 px-3 py-1.5">
-                            <span className="w-12 shrink-0 text-[11px] text-neutral-400 tabular-nums">
-                              {task.scheduledFor ? timeToken(new Date(task.scheduledFor)) : ''}
-                            </span>
+                        {items.map((p) => (
+                          <li key={p.id} className="flex items-center gap-2 rounded-lg bg-neutral-50 px-3 py-1.5">
+                            <span className="w-12 shrink-0 text-[11px] text-neutral-400 tabular-nums">{p.timeLabel}</span>
                             <span className="w-1.5 h-1.5 rounded-full bg-primary-400 shrink-0" />
-                            <span className="flex-1 min-w-0 truncate text-sm text-neutral-700">{task.title}</span>
+                            <span className="flex-1 min-w-0 truncate text-sm text-neutral-700">{p.title}</span>
                           </li>
                         ))}
                       </ul>

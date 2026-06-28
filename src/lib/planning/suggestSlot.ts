@@ -18,6 +18,19 @@ export function slotTime(date: Date, slot: TimeOfDay): Date {
   return d
 }
 
+/** The slot's representative time as a routine `time_of_day` string ("HH:MM:SS"). */
+export function slotTimeOfDay(slot: TimeOfDay): string {
+  return `${String(SLOT_HOUR[slot]).padStart(2, '0')}:00:00`
+}
+
+/** Map an "HH:MM[:SS]" time-of-day to its slot. */
+export function timeOfDayToSlot(timeOfDay: string): TimeOfDay {
+  const hour = Number(timeOfDay.split(':')[0])
+  if (hour < 12) return 'morning'
+  if (hour < 18) return 'afternoon'
+  return 'evening'
+}
+
 export interface SlotSuggestion {
   slot: TimeOfDay
   reason: string

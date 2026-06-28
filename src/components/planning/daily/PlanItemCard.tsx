@@ -4,18 +4,18 @@
 
 import { ConceptIcon, type ConceptName } from '@/lib/conceptIcons'
 import { MaterialChip } from '@/components/surface/MaterialChip'
-import type { Task } from '@/types/task'
 import type { Material } from '@/types/material'
 import type { TimeOfDay } from '@/lib/timeUtils'
 import type { SlotSuggestion } from '@/lib/planning/suggestSlot'
 
-export type ItemOrigin = 'carried_over' | 'email' | 'goal_nudge' | 'week'
+export type ItemOrigin = 'carried_over' | 'email' | 'goal_nudge' | 'week' | 'routine'
 
 const ORIGIN_META: Record<ItemOrigin, { icon: ConceptName; label: string; tone: string }> = {
   carried_over: { icon: 'time', label: 'Carried over', tone: 'bg-amber-50 text-amber-700' },
   email: { icon: 'email', label: 'From email', tone: 'bg-indigo-50 text-indigo-600' },
   goal_nudge: { icon: 'idea', label: 'Goal nudge', tone: 'bg-primary-50 text-primary-700' },
   week: { icon: 'when', label: 'This week', tone: 'bg-neutral-100 text-neutral-500' },
+  routine: { icon: 'routine', label: 'Routine', tone: 'bg-primary-50 text-primary-700' },
 }
 
 const SLOTS: { slot: TimeOfDay; label: string }[] = [
@@ -25,7 +25,7 @@ const SLOTS: { slot: TimeOfDay; label: string }[] = [
 ]
 
 interface PlanItemCardProps {
-  task: Task
+  title: string
   origin: ItemOrigin
   materials: Material[]
   suggestion: SlotSuggestion
@@ -38,7 +38,7 @@ interface PlanItemCardProps {
 }
 
 export function PlanItemCard({
-  task, origin, materials, suggestion, chosenSlot,
+  title, origin, materials, suggestion, chosenSlot,
   onPickSlot, onNotToday, onAddMaterial, onMaterialAction,
 }: PlanItemCardProps) {
   const om = ORIGIN_META[origin]
@@ -52,7 +52,7 @@ export function PlanItemCard({
           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${om.tone}`}>
             <ConceptIcon name={om.icon} size={12} decorative /> {om.label}
           </span>
-          <h3 className="mt-1.5 text-[15px] font-medium text-neutral-800 leading-snug">{task.title}</h3>
+          <h3 className="mt-1.5 text-[15px] font-medium text-neutral-800 leading-snug">{title}</h3>
         </div>
       </div>
 
