@@ -90,7 +90,14 @@ export function useFamilyMembers() {
         seedingRef.current = false
       }
     }
-    seedIfEmpty()
+    // Best-effort seed: the pre-insert auth/existence checks run before the
+    // inner try, so a transient network failure there would otherwise escape as
+    // an unhandled rejection. Catch it, reset the guard so a later render can
+    // retry, and never crash the hook.
+    seedIfEmpty().catch((err) => {
+      console.error('Error seeding family members:', err)
+      seedingRef.current = false
+    })
   }, [loading, members.length])
 
   const addMember = useCallback(async (member: Omit<FamilyMember, 'id' | 'user_id' | 'created_at'>) => {
