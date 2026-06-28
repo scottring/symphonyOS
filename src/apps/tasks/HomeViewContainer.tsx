@@ -618,6 +618,7 @@ export function HomeViewContainer() {
             onCompleteTask={toggleTask}
             onSetBucket={setBucket}
             onOpenTimeBlock={() => { setPlanTodayOpen(false); setPlanningOpen(true); }}
+            contacts={contacts}
           />
         </Suspense>
       )}

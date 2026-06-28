@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
-import { screen, within } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { PlanTodaySession } from './PlanTodaySession'
 import type { Task } from '@/types/task'
+import type { Contact } from '@/types/contact'
 
 const viewedDate = new Date(2026, 5, 10, 9, 0, 0) // Wed Jun 10
 
@@ -23,15 +24,14 @@ function task(over: Partial<Task>): Task {
   }
 }
 
-function setup(tasksOverride?: Task[]) {
+function setup(tasksOverride?: Task[], contacts: Contact[] = []) {
   const onPushTask = vi.fn()
   const onCompleteTask = vi.fn()
   const onSetBucket = vi.fn()
   const onClose = vi.fn()
   const tasks = tasksOverride ?? [
     task({ id: 'w1', title: 'Week one', bucket: 'week' }),
-    task({ id: 'w2', title: 'Week two', bucket: 'week' }),
-    task({ id: 'od', title: 'Overdue one', bucket: 'timed', scheduledFor: new Date(2020, 0, 1) }),
+    task({ id: 'od', title: 'Overdue one', bucket: 'timed', scheduledFor: new Date(2020, 0, 1), isAllDay: false }),
   ]
   const utils = render(
     <PlanTodaySession
@@ -42,64 +42,58 @@ function setup(tasksOverride?: Task[]) {
       onPushTask={onPushTask}
       onCompleteTask={onCompleteTask}
       onSetBucket={onSetBucket}
+      contacts={contacts}
     />
   )
   return { onPushTask, onCompleteTask, onSetBucket, onClose, ...utils }
 }
 
 describe('PlanTodaySession', () => {
-  it('lists the week pool and carried-over items', () => {
+  it('lists the pile (carried-over + week) with origin tags and progress', () => {
     setup()
     expect(screen.getByText('Week one')).toBeInTheDocument()
-    expect(screen.getByText('Week two')).toBeInTheDocument()
     expect(screen.getByText('Overdue one')).toBeInTheDocument()
-    expect(screen.getByText(/Carried over \(1\)/)).toBeInTheDocument()
-    expect(screen.getByText(/Pull from this week \(2\)/)).toBeInTheDocument()
+    expect(screen.getByText('Carried over')).toBeInTheDocument()
+    expect(screen.getByText('This week')).toBeInTheDocument()
+    expect(screen.getByText('0 placed · 2 to go')).toBeInTheDocument()
   })
 
-  it('pulls picked week items onto today (bucket=timed via pushTask(date))', async () => {
-    const { user, onPushTask } = setup()
-    await user.click(screen.getByText('Week one'))
-    await user.click(screen.getByText('Week two'))
-    await user.click(screen.getByRole('button', { name: /Add 2 to today/ }))
-    expect(onPushTask).toHaveBeenCalledTimes(2)
-    // Each call targets a Date at midnight of the viewed day.
-    for (const call of onPushTask.mock.calls) {
-      const [, target] = call
-      expect(target).toBeInstanceOf(Date)
-      expect((target as Date).getHours()).toBe(0)
-      expect((target as Date).getDate()).toBe(10)
-    }
-  })
-
-  it('Add button is disabled until something is picked', async () => {
-    const { user, onPushTask } = setup()
-    const addBtn = screen.getByRole('button', { name: /Add to today/ })
-    expect(addBtn).toBeDisabled()
-    await user.click(screen.getByText('Week one'))
-    expect(screen.getByRole('button', { name: /Add 1 to today/ })).toBeEnabled()
-    await user.click(screen.getByRole('button', { name: /Add 1 to today/ }))
+  it('placing a slot schedules a timed task at the slot hour and updates progress', async () => {
+    const { user, onPushTask } = setup([task({ id: 'w1', title: 'Only week', bucket: 'week' })])
+    await user.click(screen.getByRole('button', { name: 'Afternoon' }))
     expect(onPushTask).toHaveBeenCalledTimes(1)
+    const [id, target] = onPushTask.mock.calls[0]
+    expect(id).toBe('w1')
+    expect(target).toBeInstanceOf(Date)
+    expect((target as Date).getHours()).toBe(14) // afternoon → 2pm, non-midnight = timed
+    expect((target as Date).getDate()).toBe(10)
+    // Optimistically moves from pile → taking shape.
+    expect(screen.getByText('1 placed · 0 to go')).toBeInTheDocument()
   })
 
-  it('carried-over rows get the full triage fan-out + Done', async () => {
-    const { user, onSetBucket, onCompleteTask } = setup()
-    const row = screen.getByText('Overdue one').closest('li')!
-    // Someday chip applies directly (pool bucket).
-    await user.click(within(row).getByRole('button', { name: 'Someday' }))
-    expect(onSetBucket).toHaveBeenCalledWith('od', 'someday')
-    // Week chip fans out → This week.
-    await user.click(within(row).getByRole('button', { name: 'Week' }))
-    await user.click(screen.getByRole('menuitem', { name: 'This week' }))
+  it('"Not today" pushes the item to the week pool and removes it from the pile', async () => {
+    const { user, onSetBucket } = setup([task({ id: 'od', title: 'Overdue one', bucket: 'timed', scheduledFor: new Date(2020, 0, 1), isAllDay: false })])
+    await user.click(screen.getByRole('button', { name: 'Not today' }))
     expect(onSetBucket).toHaveBeenCalledWith('od', 'week')
-    // Done.
-    await user.click(within(row).getByRole('button', { name: 'Mark done' }))
-    expect(onCompleteTask).toHaveBeenCalledWith('od')
+    expect(screen.getByText('0 placed · 0 to go')).toBeInTheDocument()
   })
 
-  it('works (renders, no carried-over section) when nothing is overdue', () => {
+  it('stages a phone material as a tappable tel: link', () => {
+    setup([task({ id: 'c1', title: 'Call Bob', bucket: 'week', phoneNumber: '555-0100' })])
+    const link = screen.getByRole('link', { name: /Call 555-0100/ })
+    expect(link).toHaveAttribute('href', 'tel:555-0100')
+  })
+
+  it('resolves a contact phone via contactId', () => {
+    const contact: Contact = { id: 'k1', name: 'Dr. Lewis', phone: '(612) 555-0148', category: 'medical', createdAt: new Date(), updatedAt: new Date() }
+    setup([task({ id: 't1', title: 'Call doctor', bucket: 'week', contactId: 'k1' })], [contact])
+    expect(screen.getByText('(612) 555-0148')).toBeInTheDocument()
+    expect(screen.getByText('Dr. Lewis')).toBeInTheDocument()
+  })
+
+  it('renders with no carried-over section when nothing is overdue', () => {
     setup([task({ id: 'w1', title: 'Only week', bucket: 'week' })])
-    expect(screen.queryByText(/Carried over/)).not.toBeInTheDocument()
+    expect(screen.queryByText('Carried over')).not.toBeInTheDocument()
     expect(screen.getByText('Only week')).toBeInTheDocument()
   })
 })
