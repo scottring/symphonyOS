@@ -119,7 +119,10 @@ export function MealEventsProvider({ children }: MealEventsProviderProps) {
  * today (no real state) but consumers should still wrap so future caching
  * lives behind a stable seam.
  */
-export function useMealEventsForDate(viewedDate: Date): CalendarEvent[] {
+export function useMealEventsForDate(
+  viewedDate: Date,
+  opts?: { force?: boolean },
+): CalendarEvent[] {
   const ctx = useContext(MealEventsContext);
   if (!ctx) {
     throw new Error('useMealEventsForDate must be used inside <MealEventsProvider>');
@@ -128,12 +131,16 @@ export function useMealEventsForDate(viewedDate: Date): CalendarEvent[] {
   const { plan } = useMealPlan(weekStart);
   const { recipes } = useRecipes();
   const { members: familyMembers, getCurrentUserMember } = useFamilyMembers();
+  // The wall passes force:true so tonight's planned dinner (and its stored
+  // recipe) surface on the kiosk even while the global flag keeps meals off the
+  // Today / Week / Month timelines. Kiosk-scoped — no effect on those surfaces.
+  const show = SHOW_PLANNED_MEALS_ON_TIMELINE || opts?.force === true;
 
   return useMemo(
     () =>
       // Planned meals are paused from the timeline until the planner is set up
       // properly (see mealsVisibility.ts). synthesizeMealEvents stays pure.
-      SHOW_PLANNED_MEALS_ON_TIMELINE
+      show
         ? synthesizeMealEvents({
             viewedDate,
             mealPlan: plan,
@@ -142,6 +149,6 @@ export function useMealEventsForDate(viewedDate: Date): CalendarEvent[] {
             currentMemberId: getCurrentUserMember()?.id ?? null,
           })
         : [],
-    [viewedDate, plan, recipes, familyMembers, getCurrentUserMember],
+    [show, viewedDate, plan, recipes, familyMembers, getCurrentUserMember],
   );
 }

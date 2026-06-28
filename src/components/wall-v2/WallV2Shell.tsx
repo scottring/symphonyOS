@@ -167,7 +167,9 @@ export function WallV2Shell() {
 
   const wallData = useWallData();
   const { weather } = useWeather();
-  const mealEvents = useMealEventsForDate(now);
+  // force:true — surface tonight's planned dinner + its stored recipe on the
+  // kiosk even while planned meals stay off the Today/Week/Month timelines.
+  const mealEvents = useMealEventsForDate(now, { force: true });
 
   // ─── Adapted live data ───
   const liveWeather = useMemo(() => adaptWeather(weather), [weather]);
