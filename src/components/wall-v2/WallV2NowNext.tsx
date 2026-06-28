@@ -10,7 +10,7 @@
 // wall's always-on egress flat. The call tile becomes a real placed call in
 // Phase 4 (kid-phone bridge); today it's a tel: link (works on a phone).
 
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import type { WallDayData } from '@/hooks/useWallData'
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
@@ -18,6 +18,7 @@ import type { DaySection } from '@/lib/timeUtils'
 import type { Material } from '@/types/material'
 import { deriveMaterials } from '@/components/surface/hooks/useStagedMaterials'
 import { MaterialChip } from '@/components/surface/MaterialChip'
+import { placeCall } from '@/lib/telephony/placeCall'
 
 const DEFAULT_DURATION_MS = 60 * 60 * 1000
 const TIMED_SECTIONS: DaySection[] = ['morning', 'afternoon', 'evening']
@@ -52,6 +53,13 @@ export function WallV2NowNext({ today, familyMembers, now, onTapMaterial }: Wall
     return { current: cur, next: nxt }
   }, [today, now])
 
+  // On the wall, a call tile places the call through Symphony (tel: is dead on a
+  // TV). No-ops gracefully until the kid-phone bridge is provisioned (Phase 4).
+  const handleMaterial = useCallback((m: Material, item: TimelineItem) => {
+    if (m.action.kind === 'call' && m.action.value) { void placeCall({ toNumber: m.action.value }); return }
+    onTapMaterial?.(m, item)
+  }, [onTapMaterial])
+
   if (!current && !next) return null
 
   const ownerName = (item: TimelineItem) =>
@@ -68,7 +76,7 @@ export function WallV2NowNext({ today, familyMembers, now, onTapMaterial }: Wall
             <div className="mt-1 text-white/80 text-base">{ownerName(current)}</div>
           )}
           <h2 className="mt-1 font-display text-3xl leading-tight">{current.title}</h2>
-          <MaterialRow item={current} variant="tile" onTap={onTapMaterial} />
+          <MaterialRow item={current} variant="tile" onTap={handleMaterial} />
         </section>
       )}
 
@@ -79,7 +87,7 @@ export function WallV2NowNext({ today, familyMembers, now, onTapMaterial }: Wall
           </div>
           {ownerName(next) && <div className="mt-0.5 text-stone-500 text-sm">{ownerName(next)}</div>}
           <h3 className="mt-0.5 font-display text-2xl text-stone-800 dark:text-stone-100 leading-tight">{next.title}</h3>
-          <MaterialRow item={next} variant="chip" onTap={onTapMaterial} />
+          <MaterialRow item={next} variant="chip" onTap={handleMaterial} />
         </section>
       )}
     </div>
@@ -95,7 +103,7 @@ function MaterialRow({
   return (
     <div className={`mt-4 ${variant === 'tile' ? 'grid grid-cols-2 gap-2' : 'flex flex-wrap gap-2'}`}>
       {materials.map((m) => (
-        <MaterialChip key={m.id} material={m} variant={variant} onAction={(mat) => onTap?.(mat, item)} />
+        <MaterialChip key={m.id} material={m} variant={variant} callAsAction onAction={(mat) => onTap?.(mat, item)} />
       ))}
     </div>
   )

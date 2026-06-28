@@ -1,6 +1,10 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { WallV2NowNext } from './WallV2NowNext'
+
+const placeCall = vi.fn().mockResolvedValue({ ok: true })
+vi.mock('@/lib/telephony/placeCall', () => ({ placeCall: (...a: unknown[]) => placeCall(...a) }))
 import type { WallDayData } from '@/hooks/useWallData'
 import type { TimelineItem } from '@/types/timeline'
 import type { DaySection } from '@/lib/timeUtils'
@@ -27,15 +31,19 @@ describe('WallV2NowNext', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('shows the in-progress item as "Happening now" with its staged materials', () => {
+  it('shows the in-progress item as "Happening now" with its staged materials', async () => {
     const today = day({
       morning: [ti({ id: 'task-1', title: 'Shoulder HEP', startTime: at(9), endTime: at(10), phoneNumber: '555-0100' })],
     })
     render(<WallV2NowNext today={today} familyMembers={[]} now={at(9, 30)} />)
     expect(screen.getByText('Shoulder HEP')).toBeInTheDocument()
     expect(screen.getByText(/Happening now/)).toBeInTheDocument()
-    // staged phone material rendered as a tappable tile
-    expect(screen.getByRole('link', { name: /Call 555-0100/ })).toHaveAttribute('href', 'tel:555-0100')
+    // On the wall the call tile is a button that places the call via Symphony
+    // (tel: links don't work on the TV), not a tel: link.
+    const callBtn = screen.getByRole('button', { name: /Call 555-0100/ })
+    expect(callBtn).toBeInTheDocument()
+    await userEvent.click(callBtn)
+    expect(placeCall).toHaveBeenCalledWith({ toNumber: '555-0100' })
   })
 
   it('shows the soonest future item as "Next up"', () => {

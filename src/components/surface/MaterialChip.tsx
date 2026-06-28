@@ -15,9 +15,15 @@ interface MaterialChipProps {
   variant?: 'chip' | 'tile'
   /** Called for non-link actions (directions, recipe, steps, email, files). */
   onAction?: (material: Material) => void
+  /**
+   * When true, a 'call' material renders as a button (delegating to onAction)
+   * instead of a tel: link — used on the wall, where tel: does nothing and the
+   * call is placed via Symphony → kid-phone instead.
+   */
+  callAsAction?: boolean
 }
 
-export function MaterialChip({ material, variant = 'chip', onAction }: MaterialChipProps) {
+export function MaterialChip({ material, variant = 'chip', onAction, callAsAction }: MaterialChipProps) {
   const isTile = variant === 'tile'
   const partial = material.availability === 'partial'
 
@@ -46,9 +52,17 @@ export function MaterialChip({ material, variant = 'chip', onAction }: MaterialC
     </>
   )
 
-  // Real links for tappable actions.
-  if (material.action.kind === 'call' && material.action.value) {
+  // Real links for tappable actions (a tel: link works on a phone). On the wall
+  // (callAsAction) the call is placed via Symphony instead, so render a button.
+  if (material.action.kind === 'call' && material.action.value && !callAsAction) {
     return <a href={`tel:${material.action.value}`} className={className} aria-label={`Call ${material.label}`}>{body}</a>
+  }
+  if (material.action.kind === 'call' && material.action.value && callAsAction) {
+    return (
+      <button type="button" onClick={() => onAction?.(material)} className={className} aria-label={`Call ${material.label}`}>
+        {body}
+      </button>
+    )
   }
   if (material.action.kind === 'href' && material.action.value) {
     return (
