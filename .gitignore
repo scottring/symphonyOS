@@ -46,3 +46,7 @@ playwright-report/
 
 # Brainstorming visual companion
 .superpowers/
+
+# Swift/Xcode build artifacts
+.build/
+apple/**/.build/
