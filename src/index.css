@@ -607,6 +607,16 @@ body {
   50% { transform: translateY(-6px); }
 }
 
+/* Clarity curtain pulling down from the top */
+@keyframes curtain-down {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
+
+.animate-curtain-down {
+  animation: curtain-down 0.3s ease-out;
+}
+
 @keyframes pulse-soft {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }

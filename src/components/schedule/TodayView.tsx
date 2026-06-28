@@ -40,7 +40,12 @@ import { TimelineInsertPoint } from './TimelineInsertPoint'
 import { StatsRow } from './StatsRow'
 import { TodayProgress } from './TodayProgress'
 import { NeedsYourOK } from './NeedsYourOK'
-import { ClarityIndicator } from './ClarityIndicator'
+import { ClarityCurtain } from '@/components/clarity/ClarityCurtain'
+import { computeClaritySteps, type ClarityStepId } from '@/lib/clarity/claritySteps'
+import { selectOverdue } from '@/lib/today/taskPools'
+import { selectHorizonPool } from '@/lib/today/horizons'
+import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
+import { getRoutinesForDatePure } from '@/lib/routineUtils'
 import { StagingFloat } from './StagingFloat'
 import { EveningMealCard } from './EveningMealCard'
 import { EndOfDayCard } from './EndOfDayCard'
@@ -365,31 +370,43 @@ export function TodayView({
   // amber = fair, orange = needs attention) using the same health computation.
   const clarityHealth = useSystemHealth({ tasks, projects })
   const clarityColorClass = getHealthTextClasses(clarityHealth.healthColor)
+  // Clarity curtain — a full-page "where you are → your next move" guide. The
+  // binoculars pull it down. Signals are a calm read of the current state.
+  const [clarityOpen, setClarityOpen] = useState(false)
+  const clarityResult = useMemo(() => {
+    const matchAll = makeAssigneeFilter([])
+    const inboxCount = tasks.filter((t) => !t.completed && t.bucket === 'inbox').length
+    const overdueCount = selectOverdue(tasks, true, matchAll).length
+    const weekCount = selectHorizonPool(tasks, 'week', matchAll).length
+    const untimedRoutines = getRoutinesForDatePure(routines, viewedDate).filter(
+      (r) => r.recurrence_pattern?.type !== 'daily' && !r.time_of_day && r.visibility !== 'reference',
+    ).length
+    const isEvening = !!data.isToday && new Date().getHours() >= 17
+    return computeClaritySteps({ inboxCount, overdueCount, placeableCount: weekCount + untimedRoutines, isEvening })
+  }, [tasks, routines, viewedDate, data.isToday])
+
+  const onClarityStep = useCallback((id: ClarityStepId) => {
+    if (id === 'inbox') navigate('/inbox')
+    else if (id === 'carried') { if (onOpenPlanToday) onOpenPlanToday(); else navigate('/inbox') }
+    else if (id === 'plan') onOpenPlanToday?.()
+    // 'review' simply closes for now (no dedicated review flow yet).
+  }, [navigate, onOpenPlanToday])
+
   const clarityTrigger = (
-    <ClarityIndicator
-      tasks={tasks}
-      projects={projects}
-      familyMembers={familyMembers}
-      onScrollToInbox={() => navigate('/inbox')}
-      onClearAssigneeFilter={onSelectAssignees ? () => onSelectAssignees([]) : undefined}
-      onOpenProject={ctx.onOpenProject}
-      onAssignTaskAll={onAssignTaskAll}
-      trigger={
-        <span className="group relative inline-flex items-center">
-          <Binoculars
-            className={`w-5 h-5 ${clarityColorClass} group-hover:opacity-70 transition-opacity`}
-            aria-label="Clarity — review what needs attention"
-          />
-          <span
-            role="tooltip"
-            className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 hidden group-hover:block w-56 rounded-lg bg-neutral-800 px-3 py-2 text-[11px] leading-snug text-white shadow-lg"
-          >
-            <span className="font-medium">Clarity</span> — a quick read on how settled your
-            tasks and projects are. Click to see what still needs a home.
-          </span>
-        </span>
-      }
-    />
+    <button
+      type="button"
+      onClick={() => setClarityOpen(true)}
+      className="group relative inline-flex items-center p-1.5 -m-1.5 rounded-lg hover:bg-neutral-100/60 transition-colors"
+      aria-label="Clarity — where you are and your next move"
+    >
+      <Binoculars className={`w-5 h-5 ${clarityColorClass} group-hover:opacity-70 transition-opacity`} />
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 hidden group-hover:block w-56 rounded-lg bg-neutral-800 px-3 py-2 text-[11px] leading-snug text-white shadow-lg"
+      >
+        <span className="font-medium">Clarity</span> — where you are, and the next move to get clear.
+      </span>
+    </button>
   )
 
   // ── Tasks map for parent task lookup ─────────────────────────────────────────
@@ -973,6 +990,14 @@ export function TodayView({
       <div className="mt-5 hidden md:block">
         <EndOfDayCard onOpenReview={() => {}} />
       </div>
+
+      {/* Clarity curtain — pulled down by the binoculars in the header. */}
+      <ClarityCurtain
+        open={clarityOpen}
+        onClose={() => setClarityOpen(false)}
+        result={clarityResult}
+        onStepAction={onClarityStep}
+      />
 
       {/* Bulk action bar — appears when ≥1 task row is selected via the
           hover checkbox. Reuses the shared toolbar (Inbox uses the same). */}
