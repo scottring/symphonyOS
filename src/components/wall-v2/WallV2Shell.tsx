@@ -24,6 +24,7 @@ import {
 import { TINTS } from './tints';
 import { WallV2DateColumn } from './WallV2DateColumn';
 import { WallV2AtAGlance } from './WallV2AtAGlance';
+import { WallV2NowNext } from './WallV2NowNext';
 import { WallV2Timeline } from './WallV2Timeline';
 import { WallV2RightColumn } from './WallV2RightColumn';
 import { WallV2ActionDock } from './WallV2ActionDock';
@@ -493,6 +494,7 @@ export function WallV2Shell() {
 
         {/* Row 1 — Center column (glance strip + timeline) */}
         <div className="row-span-1 col-start-2 flex flex-col gap-4 min-h-0">
+          <WallV2NowNext today={todayData} familyMembers={wallData.familyMembers} now={now} />
           <WallV2AtAGlance cards={glance} />
           <div className="min-h-0 flex-1">
             <WallV2Timeline
