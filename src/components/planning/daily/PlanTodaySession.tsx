@@ -15,7 +15,12 @@
 // Placing a task sets its scheduled time; placing a routine sets its time_of_day.
 
 import { useState, useMemo, useCallback } from 'react'
-import { X, CalendarClock, Check, Undo2 } from 'lucide-react'
+import { X, CalendarClock, Check, Undo2, GripVertical } from 'lucide-react'
+import {
+  DndContext, closestCorners, PointerSensor, useSensor, useSensors, useDroppable, type DragEndEvent,
+} from '@dnd-kit/core'
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import type { Task, TaskBucket } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Routine } from '@/types/actionable'
@@ -28,7 +33,8 @@ import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { getRoutinesForDatePure } from '@/lib/routineUtils'
 import { taskToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import { deriveMaterials } from '@/components/surface/hooks/useStagedMaterials'
-import { suggestSlot, slotTime, slotTimeOfDay, timeOfDayToSlot } from '@/lib/planning/suggestSlot'
+import { suggestSlot, timeOfDayToSlot } from '@/lib/planning/suggestSlot'
+import { SLOT_BASE_MINS, minsToSlot, dropMins } from '@/lib/planning/reorder'
 import { PlanItemCard, type ItemOrigin } from './PlanItemCard'
 
 /** One thing to place: a task or a non-daily routine, normalized for the pile. */
@@ -41,8 +47,9 @@ interface PlanItem {
   timelineItem: TimelineItem
 }
 
-/** A placed entry rendered in "taking shape". */
-interface PlacedEntry { kind: 'task' | 'routine'; id: string; title: string; slot: TimeOfDay; timeLabel: string }
+/** A placed entry rendered in "taking shape". `mins` = minutes since midnight,
+ *  the sort key that drag-reordering manipulates. */
+interface PlacedEntry { kind: 'task' | 'routine'; id: string; title: string; slot: TimeOfDay; timeLabel: string; mins: number }
 
 interface Props {
   tasks: Task[]
@@ -77,11 +84,6 @@ function midnight(d: Date): Date {
 function sameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 }
-function hourToSlot(hour: number): TimeOfDay {
-  if (hour < 12) return 'morning'
-  if (hour < 18) return 'afternoon'
-  return 'evening'
-}
 function timeToken(d: Date): string {
   return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 }
@@ -91,6 +93,12 @@ function todLabel(timeOfDay: string): string {
   const d = new Date(); d.setHours(h, m || 0, 0, 0)
   return timeToken(d)
 }
+
+// Minutes-since-midnight display/format helpers (slot math lives in lib/planning/reorder).
+function todToMins(timeOfDay: string): number { const [h, m] = timeOfDay.split(':').map(Number); return h * 60 + (m || 0) }
+function minsLabel(mins: number): string { const d = new Date(); d.setHours(Math.floor(mins / 60), mins % 60, 0, 0); return timeToken(d) }
+function minsToTod(mins: number): string { return `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}:00` }
+function minsToDate(date: Date, mins: number): Date { const d = new Date(date); d.setHours(Math.floor(mins / 60), mins % 60, 0, 0); return d }
 
 const evStart = (e: CalendarEvent): string | undefined => e.startTime ?? e.start_time
 const evAllDay = (e: CalendarEvent): boolean => Boolean(e.allDay ?? e.all_day)
@@ -127,9 +135,10 @@ export function PlanTodaySession({
     [dueRoutines],
   )
 
-  // Session-local decisions (optimistic — reflected before the async write lands).
-  const [chosenSlotById, setChosenSlotById] = useState<Record<string, TimeOfDay>>({})
-  const [chosenRoutineSlotById, setChosenRoutineSlotById] = useState<Record<string, TimeOfDay>>({})
+  // Session placements as minutes-since-midnight (optimistic; enables fine
+  // drag-reordering before the async write lands).
+  const [chosenMinsById, setChosenMinsById] = useState<Record<string, number>>({})
+  const [chosenRoutineMinsById, setChosenRoutineMinsById] = useState<Record<string, number>>({})
   const [notToday, setNotToday] = useState<Set<string>>(() => new Set())
   // Optimistically hide placed entries that were just unplaced or completed,
   // until the underlying tasks/routines props refresh.
@@ -162,23 +171,25 @@ export function PlanTodaySession({
       if (t.completed || t.bucket !== 'timed' || t.isAllDay || !t.scheduledFor) continue
       if (!sameDay(new Date(t.scheduledFor), viewedDate)) continue
       const d = new Date(t.scheduledFor)
-      map.set(t.id, { kind: 'task', id: t.id, title: t.title, slot: hourToSlot(d.getHours()), timeLabel: timeToken(d) })
+      const mins = d.getHours() * 60 + d.getMinutes()
+      map.set(t.id, { kind: 'task', id: t.id, title: t.title, slot: minsToSlot(mins), timeLabel: timeToken(d), mins })
     }
     for (const r of dueRoutines) {
       if (r.recurrence_pattern?.type === 'daily' || !r.time_of_day || r.visibility === 'reference') continue
-      map.set(r.id, { kind: 'routine', id: r.id, title: r.name, slot: timeOfDayToSlot(r.time_of_day), timeLabel: todLabel(r.time_of_day) })
+      const mins = todToMins(r.time_of_day)
+      map.set(r.id, { kind: 'routine', id: r.id, title: r.name, slot: timeOfDayToSlot(r.time_of_day), timeLabel: todLabel(r.time_of_day), mins })
     }
-    for (const [id, slot] of Object.entries(chosenSlotById)) {
+    for (const [id, mins] of Object.entries(chosenMinsById)) {
       const t = tasks.find((x) => x.id === id)
-      if (t) map.set(id, { kind: 'task', id, title: t.title, slot, timeLabel: timeToken(slotTime(viewedDate, slot)) })
+      if (t) map.set(id, { kind: 'task', id, title: t.title, slot: minsToSlot(mins), timeLabel: minsLabel(mins), mins })
     }
-    for (const [id, slot] of Object.entries(chosenRoutineSlotById)) {
+    for (const [id, mins] of Object.entries(chosenRoutineMinsById)) {
       const r = routines.find((x) => x.id === id)
-      if (r) map.set(id, { kind: 'routine', id, title: r.name, slot, timeLabel: timeToken(slotTime(viewedDate, slot)) })
+      if (r) map.set(id, { kind: 'routine', id, title: r.name, slot: minsToSlot(mins), timeLabel: minsLabel(mins), mins })
     }
     for (const id of removedIds) map.delete(id)
     return map
-  }, [tasks, dueRoutines, routines, viewedDate, chosenSlotById, chosenRoutineSlotById, removedIds])
+  }, [tasks, dueRoutines, routines, viewedDate, chosenMinsById, chosenRoutineMinsById, removedIds])
 
   const visiblePile = useMemo(
     () => pile.filter((it) => !placedMap.has(it.id) && !notToday.has(it.id)),
@@ -195,16 +206,21 @@ export function PlanTodaySession({
     setRemovedIds((prev) => { if (!prev.has(id)) return prev; const next = new Set(prev); next.delete(id); return next })
   }, [])
 
-  const pickSlot = useCallback((item: PlanItem, slot: TimeOfDay) => {
-    clearRemoved(item.id) // re-placing a previously unplaced item
-    if (item.kind === 'task') {
-      setChosenSlotById((prev) => ({ ...prev, [item.id]: slot }))
-      onPushTask(item.id, slotTime(viewedDate, slot))
+  // Place/move an item to a specific minute of the day, persisting the time.
+  const persistAt = useCallback((kind: 'task' | 'routine', id: string, mins: number) => {
+    clearRemoved(id) // re-placing a previously unplaced item
+    if (kind === 'task') {
+      setChosenMinsById((prev) => ({ ...prev, [id]: mins }))
+      onPushTask(id, minsToDate(viewedDate, mins))
     } else {
-      setChosenRoutineSlotById((prev) => ({ ...prev, [item.id]: slot }))
-      void onUpdateRoutine?.(item.id, { time_of_day: slotTimeOfDay(slot) })
+      setChosenRoutineMinsById((prev) => ({ ...prev, [id]: mins }))
+      void onUpdateRoutine?.(id, { time_of_day: minsToTod(mins) })
     }
   }, [onPushTask, onUpdateRoutine, viewedDate, clearRemoved])
+
+  const pickSlot = useCallback((item: PlanItem, slot: TimeOfDay) => {
+    persistAt(item.kind, item.id, SLOT_BASE_MINS[slot])
+  }, [persistAt])
 
   const markNotToday = useCallback((item: PlanItem) => {
     setNotToday((prev) => new Set(prev).add(item.id))
@@ -216,8 +232,8 @@ export function PlanTodaySession({
   // Put a placed item back into the pile: clear its scheduled time/time_of_day.
   const unplace = useCallback((entry: PlacedEntry) => {
     setRemovedIds((prev) => new Set(prev).add(entry.id))
-    setChosenSlotById((prev) => { const { [entry.id]: _omit, ...rest } = prev; return rest })
-    setChosenRoutineSlotById((prev) => { const { [entry.id]: _omit, ...rest } = prev; return rest })
+    setChosenMinsById((prev) => { const { [entry.id]: _omit, ...rest } = prev; return rest })
+    setChosenRoutineMinsById((prev) => { const { [entry.id]: _omit, ...rest } = prev; return rest })
     if (entry.kind === 'task') onSetBucket(entry.id, 'week')
     else void onUpdateRoutine?.(entry.id, { time_of_day: null })
   }, [onSetBucket, onUpdateRoutine])
@@ -229,10 +245,37 @@ export function PlanTodaySession({
     else onCompleteRoutine?.(entry.id)
   }, [onCompleteTask, onCompleteRoutine])
 
-  const placedBySlot = useCallback(
-    (slot: TimeOfDay) => Array.from(placedMap.values()).filter((p) => p.slot === slot),
-    [placedMap],
-  )
+  // Placed entries grouped by slot, each ordered by time (the drag order).
+  const slotItems = useMemo(() => {
+    const groups: Record<TimeOfDay, PlacedEntry[]> = { morning: [], afternoon: [], evening: [] }
+    for (const p of placedMap.values()) groups[p.slot].push(p)
+    for (const slot of Object.keys(groups) as TimeOfDay[]) groups[slot].sort((a, b) => a.mins - b.mins)
+    return groups
+  }, [placedMap])
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+
+  // Drag to reorder. The dropped item takes a time between its new neighbours
+  // (a single write); cross-slot drops adopt the destination slot's band.
+  const handleDragEnd = useCallback((e: DragEndEvent) => {
+    const activeId = String(e.active.id)
+    const overId = e.over ? String(e.over.id) : null
+    if (!overId || overId === activeId) return
+    const entry = placedMap.get(activeId)
+    if (!entry) return
+    const destSlot: TimeOfDay = overId.startsWith('slot:')
+      ? (overId.slice(5) as TimeOfDay)
+      : (placedMap.get(overId)?.slot ?? entry.slot)
+    const dest = slotItems[destSlot].filter((p) => p.id !== activeId)
+    let idx = dest.length
+    if (!overId.startsWith('slot:')) {
+      const oi = dest.findIndex((p) => p.id === overId)
+      if (oi >= 0) idx = oi
+    }
+    const mins = dropMins(dest[idx - 1]?.mins ?? null, dest[idx]?.mins ?? null, destSlot)
+    if (mins === entry.mins && destSlot === entry.slot) return
+    persistAt(entry.kind, entry.id, mins)
+  }, [placedMap, slotItems, persistAt])
 
   const dateLabel = viewedDate.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
 
@@ -277,7 +320,10 @@ export function PlanTodaySession({
                   origin={it.origin}
                   materials={deriveMaterials(it.timelineItem, { contactsById })}
                   suggestion={suggestSlot({ category: it.category, title: it.title })}
-                  chosenSlot={it.kind === 'task' ? chosenSlotById[it.id] : chosenRoutineSlotById[it.id]}
+                  chosenSlot={(() => {
+                    const m = it.kind === 'task' ? chosenMinsById[it.id] : chosenRoutineMinsById[it.id]
+                    return m != null ? minsToSlot(m) : undefined
+                  })()}
                   onPickSlot={(slot) => pickSlot(it, slot)}
                   onNotToday={() => markNotToday(it)}
                 />
@@ -306,50 +352,20 @@ export function PlanTodaySession({
                 </div>
               )}
 
-              {SECTION_META.map(({ slot, label, range }) => {
-                const items = placedBySlot(slot)
-                return (
-                  <div key={slot} className="mb-3 last:mb-0">
-                    <div className="flex items-baseline gap-2 mb-1.5">
-                      <span className="text-sm font-medium text-neutral-700">{label}</span>
-                      <span className="text-[11px] text-neutral-400">{range}</span>
-                    </div>
-                    {items.length === 0 ? (
-                      <div className="rounded-lg border border-dashed border-neutral-200 px-3 py-2 text-xs text-neutral-300">
-                        Open — place an item here
-                      </div>
-                    ) : (
-                      <ul className="space-y-1">
-                        {items.map((p) => (
-                          <li key={p.id} className="flex items-center gap-2 rounded-lg bg-neutral-50 px-3 py-1.5">
-                            <span className="w-12 shrink-0 text-[11px] text-neutral-400 tabular-nums">{p.timeLabel}</span>
-                            <span className="w-1.5 h-1.5 rounded-full bg-primary-400 shrink-0" />
-                            <span className="flex-1 min-w-0 truncate text-sm text-neutral-700">{p.title}</span>
-                            {(p.kind === 'task' || onCompleteRoutine) && (
-                              <button
-                                type="button"
-                                onClick={() => completeEntry(p)}
-                                aria-label={`Complete ${p.title}`}
-                                className="shrink-0 p-1 rounded-md text-neutral-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
-                              >
-                                <Check className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => unplace(p)}
-                              aria-label={`Put ${p.title} back to place`}
-                              className="shrink-0 p-1 rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200 transition-colors"
-                            >
-                              <Undo2 className="w-3.5 h-3.5" />
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )
-              })}
+              <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+                {SECTION_META.map(({ slot, label, range }) => (
+                  <SlotSection
+                    key={slot}
+                    slot={slot}
+                    label={label}
+                    range={range}
+                    items={slotItems[slot]}
+                    showRoutineComplete={!!onCompleteRoutine}
+                    onComplete={completeEntry}
+                    onUnplace={unplace}
+                  />
+                ))}
+              </DndContext>
             </div>
 
             <button
@@ -378,5 +394,84 @@ export function PlanTodaySession({
         </button>
       </footer>
     </div>
+  )
+}
+
+/** One time-of-day section in "taking shape": a droppable, sortable list. */
+function SlotSection({ slot, label, range, items, showRoutineComplete, onComplete, onUnplace }: {
+  slot: TimeOfDay
+  label: string
+  range: string
+  items: PlacedEntry[]
+  showRoutineComplete: boolean
+  onComplete: (e: PlacedEntry) => void
+  onUnplace: (e: PlacedEntry) => void
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: `slot:${slot}` })
+  return (
+    <div ref={setNodeRef} className={`mb-3 last:mb-0 rounded-lg transition-colors ${isOver ? 'bg-primary-50/50' : ''}`}>
+      <div className="flex items-baseline gap-2 mb-1.5">
+        <span className="text-sm font-medium text-neutral-700">{label}</span>
+        <span className="text-[11px] text-neutral-400">{range}</span>
+      </div>
+      <SortableContext items={items.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+        {items.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-neutral-200 px-3 py-2 text-xs text-neutral-300">
+            Open — drop an item here
+          </div>
+        ) : (
+          <ul className="space-y-1">
+            {items.map((p) => (
+              <SortablePlacedRow key={p.id} entry={p} showRoutineComplete={showRoutineComplete} onComplete={onComplete} onUnplace={onUnplace} />
+            ))}
+          </ul>
+        )}
+      </SortableContext>
+    </div>
+  )
+}
+
+/** A draggable placed row — grip to reorder, plus complete / put-back. */
+function SortablePlacedRow({ entry, showRoutineComplete, onComplete, onUnplace }: {
+  entry: PlacedEntry
+  showRoutineComplete: boolean
+  onComplete: (e: PlacedEntry) => void
+  onUnplace: (e: PlacedEntry) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: entry.id })
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
+  return (
+    <li ref={setNodeRef} style={style} className="flex items-center gap-1.5 rounded-lg bg-neutral-50 px-2 py-1.5">
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        aria-label={`Reorder ${entry.title}`}
+        className="shrink-0 p-0.5 text-neutral-300 hover:text-neutral-500 cursor-grab active:cursor-grabbing touch-none"
+      >
+        <GripVertical className="w-3.5 h-3.5" />
+      </button>
+      <span className="w-12 shrink-0 text-[11px] text-neutral-400 tabular-nums">{entry.timeLabel}</span>
+      <span className="w-1.5 h-1.5 rounded-full bg-primary-400 shrink-0" />
+      <span className="flex-1 min-w-0 truncate text-sm text-neutral-700">{entry.title}</span>
+      {(entry.kind === 'task' || showRoutineComplete) && (
+        <button
+          type="button"
+          onClick={() => onComplete(entry)}
+          aria-label={`Complete ${entry.title}`}
+          className="shrink-0 p-1 rounded-md text-neutral-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+        >
+          <Check className="w-3.5 h-3.5" />
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => onUnplace(entry)}
+        aria-label={`Put ${entry.title} back to place`}
+        className="shrink-0 p-1 rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200 transition-colors"
+      >
+        <Undo2 className="w-3.5 h-3.5" />
+      </button>
+    </li>
   )
 }
