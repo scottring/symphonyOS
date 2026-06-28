@@ -56,7 +56,7 @@ export function WallV2NowNext({ today, familyMembers, now, onTapMaterial }: Wall
   // On the wall, a call tile places the call through Symphony (tel: is dead on a
   // TV). No-ops gracefully until the kid-phone bridge is provisioned (Phase 4).
   const handleMaterial = useCallback((m: Material, item: TimelineItem) => {
-    if (m.action.kind === 'call' && m.action.value) { void placeCall({ toNumber: m.action.value }); return }
+    if (m.action.kind === 'call' && m.action.value) { void placeCall({ toNumber: m.action.value, source: 'kiosk' }); return }
     onTapMaterial?.(m, item)
   }, [onTapMaterial])
 

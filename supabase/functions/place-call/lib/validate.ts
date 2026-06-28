@@ -5,7 +5,14 @@ export interface PlaceCallBody {
   taskId?: string
   toNumber?: string
   mode?: 'bridge' | 'agent'
+  /** Where the call was started — 'kiosk' rings the in-house handset, else the cell. */
+  source?: 'app' | 'kiosk'
   context?: 'work' | 'family' | 'personal'
+}
+
+/** Map the call's source to the kid-phone bridge target. */
+export function bridgeToFor(source: PlaceCallBody['source']): 'cell' | 'handset' {
+  return source === 'kiosk' ? 'handset' : 'cell'
 }
 
 export type Validation =

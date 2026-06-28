@@ -43,7 +43,7 @@ describe('WallV2NowNext', () => {
     const callBtn = screen.getByRole('button', { name: /Call 555-0100/ })
     expect(callBtn).toBeInTheDocument()
     await userEvent.click(callBtn)
-    expect(placeCall).toHaveBeenCalledWith({ toNumber: '555-0100' })
+    expect(placeCall).toHaveBeenCalledWith({ toNumber: '555-0100', source: 'kiosk' })
   })
 
   it('shows the soonest future item as "Next up"', () => {

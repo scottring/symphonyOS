@@ -10,7 +10,7 @@
 // referenced task is enforced by RLS via the user-scoped client.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { validateBody, buildLogRow, type PlaceCallBody } from './lib/validate.ts'
+import { validateBody, buildLogRow, bridgeToFor, type PlaceCallBody } from './lib/validate.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -74,7 +74,7 @@ Deno.serve(async (req: Request) => {
     const res = await fetch(initiateUrl, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-kidphone-secret': secret },
-      body: JSON.stringify({ toNumber, mode: v.mode, context: parsed.context }),
+      body: JSON.stringify({ toNumber, mode: v.mode, bridgeTo: bridgeToFor(parsed.source), context: parsed.context }),
     })
     if (!res.ok) return jsonResponse({ error: `bridge error ${res.status}` }, 502)
     const out = await res.json().catch(() => ({}))
