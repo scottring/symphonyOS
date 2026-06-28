@@ -621,6 +621,7 @@ export function HomeViewContainer() {
             contacts={contacts}
             routines={allRoutines}
             onUpdateRoutine={(id, input) => updateRoutine(id, input)}
+            onCompleteRoutine={(id) => scheduleActions.onCompleteRoutine(id, true)}
           />
         </Suspense>
       )}

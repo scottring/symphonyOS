@@ -50,6 +50,7 @@ function setup(tasksOverride?: Task[], contacts: Contact[] = [], routines: Routi
   const onSetBucket = vi.fn()
   const onClose = vi.fn()
   const onUpdateRoutine = vi.fn()
+  const onCompleteRoutine = vi.fn()
   const tasks = tasksOverride ?? [
     task({ id: 'w1', title: 'Week one', bucket: 'week' }),
     task({ id: 'od', title: 'Overdue one', bucket: 'timed', scheduledFor: new Date(2020, 0, 1), isAllDay: false }),
@@ -62,13 +63,14 @@ function setup(tasksOverride?: Task[], contacts: Contact[] = [], routines: Routi
       onClose={onClose}
       onPushTask={onPushTask}
       onCompleteTask={onCompleteTask}
+      onCompleteRoutine={onCompleteRoutine}
       onSetBucket={onSetBucket}
       contacts={contacts}
       routines={routines}
       onUpdateRoutine={onUpdateRoutine}
     />
   )
-  return { onPushTask, onCompleteTask, onSetBucket, onClose, onUpdateRoutine, ...utils }
+  return { onPushTask, onCompleteTask, onSetBucket, onClose, onUpdateRoutine, onCompleteRoutine, ...utils }
 }
 
 describe('PlanTodaySession', () => {
@@ -142,5 +144,31 @@ describe('PlanTodaySession', () => {
     expect(onUpdateRoutine).toHaveBeenCalledWith('food-shopping', { time_of_day: '09:00:00' })
     // optimistically moves into "taking shape"
     expect(screen.getByText('1 placed · 0 to go')).toBeInTheDocument()
+  })
+
+  it('unplaces a placed task — back to "to place"', async () => {
+    const placed = task({ id: 'pt', title: 'Placed task', bucket: 'timed', scheduledFor: new Date(2026, 5, 10, 9, 0), isAllDay: false })
+    const { user, onSetBucket } = setup([placed])
+    expect(screen.getByText('1 placed · 0 to go')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Put Placed task back to place' }))
+    expect(onSetBucket).toHaveBeenCalledWith('pt', 'week')
+    // Leaves placed and returns to the pile.
+    expect(screen.getByText('0 placed · 1 to go')).toBeInTheDocument()
+  })
+
+  it('completes a placed task from the day-shaping panel', async () => {
+    const placed = task({ id: 'pt', title: 'Placed task', bucket: 'timed', scheduledFor: new Date(2026, 5, 10, 9, 0), isAllDay: false })
+    const { user, onCompleteTask } = setup([placed])
+    await user.click(screen.getByRole('button', { name: 'Complete Placed task' }))
+    expect(onCompleteTask).toHaveBeenCalledWith('pt')
+    // No longer in the placed panel.
+    expect(screen.queryByRole('button', { name: 'Complete Placed task' })).toBeNull()
+  })
+
+  it('completes a placed (already-timed) routine', async () => {
+    const timed = makeRoutine({ name: 'Morning walk', recurrence_pattern: { type: 'weekly', days: ['wed'] }, time_of_day: '09:00' })
+    const { user, onCompleteRoutine } = setup([], [], [timed])
+    await user.click(screen.getByRole('button', { name: 'Complete Morning walk' }))
+    expect(onCompleteRoutine).toHaveBeenCalledWith('morning-walk')
   })
 })

@@ -15,7 +15,7 @@
 // Placing a task sets its scheduled time; placing a routine sets its time_of_day.
 
 import { useState, useMemo, useCallback } from 'react'
-import { X, CalendarClock } from 'lucide-react'
+import { X, CalendarClock, Check, Undo2 } from 'lucide-react'
 import type { Task, TaskBucket } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Routine } from '@/types/actionable'
@@ -42,7 +42,7 @@ interface PlanItem {
 }
 
 /** A placed entry rendered in "taking shape". */
-interface PlacedEntry { id: string; title: string; slot: TimeOfDay; timeLabel: string }
+interface PlacedEntry { kind: 'task' | 'routine'; id: string; title: string; slot: TimeOfDay; timeLabel: string }
 
 interface Props {
   tasks: Task[]
@@ -50,8 +50,10 @@ interface Props {
   viewedDate: Date
   onClose: () => void
   onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
-  /** Retained in the triage contract for inline-complete of carried items. */
+  /** Complete a placed task from "taking shape". */
   onCompleteTask: (id: string) => void
+  /** Complete a placed routine for the day (optional). */
+  onCompleteRoutine?: (id: string) => void
   onSetBucket: (id: string, bucket: TaskBucket) => void
   /** Optional: open the time-block grid (PlanningSession) as a next step. */
   onOpenTimeBlock?: () => void
@@ -102,8 +104,8 @@ function eventsOnDate(events: CalendarEvent[], date: Date): CalendarEvent[] {
 }
 
 export function PlanTodaySession({
-  tasks, events, viewedDate, onClose, onPushTask, onSetBucket, onOpenTimeBlock,
-  contacts = [], routines = [], onUpdateRoutine,
+  tasks, events, viewedDate, onClose, onPushTask, onCompleteTask, onCompleteRoutine,
+  onSetBucket, onOpenTimeBlock, contacts = [], routines = [], onUpdateRoutine,
 }: Props) {
   const matchAll = useMemo(() => makeAssigneeFilter([]), [])
   const contactsById = useMemo(
@@ -129,6 +131,9 @@ export function PlanTodaySession({
   const [chosenSlotById, setChosenSlotById] = useState<Record<string, TimeOfDay>>({})
   const [chosenRoutineSlotById, setChosenRoutineSlotById] = useState<Record<string, TimeOfDay>>({})
   const [notToday, setNotToday] = useState<Set<string>>(() => new Set())
+  // Optimistically hide placed entries that were just unplaced or completed,
+  // until the underlying tasks/routines props refresh.
+  const [removedIds, setRemovedIds] = useState<Set<string>>(() => new Set())
 
   // The pile: carried-over, then this-week tasks, then non-daily routines.
   const pile = useMemo<PlanItem[]>(() => {
@@ -157,22 +162,23 @@ export function PlanTodaySession({
       if (t.completed || t.bucket !== 'timed' || t.isAllDay || !t.scheduledFor) continue
       if (!sameDay(new Date(t.scheduledFor), viewedDate)) continue
       const d = new Date(t.scheduledFor)
-      map.set(t.id, { id: t.id, title: t.title, slot: hourToSlot(d.getHours()), timeLabel: timeToken(d) })
+      map.set(t.id, { kind: 'task', id: t.id, title: t.title, slot: hourToSlot(d.getHours()), timeLabel: timeToken(d) })
     }
     for (const r of dueRoutines) {
       if (r.recurrence_pattern?.type === 'daily' || !r.time_of_day || r.visibility === 'reference') continue
-      map.set(r.id, { id: r.id, title: r.name, slot: timeOfDayToSlot(r.time_of_day), timeLabel: todLabel(r.time_of_day) })
+      map.set(r.id, { kind: 'routine', id: r.id, title: r.name, slot: timeOfDayToSlot(r.time_of_day), timeLabel: todLabel(r.time_of_day) })
     }
     for (const [id, slot] of Object.entries(chosenSlotById)) {
       const t = tasks.find((x) => x.id === id)
-      if (t) map.set(id, { id, title: t.title, slot, timeLabel: timeToken(slotTime(viewedDate, slot)) })
+      if (t) map.set(id, { kind: 'task', id, title: t.title, slot, timeLabel: timeToken(slotTime(viewedDate, slot)) })
     }
     for (const [id, slot] of Object.entries(chosenRoutineSlotById)) {
       const r = routines.find((x) => x.id === id)
-      if (r) map.set(id, { id, title: r.name, slot, timeLabel: timeToken(slotTime(viewedDate, slot)) })
+      if (r) map.set(id, { kind: 'routine', id, title: r.name, slot, timeLabel: timeToken(slotTime(viewedDate, slot)) })
     }
+    for (const id of removedIds) map.delete(id)
     return map
-  }, [tasks, dueRoutines, routines, viewedDate, chosenSlotById, chosenRoutineSlotById])
+  }, [tasks, dueRoutines, routines, viewedDate, chosenSlotById, chosenRoutineSlotById, removedIds])
 
   const visiblePile = useMemo(
     () => pile.filter((it) => !placedMap.has(it.id) && !notToday.has(it.id)),
@@ -185,7 +191,12 @@ export function PlanTodaySession({
   const toGo = visiblePile.length
   const progressPct = placedCount + toGo === 0 ? 100 : Math.round((placedCount / (placedCount + toGo)) * 100)
 
+  const clearRemoved = useCallback((id: string) => {
+    setRemovedIds((prev) => { if (!prev.has(id)) return prev; const next = new Set(prev); next.delete(id); return next })
+  }, [])
+
   const pickSlot = useCallback((item: PlanItem, slot: TimeOfDay) => {
+    clearRemoved(item.id) // re-placing a previously unplaced item
     if (item.kind === 'task') {
       setChosenSlotById((prev) => ({ ...prev, [item.id]: slot }))
       onPushTask(item.id, slotTime(viewedDate, slot))
@@ -193,7 +204,7 @@ export function PlanTodaySession({
       setChosenRoutineSlotById((prev) => ({ ...prev, [item.id]: slot }))
       void onUpdateRoutine?.(item.id, { time_of_day: slotTimeOfDay(slot) })
     }
-  }, [onPushTask, onUpdateRoutine, viewedDate])
+  }, [onPushTask, onUpdateRoutine, viewedDate, clearRemoved])
 
   const markNotToday = useCallback((item: PlanItem) => {
     setNotToday((prev) => new Set(prev).add(item.id))
@@ -201,6 +212,22 @@ export function PlanTodaySession({
     // session (we don't retime a recurring routine to dismiss one occurrence).
     if (item.kind === 'task') onSetBucket(item.id, 'week')
   }, [onSetBucket])
+
+  // Put a placed item back into the pile: clear its scheduled time/time_of_day.
+  const unplace = useCallback((entry: PlacedEntry) => {
+    setRemovedIds((prev) => new Set(prev).add(entry.id))
+    setChosenSlotById((prev) => { const { [entry.id]: _omit, ...rest } = prev; return rest })
+    setChosenRoutineSlotById((prev) => { const { [entry.id]: _omit, ...rest } = prev; return rest })
+    if (entry.kind === 'task') onSetBucket(entry.id, 'week')
+    else void onUpdateRoutine?.(entry.id, { time_of_day: null })
+  }, [onSetBucket, onUpdateRoutine])
+
+  // Complete a placed item from the day-shaping panel.
+  const completeEntry = useCallback((entry: PlacedEntry) => {
+    setRemovedIds((prev) => new Set(prev).add(entry.id))
+    if (entry.kind === 'task') onCompleteTask(entry.id)
+    else onCompleteRoutine?.(entry.id)
+  }, [onCompleteTask, onCompleteRoutine])
 
   const placedBySlot = useCallback(
     (slot: TimeOfDay) => Array.from(placedMap.values()).filter((p) => p.slot === slot),
@@ -298,6 +325,24 @@ export function PlanTodaySession({
                             <span className="w-12 shrink-0 text-[11px] text-neutral-400 tabular-nums">{p.timeLabel}</span>
                             <span className="w-1.5 h-1.5 rounded-full bg-primary-400 shrink-0" />
                             <span className="flex-1 min-w-0 truncate text-sm text-neutral-700">{p.title}</span>
+                            {(p.kind === 'task' || onCompleteRoutine) && (
+                              <button
+                                type="button"
+                                onClick={() => completeEntry(p)}
+                                aria-label={`Complete ${p.title}`}
+                                className="shrink-0 p-1 rounded-md text-neutral-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => unplace(p)}
+                              aria-label={`Put ${p.title} back to place`}
+                              className="shrink-0 p-1 rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200 transition-colors"
+                            >
+                              <Undo2 className="w-3.5 h-3.5" />
+                            </button>
                           </li>
                         ))}
                       </ul>
