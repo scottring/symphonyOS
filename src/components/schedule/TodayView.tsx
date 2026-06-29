@@ -131,7 +131,7 @@ export function TodayView({
   onToggleTask,
   onCompleteRoutine,
   onCompleteEvent,
-  loading: _loading,
+  loading,
   viewedDate,
   onDateChange,
   onOpenPlanToday,
@@ -610,7 +610,12 @@ export function TodayView({
         {data.counts.totalItems === 0 ? (
           <div className="text-center py-16">
             <p className="font-display text-xl text-neutral-700">
-              {data.isToday && data.counts.completedCount > 0 ? 'All cleared — nicely done' : 'Your day is clear'}
+              {/* While the day's data is still in flight, an empty list means
+                  "not loaded yet" — not "clear". Say so, so the user never sees
+                  a false "Your day is clear" flash before items arrive. */}
+              {loading
+                ? 'Loading your day…'
+                : data.isToday && data.counts.completedCount > 0 ? 'All cleared — nicely done' : 'Your day is clear'}
             </p>
           </div>
         ) : (

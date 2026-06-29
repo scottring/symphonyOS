@@ -9,7 +9,9 @@ import { useState, useRef, useCallback } from 'react'
 import { CalendarClock } from 'lucide-react'
 import type { TimelineItem } from '@/types/timeline'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
-import { applyTriageWhen } from '@/lib/triage/applyWhen'
+import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
+import { formatDateLabel } from '@/lib/dateHelpers'
+import { showToast } from '@/hooks/useToast'
 import type { TriageWhen } from './TriageWhenMenu'
 import { RescheduleGrid } from './RescheduleGrid'
 
@@ -26,13 +28,18 @@ export function RescheduleButton({ item }: { item: TimelineItem }) {
         onPushTask: (id, target) => ctx.onPushTask?.(id, target),
         onSetBucket: (id, bucket) => ctx.onUpdateTask?.(id, { bucket, scheduledFor: undefined, isAllDay: undefined }),
       })
+      // Confirm where it landed — the dated label removes any "which weekend?" doubt.
+      showToast(describeTriageWhen(when), 'success')
     }
     setOpen(false)
   }, [item.originalTask, ctx])
 
   const rescheduleToDate = useCallback((date: Date, isAllDay: boolean) => {
     const taskId = item.originalTask?.id
-    if (taskId) ctx.onUpdateTask?.(taskId, { bucket: 'timed', scheduledFor: date, isAllDay })
+    if (taskId) {
+      ctx.onUpdateTask?.(taskId, { bucket: 'timed', scheduledFor: date, isAllDay })
+      showToast(`Moved to ${formatDateLabel(date)}`, 'success')
+    }
     setOpen(false)
   }, [item.originalTask, ctx])
 

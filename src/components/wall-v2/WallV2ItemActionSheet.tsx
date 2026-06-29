@@ -1,5 +1,6 @@
 import { Redo2, Check, X, Phone, MapPin, FileText, Video, Link as LinkIcon } from 'lucide-react'
 import { useDragScroll } from '@/hooks/useDragScroll'
+import { getNextWeekend, getWeekendAfterNext, formatShortDate } from '@/lib/dateHelpers'
 import type { WallV2TimelineEvent } from './types'
 
 /**
@@ -38,6 +39,14 @@ const PUSH_PRESETS: ReadonlyArray<{ preset: PushPreset; label: string }> = [
   { preset: 'next-month',   label: 'Next month'   },
   { preset: 'someday',      label: 'Someday'      },
 ]
+
+// The two weekend presets land on a concrete Saturday; surface that date under
+// the label so "next weekend" is unambiguous at tap time (which Saturday?).
+// The fuzzy bucket presets have no specific date and show label only.
+const PRESET_DATE: Partial<Record<PushPreset, () => Date>> = {
+  'this-weekend': getNextWeekend,
+  'next-weekend': getWeekendAfterNext,
+}
 
 // Destination-only Maps link — the wall is stationary, so we surface "where is
 // this" rather than a turn-by-turn route. Rendered into an <a> (never
@@ -158,16 +167,23 @@ export function WallV2ItemActionSheet({ event, onSkip, onMarkDone, onPushTask, o
 
               {/* Push presets — 2×2 grid of stone buttons */}
               <div className="grid grid-cols-2 gap-3">
-                {PUSH_PRESETS.map(({ preset, label }) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => { onPushTask(event.id, preset); onClose() }}
-                    className="flex items-center justify-center w-full min-h-[64px] rounded-2xl bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-200 text-lg font-bold active:scale-[0.98] transition-transform"
-                  >
-                    {label}
-                  </button>
-                ))}
+                {PUSH_PRESETS.map(({ preset, label }) => {
+                  const dateFn = PRESET_DATE[preset]
+                  const sub = dateFn ? formatShortDate(dateFn()) : null
+                  return (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => { onPushTask(event.id, preset); onClose() }}
+                      className="flex flex-col items-center justify-center w-full min-h-[64px] rounded-2xl bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-200 text-lg font-bold leading-tight active:scale-[0.98] transition-transform"
+                    >
+                      <span>{label}</span>
+                      {sub && (
+                        <span className="text-sm font-semibold text-stone-400 dark:text-stone-500 mt-0.5">{sub}</span>
+                      )}
+                    </button>
+                  )
+                })}
               </div>
             </>
           ) : (

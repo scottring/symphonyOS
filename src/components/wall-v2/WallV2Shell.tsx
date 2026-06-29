@@ -42,7 +42,7 @@ import { useWeather } from '@/hooks/useWeather';
 import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
 import { findDinnerEvent, getMealIcon } from '@/components/wall/WallDinnerWidget';
 import { extractRecipeNameHint, resolveRecipeUrl } from '@/lib/recipeDetection';
-import { getNextWeekend, getWeekendAfterNext } from '@/lib/dateHelpers';
+import { getNextWeekend, getWeekendAfterNext, formatShortDate } from '@/lib/dateHelpers';
 import { WallRecipeViewer } from '@/components/wall/WallRecipeViewer';
 import { useRecipe } from '@/hooks/useRecipe';
 import { WallDiscussionOverlay } from '@/components/wall/WallDiscussionOverlay';
@@ -399,13 +399,16 @@ export function WallV2Shell() {
     const taskId = id.replace(/^task-/, '');
     await updateTask(taskId, pushPresetToUpdates(preset));
     wallData.refetch();
+    // Weekend presets resolve to a concrete Saturday — show it so "next
+    // weekend" is never ambiguous (which Saturday did it land on?). The fuzzy
+    // bucket presets have no specific date, so they stay label-only.
     const flash: Record<PushPreset, string> = {
-      'this-week':    'Pushed to this week',
-      'this-weekend': 'Scheduled for this weekend',
-      'next-week':    'Pushed to next week',
-      'next-weekend': 'Scheduled for next weekend',
-      'next-month':   'Pushed to next month',
-      'someday':      'Pushed to Someday',
+      'this-week':    'Moved to this week',
+      'this-weekend': `Moved to this weekend · ${formatShortDate(getNextWeekend())}`,
+      'next-week':    'Moved to next week',
+      'next-weekend': `Moved to next weekend · ${formatShortDate(getWeekendAfterNext())}`,
+      'next-month':   'Moved to next month',
+      'someday':      'Moved to Someday',
     };
     showFlash(flash[preset]);
   }, [updateTask, wallData, showFlash]);
@@ -524,7 +527,7 @@ export function WallV2Shell() {
           {flashMessage && (
             <div
               role="status"
-              className="absolute -top-9 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-stone-800/90 dark:bg-stone-200/90 text-white dark:text-stone-900 text-[0.85rem] font-bold shadow-lg backdrop-blur-md whitespace-nowrap"
+              className="animate-fade-in-up absolute -top-9 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-stone-800/90 dark:bg-stone-200/90 text-white dark:text-stone-900 text-[0.85rem] font-bold shadow-lg backdrop-blur-md whitespace-nowrap"
             >
               {flashMessage}
             </div>
