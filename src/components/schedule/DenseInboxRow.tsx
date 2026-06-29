@@ -16,6 +16,7 @@ export type QuickAction =
   | { kind: 'someday' }
   | { kind: 'next-week' }
   | { kind: 'note' }
+  | { kind: 'complete' }
   | { kind: 'delete' }
 
 const ACTION_LABELS: Record<QuickAction['kind'], string> = {
@@ -25,6 +26,7 @@ const ACTION_LABELS: Record<QuickAction['kind'], string> = {
   someday: 'Someday',
   'next-week': 'Next Week',
   note: 'Note',
+  complete: 'Done',
   delete: 'Delete',
 }
 

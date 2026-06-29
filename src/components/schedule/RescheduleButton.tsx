@@ -38,7 +38,10 @@ export function RescheduleButton({ item }: { item: TimelineItem }) {
     const taskId = item.originalTask?.id
     if (taskId) {
       ctx.onUpdateTask?.(taskId, { bucket: 'timed', scheduledFor: date, isAllDay })
-      showToast(`Moved to ${formatDateLabel(date)}`, 'success')
+      const label = isAllDay
+        ? formatDateLabel(date)
+        : `${formatDateLabel(date)}, ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+      showToast(`Moved to ${label}`, 'success')
     }
     setOpen(false)
   }, [item.originalTask, ctx])

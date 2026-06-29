@@ -292,6 +292,8 @@ export function InboxView({
       bucket: task.bucket,
       scheduledFor: task.scheduledFor,
       isAllDay: task.isAllDay,
+      // Captured so "Done" is undoable — restores the item to the inbox.
+      completed: task.completed,
     }
 
     setLeavingIds((s) => new Set(s).add(task.id))
@@ -307,6 +309,9 @@ export function InboxView({
         const bucket = action.kind === 'someday' ? 'quarter' : action.kind
         if (onPushTask) onPushTask(task.id, bucket as 'week' | 'month' | 'quarter')
         message = `Sent to ${BUCKET_LABELS[bucket as 'week' | 'month' | 'quarter']}`
+      } else if (action.kind === 'complete') {
+        if (onUpdateTask) onUpdateTask(task.id, { completed: true })
+        message = 'Completed'
       } else if (action.kind === 'delete') {
         if (onDeleteTask) onDeleteTask(task.id)
         message = 'Deleted'
@@ -315,7 +320,7 @@ export function InboxView({
       setLeavingIds((s) => { const next = new Set(s); next.delete(task.id); return next })
       setUndo({ taskId: task.id, message, previous, undoable: action.kind !== 'delete' })
     }, 220)
-  }, [onPushTask, onDeleteTask])
+  }, [onPushTask, onDeleteTask, onUpdateTask])
 
   // Fan-out triage: route an inbox item to a specific WHEN. Mirrors applyTriage's
   // leaving-animation + undo, but covers the richer temporal vocabulary. Dated
@@ -385,6 +390,12 @@ export function InboxView({
       : 'someday'
     applyWhen(task, when)
   }, [filteredTasks, applyWhen])
+
+  const handleFocusComplete = useCallback((taskId: string) => {
+    const task = filteredTasks.find((t) => t.id === taskId)
+    if (!task) return
+    applyTriage(task, { kind: 'complete' })
+  }, [filteredTasks, applyTriage])
 
   const handleFocusDelete = useCallback((taskId: string) => {
     const task = filteredTasks.find((t) => t.id === taskId)
@@ -501,6 +512,7 @@ export function InboxView({
           familyMembers={familyMembers}
           onTriage={handleFocusTriage}
           onDelete={handleFocusDelete}
+          onComplete={handleFocusComplete}
           onUpdate={(taskId, updates) => onUpdateTask?.(taskId, updates)}
           onSelectDetail={handleSelect}
           onExitFocus={() => setMode('dense')}

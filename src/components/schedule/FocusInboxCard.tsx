@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Check } from 'lucide-react'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
@@ -12,6 +13,7 @@ interface FocusInboxCardProps {
   familyMembers: FamilyMember[]
   onTriage: (taskId: string, bucket: FocusBucket) => void
   onDelete: (taskId: string) => void
+  onComplete: (taskId: string) => void
   onUpdate: (taskId: string, updates: Partial<Task>) => void
   onSelectDetail: (taskId: string) => void
   onExitFocus: () => void
@@ -26,7 +28,7 @@ const WHEN_BUTTONS: Array<{ key: string; bucket: FocusBucket; label: string; sub
 
 export function FocusInboxCard({
   tasks, projects, familyMembers: _familyMembers,
-  onTriage, onDelete, onUpdate: _onUpdate, onSelectDetail, onExitFocus,
+  onTriage, onDelete, onComplete, onUpdate: _onUpdate, onSelectDetail, onExitFocus,
 }: FocusInboxCardProps) {
   const [index, setIndex] = useState(0)
 
@@ -53,6 +55,12 @@ export function FocusInboxCard({
     advance()
   }, [current, onDelete, advance])
 
+  const complete = useCallback(() => {
+    if (!current) return
+    onComplete(current.id)
+    advance()
+  }, [current, onComplete, advance])
+
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       const target = e.target as HTMLElement
@@ -63,6 +71,8 @@ export function FocusInboxCard({
         case '2': triage('week'); break
         case '3': triage('month'); break
         case '4': triage('quarter'); break
+        case 'c':
+        case 'C': complete(); break
         case 'd':
         case 'D':
         case 'Backspace': del(); break
@@ -75,7 +85,7 @@ export function FocusInboxCard({
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [triage, del, advance, goBack, current, onSelectDetail, onExitFocus])
+  }, [triage, del, complete, advance, goBack, current, onSelectDetail, onExitFocus])
 
   if (total === 0 || !current) {
     return (
@@ -126,6 +136,17 @@ export function FocusInboxCard({
             </button>
           ))}
         </div>
+
+        {/* Resolve-without-scheduling: the item is already handled, so check it
+            off rather than filing it to a horizon. (keyboard: C) */}
+        <button
+          type="button"
+          onClick={complete}
+          className="flex items-center justify-center gap-2 w-full px-3 py-3 mb-4 rounded-xl border-2 border-emerald-100 bg-emerald-50/50 text-emerald-700 font-medium text-sm hover:border-emerald-300 hover:bg-emerald-50 transition-colors"
+        >
+          <Check className="w-4 h-4" /> Mark done
+          <span className="text-xs text-emerald-500/70 bg-white/60 rounded px-1.5 py-0.5">C</span>
+        </button>
 
         <div className="flex justify-between text-xs text-neutral-400">
           <button type="button" onClick={goBack} className="hover:text-neutral-600">back</button>
