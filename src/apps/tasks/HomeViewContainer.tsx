@@ -13,7 +13,8 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
-import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
+import { useGoogleCalendar, CalendarReconnectError } from '@/hooks/useGoogleCalendar';
+import { showToast } from '@/hooks/useToast';
 import { useVaultWrite } from '@/hooks/useVaultWrite';
 import { useGoalsContext } from '@/contexts/GoalsContext';
 import { PlanningSession, WeeklyPlanningSession, PlanTodaySession, MonthlyPlanningSession, SeasonalPlanningSession, AnnualPlanningSession } from '@/components/lazy';
@@ -441,12 +442,23 @@ export function HomeViewContainer() {
       // whole local cache (2026-06-12 incident).
       const eventId = event.google_event_id ?? event.id;
       if (!eventId) return;
+      // calendar_id (snake_case) comes from the events edge function, but some
+      // runtime paths surface it camelCased as calendarId. Without this fallback
+      // the delete defaults to 'primary' and Google rejects it (404) for any
+      // event on a secondary calendar — the .catch then restores it, so the
+      // event "pops right back up". (The legacy App.tsx handler has this fallback;
+      // the Shell rewrite dropped it.)
+      const calendarId = event.calendar_id ?? event.calendarId;
       removeEventLocal(eventId);
-      deleteEvent({
-        eventId,
-        calendarId: event.calendar_id,
-      }).catch((err) => {
-        console.error('Failed to delete event:', err);
+      deleteEvent({ eventId, calendarId }).catch((err) => {
+        // Surface the failure — silently restoring looks like the event came
+        // back for no reason. showToast is a stable module-level singleton.
+        if (err instanceof CalendarReconnectError) {
+          showToast('Calendar connection expired. Please reconnect.', 'warning');
+        } else {
+          console.error('Failed to delete event:', err);
+          showToast(err instanceof Error ? err.message : 'Failed to delete event', 'warning');
+        }
         restoreEventLocal(event);
       });
     },
