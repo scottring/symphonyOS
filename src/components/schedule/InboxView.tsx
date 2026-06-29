@@ -48,11 +48,15 @@ interface InboxViewProps {
   panelOpen: boolean
   onClosePanel: () => void
   currentUserMemberId?: string
+  /** True while the first task fetch is in flight — gates the empty state so the
+   *  inbox shows "Loading…" instead of a false "Inbox zero" before items arrive. */
+  loading?: boolean
 }
 
 export function InboxView({
   tasks, projects, selectedItemId: _selectedItemId, onSelectItem,
   panelOpen: _panelOpen, onClosePanel: _onClosePanel, currentUserMemberId,
+  loading = false,
 }: InboxViewProps) {
   const {
     onUpdateTask, onPushTask, onDeleteTask, onUpdateTasksBulk,
@@ -460,7 +464,7 @@ export function InboxView({
           <h1 className="font-display text-2xl font-semibold text-neutral-800">Inbox</h1>
           <p className="text-sm text-neutral-500 mt-1">
             {totalCount === 0
-              ? 'All clear — nothing to triage'
+              ? (loading ? 'Loading your inbox…' : 'All clear — nothing to triage')
               : `${totalCount} item${totalCount !== 1 ? 's' : ''} to triage`}
           </p>
         </div>
@@ -495,7 +499,11 @@ export function InboxView({
         onSnooze={emailActions.snooze}
       />
 
-      {totalCount === 0 ? (
+      {totalCount === 0 && loading ? (
+        <div className="text-center py-16">
+          <p className="font-display text-xl text-neutral-700">Loading your inbox…</p>
+        </div>
+      ) : totalCount === 0 ? (
         <div className="text-center py-16">
           <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-primary-50 flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-primary-400" viewBox="0 0 20 20" fill="currentColor">

@@ -24,7 +24,7 @@ import { InboxView } from '@/components/schedule/InboxView';
 import { useSelection } from '@/shell/providers/SelectionProvider';
 
 export function InboxViewContainer() {
-  const { tasks, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, pushTask } = useSupabaseTasks();
+  const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, pushTask } = useSupabaseTasks();
   const { events } = useGoogleCalendar();
   const { notes: eventNotesMap, updateEventAssignment, updateEventAssignmentAll, updateEventContext, updateEventProject } = useEventNotes();
   const { contacts, contactsMap, addContact, searchContacts } = useContacts();
@@ -175,6 +175,7 @@ export function InboxViewContainer() {
         panelOpen={selection !== null}
         onClosePanel={clearSelection}
         currentUserMemberId={getCurrentUserMember()?.id}
+        loading={tasksLoading}
       />
     </ScheduleActionsProvider>
   );
