@@ -5,7 +5,7 @@
 // Supabase wiring. Task #3 swaps this for live data via useWallData.
 
 import {
-  Backpack, Bath, Calendar, Camera, Car, Check, MessageCircle,
+  Backpack, Bath, Calendar, Phone, Car, Check, MessageCircle,
   Moon, Plus, ShoppingBag, ShoppingCart, Sun, Trophy, Users,
   UtensilsCrossed, Flame, Sunrise,
 } from 'lucide-react';
@@ -179,5 +179,5 @@ export const MOCK_ACTIONS: WallV2ActionDef[] = [
   { id: 'task', label: 'Add task', caption: 'For today or later', icon: Check, tint: 'sky' },
   { id: 'discuss', label: 'Need to discuss', caption: 'Open a conversation', icon: MessageCircle, tint: 'lavender' },
   { id: 'event', label: 'Add event', caption: 'On the calendar', icon: Calendar, tint: 'rose' },
-  { id: 'photo', label: 'Add photo', caption: 'Share a moment', icon: Camera, tint: 'honey' },
+  { id: 'phone', label: 'Call someone', caption: 'Ring the phone', icon: Phone, tint: 'mint' },
 ];
