@@ -51,18 +51,21 @@ Deno.serve(async (req: Request) => {
   if (userErr || !userData?.user) return jsonResponse({ error: 'unauthorized' }, 401)
   const userId = userData.user.id
 
-  // Resolve the number: explicit toNumber wins, else the task's phone_number.
+  // contactId path: kid-phone resolves the number server-side. Otherwise resolve
+  // a number here (explicit toNumber wins, else the task's phone_number).
   let toNumber = parsed.toNumber
-  if (!toNumber && parsed.taskId) {
-    const { data: task } = await userClient
-      .from('tasks')
-      .select('id, phone_number')
-      .eq('id', parsed.taskId)
-      .maybeSingle()
-    if (!task) return jsonResponse({ error: 'task not found' }, 404)
-    toNumber = (task as { phone_number?: string }).phone_number
+  if (!parsed.contactId) {
+    if (!toNumber && parsed.taskId) {
+      const { data: task } = await userClient
+        .from('tasks')
+        .select('id, phone_number')
+        .eq('id', parsed.taskId)
+        .maybeSingle()
+      if (!task) return jsonResponse({ error: 'task not found' }, 404)
+      toNumber = (task as { phone_number?: string }).phone_number
+    }
+    if (!toNumber) return jsonResponse({ error: 'no phone number available for this call' }, 422)
   }
-  if (!toNumber) return jsonResponse({ error: 'no phone number available for this call' }, 422)
 
   // Ask kid-phone to place the call. No-op (503) until provisioned.
   const initiateUrl = Deno.env.get('KIDPHONE_INITIATE_URL') ?? ''
@@ -74,7 +77,7 @@ Deno.serve(async (req: Request) => {
     const res = await fetch(initiateUrl, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-kidphone-secret': secret },
-      body: JSON.stringify({ toNumber, mode: v.mode, bridgeTo: bridgeToFor(parsed.source), context: parsed.context }),
+      body: JSON.stringify({ toNumber, contactId: parsed.contactId, mode: v.mode, bridgeTo: bridgeToFor(parsed.source), context: parsed.context }),
     })
     if (!res.ok) return jsonResponse({ error: `bridge error ${res.status}` }, 502)
     const out = await res.json().catch(() => ({}))
@@ -87,7 +90,7 @@ Deno.serve(async (req: Request) => {
   const admin = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
   const { error: logErr } = await admin
     .from('call_log')
-    .insert(buildLogRow(userId, toNumber, v.mode, parsed.taskId, callSid))
+    .insert(buildLogRow(userId, toNumber ?? `contact:${parsed.contactId}`, v.mode, parsed.taskId, callSid))
   if (logErr) return jsonResponse({ ok: true, callSid, warning: `log failed: ${logErr.message}` })
 
   return jsonResponse({ ok: true, callSid })

@@ -4,6 +4,8 @@
 export interface PlaceCallBody {
   taskId?: string
   toNumber?: string
+  /** Dial a kid-phone allowlist contact by id; number resolved server-side. */
+  contactId?: string
   mode?: 'bridge' | 'agent'
   /** Where the call was started — 'kiosk' rings the in-house handset, else the cell. */
   source?: 'app' | 'kiosk'
@@ -28,8 +30,8 @@ export function validateBody(body: Partial<PlaceCallBody>): Validation {
   if (mode === 'agent') {
     return { ok: false, status: 403, error: 'agent mode not enabled (Phase 5)' }
   }
-  if (!body.taskId && !body.toNumber) {
-    return { ok: false, status: 400, error: 'taskId or toNumber required' }
+  if (!body.taskId && !body.toNumber && !body.contactId) {
+    return { ok: false, status: 400, error: 'taskId, toNumber or contactId required' }
   }
   return { ok: true, mode }
 }
