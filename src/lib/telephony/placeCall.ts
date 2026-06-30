@@ -10,6 +10,8 @@ export interface PlaceCallRequest {
   taskId?: string
   /** Or a raw number for ad-hoc calls. */
   toNumber?: string
+  /** Dial a kid-phone allowlist contact by id (number resolved server-side). */
+  contactId?: string
   /** 'bridge' rings you then connects the callee; 'agent' is gated off (Phase 5). */
   mode?: 'bridge' | 'agent'
   /** Where the call was started — 'kiosk' rings the in-house handset, else your cell. */
