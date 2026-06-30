@@ -110,6 +110,28 @@ function PanelLoading() {
   return <div className="p-8 text-center text-neutral-500">Loading…</div>;
 }
 
+/**
+ * True when an open event panel points at an event that's no longer resolvable
+ * and should be closed rather than left hanging on "Loading…".
+ *
+ * `events` is replaced wholesale on each day's fetch (scoped to the viewed day's
+ * window — see useGoogleCalendar.fetchEvents), so an event rescheduled to another
+ * day or deleted leaves the set while its id stays in ?detail=event:<id>. We only
+ * close once the calendar has settled (not fetching/loading) AND the day loaded
+ * at least one event — proof a fetch completed and this id genuinely isn't in it.
+ * Without the `eventCount > 0` guard we'd close prematurely during the pre-fetch
+ * tick on a fresh deep-link. Exported for unit testing.
+ */
+export function shouldCloseStaleEventPanel(opts: {
+  found: boolean;
+  isFetching: boolean;
+  isLoading: boolean;
+  eventCount: number;
+}): boolean {
+  const { found, isFetching, isLoading, eventCount } = opts;
+  return !found && !isFetching && !isLoading && eventCount > 0;
+}
+
 // ── Task ──────────────────────────────────────────────────────────────────
 function TaskPanelBody({ id }: { id: string }) {
   const { clearSelection } = useSelection();
@@ -296,7 +318,7 @@ function RoutinePanelBody({ id }: { id: string }) {
 function EventPanelBody({ id }: { id: string }) {
   const { clearSelection } = useSelection();
   const navigate = useNavigate();
-  const { events, updateEvent } = useGoogleCalendar();
+  const { events, updateEvent, isFetching, isLoading } = useGoogleCalendar();
   const { getNote, updateNote } = useEventNotes();
   const { tasks } = useSupabaseTasks();
 
@@ -306,6 +328,21 @@ function EventPanelBody({ id }: { id: string }) {
     [events, id],
   );
   const handleClose = useCallback(() => clearSelection(), [clearSelection]);
+
+  // Close the panel (rather than hang on "Loading…") when the selected event has
+  // been rescheduled off this day or deleted — see shouldCloseStaleEventPanel.
+  useEffect(() => {
+    if (
+      shouldCloseStaleEventPanel({
+        found: !!event,
+        isFetching,
+        isLoading,
+        eventCount: events.length,
+      })
+    ) {
+      clearSelection();
+    }
+  }, [event, isFetching, isLoading, events.length, clearSelection]);
 
   if (!event) return <PanelLoading />;
 
