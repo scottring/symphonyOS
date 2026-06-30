@@ -24,6 +24,8 @@ export interface PlaceCallResult {
   callSid?: string
   /** Set when the call could not be placed (e.g. telephony not configured). */
   error?: string
+  /** Machine-readable rejection reason for expected soft-fails, e.g. 'quiet_hours'. */
+  reason?: string
 }
 
 export async function placeCall(req: PlaceCallRequest): Promise<PlaceCallResult> {
