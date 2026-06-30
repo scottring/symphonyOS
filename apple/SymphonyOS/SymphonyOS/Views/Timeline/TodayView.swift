@@ -103,7 +103,12 @@ struct TodayView: View {
             Task { await calendar.fetchEvents(for: appState.selectedDate) }
         }
         .onChange(of: appState.domainFilter) { _, _ in rebuildTimeline() }
-        .onChange(of: allTasks.count) { _, _ in rebuildTimeline() }
+        // Rebuild on task CONTENT changes, not just count: completing or
+        // rescheduling a task leaves the count unchanged, so keying on
+        // `allTasks.count` never fired — the row mutated in SwiftData but the
+        // carried-over/timeline snapshot stayed stale (visible completion bug).
+        .onChange(of: tasksRevision) { _, _ in rebuildTimeline() }
+        .onChange(of: instancesRevision) { _, _ in rebuildTimeline() }
         .onChange(of: playbookInstances.count) { _, _ in rebuildTimeline() }
         // Google events arrived (or changed) → fold them into the timeline.
         .onChange(of: calendar.eventItems.count) { _, _ in rebuildTimeline() }
@@ -276,6 +281,34 @@ struct TodayView: View {
                 .font(.bodySmall)
                 .foregroundStyle(Color.textTertiary)
         }
+    }
+
+    /// A content fingerprint of the task list. Changes whenever a task is added,
+    /// removed, completed, or rescheduled — the signals that affect what the
+    /// timeline shows. Keying `.onChange` on this (instead of `allTasks.count`)
+    /// makes completion/reschedule actually re-derive the Today view.
+    private var tasksRevision: Int {
+        var hasher = Hasher()
+        hasher.combine(allTasks.count)
+        for task in allTasks {
+            hasher.combine(task.id)
+            hasher.combine(task.completed)
+            hasher.combine(task.scheduledFor)
+            hasher.combine(task.bucket)
+        }
+        return hasher.finalize()
+    }
+
+    /// Same idea for routine completions, which write `ActionableInstance.status`
+    /// in place — the count never changes, so a count-only trigger would miss it.
+    private var instancesRevision: Int {
+        var hasher = Hasher()
+        hasher.combine(instances.count)
+        for instance in instances {
+            hasher.combine(instance.id)
+            hasher.combine(instance.status)
+        }
+        return hasher.finalize()
     }
 
     private func rebuildTimeline() {
