@@ -26,6 +26,14 @@ describe('WallV2PhoneScreen', () => {
     await waitFor(() => expect(placeCall).toHaveBeenCalledWith({ contactId: 'g', source: 'kiosk' }));
   });
 
+  it('shows a quiet-hours message when the call is soft-rejected', async () => {
+    placeCall.mockResolvedValueOnce({ ok: false, reason: 'quiet_hours' });
+    render(<WallV2PhoneScreen onClose={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: /Grandma/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Call$/ }));
+    await waitFor(() => expect(screen.getByText(/quiet hours/i)).toBeTruthy());
+  });
+
   it('cancel returns to the grid without calling', () => {
     render(<WallV2PhoneScreen onClose={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: /Iris/ }));

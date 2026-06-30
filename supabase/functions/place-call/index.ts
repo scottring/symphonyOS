@@ -79,6 +79,12 @@ Deno.serve(async (req: Request) => {
       headers: { 'content-type': 'application/json', 'x-kidphone-secret': secret },
       body: JSON.stringify({ toNumber, contactId: parsed.contactId, mode: v.mode, bridgeTo: bridgeToFor(parsed.source), context: parsed.context }),
     })
+    // Quiet hours is an expected, user-facing rejection — return it as a soft
+    // fail (HTTP 200 so the body reaches the browser; supabase-js hides bodies
+    // on non-2xx) with a reason the wall can show.
+    if (res.status === 409) {
+      return jsonResponse({ ok: false, reason: 'quiet_hours' })
+    }
     if (!res.ok) return jsonResponse({ error: `bridge error ${res.status}` }, 502)
     const out = await res.json().catch(() => ({}))
     callSid = (out as { callSid?: string }).callSid ?? null

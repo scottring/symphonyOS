@@ -50,7 +50,10 @@ export function WallV2PhoneScreen({ onClose }: { onClose: () => void }) {
       // The CallerIdTakeover paints "Calling …" from here; close the book.
       setTimeout(onClose, 1200)
     } else {
-      setPending({ state: 'error', contact, message: "Couldn't ring the phone — try again." })
+      const message = r.reason === 'quiet_hours'
+        ? "It's quiet hours — calls are off right now."
+        : "Couldn't ring the phone — try again."
+      setPending({ state: 'error', contact, message })
     }
   }
 
