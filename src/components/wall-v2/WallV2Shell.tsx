@@ -29,6 +29,7 @@ import { WallV2Timeline } from './WallV2Timeline';
 import { WallV2RightColumn } from './WallV2RightColumn';
 import { WallV2ActionDock } from './WallV2ActionDock';
 import { CallerIdTakeover } from './CallerIdTakeover';
+import { WallV2PhoneScreen } from './WallV2PhoneScreen';
 import { MOCK_ACTIONS } from './wallV2Mock';
 import {
   adaptGlanceForMember,
@@ -236,6 +237,7 @@ export function WallV2Shell() {
   const [showRecipeViewer, setShowRecipeViewer] = useState(false);
   const [showDiscussion, setShowDiscussion] = useState(false);
   const [showQuickCapture, setShowQuickCapture] = useState(false);
+  const [showPhone, setShowPhone] = useState(false);
   const [flashMessage, setFlashMessage] = useState<string | null>(null);
   const flashTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -344,8 +346,8 @@ export function WallV2Shell() {
       case 'event':
         showFlash('Event capture is coming soon');
         break;
-      case 'photo':
-        showFlash('Photo capture is coming soon');
+      case 'phone':
+        setShowPhone(true);
         break;
     }
   }, [discussionItems.length, showFlash]);
@@ -592,6 +594,8 @@ export function WallV2Shell() {
           onExit={() => setGuestMode(false)}
         />
       )}
+
+      {showPhone && <WallV2PhoneScreen onClose={() => setShowPhone(false)} />}
 
       {/* Caller-ID takeover — full-screen when the kid phone has a live call. */}
       <CallerIdTakeover />

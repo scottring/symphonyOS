@@ -21,8 +21,12 @@ describe('validateBody', () => {
     expect(validateBody({ toNumber: '1', mode: 'robocall' }).ok).toBe(false)
   })
 
-  it('requires a task or a number', () => {
-    expect(validateBody({})).toEqual({ ok: false, status: 400, error: 'taskId or toNumber required' })
+  it('requires a task, a number, or a contactId', () => {
+    expect(validateBody({})).toEqual({ ok: false, status: 400, error: 'taskId, toNumber or contactId required' })
+  })
+
+  it('accepts a contactId alone', () => {
+    expect(validateBody({ contactId: 'grandma' })).toMatchObject({ ok: true, mode: 'bridge' })
   })
 })
 
