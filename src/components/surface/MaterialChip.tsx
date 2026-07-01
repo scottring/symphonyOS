@@ -29,7 +29,7 @@ export function MaterialChip({ material, variant = 'chip', onAction, callAsActio
 
   const base = isTile
     ? 'flex items-start gap-3 rounded-xl px-4 py-3 text-left w-full transition-colors'
-    : 'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-left transition-colors'
+    : 'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-left transition-colors max-w-full min-w-0'
 
   const tone = partial
     ? 'bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100'
@@ -38,16 +38,28 @@ export function MaterialChip({ material, variant = 'chip', onAction, callAsActio
   const className = `${base} ${tone}`
   const iconSize = isTile ? 20 : 15
 
+  // In the compact chip, the label is a short identifier ("Directions", a phone
+  // number) and the sublabel can be an arbitrarily long value (a raw meeting URL
+  // in an item's location field, an address). Keep the label whole and let the
+  // sublabel absorb the shrink and truncate — otherwise a long URL both clips the
+  // label and forces the chip past its container, skewing the whole wall. The
+  // chip's own max-w-full/min-w-0 caps it to the container width. When there's no
+  // sublabel the label itself may be long (a link's URL), so let it truncate.
+  const labelCls = isTile
+    ? 'block text-sm font-medium truncate min-w-0'
+    : material.sublabel
+      ? 'text-sm shrink-0 whitespace-nowrap'
+      : 'text-sm truncate min-w-0'
+  const sublabelCls = isTile
+    ? 'block text-xs text-neutral-500 mt-0.5 truncate min-w-0'
+    : 'text-xs text-neutral-500 flex-1 min-w-0 truncate'
+
   const body = (
     <>
       <ConceptIcon name={material.icon} size={iconSize} decorative className={isTile ? 'mt-0.5 shrink-0' : 'shrink-0'} />
       <span className={isTile ? 'min-w-0' : 'inline-flex items-baseline gap-1.5 min-w-0'}>
-        <span className={`truncate ${isTile ? 'block text-sm font-medium' : 'text-sm'}`}>{material.label}</span>
-        {material.sublabel && (
-          <span className={`truncate ${isTile ? 'block text-xs text-neutral-500 mt-0.5' : 'text-xs text-neutral-500'}`}>
-            {material.sublabel}
-          </span>
-        )}
+        <span className={labelCls}>{material.label}</span>
+        {material.sublabel && <span className={sublabelCls}>{material.sublabel}</span>}
       </span>
     </>
   )

@@ -500,7 +500,7 @@ export function WallV2Shell() {
         </div>
 
         {/* Row 1 — Center column (glance strip + timeline) */}
-        <div className="row-span-1 col-start-2 flex flex-col gap-4 min-h-0">
+        <div className="row-span-1 col-start-2 flex flex-col gap-4 min-h-0 min-w-0">
           <WallV2NowNext today={todayData} familyMembers={wallData.familyMembers} now={now} />
           <WallV2AtAGlance cards={glance} />
           <div className="min-h-0 flex-1">
