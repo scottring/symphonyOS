@@ -94,7 +94,7 @@ function isRecipeUrl(url: string): boolean {
 /**
  * Check if a URL is a video call link and return the service name
  */
-function getVideoCallService(url: string): string | null {
+export function getVideoCallService(url: string): string | null {
   for (const { pattern, service } of VIDEO_CALL_PATTERNS) {
     // Reset pattern lastIndex for global regex
     pattern.lastIndex = 0

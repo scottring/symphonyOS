@@ -67,6 +67,35 @@ describe('deriveMaterials', () => {
     expect(mats.find((m) => m.type === 'directions')?.action.value).toBe('123 Main St')
   })
 
+  it('surfaces a "Join call" link (not Directions) for a video-meeting URL in location', () => {
+    const url = 'https://teams.microsoft.com/light-meetings/launch?agent=web&coords=abc'
+    const mats = deriveMaterials(item({ location: url }))
+    expect(mats.find((m) => m.type === 'directions')).toBeUndefined()
+    const call = mats.find((m) => m.id === 'video-call')
+    expect(call?.label).toBe('Join call')
+    expect(call?.sublabel).toBe('Microsoft Teams')
+    expect(call?.action).toEqual({ kind: 'href', value: url })
+  })
+
+  it('uses the separate meetingUrl to make a virtual-meeting label joinable', () => {
+    const mats = deriveMaterials(
+      item({ location: 'Microsoft Teams Meeting', meetingUrl: 'https://teams.microsoft.com/l/meetup/xyz' }),
+    )
+    expect(mats.find((m) => m.type === 'directions')).toBeUndefined()
+    const call = mats.find((m) => m.id === 'video-call')
+    expect(call?.label).toBe('Join call')
+    expect(call?.action).toEqual({ kind: 'href', value: 'https://teams.microsoft.com/l/meetup/xyz' })
+  })
+
+  it('labels a virtual meeting with no join URL as a non-tappable "Video call"', () => {
+    const mats = deriveMaterials(item({ location: 'Zoom Meeting' }))
+    expect(mats.find((m) => m.type === 'directions')).toBeUndefined()
+    const call = mats.find((m) => m.id === 'video-call')
+    expect(call?.label).toBe('Video call')
+    expect(call?.sublabel).toBe('Zoom Meeting')
+    expect(call?.action).toEqual({ kind: 'none' })
+  })
+
   it('stages each link (AUTO) and skips empty urls', () => {
     const mats = deriveMaterials(
       item({ links: [{ url: 'https://a.com', title: 'Referral' }, { url: '' }] }),

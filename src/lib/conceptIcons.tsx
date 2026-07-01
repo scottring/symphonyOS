@@ -2,7 +2,7 @@ import {
   Check, ClipboardList, Calendar, StickyNote, SquareCheckBig, Repeat,
   Folder, User, Tag, SprayCan, Car, Volleyball, Phone, X, Plus, Flame,
   MessageCircle, Mail, MapPin, Paperclip, TriangleAlert, Clock, Sparkles,
-  PartyPopper, Lightbulb, type LucideIcon,
+  PartyPopper, Lightbulb, Video, type LucideIcon,
 } from 'lucide-react'
 
 export const CONCEPT_ICONS = {
@@ -12,6 +12,7 @@ export const CONCEPT_ICONS = {
   call: Phone, close: X, add: Plus, streak: Flame, discussion: MessageCircle,
   email: Mail, location: MapPin, attachment: Paperclip, warning: TriangleAlert,
   time: Clock, ai: Sparkles, celebration: PartyPopper, idea: Lightbulb,
+  video: Video,
 } satisfies Record<string, LucideIcon>
 
 export type ConceptName = keyof typeof CONCEPT_ICONS

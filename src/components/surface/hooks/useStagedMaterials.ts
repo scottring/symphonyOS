@@ -12,6 +12,8 @@ import { useMemo } from 'react'
 import type { TimelineItem } from '@/types/timeline'
 import type { Contact } from '@/types/contact'
 import type { Material } from '@/types/material'
+import { locationLink } from '@/lib/locationLink'
+import { getVideoCallService } from '@/lib/actionDetection'
 
 export interface StagingContext {
   /** Resolve a contactId → contact (for the phone number + person tile). */
@@ -58,18 +60,37 @@ export function deriveMaterials(item: TimelineItem, ctx: StagingContext = {}): M
     })
   }
 
-  // 3. Directions — any item with a location. AUTO (we have the destination).
+  // 3. Location — resolve to the right kind of material. A video meeting is not
+  // a place: showing "Directions" would try to build a Maps route to the join
+  // URL (or to "Microsoft Teams Meeting"). locationLink already classifies this,
+  // so surface a "Join call" link for meetings and directions only for real
+  // addresses. AUTO (we have the destination).
   if (item.location) {
-    out.push({
-      id: 'directions',
-      type: 'directions',
-      icon: 'location',
-      label: 'Directions',
-      sublabel: item.location,
-      source: item.locationPlaceId ? 'precise route' : 'from location',
-      action: { kind: 'directions', value: item.locationPlaceId || item.location },
-      availability: 'auto',
-    })
+    const link = locationLink(item.location, item.locationPlaceId, item.meetingUrl)
+    const service = link.kind === 'url' ? getVideoCallService(link.href) : null
+    if (service || link.kind === 'virtual') {
+      out.push({
+        id: 'video-call',
+        type: 'link',
+        icon: 'video',
+        label: link.href ? 'Join call' : 'Video call',
+        sublabel: service ?? (link.href ? undefined : item.location),
+        source: 'from location',
+        action: link.href ? { kind: 'href', value: link.href } : { kind: 'none' },
+        availability: 'auto',
+      })
+    } else {
+      out.push({
+        id: 'directions',
+        type: 'directions',
+        icon: 'location',
+        label: 'Directions',
+        sublabel: item.location,
+        source: item.locationPlaceId ? 'precise route' : 'from location',
+        action: { kind: 'directions', value: item.locationPlaceId || item.location },
+        availability: 'auto',
+      })
+    }
   }
 
   // 4. Links — each saved URL on the item. AUTO.
