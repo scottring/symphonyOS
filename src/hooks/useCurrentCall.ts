@@ -22,17 +22,31 @@ function isLive(call: CurrentCall | null, now: number): call is CurrentCall {
   return new Date(call.expires_at).getTime() > now
 }
 
+export interface UseCurrentCallResult {
+  call: CurrentCall | null
+  /**
+   * Clears the wall's display of the current call on this device only. The
+   * bridge/webhook and the DB row are untouched — this is purely a local
+   * escape hatch for when the takeover is showing a call that's stuck (e.g.
+   * an out-of-order or missed webhook event), so a person is never trapped
+   * behind a frozen full-screen "Calling…" with no way back. Any subsequent
+   * call event (a new row from the bridge) shows again normally.
+   */
+  dismiss: () => void
+}
+
 /**
  * Subscribes to the singleton `current_call` row and exposes the active call
  * for the caller-ID takeover. Single household → no per-user filter needed
  * (RLS already scopes reads to authenticated members). Returns null whenever
- * there is no row, it is `ended`, or it has expired (self-heals a lost
- * `ended` event via the TTL).
+ * there is no row, it is `ended`, it has expired (self-heals a lost `ended`
+ * event via the TTL), or it was locally dismissed.
  */
-export function useCurrentCall(): CurrentCall | null {
+export function useCurrentCall(): UseCurrentCallResult {
   const { user } = useAuth()
   const [row, setRow] = useState<CurrentCall | null>(null)
   const [active, setActive] = useState<CurrentCall | null>(null)
+  const [dismissedRow, setDismissedRow] = useState<CurrentCall | null>(null)
 
   const fetchCall = useCallback(async () => {
     const { data, error } = await supabase
@@ -85,5 +99,10 @@ export function useCurrentCall(): CurrentCall | null {
     return () => clearTimeout(id)
   }, [row])
 
-  return active
+  // Reference equality: a genuinely new event replaces `row` (and so `active`)
+  // with a new object, which naturally un-dismisses it.
+  const call = active && active !== dismissedRow ? active : null
+  const dismiss = useCallback(() => setDismissedRow(active), [active])
+
+  return { call, dismiss }
 }

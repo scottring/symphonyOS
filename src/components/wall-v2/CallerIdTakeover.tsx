@@ -5,7 +5,7 @@
 // outbound shows "Calling {name}…". Blocked calls are never published upstream,
 // so they never reach here. lucide-react icons only — no emoji (wall-v2 rule).
 
-import { PhoneIncoming, PhoneOutgoing } from 'lucide-react';
+import { PhoneIncoming, PhoneOff, PhoneOutgoing } from 'lucide-react';
 import { useCurrentCall, type CurrentCall } from '@/hooks/useCurrentCall';
 
 /** Direction-aware headline. Exported for unit testing. */
@@ -19,7 +19,7 @@ function initialOf(name: string | null): string {
 }
 
 export function CallerIdTakeover() {
-  const call = useCurrentCall();
+  const { call, dismiss } = useCurrentCall();
   if (!call) return null;
 
   const outbound = call.direction === 'outbound';
@@ -56,6 +56,15 @@ export function CallerIdTakeover() {
         {call.number && (
           <p className="font-body text-2xl text-white/70">{call.number}</p>
         )}
+
+        <button
+          type="button"
+          onClick={dismiss}
+          aria-label="Hang up"
+          className="mt-4 flex items-center gap-3 rounded-full bg-red-500/90 px-8 py-4 text-xl font-bold text-white shadow-xl hover:bg-red-500 transition-colors"
+        >
+          <PhoneOff className="h-6 w-6" aria-hidden="true" /> Hang up
+        </button>
       </div>
     </div>
   );

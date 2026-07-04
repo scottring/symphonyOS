@@ -1,13 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen } from '@testing-library/react'
+import { screen, fireEvent } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { callHeadline, CallerIdTakeover } from './CallerIdTakeover'
-import type { CurrentCall } from '@/hooks/useCurrentCall'
+import type { CurrentCall, UseCurrentCallResult } from '@/hooks/useCurrentCall'
 
-const mockUseCurrentCall = vi.fn<[], CurrentCall | null>()
+const mockUseCurrentCall = vi.fn<[], UseCurrentCallResult>()
 vi.mock('@/hooks/useCurrentCall', () => ({
   useCurrentCall: () => mockUseCurrentCall(),
 }))
+const mockDismiss = vi.fn()
 
 function call(over: Partial<CurrentCall> = {}): CurrentCall {
   return {
@@ -24,7 +25,14 @@ function call(over: Partial<CurrentCall> = {}): CurrentCall {
   }
 }
 
-beforeEach(() => mockUseCurrentCall.mockReset())
+function mockResult(over: Partial<CurrentCall> | null): UseCurrentCallResult {
+  return { call: over === null ? null : call(over), dismiss: mockDismiss }
+}
+
+beforeEach(() => {
+  mockUseCurrentCall.mockReset()
+  mockDismiss.mockReset()
+})
 
 describe('callHeadline', () => {
   it('inbound reads "{name} is calling"', () => {
@@ -41,25 +49,25 @@ describe('callHeadline', () => {
 
 describe('CallerIdTakeover', () => {
   it('renders nothing when there is no live call', () => {
-    mockUseCurrentCall.mockReturnValue(null)
+    mockUseCurrentCall.mockReturnValue(mockResult(null))
     const { container } = render(<CallerIdTakeover />)
     expect(container).toBeEmptyDOMElement()
   })
 
   it('shows the inbound headline', () => {
-    mockUseCurrentCall.mockReturnValue(call())
+    mockUseCurrentCall.mockReturnValue(mockResult({}))
     render(<CallerIdTakeover />)
     expect(screen.getByRole('heading', { name: 'Grandma is calling' })).toBeInTheDocument()
   })
 
   it('shows the outbound headline', () => {
-    mockUseCurrentCall.mockReturnValue(call({ direction: 'outbound' }))
+    mockUseCurrentCall.mockReturnValue(mockResult({ direction: 'outbound' }))
     render(<CallerIdTakeover />)
     expect(screen.getByRole('heading', { name: 'Calling Grandma…' })).toBeInTheDocument()
   })
 
   it('renders the photo when present', () => {
-    mockUseCurrentCall.mockReturnValue(call({ photo_url: 'https://x/g.jpg' }))
+    mockUseCurrentCall.mockReturnValue(mockResult({ photo_url: 'https://x/g.jpg' }))
     render(<CallerIdTakeover />)
     const img = document.querySelector('img') as HTMLImageElement
     expect(img).not.toBeNull()
@@ -67,9 +75,16 @@ describe('CallerIdTakeover', () => {
   })
 
   it('falls back to the initial placeholder when no photo', () => {
-    mockUseCurrentCall.mockReturnValue(call({ photo_url: null, name: 'Grandma' }))
+    mockUseCurrentCall.mockReturnValue(mockResult({ photo_url: null, name: 'Grandma' }))
     render(<CallerIdTakeover />)
     expect(document.querySelector('img')).toBeNull()
     expect(screen.getByText('G')).toBeInTheDocument()
+  })
+
+  it('hang up calls dismiss so a stuck takeover can always be cleared', () => {
+    mockUseCurrentCall.mockReturnValue(mockResult({}))
+    render(<CallerIdTakeover />)
+    fireEvent.click(screen.getByRole('button', { name: /hang up/i }))
+    expect(mockDismiss).toHaveBeenCalledTimes(1)
   })
 })

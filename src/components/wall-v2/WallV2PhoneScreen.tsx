@@ -5,7 +5,7 @@
 // and bridges to the callee (placeCall with source:'kiosk'). Numbers never reach
 // the browser; we dial by contactId.
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Phone, X, PhoneCall } from 'lucide-react'
 import { useKidPhoneContacts } from '@/hooks/useKidPhoneContacts'
 import { placeCall } from '@/lib/telephony/placeCall'
@@ -40,12 +40,17 @@ function ContactButton({ c, large, onTap }: { c: KidPhoneContact; large?: boolea
 export function WallV2PhoneScreen({ onClose }: { onClose: () => void }) {
   const { favorites, others, loading, error } = useKidPhoneContacts(true)
   const [pending, setPending] = useState<Pending | null>(null)
+  // Bumped on cancel so a placeCall() that resolves after the user has
+  // already backed out can't resurrect the "calling" modal.
+  const requestId = useRef(0)
 
   const confirm = async () => {
     if (!pending) return
     const contact = pending.contact
+    const id = ++requestId.current
     setPending({ state: 'calling', contact })
     const r = await placeCall({ contactId: contact.contactId, source: 'kiosk' })
+    if (id !== requestId.current) return
     if (r.ok) {
       // The CallerIdTakeover paints "Calling …" from here; close the book.
       setTimeout(onClose, 1200)
@@ -55,6 +60,11 @@ export function WallV2PhoneScreen({ onClose }: { onClose: () => void }) {
         : "Couldn't ring the phone — try again."
       setPending({ state: 'error', contact, message })
     }
+  }
+
+  const cancelCalling = () => {
+    requestId.current++
+    setPending(null)
   }
 
   const empty = !loading && favorites.length === 0 && others.length === 0
@@ -109,9 +119,18 @@ export function WallV2PhoneScreen({ onClose }: { onClose: () => void }) {
                 : initials(pending.contact.name)}
             </div>
             {pending.state === 'calling' ? (
-              <p className="flex items-center justify-center gap-2 text-2xl font-bold text-stone-800 dark:text-stone-100">
-                <PhoneCall className="w-6 h-6 animate-pulse" /> Calling {pending.contact.name}…
-              </p>
+              <>
+                <p className="flex items-center justify-center gap-2 text-2xl font-bold text-stone-800 dark:text-stone-100">
+                  <PhoneCall className="w-6 h-6 animate-pulse" /> Calling {pending.contact.name}…
+                </p>
+                <button
+                  type="button"
+                  onClick={cancelCalling}
+                  className="mt-6 w-full py-4 rounded-2xl bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-200 text-xl font-bold"
+                >
+                  Cancel
+                </button>
+              </>
             ) : (
               <>
                 <p className="text-2xl font-extrabold text-stone-800 dark:text-stone-100 mb-1">Call {pending.contact.name}?</p>
