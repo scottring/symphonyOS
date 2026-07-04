@@ -57,7 +57,16 @@ export function MedsApp() {
           <SymptomQuickLog symptoms={symptoms} onLog={logSymptom} />
         </div>
       ) : tab === 'timing' ? (
-        <TimingView medications={medications} logs={logs} onUpdateLog={updateLog} onDeleteLog={deleteLog} />
+        <TimingView
+          medications={medications}
+          doseLogs={logs}
+          onUpdateDose={updateLog}
+          onDeleteDose={deleteLog}
+          symptoms={symptoms}
+          symptomLogs={symptomLogs}
+          onUpdateSymptom={updateSymptomLog}
+          onDeleteSymptom={deleteSymptomLog}
+        />
       ) : (
         <div className="space-y-8">
           <MedManageList
