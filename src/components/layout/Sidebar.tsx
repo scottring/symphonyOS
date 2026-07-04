@@ -389,7 +389,7 @@ export function Sidebar({
             className={navItemClass(location.pathname.startsWith('/meds'))}
           >
             {createElement(Pill, { className: 'w-5 h-5 shrink-0' })}
-            {!collapsed && <span>Meds</span>}
+            {!collapsed && <span>Health</span>}
           </button>
 
           {/* Meals */}

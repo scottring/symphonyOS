@@ -2,9 +2,13 @@ import { useState } from 'react'
 import { Pill, Clock, ListChecks } from 'lucide-react'
 import { useMedications } from '@/hooks/useMedications'
 import { useMedicationLogs } from '@/hooks/useMedicationLogs'
+import { useSymptoms } from '@/hooks/useSymptoms'
+import { useSymptomLogs } from '@/hooks/useSymptomLogs'
 import { TodayStrip } from './components/TodayStrip'
 import { TimingView } from './components/TimingView'
 import { MedManageList } from './components/MedManageList'
+import { SymptomManageList } from './components/SymptomManageList'
+import { SymptomQuickLog } from './components/SymptomQuickLog'
 
 type Tab = 'today' | 'timing' | 'manage'
 
@@ -12,6 +16,11 @@ export function MedsApp() {
   const [tab, setTab] = useState<Tab>('today')
   const { medications, loading, addMedication, updateMedication, deleteMedication } = useMedications()
   const { logs, logDose, updateLog, deleteLog } = useMedicationLogs({ sinceDays: 30 })
+  const { symptoms, addSymptom, updateSymptom, deleteSymptom } = useSymptoms()
+  const {
+    logs: symptomLogs, logSymptom,
+    updateLog: updateSymptomLog, deleteLog: deleteSymptomLog,
+  } = useSymptomLogs({ sinceDays: 30 })
 
   const tabs: { id: Tab; label: string; icon: typeof Pill }[] = [
     { id: 'today', label: 'Today', icon: Pill },
@@ -21,7 +30,7 @@ export function MedsApp() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
-      <h1 className="text-3xl font-display mb-4">Medications</h1>
+      <h1 className="text-3xl font-display mb-4">Health</h1>
       <div className="flex gap-2 mb-6">
         {tabs.map((t) => {
           const Icon = t.icon
@@ -43,17 +52,37 @@ export function MedsApp() {
       {loading ? (
         <p className="text-neutral-500">Loading…</p>
       ) : tab === 'today' ? (
-        <TodayStrip medications={medications} logs={logs} onLogDose={logDose} />
+        <div className="space-y-4">
+          <TodayStrip medications={medications} logs={logs} onLogDose={logDose} />
+          <SymptomQuickLog symptoms={symptoms} onLog={logSymptom} />
+        </div>
       ) : tab === 'timing' ? (
-        <TimingView medications={medications} logs={logs} onUpdateLog={updateLog} onDeleteLog={deleteLog} />
-      ) : (
-        <MedManageList
+        <TimingView
           medications={medications}
-          onAdd={addMedication}
-          onUpdate={updateMedication}
-          onDelete={deleteMedication}
-          onLogDose={logDose}
+          doseLogs={logs}
+          onUpdateDose={updateLog}
+          onDeleteDose={deleteLog}
+          symptoms={symptoms}
+          symptomLogs={symptomLogs}
+          onUpdateSymptom={updateSymptomLog}
+          onDeleteSymptom={deleteSymptomLog}
         />
+      ) : (
+        <div className="space-y-8">
+          <MedManageList
+            medications={medications}
+            onAdd={addMedication}
+            onUpdate={updateMedication}
+            onDelete={deleteMedication}
+            onLogDose={logDose}
+          />
+          <SymptomManageList
+            symptoms={symptoms}
+            onAdd={addSymptom}
+            onUpdate={updateSymptom}
+            onDelete={deleteSymptom}
+          />
+        </div>
       )}
     </div>
   )

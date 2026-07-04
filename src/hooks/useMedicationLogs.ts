@@ -54,8 +54,9 @@ export function useMedicationLogs(opts: { sinceDays?: number } = {}) {
     if (e) setError(e.message)
   }, [])
 
-  const updateLog = useCallback(async (id: string, patch: { takenAt?: Date; note?: string }) => {
+  const updateLog = useCallback(async (id: string, patch: { medicationId?: string; takenAt?: Date; note?: string }) => {
     const row: Record<string, unknown> = {}
+    if (patch.medicationId !== undefined) row.medication_id = patch.medicationId
     if (patch.takenAt !== undefined) row.taken_at = patch.takenAt.toISOString()
     if (patch.note !== undefined) row.note = patch.note
     const { error: e } = await supabase.from('medication_logs').update(row).eq('id', id)

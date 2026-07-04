@@ -1,18 +1,24 @@
 import { useState, useMemo } from 'react'
-import { Pencil, Trash2, Check } from 'lucide-react'
+import { Pencil, Trash2, Pill, Activity } from 'lucide-react'
 import type { Medication, MedicationLog } from '@/types/medication'
+import type { Symptom, SymptomLog, Severity } from '@/types/symptom'
+import { SEVERITY_LABELS } from '@/types/symptom'
 import { computeIntervals } from '@/lib/meds/intervals'
+import { mergeTimeline } from '@/lib/meds/timelineMerge'
+import type { TimelineRow } from '@/lib/meds/timelineMerge'
+import { LogEditor } from './LogEditor'
 
 interface Props {
   medications: Medication[]
-  logs: MedicationLog[]
-  onUpdateLog: (id: string, patch: { takenAt?: Date; note?: string }) => void
-  onDeleteLog: (id: string) => void
+  doseLogs: MedicationLog[]
+  onUpdateDose: (id: string, patch: { medicationId?: string; takenAt?: Date; note?: string }) => void
+  onDeleteDose: (id: string) => void
+  symptoms: Symptom[]
+  symptomLogs: SymptomLog[]
+  onUpdateSymptom: (id: string, patch: { symptomId?: string; severity?: Severity; loggedAt?: Date; note?: string }) => void
+  onDeleteSymptom: (id: string) => void
 }
 
-function dayKey(d: Date): string {
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-}
 function fmt(d: Date): string {
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 }
@@ -20,97 +26,88 @@ function fmtGap(min: number): string {
   const h = Math.floor(min / 60), m = min % 60
   return h > 0 ? `${h}h ${m}m` : `${m}m`
 }
-function toTimeInputValue(d: Date): string {
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+const SEVERITY_COLOR: Record<Severity, string> = {
+  1: 'text-amber-500', 2: 'text-orange-500', 3: 'text-red-600',
 }
 
-export function TimingView({ medications, logs, onUpdateLog, onDeleteLog }: Props) {
+export function TimingView(props: Props) {
+  const { medications, doseLogs, onUpdateDose, onDeleteDose, symptoms, symptomLogs, onUpdateSymptom, onDeleteSymptom } = props
   const [days, setDays] = useState<7 | 30>(7)
-  const [medId, setMedId] = useState<string>('all')
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [time, setTime] = useState('')
 
   // eslint-disable-next-line react-hooks/purity -- range boundary is intentionally computed at render time
   const since = Date.now() - days * 86_400_000
-  const filtered = useMemo(() => {
-    return logs.filter((l) => l.takenAt.getTime() >= since && (medId === 'all' || l.medicationId === medId))
-  }, [logs, medId, since])
+  const doses = useMemo(() => doseLogs.filter((l) => l.takenAt.getTime() >= since), [doseLogs, since])
+  const symps = useMemo(() => symptomLogs.filter((l) => l.loggedAt.getTime() >= since), [symptomLogs, since])
+  const timeline = useMemo(() => mergeTimeline(doses, symps), [doses, symps])
 
-  const byDay = useMemo(() => {
-    const groups = new Map<string, MedicationLog[]>()
-    for (const l of [...filtered].sort((a, b) => a.takenAt.getTime() - b.takenAt.getTime())) {
-      const k = dayKey(l.takenAt)
-      if (!groups.has(k)) groups.set(k, [])
-      groups.get(k)!.push(l)
-    }
-    return [...groups.entries()].reverse()
-  }, [filtered])
-
-  function startEdit(l: MedicationLog) {
-    setEditingId(l.id)
-    setTime(toTimeInputValue(l.takenAt))
-  }
-
-  function saveEdit(l: MedicationLog) {
-    const [hours, minutes] = time.split(':').map(Number)
-    if (Number.isNaN(hours) || Number.isNaN(minutes)) { setEditingId(null); return }
-    const newDate = new Date(l.takenAt)
-    newDate.setHours(hours, minutes, 0, 0)
-    onUpdateLog(l.id, { takenAt: newDate })
-    setEditingId(null)
-  }
+  const medName = (id: string) => medications.find((m) => m.id === id)?.name ?? 'Medication'
+  const sympName = (id: string) => symptoms.find((s) => s.id === id)?.name ?? 'Symptom'
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <div className="flex gap-2">
-          {([7, 30] as const).map((d) => (
-            <button key={d} className={`px-3 py-1 rounded-full text-sm ${days === d ? 'btn-primary' : 'card'}`}
-              onClick={() => setDays(d)}>{d} days</button>
-          ))}
-        </div>
-        <select className="input-base" value={medId} onChange={(e) => setMedId(e.target.value)}>
-          <option value="all">All meds</option>
-          {medications.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-        </select>
+      <div className="flex gap-2">
+        {([7, 30] as const).map((d) => (
+          <button key={d} className={`px-3 py-1 rounded-full text-sm ${days === d ? 'btn-primary' : 'card'}`}
+            onClick={() => setDays(d)}>{d} days</button>
+        ))}
       </div>
 
-      {byDay.length === 0 && <p className="text-neutral-500">No doses logged in this range.</p>}
-      {byDay.map(([day, dayLogs]) => {
-        const intervals = computeIntervals(dayLogs)
+      {timeline.length === 0 && <p className="text-neutral-500">Nothing logged in this range.</p>}
+      {timeline.map((day) => {
+        // Dose intervals are computed among that day's doses only, in chronological order,
+        // then keyed by dose id so render order (e.g. an in-progress edit) can't shift them.
+        const dayDoses = day.rows
+          .filter((r): r is Extract<TimelineRow, { kind: 'dose' }> => r.kind === 'dose')
+          .map((r) => r.log)
+        const intervals = computeIntervals(dayDoses)
+        const gapById = new Map<string, number>()
+        dayDoses.forEach((d, i) => { if (i > 0) gapById.set(d.id, intervals[i - 1].minutes) })
         return (
-          <div key={day} className="card p-4">
-            <div className="font-medium mb-2">{day}</div>
+          <div key={day.key} className="card p-4">
+            <div className="font-medium mb-2">{day.label}</div>
             <div className="space-y-1">
-              {dayLogs.map((l, i) => (
-                <div key={l.id} className="flex items-center gap-3 text-sm">
-                  {editingId === l.id ? (
-                    <>
-                      <input type="time" className="input-base w-32" value={time}
-                        onChange={(e) => setTime(e.target.value)} />
-                      <button className="card px-2 py-1" onClick={() => saveEdit(l)} title="Save">
-                        <Check className="w-4 h-4" />
-                      </button>
-                    </>
+              {day.rows.map((row) => {
+                if (editingId === row.log.id) {
+                  return row.kind === 'dose' ? (
+                    <LogEditor key={row.log.id} kind="dose" log={row.log} medications={medications}
+                      onSave={(patch) => { onUpdateDose(row.log.id, patch); setEditingId(null) }}
+                      onCancel={() => setEditingId(null)} />
                   ) : (
-                    <>
-                      <span className="w-16 tabular-nums">{fmt(l.takenAt)}</span>
-                      {i > 0 && <span className="text-neutral-400">+{fmtGap(intervals[i - 1].minutes)}</span>}
-                      {(l.source === 'shortcut' || l.source === 'siri') && <span className="text-xs text-primary-500">voice</span>}
+                    <LogEditor key={row.log.id} kind="symptom" log={row.log} symptoms={symptoms}
+                      onSave={(patch) => { onUpdateSymptom(row.log.id, patch); setEditingId(null) }}
+                      onCancel={() => setEditingId(null)} />
+                  )
+                }
+                if (row.kind === 'dose') {
+                  const gap = gapById.get(row.log.id)
+                  return (
+                    <div key={row.log.id} className="flex items-center gap-3 text-sm">
+                      <Pill className="w-4 h-4 text-primary-500 shrink-0" />
+                      <span className="w-16 tabular-nums">{fmt(row.at)}</span>
+                      <span className="text-neutral-700">{medName(row.log.medicationId)}</span>
+                      {gap !== undefined && <span className="text-neutral-400">+{fmtGap(gap)}</span>}
                       <div className="ml-auto flex items-center gap-1">
-                        <button className="card px-2 py-1" onClick={() => startEdit(l)} title="Edit time">
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button className="card px-2 py-1" onClick={() => {
-                          if (window.confirm('Delete this logged dose?')) onDeleteLog(l.id)
-                        }} title="Delete dose">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <button className="card px-2 py-1" onClick={() => setEditingId(row.log.id)} title="Edit dose"><Pencil className="w-4 h-4" /></button>
+                        <button className="card px-2 py-1" onClick={() => { if (window.confirm('Delete this logged dose?')) onDeleteDose(row.log.id) }} title="Delete dose"><Trash2 className="w-4 h-4" /></button>
                       </div>
-                    </>
-                  )}
-                </div>
-              ))}
+                    </div>
+                  )
+                }
+                const sev = row.log.severity
+                return (
+                  <div key={row.log.id} className="flex items-center gap-3 text-sm">
+                    <Activity className={`w-4 h-4 shrink-0 ${SEVERITY_COLOR[sev]}`} />
+                    <span className="w-16 tabular-nums">{fmt(row.at)}</span>
+                    <span className="text-neutral-700">{sympName(row.log.symptomId)}</span>
+                    <span className={`text-xs ${SEVERITY_COLOR[sev]}`}>{SEVERITY_LABELS[sev]}</span>
+                    <div className="ml-auto flex items-center gap-1">
+                      <button className="card px-2 py-1" onClick={() => setEditingId(row.log.id)} title="Edit symptom"><Pencil className="w-4 h-4" /></button>
+                      <button className="card px-2 py-1" onClick={() => { if (window.confirm('Delete this logged symptom?')) onDeleteSymptom(row.log.id) }} title="Delete symptom"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
         )
