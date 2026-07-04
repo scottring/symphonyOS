@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Plus, Pencil, Trash2, Check } from 'lucide-react'
+import { Plus, Pencil, Trash2, Check, KeyRound } from 'lucide-react'
 import type { Medication, MedicationLog } from '@/types/medication'
 import type { MedicationInput } from '@/hooks/useMedications'
 import { MedEditor } from './MedEditor'
+import { supabase } from '@/lib/supabase'
 
 interface Props {
   medications: Medication[]; logs: MedicationLog[]
@@ -18,9 +19,24 @@ export function MedManageList(props: Props) {
   const { medications, onAdd, onUpdate, onDelete, onLogDose } = props
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [token, setToken] = useState<string | null>(null)
+
+  async function revealToken() {
+    const { data, error } = await supabase.rpc('ensure_med_log_token')
+    if (!error && typeof data === 'string') setToken(data)
+  }
 
   return (
     <div className="space-y-4">
+      <div className="card p-4">
+        <button className="flex items-center gap-2 text-sm" onClick={revealToken}>
+          <KeyRound className="w-4 h-4" /> Show voice-logging token
+        </button>
+        {token && (
+          <code className="block mt-2 break-all text-xs bg-neutral-100 p-2 rounded select-all">{token}</code>
+        )}
+      </div>
+
       {medications.map((m) =>
         editingId === m.id ? (
           <MedEditor key={m.id} initial={m}
