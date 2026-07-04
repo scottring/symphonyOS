@@ -47,7 +47,7 @@ export function useMedications() {
     fetchMeds()
     const channel = supabase
       .channel('medications-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'medications' }, fetchMeds)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'medications', filter: `user_id=eq.${user.id}` }, fetchMeds)
       .subscribe()
     return () => { active = false; supabase.removeChannel(channel) }
   }, [user])

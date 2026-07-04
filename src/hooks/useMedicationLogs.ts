@@ -41,7 +41,7 @@ export function useMedicationLogs(opts: { sinceDays?: number } = {}) {
     fetchLogs()
     const channel = supabase
       .channel('medication-logs-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'medication_logs' }, fetchLogs)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'medication_logs', filter: `user_id=eq.${user.id}` }, fetchLogs)
       .subscribe()
     return () => { active = false; supabase.removeChannel(channel) }
   }, [user, sinceDays])
