@@ -49,13 +49,10 @@ export function MedsApp() {
       ) : (
         <MedManageList
           medications={medications}
-          logs={logs}
           onAdd={addMedication}
           onUpdate={updateMedication}
           onDelete={deleteMedication}
           onLogDose={logDose}
-          onUpdateLog={updateLog}
-          onDeleteLog={deleteLog}
         />
       )}
     </div>

@@ -96,12 +96,14 @@ export function TimingView({ medications, logs, onUpdateLog, onDeleteLog }: Prop
                     <>
                       <span className="w-16 tabular-nums">{fmt(l.takenAt)}</span>
                       {i > 0 && <span className="text-neutral-400">+{fmtGap(intervals[i - 1].minutes)}</span>}
-                      {l.source !== 'web' && l.source !== 'manual' && <span className="text-xs text-primary-500">voice</span>}
+                      {(l.source === 'shortcut' || l.source === 'siri') && <span className="text-xs text-primary-500">voice</span>}
                       <div className="ml-auto flex items-center gap-1">
                         <button className="card px-2 py-1" onClick={() => startEdit(l)} title="Edit time">
                           <Pencil className="w-4 h-4" />
                         </button>
-                        <button className="card px-2 py-1" onClick={() => onDeleteLog(l.id)} title="Delete dose">
+                        <button className="card px-2 py-1" onClick={() => {
+                          if (window.confirm('Delete this logged dose?')) onDeleteLog(l.id)
+                        }} title="Delete dose">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>

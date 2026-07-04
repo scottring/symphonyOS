@@ -81,3 +81,15 @@ $$;
 
 revoke all on function ensure_med_log_token() from public;
 grant execute on function ensure_med_log_token() to authenticated;
+
+-- Live UI refresh: the hooks subscribe via postgres_changes, so both tables
+-- must belong to the supabase_realtime publication (idempotent).
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'medications') then
+    alter publication supabase_realtime add table medications;
+  end if;
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'medication_logs') then
+    alter publication supabase_realtime add table medication_logs;
+  end if;
+end $$;

@@ -1,18 +1,16 @@
 import { useState } from 'react'
 import { Plus, Pencil, Trash2, Check, KeyRound } from 'lucide-react'
-import type { Medication, MedicationLog } from '@/types/medication'
+import type { Medication } from '@/types/medication'
 import type { MedicationInput } from '@/hooks/useMedications'
 import { MedEditor } from './MedEditor'
 import { supabase } from '@/lib/supabase'
 
 interface Props {
-  medications: Medication[]; logs: MedicationLog[]
+  medications: Medication[]
   onAdd: (input: MedicationInput) => Promise<Medication | null>
   onUpdate: (id: string, patch: Partial<MedicationInput>) => void
   onDelete: (id: string) => void
   onLogDose: (medicationId: string, takenAt?: Date, note?: string) => void
-  onUpdateLog: (id: string, patch: { takenAt?: Date; note?: string }) => void
-  onDeleteLog: (id: string) => void
 }
 
 export function MedManageList(props: Props) {
@@ -54,7 +52,9 @@ export function MedManageList(props: Props) {
                 <Check className="w-4 h-4" /> Take now
               </button>
               <button className="card px-2 py-1" onClick={() => setEditingId(m.id)}><Pencil className="w-4 h-4" /></button>
-              <button className="card px-2 py-1" onClick={() => onDelete(m.id)}><Trash2 className="w-4 h-4" /></button>
+              <button className="card px-2 py-1" onClick={() => {
+                if (window.confirm('Delete this medication and all its logged doses?')) onDelete(m.id)
+              }}><Trash2 className="w-4 h-4" /></button>
             </div>
           </div>
         )
