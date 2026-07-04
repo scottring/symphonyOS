@@ -277,6 +277,12 @@ verify_jwt = false
 [functions.kid-phone-call]
 verify_jwt = false
 
+# Meds tracker dose logger: authenticated via a durable per-user x-med-token
+# (Siri Shortcut caller has no Supabase session). JWT verification must stay
+# off or the request 401s at the gateway before the token check runs.
+[functions.log-medication]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
