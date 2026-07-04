@@ -403,20 +403,23 @@ git commit -m "feat(meds): types + pure slot-matching and interval helpers (TDD)
 ### Task 3: `log-medication` edge function — TDD on pure logic, then deploy
 
 **Files:**
-- Create: `supabase/functions/log-medication/index.ts`
-- Create: `supabase/functions/log-medication/index.test.ts`
+- Create: `supabase/functions/log-medication/lib/logic.ts` (pure helpers — matches the repo convention: `list-contacts/lib/validate.ts`, `extract-capture/lib/*.ts`)
+- Create: `supabase/functions/log-medication/lib/logic.test.ts`
+- Create: `supabase/functions/log-medication/index.ts` (HTTP handler; imports from `./lib/logic.ts`)
 - Modify: `supabase/config.toml` (add function stanza)
+
+**Convention note:** pure logic MUST live in `lib/logic.ts` and be tested there, NOT in `index.ts`. `index.ts` calls `Deno.serve(...)` at module top level; importing it under vitest (Node) would execute that call and crash on the undefined `Deno` global. Every existing edge-function test in this repo tests a `lib/` file for exactly this reason.
 
 **Interfaces:**
 - Consumes: `medications`, `medication_logs`, `med_log_tokens` from Task 1.
-- Produces: `POST /functions/v1/log-medication` with header `x-med-token`, body `{ medication: string; taken_at?: string; note?: string }`. Also exports pure `matchMedication(name, meds)` and `parseBody(raw)` for tests.
+- Produces: `POST /functions/v1/log-medication` with header `x-med-token`, body `{ medication: string; taken_at?: string; note?: string }`. `lib/logic.ts` exports pure `matchMedication(name, meds)` and `parseBody(raw)` (plus types `MedRow`, `MatchResult`, `ParsedBody`).
 
 - [ ] **Step 1: Write failing tests for the pure helpers**
 
 ```typescript
-// supabase/functions/log-medication/index.test.ts
+// supabase/functions/log-medication/lib/logic.test.ts
 import { describe, it, expect } from 'vitest'
-import { matchMedication, parseBody } from './index.ts'
+import { matchMedication, parseBody } from './logic.ts'
 
 const MEDS = [
   { id: '1', name: 'Carbidopa/Levodopa' },
@@ -455,25 +458,14 @@ describe('parseBody', () => {
 
 - [ ] **Step 2: Run — expect fail**
 
-Run: `npx vitest run supabase/functions/log-medication/index.test.ts`
-Expected: FAIL — cannot find module / functions not exported.
+Run: `npx vitest run supabase/functions/log-medication/lib/logic.test.ts`
+Expected: FAIL — cannot find module `./logic.ts` / functions not exported.
 
-- [ ] **Step 3: Implement the edge function**
+- [ ] **Step 3a: Implement the pure logic module**
 
 ```typescript
-// supabase/functions/log-medication/index.ts
-// LOG-MEDICATION — trusted-device dose logger for the meds tracker.
-// Auth: durable per-user token in `x-med-token` (see med_log_tokens / ensure_med_log_token).
-// Body: { medication: "all" | <name substring>, taken_at?: ISO8601, note?: string }
-// Returns { ok, message } — message is human-readable so Siri can speak it.
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-med-token',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
-
+// supabase/functions/log-medication/lib/logic.ts
+// Pure request logic for log-medication — no Deno/network deps, unit-tested.
 export interface MedRow { id: string; name: string }
 
 export type MatchResult =
@@ -483,8 +475,8 @@ export type MatchResult =
   | { kind: 'ambiguous'; candidates: MedRow[] }
 
 export function matchMedication(query: string, meds: MedRow[]): MatchResult {
-  if (query.trim().toLowerCase() === 'all') return { kind: 'all' }
   const q = query.trim().toLowerCase()
+  if (q === 'all') return { kind: 'all' }
   const hits = meds.filter((m) => m.name.toLowerCase().includes(q))
   if (hits.length === 0) return { kind: 'none' }
   if (hits.length > 1) return { kind: 'ambiguous', candidates: hits }
@@ -514,6 +506,24 @@ export function parseBody(raw: unknown): ParsedBody {
     taken_at: b.taken_at as string | undefined,
     note: b.note as string | undefined,
   }
+}
+```
+
+- [ ] **Step 3b: Implement the HTTP handler (imports the pure logic)**
+
+```typescript
+// supabase/functions/log-medication/index.ts
+// LOG-MEDICATION — trusted-device dose logger for the meds tracker.
+// Auth: durable per-user token in `x-med-token` (see med_log_tokens / ensure_med_log_token).
+// Body: { medication: "all" | <name substring>, taken_at?: ISO8601, note?: string }
+// Returns { ok, message } — message is human-readable so Siri can speak it.
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { matchMedication, parseBody, type MedRow } from './lib/logic.ts'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-med-token',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 function json(body: unknown, status = 200): Response {
@@ -575,8 +585,8 @@ Deno.serve(async (req: Request) => {
 
 - [ ] **Step 4: Run — expect pass**
 
-Run: `npx vitest run supabase/functions/log-medication/index.test.ts`
-Expected: PASS (7 tests). (The `Deno.serve` call is not executed by the test — only the exported pure helpers are imported. If vitest tries to evaluate `Deno`, guard is not needed because `Deno.serve` runs only at import time in Deno; in Node the module still imports since `Deno` is referenced lazily inside the callback. If import fails on `Deno.serve`, wrap the serve call: `if (typeof Deno !== 'undefined') Deno.serve(...)`.)
+Run: `npx vitest run supabase/functions/log-medication/lib/logic.test.ts`
+Expected: PASS (7 tests). The test imports only `./logic.ts` (no `Deno` reference), so it runs cleanly under vitest/Node.
 
 - [ ] **Step 5: Add config.toml stanza**
 
@@ -611,7 +621,7 @@ Expected: `{"ok":true,"message":"Logged ... at ..."}`. Also verify bad token →
 - [ ] **Step 8: Commit**
 
 ```bash
-git add supabase/functions/log-medication/ supabase/config.toml
+git add supabase/functions/log-medication/index.ts supabase/functions/log-medication/lib/ supabase/config.toml
 git commit -m "feat(meds): log-medication edge function (token auth, speakable reply)"
 ```
 
