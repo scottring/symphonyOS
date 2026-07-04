@@ -30,7 +30,7 @@ export function MedsApp() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
-      <h1 className="text-3xl font-display mb-4">Medications</h1>
+      <h1 className="text-3xl font-display mb-4">Health</h1>
       <div className="flex gap-2 mb-6">
         {tabs.map((t) => {
           const Icon = t.icon
