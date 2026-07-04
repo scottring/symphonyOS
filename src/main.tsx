@@ -121,6 +121,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/goals/*" element={<Shell />} />
               <Route path="/projects/*" element={<Shell />} />
               <Route path="/routines/*" element={<Shell />} />
+              <Route path="/meds/*" element={<Shell />} />
               <Route path="/contacts/*" element={<Shell />} />
               <Route path="/family/*" element={<Shell />} />
               <Route path="/agent/*" element={<Shell />} />
