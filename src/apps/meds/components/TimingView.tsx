@@ -5,6 +5,7 @@ import type { Symptom, SymptomLog, Severity } from '@/types/symptom'
 import { SEVERITY_LABELS } from '@/types/symptom'
 import { computeIntervals } from '@/lib/meds/intervals'
 import { mergeTimeline } from '@/lib/meds/timelineMerge'
+import type { TimelineRow } from '@/lib/meds/timelineMerge'
 import { LogEditor } from './LogEditor'
 
 interface Props {
@@ -54,10 +55,14 @@ export function TimingView(props: Props) {
 
       {timeline.length === 0 && <p className="text-neutral-500">Nothing logged in this range.</p>}
       {timeline.map((day) => {
-        // Dose intervals are computed among that day's doses only, in chronological order.
-        const dayDoses = day.rows.filter((r) => r.kind === 'dose').map((r) => r.log as MedicationLog)
+        // Dose intervals are computed among that day's doses only, in chronological order,
+        // then keyed by dose id so render order (e.g. an in-progress edit) can't shift them.
+        const dayDoses = day.rows
+          .filter((r): r is Extract<TimelineRow, { kind: 'dose' }> => r.kind === 'dose')
+          .map((r) => r.log)
         const intervals = computeIntervals(dayDoses)
-        let doseIdx = -1
+        const gapById = new Map<string, number>()
+        dayDoses.forEach((d, i) => { if (i > 0) gapById.set(d.id, intervals[i - 1].minutes) })
         return (
           <div key={day.key} className="card p-4">
             <div className="font-medium mb-2">{day.label}</div>
@@ -75,8 +80,7 @@ export function TimingView(props: Props) {
                   )
                 }
                 if (row.kind === 'dose') {
-                  doseIdx++
-                  const gap = doseIdx > 0 ? intervals[doseIdx - 1]?.minutes : undefined
+                  const gap = gapById.get(row.log.id)
                   return (
                     <div key={row.log.id} className="flex items-center gap-3 text-sm">
                       <Pill className="w-4 h-4 text-primary-500 shrink-0" />
