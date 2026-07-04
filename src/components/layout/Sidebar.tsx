@@ -31,6 +31,7 @@ import {
   Users2,
   List,
   Repeat,
+  Pill,
   Target,
   History,
   Settings,
@@ -380,6 +381,15 @@ export function Sidebar({
           >
             {createElement(Repeat, { className: 'w-5 h-5 shrink-0' })}
             {!collapsed && <span>Routines</span>}
+          </button>
+
+          {/* Meds */}
+          <button
+            onClick={() => navigate('/meds')}
+            className={navItemClass(location.pathname.startsWith('/meds'))}
+          >
+            {createElement(Pill, { className: 'w-5 h-5 shrink-0' })}
+            {!collapsed && <span>Meds</span>}
           </button>
 
           {/* Meals */}
