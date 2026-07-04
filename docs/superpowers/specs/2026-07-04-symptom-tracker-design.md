@@ -60,6 +60,11 @@ Copied from the med hooks (Supabase CRUD + user-scoped realtime, `useCallback`):
 - `useSymptoms() => { symptoms, loading, error, addSymptom, updateSymptom, deleteSymptom }`
 - `useSymptomLogs({ sinceDays? }) => { logs, loading, error, logSymptom, updateLog, deleteLog }`
   - `logSymptom(symptomId, severity, loggedAt?, note?)` writes `logged_at` = provided or now.
+  - `updateLog(id, patch)` accepts `{ symptomId?, severity?, loggedAt?, note? }` — full edit.
+
+Full log editing also **extends the shipped meds hook**: `useMedicationLogs.updateLog`
+currently accepts `{ takenAt?, note? }`; add `medicationId?` so the medication of a
+dose log can be changed. (Additive change to `src/hooks/useMedicationLogs.ts`.)
 
 Each hook exports its `dbXToX` mapper, unit-tested (mirrors the meds hook tests).
 
@@ -87,8 +92,8 @@ doses**, in `logged_at`/`taken_at` order, visually distinct from doses:
 - The result reads chronologically: `7:00 Carbidopa/Levodopa · 8:40 Tremor
   (Moderate) · 11:00 Carbidopa/Levodopa`, making the dose↔symptom relationship
   legible in sequence.
-- Symptom rows are tap-to-edit (severity, time) and deletable, same affordances as
-  dose rows, with a delete confirmation.
+- Both dose and symptom rows are **fully editable** and deletable (with a delete
+  confirmation) — see "Log editing (full)" below.
 - The existing 7/30-day range toggle applies to both. The med filter dropdown gains
   the symptom types (or a simple "show symptoms" that is on by default) — keep it
   simple: the range toggle filters both; symptoms always shown.
@@ -103,6 +108,23 @@ intervals still compute from doses only.
 Gains a **Symptoms** section next to Medications: add / rename / deactivate tracked
 symptom types (same card style as the med list). No schedule/severity config on the
 symptom type itself — severity is per-log.
+
+### Log editing (full) — both dose and symptom logs
+Any logged entry can be **fully edited**, not just its time. Tapping a row's edit
+control in the Timing tab opens a shared **`LogEditor`** (a small inline form/panel,
+`src/apps/meds/components/LogEditor.tsx`) that adapts to the row kind:
+
+- **Dose log:** which **medication** (dropdown of the user's active meds),
+  **timestamp** (date + time), **note**. This extends the current shipped behavior
+  (time-only inline edit) — the time-only inline input is replaced by this editor.
+- **Symptom log:** which **symptom** (dropdown of active symptoms), **severity**
+  (Mild/Moderate/Severe), **timestamp**, **note**.
+
+Fields common to both (timestamp, note) are shared; the entity selector and the
+severity field are kind-specific. Save calls the relevant hook's `updateLog`; Cancel
+discards. Realtime refreshes the list (no optimistic mutation needed). Editing the
+timestamp preserves the intent of a specific moment (full date + time, not just
+time-of-day) so a mis-dated log can be corrected across days.
 
 ## Error handling
 - Hooks surface Supabase errors in state (same as the med hooks).
@@ -122,8 +144,11 @@ symptom type itself — severity is per-log.
 3. Hooks (`useSymptoms`, `useSymptomLogs`) with mapper tests.
 4. Manage tab: Symptoms list (CRUD).
 5. Today tab: quick "Log symptom" control.
-6. Timing tab: interleave symptom rows with doses (uses the merge helper) + edit/delete.
-7. Rename "Meds" → "Health" (sidebar label + page heading).
+6. Timing tab: interleave symptom rows with doses (uses the merge helper).
+7. Shared `LogEditor` — full edit for both dose and symptom logs (extend
+   `useMedicationLogs.updateLog` with `medicationId?`; replace the dose row's
+   time-only inline edit with the shared editor) + delete-with-confirm on both.
+8. Rename "Meds" → "Health" (sidebar label + page heading).
 
 ## Out of scope (documented follow-ups)
 - Voice / Siri symptom logging (reuse the meds token + a `log-symptom` path).
