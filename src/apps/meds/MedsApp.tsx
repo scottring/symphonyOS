@@ -45,7 +45,7 @@ export function MedsApp() {
       ) : tab === 'today' ? (
         <TodayStrip medications={medications} logs={logs} onLogDose={logDose} />
       ) : tab === 'timing' ? (
-        <TimingView medications={medications} logs={logs} />
+        <TimingView medications={medications} logs={logs} onUpdateLog={updateLog} onDeleteLog={deleteLog} />
       ) : (
         <MedManageList
           medications={medications}
