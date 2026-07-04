@@ -31,7 +31,7 @@ export function LogEditor(props: Props) {
     props.kind === 'dose' ? props.log.medicationId : props.log.symptomId,
   )
   const [when, setWhen] = useState(toDatetimeLocal(initialAt))
-  const [note, setNote] = useState(props.kind === 'dose' ? props.log.note ?? '' : props.log.note ?? '')
+  const [note, setNote] = useState(props.log.note ?? '')
   const [severity, setSeverity] = useState<Severity>(props.kind === 'symptom' ? props.log.severity : 2)
 
   const options = props.kind === 'dose' ? props.medications : props.symptoms

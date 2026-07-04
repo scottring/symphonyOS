@@ -29,7 +29,7 @@ export function SymptomManageList({ symptoms, onAdd, onUpdate, onDelete }: Props
         editingId === s.id ? (
           <div key={s.id} className="card p-3 flex items-center gap-2">
             <input className="input-base flex-1" value={editName} onChange={(e) => setEditName(e.target.value)} />
-            <button className="card px-2 py-1" onClick={() => { onUpdate(s.id, { name: editName.trim() }); setEditingId(null) }} title="Save">
+            <button className="card px-2 py-1" onClick={() => { if (!editName.trim()) return; onUpdate(s.id, { name: editName.trim() }); setEditingId(null) }} title="Save">
               <Check className="w-4 h-4" />
             </button>
             <button className="card px-2 py-1" onClick={() => setEditingId(null)} title="Cancel">
