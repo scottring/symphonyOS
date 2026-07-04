@@ -2,9 +2,11 @@ import { useState } from 'react'
 import { Pill, Clock, ListChecks } from 'lucide-react'
 import { useMedications } from '@/hooks/useMedications'
 import { useMedicationLogs } from '@/hooks/useMedicationLogs'
+import { useSymptoms } from '@/hooks/useSymptoms'
 import { TodayStrip } from './components/TodayStrip'
 import { TimingView } from './components/TimingView'
 import { MedManageList } from './components/MedManageList'
+import { SymptomManageList } from './components/SymptomManageList'
 
 type Tab = 'today' | 'timing' | 'manage'
 
@@ -12,6 +14,7 @@ export function MedsApp() {
   const [tab, setTab] = useState<Tab>('today')
   const { medications, loading, addMedication, updateMedication, deleteMedication } = useMedications()
   const { logs, logDose, updateLog, deleteLog } = useMedicationLogs({ sinceDays: 30 })
+  const { symptoms, addSymptom, updateSymptom, deleteSymptom } = useSymptoms()
 
   const tabs: { id: Tab; label: string; icon: typeof Pill }[] = [
     { id: 'today', label: 'Today', icon: Pill },
@@ -47,13 +50,21 @@ export function MedsApp() {
       ) : tab === 'timing' ? (
         <TimingView medications={medications} logs={logs} onUpdateLog={updateLog} onDeleteLog={deleteLog} />
       ) : (
-        <MedManageList
-          medications={medications}
-          onAdd={addMedication}
-          onUpdate={updateMedication}
-          onDelete={deleteMedication}
-          onLogDose={logDose}
-        />
+        <div className="space-y-8">
+          <MedManageList
+            medications={medications}
+            onAdd={addMedication}
+            onUpdate={updateMedication}
+            onDelete={deleteMedication}
+            onLogDose={logDose}
+          />
+          <SymptomManageList
+            symptoms={symptoms}
+            onAdd={addSymptom}
+            onUpdate={updateSymptom}
+            onDelete={deleteSymptom}
+          />
+        </div>
       )}
     </div>
   )
