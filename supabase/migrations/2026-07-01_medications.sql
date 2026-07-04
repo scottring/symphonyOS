@@ -2,6 +2,10 @@
 -- Dedicated domain (not routines) so `taken_at` timestamps are first-class and
 -- PRN/extra doses are ordinary rows. Owner-only RLS (private health data).
 
+-- ensure_med_log_token() below uses gen_random_bytes() (pgcrypto). Supabase
+-- ships pgcrypto enabled, but declare it so the migration is self-contained.
+create extension if not exists pgcrypto;
+
 create table if not exists medications (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
