@@ -38,12 +38,14 @@ Deno.serve(async (req: Request) => {
   // @ts-ignore Deno env
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
-  const { data: tok } = await admin.from('med_log_tokens').select('user_id').eq('token', token).maybeSingle()
+  const { data: tok, error: tokError } = await admin.from('med_log_tokens').select('user_id').eq('token', token).maybeSingle()
+  if (tokError) return json({ ok: false, message: 'Auth check failed' }, 500)
   if (!tok) return json({ ok: false, error: 'invalid token' }, 401)
   const userId = tok.user_id as string
 
-  const { data: meds } = await admin
+  const { data: meds, error: medsError } = await admin
     .from('medications').select('id, name').eq('user_id', userId).eq('active', true)
+  if (medsError) return json({ ok: false, message: 'Could not load medications' }, 500)
   const list = (meds ?? []) as MedRow[]
   const match = matchMedication(parsed.medication, list)
 
