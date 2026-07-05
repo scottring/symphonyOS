@@ -1,10 +1,9 @@
 // src/components/wall-v2/WallV2PhoneScreen.tsx
 //
 // Full-screen kid phone book on the wall. Big photo buttons (favorites first,
-// then all allowed contacts). Tap a face → confirm → the call is armed; pick up
-// the in-house handset (either order works — the bridge waits) and it connects to
-// the callee (placeCall with source:'kiosk'). Numbers never reach the browser; we
-// dial by contactId.
+// then all allowed contacts). Tap a face → confirm → the in-house handset rings;
+// pick it up to bridge to the callee (placeCall with source:'kiosk'). Numbers
+// never reach the browser; we dial by contactId.
 
 import { useRef, useState } from 'react'
 import { Phone, X, PhoneCall } from 'lucide-react'
@@ -122,10 +121,10 @@ export function WallV2PhoneScreen({ onClose }: { onClose: () => void }) {
             </div>
             {pending.state === 'calling' ? (
               <>
-                <p className="flex items-center justify-center gap-2 text-2xl font-extrabold text-stone-800 dark:text-stone-100">
-                  <PhoneCall className="w-6 h-6 animate-pulse" /> Pick up the phone
+                <p className="flex items-center justify-center gap-2 text-2xl font-bold text-stone-800 dark:text-stone-100">
+                  <PhoneCall className="w-6 h-6 animate-pulse" /> Calling {pending.contact.name}…
                 </p>
-                <p className="mt-1 text-base text-stone-500">to talk to {pending.contact.name}</p>
+                <p className="mt-1 text-base text-stone-500">Pick up the phone when it rings.</p>
                 <button
                   type="button"
                   onClick={cancelCalling}
@@ -139,7 +138,7 @@ export function WallV2PhoneScreen({ onClose }: { onClose: () => void }) {
                 <p className="text-2xl font-extrabold text-stone-800 dark:text-stone-100 mb-1">Call {pending.contact.name}?</p>
                 {pending.state === 'error'
                   ? <p className="text-base text-red-600 font-semibold mb-6">{pending.message}</p>
-                  : <p className="text-base text-stone-500 mb-6">Then pick up the phone to talk.</p>}
+                  : <p className="text-base text-stone-500 mb-6">The phone will ring — pick it up to talk.</p>}
                 <div className="flex gap-4">
                   <button
                     type="button"

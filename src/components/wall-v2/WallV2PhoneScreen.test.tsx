@@ -42,21 +42,21 @@ describe('WallV2PhoneScreen', () => {
     expect(screen.getByRole('button', { name: /Iris/ })).toBeTruthy();
   });
 
-  it('cancel while "Pick up the phone" escapes the modal, and a late response is ignored', async () => {
+  it('cancel while "Calling…" escapes the modal, and a late response is ignored', async () => {
     let resolvePlaceCall: (v: { ok: boolean }) => void = () => {};
     placeCall.mockImplementationOnce(() => new Promise((resolve) => { resolvePlaceCall = resolve; }));
     const onClose = vi.fn();
     render(<WallV2PhoneScreen onClose={onClose} />);
     fireEvent.click(screen.getByRole('button', { name: /Grandma/ }));
     fireEvent.click(screen.getByRole('button', { name: /^Call$/ }));
-    await waitFor(() => expect(screen.getByText(/Pick up the phone/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Calling Grandma/)).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: /Cancel/ }));
     expect(screen.getByRole('button', { name: /Grandma/ })).toBeTruthy(); // back to grid, not stuck
 
     resolvePlaceCall({ ok: true });
     await Promise.resolve();
-    expect(screen.queryByText(/Pick up the phone/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Calling Grandma/)).not.toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
   });
 });
