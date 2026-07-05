@@ -179,5 +179,5 @@ export const MOCK_ACTIONS: WallV2ActionDef[] = [
   { id: 'task', label: 'Add task', caption: 'For today or later', icon: Check, tint: 'sky' },
   { id: 'discuss', label: 'Need to discuss', caption: 'Open a conversation', icon: MessageCircle, tint: 'lavender' },
   { id: 'event', label: 'Add event', caption: 'On the calendar', icon: Calendar, tint: 'rose' },
-  { id: 'phone', label: 'Call someone', caption: 'Ring the phone', icon: Phone, tint: 'mint' },
+  { id: 'phone', label: 'Call someone', caption: 'Tap, then pick up', icon: Phone, tint: 'mint' },
 ];
