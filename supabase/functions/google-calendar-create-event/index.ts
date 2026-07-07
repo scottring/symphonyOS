@@ -241,7 +241,6 @@ serve(async (req) => {
     // Handle create request
     const createBody: CreateEventRequest = body
     const { title, description, startTime, endTime, location, allDay, timeZone, requestId, calendarId } = createBody
-    const targetCreateCalendarId = calendarId || 'primary'
 
     if (!title || !startTime || !endTime) {
       return new Response(JSON.stringify({ error: 'Missing required fields: title, startTime, endTime' }), {
@@ -269,6 +268,10 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+
+    // Target calendar: explicit request > the user's default write calendar
+    // (calendar_connections.calendar_id, set in Settings) > Google primary.
+    const targetCreateCalendarId = calendarId || connection.calendar_id || 'primary'
 
     // Check if token needs refresh
     let accessToken = connection.access_token

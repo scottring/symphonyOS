@@ -75,6 +75,8 @@ vi.mock('@/hooks/useGoogleCalendar', () => ({
     removeEventLocal: vi.fn(),
     restoreEventLocal: vi.fn(),
     fetchCalendarList: vi.fn(),
+    defaultCalendarId: null,
+    setDefaultCalendarId: vi.fn(),
   }),
   GoogleCalendarProvider: ({ children }: { children: React.ReactNode }) => children,
   CalendarReconnectError: class CalendarReconnectError extends Error {

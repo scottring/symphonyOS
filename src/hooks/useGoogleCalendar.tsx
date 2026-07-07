@@ -119,6 +119,10 @@ interface GoogleCalendarContextValue {
   removeEventLocal: (eventId: string) => void
   /** Restore a previously-removed event into the local cache (used by undo). */
   restoreEventLocal: (event: CalendarEvent) => void
+  /** Default calendar for Symphony-created events (null = Google primary). */
+  defaultCalendarId: string | null
+  /** Persist a new default write calendar (null = Google primary). */
+  setDefaultCalendarId: (calendarId: string | null) => Promise<void>
 }
 
 const GoogleCalendarContext = createContext<GoogleCalendarContextValue | null>(null)
@@ -131,6 +135,9 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
   const [isFetching, setIsFetching] = useState(false)
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [error, setError] = useState<string | null>(null)
+  // Where Symphony-created events land when no calendar is specified.
+  // null = Google primary. Stored in calendar_connections.calendar_id.
+  const [defaultCalendarId, setDefaultCalendarIdState] = useState<string | null>(null)
 
   // Check connection status and validate token
   useEffect(() => {
@@ -147,7 +154,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
         // Get connection with token expiry info
         const { data: connection, error: connError } = await supabase
           .from('calendar_connections')
-          .select('id, token_expires_at')
+          .select('id, token_expires_at, calendar_id')
           .eq('user_id', user.id)
           .eq('provider', 'google')
           .single()
@@ -158,6 +165,8 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
           setIsLoading(false)
           return
         }
+
+        setDefaultCalendarIdState(connection.calendar_id ?? null)
 
         // Connection exists - validate by making a test API call
         // Retry once before declaring connection broken (handles transient failures)
@@ -612,6 +621,24 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     }
   }, [isConnected])
 
+  /** Persist the default write calendar (null = Google primary). */
+  const setDefaultCalendarId = useCallback(async (calendarId: string | null) => {
+    const previous = defaultCalendarId
+    setDefaultCalendarIdState(calendarId)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { error: updateError } = await supabase
+      .from('calendar_connections')
+      .update({ calendar_id: calendarId, updated_at: new Date().toISOString() })
+      .eq('user_id', user.id)
+      .eq('provider', 'google')
+    if (updateError) {
+      console.error('Failed to save default calendar:', updateError)
+      setDefaultCalendarIdState(previous)
+      throw updateError
+    }
+  }, [defaultCalendarId])
+
   const value: GoogleCalendarContextValue = {
     isConnected,
     needsReconnect,
@@ -631,6 +658,8 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     deleteEvent,
     removeEventLocal,
     restoreEventLocal,
+    defaultCalendarId,
+    setDefaultCalendarId,
   }
 
   return (
