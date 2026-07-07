@@ -50,4 +50,15 @@ describe('OmniboxResults', () => {
     const { container } = render(<OmniboxResults query="zzzznope" onNavigate={vi.fn()} />)
     await waitFor(() => expect(container.firstChild).toBeNull())
   })
+
+  it('clicking a result inside a form does not submit it (QuickCapture regression)', async () => {
+    const onSubmit = vi.fn((e: React.FormEvent) => e.preventDefault())
+    render(
+      <form onSubmit={onSubmit}>
+        <OmniboxResults query="light" onNavigate={vi.fn()} />
+      </form>,
+    )
+    fireEvent.click(await screen.findByText('Replace kitchen light bulbs'))
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
 })
