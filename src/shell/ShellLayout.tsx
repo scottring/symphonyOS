@@ -9,7 +9,7 @@ import { NewVersionBanner } from '@/components/layout/NewVersionBanner';
 import { ShellSearch } from './ShellSearch';
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher';
 import { HelpPanel } from '@/components/lazy';
-import { Toast } from '@/components/toast';
+import { Toast, ConfirmationToast } from '@/components/toast';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { NotesProvider } from '@/contexts/NotesContext';
 import { ListsProvider } from '@/contexts/ListsContext';
@@ -462,6 +462,14 @@ function ShellLayoutInner({ children }: Props) {
       {/* Toast — surfaces QuickCapture note-save feedback */}
       {chrome.toast && (
         <Toast toast={chrome.toast} onDismiss={chrome.dismissToast} />
+      )}
+
+      {/* Capture confirmation — "Added to Inbox" with one-tap Today/Tomorrow */}
+      {chrome.confirmationToast && (
+        <ConfirmationToast
+          toast={chrome.confirmationToast}
+          onDismiss={chrome.dismissConfirmationToast}
+        />
       )}
     </div>
   );

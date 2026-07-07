@@ -10,7 +10,8 @@
 // Must be used inside <NotesProvider> + <ListsProvider> (ShellLayout wraps its
 // tree in both) and the global <DomainProvider> (mounted in main.tsx).
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import type { ConfirmationToastMessage } from '@/components/toast';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useProjects } from '@/hooks/useProjects';
 import { useContacts } from '@/hooks/useContacts';
@@ -43,7 +44,7 @@ interface QuickAddNoteData {
 }
 
 export function useShellChrome() {
-  const { tasks, addTask } = useSupabaseTasks();
+  const { tasks, addTask, pushTask } = useSupabaseTasks();
   const { projects } = useProjects();
   const { contacts } = useContacts();
   const { routines: allRoutines } = useRoutines();
@@ -57,15 +58,51 @@ export function useShellChrome() {
   const { toast, showToast, dismissToast } = useToast();
   const { setSelection } = useSelection();
 
+  // ── Capture confirmation: an inbox capture is otherwise silent, which reads
+  // as "did that even save?". Confirm it landed and offer one-tap scheduling
+  // so the common capture→triage roundtrip collapses into the toast. ──
+  const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [confirmationToast, setConfirmationToast] = useState<ConfirmationToastMessage | null>(null);
+
+  const dismissConfirmationToast = useCallback(() => {
+    if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+    confirmTimerRef.current = null;
+    setConfirmationToast(null);
+  }, []);
+
+  const showCaptureConfirmation = useCallback(
+    (taskId: string) => {
+      if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+      const scheduleFor = (daysFromNow: number) => {
+        const d = new Date();
+        d.setHours(0, 0, 0, 0);
+        d.setDate(d.getDate() + daysFromNow);
+        void pushTask(taskId, d);
+        showToast(daysFromNow === 0 ? 'Scheduled for today' : 'Scheduled for tomorrow', 'success');
+      };
+      setConfirmationToast({
+        id: taskId,
+        message: 'Added to Inbox',
+        actions: [
+          { label: 'Today', onClick: () => scheduleFor(0), variant: 'primary' },
+          { label: 'Tomorrow', onClick: () => scheduleFor(1), variant: 'secondary' },
+        ],
+      });
+      confirmTimerRef.current = setTimeout(() => setConfirmationToast(null), 8000);
+    },
+    [pushTask, showToast],
+  );
+
   // ── QuickCapture handlers (mirror App.tsx) ──
   const onQuickAdd = useCallback(
     async (title: string) => {
-      await addTask(title, undefined, undefined, undefined, {
+      const taskId = await addTask(title, undefined, undefined, undefined, {
         assignedTo: getCurrentUserMember()?.id,
         context: currentDomain !== 'universal' ? currentDomain : undefined,
       });
+      if (taskId) showCaptureConfirmation(taskId);
     },
-    [addTask, getCurrentUserMember, currentDomain],
+    [addTask, getCurrentUserMember, currentDomain, showCaptureConfirmation],
   );
 
   const onQuickAddRich = useCallback(
@@ -106,7 +143,7 @@ export function useShellChrome() {
       const explicitAssignment = data.assignedMemberIds?.length
         ? data.assignedMemberIds[0]
         : getCurrentUserMember()?.id;
-      await addTask(data.title, data.contactId, data.projectId, data.scheduledFor, {
+      const taskId = await addTask(data.title, data.contactId, data.projectId, data.scheduledFor, {
         assignedTo: explicitAssignment,
         assignedToAll:
           data.assignedMemberIds?.length && data.assignedMemberIds.length > 1
@@ -115,8 +152,12 @@ export function useShellChrome() {
         category: data.category,
         context: data.context,
       });
+      if (taskId) {
+        if (data.scheduledFor) showToast('Task scheduled', 'success');
+        else showCaptureConfirmation(taskId);
+      }
     },
-    [addTask, isConnected, createEvent, fetchEvents, getCalendarForDomain, getCurrentUserMember, currentDomain, showToast],
+    [addTask, isConnected, createEvent, fetchEvents, getCalendarForDomain, getCurrentUserMember, currentDomain, showToast, showCaptureConfirmation],
   );
 
   const onQuickAddNote = useCallback(
@@ -207,5 +248,8 @@ export function useShellChrome() {
     // Toast (note creation feedback)
     toast,
     dismissToast,
+    // Capture confirmation toast (inbox capture feedback + one-tap scheduling)
+    confirmationToast,
+    dismissConfirmationToast,
   };
 }
