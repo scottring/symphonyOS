@@ -36,6 +36,13 @@ interface TapEventPanelProps {
    * the Reschedule control is hidden.
    */
   onReschedule?: (startTime: Date, endTime: Date) => void
+  /** The event's calendar, resolved by the caller from the Google calendar list.
+   *  readOnly=true means Google will refuse writes — edit affordances hide. */
+  calendarAccess?: { name: string | null; readOnly: boolean }
+  /** Calendars this account can write to (for "Move to calendar"). */
+  writableCalendars?: { id: string; summary: string }[]
+  /** Move the event onto another (writable) calendar. */
+  onMoveToCalendar?: (destinationCalendarId: string) => void
 }
 
 type AnyEvent = { start_time?: string; startTime?: string; end_time?: string; endTime?: string }
@@ -88,6 +95,11 @@ export function TapEventPanel(props: TapEventPanelProps) {
   const endTime = getEndTime(event)
   const eventId = event.google_event_id ?? event.id
   const calendarId = event.calendar_id ?? event.calendarId
+
+  // Google refuses writes to view-only calendars — don't offer them.
+  const readOnlyCalendar = props.calendarAccess?.readOnly === true
+  const canEdit = !readOnlyCalendar
+  const moveTargets = (props.writableCalendars ?? []).filter((c) => c.id !== (calendarId ?? ''))
 
   // Current duration in minutes, when both ends are known.
   const durationMinutes =
@@ -146,6 +158,37 @@ export function TapEventPanel(props: TapEventPanelProps) {
         </div>
       )}
 
+      {/* Which calendar this event lives on + move / view-only affordance */}
+      {props.calendarAccess && (
+        <div className="mt-2 flex items-center gap-2 flex-wrap text-[13px]">
+          <span className="text-neutral-500">
+            {props.calendarAccess.name ?? 'Primary calendar'}
+          </span>
+          {readOnlyCalendar ? (
+            <span
+              className="px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-500 text-[11px] font-medium"
+              title="This calendar is shared with you view-only — Google doesn't allow Symphony (or you) to change its events"
+            >
+              view-only
+            </span>
+          ) : (
+            props.onMoveToCalendar && moveTargets.length > 0 && (
+              <select
+                aria-label="Move to calendar"
+                value=""
+                onChange={(e) => { if (e.target.value) props.onMoveToCalendar?.(e.target.value) }}
+                className="text-[12px] text-neutral-500 bg-transparent border border-neutral-200 rounded-md px-1.5 py-0.5 hover:border-neutral-300 focus:outline-none"
+              >
+                <option value="">Move to…</option>
+                {moveTargets.map((c) => (
+                  <option key={c.id} value={c.id}>{c.summary}</option>
+                ))}
+              </select>
+            )
+          )}
+        </div>
+      )}
+
       <div className="mt-4 flex flex-wrap gap-2 pb-5 mb-6 border-b border-neutral-200/70">
         {/* Physical address → Directions toggle. Video meeting → Join link (or a
             non-clickable label when no join URL is known). Never offer directions
@@ -174,7 +217,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
             {event.location}
           </span>
         )}
-        {props.onReschedule && (
+        {canEdit && props.onReschedule && (
           <SchedulePopover
             value={startTime ? new Date(startTime) : undefined}
             onSchedule={handleReschedule}
@@ -186,7 +229,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
             }
           />
         )}
-        {props.onReschedule && durationMinutes !== null && durationMinutes > 0 && (
+        {canEdit && props.onReschedule && durationMinutes !== null && durationMinutes > 0 && (
           <div className="relative">
             <button
               onClick={() => setShowDurationMenu((v) => !v)}

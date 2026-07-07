@@ -144,4 +144,35 @@ describe('TapEventPanel', () => {
     render(<TapEventPanel event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers} />)
     expect(screen.queryByRole('button', { name: /change duration/i })).not.toBeInTheDocument()
   })
+
+  describe('calendar access', () => {
+    it('view-only calendar: badge shown, reschedule/duration hidden', () => {
+      render(<TapEventPanel
+        event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
+        onReschedule={vi.fn()}
+        calendarAccess={{ name: 'Work Schedule', readOnly: true }}
+      />)
+      expect(screen.getByText('Work Schedule')).toBeInTheDocument()
+      expect(screen.getByText('view-only')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /reschedule/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /change duration/i })).not.toBeInTheDocument()
+    })
+
+    it('writable calendar: shows Move to picker and fires onMoveToCalendar', async () => {
+      const onMoveToCalendar = vi.fn()
+      const { user } = render(<TapEventPanel
+        event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
+        onReschedule={vi.fn()}
+        calendarAccess={{ name: 'Family calendar', readOnly: false }}
+        writableCalendars={[
+          { id: 'fam@group.calendar.google.com', summary: 'Family calendar' },
+          { id: 'meals@group.calendar.google.com', summary: 'Meal planning' },
+        ]}
+        onMoveToCalendar={onMoveToCalendar}
+      />)
+      expect(screen.getByRole('button', { name: /reschedule/i })).toBeInTheDocument()
+      await user.selectOptions(screen.getByLabelText('Move to calendar'), 'meals@group.calendar.google.com')
+      expect(onMoveToCalendar).toHaveBeenCalledWith('meals@group.calendar.google.com')
+    })
+  })
 })

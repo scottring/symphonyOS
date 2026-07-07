@@ -20,7 +20,7 @@
 // Vault integration is intentionally NOT wired (vault is being removed):
 // onSaveNoteToVault is omitted so the "Save to vault" affordance stays hidden.
 
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { showToast } from '@/hooks/useToast';
 import { useSelection } from '@/shell/providers/SelectionProvider';
@@ -29,7 +29,7 @@ import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useContacts } from '@/hooks/useContacts';
 import { useProjects } from '@/hooks/useProjects';
 import { useGoals } from '@/hooks/useGoals';
-import { useGoogleCalendar, CalendarReconnectError } from '@/hooks/useGoogleCalendar';
+import { useGoogleCalendar, CalendarReconnectError, type GoogleCalendarInfo, type CalendarEvent } from '@/hooks/useGoogleCalendar';
 import { useEventNotes } from '@/hooks/useEventNotes';
 import { useRoutines } from '@/hooks/useRoutines';
 import { useFamilyMembers } from '@/hooks/useFamilyMembers';
@@ -317,6 +317,15 @@ function RoutinePanelBody({ id }: { id: string }) {
   );
 }
 
+/** Midnight of the event's start day, for a day-scoped refetch after a move. */
+function getEventDayStart(event: CalendarEvent): Date | null {
+  const raw = event.start_time ?? event.startTime;
+  if (!raw) return null;
+  const d = new Date(raw);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 // Human-readable reasons a Google Calendar write can fail. 403 means the event
 // lives on a calendar the user can't edit (an invite / shared / subscribed
 // calendar) — say that plainly instead of a generic failure.
@@ -333,9 +342,18 @@ function eventUpdateErrorMessage(err: unknown): string {
 function EventPanelBody({ id }: { id: string }) {
   const { clearSelection } = useSelection();
   const navigate = useNavigate();
-  const { events, updateEvent, isFetching, isLoading } = useGoogleCalendar();
+  const { events, updateEvent, moveEvent, fetchEvents, fetchCalendarList, isFetching, isLoading } = useGoogleCalendar();
   const { getNote, updateNote } = useEventNotes();
   const { tasks } = useSupabaseTasks();
+
+  // The calendar list tells us the event's access level (Google rejects writes
+  // to view-only calendars) and which calendars it could move to.
+  const [calendarList, setCalendarList] = useState<GoogleCalendarInfo[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    fetchCalendarList().then((cals) => { if (!cancelled) setCalendarList(cals); });
+    return () => { cancelled = true; };
+  }, [fetchCalendarList]);
 
   // Event selection id is `google_event_id || id` (see CascadingRiverView).
   const event = useMemo(
@@ -363,11 +381,47 @@ function EventPanelBody({ id }: { id: string }) {
 
   const eventId = event.google_event_id || event.id;
 
+  // Resolve the event's calendar in the account's calendar list. Events with
+  // no calendar_id live on the primary calendar (always writable — it's ours).
+  const eventCalendarId = event.calendar_id ?? event.calendarId;
+  const eventCalendar = calendarList.find((c) =>
+    eventCalendarId ? c.id === eventCalendarId : c.primary,
+  );
+  const calendarAccess = calendarList.length > 0
+    ? {
+        name: event.calendar_name ?? event.calendarName ?? eventCalendar?.summary ?? null,
+        readOnly: eventCalendar ? eventCalendar.accessRole === 'reader' : false,
+      }
+    : undefined;
+  const writableCalendars = calendarList
+    .filter((c) => c.accessRole === 'owner' || c.accessRole === 'writer')
+    .map((c) => ({ id: c.id, summary: c.summary }));
+
   return (
     <TapEventPanel
       event={event}
       notes={getNote(eventId)?.notes ?? undefined}
       allTasks={tasks}
+      calendarAccess={calendarAccess}
+      writableCalendars={writableCalendars}
+      onMoveToCalendar={async (destinationCalendarId) => {
+        try {
+          await moveEvent({
+            eventId,
+            sourceCalendarId: eventCalendarId ?? 'primary',
+            destinationCalendarId,
+          });
+          showToast('Event moved', 'success');
+          // Refresh the day so the event reappears under its new calendar.
+          const start = getEventDayStart(event);
+          if (start) {
+            const end = new Date(start); end.setHours(23, 59, 59, 999);
+            await fetchEvents(start, end);
+          }
+        } catch (err) {
+          showToast(eventUpdateErrorMessage(err), 'error', 4000);
+        }
+      }}
       onClose={handleClose}
       onNotesChange={(html) => updateNote(eventId, html)}
       onAddPrepTask={() => { /* TODO: integrate addPrepTask */ }}
