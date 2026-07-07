@@ -87,9 +87,23 @@ export function RoutineCollectionRow({ item, onSelectStep, onCompleteStep, onSki
       </button>
       {open && (
         <div className="border-t border-neutral-100 px-3 py-2 space-y-2.5">
-          {/* Mark-all-done: complete every remaining dose across all steps in one tap. */}
+          {/* Bulk resolve: complete or skip every remaining dose in one tap. */}
           {!item.completed && (item.collectionSteps ?? []).some(g => g.doses.some(d => !d.completed && !d.skipped)) && (
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-3">
+              {onSkipStep && (
+                <button
+                  onClick={() => {
+                    for (const g of item.collectionSteps ?? []) {
+                      for (const d of g.doses) {
+                        if (!d.completed && !d.skipped) onSkipStep(d.id)
+                      }
+                    }
+                  }}
+                  className="text-xs text-neutral-400 hover:text-neutral-600"
+                >
+                  Skip all
+                </button>
+              )}
               <button
                 onClick={() => {
                   for (const g of item.collectionSteps ?? []) {

@@ -108,6 +108,18 @@ describe('RoutineCollectionRow dose handling', () => {
     expect(handlers.onCompleteStep).toHaveBeenCalledWith('routine-chin#0', false)
   })
 
+  it('Skip all skips every unresolved dose, leaving completed ones alone', () => {
+    const item = collectionItem()
+    item.collectionSteps![0].doses[1] = { id: 'routine-chin#1', time: '09:00', completed: true }
+    renderRow(item)
+    expandRow()
+
+    fireEvent.click(screen.getByText(/skip all/i))
+    expect(handlers.onSkipStep).toHaveBeenCalledTimes(1)
+    expect(handlers.onSkipStep).toHaveBeenCalledWith('routine-chin#0')
+    expect(handlers.onCompleteStep).not.toHaveBeenCalled()
+  })
+
   it('Mark all done leaves skipped doses alone', () => {
     const item = collectionItem()
     item.collectionSteps![0].doses[0] = { id: 'routine-chin#0', time: '07:00', completed: false, skipped: true }
