@@ -5,6 +5,7 @@
 // InboxView component unchanged.
 
 import { useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 import { useEventNotes } from '@/hooks/useEventNotes';
@@ -20,10 +21,12 @@ import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings';
 import { useListsContext } from '@/contexts/ListsContext';
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext';
 import { useUndo } from '@/hooks/useUndo';
+import { useConvertTaskToProject } from '@/hooks/useConvertTaskToProject';
 import { InboxView } from '@/components/schedule/InboxView';
 import { useSelection } from '@/shell/providers/SelectionProvider';
 
 export function InboxViewContainer() {
+  const navigate = useNavigate();
   const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, pushTask } = useSupabaseTasks();
   const { events } = useGoogleCalendar();
   const { notes: eventNotesMap, updateEventAssignment, updateEventAssignmentAll, updateEventContext, updateEventProject } = useEventNotes();
@@ -105,6 +108,9 @@ export function InboxViewContainer() {
     [addTask, getCurrentUserMember, currentDomain],
   );
 
+  // Expand a task into a new project (subtasks absorbed, parent task deleted).
+  const handleConvertTaskToProject = useConvertTaskToProject(tasks, { addProject, updateTask, deleteTask });
+
   const scheduleActionsValue = useMemo<ScheduleActionsValue>(
     () => ({
       onToggleTask: toggleTask,
@@ -115,6 +121,7 @@ export function InboxViewContainer() {
       onDeleteTask: deleteTask,
       onCreateTask: onCreateTaskFromValue,
       onOpenTask: (taskId: string) => setSelection({ kind: 'task', id: taskId }),
+      onOpenProject: (projectId: string) => navigate(`/projects/${projectId}`),
 
       onAssignTask: scheduleActions.onAssignTask,
       onAssignTaskAll: scheduleActions.onAssignTaskAll,
@@ -146,6 +153,7 @@ export function InboxViewContainer() {
       eventContextOverrides,
 
       onAddProject: addProject,
+      onConvertTaskToProject: handleConvertTaskToProject,
       onDeleteProject: deleteProject,
       onSearchContacts: searchContacts,
       onAddContact: (name, details) => addContact({ name, ...details }),
@@ -156,11 +164,11 @@ export function InboxViewContainer() {
     }),
     [
       toggleTask, toggleWaiting, updateTask, updateTasksBulk, pushTask, deleteTask, onCreateTaskFromValue,
-      setSelection,
+      setSelection, navigate,
       scheduleActions, updateRoutine, updateEventContext, hideEvent,
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
       eventNotesMap, eventContextOverrides,
-      addProject, deleteProject, searchContacts, addContact, getDomainForCalendar,
+      addProject, handleConvertTaskToProject, deleteProject, searchContacts, addContact, getDomainForCalendar,
       updateEventProject,
     ],
   );

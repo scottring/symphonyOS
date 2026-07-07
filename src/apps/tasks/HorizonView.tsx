@@ -35,6 +35,7 @@ import { TriageWhenMenu, type TriageWhen } from '@/components/schedule/TriageWhe
 import { selectOverdue } from '@/lib/today/taskPools';
 import { selectHorizonPool, HORIZONS, type HorizonId } from '@/lib/today/horizons';
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter';
+import { useConvertTaskToProject } from '@/hooks/useConvertTaskToProject';
 import { getBaseDate, getThisEvening, getNextWeekend, getWeekendAfterNext, getNextMonday } from '@/lib/dateHelpers';
 import type { Task } from '@/types/task';
 
@@ -130,6 +131,9 @@ export function HorizonView({ horizon }: HorizonViewProps) {
     [addTask, getCurrentUserMember, currentDomain],
   );
 
+  // Expand a task into a new project (subtasks absorbed, parent task deleted).
+  const handleConvertTaskToProject = useConvertTaskToProject(tasks, { addProject, updateTask, deleteTask });
+
   const scheduleActionsValue = useMemo<ScheduleActionsValue>(
     () => ({
       onToggleTask: toggleTask,
@@ -140,6 +144,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
       onDeleteTask: deleteTask,
       onCreateTask: onCreateTaskFromValue,
       onOpenTask: (taskId: string) => setSelection({ kind: 'task', id: taskId }),
+      onOpenProject: (projectId: string) => navigate(`/projects/${projectId}`),
 
       onAssignTask: scheduleActions.onAssignTask,
       onAssignTaskAll: scheduleActions.onAssignTaskAll,
@@ -171,6 +176,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
       eventContextOverrides,
 
       onAddProject: addProject,
+      onConvertTaskToProject: handleConvertTaskToProject,
       onDeleteProject: deleteProject,
       onSearchContacts: searchContacts,
       onAddContact: (name, details) => addContact({ name, ...details }),
@@ -180,11 +186,11 @@ export function HorizonView({ horizon }: HorizonViewProps) {
     }),
     [
       toggleTask, toggleWaiting, updateTask, updateTasksBulk, pushTask, deleteTask, onCreateTaskFromValue,
-      setSelection,
+      setSelection, navigate,
       scheduleActions, updateRoutine, updateEventContext, hideEvent,
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
       eventNotesMap, eventContextOverrides,
-      addProject, deleteProject, searchContacts, addContact, getDomainForCalendar,
+      addProject, handleConvertTaskToProject, deleteProject, searchContacts, addContact, getDomainForCalendar,
       updateEventProject,
     ],
   );

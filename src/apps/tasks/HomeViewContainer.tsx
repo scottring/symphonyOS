@@ -22,6 +22,7 @@ import { LoadingFallback } from '@/components/layout/LoadingFallback';
 import { isEverydayRoutine, scheduleRoutineOnDate } from '@/lib/routineUtils';
 import { parseRoutineTimelineId } from '@/lib/today/doseExpansion';
 import { groupItems } from '@/lib/today/groupTasks';
+import { useConvertTaskToProject } from '@/hooks/useConvertTaskToProject';
 import { parseQuickInput } from '@/lib/quickInputParser';
 import type { ParserContext } from '@/lib/quickInputParser';
 import type { ResolverContext } from '@/lib/entityResolver';
@@ -465,6 +466,9 @@ export function HomeViewContainer() {
     [deleteEvent, removeEventLocal, restoreEventLocal],
   );
 
+  // Expand a task into a new project (subtasks absorbed, parent task deleted).
+  const handleConvertTaskToProject = useConvertTaskToProject(tasks, { addProject, updateTask, deleteTask });
+
   const scheduleActionsValue = useMemo<ScheduleActionsValue>(
     () => ({
       // Planning
@@ -488,6 +492,7 @@ export function HomeViewContainer() {
       onCreateFollowUp: handleCreateFollowUp,
       onGroupItems: handleGroupItems,
       onOpenTask: (taskId: string) => setSelection({ kind: 'task', id: taskId }),
+      onOpenProject: (projectId: string) => navigate(`/projects/${projectId}`),
 
       // Assignment actions
       onAssignTask: scheduleActions.onAssignTask,
@@ -527,6 +532,7 @@ export function HomeViewContainer() {
 
       // List/contact actions
       onAddProject: addProject,
+      onConvertTaskToProject: handleConvertTaskToProject,
       onSearchContacts: searchContacts,
       onAddContact: (name, details) => addContact({ name, ...details }),
 
@@ -539,11 +545,11 @@ export function HomeViewContainer() {
     }),
     [
       toggleTask, toggleWaiting, updateTask, pushTask, deleteTask, onCreateTaskFromValue, onCreateTaskParsed, parserContext, currentDomain, resolverContext, getRecentTaskForContact, onCreateTaskAt, onCreateEventAt, onCreateRoutineAt, handleCreateFollowUp, handleGroupItems,
-      setSelection,
+      setSelection, navigate,
       scheduleActions, updateRoutine, updateEventContext, updateEventSharedWithFamily, dismissShareNudge, hideEvent, handleDeleteEvent,
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
       eventNotesMapWithDefaults, eventContextOverrides,
-      addProject, searchContacts, addContact, getDomainForCalendar,
+      addProject, handleConvertTaskToProject, searchContacts, addContact, getDomainForCalendar,
       refreshDateInstances, updateEventProject,
     ],
   );
