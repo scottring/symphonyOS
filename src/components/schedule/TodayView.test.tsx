@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { screen } from '@testing-library/react'
+import { screen, fireEvent } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext'
 import { TodayView } from './TodayView'
@@ -149,8 +149,12 @@ describe('TodayView', () => {
         },
       ],
     } as never)
-    // OverdueSection renders a role="region" aria-label="Carried over tasks" wrapper
+    // OverdueSection renders a role="region" aria-label="Carried over tasks" wrapper,
+    // collapsed by default to a single calm line (count + first title).
     expect(screen.getByRole('region', { name: /carried over tasks/i })).toBeInTheDocument()
+    expect(screen.getByText(/1 carried over/i)).toBeInTheDocument()
+    // Expanding reveals the full rows
+    fireEvent.click(screen.getByText(/1 carried over/i))
     expect(screen.getByText('Overdue task title')).toBeInTheDocument()
   })
 
@@ -176,8 +180,10 @@ describe('TodayView', () => {
       } as never,
       { onToggleWaiting },
     )
-    // CarriedOver (overdue) section renders with its aria-label region
+    // CarriedOver (overdue) section renders with its aria-label region,
+    // collapsed by default — expand it to reach the wired rows.
     expect(screen.getByRole('region', { name: /carried over tasks/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByText(/1 carried over/i))
     expect(screen.getByText('Wired overdue task')).toBeInTheDocument()
     // The "Carried over" h3 heading is present — rendered by OverdueSection
     expect(screen.getByText('Carried over')).toBeInTheDocument()
@@ -199,6 +205,17 @@ describe('TodayView', () => {
           {
             id: 'task-1',
             title: 'Test task',
+            completed: false,
+            createdAt: TODAY,
+            updatedAt: TODAY,
+            bucket: 'timed' as const,
+            scheduledFor: TODAY,
+          },
+          // Second task at the same time: the Up Next hero lifts the first
+          // candidate out of its section, this one keeps the section rendered.
+          {
+            id: 'task-2',
+            title: 'Second test task',
             completed: false,
             createdAt: TODAY,
             updatedAt: TODAY,
@@ -258,11 +275,51 @@ describe('TodayView', () => {
     expect(screen.getByLabelText(/clarity/i)).toBeInTheDocument()
   })
 
+  describe('Up Next hero', () => {
+    it('lifts the next incomplete timed item into the hero card (no duplicate row)', () => {
+      const heroTime = new Date()
+      heroTime.setMinutes(heroTime.getMinutes() - 30) // within the 2h grace window
+      if (heroTime.getDate() !== new Date().getDate()) {
+        // Test ran within 30 min of midnight — use an upcoming slot instead.
+        heroTime.setMinutes(heroTime.getMinutes() + 60)
+      }
+      renderView({
+        tasks: [
+          {
+            id: 'hero-task',
+            title: 'Call the pediatrician',
+            completed: false,
+            createdAt: TODAY,
+            updatedAt: TODAY,
+            bucket: 'timed' as const,
+            scheduledFor: heroTime,
+          },
+        ],
+      } as never)
+
+      const hero = screen.getByTestId('up-next-hero')
+      expect(hero).toHaveTextContent('Call the pediatrician')
+      expect(hero).toHaveTextContent(/since|starts in|starting now/i)
+      // Tasks get a one-tap Done as the hero action
+      expect(screen.getByRole('button', { name: /done/i })).toBeInTheDocument()
+      // The hero item is lifted OUT of its day section — it must not render twice
+      expect(screen.getAllByText('Call the pediatrician')).toHaveLength(1)
+    })
+
+    it('renders no hero when nothing qualifies', () => {
+      renderView()
+      expect(screen.queryByTestId('up-next-hero')).toBeNull()
+    })
+  })
+
   it('renders the Morning section header on mobile in italic serif', () => {
     // Create a task scheduled for the morning (8am) so the Morning section
     // actually renders.
     const morningTime = new Date(TODAY)
     morningTime.setHours(8, 0, 0)
+
+    const morningTimeLater = new Date(morningTime)
+    morningTimeLater.setMinutes(5)
 
     renderView({
       tasks: [
@@ -274,6 +331,17 @@ describe('TodayView', () => {
           updatedAt: TODAY,
           bucket: 'timed' as const,
           scheduledFor: morningTime,
+        },
+        // Two morning tasks: whichever the Up Next hero lifts, the other keeps
+        // the Morning section (and both responsive headers) rendered.
+        {
+          id: 'morning-task-2',
+          title: 'Second morning task',
+          completed: false,
+          createdAt: TODAY,
+          updatedAt: TODAY,
+          bucket: 'timed' as const,
+          scheduledFor: morningTimeLater,
         },
       ],
     } as never)

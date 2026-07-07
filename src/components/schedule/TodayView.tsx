@@ -31,11 +31,13 @@ import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 import { computeAnchorTime } from '@/lib/timelineAnchor'
 
-import { Eye, EyeOff, Repeat, Mail, Binoculars, Sun } from 'lucide-react'
+import { Eye, EyeOff, Repeat, Mail, Binoculars, Sun, ChevronDown, ChevronRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
 import { TodayAddInput } from './TodayAddInput'
+import { UpNextHero } from './UpNextHero'
+import { selectUpNext } from '@/lib/today/upNext'
 import { TimelineInsertPoint } from './TimelineInsertPoint'
 import { StatsRow } from './StatsRow'
 import { TodayProgress } from './TodayProgress'
@@ -261,10 +263,11 @@ export function TodayView({
   const COMPLETED_LINGER_MS = 60_000
   const [nowTick, setNowTick] = useState(() => Date.now())
   useEffect(() => {
-    if (!isMobile) return
+    // Ticks on all breakpoints: mobile uses it for completed-task linger,
+    // and the Up Next hero uses it to stay minute-fresh everywhere.
     const id = setInterval(() => setNowTick(Date.now()), 15_000)
     return () => clearInterval(id)
-  }, [isMobile])
+  }, [])
   const completedLingerCutoff = isMobile ? nowTick - COMPLETED_LINGER_MS : undefined
 
   // ── Derived data ─────────────────────────────────────────────────────────────
@@ -285,6 +288,27 @@ export function TodayView({
       ctx.eventNotesMap, ctx.eventContextOverrides, ctx.getDomainForCalendar])
 
   const data = useTodayData(todayInput)
+
+  // ── Up Next hero: the single next commitment, lifted out of its section ──
+  const upNext = useMemo(() => {
+    if (!data.isToday) return null
+    const allItems = data.sectionsOrder.flatMap((s) => data.grouped[s] ?? [])
+    return selectUpNext(allItems, new Date(nowTick))
+  }, [data, nowTick])
+  const upNextId = upNext?.item.id
+
+  // Sections whose remaining items are all complete render collapsed by
+  // default; this tracks the ones the user has re-expanded.
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
+  const toggleSectionExpanded = useCallback((section: string) => {
+    setExpandedSections((prev) => {
+      const next = new Set(prev)
+      if (next.has(section)) next.delete(section)
+      else next.add(section)
+      return next
+    })
+  }, [])
+
   const proactive = useProactiveSuggestions()
   const emailActions = useEmailActionItems()
   const { getStats: getRoutineStats } = useRoutineStats()
@@ -471,7 +495,10 @@ export function TodayView({
     : (() => {
         for (const section of data.sectionsOrder) {
           const items = data.grouped[section]
-          if (items && items.length > 0) return items[0].id
+          // The Up Next hero lifts its item out of the section list, so the
+          // marker goes to the first item still rendered in a section.
+          const first = items?.find((i) => i.id !== upNextId)
+          if (first) return first.id
         }
         return null
       })()
@@ -495,20 +522,20 @@ export function TodayView({
         </div>
       )}
 
-      {/* Unified Today header — the momentum band owns the numbers + reward,
-          and the controls strip (StatsRow) sits directly beneath it. */}
-      <div className="px-3 md:px-0">
-        <TodayProgress
-          completedCount={data.counts.completedCount}
-          actionableCount={data.counts.actionableCount}
-          isToday={data.isToday}
-        />
-      </div>
-
-      {/* Controls strip — desktop only. Mobile folds the filters into the
-          Add-to-today row below to save vertical space. */}
-      <div className="hidden md:block mb-6">
-        <StatsRow
+      {/* Unified Today header — one strip: momentum band (headline · rail ·
+          count) with the controls chips on the same row. Collapsing the old
+          two-row preamble is what buys the Up Next hero its above-the-fold
+          position. */}
+      <div className="px-3 md:px-0 mb-4 md:card md:rounded-2xl md:border md:border-neutral-200/70 md:px-4 md:py-2.5 md:flex md:items-center md:gap-5">
+        <div className="md:flex-1 md:min-w-0">
+          <TodayProgress
+            completedCount={data.counts.completedCount}
+            actionableCount={data.counts.actionableCount}
+            isToday={data.isToday}
+          />
+        </div>
+        <div className="hidden md:block shrink-0">
+          <StatsRow
           dueToday={data.counts.actionableCount}
           doneToday={data.counts.completedCount}
           thisWeek={data.weekTasks.length}
@@ -552,7 +579,21 @@ export function TodayView({
             </>
           }
         />
+        </div>
       </div>
+
+      {/* Up Next hero — the single next commitment, above everything else.
+          Its item is lifted out of its day section below. */}
+      {upNext && (
+        <div className="px-3 md:px-0">
+          <UpNextHero
+            selection={upNext}
+            onSelectItem={onSelectItem}
+            onToggleTask={onToggleTask}
+            projectsMap={ctx.projectsMap}
+          />
+        </div>
+      )}
 
       {/* Inline "Add to today" — today-only, when onCreateTask is wired.
           Desktop: full-width add input. Mobile: same input but flanked by the
@@ -656,9 +697,44 @@ export function TodayView({
 
             {/* Sections */}
             {data.sectionsOrder.map((section) => {
-              const items = data.grouped[section]
-              if (!items || items.length === 0) return null
+              const allSectionItems = data.grouped[section]
+              if (!allSectionItems || allSectionItems.length === 0) return null
               const meta = daySectionMeta(section)
+
+              // The hero item is lifted out of its section; a section whose
+              // remaining items are all complete (or whose only item IS the
+              // hero) collapses to a single header line.
+              const items = upNextId
+                ? allSectionItems.filter((i) => i.id !== upNextId)
+                : allSectionItems
+              const restAllDone = items.every((i) => i.completed)
+              const sectionExpanded = expandedSections.has(section)
+
+              if (restAllDone && !sectionExpanded) {
+                const emptyBecauseHero = items.length === 0
+                return (
+                  <section key={section}>
+                    <button
+                      type="button"
+                      onClick={emptyBecauseHero ? undefined : () => toggleSectionExpanded(section)}
+                      disabled={emptyBecauseHero}
+                      aria-expanded={false}
+                      className={`w-full flex items-center gap-2 text-[11px] uppercase tracking-wider font-semibold text-neutral-400 px-3 md:px-0 py-0.5 text-left ${emptyBecauseHero ? 'cursor-default' : 'hover:text-neutral-600 transition-colors'}`}
+                    >
+                      {createElement(meta.Icon, { className: 'w-4 h-4 text-amber-500/60 shrink-0' })}
+                      <span>{meta.label}</span>
+                      {meta.range && (
+                        <span className="text-neutral-300 normal-case font-normal">{meta.range}</span>
+                      )}
+                      <span className="text-primary-600/70 normal-case font-normal">
+                        · {emptyBecauseHero ? 'up next' : 'complete'}
+                      </span>
+                      {!emptyBecauseHero && <ChevronRight className="w-3.5 h-3.5 text-neutral-300" />}
+                    </button>
+                  </section>
+                )
+              }
+
               return (
                 <section key={section}>
                   <h3 className="hidden md:flex items-center gap-2 text-[11px] uppercase tracking-wider font-semibold text-neutral-400 mb-3 px-3 md:px-0">
@@ -668,6 +744,16 @@ export function TodayView({
                       <span className="text-neutral-300 normal-case font-normal">
                         {meta.range}
                       </span>
+                    )}
+                    {restAllDone && sectionExpanded && (
+                      <button
+                        type="button"
+                        onClick={() => toggleSectionExpanded(section)}
+                        aria-label={`Collapse ${meta.label}`}
+                        className="inline-flex items-center gap-1 text-primary-600/70 normal-case font-normal hover:text-primary-700"
+                      >
+                        · complete <ChevronDown className="w-3.5 h-3.5" />
+                      </button>
                     )}
                   </h3>
 

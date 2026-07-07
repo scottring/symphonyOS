@@ -1,4 +1,5 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { CornerUpLeft, ChevronDown, ChevronUp } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
@@ -67,6 +68,7 @@ export function OverdueSection({
   onOpenGuidedChat,
 }: OverdueSectionProps) {
   const isMobile = useMobile()
+  const [expanded, setExpanded] = useState(false)
 
   // Sort: incomplete first (oldest at top), then completed at bottom
   const sortedTasks = useMemo(() => [...tasks].sort((a, b) => {
@@ -86,6 +88,36 @@ export function OverdueSection({
     }
   }
 
+  const incompleteCount = tasks.filter((t) => !t.completed).length
+  const firstIncomplete = sortedTasks.find((t) => !t.completed) ?? sortedTasks[0]
+
+  // Collapsed by default: carried-over items are obligations to review, not
+  // the day's headline — one calm line keeps the timeline above the fold.
+  if (!expanded) {
+    return (
+      <div role="region" aria-label="Carried over tasks">
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          aria-expanded={false}
+          className="w-full flex items-center gap-2 px-3 md:px-0 py-1 text-left text-[13px] text-neutral-500 hover:text-neutral-700 transition-colors"
+        >
+          <CornerUpLeft className="w-3.5 h-3.5 text-amber-500/80 shrink-0" />
+          <span className="font-medium text-amber-700/90 shrink-0">
+            {incompleteCount || tasks.length} carried over
+          </span>
+          {firstIncomplete && (
+            <span className="min-w-0 truncate text-neutral-500">
+              — {firstIncomplete.title}
+              {tasks.length > 1 ? ` +${tasks.length - 1} more` : ''}
+            </span>
+          )}
+          <ChevronDown className="w-3.5 h-3.5 text-neutral-300 shrink-0" />
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div
       role="region"
@@ -93,8 +125,16 @@ export function OverdueSection({
       className="mb-10 animate-fade-in-up"
     >
       {/* Section header — calm, plain. These are obligations, not emergencies. */}
-      <h3 className="time-group-header mb-4" style={{ color: 'hsl(220 9% 46%)' }}>
+      <h3 className="time-group-header mb-4 flex items-center gap-2" style={{ color: 'hsl(220 9% 46%)' }}>
         Carried over
+        <button
+          type="button"
+          onClick={() => setExpanded(false)}
+          aria-label="Collapse carried over"
+          className="inline-flex items-center text-neutral-400 hover:text-neutral-600 transition-colors"
+        >
+          <ChevronUp className="w-3.5 h-3.5" />
+        </button>
       </h3>
 
       <div className="timeline-group timeline-group--tight stagger-in">

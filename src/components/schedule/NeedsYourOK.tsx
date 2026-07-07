@@ -50,9 +50,15 @@ export function NeedsYourOK() {
   // Locally hide rows we've resolved, so the strip updates instantly instead of
   // waiting on a realtime UPDATE (which the table may not even publish).
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set())
+  // Slim by default: the first proposal renders as one line with its approve
+  // button; the rest sit behind "+N more" so the queue never stacks a banner
+  // above the day.
+  const [expanded, setExpanded] = useState(false)
 
   const visible = actions.filter((a) => !resolvedIds.has(a.id))
   if (visible.length === 0) return null
+  const shown = expanded ? visible : visible.slice(0, 1)
+  const hiddenCount = visible.length - shown.length
 
   const run = async (id: string, fn: () => Promise<unknown>) => {
     setBusyId(id)
@@ -74,33 +80,34 @@ export function NeedsYourOK() {
   }
 
   return (
-    <section className="mb-5 rounded-2xl border border-primary-200/60 bg-primary-50/40 px-4 py-3.5">
-      <div className="mb-2.5 flex items-center gap-2">
-        <Sparkles className="w-4 h-4 text-primary-600" />
-        <h3 className="text-[11px] uppercase tracking-wider font-semibold text-primary-700/80">
-          Needs your OK
-        </h3>
-        <span className="text-[11px] text-primary-600/70 tabular-nums">{visible.length}</span>
-      </div>
-
-      <ul className="space-y-1.5">
-        {visible.map((item) => {
+    <section
+      aria-label="Needs your OK"
+      className="mb-3 rounded-xl border border-primary-200/60 bg-primary-50/40 px-3 py-1.5"
+    >
+      <ul className="divide-y divide-primary-100/60">
+        {shown.map((item) => {
           const Icon = ACTION_ICON[item.action_type] ?? Sparkles
           const busy = busyId === item.id
           return (
-            <li
-              key={item.id}
-              className="flex items-center gap-3 rounded-xl bg-white/70 px-3 py-2.5 border border-neutral-200/60"
-            >
-              <Icon className="w-4 h-4 text-neutral-500 shrink-0" />
-              <p className="min-w-0 flex-1 text-[14px] text-neutral-800 truncate">{item.summary}</p>
+            <li key={item.id} className="flex items-center gap-2.5 py-1">
+              <Icon className="w-4 h-4 text-primary-600/80 shrink-0" />
+              <p className="min-w-0 flex-1 text-[13px] text-neutral-800 truncate">{item.summary}</p>
 
+              {hiddenCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setExpanded(true)}
+                  className="shrink-0 text-[12px] text-primary-600 hover:text-primary-700 tabular-nums"
+                >
+                  +{hiddenCount} more
+                </button>
+              )}
               <button
                 type="button"
                 disabled={busy}
                 onClick={() => run(item.id, () => approveAction(item.id))}
                 title={approveVerb(item)}
-                className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-primary-600 px-2.5 py-1.5 text-[13px] font-medium text-white hover:bg-primary-700 disabled:opacity-50 transition-colors"
+                className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-primary-600 px-2.5 py-1 text-[12px] font-medium text-white hover:bg-primary-700 disabled:opacity-50 transition-colors"
               >
                 <Check className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">{approveVerb(item)}</span>
@@ -111,7 +118,7 @@ export function NeedsYourOK() {
                 onClick={() => run(item.id, () => rejectAction(item.id))}
                 title="Dismiss"
                 aria-label="Dismiss"
-                className="shrink-0 inline-flex items-center justify-center rounded-lg p-1.5 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 disabled:opacity-50 transition-colors"
+                className="shrink-0 inline-flex items-center justify-center rounded-lg p-1 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 disabled:opacity-50 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>

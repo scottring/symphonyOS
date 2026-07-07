@@ -24,32 +24,31 @@ export function TodayProgress({ completedCount, actionableCount, isToday }: Toda
   // state speaks for it.
   if (r.empty) return null
 
+  // One-line band: headline · rail · count. Keeping the whole momentum story
+  // to a single row is what lets the Up Next hero sit above the fold.
   return (
-    <div className="mb-3 flex items-center gap-3">
+    <div className="flex items-center gap-3 min-w-0">
       {r.complete ? (
         <CheckCircle2 className="w-5 h-5 text-primary-600 shrink-0" />
       ) : (
         <Sparkles className="w-5 h-5 text-primary-500/70 shrink-0" />
       )}
 
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="font-display text-xl md:text-2xl leading-tight text-neutral-900">
-            {r.headline}
-          </h2>
-          <span className="shrink-0 text-[13px] text-neutral-500 tabular-nums">{r.detail}</span>
-        </div>
+      <h2 className="font-display text-lg md:text-xl leading-tight text-neutral-900 shrink-0 truncate max-w-[14rem]">
+        {r.headline}
+      </h2>
 
-        {/* Progress rail */}
-        <div className="mt-2 h-1.5 w-full rounded-full bg-neutral-200/70 overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-[width] duration-700 ease-out ${
-              r.complete ? 'bg-primary-600' : 'bg-primary-500/80'
-            }`}
-            style={{ width: `${r.pct}%` }}
-          />
-        </div>
+      {/* Progress rail — inline, takes the slack */}
+      <div className="hidden sm:block flex-1 min-w-[4rem] h-1.5 rounded-full bg-neutral-200/70 overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-[width] duration-700 ease-out ${
+            r.complete ? 'bg-primary-600' : 'bg-primary-500/80'
+          }`}
+          style={{ width: `${r.pct}%` }}
+        />
       </div>
+
+      <span className="shrink-0 text-[13px] text-neutral-500 tabular-nums">{r.detail}</span>
     </div>
   )
 }
