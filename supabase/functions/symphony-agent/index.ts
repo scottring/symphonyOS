@@ -126,6 +126,8 @@ const TOOLS = [
         contact_id: { type: ['string', 'null'] },
         assigned_to: { type: ['string', 'null'] },
         is_waiting: { type: 'boolean' },
+        needs_discussion: { type: 'boolean', description: 'Flag that the real next step is a conversation with someone, not solo work' },
+        discussion_note: { type: ['string', 'null'], description: 'Who to talk to and what to decide, e.g. "Ask Iris which clothes and where to donate"' },
       },
       required: ['id'],
     },
@@ -805,10 +807,27 @@ Deno.serve(async (req) => {
   const incoming = body.messages
   const attachment: AttachmentMeta | null = body.attachment ?? null
   const currentMemberId: string | null = typeof body.currentMemberId === 'string' ? body.currentMemberId : null
+  // Optional task scoping: the client says which task this conversation is
+  // about, so the agent can help make it doable without the user re-typing it.
+  const rawTaskContext = body.taskContext
+  const taskContext: { id: string; title: string; notes?: string | null; projectName?: string | null } | null =
+    rawTaskContext && typeof rawTaskContext.id === 'string' && typeof rawTaskContext.title === 'string'
+      ? rawTaskContext
+      : null
   if (!Array.isArray(incoming) || incoming.length === 0) return json({ error: 'messages is required' }, 400)
 
   const today = new Date().toISOString().split('T')[0]
-  const datePrefix = `(Today is ${today}.)`
+  let datePrefix = `(Today is ${today}.)`
+  if (taskContext) {
+    const notesPart = taskContext.notes ? ` Task notes: ${taskContext.notes}.` : ''
+    const projectPart = taskContext.projectName ? ` Project: ${taskContext.projectName}.` : ''
+    datePrefix +=
+      `\n(This conversation is about the task "${taskContext.title}" (id ${taskContext.id}).${notesPart}${projectPart}` +
+      ' The user wants help making this task doable. You can: break it into subtasks' +
+      ' (symphony_create_task with parent_task_id), enrich its notes with what you find out,' +
+      ' or — when the real next step is a conversation with someone — set needs_discussion true' +
+      ' with a discussion_note via symphony_update_task. Look the task up by id before writing to it.)'
+  }
   const convo: Array<{ role: string; content: unknown }> = incoming.map(
     (m: { role: string; content: unknown }, i: number) => {
       if (i !== 0) return { role: m.role, content: m.content }
