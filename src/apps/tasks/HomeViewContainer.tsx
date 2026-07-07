@@ -667,6 +667,7 @@ export function HomeViewContainer() {
             onSetBucket={setBucket}
             onOpenTimeBlock={() => { setPlanTodayOpen(false); setPlanningFromWizard(true); setPlanningOpen(true); }}
             onFlagDiscussion={(taskId, note) => updateTask(taskId, { needsDiscussion: true, discussionNote: note })}
+            onRefetchTasks={refetch}
             contacts={contacts}
             routines={allRoutines}
             onUpdateRoutine={(id, input) => updateRoutine(id, input)}

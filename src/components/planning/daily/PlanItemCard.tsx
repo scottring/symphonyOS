@@ -36,13 +36,15 @@ interface PlanItemCardProps {
   onNotToday: () => void
   /** Flag "needs a conversation first" with a who/what note (tasks only). */
   onDiscuss?: (note: string) => void
+  /** Open the planning assistant scoped to this item ("make it doable"). */
+  onAssist?: () => void
   onAddMaterial?: () => void
   onMaterialAction?: (m: Material) => void
 }
 
 export function PlanItemCard({
   title, origin, materials, suggestion, chosenSlot,
-  onPickSlot, onNotToday, onDiscuss, onAddMaterial, onMaterialAction,
+  onPickSlot, onNotToday, onDiscuss, onAssist, onAddMaterial, onMaterialAction,
 }: PlanItemCardProps) {
   const om = ORIGIN_META[origin]
   const suggestedLabel = suggestion ? SLOTS.find((s) => s.slot === suggestion.slot)?.label ?? 'Morning' : null
@@ -87,6 +89,15 @@ export function PlanItemCard({
         <div className="flex items-center justify-between mb-1.5">
           <span className="text-[10px] uppercase tracking-wider text-neutral-400">When</span>
           <span className="flex items-center gap-3">
+            {onAssist && (
+              <button
+                type="button"
+                onClick={onAssist}
+                className="inline-flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 transition-colors"
+              >
+                <ConceptIcon name="ai" size={13} decorative /> Help me plan
+              </button>
+            )}
             {onDiscuss && (
               <button
                 type="button"

@@ -1,6 +1,23 @@
 import { describe, it, expect, vi } from 'vitest'
 import { screen } from '@testing-library/react'
 import { render } from '@/test/test-utils'
+
+// The "Help me plan" drawer hosts the live assistant; stub the hook so the
+// drawer renders without auth/streaming.
+vi.mock('@/hooks/useSymphonyAssistant', () => ({
+  useSymphonyAssistant: () => ({
+    messages: [],
+    loading: false,
+    error: null,
+    toolActivity: [],
+    sendMessage: vi.fn(),
+    resetSession: vi.fn(),
+  }),
+}))
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: () => ({ user: null, signOut: vi.fn() }),
+}))
+
 import { PlanTodaySession } from './PlanTodaySession'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
@@ -117,6 +134,14 @@ describe('PlanTodaySession', () => {
     expect(onSetBucket).toHaveBeenCalledWith('dc', 'week')
     // Card leaves the pile
     expect(screen.getByText('0 placed · 0 to go')).toBeInTheDocument()
+  })
+
+  it('"Help me plan" opens the planning assistant drawer scoped to the task', async () => {
+    const { user } = setup([task({ id: 'lb', title: 'Replace kitchen light bulbs', bucket: 'week' })])
+    await user.click(screen.getByRole('button', { name: /Help me plan/ }))
+    expect(screen.getByRole('dialog', { name: 'Plan Replace kitchen light bulbs' })).toBeInTheDocument()
+    // P1 starter chips are offered
+    expect(screen.getByRole('button', { name: 'Break this into doable steps' })).toBeInTheDocument()
   })
 
   it('stages a phone material as a tappable tel: link', () => {

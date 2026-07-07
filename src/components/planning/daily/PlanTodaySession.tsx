@@ -37,6 +37,7 @@ import { suggestSlot, timeOfDayToSlot } from '@/lib/planning/suggestSlot'
 import { showToast } from '@/hooks/useToast'
 import { SLOT_BASE_MINS, minsToSlot, dropMins } from '@/lib/planning/reorder'
 import { PlanItemCard, type ItemOrigin } from './PlanItemCard'
+import { PlanAssistDrawer } from './PlanAssistDrawer'
 
 /** One thing to place: a task or a non-daily routine, normalized for the pile. */
 interface PlanItem {
@@ -73,6 +74,8 @@ interface Props {
   onUpdateRoutine?: (id: string, input: { time_of_day?: string | null }) => void | Promise<unknown>
   /** Flag a task "needs a conversation first" (sets needsDiscussion + note). */
   onFlagDiscussion?: (taskId: string, note: string) => void
+  /** Refetch tasks after the planning assistant writes (subtasks/notes/discussion). */
+  onRefetchTasks?: () => void
 }
 
 const SECTION_META: { slot: TimeOfDay; label: string; range: string }[] = [
@@ -117,7 +120,7 @@ function eventsOnDate(events: CalendarEvent[], date: Date): CalendarEvent[] {
 export function PlanTodaySession({
   tasks, events, viewedDate, onClose, onPushTask, onCompleteTask, onCompleteRoutine,
   onSetBucket, onOpenTimeBlock, contacts = [], routines = [], onUpdateRoutine,
-  onFlagDiscussion,
+  onFlagDiscussion, onRefetchTasks,
 }: Props) {
   const matchAll = useMemo(() => makeAssigneeFilter([]), [])
   const contactsById = useMemo(
@@ -144,6 +147,8 @@ export function PlanTodaySession({
   const [chosenMinsById, setChosenMinsById] = useState<Record<string, number>>({})
   const [chosenRoutineMinsById, setChosenRoutineMinsById] = useState<Record<string, number>>({})
   const [notToday, setNotToday] = useState<Set<string>>(() => new Set())
+  // "Help me plan": the pile item whose planning assistant drawer is open.
+  const [assistItem, setAssistItem] = useState<PlanItem | null>(null)
   // Optimistically hide placed entries that were just unplaced or completed,
   // until the underlying tasks/routines props refresh.
   const [removedIds, setRemovedIds] = useState<Set<string>>(() => new Set())
@@ -345,6 +350,7 @@ export function PlanTodaySession({
                   onPickSlot={(slot) => pickSlot(it, slot)}
                   onNotToday={() => markNotToday(it)}
                   onDiscuss={it.kind === 'task' && onFlagDiscussion ? (note) => flagDiscussion(it, note) : undefined}
+                  onAssist={it.kind === 'task' ? () => setAssistItem(it) : undefined}
                 />
               ))
             )}
@@ -418,6 +424,20 @@ export function PlanTodaySession({
           Close
         </button>
       </footer>
+
+      {/* "Help me plan" — the fenced assistant scoped to one pile task (P1). */}
+      {assistItem && (
+        <PlanAssistDrawer
+          task={{
+            id: assistItem.id,
+            title: assistItem.title,
+            notes: tasks.find((t) => t.id === assistItem.id)?.notes ?? null,
+            projectName: null,
+          }}
+          onClose={() => setAssistItem(null)}
+          onMutate={onRefetchTasks}
+        />
+      )}
     </div>
   )
 }
