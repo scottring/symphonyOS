@@ -185,28 +185,6 @@ struct TimelineItemCard: View {
         .opacity(isCompleted ? 0.7 : 1.0)
     }
 
-    // MARK: - Checkbox
-
-    @ViewBuilder
-    private var checkboxView: some View {
-        if item.type == .event {
-            // Calendar icon for events
-            Image(systemName: isCompleted ? "calendar.badge.checkmark" : "calendar")
-                .font(.system(size: 20))
-                .foregroundStyle(isCompleted ? Color.primaryTint : accentColor)
-        } else if item.type == .routine {
-            // Circle for routines
-            Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
-                .font(.system(size: 22))
-                .foregroundStyle(isCompleted ? Color.primaryTint : Color.textTertiary)
-        } else {
-            // Rounded square for tasks
-            Image(systemName: isCompleted ? "checkmark.square.fill" : "square")
-                .font(.system(size: 20))
-                .foregroundStyle(isCompleted ? Color.primaryTint : Color.textTertiary)
-        }
-    }
-
     // MARK: - Type Icon
 
     @ViewBuilder
