@@ -31,18 +31,20 @@ export function RoutineCollectionRow({ item, onSelectStep, onCompleteStep }: Pro
   const p = item.collectionProgress ?? { done: 0, total: 0 }
   const nextUp = item.collectionNextUp
   return (
-    <div className="rounded-xl border border-neutral-200 bg-white">
-      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center gap-3 px-3 py-2.5 text-left">
-        {open ? <ChevronDown className="w-4 h-4 text-neutral-400" /> : <ChevronRight className="w-4 h-4 text-neutral-400" />}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-neutral-800 truncate">{item.title}</span>
-            <span className="text-xs text-neutral-400">{p.done} / {p.total}</span>
-          </div>
-          {item.completed
-            ? <span className="text-xs text-neutral-400">Done</span>
-            : nextUp && <span className="text-xs text-neutral-500">Next up: {fmt(nextUp.time)} {nextUp.stepName}</span>}
-        </div>
+    <div className={`${open ? 'rounded-xl' : 'rounded-full'} border border-neutral-200 bg-white`}>
+      {/* Collapsed: a single slim line — name · progress · next step — so the
+          routine reads as a pill on the timeline instead of a two-line card. */}
+      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center gap-2 px-3 py-1.5 text-left min-w-0">
+        {open ? <ChevronDown className="w-4 h-4 text-neutral-400 shrink-0" /> : <ChevronRight className="w-4 h-4 text-neutral-400 shrink-0" />}
+        <span className="text-sm font-medium text-neutral-800 truncate shrink-0 max-w-[50%]">{item.title}</span>
+        <span className="text-xs text-neutral-400 tabular-nums shrink-0">{p.done}/{p.total}</span>
+        {item.completed
+          ? <span className="text-xs text-neutral-400 truncate">· done</span>
+          : nextUp && (
+              <span className="text-xs text-neutral-500 truncate min-w-0">
+                · {fmt(nextUp.time)} {nextUp.stepName}
+              </span>
+            )}
       </button>
       {open && (
         <div className="border-t border-neutral-100 px-3 py-2 space-y-2.5">
