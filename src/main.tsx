@@ -78,6 +78,7 @@ if (ACTIVE_THEME === 'kinetic') {
 
 import { Suspense, lazy } from 'react'
 import { CalendarCallback } from './pages/CalendarCallback'
+import { isDesktopShell } from './lib/desktop'
 import { JoinHousehold } from './components/JoinHousehold'
 import { GoogleCalendarProvider } from './hooks/useGoogleCalendar'
 import { DomainProvider } from './hooks/useDomain'
@@ -111,6 +112,12 @@ const CapturePage = lazy(() => import('./desktop/CapturePage').then((m) => ({ de
 // path to a descendant <Routes> when the parent route ends in `*`; mounting at
 // exact `/today` consumes the segment and leaves nothing to match, so Today
 // rendered blank. See src/shell/cutoverRouting.test.tsx for the repro + fix.
+// Inside the Tauri Mac shell (desktop/), scope the native-feel CSS pass
+// (cursors, selection, overscroll — see index.css tail) to the whole document.
+if (isDesktopShell()) {
+  document.documentElement.classList.add('desktop-shell')
+}
+
 const cutoverShell = <AuthGate>{() => <Shell />}</AuthGate>
 
 createRoot(document.getElementById('root')!).render(

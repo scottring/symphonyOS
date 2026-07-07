@@ -25,6 +25,7 @@ import { useNotesContext } from '@/contexts/NotesContext';
 import { useListsContext } from '@/contexts/ListsContext';
 import { useToast } from '@/hooks/useToast';
 import { useSelection } from './providers/SelectionProvider';
+import { useDesktopBridge } from '@/desktop/useDesktopBridge';
 import type { PinnableEntityType } from '@/types/pin';
 
 interface QuickAddRichData {
@@ -45,6 +46,8 @@ interface QuickAddNoteData {
 
 export function useShellChrome() {
   const { tasks, addTask, pushTask } = useSupabaseTasks();
+  // Mac shell (desktop/): native menu nav, ⌘N capture, tray feed. No-op in browsers.
+  useDesktopBridge(tasks);
   const { projects } = useProjects();
   const { contacts } = useContacts();
   const { routines: allRoutines } = useRoutines();

@@ -1209,3 +1209,29 @@ html.capture-window body,
 html.capture-window #root {
   background: transparent !important;
 }
+
+/* ── Mac shell: native-feel polish (html.desktop-shell set in main.tsx) ──
+   Mirrors the .wall-touch-root pattern: chrome is not selectable/draggable,
+   but anything editable stays selectable. */
+html.desktop-shell body {
+  cursor: default;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+html.desktop-shell input,
+html.desktop-shell textarea,
+html.desktop-shell [contenteditable='true'] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+/* Native Mac apps use the arrow cursor on controls, not the hand. */
+html.desktop-shell button,
+html.desktop-shell a,
+html.desktop-shell [role='button'] {
+  cursor: default;
+}
+html.desktop-shell img,
+html.desktop-shell a {
+  -webkit-user-drag: none;
+}
