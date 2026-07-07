@@ -1,6 +1,12 @@
 // src/components/schedule/TodayAddInput.test.tsx
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
+
+const openAssistant = vi.fn()
+vi.mock('@/contexts/AssistantLaunchContext', () => ({
+  useAssistantLauncher: () => ({ openAssistant }),
+}))
+
 import { TodayAddInput, type TodayCaptureResult } from './TodayAddInput'
 
 const parserContext = {
@@ -127,6 +133,22 @@ describe('TodayAddInput smart capture', () => {
       fireEvent.click(screen.getByRole('button', { name: /add to today/i }))
       expect(screen.getByRole('radio', { name: 'Today' })).toHaveAttribute('aria-checked', 'true')
       expect(onAdd.mock.calls[0][0].destination).toBe('inbox')
+    })
+  })
+
+  describe('Symphony escalation', () => {
+    it('offers "Set this up with Symphony" while typing and launches with the text', () => {
+      const { input, onAdd } = setup()
+      expect(screen.queryByRole('button', { name: /Set this up with Symphony/ })).not.toBeInTheDocument()
+      fireEvent.change(input, { target: { value: 'plan the school fundraiser' } })
+      fireEvent.click(screen.getByRole('button', { name: /Set this up with Symphony/ }))
+      expect(openAssistant).toHaveBeenCalledWith({
+        message: 'Set this up and schedule it for today: plan the school fundraiser',
+        autoSend: true,
+      })
+      // Escalation hands off — nothing is added locally, input resets.
+      expect(onAdd).not.toHaveBeenCalled()
+      expect(screen.getByRole('button', { name: /add to today/i })).toBeInTheDocument()
     })
   })
 })

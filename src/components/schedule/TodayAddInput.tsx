@@ -1,9 +1,10 @@
 // src/components/schedule/TodayAddInput.tsx
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
-import { Plus, Check, X, Phone } from 'lucide-react'
+import { Plus, Check, X, Phone, Sparkles } from 'lucide-react'
 import type { ParserContext } from '@/lib/quickInputParser'
 import type { ResolverContext, ContactSuggestion } from '@/lib/entityResolver'
 import { useQuickParse } from '@/hooks/useQuickParse'
+import { useAssistantLauncher } from '@/contexts/AssistantLaunchContext'
 import type { ResolutionAction } from '@/hooks/useResolutionLearning'
 import type { TaskCategory } from '@/types/task'
 
@@ -58,6 +59,7 @@ export function TodayAddInput({ onAdd, parserContext, currentDomain, resolver, g
   const [value, setValue] = useState('')
   const [destination, setDestination] = useState<CaptureDestination>('today')
   const inputRef = useRef<HTMLInputElement>(null)
+  const { openAssistant } = useAssistantLauncher()
 
   // Stable ctx identity for useQuickParse's parse memo.
   const ctx = useMemo(
@@ -87,6 +89,15 @@ export function TodayAddInput({ onAdd, parserContext, currentDomain, resolver, g
     qp.resetOverrides()
     qp.resetSuggestion()
   }, [qp])
+
+  // Escalation: hand the raw text to the fenced assistant, which can set up
+  // something bigger than one task (project, subtasks, schedule) and verify it.
+  const handleAskSymphony = useCallback(() => {
+    const trimmed = value.trim()
+    if (!trimmed) return
+    openAssistant({ message: `Set this up and schedule it for today: ${trimmed}`, autoSend: true })
+    reset()
+  }, [value, openAssistant, reset])
 
   const handleSubmit = useCallback(() => {
     const trimmed = value.trim()
@@ -238,6 +249,18 @@ export function TodayAddInput({ onAdd, parserContext, currentDomain, resolver, g
             </button>
           )}
         </div>
+      )}
+
+      {/* Escalation to the fenced assistant — explicit, one tap, never automatic */}
+      {value.trim() && (
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={handleAskSymphony}
+          className="flex items-center gap-1.5 px-3 pb-2 md:px-4 text-xs text-primary-600 hover:text-primary-700 transition-colors"
+        >
+          <Sparkles className="w-3.5 h-3.5" /> Set this up with Symphony
+        </button>
       )}
     </div>
   )
