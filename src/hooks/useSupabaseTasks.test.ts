@@ -395,7 +395,51 @@ describe('useSupabaseTasks', () => {
       })
 
       expect(result.current.tasks[0].scheduledFor).toEqual(newDate)
-      expect(mockUpdate).toHaveBeenCalledWith({ scheduled_for: newDate.toISOString() })
+      // Setting a date implies bucket 'timed' (scheduledFor is documented as
+      // "only set when bucket='timed'") — without it the task would be dated
+      // but absent from every day view.
+      expect(mockUpdate).toHaveBeenCalledWith({ scheduled_for: newDate.toISOString(), bucket: 'timed' })
+    })
+
+    it("clearing the date on a timed task returns it to the inbox (never bucket 'timed' with no date)", async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task', bucket: 'timed', scheduled_for: '2024-06-20T14:00:00Z' } as any))
+
+      const { result } = renderHook(() => useSupabaseTasks())
+
+      await waitFor(() => {
+        expect(result.current.tasks).toHaveLength(1)
+      })
+
+      await act(async () => {
+        await result.current.updateTask('task-1', { bucket: 'timed', scheduledFor: undefined, isAllDay: false })
+      })
+
+      // A 'timed' task without a date is invisible to both the timed pool and
+      // the inbox pool — the clear must re-bucket to inbox.
+      expect(result.current.tasks[0].bucket).toBe('inbox')
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ bucket: 'inbox', scheduled_for: null, is_all_day: false })
+      )
+    })
+
+    it('keeps an explicit bucket when a date is set alongside it', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task' }))
+
+      const { result } = renderHook(() => useSupabaseTasks())
+
+      await waitFor(() => {
+        expect(result.current.tasks).toHaveLength(1)
+      })
+
+      const newDate = new Date('2024-06-21T09:00:00Z')
+      await act(async () => {
+        await result.current.updateTask('task-1', { bucket: 'timed', scheduledFor: newDate, isAllDay: false })
+      })
+
+      expect(result.current.tasks[0].bucket).toBe('timed')
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ bucket: 'timed', scheduled_for: newDate.toISOString() })
+      )
     })
 
     it('updates task notes', async () => {

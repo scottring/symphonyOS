@@ -719,6 +719,24 @@ export function useSupabaseTasks() {
       }
     }
 
+    // Invariant: bucket 'timed' requires a scheduled date (the timed pool only
+    // shows tasks with a date; the inbox pool only shows bucket 'inbox'). A
+    // clear-date update would otherwise strand the task invisible until a
+    // refetch — send it back to the inbox instead.
+    if (
+      'scheduledFor' in updates && !updates.scheduledFor &&
+      (updates.bucket === 'timed' || (!('bucket' in updates) && task.bucket === 'timed'))
+    ) {
+      updates = { ...updates, bucket: 'inbox', isAllDay: false }
+    }
+    // Inverse invariant: a scheduled date implies bucket 'timed' (types/task.ts
+    // documents scheduledFor as "only set when bucket='timed'"). A caller that
+    // sets a date without flipping the bucket would leave the task dated but
+    // absent from every day view.
+    if ('scheduledFor' in updates && updates.scheduledFor && !('bucket' in updates) && task.bucket !== 'timed') {
+      updates = { ...updates, bucket: 'timed' }
+    }
+
     // Optimistic update — handle both top-level tasks and nested subtasks
     const isSubtask = !!task.parentTaskId
     if (isSubtask) {
@@ -826,6 +844,14 @@ export function useSupabaseTasks() {
     if (taskIds.length === 0) return
 
     logger.debug('[updateTasksBulk] Called with:', { taskIds, updates })
+
+    // Same schedule/bucket invariants as updateTask (see comments there).
+    if (updates.bucket === 'timed' && 'scheduledFor' in updates && !updates.scheduledFor) {
+      updates = { ...updates, bucket: 'inbox', isAllDay: false }
+    }
+    if ('scheduledFor' in updates && updates.scheduledFor && !('bucket' in updates)) {
+      updates = { ...updates, bucket: 'timed' }
+    }
 
     // Save original tasks for rollback
     const tasksToUpdate = tasks.filter(t => taskIds.includes(t.id))
