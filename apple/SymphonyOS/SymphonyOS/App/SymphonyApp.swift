@@ -121,6 +121,18 @@ struct SymphonyShortcuts: AppShortcutsProvider {
             shortTitle: "Capture",
             systemImageName: "plus.circle"
         )
+        // NOTE: phrases can only interpolate AppEnum/AppEntity parameters — a
+        // free-text med name can't be spoken inline. "Log my meds" logs the
+        // default ("all"); a specific med is configurable in the Shortcuts app.
+        AppShortcut(
+            intent: LogMedicationIntent(),
+            phrases: [
+                "Log my meds in \(.applicationName)",
+                "Log my medication in \(.applicationName)",
+            ],
+            shortTitle: "Log Meds",
+            systemImageName: "pills.fill"
+        )
     }
 }
 
