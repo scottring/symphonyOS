@@ -181,6 +181,7 @@ function TaskPanelBody({ id }: { id: string }) {
         />
       }
       // createdByName not tracked in current data model
+      onAssistMutate={refetch}
       onClose={handleClose}
       onTitleChange={(t) => updateTask(task.id, { title: t })}
       onNotesChange={(n) => updateTask(task.id, { notes: n })}
@@ -281,7 +282,7 @@ function RoutinePanelBody({ id }: { id: string }) {
   // Search ALL routines (not just active): flipping a routine to "reference"
   // visibility removes it from the active set/timeline but the panel must stay
   // populated so it doesn't go blank (and so the user can flip it back).
-  const { routines, updateRoutine } = useRoutines();
+  const { routines, updateRoutine, refetch: refetchRoutines } = useRoutines();
   const { members: familyMembers } = useFamilyMembers();
 
   const routine = useMemo(() => routines.find((r) => r.id === id), [routines, id]);
@@ -311,6 +312,7 @@ function RoutinePanelBody({ id }: { id: string }) {
       onClearLocation={() =>
         updateRoutine(routine.id, { location: null, location_place_id: null })
       }
+      onAssistMutate={refetchRoutines}
     />
   );
 }

@@ -35,12 +35,14 @@ export interface AttachmentMeta {
   fileSize: number
 }
 
-/** The task a conversation is about. Sent to the edge fn, which injects it as
- *  context so the agent can help make the task doable without the user
- *  re-describing it. */
+/** The task or routine a conversation is about. Sent to the edge fn, which
+ *  injects it as context so the agent can help make the item doable without
+ *  the user re-describing it. */
 export interface AssistantTaskContext {
   id: string
   title: string
+  /** Defaults to 'task' when omitted. */
+  kind?: 'task' | 'routine'
   notes?: string | null
   projectName?: string | null
 }

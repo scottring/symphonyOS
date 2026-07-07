@@ -17,6 +17,7 @@ import { PanelClassify } from './sections/PanelClassify'
 import { PanelFooter } from './sections/PanelFooter'
 import { useLinkedEntities } from './hooks/useLinkedEntities'
 import { useMightBeRelevant } from './hooks/useMightBeRelevant'
+import { AssistDrawer } from '@/components/assist/AssistDrawer'
 import type { MightBeRelevantItem } from './types'
 
 interface TapContextPanelProps {
@@ -77,12 +78,15 @@ interface TapContextPanelProps {
   onContactChange?: (contactId: string | undefined) => void
   onSearchContacts?: (query: string) => Contact[]
   onAddContact?: (name: string, details?: { phone?: string; category?: import('@/types/contact').ContactCategory; placeId?: string }) => Promise<Contact | null>
+  /** Refetch after the planning assistant writes (enables the Help-me-plan action). */
+  onAssistMutate?: () => void
 }
 
 export function TapContextPanel(props: TapContextPanelProps) {
   const { task, allTasks, createdByName } = props
 
   const [showDirections, setShowDirections] = useState(false)
+  const [assistOpen, setAssistOpen] = useState(false)
 
   // Collapse the directions builder when switching to a different task
   // (React-recommended "adjust state during render" pattern, not an effect).
@@ -90,6 +94,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
   if (task.id !== prevTaskId) {
     setPrevTaskId(task.id)
     setShowDirections(false)
+    setAssistOpen(false)
   }
 
   const linked = useLinkedEntities(task, {
@@ -137,6 +142,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
         onDelete={props.onDelete}
         onUngroup={(task.subtasks?.length ?? 0) > 0 ? props.onUngroup : undefined}
         onDeleteGroup={(task.subtasks?.length ?? 0) > 0 ? props.onDeleteGroup : undefined}
+        onAssist={props.onAssistMutate ? () => setAssistOpen(true) : undefined}
       />
       <PanelClassify
         context={task.context}
@@ -195,6 +201,18 @@ export function TapContextPanel(props: TapContextPanelProps) {
         updatedAt={task.updatedAt}
         createdByName={createdByName}
       />
+      {assistOpen && (
+        <AssistDrawer
+          item={{
+            id: task.id,
+            title: task.title,
+            notes: task.notes ?? null,
+            projectName: linked.project?.name ?? null,
+          }}
+          onClose={() => setAssistOpen(false)}
+          onMutate={props.onAssistMutate}
+        />
+      )}
     </article>
   )
 }

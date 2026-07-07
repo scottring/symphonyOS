@@ -13,6 +13,7 @@ import { MultiAssigneeDropdown } from '@/components/family'
 import { RoutineScheduleEditor } from '@/components/routine/RoutineScheduleEditor'
 import { RoutineStepsSection } from './sections/RoutineStepsSection'
 import { ConceptIcon } from '@/lib/conceptIcons'
+import { AssistDrawer } from '@/components/assist/AssistDrawer'
 import { useRoutineStats } from '@/hooks/useRoutineStats'
 import { useAttachments } from '@/hooks/useAttachments'
 
@@ -43,6 +44,8 @@ interface TapRoutinePanelProps {
   onSelectStep?: (step: Routine) => void
   onAddStep?: (name: string) => void
   onReorderSteps?: (writes: { id: string; step_order: number }[]) => void
+  /** Refetch after the planning assistant writes (enables the Help-me-plan action). */
+  onAssistMutate?: () => void
 }
 
 export function TapRoutinePanel(props: TapRoutinePanelProps) {
@@ -54,6 +57,7 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
     : (routine.assigned_to ? [routine.assigned_to] : [])
   const [editingSchedule, setEditingSchedule] = useState(false)
   const [showDirections, setShowDirections] = useState(false)
+  const [assistOpen, setAssistOpen] = useState(false)
   const onTimeline = routine.visibility === 'active'
 
   // Load source document from the parent project (if any)
@@ -85,6 +89,15 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
             />
           )}
           <ContextPicker value={routine.context ?? undefined} onChange={props.onContextChange} />
+          {props.onAssistMutate && (
+            <button
+              type="button"
+              onClick={() => setAssistOpen(true)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
+            >
+              <ConceptIcon name="ai" size={14} decorative /> Help me plan
+            </button>
+          )}
           {streak > 0 && (
             <span className="inline-flex items-center gap-1 text-sm font-medium text-amber-600 ml-auto">
               <Flame className="w-4 h-4" />
@@ -214,6 +227,18 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
         createdAt={new Date(routine.created_at)}
         updatedAt={new Date(routine.updated_at)}
       />
+      {assistOpen && (
+        <AssistDrawer
+          item={{
+            id: routine.id,
+            title: routine.name,
+            kind: 'routine',
+            notes: routine.description ?? null,
+          }}
+          onClose={() => setAssistOpen(false)}
+          onMutate={props.onAssistMutate}
+        />
+      )}
     </article>
   )
 }

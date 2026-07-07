@@ -37,7 +37,7 @@ import { suggestSlot, timeOfDayToSlot } from '@/lib/planning/suggestSlot'
 import { showToast } from '@/hooks/useToast'
 import { SLOT_BASE_MINS, minsToSlot, dropMins } from '@/lib/planning/reorder'
 import { PlanItemCard, type ItemOrigin } from './PlanItemCard'
-import { PlanAssistDrawer } from './PlanAssistDrawer'
+import { AssistDrawer } from '@/components/assist/AssistDrawer'
 
 /** One thing to place: a task or a non-daily routine, normalized for the pile. */
 interface PlanItem {
@@ -350,7 +350,7 @@ export function PlanTodaySession({
                   onPickSlot={(slot) => pickSlot(it, slot)}
                   onNotToday={() => markNotToday(it)}
                   onDiscuss={it.kind === 'task' && onFlagDiscussion ? (note) => flagDiscussion(it, note) : undefined}
-                  onAssist={it.kind === 'task' ? () => setAssistItem(it) : undefined}
+                  onAssist={() => setAssistItem(it)}
                 />
               ))
             )}
@@ -425,13 +425,16 @@ export function PlanTodaySession({
         </button>
       </footer>
 
-      {/* "Help me plan" — the fenced assistant scoped to one pile task (P1). */}
+      {/* "Help me plan" — the fenced assistant scoped to one pile item (P1). */}
       {assistItem && (
-        <PlanAssistDrawer
-          task={{
+        <AssistDrawer
+          item={{
             id: assistItem.id,
             title: assistItem.title,
-            notes: tasks.find((t) => t.id === assistItem.id)?.notes ?? null,
+            kind: assistItem.kind,
+            notes: assistItem.kind === 'task'
+              ? tasks.find((t) => t.id === assistItem.id)?.notes ?? null
+              : null,
             projectName: null,
           }}
           onClose={() => setAssistItem(null)}

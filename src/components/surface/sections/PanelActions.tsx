@@ -24,6 +24,8 @@ interface PanelActionsProps {
   /** Group-wrapper actions, forwarded to the more-menu (present only for a task with subtasks). */
   onUngroup?: () => void
   onDeleteGroup?: () => void
+  /** Open the fenced planning assistant scoped to this item. */
+  onAssist?: () => void
 }
 
 export function PanelActions({
@@ -41,6 +43,7 @@ export function PanelActions({
   onDelete,
   onUngroup,
   onDeleteGroup,
+  onAssist,
 }: PanelActionsProps) {
   const [schedOpen, setSchedOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -114,6 +117,16 @@ export function PanelActions({
           </div>
         )}
       </div>
+
+      {onAssist && (
+        <button
+          type="button"
+          onClick={onAssist}
+          className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
+        >
+          <ConceptIcon name="ai" decorative /> Help me plan
+        </button>
+      )}
 
       <PanelMoreMenu
         isPinned={isPinned}
