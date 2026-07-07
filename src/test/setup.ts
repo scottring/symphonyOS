@@ -7,14 +7,16 @@ import { afterEach, vi } from 'vitest'
 vi.mock('@/lib/supabase', () => {
   // Helper to create chainable query builder that supports common patterns
   const createChainableQuery = (data: any[] = [], error: any = null) => {
-    const chain = {
+    const chain: any = {
       eq: () => chain,
       or: () => chain,
       order: () => chain, // Return chain to support multiple .order() calls
+      limit: () => chain,
       select: () => chain,
       single: () => Promise.resolve({ data: data[0] || null, error }),
+      // Intermediate chains are awaitable too (e.g. .eq().order().limit())
+      then: (resolve: (v: { data: any[]; error: any }) => void) => resolve({ data, error }),
     }
-    // Make it thenable for direct awaiting
     return Object.assign(Promise.resolve({ data, error }), chain)
   }
 
