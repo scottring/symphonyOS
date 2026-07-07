@@ -516,7 +516,7 @@ export const ScheduleItem = memo(function ScheduleItem({
               itemTitle={item.title}
               trigger={
                 <button
-                  className="w-full text-left text-xs font-medium tabular-nums rounded-md px-1 py-0.5 -mx-1 hover:bg-neutral-100 transition-colors cursor-pointer"
+                  className="w-full text-left text-xs font-medium tabular-nums rounded-md px-1 py-0.5 -mx-1 hover:bg-neutral-100 transition-colors cursor-pointer underline decoration-dotted decoration-neutral-300 underline-offset-2 hover:decoration-neutral-500"
                   title="Change time"
                 >
                   {isOverdue && overdueLabel ? (
