@@ -445,6 +445,20 @@ interface AttachmentMeta {
   fileSize: number
 }
 
+/** family_members accumulates duplicate rows per name across household shares;
+ *  keep the first (display_order) row per case-insensitive name. */
+function dedupeMembersByName<T extends { name: string }>(rows: T[]): T[] {
+  const seen = new Set<string>()
+  const out: T[] = []
+  for (const r of rows) {
+    const key = (r.name ?? '').trim().toLowerCase()
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    out.push(r)
+  }
+  return out
+}
+
 // ── Tool executor (RLS-scoped via userSupabase) ────────────────────
 async function runTool(
   db: SupabaseClient,
@@ -540,10 +554,13 @@ async function runTool(
         return `${(data || []).length} contacts:\n${JSON.stringify(data, null, 2)}`
       }
       case 'symphony_list_household_members': {
-        const { data, error } = await db.from('household_members')
-          .select('id, name, role, avatar_url').order('name')
+        // NOTE: the names/roles live in family_members (household_members is
+        // an invite/membership table with no name column).
+        const { data, error } = await db.from('family_members')
+          .select('id, name, role_label, member_type, is_full_user')
+          .order('display_order')
         if (error) throw error
-        return JSON.stringify(data, null, 2)
+        return JSON.stringify(dedupeMembersByName(data ?? []), null, 2)
       }
       case 'symphony_daily_summary': {
         const today = new Date().toISOString().split('T')[0]
@@ -807,26 +824,50 @@ Deno.serve(async (req) => {
   const incoming = body.messages
   const attachment: AttachmentMeta | null = body.attachment ?? null
   const currentMemberId: string | null = typeof body.currentMemberId === 'string' ? body.currentMemberId : null
-  // Optional task scoping: the client says which task this conversation is
-  // about, so the agent can help make it doable without the user re-typing it.
+  // Optional item scoping: the client says which task/routine this conversation
+  // is about, so the agent can help make it doable without the user re-typing it.
   const rawTaskContext = body.taskContext
-  const taskContext: { id: string; title: string; notes?: string | null; projectName?: string | null } | null =
+  const taskContext: { id: string; title: string; kind?: string; notes?: string | null; projectName?: string | null } | null =
     rawTaskContext && typeof rawTaskContext.id === 'string' && typeof rawTaskContext.title === 'string'
       ? rawTaskContext
       : null
   if (!Array.isArray(incoming) || incoming.length === 0) return json({ error: 'messages is required' }, 400)
 
+  // Who's who: inject the household roster so names like "Iris" or "Kaleb"
+  // resolve without a lookup, and assigned_to gets real member ids.
+  let familyLine = ''
+  try {
+    const { data: fam } = await db.from('family_members')
+      .select('id, name, role_label, member_type')
+      .order('display_order')
+    const unique = dedupeMembersByName(fam ?? [])
+    if (unique.length > 0) {
+      const roster = unique.map((m) => {
+        const me = currentMemberId && m.id === currentMemberId ? ', THE USER you are talking to' : ''
+        return `${m.name} (${m.role_label || m.member_type || 'member'}${me}) [id ${m.id}]`
+      }).join('; ')
+      familyLine = `\n(Household members: ${roster}. Use these ids for assigned_to. When one of these names comes up, you already know who they are — don't ask.)`
+    }
+  } catch (_e) {
+    // Roster is a nice-to-have; never fail the request over it.
+  }
+
   const today = new Date().toISOString().split('T')[0]
-  let datePrefix = `(Today is ${today}.)`
+  let datePrefix = `(Today is ${today}.)${familyLine}`
   if (taskContext) {
-    const notesPart = taskContext.notes ? ` Task notes: ${taskContext.notes}.` : ''
+    const isRoutine = taskContext.kind === 'routine'
+    const notesPart = taskContext.notes ? ` Notes: ${taskContext.notes}.` : ''
     const projectPart = taskContext.projectName ? ` Project: ${taskContext.projectName}.` : ''
-    datePrefix +=
-      `\n(This conversation is about the task "${taskContext.title}" (id ${taskContext.id}).${notesPart}${projectPart}` +
-      ' The user wants help making this task doable. You can: break it into subtasks' +
-      ' (symphony_create_task with parent_task_id), enrich its notes with what you find out,' +
-      ' or — when the real next step is a conversation with someone — set needs_discussion true' +
-      ' with a discussion_note via symphony_update_task. Look the task up by id before writing to it.)'
+    datePrefix += isRoutine
+      ? `\n(This conversation is about the recurring routine "${taskContext.title}" (id ${taskContext.id}).${notesPart}` +
+        ' The user wants help making this routine work. You can adjust it via symphony_update_routine' +
+        ' (time_of_day, recurrence), create supporting tasks with symphony_create_task, or talk through' +
+        ' how to structure it. Look the routine up by id before writing to it.)'
+      : `\n(This conversation is about the task "${taskContext.title}" (id ${taskContext.id}).${notesPart}${projectPart}` +
+        ' The user wants help making this task doable. You can: break it into subtasks' +
+        ' (symphony_create_task with parent_task_id), enrich its notes with what you find out,' +
+        ' or — when the real next step is a conversation with someone — set needs_discussion true' +
+        ' with a discussion_note via symphony_update_task. Look the task up by id before writing to it.)'
   }
   const convo: Array<{ role: string; content: unknown }> = incoming.map(
     (m: { role: string; content: unknown }, i: number) => {
