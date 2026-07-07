@@ -143,7 +143,18 @@ final class TimelineViewModel {
         // Google Calendar events (already mapped to TimelineItems by
         // GoogleCalendarService). Events bypass the domain filter — they mirror the
         // wall/kiosk, which shows every calendar regardless of work/family/personal.
-        items.append(contentsOf: eventItems)
+        // Overlay each event's actionable_instances status (checked off on any
+        // device → shows done here too).
+        for var event in eventItems {
+            if let key = event.eventKey {
+                let status = instances.first {
+                    $0.entityType == "calendar_event" && $0.entityId == key &&
+                    cal.isDate($0.date, inSameDayAs: date)
+                }?.status
+                event.completed = status == "completed" || status == "skipped"
+            }
+            items.append(event)
+        }
 
         // Sort: all-day first, then by time, then untimed
         items.sort { a, b in
@@ -230,6 +241,9 @@ struct TimelineItem: Identifiable {
     var blockType: String? = nil
     var assignedTo: [UUID] = []
     var location: String? = nil
+    /// Google event id — the actionable_instances entity_id for events
+    /// (matches the web: entity_id = google_event_id).
+    var eventKey: String? = nil
 
     enum ItemType: String {
         case task

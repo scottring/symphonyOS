@@ -124,7 +124,8 @@ struct GoogleCalendarEvent: Decodable {
             completed: false,
             context: nil,
             entityId: UUID(),          // Google events have no Symphony UUID
-            location: location
+            location: location,
+            eventKey: googleEventId
         )
     }
 

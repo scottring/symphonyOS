@@ -85,7 +85,14 @@ struct TimelineItemCard: View {
         case .routine:
             return [
                 SlideAction(label: "Skip", systemImage: "arrow.uturn.forward", tint: Self.neutralSlate) {
-                    setRoutineInstanceStatus("skipped")
+                    setInstanceStatus(entityType: "routine", entityId: item.entityId.uuidString, status: "skipped")
+                },
+            ]
+        case .event:
+            guard let key = item.eventKey else { return [] }
+            return [
+                SlideAction(label: "Skip", systemImage: "arrow.uturn.forward", tint: Self.neutralSlate) {
+                    setInstanceStatus(entityType: "calendar_event", entityId: key, status: "skipped")
                 },
             ]
         default:
@@ -224,24 +231,32 @@ struct TimelineItemCard: View {
                 vm.toggleComplete(task)
             }
         case .routine:
-            setRoutineInstanceStatus(isCompleted ? "completed" : "pending")
+            setInstanceStatus(entityType: "routine", entityId: item.entityId.uuidString,
+                              status: isCompleted ? "completed" : "pending")
+        case .event:
+            // Web parity: events check off via actionable_instances keyed by the
+            // Google event id.
+            if let key = item.eventKey {
+                setInstanceStatus(entityType: "calendar_event", entityId: key,
+                                  status: isCompleted ? "completed" : "pending")
+            }
         default:
             break
         }
     }
 
-    /// Write a routine occurrence's status to THIS card's day, mirroring the web:
-    /// find the (routine, date) instance — household-shared ones included, since
-    /// the pull syncs every RLS-visible row — update it if present, otherwise
-    /// create one owned by the current user. Every path queues a sync push;
-    /// without it the completion never left the phone (and the next pull's
-    /// reconciler deleted the local instance — completions silently vanished).
-    private func setRoutineInstanceStatus(_ status: String) {
-        let entityIdString = item.entityId.uuidString
+    /// Write a routine/event occurrence's status to THIS card's day, mirroring
+    /// the web: find the (entity, date) instance — household-shared ones
+    /// included, since the pull syncs every RLS-visible row — update it if
+    /// present, otherwise create one owned by the current user. Every path
+    /// queues a sync push; without it the completion never left the phone (and
+    /// the next pull's reconciler deleted the local instance — completions
+    /// silently vanished).
+    private func setInstanceStatus(entityType: String, entityId entityIdString: String, status: String) {
         let cal = Calendar.current
         let allInstances = (try? modelContext.fetch(FetchDescriptor<ActionableInstance>())) ?? []
         let instance = allInstances.first {
-            $0.entityType == "routine" && $0.entityId == entityIdString &&
+            $0.entityType == entityType && $0.entityId == entityIdString &&
             cal.isDate($0.date, inSameDayAs: date)
         }
 
@@ -256,7 +271,7 @@ struct TimelineItemCard: View {
         } else if status != "pending" {
             let newInstance = ActionableInstance(
                 userId: userId,
-                entityType: "routine",
+                entityType: entityType,
                 entityId: entityIdString,
                 date: date
             )
