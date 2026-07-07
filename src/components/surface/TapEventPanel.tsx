@@ -3,7 +3,6 @@ import { Video } from 'lucide-react'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Task } from '@/types/task'
 import { PanelHeader } from './sections/PanelHeader'
-import { PanelMetaRow } from './sections/PanelMetaRow'
 import { PanelWhy } from './sections/PanelWhy'
 import { PanelLinks } from './sections/PanelLinks'
 import { PanelMightBeRelevant } from './sections/PanelMightBeRelevant'
@@ -58,15 +57,18 @@ function formatDuration(minutes: number): string {
   return m === 0 ? `${h} hr` : `${h} hr ${m} min`
 }
 
-function formatTime(iso?: string): string {
+function formatDayLabel(iso?: string): string {
   if (!iso) return ''
   const d = new Date(iso)
-  return d.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  })
+  const today = new Date()
+  const sameDay = d.toDateString() === today.toDateString()
+  if (sameDay) return 'Today'
+  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+}
+
+function formatClock(iso?: string): string {
+  if (!iso) return ''
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 }
 
 export function TapEventPanel(props: TapEventPanelProps) {
@@ -123,16 +125,28 @@ export function TapEventPanel(props: TapEventPanelProps) {
   }
 
   return (
-    <article className="bg-bg-elevated rounded-2xl p-5 max-w-md w-full">
+    <article className="bg-bg-elevated rounded-2xl p-6 max-w-md w-full">
       <PanelHeader
         title={event.title}
         onTitleChange={() => { /* event title is read-only from gcal */ }}
         onClose={props.onClose}
       />
-      <PanelMetaRow
-        bucket={formatTime(startTime)}
-      />
-      <div className="flex flex-wrap gap-2 pb-4 mb-4 border-b border-neutral-200">
+
+      {/* When — the one fact that defines an event, stated plainly. */}
+      {startTime && (
+        <div className="mt-1.5 flex items-baseline gap-2 flex-wrap">
+          <span className="text-[15px] font-medium text-neutral-800">{formatDayLabel(startTime)}</span>
+          <span className="text-[15px] text-neutral-600 tabular-nums">
+            {formatClock(startTime)}
+            {endTime ? ` \u2013 ${formatClock(endTime)}` : ''}
+          </span>
+          {durationMinutes !== null && durationMinutes > 0 && (
+            <span className="text-[13px] text-neutral-400">· {formatDuration(durationMinutes)}</span>
+          )}
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-wrap gap-2 pb-5 mb-6 border-b border-neutral-200/70">
         {/* Physical address → Directions toggle. Video meeting → Join link (or a
             non-clickable label when no join URL is known). Never offer directions
             to a Teams/Zoom/Meet "location". */}
@@ -201,53 +215,59 @@ export function TapEventPanel(props: TapEventPanelProps) {
         )}
       </div>
 
-      {/* Location editor: for physical addresses or to add one. A virtual
-          meeting is handled by the Join/label chip above, not a Places field. */}
-      {!isVirtualMeeting && (
-        <PanelLocation
-          location={event.location ?? undefined}
-          title={event.title}
-          showDirections={isPhysicalLocation && showDirections}
-          onUpdateLocation={(addr) => props.onUpdateEventLocation?.(eventId, addr, calendarId)}
-          onClearLocation={() => props.onUpdateEventLocation?.(eventId, null, calendarId)}
+      {/* Body sections — one consistent rhythm so the panel reads as grouped
+          blocks instead of a scrunched column. */}
+      <div className="space-y-6 [&_section]:!mb-0">
+        {/* Location editor: for physical addresses or to add one. A virtual
+            meeting is handled by the Join/label chip above, not a Places field. */}
+        {!isVirtualMeeting && (
+          <PanelLocation
+            location={event.location ?? undefined}
+            title={event.title}
+            showDirections={isPhysicalLocation && showDirections}
+            onUpdateLocation={(addr) => props.onUpdateEventLocation?.(eventId, addr, calendarId)}
+            onClearLocation={() => props.onUpdateEventLocation?.(eventId, null, calendarId)}
+          />
+        )}
+
+        <PanelWhy
+          key={event.id}
+          notes={props.notes}
+          onChange={props.onNotesChange}
+          label="What to bring"
         />
-      )}
 
-      <PanelWhy
-        key={event.id}
-        notes={props.notes}
-        onChange={props.onNotesChange}
-        label="What to bring"
-      />
+        {relations.tasks.length > 0 && (
+          <section>
+            <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">
+              Prep tasks
+            </div>
+            {relations.tasks.map(t => (
+              <button
+                key={t.id}
+                onClick={() => props.onOpenTask(t.id)}
+                className="flex items-center gap-2 w-full text-left mb-1 py-1.5 px-2 rounded-md bg-white shadow-[inset_0_0_0_1px_#e5e7eb] hover:bg-neutral-50"
+              >
+                <span className="w-6 h-6 flex items-center justify-center rounded-md bg-amber-100"><ConceptIcon name="list" decorative /></span>
+                <span className="text-sm text-neutral-800 flex-1">{t.title}</span>
+              </button>
+            ))}
+          </section>
+        )}
 
-      {relations.tasks.length > 0 && (
-        <section className="mb-4">
-          <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">
-            Prep tasks
-          </div>
-          {relations.tasks.map(t => (
-            <button
-              key={t.id}
-              onClick={() => props.onOpenTask(t.id)}
-              className="flex items-center gap-2 w-full text-left mb-1 py-1.5 px-2 rounded-md bg-white shadow-[inset_0_0_0_1px_#e5e7eb] hover:bg-neutral-50"
-            >
-              <span className="w-6 h-6 flex items-center justify-center rounded-md bg-amber-100"><ConceptIcon name="list" decorative /></span>
-              <span className="text-sm text-neutral-800 flex-1">{t.title}</span>
-            </button>
-          ))}
-        </section>
-      )}
+        <PanelLinks links={undefined} onAddLink={props.onAddLink} />
 
-      <PanelLinks links={undefined} onAddLink={props.onAddLink} />
-
-      <PanelMightBeRelevant items={[]} onOpen={props.onOpenRelated} />
+        <PanelMightBeRelevant items={[]} onOpen={props.onOpenRelated} />
+      </div>
 
       {/* Events carry no created/updated timestamps; show the start time when present. */}
       {startTime && (
-        <PanelFooter
-          createdAt={new Date(startTime)}
-          updatedAt={new Date(startTime)}
-        />
+        <div className="mt-8 pt-4 border-t border-neutral-100">
+          <PanelFooter
+            createdAt={new Date(startTime)}
+            updatedAt={new Date(startTime)}
+          />
+        </div>
       )}
     </article>
   )

@@ -22,13 +22,14 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { showToast } from '@/hooks/useToast';
 import { useSelection } from '@/shell/providers/SelectionProvider';
 import type { SelectionRef } from '@/shell/types';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useContacts } from '@/hooks/useContacts';
 import { useProjects } from '@/hooks/useProjects';
 import { useGoals } from '@/hooks/useGoals';
-import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
+import { useGoogleCalendar, CalendarReconnectError } from '@/hooks/useGoogleCalendar';
 import { useEventNotes } from '@/hooks/useEventNotes';
 import { useRoutines } from '@/hooks/useRoutines';
 import { useFamilyMembers } from '@/hooks/useFamilyMembers';
@@ -361,15 +362,35 @@ function EventPanelBody({ id }: { id: string }) {
       onOpenProject={() => {}}
       onOpenRelated={() => {}}
       onUpdateEventLocation={async (eid, location, calendarId) => {
-        await updateEvent({ eventId: eid, location, calendarId });
+        try {
+          await updateEvent({ eventId: eid, location, calendarId });
+          showToast('Location updated', 'success');
+        } catch (err) {
+          showToast(
+            err instanceof CalendarReconnectError
+              ? 'Calendar connection expired — reconnect in Settings'
+              : 'Could not update the event',
+            'error',
+          );
+        }
       }}
       onReschedule={async (startTime, endTime) => {
-        await updateEvent({
-          eventId: event.google_event_id ?? event.id,
-          startTime,
-          endTime,
-          calendarId: event.calendar_id ?? event.calendarId,
-        });
+        try {
+          await updateEvent({
+            eventId: event.google_event_id ?? event.id,
+            startTime,
+            endTime,
+            calendarId: event.calendar_id ?? event.calendarId,
+          });
+          showToast('Event updated', 'success');
+        } catch (err) {
+          showToast(
+            err instanceof CalendarReconnectError
+              ? 'Calendar connection expired — reconnect in Settings'
+              : 'Could not update the event',
+            'error',
+          );
+        }
       }}
     />
   );

@@ -487,9 +487,26 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
       throw new Error(errorMessage)
     }
 
-    // Refresh events after update to show new location
-    await fetchTodayEvents()
-  }, [isConnected, fetchTodayEvents])
+    // Patch the local cache in place. A destructive fetchTodayEvents() here
+    // wiped any non-today window (updating a Thursday event blanked that view)
+    // and made same-day edits look like no-ops while the refetch raced. The
+    // next natural fetch reconciles with Google's truth.
+    setEvents(prev => prev.map(e => {
+      const key = e.google_event_id ?? e.id
+      if (key !== params.eventId) return e
+      const patched = { ...e }
+      if (params.startTime) {
+        patched.start_time = params.startTime.toISOString()
+        patched.startTime = params.startTime.toISOString()
+      }
+      if (params.endTime) {
+        patched.end_time = params.endTime.toISOString()
+        patched.endTime = params.endTime.toISOString()
+      }
+      if (params.location !== undefined) patched.location = params.location ?? undefined
+      return patched
+    }))
+  }, [isConnected])
 
   // Optimistically remove an event from the local cache.
   // Caller is responsible for orchestrating any undo + the actual API call.
