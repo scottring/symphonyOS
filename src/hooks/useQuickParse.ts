@@ -19,6 +19,7 @@ interface Overrides {
   projectId?: string | null
   contactId?: string | null
   dueDate?: Date | null
+  durationMinutes?: number | null
   category?: TaskCategory | null
   context?: TaskContext | null
   assignedMemberIds?: string[] | null
@@ -71,6 +72,7 @@ export function useQuickParse(title: string, ctx: ParserContext, currentDomain: 
     projectId: overrides.projectId === null ? undefined : (overrides.projectId ?? parsed.projectId),
     contactId: overrides.contactId === null ? undefined : (overrides.contactId ?? parsed.contactId ?? (suggestionApplied ? suggestion!.contactId : undefined)),
     dueDate: overrides.dueDate === null ? undefined : (overrides.dueDate ?? parsed.dueDate),
+    durationMinutes: overrides.durationMinutes === null ? undefined : (overrides.durationMinutes ?? parsed.durationMinutes),
     category: overrides.category === null ? undefined : (overrides.category ?? parsed.category),
     context: overrides.context === null ? undefined : (overrides.context ?? (currentDomain !== 'universal' ? currentDomain as TaskContext : undefined)),
     assignedMemberIds: overrides.assignedMemberIds === null ? undefined : (overrides.assignedMemberIds ?? parsed.assignedMemberIds),
@@ -107,6 +109,7 @@ export function useQuickParse(title: string, ctx: ParserContext, currentDomain: 
     clearProject: () => setOverrides(prev => ({ ...prev, projectId: null })),
     clearContact: () => setOverrides(prev => ({ ...prev, contactId: null })),
     clearDate: () => setOverrides(prev => ({ ...prev, dueDate: null })),
+    clearDuration: () => setOverrides(prev => ({ ...prev, durationMinutes: null })),
     clearCategory: () => setOverrides(prev => ({ ...prev, category: null })),
     clearContext: () => setOverrides(prev => ({ ...prev, context: null })),
     clearAssignment: () => setOverrides(prev => ({ ...prev, assignedMemberIds: null })),

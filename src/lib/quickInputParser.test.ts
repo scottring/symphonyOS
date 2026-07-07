@@ -245,3 +245,51 @@ describe('category prefix parsing', () => {
     expect(result.dueDate).toBeDefined()
   })
 })
+
+describe('duration parsing', () => {
+  it('parses "45m" as a 45-minute duration and strips it from the title', () => {
+    const result = parseQuickInput('event: dentist thursday 2pm 45m', mockContext)
+    expect(result.category).toBe('event')
+    expect(result.durationMinutes).toBe(45)
+    expect(result.dueDate).toBeDefined()
+    expect(result.title).toBe('dentist')
+  })
+
+  it('parses "for 45 minutes"', () => {
+    const result = parseQuickInput('standup tomorrow 9am for 45 minutes', mockContext)
+    expect(result.durationMinutes).toBe(45)
+    expect(result.title).toBe('standup')
+  })
+
+  it('parses hour forms: "2h", "1.5h", "1h30m"', () => {
+    expect(parseQuickInput('deep work 2h tomorrow', mockContext).durationMinutes).toBe(120)
+    expect(parseQuickInput('deep work 1.5h tomorrow', mockContext).durationMinutes).toBe(90)
+    expect(parseQuickInput('deep work 1h30m tomorrow', mockContext).durationMinutes).toBe(90)
+  })
+
+  it('does NOT treat "in 45 minutes" as a duration (relative time belongs to chrono)', () => {
+    const result = parseQuickInput('call vet in 45 minutes', mockContext)
+    expect(result.durationMinutes).toBeUndefined()
+    expect(result.dueDate).toBeDefined()
+  })
+
+  it('does not confuse clock times or unit words with durations', () => {
+    const r1 = parseQuickInput('meeting at 2pm', mockContext)
+    expect(r1.durationMinutes).toBeUndefined()
+    const r2 = parseQuickInput('run 45 miles someday', mockContext)
+    expect(r2.durationMinutes).toBeUndefined()
+    const r3 = parseQuickInput('vitamin d 500 mg daily', mockContext)
+    expect(r3.durationMinutes).toBeUndefined()
+  })
+
+  it('derives duration from a chrono time range', () => {
+    const result = parseQuickInput('dentist thursday 2pm-3:30pm', mockContext)
+    expect(result.durationMinutes).toBe(90)
+  })
+
+  it('hasParsedFields counts duration as a field', () => {
+    const result = parseQuickInput('mow lawn 30m', mockContext)
+    expect(result.durationMinutes).toBe(30)
+    expect(hasParsedFields(result)).toBe(true)
+  })
+})

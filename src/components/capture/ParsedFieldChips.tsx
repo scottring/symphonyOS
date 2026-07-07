@@ -10,6 +10,15 @@ interface Props {
   onClearContact: () => void
   onClearCategory: () => void
   onClearContext: () => void
+  onClearDuration?: () => void
+}
+
+// "45 min" / "1 hr" / "1 hr 30 min" — matches how the schedule rows label durations.
+function formatDuration(minutes: number) {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  if (h === 0) return `${m} min`
+  return m === 0 ? `${h} hr` : `${h} hr ${m} min`
 }
 
 // Format date and time for display — preserved verbatim from QuickCapture.
@@ -58,13 +67,15 @@ export function ParsedFieldChips({
   onClearContact,
   onClearCategory,
   onClearContext,
+  onClearDuration,
 }: Props) {
   if (
     !parsed.dueDate &&
     !parsed.projectId &&
     !parsed.contactId &&
     !parsed.category &&
-    !parsed.context
+    !parsed.context &&
+    !parsed.durationMinutes
   ) {
     return null
   }
@@ -109,6 +120,27 @@ export function ParsedFieldChips({
             >
               ×
             </button>
+          </span>
+        </div>
+      )}
+
+      {/* Duration chip */}
+      {!parsed.isNote && parsed.durationMinutes !== undefined && parsed.durationMinutes > 0 && (
+        <div className="flex items-center gap-2">
+          <span className="text-base"><ConceptIcon name="time" size={18} decorative /></span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary-50 text-primary-700 rounded-full text-xs font-medium border border-primary-100">
+            {formatDuration(parsed.durationMinutes)}
+            {onClearDuration && (
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={onClearDuration}
+                aria-label="Clear duration"
+                className="ml-1 text-primary-400 hover:text-primary-600"
+              >
+                ×
+              </button>
+            )}
           </span>
         </div>
       )}

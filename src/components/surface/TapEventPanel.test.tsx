@@ -121,4 +121,27 @@ describe('TapEventPanel', () => {
     // mockEvent is 09:00–09:30Z (30 min); reschedule must keep that duration
     expect(end.getTime() - start.getTime()).toBe(30 * 60 * 1000)
   })
+
+  it('shows the current duration and changes it via the preset menu', async () => {
+    const onReschedule = vi.fn()
+    const { user } = render(<TapEventPanel
+      event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers} onReschedule={onReschedule}
+    />)
+    // 09:00–09:30Z = 30 min
+    const durationButton = screen.getByRole('button', { name: /change duration/i })
+    expect(durationButton).toHaveTextContent('30 min')
+
+    await user.click(durationButton)
+    await user.click(screen.getByRole('button', { name: '45 min' }))
+
+    expect(onReschedule).toHaveBeenCalledTimes(1)
+    const [start, end] = onReschedule.mock.calls[0]
+    expect(start.toISOString()).toBe(new Date(mockEvent.start_time).toISOString())
+    expect(end.getTime() - start.getTime()).toBe(45 * 60 * 1000)
+  })
+
+  it('hides the duration control when onReschedule is not provided', () => {
+    render(<TapEventPanel event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers} />)
+    expect(screen.queryByRole('button', { name: /change duration/i })).not.toBeInTheDocument()
+  })
 })

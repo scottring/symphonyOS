@@ -9,6 +9,8 @@ export interface ParsedQuickInput {
   contactMatch?: string              // What text matched
   dueDate?: Date                     // Parsed date
   dueDateMatch?: string              // What text matched (e.g., "tomorrow")
+  durationMinutes?: number           // Parsed duration ("45m", "1h30m", "for 45 minutes", or a chrono range)
+  durationMatch?: string             // What text matched (e.g., "45m")
   priority?: 'high' | 'medium' | 'low'
   category?: 'task' | 'chore' | 'errand' | 'event' | 'activity'
   categoryMatch?: string             // What text matched (e.g., "errand:")
@@ -104,6 +106,27 @@ export function parseQuickInput(
     }
   }
 
+  // 0b. Extract an explicit duration token BEFORE date parsing so chrono never
+  //     misreads "for 45 minutes" as a relative date. Supported: "45m",
+  //     "45 min(s)/minutes", "1h/hr/hour(s)", "1h30m", "1.5h", each optionally
+  //     preceded by "for". The minutes-only branch requires the unit to touch a
+  //     word boundary, so times like "2pm" and words like "45 miles" don't match.
+  const durationMatch = workingText.match(
+    /(?:^|\s)(in\s+)?(?:for\s+)?((\d+(?:\.\d+)?)\s*h(?:rs?|ours?)?(?:\s*(\d{1,2})\s*m(?:ins?|inutes?)?)?|(\d{1,3})\s*m(?:ins?|inutes?)?)(?=[\s,.]|$)/i,
+  )
+  // "in 45 minutes" is a relative TIME (chrono's job), not a duration — skip it.
+  if (durationMatch && !durationMatch[1]) {
+    const hours = durationMatch[3] ? parseFloat(durationMatch[3]) : 0
+    const minsAfterHours = durationMatch[4] ? parseInt(durationMatch[4], 10) : 0
+    const minsOnly = durationMatch[5] ? parseInt(durationMatch[5], 10) : 0
+    const total = Math.round(hours * 60) + minsAfterHours + minsOnly
+    if (total > 0) {
+      result.durationMinutes = total
+      result.durationMatch = durationMatch[2]
+      workingText = workingText.replace(durationMatch[0], ' ').replace(/\s+/g, ' ').trim()
+    }
+  }
+
   // 1. Extract dates using chrono-node — skipping weak/ambiguous bare keywords
   //    (see isWeakDateMatch) so topic words like "weekend" or "May" don't
   //    hijack scheduling and mangle the title.
@@ -112,6 +135,12 @@ export function parseQuickInput(
     result.dueDate = dateMatch.start.date()
     result.dueDateMatch = dateMatch.text
     workingText = workingText.replace(dateMatch.text, '').trim()
+    // A chrono range ("2pm-3:30pm") carries the end time — derive a duration
+    // from it unless an explicit duration token already won.
+    if (dateMatch.end && result.durationMinutes === undefined) {
+      const rangeMinutes = Math.round((dateMatch.end.date().getTime() - dateMatch.start.date().getTime()) / 60000)
+      if (rangeMinutes > 0) result.durationMinutes = rangeMinutes
+    }
   }
 
   // 2. Check for explicit contact markers FIRST (before projects)
@@ -235,5 +264,5 @@ export function parseQuickInput(
 
 // Helper to check if anything was parsed beyond the title
 export function hasParsedFields(parsed: ParsedQuickInput): boolean {
-  return !!(parsed.projectId || parsed.contactId || parsed.dueDate || parsed.priority || parsed.category || parsed.isNote || parsed.assignedMemberIds?.length)
+  return !!(parsed.projectId || parsed.contactId || parsed.dueDate || parsed.durationMinutes || parsed.priority || parsed.category || parsed.isNote || parsed.assignedMemberIds?.length)
 }

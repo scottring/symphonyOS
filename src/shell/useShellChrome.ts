@@ -31,6 +31,7 @@ interface QuickAddRichData {
   projectId?: string;
   contactId?: string;
   scheduledFor?: Date;
+  durationMinutes?: number;
   category?: 'task' | 'chore' | 'errand' | 'event' | 'activity';
   context?: 'work' | 'family' | 'personal';
   assignedMemberIds?: string[];
@@ -73,8 +74,7 @@ export function useShellChrome() {
       if (data.category === 'event' && data.scheduledFor && isConnected) {
         try {
           const startTime = new Date(data.scheduledFor);
-          const endTime = new Date(startTime);
-          endTime.setHours(endTime.getHours() + 1);
+          const endTime = new Date(startTime.getTime() + (data.durationMinutes ?? 60) * 60000);
 
           const explicitContext =
             data.context ?? (currentDomain !== 'universal' ? currentDomain : undefined);

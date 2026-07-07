@@ -15,6 +15,7 @@ interface QuickCaptureProps {
     projectId?: string
     contactId?: string
     scheduledFor?: Date
+    durationMinutes?: number
     category?: TaskCategory
     context?: TaskContext
     assignedMemberIds?: string[]
@@ -80,6 +81,7 @@ export function QuickCapture({
     clearProject,
     clearContact,
     clearDate,
+    clearDuration,
     clearCategory,
     clearContext,
     clearAssignment,
@@ -205,6 +207,7 @@ export function QuickCapture({
         projectId: effectiveParsed.projectId,
         contactId: effectiveParsed.contactId,
         scheduledFor: effectiveParsed.dueDate,
+        durationMinutes: effectiveParsed.durationMinutes,
         category: effectiveParsed.category,
         context: effectiveParsed.context,
         assignedMemberIds: effectiveParsed.assignedMemberIds,
@@ -400,6 +403,7 @@ export function QuickCapture({
                     onClearContact={clearContact}
                     onClearCategory={clearCategory}
                     onClearContext={clearContext}
+                    onClearDuration={clearDuration}
                   />
 
                   {/* Assignment chip(s) */}

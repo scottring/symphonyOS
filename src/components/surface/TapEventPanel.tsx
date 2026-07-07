@@ -39,10 +39,23 @@ interface TapEventPanelProps {
   onReschedule?: (startTime: Date, endTime: Date) => void
 }
 
-type AnyEvent = { start_time?: string; startTime?: string }
+type AnyEvent = { start_time?: string; startTime?: string; end_time?: string; endTime?: string }
 
 function getStartTime(event: CalendarEvent): string | undefined {
   return (event as AnyEvent).start_time || (event as AnyEvent).startTime
+}
+
+function getEndTime(event: CalendarEvent): string | undefined {
+  return (event as AnyEvent).end_time || (event as AnyEvent).endTime
+}
+
+const DURATION_PRESETS = [15, 30, 45, 60, 90, 120]
+
+function formatDuration(minutes: number): string {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  if (h === 0) return `${m} min`
+  return m === 0 ? `${h} hr` : `${h} hr ${m} min`
 }
 
 function formatTime(iso?: string): string {
@@ -59,6 +72,7 @@ function formatTime(iso?: string): string {
 export function TapEventPanel(props: TapEventPanelProps) {
   const { event, allTasks } = props
   const [showDirections, setShowDirections] = useState(false)
+  const [showDurationMenu, setShowDurationMenu] = useState(false)
 
   const relations = useEntityRelations({
     kind: 'event',
@@ -69,8 +83,24 @@ export function TapEventPanel(props: TapEventPanelProps) {
   })
 
   const startTime = getStartTime(event)
+  const endTime = getEndTime(event)
   const eventId = event.google_event_id ?? event.id
   const calendarId = event.calendar_id ?? event.calendarId
+
+  // Current duration in minutes, when both ends are known.
+  const durationMinutes =
+    startTime && endTime
+      ? Math.round((new Date(endTime).getTime() - new Date(startTime).getTime()) / 60000)
+      : null
+
+  // Keep the start, move the end. This pushes to Google Calendar via the same
+  // channel a reschedule uses.
+  const handleDurationChange = (minutes: number) => {
+    if (!startTime) return
+    const start = new Date(startTime)
+    props.onReschedule?.(start, new Date(start.getTime() + minutes * 60000))
+    setShowDurationMenu(false)
+  }
 
   // Classify the location so a video meeting (Teams/Zoom/Meet) never renders
   // as a physical address with a Directions/Maps affordance.
@@ -141,6 +171,33 @@ export function TapEventPanel(props: TapEventPanelProps) {
               </button>
             }
           />
+        )}
+        {props.onReschedule && durationMinutes !== null && durationMinutes > 0 && (
+          <div className="relative">
+            <button
+              onClick={() => setShowDurationMenu((v) => !v)}
+              aria-expanded={showDurationMenu}
+              aria-label="Change duration"
+              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
+            >
+              <ConceptIcon name="time" decorative /> {formatDuration(durationMinutes)} {showDurationMenu ? '▾' : '▸'}
+            </button>
+            {showDurationMenu && (
+              <div className="absolute left-0 top-full mt-1 z-20 bg-white rounded-xl shadow-lg border border-neutral-100 py-1 min-w-[7rem]">
+                {DURATION_PRESETS.map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => handleDurationChange(m)}
+                    className={`block w-full text-left px-4 py-2 text-sm transition-colors hover:bg-neutral-50 ${
+                      m === durationMinutes ? 'text-primary-700 font-medium' : 'text-neutral-700'
+                    }`}
+                  >
+                    {formatDuration(m)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
 
