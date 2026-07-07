@@ -1,5 +1,8 @@
 use tauri::menu::{AboutMetadata, CheckMenuItemBuilder, Menu, MenuItemBuilder, SubmenuBuilder};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter, Listener, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_global_shortcut::ShortcutState;
+
+const APP_URL: &str = "https://app.symphony-os.com";
 
 const NAV_EVENTS: [(&str, &str); 4] = [
     ("nav-today", "today"),
@@ -12,6 +15,35 @@ fn show_main(app: &AppHandle) {
     if let Some(win) = app.get_webview_window("main") {
         let _ = win.show();
         let _ = win.set_focus();
+    }
+}
+
+fn create_capture_window(app: &AppHandle) -> tauri::Result<()> {
+    let url: tauri::Url = format!("{APP_URL}/capture").parse().expect("valid capture url");
+    WebviewWindowBuilder::new(app, "capture", WebviewUrl::External(url))
+        .title("Quick Capture")
+        .inner_size(560.0, 120.0)
+        .decorations(false)
+        .transparent(true)
+        .always_on_top(true)
+        .resizable(false)
+        .skip_taskbar(true)
+        .visible(false)
+        .center()
+        .build()?;
+    Ok(())
+}
+
+fn toggle_capture(app: &AppHandle) {
+    let Some(win) = app.get_webview_window("capture") else {
+        return;
+    };
+    if win.is_visible().unwrap_or(false) {
+        let _ = win.hide();
+    } else {
+        let _ = win.show();
+        let _ = win.set_focus();
+        let _ = app.emit_to("capture", "capture:shown", ());
     }
 }
 
@@ -102,10 +134,37 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_shortcuts(["cmd+shift+space"])
+                .expect("valid shortcut")
+                .with_handler(|app, _shortcut, event| {
+                    if event.state() == ShortcutState::Pressed {
+                        toggle_capture(app);
+                    }
+                })
+                .build(),
+        )
         .setup(|app| {
             let menu = build_menu(app.handle())?;
             app.set_menu(menu)?;
+            create_capture_window(app.handle())?;
+            // The web page asks us to hide it (Enter-submitted or Esc).
+            let handle = app.handle().clone();
+            app.listen_any("capture:close", move |_| {
+                if let Some(win) = handle.get_webview_window("capture") {
+                    let _ = win.hide();
+                }
+            });
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            // Click-away dismisses the capture palette, like Spotlight.
+            if window.label() == "capture" {
+                if let tauri::WindowEvent::Focused(false) = event {
+                    let _ = window.hide();
+                }
+            }
         })
         .on_menu_event(|app, event| handle_menu_event(app, event.id().as_ref()))
         .run(tauri::generate_context!())
