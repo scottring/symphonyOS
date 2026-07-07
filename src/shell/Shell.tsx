@@ -1,9 +1,10 @@
 // src/shell/Shell.tsx
-import type { ComponentType, ReactNode } from 'react';
+import { useEffect, useRef, type ComponentType, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { PanelRightOpen } from 'lucide-react';
 import { SelectionProvider } from './providers/SelectionProvider';
 import { MealEventsProvider } from './providers/MealEventsProvider';
+import { AssistantLaunchProvider, useAssistantLaunchRequests } from '@/contexts/AssistantLaunchContext';
 import { ShellRoutes } from './ShellRoutes';
 import { DetailPanel } from './DetailPanel';
 import { LegacyDetailPanelHost } from './LegacyDetailPanelHost';
@@ -61,6 +62,20 @@ function ShellAssistantHost() {
   const assistant = useSymphonyAssistant();
 
   const isToday = TODAY_PATHS.has(pathname);
+
+  // Programmatic launches (unibox "Ask Symphony", plan cards…): this host owns
+  // desktop-Today; ShellLayout's rail owns everything else (incl. mobile).
+  const { nonce, consumeSeed } = useAssistantLaunchRequests();
+  const seenNonce = useRef(0);
+  useEffect(() => {
+    if (nonce === 0 || nonce === seenNonce.current) return;
+    if (isMobile || !isToday) return;
+    seenNonce.current = nonce;
+    setHidden(false);
+    const seed = consumeSeed();
+    if (seed && seed.autoSend !== false) void assistant.sendMessage(seed.message);
+  }, [nonce, isMobile, isToday, consumeSeed, assistant, setHidden]);
+
   // Conditions for the rail slot (desktop, today, no detail pane open)
   const railSlot = !isMobile && isToday && selection === null;
 
@@ -137,7 +152,9 @@ export function Shell({ registry = appRegistry, Layout = DefaultShellLayout, lay
 
   return (
     <SelectionProvider registry={registry}>
-      <MealEventsProvider>{wrapped}</MealEventsProvider>
+      <AssistantLaunchProvider>
+        <MealEventsProvider>{wrapped}</MealEventsProvider>
+      </AssistantLaunchProvider>
     </SelectionProvider>
   );
 }

@@ -18,6 +18,7 @@ import { useMobile } from '@/hooks/useMobile';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useSymphonyAssistant } from '@/hooks/useSymphonyAssistant';
 import { useScratchpadHidden } from '@/hooks/useScratchpadHidden';
+import { useAssistantLaunchRequests } from '@/contexts/AssistantLaunchContext';
 import { useShellChrome } from './useShellChrome';
 import { useSelection } from './providers/SelectionProvider';
 
@@ -140,10 +141,25 @@ function ShellLayoutInner({ children }: Props) {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
-  // Non-Today AI rail (Today's rail is owned by Shell.tsx's ShellAssistantHost).
+  // Non-Today AI rail (desktop Today's rail is owned by Shell.tsx's
+  // ShellAssistantHost; mobile Today has no other surface, so this rail's
+  // full-screen mobile overlay covers it too).
   const [chatOpen, setChatOpen] = useState(false);
   const assistant = useSymphonyAssistant();
-  const showAiRail = chatOpen && !isToday;
+  const showAiRail = chatOpen && (!isToday || isMobile);
+
+  // Programmatic launches (unibox "Ask Symphony", Add-to-today…): this host
+  // owns every surface except desktop-Today (Shell's ShellAssistantHost).
+  const { nonce: launchNonce, consumeSeed } = useAssistantLaunchRequests();
+  const seenLaunchNonce = useRef(0);
+  useEffect(() => {
+    if (launchNonce === 0 || launchNonce === seenLaunchNonce.current) return;
+    if (isToday && !isMobile) return;
+    seenLaunchNonce.current = launchNonce;
+    setChatOpen(true);
+    const seed = consumeSeed();
+    if (seed && seed.autoSend !== false) void assistant.sendMessage(seed.message);
+  }, [launchNonce, isToday, isMobile, consumeSeed, assistant]);
 
   const handleViewChange = useCallback(
     (view: ViewType) => {
