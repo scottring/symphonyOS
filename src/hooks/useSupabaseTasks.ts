@@ -118,8 +118,10 @@ function nestSubtasks(tasks: Task[]): Task[] {
   const taskMap = new Map<string, Task>()
   const subtasksByParent = new Map<string, Task[]>()
 
-  // First pass: index all tasks and group subtasks
+  // First pass: index all tasks and group subtasks. Duplicate ids in the
+  // input (e.g. a realtime INSERT racing a refetch) collapse to one.
   for (const task of tasks) {
+    if (taskMap.has(task.id)) continue
     taskMap.set(task.id, { ...task })
     if (task.parentTaskId) {
       const existing = subtasksByParent.get(task.parentTaskId) || []
@@ -130,8 +132,10 @@ function nestSubtasks(tasks: Task[]): Task[] {
 
   // Second pass: attach subtasks to parents and filter out subtasks from top level
   const result: Task[] = []
+  const emitted = new Set<string>()
   for (const task of tasks) {
-    if (!task.parentTaskId) {
+    if (!task.parentTaskId && !emitted.has(task.id)) {
+      emitted.add(task.id)
       const taskWithSubtasks = taskMap.get(task.id)!
       const subtasks = subtasksByParent.get(task.id)
       if (subtasks && subtasks.length > 0) {
@@ -208,8 +212,23 @@ export function useSupabaseTasks() {
           if (payload.eventType === 'INSERT') {
             const newTask = dbTaskToTask(payload.new as DbTask)
             setTasks((prev) => {
-              const nested = nestSubtasks([newTask, ...prev])
-              return nested
+              // Realtime is not the only writer: this tab's own addTask has
+              // usually already added the row (optimistically or reconciled).
+              const exists = prev.some(
+                (t) => t.id === newTask.id || t.subtasks?.some((st) => st.id === newTask.id)
+              )
+              if (exists) return prev
+              if (newTask.parentTaskId) {
+                // Append to the parent's nested subtasks. Don't re-run
+                // nestSubtasks on an already-nested list — it would replace
+                // the parent's subtasks with just this one.
+                return prev.map((t) =>
+                  t.id === newTask.parentTaskId
+                    ? { ...t, subtasks: [...(t.subtasks || []), newTask] }
+                    : t
+                )
+              }
+              return [newTask, ...prev]
             })
           } else if (payload.eventType === 'UPDATE') {
             const updatedTask = dbTaskToTask(payload.new as DbTask)
@@ -351,9 +370,13 @@ export function useSupabaseTasks() {
 
     const createdTask = dbTaskToTask(data as DbTask)
 
-    // Replace optimistic task with real one
+    // Replace optimistic task with real one. Drop any copy the realtime
+    // INSERT already delivered (it can land before this response), otherwise
+    // the swap leaves the task in the list twice.
     setTasks((prev) =>
-      prev.map((t) => (t.id === tempId ? createdTask : t))
+      prev
+        .filter((t) => t.id !== createdTask.id)
+        .map((t) => (t.id === tempId ? createdTask : t))
     )
 
     return createdTask.id
@@ -428,15 +451,16 @@ export function useSupabaseTasks() {
 
     const createdSubtask = dbTaskToTask(data as DbTask)
 
-    // Replace optimistic subtask with real one
+    // Replace optimistic subtask with real one. Drop any copy the realtime
+    // INSERT already delivered (it can land before this response).
     setTasks((prev) =>
       prev.map((t) =>
         t.id === parentId
           ? {
               ...t,
-              subtasks: (t.subtasks || []).map((s) =>
-                s.id === tempId ? createdSubtask : s
-              ),
+              subtasks: (t.subtasks || [])
+                .filter((s) => s.id !== createdSubtask.id)
+                .map((s) => (s.id === tempId ? createdSubtask : s)),
             }
           : t
       )
@@ -988,9 +1012,13 @@ export function useSupabaseTasks() {
 
     const createdTask = dbTaskToTask(data as DbTask)
 
-    // Replace optimistic task with real one
+    // Replace optimistic task with real one. Drop any copy the realtime
+    // INSERT already delivered (it can land before this response), otherwise
+    // the swap leaves the task in the list twice.
     setTasks((prev) =>
-      prev.map((t) => (t.id === tempId ? createdTask : t))
+      prev
+        .filter((t) => t.id !== createdTask.id)
+        .map((t) => (t.id === tempId ? createdTask : t))
     )
 
     return createdTask.id

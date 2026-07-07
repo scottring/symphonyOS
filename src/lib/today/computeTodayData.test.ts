@@ -80,6 +80,39 @@ describe('computeTodayData', () => {
     expect(ids).toContain('task-s')
   })
 
+  it('dedupes the same meeting surfaced by two calendars with different timezone strings', () => {
+    // Real-world case: an Outlook invite lands on the primary calendar
+    // (offset form) AND a G Suite group calendar (UTC form). Same instant,
+    // different start_time strings — both must not render.
+    const e1 = {
+      id: 'evt-primary', title: 'HOLD - PeerAspect Meeting',
+      start_time: '2026-05-19T09:00:00-04:00', end_time: '2026-05-19T09:30:00-04:00',
+      calendar_id: 'scott@work',
+    }
+    const e2 = {
+      id: 'evt-gsuite', title: 'HOLD - PeerAspect Meeting',
+      start_time: '2026-05-19T13:00:00Z', end_time: '2026-05-19T13:30:00Z',
+      calendar_id: 'abc@group.calendar.google.com',
+    }
+    const d = computeTodayData(baseInput({ viewedDate: new Date('2026-05-19T12:00:00-04:00'), events: [e1, e2] }))
+    const eventItems = Object.values(d.grouped).flat().filter((i) => i.type === 'event')
+    expect(eventItems).toHaveLength(1)
+  })
+
+  it('keeps two events that share a title but start at different times', () => {
+    const e1 = {
+      id: 'evt-1', title: 'Standup',
+      start_time: '2026-05-19T09:00:00-04:00', end_time: '2026-05-19T09:15:00-04:00',
+    }
+    const e2 = {
+      id: 'evt-2', title: 'Standup',
+      start_time: '2026-05-19T16:00:00-04:00', end_time: '2026-05-19T16:15:00-04:00',
+    }
+    const d = computeTodayData(baseInput({ viewedDate: new Date('2026-05-19T12:00:00-04:00'), events: [e1, e2] }))
+    const eventItems = Object.values(d.grouped).flat().filter((i) => i.type === 'event')
+    expect(eventItems).toHaveLength(2)
+  })
+
   it('week + inbox pools populate only when isToday', () => {
     const now = new Date()
     const w = task({ id: 'w', bucket: 'week' })

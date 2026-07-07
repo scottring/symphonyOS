@@ -50,10 +50,13 @@ export function computeTodayData(input: TodayDataInput): TodayData {
     const es = new Date(s)
     return es.getFullYear() === vY && es.getMonth() === vM && es.getDate() === vD
   })
+  // Key on the parsed instant, not the raw string: the same meeting synced to
+  // two calendars can report identical times in different forms (e.g.
+  // "09:00:00-04:00" on the primary vs "13:00:00Z" on a group calendar).
   const seen = new Set<string>()
   const filteredEvents = eventsForDay.filter((event) => {
     const s = event.start_time || event.startTime
-    const key = `${event.title}|${s}`
+    const key = `${event.title}|${new Date(s!).getTime()}`
     if (seen.has(key)) return false
     seen.add(key)
     return true
