@@ -315,6 +315,18 @@ function RoutinePanelBody({ id }: { id: string }) {
   );
 }
 
+// Human-readable reasons a Google Calendar write can fail. 403 means the event
+// lives on a calendar the user can't edit (an invite / shared / subscribed
+// calendar) — say that plainly instead of a generic failure.
+function eventUpdateErrorMessage(err: unknown): string {
+  if (err instanceof CalendarReconnectError) return 'Calendar connection expired — reconnect in Settings';
+  const msg = err instanceof Error ? err.message : String(err);
+  if (/forbidden|403/i.test(msg)) {
+    return "Google won't allow edits to this event — it's on a calendar you don't own (an invite or shared calendar)";
+  }
+  return 'Could not update the event';
+}
+
 // ── Event ─────────────────────────────────────────────────────────────────
 function EventPanelBody({ id }: { id: string }) {
   const { clearSelection } = useSelection();
@@ -366,12 +378,7 @@ function EventPanelBody({ id }: { id: string }) {
           await updateEvent({ eventId: eid, location, calendarId });
           showToast('Location updated', 'success');
         } catch (err) {
-          showToast(
-            err instanceof CalendarReconnectError
-              ? 'Calendar connection expired — reconnect in Settings'
-              : 'Could not update the event',
-            'error',
-          );
+          showToast(eventUpdateErrorMessage(err), 'error', 4000);
         }
       }}
       onReschedule={async (startTime, endTime) => {
@@ -384,12 +391,7 @@ function EventPanelBody({ id }: { id: string }) {
           });
           showToast('Event updated', 'success');
         } catch (err) {
-          showToast(
-            err instanceof CalendarReconnectError
-              ? 'Calendar connection expired — reconnect in Settings'
-              : 'Could not update the event',
-            'error',
-          );
+          showToast(eventUpdateErrorMessage(err), 'error', 4000);
         }
       }}
     />
