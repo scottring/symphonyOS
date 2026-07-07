@@ -1,5 +1,6 @@
 import Testing
-@testable import SymphonyOS
+import Foundation
+@testable import Symphony
 
 @Test func appStateDefaults() async throws {
     let state = AppState()

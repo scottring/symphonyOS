@@ -32,7 +32,7 @@ targets:
         INFOPLIST_FILE: SymphonyOS/App/Info.plist
         PRODUCT_NAME: Symphony
         MARKETING_VERSION: "1.0.0"
-        CURRENT_PROJECT_VERSION: "103"
+        CURRENT_PROJECT_VERSION: "104"
         # Signing team lives here (not just in the generated pbxproj) so `xcodegen`
         # regeneration is safe and reproducible — regenerating no longer wipes the
         # team. Actual cert/profile is resolved at archive time via the App Store
@@ -63,6 +63,13 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.scottkaufman.symphonyos.tests
+        # The app target overrides PRODUCT_NAME to "Symphony", but xcodegen
+        # derives TEST_HOST from the target name — point it at the real binary.
+        "TEST_HOST[sdk=iphonesimulator*]": "$(BUILT_PRODUCTS_DIR)/Symphony.app/Symphony"
+        "TEST_HOST[sdk=iphoneos*]": "$(BUILT_PRODUCTS_DIR)/Symphony.app/Symphony"
+        "TEST_HOST[sdk=macosx*]": "$(BUILT_PRODUCTS_DIR)/Symphony.app/Contents/MacOS/Symphony"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        GENERATE_INFOPLIST_FILE: YES
 
   SymphonyOSUITests:
     type: bundle.ui-testing
@@ -74,6 +81,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.scottkaufman.symphonyos.uitests
+        GENERATE_INFOPLIST_FILE: YES
 
 schemes:
   SymphonyOS:
