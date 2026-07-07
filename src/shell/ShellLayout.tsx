@@ -142,7 +142,7 @@ function ShellLayoutInner({ children }: Props) {
   // ShellAssistantHost; mobile Today has no other surface, so this rail's
   // full-screen mobile overlay covers it too).
   const [chatOpen, setChatOpen] = useState(false);
-  const assistant = useSymphonyAssistant();
+  const assistant = useSymphonyAssistant({ persistKey: 'symphony_rail' });
   const showAiRail = chatOpen && (!isToday || isMobile);
 
   // Programmatic launches (unibox "Ask Symphony", Add-to-today…): this host
@@ -370,6 +370,11 @@ function ShellLayoutInner({ children }: Props) {
             onClose={() => setChatOpen(false)}
             onNewChat={assistant.resetSession}
             toolActivity={assistant.toolActivity}
+            sessions={assistant.sessions}
+            sessionsLoading={assistant.sessionsLoading}
+            onLoadSession={assistant.loadSession}
+            onDeleteSession={assistant.deleteSession}
+            activeSessionId={assistant.activeSessionId}
           />
         </aside>
       )}
@@ -394,6 +399,11 @@ function ShellLayoutInner({ children }: Props) {
             onClose={() => setChatOpen(false)}
             onNewChat={assistant.resetSession}
             toolActivity={assistant.toolActivity}
+            sessions={assistant.sessions}
+            sessionsLoading={assistant.sessionsLoading}
+            onLoadSession={assistant.loadSession}
+            onDeleteSession={assistant.deleteSession}
+            activeSessionId={assistant.activeSessionId}
           />
         </div>
       )}

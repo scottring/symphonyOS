@@ -59,7 +59,7 @@ function ShellAssistantHost() {
   const { pathname } = useLocation();
   const isMobile = useMobile();
   const { hidden, setHidden } = useScratchpadHidden();
-  const assistant = useSymphonyAssistant();
+  const assistant = useSymphonyAssistant({ persistKey: 'symphony_rail' });
 
   const isToday = TODAY_PATHS.has(pathname);
 
@@ -109,6 +109,11 @@ function ShellAssistantHost() {
         onClose={() => setHidden(true)}
         onNewChat={assistant.resetSession}
         toolActivity={assistant.toolActivity}
+        sessions={assistant.sessions}
+        sessionsLoading={assistant.sessionsLoading}
+        onLoadSession={assistant.loadSession}
+        onDeleteSession={assistant.deleteSession}
+        activeSessionId={assistant.activeSessionId}
       />
     </aside>
   );
