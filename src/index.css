@@ -1202,3 +1202,10 @@ body {
   }
 }
 
+
+/* ── Mac shell: quick-capture window (frameless + transparent) ───────── */
+html.capture-window,
+html.capture-window body,
+html.capture-window #root {
+  background: transparent !important;
+}

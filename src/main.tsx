@@ -76,7 +76,7 @@ if (ACTIVE_THEME === 'kinetic') {
   await import('./index.css')
 }
 
-import { Suspense } from 'react'
+import { Suspense, lazy } from 'react'
 import { CalendarCallback } from './pages/CalendarCallback'
 import { JoinHousehold } from './components/JoinHousehold'
 import { GoogleCalendarProvider } from './hooks/useGoogleCalendar'
@@ -86,6 +86,10 @@ import { AuthGate } from './components/auth/AuthGate'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { OnboardingFlow, SamplePlanPage } from './components/lazy'
 import { LoadingFallback } from './components/layout/LoadingFallback'
+
+// Quick-capture window for the Mac shell (desktop/): a frameless Tauri window
+// loads /capture via the global hotkey. Lazy — browsers never fetch it.
+const CapturePage = lazy(() => import('./desktop/CapturePage').then((m) => ({ default: m.CapturePage })))
 
 // P5 cutover (gated). /, /today, /inbox, /task/:id route to the new Shell-mounted
 // TasksApp when the flag is enabled, otherwise to legacy App.tsx. Both paths now
@@ -138,6 +142,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/settings/*" element={<Shell />} />
               <Route path="/history/*" element={<Shell />} />
               <Route path="/lists/*" element={<Shell />} />
+              <Route path="/capture" element={<Suspense fallback={null}><CapturePage /></Suspense>} />
               <Route path="/join/:token" element={<JoinHousehold />} />
               <Route path="/calendar-callback" element={<CalendarCallback />} />
               {/* The Shell owns the cutover paths (/, /today, /inbox, /task/:id)
