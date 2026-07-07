@@ -1,4 +1,8 @@
-use tauri::menu::{AboutMetadata, CheckMenuItemBuilder, Menu, MenuItemBuilder, SubmenuBuilder};
+use serde::Deserialize;
+use tauri::menu::{
+    AboutMetadata, CheckMenuItemBuilder, Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder,
+};
+use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Listener, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_global_shortcut::ShortcutState;
 
@@ -45,6 +49,80 @@ fn toggle_capture(app: &AppHandle) {
         let _ = win.set_focus();
         let _ = app.emit_to("capture", "capture:shown", ());
     }
+}
+
+// Shape emitted by the web bridge (src/desktop/trayPayload.ts) — keep in sync.
+#[derive(Deserialize)]
+struct TrayItem {
+    #[allow(dead_code)]
+    id: String,
+    title: String,
+}
+
+#[derive(Deserialize)]
+struct TrayPayload {
+    remaining: u32,
+    items: Vec<TrayItem>,
+}
+
+fn tray_menu(app: &AppHandle, payload: &TrayPayload) -> tauri::Result<Menu<tauri::Wry>> {
+    let mut builder = MenuBuilder::new(app);
+    let header_text = if payload.remaining == 0 {
+        "Today — all done".to_string()
+    } else {
+        format!("Today — {} remaining", payload.remaining)
+    };
+    builder = builder
+        .item(
+            &MenuItemBuilder::with_id("tray-header", header_text)
+                .enabled(false)
+                .build(app)?,
+        )
+        .separator();
+    for (i, item) in payload.items.iter().enumerate() {
+        let mut title = item.title.clone();
+        if title.chars().count() > 40 {
+            title = format!("{}…", title.chars().take(39).collect::<String>());
+        }
+        builder = builder.item(&MenuItemBuilder::with_id(format!("tray-task-{i}"), title).build(app)?);
+    }
+    builder
+        .separator()
+        .item(&MenuItemBuilder::with_id("tray-open", "Open Symphony").build(app)?)
+        .item(
+            &MenuItemBuilder::with_id("tray-capture", "Quick Capture")
+                .accelerator("Cmd+Shift+Space")
+                .build(app)?,
+        )
+        .separator()
+        .quit()
+        .build()
+}
+
+fn build_tray(app: &AppHandle) -> tauri::Result<()> {
+    let initial = TrayPayload { remaining: 0, items: vec![] };
+    let menu = tray_menu(app, &initial)?;
+    TrayIconBuilder::with_id("main-tray")
+        .icon(app.default_window_icon().expect("app icon").clone())
+        .menu(&menu)
+        .show_menu_on_left_click(true)
+        .build(app)?;
+    Ok(())
+}
+
+fn update_tray(app: &AppHandle, payload: &TrayPayload) {
+    let Some(tray) = app.tray_by_id("main-tray") else {
+        return;
+    };
+    if let Ok(menu) = tray_menu(app, payload) {
+        let _ = tray.set_menu(Some(menu));
+    }
+    let title = if payload.remaining > 0 {
+        Some(payload.remaining.to_string())
+    } else {
+        None
+    };
+    let _ = tray.set_title(title);
 }
 
 fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
@@ -118,6 +196,15 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
 }
 
 fn handle_menu_event(app: &AppHandle, id: &str) {
+    if id == "tray-open" || id.starts_with("tray-task-") {
+        show_main(app);
+        let _ = app.emit_to("main", "shell:navigate", "today");
+        return;
+    }
+    if id == "tray-capture" {
+        toggle_capture(app);
+        return;
+    }
     if id == "new-capture" {
         show_main(app);
         let _ = app.emit_to("main", "shell:quick-capture", ());
@@ -149,6 +236,14 @@ pub fn run() {
             let menu = build_menu(app.handle())?;
             app.set_menu(menu)?;
             create_capture_window(app.handle())?;
+            build_tray(app.handle())?;
+            // Today's remaining tasks stream in from the web bridge.
+            let tray_handle = app.handle().clone();
+            app.listen_any("shell:tray-update", move |event| {
+                if let Ok(payload) = serde_json::from_str::<TrayPayload>(event.payload()) {
+                    update_tray(&tray_handle, &payload);
+                }
+            });
             // The web page asks us to hide it (Enter-submitted or Esc).
             let handle = app.handle().clone();
             app.listen_any("capture:close", move |_| {
