@@ -29,3 +29,18 @@ final class PendingChange {
         self.createdAt = Date()
     }
 }
+
+extension ModelContext {
+    /// Queue a sync push for a record. Every local mutation must call this —
+    /// rows the push loop doesn't know about never reach Supabase, and the pull
+    /// reconciler then deletes them as "gone from server" (write-then-vanish).
+    /// Identical already-queued changes are deduped so per-keystroke edit
+    /// callbacks don't pile up one PendingChange each.
+    func queueSync(table: String, recordId: UUID, type: String) {
+        let queued = (try? fetch(FetchDescriptor<PendingChange>())) ?? []
+        if queued.contains(where: { $0.tableName == table && $0.recordId == recordId && $0.changeType == type }) {
+            return
+        }
+        insert(PendingChange(tableName: table, recordId: recordId, changeType: type))
+    }
+}

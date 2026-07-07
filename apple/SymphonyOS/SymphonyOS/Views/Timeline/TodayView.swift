@@ -68,7 +68,8 @@ struct TodayView: View {
                                     title: section.rawValue,
                                     items: sectionItems,
                                     modelContext: modelContext,
-                                    userId: auth.currentUser?.id ?? UUID()
+                                    userId: auth.currentUser?.id ?? UUID(),
+                                    date: appState.selectedDate
                                 )
                             }
                         }
@@ -367,6 +368,8 @@ struct TimelineSectionView: View {
     let items: [TimelineItem]
     let modelContext: ModelContext
     let userId: UUID
+    /// The day this section renders — routine completions attach to this date.
+    var date: Date = Date()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -380,7 +383,7 @@ struct TimelineSectionView: View {
                 .padding(.bottom, 2)
 
             ForEach(items) { item in
-                TimelineItemCard(item: item, modelContext: modelContext, userId: userId)
+                TimelineItemCard(item: item, modelContext: modelContext, userId: userId, date: date)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 3)
             }

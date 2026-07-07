@@ -5,16 +5,21 @@ struct TimelineItemCard: View {
     let item: TimelineItem
     let modelContext: ModelContext
     let userId: UUID
+    /// The day this card is rendered for (Today view's selected date) — routine
+    /// completions must attach to THIS day's instance, not whatever instance
+    /// happens to exist for the routine on another date.
+    let date: Date
 
     @State private var isCompleted: Bool
     @State private var showContextPicker = false
     @State private var showDetail = false
     @Query private var familyMembers: [FamilyMember]
 
-    init(item: TimelineItem, modelContext: ModelContext, userId: UUID) {
+    init(item: TimelineItem, modelContext: ModelContext, userId: UUID, date: Date = Date()) {
         self.item = item
         self.modelContext = modelContext
         self.userId = userId
+        self.date = date
         self._isCompleted = State(initialValue: item.completed)
     }
 
@@ -230,32 +235,49 @@ struct TimelineItemCard: View {
                 vm.toggleComplete(task)
             }
         case .routine:
-            let entityIdString = entityId.uuidString
-            let descriptor = FetchDescriptor<ActionableInstance>()
-            let allInstances = (try? modelContext.fetch(descriptor)) ?? []
-            let instance = allInstances.first {
-                $0.entityType == "routine" && $0.entityId == entityIdString
-            }
-
-            if let instance {
-                instance.status = isCompleted ? "completed" : "pending"
-                instance.completedAt = isCompleted ? Date() : nil
-                instance.updatedAt = Date()
-            } else if isCompleted {
-                let newInstance = ActionableInstance(
-                    userId: userId,
-                    entityType: "routine",
-                    entityId: entityIdString,
-                    date: Date()
-                )
-                newInstance.status = "completed"
-                newInstance.completedAt = Date()
-                modelContext.insert(newInstance)
-            }
-            try? modelContext.save()
+            setRoutineInstanceStatus(isCompleted ? "completed" : "pending")
         default:
             break
         }
+    }
+
+    /// Write a routine occurrence's status to THIS card's day, mirroring the web:
+    /// find the (routine, date) instance — household-shared ones included, since
+    /// the pull syncs every RLS-visible row — update it if present, otherwise
+    /// create one owned by the current user. Every path queues a sync push;
+    /// without it the completion never left the phone (and the next pull's
+    /// reconciler deleted the local instance — completions silently vanished).
+    private func setRoutineInstanceStatus(_ status: String) {
+        let entityIdString = item.entityId.uuidString
+        let cal = Calendar.current
+        let allInstances = (try? modelContext.fetch(FetchDescriptor<ActionableInstance>())) ?? []
+        let instance = allInstances.first {
+            $0.entityType == "routine" && $0.entityId == entityIdString &&
+            cal.isDate($0.date, inSameDayAs: date)
+        }
+
+        let now = Date()
+        if let instance {
+            instance.status = status
+            instance.completedAt = status == "completed" ? now : nil
+            instance.skippedAt = status == "skipped" ? now : nil
+            instance.updatedAt = now
+            instance.syncStatus = .pending
+            modelContext.queueSync(table: "actionable_instances", recordId: instance.id, type: "update")
+        } else if status != "pending" {
+            let newInstance = ActionableInstance(
+                userId: userId,
+                entityType: "routine",
+                entityId: entityIdString,
+                date: date
+            )
+            newInstance.status = status
+            newInstance.completedAt = status == "completed" ? now : nil
+            newInstance.skippedAt = status == "skipped" ? now : nil
+            modelContext.insert(newInstance)
+            modelContext.queueSync(table: "actionable_instances", recordId: newInstance.id, type: "insert")
+        }
+        try? modelContext.save()
     }
 }
 

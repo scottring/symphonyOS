@@ -45,8 +45,10 @@ struct ProjectListView: View {
             }
         }
         .sheet(isPresented: $showingNewProject) {
-            NewProjectSheet(userId: auth.currentUser?.id ?? UUID())
-                .presentationDetents([.medium])
+            if let userId = auth.currentUser?.id {
+                NewProjectSheet(userId: userId)
+                    .presentationDetents([.medium])
+            }
         }
     }
 
@@ -74,6 +76,7 @@ struct ProjectListView: View {
     private func deleteProjects(status: String, at offsets: IndexSet) {
         let projects = groupedProjects[status] ?? []
         for index in offsets {
+            modelContext.queueSync(table: "projects", recordId: projects[index].id, type: "delete")
             modelContext.delete(projects[index])
         }
         try? modelContext.save()
@@ -105,7 +108,7 @@ struct ProjectRow: View {
 
     private var statusColor: Color {
         switch project.status {
-        case "active": .statusActive
+        case "in_progress": .statusActive
         case "completed": .statusCompleted
         case "not_started": .textTertiary
         default: .textTertiary
@@ -151,6 +154,7 @@ struct NewProjectSheet: View {
                     Button("Create") {
                         let project = Project(userId: userId, name: name, context: context)
                         modelContext.insert(project)
+                        modelContext.queueSync(table: "projects", recordId: project.id, type: "insert")
                         try? modelContext.save()
                         dismiss()
                     }

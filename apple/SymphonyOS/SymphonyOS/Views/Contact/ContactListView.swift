@@ -29,6 +29,7 @@ struct ContactListView: View {
                             .onDelete { offsets in
                                 let sectionContacts = grouped[key] ?? []
                                 for offset in offsets {
+                                    modelContext.queueSync(table: "contacts", recordId: sectionContacts[offset].id, type: "delete")
                                     modelContext.delete(sectionContacts[offset])
                                 }
                                 try? modelContext.save()
@@ -51,8 +52,10 @@ struct ContactListView: View {
             }
         }
         .sheet(isPresented: $showingNewContact) {
-            NewContactSheet(userId: auth.currentUser?.id ?? UUID())
-                .presentationDetents([.medium])
+            if let userId = auth.currentUser?.id {
+                NewContactSheet(userId: userId)
+                    .presentationDetents([.medium])
+            }
         }
     }
 
@@ -183,6 +186,7 @@ struct ContactDetailView: View {
 
             Section {
                 Button(role: .destructive) {
+                    modelContext.queueSync(table: "contacts", recordId: contact.id, type: "delete")
                     modelContext.delete(contact)
                     try? modelContext.save()
                     dismiss()
@@ -200,6 +204,7 @@ struct ContactDetailView: View {
     private func markDirty() {
         contact.updatedAt = Date()
         contact.syncStatus = .pending
+        modelContext.queueSync(table: "contacts", recordId: contact.id, type: "update")
         try? modelContext.save()
     }
 }
@@ -243,6 +248,7 @@ struct NewContactSheet: View {
                         if !phone.isEmpty { contact.phone = phone }
                         if !email.isEmpty { contact.email = email }
                         modelContext.insert(contact)
+                        modelContext.queueSync(table: "contacts", recordId: contact.id, type: "insert")
                         try? modelContext.save()
                         dismiss()
                     }

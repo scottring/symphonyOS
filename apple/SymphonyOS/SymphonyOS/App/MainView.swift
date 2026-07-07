@@ -34,8 +34,10 @@ struct iOSMainView: View {
             SymphonyDock(activeTab: $state.activeTab) { showCapture = true }
         }
         .sheet(isPresented: $showCapture) {
-            CaptureSheet(userId: auth.currentUser?.id ?? UUID())
-                .presentationDetents([.medium])
+            if let userId = auth.currentUser?.id {
+                CaptureSheet(userId: userId)
+                    .presentationDetents([.medium])
+            }
         }
     }
 }

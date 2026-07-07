@@ -157,6 +157,16 @@ actor SyncEngine {
 
             let serverIds = Set(rows.compactMap { $0["id"]?.stringValue?.lowercased() })
 
+            // Rows with a queued (not-yet-pushed) local change are off-limits in
+            // BOTH phases: deleting one as "gone from server" destroys a local
+            // creation before it ever pushes (write-then-vanish), and replacing
+            // one with the server row silently reverts a local edit.
+            let pendingIds: Set<UUID> = Set(
+                ((try? context.fetch(FetchDescriptor<PendingChange>())) ?? [])
+                    .filter { $0.tableName == table }
+                    .map(\.recordId)
+            )
+
             // Phase 1: delete any local row we're about to replace (same id), plus —
             // for server-owned tables — rows that no longer exist on the server
             // (stale duplicates, deleted people, etc.). NOT tasks for the latter,
@@ -170,6 +180,7 @@ actor SyncEngine {
             var deleted = 0
             if let locals = try? context.fetch(FetchDescriptor<T>()) {
                 for item in locals {
+                    if pendingIds.contains(item.id) { continue }   // local edit wins until pushed
                     let idStr = item.id.uuidString.lowercased()
                     if serverIds.contains(idStr) {
                         context.delete(item)            // replaced by the fresh row below
@@ -181,10 +192,11 @@ actor SyncEngine {
             }
             try context.save()
 
-            // Phase 2: insert the fresh server rows.
+            // Phase 2: insert the fresh server rows (skipping ones we kept above).
             var inserted = 0
             for row in rows {
                 guard let model = RowMapper.toModel(type, from: row) else { continue }
+                if pendingIds.contains(model.id) { continue }
                 context.insert(model)
                 inserted += 1
             }
@@ -203,12 +215,26 @@ actor SyncEngine {
         case "insert":
             // INSERT for a brand-new local row (its user_id is the current user, so
             // the INSERT policy's `auth.uid() = user_id` check passes). Upsert keeps
-            // it idempotent on retry.
+            // it idempotent on retry. actionable_instances additionally has a
+            // UNIQUE(user_id, entity_type, entity_id, date) key — if the web/wall
+            // created the same day's instance first (different id), conflict on
+            // that natural key and update it instead of failing the push forever.
             guard let row = Self.serializeRow(table: change.tableName, id: change.recordId, context: context) else { return }
-            try await supabase
-                .from(change.tableName)
-                .upsert(AnyJSON.object(row))
-                .execute()
+            let conflictKey = change.tableName == "actionable_instances"
+                ? "user_id,entity_type,entity_id,date" : nil
+            if let conflictKey {
+                var naturalRow = row
+                naturalRow.removeValue(forKey: "id")   // let the existing row keep its id
+                try await supabase
+                    .from(change.tableName)
+                    .upsert(AnyJSON.object(naturalRow), onConflict: conflictKey)
+                    .execute()
+            } else {
+                try await supabase
+                    .from(change.tableName)
+                    .upsert(AnyJSON.object(row))
+                    .execute()
+            }
             Self.syncLog.info("pushed insert \(change.tableName, privacy: .public)")
 
         case "update":
@@ -218,13 +244,28 @@ actor SyncEngine {
             // UPDATE only evaluates the UPDATE policy, which allows household edits.
             // Drop id/user_id so we never try to change ownership.
             guard var row = Self.serializeRow(table: change.tableName, id: change.recordId, context: context) else { return }
+            let matchColumns = Self.naturalKey(for: change.tableName)
+            var filters: [(String, String)] = []
+            if let matchColumns {
+                // Match on the natural key: a locally-created instance may have a
+                // different id than the server row it landed on (insert upserts on
+                // the natural key and lets the server keep its id), so an id match
+                // would silently update 0 rows.
+                for column in matchColumns {
+                    guard let value = row[column]?.stringValue else { return }
+                    filters.append((column, value))
+                    row.removeValue(forKey: column)
+                }
+            } else {
+                filters.append(("id", change.recordId.uuidString))
+            }
             row.removeValue(forKey: "id")
             row.removeValue(forKey: "user_id")
-            try await supabase
-                .from(change.tableName)
-                .update(AnyJSON.object(row))
-                .eq("id", value: change.recordId.uuidString)
-                .execute()
+            var query = try supabase.from(change.tableName).update(AnyJSON.object(row))
+            for (column, value) in filters {
+                query = query.eq(column, value: value)
+            }
+            try await query.execute()
             Self.syncLog.info("pushed update \(change.tableName, privacy: .public)")
 
         case "delete":
@@ -240,32 +281,73 @@ actor SyncEngine {
         }
     }
 
+    /// Tables whose pushes match rows by a semantic unique key instead of `id`
+    /// (values are read from the serialized row, so household-owned rows keep
+    /// their true user_id).
+    private static func naturalKey(for table: String) -> [String]? {
+        switch table {
+        case "actionable_instances": ["user_id", "entity_type", "entity_id", "date"]
+        default: nil
+        }
+    }
+
     // MARK: - Model → Row serialization (for push)
 
     private static let isoOut = ISO8601DateFormatter()
 
     static func serializeRow(table: String, id: UUID, context: ModelContext) -> [String: AnyJSON]? {
+        func find<T: PersistentModel & HasUUID>(_ type: T.Type) -> T? {
+            (try? context.fetch(FetchDescriptor<T>()))?.first(where: { $0.id == id })
+        }
         switch table {
         case "tasks":
-            let descriptor = FetchDescriptor<SymphonyTask>()
-            guard let t = (try? context.fetch(descriptor))?.first(where: { $0.id == id }) else { return nil }
+            guard let t = find(SymphonyTask.self) else { return nil }
             return taskRow(t)
+        case "routines":
+            guard let r = find(Routine.self) else { return nil }
+            return routineRow(r)
+        case "projects":
+            guard let p = find(Project.self) else { return nil }
+            return projectRow(p)
+        case "contacts":
+            guard let c = find(Contact.self) else { return nil }
+            return contactRow(c)
+        case "family_rules":
+            guard let f = find(FamilyRule.self) else { return nil }
+            return familyRuleRow(f)
+        case "actionable_instances":
+            guard let i = find(ActionableInstance.self) else { return nil }
+            return instanceRow(i)
         default:
-            return nil   // other tables aren't edited from iOS yet
+            return nil   // other tables aren't edited from iOS
         }
     }
 
+    /// Local-day formatter for Postgres DATE columns (yyyy-MM-dd, user's timezone —
+    /// an ISO timestamp here would shift the day near midnight and break the
+    /// (user, entity, date) unique key that routine completions dedupe on).
+    private static let dateOnlyOut: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+
+    // Shared column encoders for the row builders below.
+    private static func s(_ v: String?) -> AnyJSON { v.map { .string($0) } ?? .null }
+    private static func i(_ v: Int?) -> AnyJSON { v.map { .integer($0) } ?? .null }
+    private static func d(_ v: Date?) -> AnyJSON { v.map { .string(isoOut.string(from: $0)) } ?? .null }
+    private static func dateOnly(_ v: Date?) -> AnyJSON { v.map { .string(dateOnlyOut.string(from: $0)) } ?? .null }
+    private static func u(_ v: UUID?) -> AnyJSON { v.map { .string($0.uuidString) } ?? .null }
+    private static func us(_ v: [UUID]?) -> AnyJSON { v.map { .array($0.map { .string($0.uuidString) }) } ?? .null }
+    private static func ss(_ v: [String]?) -> AnyJSON { v.map { .array($0.map { .string($0) }) } ?? .null }
+    private static func j<T: Encodable>(_ v: T?) -> AnyJSON {
+        guard let v, let data = try? JSONEncoder().encode(v),
+              let any = try? JSONDecoder().decode(AnyJSON.self, from: data) else { return .null }
+        return any
+    }
+
     private static func taskRow(_ t: SymphonyTask) -> [String: AnyJSON] {
-        func s(_ v: String?) -> AnyJSON { v.map { .string($0) } ?? .null }
-        func i(_ v: Int?) -> AnyJSON { v.map { .integer($0) } ?? .null }
-        func d(_ v: Date?) -> AnyJSON { v.map { .string(isoOut.string(from: $0)) } ?? .null }
-        func u(_ v: UUID?) -> AnyJSON { v.map { .string($0.uuidString) } ?? .null }
-        func us(_ v: [UUID]?) -> AnyJSON { v.map { .array($0.map { .string($0.uuidString) }) } ?? .null }
-        func j<T: Encodable>(_ v: T?) -> AnyJSON {
-            guard let v, let data = try? JSONEncoder().encode(v),
-                  let any = try? JSONDecoder().decode(AnyJSON.self, from: data) else { return .null }
-            return any
-        }
         return [
             "id": .string(t.id.uuidString),
             "user_id": .string(t.userId.uuidString),
@@ -291,6 +373,93 @@ actor SyncEngine {
             "parent_task_id": u(t.parentTaskId),
             "link_type": s(t.linkType),
             "created_at": .string(isoOut.string(from: t.createdAt)),
+            "updated_at": .string(isoOut.string(from: Date())),
+        ]
+    }
+
+    // Column sets below are the intersection of the iOS model's fields and the
+    // production schema — pushing a column Postgres doesn't have rejects the
+    // whole row (the "phantom columns" incident), and omitted server-only
+    // columns (e.g. routines.times_per_day) are left untouched by UPDATE.
+
+    private static func routineRow(_ r: Routine) -> [String: AnyJSON] {
+        [
+            "id": .string(r.id.uuidString),
+            "user_id": .string(r.userId.uuidString),
+            "name": .string(r.name),
+            "description": s(r.routineDescription),
+            "visibility": .string(r.visibility),
+            "recurrence_pattern": j(r.recurrencePattern),
+            "time_of_day": s(r.timeOfDay),
+            "context": s(r.context),
+            "assigned_to": u(r.assignedTo),
+            "created_at": .string(isoOut.string(from: r.createdAt)),
+            "updated_at": .string(isoOut.string(from: Date())),
+        ]
+    }
+
+    private static func projectRow(_ p: Project) -> [String: AnyJSON] {
+        [
+            "id": .string(p.id.uuidString),
+            "user_id": .string(p.userId.uuidString),
+            "name": .string(p.name),
+            "status": .string(p.status),
+            "context": s(p.context),
+            "type": s(p.type),
+            "notes": s(p.notes),
+            "links": j(p.links),
+            "phone_number": s(p.phoneNumber),
+            "parent_id": u(p.parentId),
+            "created_at": .string(isoOut.string(from: p.createdAt)),
+            "updated_at": .string(isoOut.string(from: Date())),
+        ]
+    }
+
+    private static func contactRow(_ c: Contact) -> [String: AnyJSON] {
+        [
+            "id": .string(c.id.uuidString),
+            "user_id": .string(c.userId.uuidString),
+            "name": .string(c.name),
+            "phone": s(c.phone),
+            "email": s(c.email),
+            "notes": s(c.notes),
+            "category": s(c.category),
+            "birthday": dateOnly(c.birthday),
+            "relationship": s(c.relationship),
+            "preferences": s(c.preferences),
+            "created_at": .string(isoOut.string(from: c.createdAt)),
+            "updated_at": .string(isoOut.string(from: Date())),
+        ]
+    }
+
+    private static func familyRuleRow(_ f: FamilyRule) -> [String: AnyJSON] {
+        [
+            "id": .string(f.id.uuidString),
+            "user_id": .string(f.userId.uuidString),
+            "rule": .string(f.rule),
+            "applies_to": ss(f.appliesTo),
+            "status": .string(f.status),
+            "rationale": s(f.rationale),
+            "enforcement_tip": s(f.enforcementTip),
+            "created_at": .string(isoOut.string(from: f.createdAt)),
+            "updated_at": .string(isoOut.string(from: Date())),
+        ]
+    }
+
+    private static func instanceRow(_ i: ActionableInstance) -> [String: AnyJSON] {
+        [
+            "id": .string(i.id.uuidString),
+            "user_id": .string(i.userId.uuidString),
+            "entity_type": .string(i.entityType),
+            "entity_id": .string(i.entityId),
+            "date": dateOnly(i.date),
+            "status": .string(i.status),
+            "assignee": u(i.assignee),
+            "assigned_to_override": u(i.assignedToOverride),
+            "deferred_to": d(i.deferredTo),
+            "completed_at": d(i.completedAt),
+            "skipped_at": d(i.skippedAt),
+            "created_at": .string(isoOut.string(from: i.createdAt)),
             "updated_at": .string(isoOut.string(from: Date())),
         ]
     }
@@ -373,6 +542,12 @@ actor SyncEngine {
     /// conflict within a single transaction.
     private func upsert<T: PersistentModel & HasUUID>(_ model: T, context: ModelContext) {
         let targetId = model.id
+        // A queued-but-unpushed local edit outranks the incoming server row —
+        // replacing it here would silently revert the edit (the push loop will
+        // send it up within seconds, and the resulting realtime echo converges).
+        let hasPendingLocalChange = ((try? context.fetch(FetchDescriptor<PendingChange>())) ?? [])
+            .contains { $0.recordId == targetId }
+        if hasPendingLocalChange { return }
         if let existing = try? context.fetch(FetchDescriptor<T>()).first(where: { $0.id == targetId }) {
             context.delete(existing)
             try? context.save()

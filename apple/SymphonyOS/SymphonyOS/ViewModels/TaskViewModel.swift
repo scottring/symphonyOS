@@ -115,7 +115,6 @@ final class TaskViewModel {
     // MARK: - Queue Changes
 
     private func queueChange(tableName: String, recordId: UUID, type: String) {
-        let change = PendingChange(tableName: tableName, recordId: recordId, changeType: type)
-        modelContext.insert(change)
+        modelContext.queueSync(table: tableName, recordId: recordId, type: type)
     }
 }

@@ -53,6 +53,7 @@ struct FamilyRulesView: View {
                                 }
                                 .onDelete { offsets in
                                     for offset in offsets {
+                                        modelContext.queueSync(table: "family_rules", recordId: statusRules[offset].id, type: "delete")
                                         modelContext.delete(statusRules[offset])
                                     }
                                     try? modelContext.save()
@@ -75,8 +76,10 @@ struct FamilyRulesView: View {
             }
         }
         .sheet(isPresented: $showingNewRule) {
-            NewFamilyRuleSheet(userId: auth.currentUser?.id ?? UUID())
-                .presentationDetents([.medium])
+            if let userId = auth.currentUser?.id {
+                NewFamilyRuleSheet(userId: userId)
+                    .presentationDetents([.medium])
+            }
         }
     }
 }
@@ -149,6 +152,7 @@ struct FamilyRuleDetailView: View {
 
             Section {
                 Button(role: .destructive) {
+                    modelContext.queueSync(table: "family_rules", recordId: rule.id, type: "delete")
                     modelContext.delete(rule)
                     try? modelContext.save()
                     dismiss()
@@ -166,6 +170,7 @@ struct FamilyRuleDetailView: View {
     private func markDirty() {
         rule.updatedAt = Date()
         rule.syncStatus = .pending
+        modelContext.queueSync(table: "family_rules", recordId: rule.id, type: "update")
         try? modelContext.save()
     }
 }
@@ -206,6 +211,7 @@ struct NewFamilyRuleSheet: View {
                     Button("Create") {
                         let rule = FamilyRule(userId: userId, rule: ruleText, status: status)
                         modelContext.insert(rule)
+                        modelContext.queueSync(table: "family_rules", recordId: rule.id, type: "insert")
                         try? modelContext.save()
                         dismiss()
                     }

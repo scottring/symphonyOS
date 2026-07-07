@@ -30,6 +30,7 @@ struct RoutineListView: View {
                             }
                             .onDelete { offsets in
                                 for offset in offsets {
+                                    modelContext.queueSync(table: "routines", recordId: active[offset].id, type: "delete")
                                     modelContext.delete(active[offset])
                                 }
                                 try? modelContext.save()
@@ -63,8 +64,10 @@ struct RoutineListView: View {
             }
         }
         .sheet(isPresented: $showingNewRoutine) {
-            NewRoutineSheet(userId: auth.currentUser?.id ?? UUID())
-                .presentationDetents([.medium])
+            if let userId = auth.currentUser?.id {
+                NewRoutineSheet(userId: userId)
+                    .presentationDetents([.medium])
+            }
         }
     }
 
@@ -216,6 +219,7 @@ struct NewRoutineSheet: View {
             routine.timeOfDay = timeOfDay
         }
         modelContext.insert(routine)
+        modelContext.queueSync(table: "routines", recordId: routine.id, type: "insert")
         try? modelContext.save()
         dismiss()
     }

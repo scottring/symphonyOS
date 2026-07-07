@@ -33,8 +33,12 @@ struct ProjectDetailView: View {
                         get: { project.status },
                         set: { project.status = $0; markDirty() }
                     )) {
+                        // Values must match the DB CHECK constraint
+                        // (not_started | in_progress | on_hold | completed) —
+                        // the old "active" tag was rejected by Postgres.
                         Text("Not Started").tag("not_started")
-                        Text("Active").tag("active")
+                        Text("In Progress").tag("in_progress")
+                        Text("On Hold").tag("on_hold")
                         Text("Completed").tag("completed")
                     }
                     .pickerStyle(.menu)
@@ -155,20 +159,25 @@ struct ProjectDetailView: View {
     private func markDirty() {
         project.updatedAt = Date()
         project.syncStatus = .pending
+        modelContext.queueSync(table: "projects", recordId: project.id, type: "update")
         try? modelContext.save()
     }
 
     private func addTask() {
         let trimmed = newTaskTitle.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
+        // Never fabricate a user_id: RLS rejects it server-side and the row
+        // orphans locally. No session here means nothing to safely create.
+        guard let userId = auth.currentUser?.id else { return }
 
         let task = SymphonyTask(
-            userId: auth.currentUser?.id ?? UUID(),
+            userId: userId,
             title: trimmed,
             context: project.context
         )
         task.projectId = project.id
         modelContext.insert(task)
+        modelContext.queueSync(table: "tasks", recordId: task.id, type: "insert")
         try? modelContext.save()
         newTaskTitle = ""
     }

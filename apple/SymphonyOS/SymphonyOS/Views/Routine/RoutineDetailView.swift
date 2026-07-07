@@ -105,6 +105,7 @@ struct RoutineDetailView: View {
 
             Section {
                 Button(role: .destructive) {
+                    modelContext.queueSync(table: "routines", recordId: routine.id, type: "delete")
                     modelContext.delete(routine)
                     try? modelContext.save()
                     dismiss()
@@ -138,6 +139,7 @@ struct RoutineDetailView: View {
     private func markDirty() {
         routine.updatedAt = Date()
         routine.syncStatus = .pending
+        modelContext.queueSync(table: "routines", recordId: routine.id, type: "update")
         try? modelContext.save()
     }
 }
