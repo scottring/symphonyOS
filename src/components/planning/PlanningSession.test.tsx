@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@/test/test-utils'
+import { render, screen, fireEvent } from '@/test/test-utils'
 import { PlanningSession } from './PlanningSession'
 import { createMockTask, createMockRoutine, resetIdCounter } from '@/test/mocks/factories'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -39,7 +39,7 @@ describe('PlanningSession', () => {
   })
 
   it('displays unscheduled tasks in the drawer', () => {
-    const unscheduledTask = createMockTask({ title: 'Unscheduled Task' })
+    const unscheduledTask = createMockTask({ title: 'Unscheduled Task', bucket: 'week' })
 
     render(
       <PlanningSession
@@ -54,6 +54,31 @@ describe('PlanningSession', () => {
 
     expect(screen.getByText('Unscheduled Task')).toBeInTheDocument()
     expect(screen.getByText('Unscheduled')).toBeInTheDocument()
+  })
+
+  it('keeps backlog (inbox) tasks behind the Show-more expander', () => {
+    const relevant = createMockTask({ id: 'rel', title: 'Week task', bucket: 'week' })
+    const backlog = createMockTask({ id: 'back', title: 'Someday side quest' })
+
+    render(
+      <PlanningSession
+        tasks={[relevant, backlog]}
+        events={[]}
+        routines={[]}
+        onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('Week task')).toBeInTheDocument()
+    expect(screen.queryByText('Someday side quest')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByText(/show 1 more from the backlog/i))
+    expect(screen.getByText('Someday side quest')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText(/show today-relevant only/i))
+    expect(screen.queryByText('Someday side quest')).not.toBeInTheDocument()
   })
 
   it('displays scheduled tasks on the correct day column', () => {
@@ -206,9 +231,9 @@ describe('PlanningSession', () => {
 
   it('shows the task drawer with count badge', () => {
     const tasks = [
-      createMockTask({ title: 'Task 1' }),
-      createMockTask({ title: 'Task 2' }),
-      createMockTask({ title: 'Task 3' }),
+      createMockTask({ title: 'Task 1', bucket: 'week' }),
+      createMockTask({ title: 'Task 2', bucket: 'week' }),
+      createMockTask({ title: 'Task 3', bucket: 'week' }),
     ]
 
     render(

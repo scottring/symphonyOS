@@ -8,9 +8,13 @@ interface PlanningTaskDrawerProps {
   tasks: Task[]
   routines?: Routine[]
   onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
+  /** Backlog items hidden behind the default today-relevant filter. */
+  hiddenCount?: number
+  showingAll?: boolean
+  onToggleShowAll?: () => void
 }
 
-export function PlanningTaskDrawer({ tasks, routines = [], onPushTask }: PlanningTaskDrawerProps) {
+export function PlanningTaskDrawer({ tasks, routines = [], onPushTask, hiddenCount = 0, showingAll = false, onToggleShowAll }: PlanningTaskDrawerProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: 'unscheduled-drawer',
   })
@@ -91,6 +95,15 @@ export function PlanningTaskDrawer({ tasks, routines = [], onPushTask }: Plannin
               </div>
             )}
           </>
+        )}
+        {onToggleShowAll && (hiddenCount > 0 || showingAll) && (
+          <button
+            type="button"
+            onClick={onToggleShowAll}
+            className="w-full text-center text-xs text-neutral-500 hover:text-neutral-700 py-2 transition-colors"
+          >
+            {showingAll ? 'Show today-relevant only' : `Show ${hiddenCount} more from the backlog`}
+          </button>
         )}
       </div>
 

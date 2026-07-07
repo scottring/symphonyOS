@@ -90,4 +90,43 @@ describe('TodayAddInput smart capture', () => {
     expect(r.contactId).toBeUndefined()
     expect(r.resolution).toBeUndefined()
   })
+
+  describe('destination chips', () => {
+    it('defaults to today', () => {
+      const { input, onAdd } = setup()
+      fireEvent.change(input, { target: { value: 'Buy milk' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+      expect(onAdd.mock.calls[0][0].destination).toBe('today')
+    })
+
+    it('Inbox chip routes the capture to the inbox and updates the placeholder', () => {
+      const { input, onAdd } = setup()
+      fireEvent.click(screen.getByRole('radio', { name: 'Inbox' }))
+      expect(screen.getByPlaceholderText(/capture to inbox/i)).toBeInTheDocument()
+      fireEvent.change(input, { target: { value: 'Research summer camps' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+      const r = onAdd.mock.calls[0][0]
+      expect(r.destination).toBe('inbox')
+      expect(r.title).toBe('Research summer camps')
+    })
+
+    it('Note chip routes to a note', () => {
+      const { input, onAdd } = setup()
+      fireEvent.click(screen.getByRole('radio', { name: 'Note' }))
+      fireEvent.change(input, { target: { value: 'Mia liked the blue paint sample' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+      expect(onAdd.mock.calls[0][0].destination).toBe('note')
+    })
+
+    it('destination resets to today after submit', () => {
+      const { input, onAdd } = setup()
+      fireEvent.click(screen.getByRole('radio', { name: 'Inbox' }))
+      fireEvent.change(input, { target: { value: 'one' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+      // Re-expand (submit collapses the input)
+      fireEvent.click(screen.getByRole('button', { name: /add to today/i }))
+      expect(screen.getByRole('radio', { name: 'Today' })).toHaveAttribute('aria-checked', 'true')
+      expect(onAdd.mock.calls[0][0].destination).toBe('inbox')
+    })
+  })
 })

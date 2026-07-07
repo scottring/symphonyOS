@@ -51,6 +51,7 @@ function setup(tasksOverride?: Task[], contacts: Contact[] = [], routines: Routi
   const onClose = vi.fn()
   const onUpdateRoutine = vi.fn()
   const onCompleteRoutine = vi.fn()
+  const onFlagDiscussion = vi.fn()
   const tasks = tasksOverride ?? [
     task({ id: 'w1', title: 'Week one', bucket: 'week' }),
     task({ id: 'od', title: 'Overdue one', bucket: 'timed', scheduledFor: new Date(2020, 0, 1), isAllDay: false }),
@@ -65,12 +66,13 @@ function setup(tasksOverride?: Task[], contacts: Contact[] = [], routines: Routi
       onCompleteTask={onCompleteTask}
       onCompleteRoutine={onCompleteRoutine}
       onSetBucket={onSetBucket}
+      onFlagDiscussion={onFlagDiscussion}
       contacts={contacts}
       routines={routines}
       onUpdateRoutine={onUpdateRoutine}
     />
   )
-  return { onPushTask, onCompleteTask, onSetBucket, onClose, onUpdateRoutine, onCompleteRoutine, ...utils }
+  return { onPushTask, onCompleteTask, onSetBucket, onClose, onUpdateRoutine, onCompleteRoutine, ...utils, onFlagDiscussion }
 }
 
 describe('PlanTodaySession', () => {
@@ -100,6 +102,20 @@ describe('PlanTodaySession', () => {
     const { user, onSetBucket } = setup([task({ id: 'od', title: 'Overdue one', bucket: 'timed', scheduledFor: new Date(2020, 0, 1), isAllDay: false })])
     await user.click(screen.getByRole('button', { name: 'Not today' }))
     expect(onSetBucket).toHaveBeenCalledWith('od', 'week')
+    expect(screen.getByText('0 placed · 0 to go')).toBeInTheDocument()
+  })
+
+  it('"Needs a conversation" flags discussion and moves the task to the week pool', async () => {
+    const { user, onFlagDiscussion, onSetBucket } = setup([
+      task({ id: 'dc', title: 'Donate clothes', bucket: 'week' }),
+    ])
+    await user.click(screen.getByRole('button', { name: 'Needs a conversation' }))
+    await user.type(screen.getByLabelText(/who to discuss with/i), 'Iris — which clothes & where')
+    await user.click(screen.getByRole('button', { name: 'Flag it' }))
+
+    expect(onFlagDiscussion).toHaveBeenCalledWith('dc', 'Iris — which clothes & where')
+    expect(onSetBucket).toHaveBeenCalledWith('dc', 'week')
+    // Card leaves the pile
     expect(screen.getByText('0 placed · 0 to go')).toBeInTheDocument()
   })
 

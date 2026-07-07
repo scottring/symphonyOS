@@ -42,6 +42,7 @@ import { useScheduleActions } from '@/hooks/useScheduleActions';
 import { useDomain } from '@/hooks/useDomain';
 import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings';
 import { useListsContext } from '@/contexts/ListsContext';
+import { useNotesContext } from '@/contexts/NotesContext';
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext';
 import { withDefaultEventAssignees } from '@/components/home/eventAssigneeDefaults';
 import { useUndo } from '@/hooks/useUndo';
@@ -70,6 +71,7 @@ export function HomeViewContainer() {
   const { isHidden: isEventHidden, hideEvent } = useHiddenCalendarEvents();
   const { getDomainForCalendar } = useCalendarDomainMappings();
   const { lists, listsByCategory } = useListsContext();
+  const { addNote } = useNotesContext();
   const { currentDomain } = useDomain();
   const { goals, getCurrentQuarter } = useGoalsContext();
   const vaultWrite = useVaultWrite();
@@ -83,6 +85,9 @@ export function HomeViewContainer() {
   const [planningOpen, setPlanningOpen] = useState(false);
   const [weeklyPlanningOpen, setWeeklyPlanningOpen] = useState(false);
   const [planTodayOpen, setPlanTodayOpen] = useState(false);
+  // Time-block opened from inside Plan-today: Done should return to the wizard,
+  // not strand you on Today with the ritual half-finished.
+  const [planningFromWizard, setPlanningFromWizard] = useState(false);
   const [monthlyPlanningOpen, setMonthlyPlanningOpen] = useState(false);
   const [seasonalPlanningOpen, setSeasonalPlanningOpen] = useState(false);
   const [annualPlanningOpen, setAnnualPlanningOpen] = useState(false);
@@ -277,16 +282,35 @@ export function HomeViewContainer() {
 
   const onCreateTaskParsed = useCallback(
     async (r: TodayCaptureResult) => {
+      // Destination routing: one visible input handles all captures.
+      if (r.destination === 'note') {
+        const note = await addNote({
+          content: r.title,
+          context: currentDomain !== 'universal' ? currentDomain : undefined,
+        });
+        showToast(note ? 'Note saved' : 'Could not save the note', note ? 'success' : 'error');
+        return;
+      }
+
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const taskId = await addTask(r.title, r.contactId, r.projectId, r.scheduledFor ?? today, {
-        assignedTo: r.assignedMemberIds?.[0] ?? getCurrentUserMember()?.id,
-        assignedToAll: r.assignedMemberIds,
-        context: currentDomain !== 'universal' ? currentDomain : undefined,
-        category: r.category,
-        isAllDay: r.scheduledFor ? false : true,
-        phoneNumber: r.phoneNumber,
-      });
+      const toInbox = r.destination === 'inbox' && !r.scheduledFor;
+      const taskId = await addTask(
+        r.title,
+        r.contactId,
+        r.projectId,
+        // Inbox destination = unscheduled; an explicit parsed date always wins.
+        toInbox ? undefined : (r.scheduledFor ?? today),
+        {
+          assignedTo: r.assignedMemberIds?.[0] ?? getCurrentUserMember()?.id,
+          assignedToAll: r.assignedMemberIds,
+          context: currentDomain !== 'universal' ? currentDomain : undefined,
+          category: r.category,
+          isAllDay: toInbox ? undefined : r.scheduledFor ? false : true,
+          phoneNumber: r.phoneNumber,
+        },
+      );
+      if (toInbox && taskId) showToast('Added to Inbox', 'success');
       if (r.resolution) {
         recordOutcome({
           inputText: r.resolution.inputText,
@@ -296,7 +320,7 @@ export function HomeViewContainer() {
         });
       }
     },
-    [addTask, getCurrentUserMember, currentDomain, recordOutcome],
+    [addTask, addNote, getCurrentUserMember, currentDomain, recordOutcome],
   );
 
   // Inline timeline "+" create: the TimelineInsertPoint quick-input captures a
@@ -594,7 +618,13 @@ export function HomeViewContainer() {
               })
             }
             initialDate={viewedDate}
-            onClose={() => setPlanningOpen(false)}
+            onClose={() => {
+              setPlanningOpen(false);
+              if (planningFromWizard) {
+                setPlanningFromWizard(false);
+                setPlanTodayOpen(true);
+              }
+            }}
             onUpdateTask={updateTask}
             onPushTask={pushTask}
             familyMembers={familyMembers}
@@ -635,7 +665,8 @@ export function HomeViewContainer() {
             onPushTask={pushTask}
             onCompleteTask={toggleTask}
             onSetBucket={setBucket}
-            onOpenTimeBlock={() => { setPlanTodayOpen(false); setPlanningOpen(true); }}
+            onOpenTimeBlock={() => { setPlanTodayOpen(false); setPlanningFromWizard(true); setPlanningOpen(true); }}
+            onFlagDiscussion={(taskId, note) => updateTask(taskId, { needsDiscussion: true, discussionNote: note })}
             contacts={contacts}
             routines={allRoutines}
             onUpdateRoutine={(id, input) => updateRoutine(id, input)}

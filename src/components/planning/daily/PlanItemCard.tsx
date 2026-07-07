@@ -2,6 +2,7 @@
 // already staged ("Bring"), and taps a slot ("When"). The AI line is advisory —
 // it pre-suggests a slot but the tap is what commits.
 
+import { useState } from 'react'
 import { ConceptIcon, type ConceptName } from '@/lib/conceptIcons'
 import { MaterialChip } from '@/components/surface/MaterialChip'
 import type { Material } from '@/types/material'
@@ -28,21 +29,25 @@ interface PlanItemCardProps {
   title: string
   origin: ItemOrigin
   materials: Material[]
-  suggestion: SlotSuggestion
+  suggestion: SlotSuggestion | null
   /** Currently chosen slot this session, if any (drives the selected toggle). */
   chosenSlot?: TimeOfDay
   onPickSlot: (slot: TimeOfDay) => void
   onNotToday: () => void
+  /** Flag "needs a conversation first" with a who/what note (tasks only). */
+  onDiscuss?: (note: string) => void
   onAddMaterial?: () => void
   onMaterialAction?: (m: Material) => void
 }
 
 export function PlanItemCard({
   title, origin, materials, suggestion, chosenSlot,
-  onPickSlot, onNotToday, onAddMaterial, onMaterialAction,
+  onPickSlot, onNotToday, onDiscuss, onAddMaterial, onMaterialAction,
 }: PlanItemCardProps) {
   const om = ORIGIN_META[origin]
-  const suggestedLabel = SLOTS.find((s) => s.slot === suggestion.slot)?.label ?? 'Morning'
+  const suggestedLabel = suggestion ? SLOTS.find((s) => s.slot === suggestion.slot)?.label ?? 'Morning' : null
+  const [discussOpen, setDiscussOpen] = useState(false)
+  const [discussNote, setDiscussNote] = useState('')
 
   return (
     <div className="rounded-2xl border border-neutral-200/80 bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
@@ -81,14 +86,52 @@ export function PlanItemCard({
       <div className="mt-3 pt-3 border-t border-neutral-100">
         <div className="flex items-center justify-between mb-1.5">
           <span className="text-[10px] uppercase tracking-wider text-neutral-400">When</span>
-          <button
-            type="button"
-            onClick={onNotToday}
-            className="text-xs text-neutral-400 hover:text-neutral-600 transition-colors"
-          >
-            Not today
-          </button>
+          <span className="flex items-center gap-3">
+            {onDiscuss && (
+              <button
+                type="button"
+                onClick={() => setDiscussOpen((v) => !v)}
+                aria-expanded={discussOpen}
+                className="text-xs text-neutral-400 hover:text-neutral-600 transition-colors"
+              >
+                Needs a conversation
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onNotToday}
+              className="text-xs text-neutral-400 hover:text-neutral-600 transition-colors"
+            >
+              Not today
+            </button>
+          </span>
         </div>
+        {discussOpen && onDiscuss && (
+          <div className="mb-2 flex items-center gap-1.5">
+            <input
+              type="text"
+              value={discussNote}
+              onChange={(e) => setDiscussNote(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && discussNote.trim()) {
+                  onDiscuss(discussNote.trim())
+                }
+              }}
+              placeholder="With whom, about what? e.g. Iris — which clothes & where"
+              aria-label="Who to discuss with and about what"
+              autoFocus
+              className="flex-1 min-w-0 rounded-lg border border-neutral-200 px-2.5 py-1.5 text-sm text-neutral-700 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+            <button
+              type="button"
+              disabled={!discussNote.trim()}
+              onClick={() => onDiscuss(discussNote.trim())}
+              className="shrink-0 rounded-lg bg-primary-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-40 transition-colors"
+            >
+              Flag it
+            </button>
+          </div>
+        )}
         <div className="grid grid-cols-3 gap-1.5">
           {SLOTS.map(({ slot, label }) => {
             const selected = chosenSlot === slot
@@ -111,8 +154,9 @@ export function PlanItemCard({
         </div>
       </div>
 
-      {/* Advisory AI suggestion — only before a choice is made */}
-      {!chosenSlot && (
+      {/* Advisory AI suggestion — only before a choice is made, and only when
+          there's something honest to say (null late in the day / stale slots). */}
+      {!chosenSlot && suggestion && suggestedLabel && (
         <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-primary-700">
           <ConceptIcon name="ai" size={13} decorative />
           Symphony suggests {suggestedLabel} — {suggestion.reason}

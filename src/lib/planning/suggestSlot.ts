@@ -43,14 +43,54 @@ interface Suggestable {
 }
 
 /**
- * Suggest a slot for an item. Heuristic, not a schedule:
- * - errands/chores lean afternoon (batch them when you're already up and out)
- * - everything else defaults to morning (focus is sharpest early)
+ * Suggest a slot for an item. Heuristic, not a schedule — and honest:
+ * - never suggests a slot that's already (mostly) over ("Morning" at 2pm reads
+ *   as canned and poisons trust in every other suggestion)
+ * - errands/chores lean afternoon; calls lean business hours; conversations
+ *   lean evening; everything else takes the earliest slot with room left
+ * - returns null late in the day when there's nothing useful to say
  */
-export function suggestSlot(item: Suggestable): SlotSuggestion {
-  const category = item.category ?? undefined
-  if (category === 'errand' || category === 'chore') {
-    return { slot: 'afternoon', reason: 'Errands batch well in the afternoon.' }
+export function suggestSlot(item: Suggestable, now: Date = new Date()): SlotSuggestion | null {
+  const hour = now.getHours()
+  const open: Record<TimeOfDay, boolean> = {
+    morning: hour < 11,
+    afternoon: hour < 16,
+    evening: hour < 21,
   }
-  return { slot: 'morning', reason: 'Your focus is sharpest early.' }
+
+  const firstOpen = (
+    prefs: TimeOfDay[],
+    reasons: Partial<Record<TimeOfDay, string>>,
+  ): SlotSuggestion | null => {
+    for (const slot of prefs) {
+      if (open[slot]) return { slot, reason: reasons[slot] ?? '' }
+    }
+    return null
+  }
+
+  const category = item.category ?? undefined
+  const title = (item.title ?? '').toLowerCase()
+
+  if (category === 'errand' || category === 'chore') {
+    return firstOpen(['afternoon', 'evening'], {
+      afternoon: 'Errands batch well in the afternoon.',
+      evening: 'Fold it into an evening run.',
+    })
+  }
+  if (/\b(call|phone|ring|book|appointment|schedule)\b/.test(title)) {
+    return firstOpen(['morning', 'afternoon'], {
+      morning: 'Calls connect better during business hours.',
+      afternoon: 'Still business hours — a good window to call.',
+    })
+  }
+  if (/\b(talk|discuss|ask|check in)\b/.test(title)) {
+    return firstOpen(['evening'], {
+      evening: 'Evenings are better for conversations at home.',
+    })
+  }
+  return firstOpen(['morning', 'afternoon', 'evening'], {
+    morning: 'Your focus is sharpest early.',
+    afternoon: 'The afternoon still has room.',
+    evening: 'The evening is what\u2019s left \u2014 keep it light.',
+  })
 }

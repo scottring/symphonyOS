@@ -9,9 +9,13 @@ import type { TaskCategory } from '@/types/task'
 
 type Domain = 'work' | 'family' | 'personal' | 'universal'
 
+export type CaptureDestination = 'today' | 'inbox' | 'note'
+
 export interface TodayCaptureResult {
   title: string
   scheduledFor: Date | null      // null → caller defaults to "today, all-day"
+  /** Where this capture lands. Default 'today' (task on today). */
+  destination?: CaptureDestination
   category?: TaskCategory
   projectId?: string
   contactId?: string
@@ -43,9 +47,16 @@ function useDebouncedValue<T>(value: T, ms: number): T {
   return debounced
 }
 
+const DESTINATIONS: { key: CaptureDestination; label: string; placeholder: string }[] = [
+  { key: 'today', label: 'Today', placeholder: 'Add to today...' },
+  { key: 'inbox', label: 'Inbox', placeholder: 'Capture to inbox — triage later...' },
+  { key: 'note', label: 'Note', placeholder: 'Jot a note...' },
+]
+
 export function TodayAddInput({ onAdd, parserContext, currentDomain, resolver, getRecentTaskForContact }: TodayAddInputProps) {
   const [expanded, setExpanded] = useState(false)
   const [value, setValue] = useState('')
+  const [destination, setDestination] = useState<CaptureDestination>('today')
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Stable ctx identity for useQuickParse's parse memo.
@@ -72,6 +83,7 @@ export function TodayAddInput({ onAdd, parserContext, currentDomain, resolver, g
   const reset = useCallback(() => {
     setValue('')
     setExpanded(false)
+    setDestination('today')
     qp.resetOverrides()
     qp.resetSuggestion()
   }, [qp])
@@ -91,6 +103,7 @@ export function TodayAddInput({ onAdd, parserContext, currentDomain, resolver, g
     onAdd({
       title: p.title?.trim() || trimmed,
       scheduledFor: p.dueDate ?? null,
+      destination,
       category: p.category,
       projectId: p.projectId,
       contactId: p.contactId,
@@ -99,7 +112,7 @@ export function TodayAddInput({ onAdd, parserContext, currentDomain, resolver, g
       resolution: suggestion && action ? { inputText: trimmed, suggestion, action } : undefined,
     })
     reset()
-  }, [value, qp, suggestion, suggestionState, suggestionApplied, onAdd, reset])
+  }, [value, qp, suggestion, suggestionState, suggestionApplied, destination, onAdd, reset])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -148,9 +161,30 @@ export function TodayAddInput({ onAdd, parserContext, currentDomain, resolver, g
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
-          placeholder="Add to today..."
+          placeholder={DESTINATIONS.find((d) => d.key === destination)!.placeholder}
           className="flex-1 bg-transparent text-sm text-neutral-800 placeholder:text-neutral-400 outline-none"
         />
+        {/* Destination chips — one input, every capture. Mousedown-preventDefault
+            keeps the input focused while switching. */}
+        <div role="radiogroup" aria-label="Capture destination" className="flex items-center gap-0.5">
+          {DESTINATIONS.map((d) => (
+            <button
+              key={d.key}
+              type="button"
+              role="radio"
+              aria-checked={destination === d.key}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => setDestination(d.key)}
+              className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
+                destination === d.key
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100'
+              }`}
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
         {value.trim() && (
           <button
             type="button"

@@ -103,7 +103,7 @@ export function PlanningSession({
   )
 
   // Get unscheduled tasks (no scheduledFor or in the past, and not deferred to future)
-  const unscheduledTasks = useMemo(() => {
+  const allUnscheduledTasks = useMemo(() => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
@@ -127,6 +127,29 @@ export function PlanningSession({
       return taskDate < today
     })
   }, [tasks])
+
+  // The rail defaults to today-relevant candidates — carried-over, all-day, and
+  // this-week tasks. Dumping the whole backlog (inbox/month/someday) made the
+  // rail a 29-item wall of project sub-steps; those stay behind "Show more".
+  const [showAllUnscheduled, setShowAllUnscheduled] = useState(false)
+  const { relevantUnscheduled, backlogCount } = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const isRelevant = (task: Task) => {
+      if (task.isAllDay) return true
+      if (task.bucket === 'week') return true
+      if (task.scheduledFor) {
+        const d = new Date(task.scheduledFor)
+        d.setHours(0, 0, 0, 0)
+        if (d < today) return true // carried over
+      }
+      return false
+    }
+    const relevant = allUnscheduledTasks.filter(isRelevant)
+    return { relevantUnscheduled: relevant, backlogCount: allUnscheduledTasks.length - relevant.length }
+  }, [allUnscheduledTasks])
+
+  const unscheduledTasks = showAllUnscheduled ? allUnscheduledTasks : relevantUnscheduled
 
   // Get scheduled tasks for the date range
   const scheduledTasksByDate = useMemo(() => {
@@ -417,7 +440,14 @@ export function PlanningSession({
           onDragEnd={handleDragEnd}
         >
           {/* Task drawer (sidebar) */}
-          <PlanningTaskDrawer tasks={unscheduledTasks} routines={draggableRoutines} onPushTask={onPushTask} />
+          <PlanningTaskDrawer
+            tasks={unscheduledTasks}
+            routines={draggableRoutines}
+            onPushTask={onPushTask}
+            hiddenCount={showAllUnscheduled ? 0 : backlogCount}
+            showingAll={showAllUnscheduled}
+            onToggleShowAll={backlogCount > 0 || showAllUnscheduled ? () => setShowAllUnscheduled((v) => !v) : undefined}
+          />
 
           {/* Planning grid */}
           <PlanningGrid

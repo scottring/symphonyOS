@@ -19,19 +19,49 @@ describe('slotTime', () => {
 })
 
 describe('suggestSlot', () => {
-  it('suggests afternoon for errands and chores', () => {
-    expect(suggestSlot({ category: 'errand' }).slot).toBe('afternoon')
-    expect(suggestSlot({ category: 'chore' }).slot).toBe('afternoon')
+  const morning = new Date(2026, 6, 7, 8, 0)   // 8:00 AM
+  const midday = new Date(2026, 6, 7, 13, 0)   // 1:00 PM
+  const evening = new Date(2026, 6, 7, 18, 30) // 6:30 PM
+  const lateNight = new Date(2026, 6, 7, 22, 0)
+
+  it('suggests afternoon for errands and chores (while afternoon has room)', () => {
+    expect(suggestSlot({ category: 'errand' }, morning)?.slot).toBe('afternoon')
+    expect(suggestSlot({ category: 'chore' }, midday)?.slot).toBe('afternoon')
+    // Afternoon gone → errands fold into the evening
+    expect(suggestSlot({ category: 'errand' }, evening)?.slot).toBe('evening')
   })
 
-  it('defaults to morning otherwise', () => {
-    expect(suggestSlot({}).slot).toBe('morning')
-    expect(suggestSlot({ category: 'task' }).slot).toBe('morning')
-    expect(suggestSlot({ category: null }).slot).toBe('morning')
+  it('defaults to the earliest slot that still has room', () => {
+    expect(suggestSlot({}, morning)?.slot).toBe('morning')
+    expect(suggestSlot({ category: 'task' }, midday)?.slot).toBe('afternoon') // morning is over
+    expect(suggestSlot({ category: null }, evening)?.slot).toBe('evening')
   })
 
-  it('always returns a reason', () => {
-    expect(suggestSlot({}).reason).toBeTruthy()
-    expect(suggestSlot({ category: 'errand' }).reason).toBeTruthy()
+  it('never suggests a slot that has already passed', () => {
+    expect(suggestSlot({}, midday)?.slot).not.toBe('morning')
+    expect(suggestSlot({}, evening)?.slot).toBe('evening')
+  })
+
+  it('goes quiet late at night instead of suggesting nonsense', () => {
+    expect(suggestSlot({}, lateNight)).toBeNull()
+    expect(suggestSlot({ category: 'errand' }, lateNight)).toBeNull()
+  })
+
+  it('leans business hours for calls and evening for conversations', () => {
+    expect(suggestSlot({ title: 'Call the pediatrician' }, morning)?.slot).toBe('morning')
+    expect(suggestSlot({ title: 'Call the pediatrician' }, midday)?.slot).toBe('afternoon')
+    expect(suggestSlot({ title: 'Talk to Iris about donations' }, morning)?.slot).toBe('evening')
+  })
+
+  it('always returns a reason when it suggests', () => {
+    expect(suggestSlot({}, morning)?.reason).toBeTruthy()
+    expect(suggestSlot({ category: 'errand' }, morning)?.reason).toBeTruthy()
+  })
+
+  it('copy varies by slot (no single canned line)', () => {
+    const a = suggestSlot({}, morning)?.reason
+    const b = suggestSlot({}, midday)?.reason
+    const c = suggestSlot({}, evening)?.reason
+    expect(new Set([a, b, c]).size).toBe(3)
   })
 })

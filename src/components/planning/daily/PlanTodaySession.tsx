@@ -34,6 +34,7 @@ import { getRoutinesForDatePure } from '@/lib/routineUtils'
 import { taskToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import { deriveMaterials } from '@/components/surface/hooks/useStagedMaterials'
 import { suggestSlot, timeOfDayToSlot } from '@/lib/planning/suggestSlot'
+import { showToast } from '@/hooks/useToast'
 import { SLOT_BASE_MINS, minsToSlot, dropMins } from '@/lib/planning/reorder'
 import { PlanItemCard, type ItemOrigin } from './PlanItemCard'
 
@@ -70,6 +71,8 @@ interface Props {
   routines?: Routine[]
   /** Place a non-daily routine into a slot by setting its time_of_day. */
   onUpdateRoutine?: (id: string, input: { time_of_day?: string | null }) => void | Promise<unknown>
+  /** Flag a task "needs a conversation first" (sets needsDiscussion + note). */
+  onFlagDiscussion?: (taskId: string, note: string) => void
 }
 
 const SECTION_META: { slot: TimeOfDay; label: string; range: string }[] = [
@@ -114,6 +117,7 @@ function eventsOnDate(events: CalendarEvent[], date: Date): CalendarEvent[] {
 export function PlanTodaySession({
   tasks, events, viewedDate, onClose, onPushTask, onCompleteTask, onCompleteRoutine,
   onSetBucket, onOpenTimeBlock, contacts = [], routines = [], onUpdateRoutine,
+  onFlagDiscussion,
 }: Props) {
   const matchAll = useMemo(() => makeAssigneeFilter([]), [])
   const contactsById = useMemo(
@@ -226,8 +230,22 @@ export function PlanTodaySession({
     setNotToday((prev) => new Set(prev).add(item.id))
     // Tasks move back to the week pool; routines just drop from the pile this
     // session (we don't retime a recurring routine to dismiss one occurrence).
-    if (item.kind === 'task') onSetBucket(item.id, 'week')
+    // Say where it went — silent dismissal reads as "vanished".
+    if (item.kind === 'task') {
+      onSetBucket(item.id, 'week')
+      showToast('Moved to This Week', 'info', 2000)
+    }
   }, [onSetBucket])
+
+  // "Needs a conversation first": flag for the to-discuss ledger AND move the
+  // task to the week pool — the conversation is the real next step, not a slot.
+  const flagDiscussion = useCallback((item: PlanItem, note: string) => {
+    if (item.kind !== 'task' || !onFlagDiscussion) return
+    onFlagDiscussion(item.id, note)
+    setNotToday((prev) => new Set(prev).add(item.id))
+    onSetBucket(item.id, 'week')
+    showToast('Flagged to discuss — it\u2019s in your to-discuss list', 'success', 2500)
+  }, [onFlagDiscussion, onSetBucket])
 
   // Put a placed item back into the pile: clear its scheduled time/time_of_day.
   const unplace = useCallback((entry: PlacedEntry) => {
@@ -319,13 +337,14 @@ export function PlanTodaySession({
                   title={it.title}
                   origin={it.origin}
                   materials={deriveMaterials(it.timelineItem, { contactsById })}
-                  suggestion={suggestSlot({ category: it.category, title: it.title })}
+                  suggestion={suggestSlot({ category: it.category, title: it.title }, new Date())}
                   chosenSlot={(() => {
                     const m = it.kind === 'task' ? chosenMinsById[it.id] : chosenRoutineMinsById[it.id]
                     return m != null ? minsToSlot(m) : undefined
                   })()}
                   onPickSlot={(slot) => pickSlot(it, slot)}
                   onNotToday={() => markNotToday(it)}
+                  onDiscuss={it.kind === 'task' && onFlagDiscussion ? (note) => flagDiscussion(it, note) : undefined}
                 />
               ))
             )}
@@ -370,7 +389,13 @@ export function PlanTodaySession({
 
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => {
+                showToast(
+                  placedCount > 0 ? `Day planned — ${placedCount} placed` : 'Day planned',
+                  'success',
+                )
+                onClose()
+              }}
               className="mt-3 w-full rounded-xl bg-primary-600 text-white text-sm font-medium py-3 hover:bg-primary-700 transition-colors"
             >
               Start my day →
