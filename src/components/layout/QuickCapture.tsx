@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, type ReactNode } from 'react'
+import { Sparkles } from 'lucide-react'
 import { hasParsedFields } from '@/lib/quickInputParser'
 import type { TaskCategory, TaskContext } from '@/types/task'
 import { useDomain } from '@/hooks/useDomain'
@@ -34,6 +35,11 @@ interface QuickCaptureProps {
   onOpen?: () => void
   onClose?: () => void
   showFab?: boolean
+  /** Unibox: render inline search results for the current text (mounted only
+   *  while open, so data subscriptions stay lazy). `close` dismisses the modal. */
+  resultsSlot?: (query: string, close: () => void) => ReactNode
+  /** Unibox: escalate the raw text to the Symphony assistant (⌘↵ or the row). */
+  onAskSymphony?: (text: string) => void
 }
 
 export function QuickCapture({
@@ -47,6 +53,8 @@ export function QuickCapture({
   onOpen,
   onClose,
   showFab = true,
+  resultsSlot,
+  onAskSymphony,
 }: QuickCaptureProps) {
   // Support both controlled and uncontrolled modes
   const [internalIsOpen, setInternalIsOpen] = useState(false)
@@ -239,12 +247,22 @@ export function QuickCapture({
     inputRef.current?.focus()
   }
 
+  const handleAskSymphony = () => {
+    const trimmed = title.trim()
+    if (!trimmed || !onAskSymphony) return
+    onAskSymphony(trimmed)
+    handleClose()
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Escape') {
       handleClose()
     } else if (e.key === 'Enter') {
       e.preventDefault()
-      if (e.shiftKey) {
+      if ((e.metaKey || e.ctrlKey) && onAskSymphony) {
+        // ⌘Enter = hand the raw text to the Symphony assistant
+        handleAskSymphony()
+      } else if (e.shiftKey) {
         // Shift+Enter = always add raw text to inbox
         doSubmit(true)
       } else {
@@ -457,6 +475,22 @@ export function QuickCapture({
                     </div>
                   )}
                 </div>
+              )}
+
+              {/* Unibox: inline search results for the current text */}
+              {resultsSlot && title.trim().length >= 2 && resultsSlot(title.trim(), handleClose)}
+
+              {/* Unibox: escalate to the Symphony assistant */}
+              {onAskSymphony && title.trim() && (
+                <button
+                  type="button"
+                  onClick={handleAskSymphony}
+                  className="w-full flex items-center gap-2 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3 text-sm text-primary-700 hover:bg-primary-50 transition-colors"
+                >
+                  <Sparkles className="w-4 h-4 shrink-0" />
+                  <span className="flex-1 text-left truncate">Ask Symphony to set this up: “{title.trim()}”</span>
+                  <kbd className="hidden md:inline px-1.5 py-0.5 bg-white/70 text-primary-500 rounded text-xs font-mono">⌘↵</kbd>
+                </button>
               )}
 
               {/* Buttons */}

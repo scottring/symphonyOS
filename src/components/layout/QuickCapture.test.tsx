@@ -332,4 +332,48 @@ describe('QuickCapture', () => {
       expect(screen.queryByText('Montreal Trip')).not.toBeInTheDocument()
     })
   })
+
+  describe('unibox', () => {
+    it('renders the results slot with the typed query once 2+ chars', async () => {
+      const resultsSlot = vi.fn((query: string) => <div data-testid="slot">results for {query}</div>)
+      const { user } = render(
+        <QuickCapture onAdd={vi.fn()} isOpen={true} showFab={false} resultsSlot={resultsSlot} />,
+      )
+      await user.type(screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"'), 'lig')
+      expect(screen.getByTestId('slot')).toHaveTextContent('results for lig')
+    })
+
+    it('shows the Ask Symphony row and escalates + closes on click', async () => {
+      const onAskSymphony = vi.fn()
+      const onClose = vi.fn()
+      const { user } = render(
+        <QuickCapture onAdd={vi.fn()} isOpen={true} showFab={false} onAskSymphony={onAskSymphony} onClose={onClose} />,
+      )
+      await user.type(
+        screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"'),
+        'plan the school fundraiser',
+      )
+      await user.click(screen.getByRole('button', { name: /Ask Symphony to set this up/ }))
+      expect(onAskSymphony).toHaveBeenCalledWith('plan the school fundraiser')
+      await waitFor(() => expect(onClose).toHaveBeenCalled())
+    })
+
+    it('⌘Enter escalates to Symphony', async () => {
+      const onAskSymphony = vi.fn()
+      const { user } = render(
+        <QuickCapture onAdd={vi.fn()} isOpen={true} showFab={false} onAskSymphony={onAskSymphony} onClose={vi.fn()} />,
+      )
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
+      await user.type(input, 'set up the garage cleanout')
+      await user.keyboard('{Meta>}{Enter}{/Meta}')
+      expect(onAskSymphony).toHaveBeenCalledWith('set up the garage cleanout')
+    })
+
+    it('hides the Ask Symphony row when the input is empty', () => {
+      render(
+        <QuickCapture onAdd={vi.fn()} isOpen={true} showFab={false} onAskSymphony={vi.fn()} />,
+      )
+      expect(screen.queryByRole('button', { name: /Ask Symphony/ })).not.toBeInTheDocument()
+    })
+  })
 })

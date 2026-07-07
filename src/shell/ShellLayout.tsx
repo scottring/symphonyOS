@@ -6,7 +6,7 @@ import { Sidebar, type ViewType } from '@/components/layout/Sidebar';
 import { MoreSheet } from '@/components/layout/MoreSheet';
 import { QuickCapture } from '@/components/layout/QuickCapture';
 import { NewVersionBanner } from '@/components/layout/NewVersionBanner';
-import { ShellSearch } from './ShellSearch';
+import { OmniboxResults } from '@/components/omnibox/OmniboxResults';
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher';
 import { HelpPanel } from '@/components/lazy';
 import { Toast, ConfirmationToast } from '@/components/toast';
@@ -18,7 +18,7 @@ import { useMobile } from '@/hooks/useMobile';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useSymphonyAssistant } from '@/hooks/useSymphonyAssistant';
 import { useScratchpadHidden } from '@/hooks/useScratchpadHidden';
-import { useAssistantLaunchRequests } from '@/contexts/AssistantLaunchContext';
+import { useAssistantLaunchRequests, useAssistantLauncher } from '@/contexts/AssistantLaunchContext';
 import { useShellChrome } from './useShellChrome';
 import { useSelection } from './providers/SelectionProvider';
 
@@ -111,23 +111,20 @@ function ShellLayoutInner({ children }: Props) {
   // Mobile/UI chrome state
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const helpButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Global keyboard shortcuts: ⌘K opens Quick Add; ⌘/ opens search; ⌘\ toggles
-  // the sidebar. ⌘\ is ignored while typing in a field (so it doesn't fight text
-  // entry); ⌘K / ⌘/ work anywhere.
+  // Global keyboard shortcuts: ⌘K opens the unibox (Quick Add + search + Ask
+  // Symphony); ⌘/ is a legacy alias for the same box; ⌘\ toggles the sidebar.
+  // ⌘\ is ignored while typing in a field (so it doesn't fight text entry);
+  // ⌘K / ⌘/ work anywhere.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
       const key = e.key.toLowerCase();
-      if (key === 'k') {
+      if (key === 'k' || key === '/') {
         e.preventDefault();
         setQuickAddOpen((o) => !o);
-      } else if (key === '/') {
-        e.preventDefault();
-        setSearchOpen((o) => !o);
       } else if (key === '\\') {
         const el = document.activeElement;
         const typing = el instanceof HTMLElement &&
@@ -150,6 +147,7 @@ function ShellLayoutInner({ children }: Props) {
 
   // Programmatic launches (unibox "Ask Symphony", Add-to-today…): this host
   // owns every surface except desktop-Today (Shell's ShellAssistantHost).
+  const { openAssistant } = useAssistantLauncher();
   const { nonce: launchNonce, consumeSeed } = useAssistantLaunchRequests();
   const seenLaunchNonce = useRef(0);
   useEffect(() => {
@@ -247,7 +245,7 @@ function ShellLayoutInner({ children }: Props) {
           onSignOut={signOut}
           activeView={activeView}
           onViewChange={handleViewChange}
-          onOpenSearch={() => setSearchOpen(true)}
+          onOpenSearch={() => setQuickAddOpen(true)}
           inboxCount={inboxCount}
           pins={chrome.pins}
           entities={chrome.pinnedEntities}
@@ -350,11 +348,10 @@ function ShellLayoutInner({ children }: Props) {
           isOpen={quickAddOpen}
           onOpen={() => setQuickAddOpen(true)}
           onClose={() => setQuickAddOpen(false)}
+          resultsSlot={(query, close) => <OmniboxResults query={query} onNavigate={close} />}
+          onAskSymphony={(text) => openAssistant({ message: text, autoSend: true })}
         />
       )}
-
-      {/* Global search (⌘/) — mounted only while open so it subscribes lazily. */}
-      {searchOpen && <ShellSearch onClose={() => setSearchOpen(false)} />}
 
       {/* Non-Today AI rail (desktop). Today's rail is in Shell.tsx. */}
       {showAiRail && !isMobile && (
