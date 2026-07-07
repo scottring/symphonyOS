@@ -19,6 +19,8 @@ interface ChatPanelProps {
   onAddTask?: (title: string, destination: 'inbox' | 'today') => void
   toolActivity?: string[]
   mode?: ChatMode
+  /** Tappable starter prompts shown in the empty state; click sends them. */
+  suggestions?: string[]
   // Chat history
   sessions?: ChatSession[]
   sessionsLoading?: boolean
@@ -56,6 +58,7 @@ export function ChatPanel({
   onAddTask,
   toolActivity,
   mode = 'chat',
+  suggestions,
   sessions = [],
   sessionsLoading = false,
   onLoadSession,
@@ -262,6 +265,20 @@ export function ChatPanel({
                 : "I can manage your tasks, projects, and calendar in Symphony"
               }
             </p>
+            {suggestions && suggestions.length > 0 && (
+              <div className="mt-4 flex flex-col gap-2 w-full max-w-[260px]">
+                {suggestions.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => onSend(s)}
+                    className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-600 hover:bg-primary-50 hover:text-primary-700 hover:border-primary-200 transition-colors text-left"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           messages.map((msg) => (
