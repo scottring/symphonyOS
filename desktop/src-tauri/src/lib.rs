@@ -4,6 +4,7 @@ use tauri::menu::{
 };
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Listener, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_global_shortcut::ShortcutState;
 
 const APP_URL: &str = "https://app.symphony-os.com";
@@ -125,9 +126,9 @@ fn update_tray(app: &AppHandle, payload: &TrayPayload) {
     let _ = tray.set_title(title);
 }
 
-fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
+fn build_menu(app: &AppHandle, autostart_enabled: bool) -> tauri::Result<Menu<tauri::Wry>> {
     let launch_login = CheckMenuItemBuilder::with_id("launch-login", "Launch at Login")
-        .checked(false)
+        .checked(autostart_enabled)
         .build(app)?;
 
     let app_menu = SubmenuBuilder::new(app, "Symphony")
@@ -205,6 +206,20 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
         toggle_capture(app);
         return;
     }
+    if id == "launch-login" {
+        // The CheckMenuItem toggles its own checkmark; flip the real state to match.
+        let autolaunch = app.autolaunch();
+        let enabled = autolaunch.is_enabled().unwrap_or(false);
+        let result = if enabled {
+            autolaunch.disable()
+        } else {
+            autolaunch.enable()
+        };
+        if result.is_err() {
+            eprintln!("failed to toggle launch at login");
+        }
+        return;
+    }
     if id == "new-capture" {
         show_main(app);
         let _ = app.emit_to("main", "shell:quick-capture", ());
@@ -232,8 +247,13 @@ pub fn run() {
                 })
                 .build(),
         )
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .setup(|app| {
-            let menu = build_menu(app.handle())?;
+            let autostart_enabled = app.autolaunch().is_enabled().unwrap_or(false);
+            let menu = build_menu(app.handle(), autostart_enabled)?;
             app.set_menu(menu)?;
             create_capture_window(app.handle())?;
             build_tray(app.handle())?;
@@ -254,6 +274,13 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            // Mac convention: the red button closes the window, not the app.
+            if window.label() == "main" {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    let _ = window.hide();
+                    api.prevent_close();
+                }
+            }
             // Click-away dismisses the capture palette, like Spotlight.
             if window.label() == "capture" {
                 if let tauri::WindowEvent::Focused(false) = event {
@@ -262,6 +289,12 @@ pub fn run() {
             }
         })
         .on_menu_event(|app, event| handle_menu_event(app, event.id().as_ref()))
-        .run(tauri::generate_context!())
-        .expect("error while running Symphony");
+        .build(tauri::generate_context!())
+        .expect("error while building Symphony")
+        .run(|app, event| {
+            // Dock-icon click with no visible windows restores the main window.
+            if let tauri::RunEvent::Reopen { .. } = event {
+                show_main(app);
+            }
+        });
 }
