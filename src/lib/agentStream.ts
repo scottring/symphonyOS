@@ -35,6 +35,16 @@ export interface AttachmentMeta {
   fileSize: number
 }
 
+/** The task a conversation is about. Sent to the edge fn, which injects it as
+ *  context so the agent can help make the task doable without the user
+ *  re-describing it. */
+export interface AssistantTaskContext {
+  id: string
+  title: string
+  notes?: string | null
+  projectName?: string | null
+}
+
 export interface StreamHandlers {
   onText?: (text: string) => void
   onTool?: (name: string) => void
@@ -46,6 +56,8 @@ export interface StreamHandlers {
    *  routines to them (otherwise they're unassigned and the Today "my tasks"
    *  filter hides them). */
   currentMemberId?: string
+  /** When set, the whole conversation is scoped to this task. */
+  taskContext?: AssistantTaskContext
 }
 
 export type AgentContentBlock =
@@ -86,6 +98,7 @@ export async function streamSymphonyAgent(
         messages,
         ...(handlers.attachment ? { attachment: handlers.attachment } : {}),
         ...(handlers.currentMemberId ? { currentMemberId: handlers.currentMemberId } : {}),
+        ...(handlers.taskContext ? { taskContext: handlers.taskContext } : {}),
       }),
     },
   )

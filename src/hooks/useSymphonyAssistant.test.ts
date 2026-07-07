@@ -63,4 +63,29 @@ describe('useSymphonyAssistant', () => {
     await act(async () => { await result.current.sendMessage('hi') })
     await waitFor(() => expect(result.current.error).toBe('Assistant offline'))
   })
+
+  it('forwards taskContext to the stream call', async () => {
+    let seen: unknown
+    vi.mocked(streamSymphonyAgent).mockImplementation(async (_messages, h) => {
+      seen = h.taskContext
+      h.onDone?.('ok', null)
+    })
+    const taskContext = { id: 't1', title: 'Replace kitchen light bulbs', notes: 'GU10?' }
+    const { result } = renderHook(() => useSymphonyAssistant({ taskContext }))
+    await act(async () => { await result.current.sendMessage('help me plan this') })
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(seen).toEqual(taskContext)
+  })
+
+  it('calls onMutate after a turn that used a write tool', async () => {
+    vi.mocked(streamSymphonyAgent).mockImplementation(async (_messages, h) => {
+      h.onTool?.('symphony_update_task')
+      h.onDone?.('updated', null)
+    })
+    const onMutate = vi.fn()
+    const { result } = renderHook(() => useSymphonyAssistant({ onMutate }))
+    await act(async () => { await result.current.sendMessage('mark it needs discussion') })
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(onMutate).toHaveBeenCalledTimes(1)
+  })
 })

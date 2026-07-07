@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { streamSymphonyAgent, type AgentApiMessage } from '@/lib/agentStream'
+import { streamSymphonyAgent, type AgentApiMessage, type AssistantTaskContext } from '@/lib/agentStream'
 import type { ChatMessage } from '@/types/chat'
 import type { ChatAttachment } from '@/components/chat/ChatAttachment'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
@@ -10,21 +10,32 @@ const WRITE_TOOLS = new Set([
   'symphony_create_task',
   'symphony_update_task',
   'symphony_complete_task',
+  'symphony_delete_task',
   'symphony_create_project',
+  'symphony_update_project',
   'symphony_create_routine',
+  'symphony_update_routine',
+  'symphony_delete_routine',
+  'symphony_create_note',
   'symphony_attach_source',
 ])
+
+export interface UseSymphonyAssistantOptions {
+  /** Called after a turn in which the agent wrote data, so the caller can
+   *  refetch (the task list is not realtime for external writes). */
+  onMutate?: () => void
+  /** Scope the conversation to one task (sent to the edge fn every turn). */
+  taskContext?: AssistantTaskContext
+}
 
 /**
  * Right-rail assistant scoped to Symphony. Talks to the `symphony-agent`
  * edge function, which runs an Anthropic tool-use loop over the user's own
  * Symphony data (RLS-scoped). Conversation is held in React state and sent
  * with each turn; there is no server-side session in v1.
- *
- * @param onMutate called after a turn in which the agent wrote data, so the
- *   caller can refetch (the task list is not realtime for external writes).
  */
-export function useSymphonyAssistant(onMutate?: () => void) {
+export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
+  const { onMutate, taskContext } = options ?? {}
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -100,11 +111,12 @@ export function useSymphonyAssistant(onMutate?: () => void) {
       onError: (message) => setError(message),
       attachment: attachmentMeta,
       currentMemberId: getCurrentUserMember()?.id,
+      taskContext,
     })
 
     if (didWrite) onMutate?.()
     setLoading(false)
-  }, [loading, messages, onMutate])
+  }, [loading, messages, onMutate, taskContext, getCurrentUserMember])
 
   const resetSession = useCallback(() => {
     setMessages([])
