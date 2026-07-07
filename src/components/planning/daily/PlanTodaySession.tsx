@@ -244,7 +244,7 @@ export function PlanTodaySession({
     onFlagDiscussion(item.id, note)
     setNotToday((prev) => new Set(prev).add(item.id))
     onSetBucket(item.id, 'week')
-    showToast('Flagged to discuss — it\u2019s in your to-discuss list', 'success', 2500)
+    showToast('Flagged to discuss \u2014 moved to This Week, and it\u2019s on your to-discuss list', 'success', 3500)
   }, [onFlagDiscussion, onSetBucket])
 
   // Put a placed item back into the pile: clear its scheduled time/time_of_day.

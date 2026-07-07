@@ -53,7 +53,7 @@ export function ConfirmationToast({ toast, onDismiss }: ConfirmationToastProps) 
   if (!isVisible && !toast) return null
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[300]">
       <div
         className={`
           flex flex-col gap-3 px-4 py-4 rounded-xl

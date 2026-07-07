@@ -34,12 +34,12 @@ export function TodayProgress({ completedCount, actionableCount, isToday }: Toda
         <Sparkles className="w-5 h-5 text-primary-500/70 shrink-0" />
       )}
 
-      <h2 className="font-display text-lg md:text-xl leading-tight text-neutral-900 shrink-0 truncate max-w-[14rem]">
+      <h2 className="font-display text-lg md:text-xl leading-tight text-neutral-900 min-w-0 truncate max-w-[14rem]">
         {r.headline}
       </h2>
 
-      {/* Progress rail — inline, takes the slack */}
-      <div className="hidden sm:block flex-1 min-w-[4rem] h-1.5 rounded-full bg-neutral-200/70 overflow-hidden">
+      {/* Progress rail — inline, takes the slack; collapses first when tight */}
+      <div className="hidden sm:block flex-1 min-w-4 h-1.5 rounded-full bg-neutral-200/70 overflow-hidden">
         <div
           className={`h-full rounded-full transition-[width] duration-700 ease-out ${
             r.complete ? 'bg-primary-600' : 'bg-primary-500/80'
@@ -48,7 +48,7 @@ export function TodayProgress({ completedCount, actionableCount, isToday }: Toda
         />
       </div>
 
-      <span className="shrink-0 text-[13px] text-neutral-500 tabular-nums">{r.detail}</span>
+      <span className="shrink-0 whitespace-nowrap text-[13px] text-neutral-500 tabular-nums">{r.detail}</span>
     </div>
   )
 }

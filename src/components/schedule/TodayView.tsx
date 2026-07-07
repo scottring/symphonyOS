@@ -526,8 +526,8 @@ export function TodayView({
           count) with the controls chips on the same row. Collapsing the old
           two-row preamble is what buys the Up Next hero its above-the-fold
           position. */}
-      <div className="px-3 md:px-0 mb-4 md:card md:rounded-2xl md:border md:border-neutral-200/70 md:px-4 md:py-2.5 md:flex md:items-center md:gap-5">
-        <div className="md:flex-1 md:min-w-0">
+      <div className="px-3 md:px-0 mb-4 md:card md:rounded-2xl md:border md:border-neutral-200/70 md:px-4 md:py-2.5 md:flex md:flex-wrap md:items-center md:gap-x-5 md:gap-y-1">
+        <div className="md:flex-1 md:min-w-0 md:basis-[18rem] overflow-hidden">
           <TodayProgress
             completedCount={data.counts.completedCount}
             actionableCount={data.counts.actionableCount}
