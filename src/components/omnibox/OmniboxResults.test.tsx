@@ -61,4 +61,21 @@ describe('OmniboxResults', () => {
     fireEvent.click(await screen.findByText('Replace kitchen light bulbs'))
     expect(onSubmit).not.toHaveBeenCalled()
   })
+
+  it('ArrowDown then Enter opens the highlighted result', async () => {
+    const onNavigate = vi.fn()
+    render(<OmniboxResults query="light" onNavigate={onNavigate} />)
+    await screen.findByText('Replace kitchen light bulbs')
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(navigateSpy).toHaveBeenCalledWith(expect.stringContaining('detail=task:t1'))
+    expect(onNavigate).toHaveBeenCalled()
+  })
+
+  it('plain Enter with no highlight does not hijack submission', async () => {
+    render(<OmniboxResults query="light" onNavigate={vi.fn()} />)
+    await screen.findByText('Replace kitchen light bulbs')
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(navigateSpy).not.toHaveBeenCalled()
+  })
 })
