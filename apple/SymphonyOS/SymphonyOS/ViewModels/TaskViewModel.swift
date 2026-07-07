@@ -87,6 +87,18 @@ final class TaskViewModel {
         try? modelContext.save()
     }
 
+    /// Move a task to a horizon bucket (week/month/someday/inbox). Mirrors the
+    /// web invariant: only bucket=="timed" carries a scheduled_for value.
+    func moveToBucket(_ task: SymphonyTask, bucket: String) {
+        task.bucket = bucket
+        task.scheduledFor = nil
+        task.isSomeday = bucket == "someday"
+        task.updatedAt = Date()
+        task.syncStatus = .pending
+        queueChange(tableName: "tasks", recordId: task.id, type: "update")
+        try? modelContext.save()
+    }
+
     func updateTitle(_ task: SymphonyTask, title: String) {
         task.title = title
         task.updatedAt = Date()

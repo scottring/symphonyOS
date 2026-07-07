@@ -64,22 +64,33 @@ struct TimelineItemCard: View {
         }
     }
 
-    /// Right-swipe actions. Task-only (routines/events just complete via left swipe).
+    /// Right-swipe actions. Tasks get push/context/more; routines get skip
+    /// (status="skipped" on the day's instance, same as the web). Events have none.
     private var slideActions: [SlideAction] {
-        guard item.type == .task else { return [] }
-        return [
-            SlideAction(label: "Push", systemImage: "arrow.right", tint: Self.pushAmber) {
-                if let task = fetchTask() {
-                    TaskViewModel(modelContext: modelContext).schedule(task, for: Date().addingDays(1))
-                }
-            },
-            SlideAction(label: "Context", systemImage: "tag", tint: Self.neutralSlate) {
-                showContextPicker = true
-            },
-            SlideAction(label: "More", systemImage: "ellipsis", tint: .blue) {
-                showDetail = true
-            },
-        ]
+        switch item.type {
+        case .task:
+            return [
+                SlideAction(label: "Push", systemImage: "arrow.right", tint: Self.pushAmber) {
+                    if let task = fetchTask() {
+                        TaskViewModel(modelContext: modelContext).schedule(task, for: Date().addingDays(1))
+                    }
+                },
+                SlideAction(label: "Context", systemImage: "tag", tint: Self.neutralSlate) {
+                    showContextPicker = true
+                },
+                SlideAction(label: "More", systemImage: "ellipsis", tint: .blue) {
+                    showDetail = true
+                },
+            ]
+        case .routine:
+            return [
+                SlideAction(label: "Skip", systemImage: "arrow.uturn.forward", tint: Self.neutralSlate) {
+                    setRoutineInstanceStatus("skipped")
+                },
+            ]
+        default:
+            return []
+        }
     }
 
     private func fetchTask() -> SymphonyTask? {

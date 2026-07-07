@@ -14,6 +14,12 @@ struct TaskDetailView: View {
 
     @State private var placeSuggestions: [PlacePrediction] = []
     @State private var placeSearchTask: Task<Void, Never>?
+    @State private var showScheduleSheet = false
+    @State private var showAddLink = false
+    @State private var newLinkURL = ""
+    @State private var newLinkTitle = ""
+
+    private var viewModel: TaskViewModel { TaskViewModel(modelContext: modelContext) }
 
     var body: some View {
         ScrollView {
@@ -53,21 +59,69 @@ struct TaskDetailView: View {
 
                     if let scheduled = task.scheduledFor {
                         HStack {
-                            Text(scheduled.formatted(date: .long, time: task.isAllDay ? .omitted : .shortened))
-                                .font(.bodyMedium)
+                            Button {
+                                showScheduleSheet = true
+                            } label: {
+                                Text(scheduled.formatted(date: .long, time: task.isAllDay ? .omitted : .shortened))
+                                    .font(.bodyMedium)
+                                    .foregroundStyle(Color.textPrimary)
+                            }
+                            .buttonStyle(.plain)
                             Spacer()
                             Button("Clear") {
-                                task.scheduledFor = nil
-                                markDirty()
+                                viewModel.schedule(task, for: nil)
                             }
                             .font(.bodySmall)
                             .foregroundStyle(.red)
                         }
+                    } else if task.bucket == "week" || task.bucket == "someday" {
+                        Text(task.bucket == "week" ? "Next week" : "Someday")
+                            .font(.bodyMedium)
+                            .foregroundStyle(Color.textSecondary)
                     } else {
                         Text("Not scheduled")
                             .font(.bodyMedium)
                             .foregroundStyle(Color.textTertiary)
                     }
+
+                    // When — quick triage options, mirrors the web WhenPicker
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 8)],
+                              alignment: .leading, spacing: 8) {
+                        whenChip("Today", systemImage: "sun.max") {
+                            viewModel.schedule(task, for: Calendar.current.startOfDay(for: Date()), isAllDay: true)
+                        }
+                        whenChip("Tomorrow", systemImage: "sunrise") {
+                            viewModel.schedule(task, for: Calendar.current.startOfDay(for: Date().addingDays(1)), isAllDay: true)
+                        }
+                        whenChip("Next week", systemImage: "arrow.right.to.line") {
+                            viewModel.moveToBucket(task, bucket: "week")
+                        }
+                        whenChip("Someday", systemImage: "moon.zzz") {
+                            viewModel.markSomeday(task)
+                        }
+                        whenChip("Pick date", systemImage: "calendar.badge.plus") {
+                            showScheduleSheet = true
+                        }
+                    }
+                }
+
+                // Duration
+                HStack {
+                    Label("Duration", systemImage: "clock")
+                        .font(.bodySmallBold)
+                        .foregroundStyle(Color.textSecondary)
+                    Spacer()
+                    Picker("Duration", selection: Binding(
+                        get: { task.estimatedDuration },
+                        set: { task.estimatedDuration = $0; markDirty() }
+                    )) {
+                        Text("None").tag(Optional<Int>.none)
+                        ForEach([15, 30, 45, 60, 90, 120], id: \.self) { minutes in
+                            Text(minutes < 60 ? "\(minutes) min" : String(format: "%g hr", Double(minutes) / 60))
+                                .tag(Optional(minutes))
+                        }
+                    }
+                    .pickerStyle(.menu)
                 }
 
                 // Context
@@ -142,26 +196,110 @@ struct TaskDetailView: View {
                     )
                 }
 
-                // Linked contact (e.g. a place/service provider). The web stores
-                // the place's phone on the contact, not the task — surface it here.
-                if let contact = linkedContact {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("Contact", systemImage: "person.crop.circle")
-                            .font(.bodySmallBold)
-                            .foregroundStyle(Color.textSecondary)
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(contact.name)
-                                    .font(.bodyMedium)
-                                    .foregroundStyle(Color.textPrimary)
-                                if let phone = contact.phone, !phone.isEmpty {
-                                    Text(phone)
+                // Links — product pages, reservations, docs (web parity)
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Links", systemImage: "link")
+                        .font(.bodySmallBold)
+                        .foregroundStyle(Color.textSecondary)
+
+                    ForEach(Array((task.links ?? []).enumerated()), id: \.element) { index, link in
+                        HStack(spacing: 8) {
+                            Button {
+                                openURL(link.url)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(link.title?.isEmpty == false ? link.title! : link.url)
                                         .font(.bodySmall)
-                                        .foregroundStyle(Color.textSecondary)
+                                        .foregroundStyle(Color.primaryTint)
+                                        .lineLimit(1)
+                                    if link.title?.isEmpty == false {
+                                        Text(link.url)
+                                            .font(.captionText)
+                                            .foregroundStyle(Color.textTertiary)
+                                            .lineLimit(1)
+                                    }
                                 }
                             }
+                            .buttonStyle(.plain)
                             Spacer()
-                            if let phone = contact.phone, !phone.isEmpty {
+                            Button {
+                                removeLink(at: index)
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(Color.textTertiary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.vertical, 4)
+                    }
+
+                    if showAddLink {
+                        VStack(spacing: 8) {
+                            TextField("https://…", text: $newLinkURL)
+                                .font(.bodySmall)
+                                .autocorrectionDisabled()
+                                #if os(iOS)
+                                .keyboardType(.URL)
+                                .textInputAutocapitalization(.never)
+                                #endif
+                            TextField("Title (optional)", text: $newLinkTitle)
+                                .font(.bodySmall)
+                            HStack {
+                                Button("Add") { addLink() }
+                                    .font(.bodySmallBold)
+                                    .foregroundStyle(Color.primaryTint)
+                                    .disabled(newLinkURL.trimmingCharacters(in: .whitespaces).isEmpty)
+                                Button("Cancel") {
+                                    showAddLink = false
+                                    newLinkURL = ""
+                                    newLinkTitle = ""
+                                }
+                                .font(.bodySmall)
+                                .foregroundStyle(Color.textSecondary)
+                            }
+                        }
+                        .padding(10)
+                        .background(Color.bgElevated)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    } else {
+                        Button {
+                            showAddLink = true
+                        } label: {
+                            Label("Add link", systemImage: "plus")
+                                .font(.bodySmall)
+                                .foregroundStyle(Color.primaryTint)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                // Linked contact (e.g. a place/service provider). The web stores
+                // the place's phone on the contact, not the task — surface it here.
+                if !contacts.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Label("Contact", systemImage: "person.crop.circle")
+                                .font(.bodySmallBold)
+                                .foregroundStyle(Color.textSecondary)
+                            Spacer()
+                            Picker("Contact", selection: Binding(
+                                get: { task.contactId },
+                                set: { task.contactId = $0; markDirty() }
+                            )) {
+                                Text("None").tag(Optional<UUID>.none)
+                                ForEach(contacts.sorted { $0.name < $1.name }, id: \.id) { contact in
+                                    Text(contact.name).tag(Optional(contact.id))
+                                }
+                            }
+                            .pickerStyle(.menu)
+                        }
+                        if let contact = linkedContact, let phone = contact.phone, !phone.isEmpty {
+                            HStack {
+                                Text(phone)
+                                    .font(.bodySmall)
+                                    .foregroundStyle(Color.textSecondary)
+                                Spacer()
                                 Button { call(phone) } label: {
                                     Image(systemName: "phone.fill")
                                         .foregroundStyle(.white)
@@ -276,6 +414,64 @@ struct TaskDetailView: View {
         .navigationTitle("Task")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .sheet(isPresented: $showScheduleSheet) {
+            SchedulePickerSheet(
+                initialDate: task.scheduledFor ?? Calendar.current.startOfDay(for: Date()),
+                initialAllDay: task.scheduledFor == nil ? true : task.isAllDay
+            ) { date, isAllDay in
+                viewModel.schedule(task, for: date, isAllDay: isAllDay)
+            }
+            .presentationDetents([.medium])
+        }
+    }
+
+    private func whenChip(_ label: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 11))
+                Text(label)
+                    .font(.captionBold)
+            }
+            .foregroundStyle(Color.textSecondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity)
+            .background(Color.bgElevated)
+            .clipShape(Capsule())
+            .overlay(Capsule().strokeBorder(Color.textTertiary.opacity(0.15), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Links
+
+    private func addLink() {
+        var url = newLinkURL.trimmingCharacters(in: .whitespaces)
+        guard !url.isEmpty else { return }
+        if !url.lowercased().hasPrefix("http") { url = "https://\(url)" }
+        let title = newLinkTitle.trimmingCharacters(in: .whitespaces)
+        var links = task.links ?? []
+        links.append(TaskLink(url: url, title: title.isEmpty ? nil : title))
+        task.links = links
+        showAddLink = false
+        newLinkURL = ""
+        newLinkTitle = ""
+        markDirty()
+    }
+
+    private func removeLink(at index: Int) {
+        var links = task.links ?? []
+        guard links.indices.contains(index) else { return }
+        links.remove(at: index)
+        task.links = links.isEmpty ? nil : links
+        markDirty()
+    }
+
+    private func openURL(_ urlString: String) {
+        #if os(iOS)
+        if let url = URL(string: urlString) { UIApplication.shared.open(url) }
         #endif
     }
 

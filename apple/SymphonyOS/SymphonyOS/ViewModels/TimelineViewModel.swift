@@ -98,7 +98,9 @@ final class TimelineViewModel {
                 title: routine.name,
                 startTime: startTime,
                 isAllDay: false,
-                completed: instanceStatus == "completed",
+                // Skipped reads as "off my plate today" — render it done-style
+                // so it doesn't invite a second completion.
+                completed: instanceStatus == "completed" || instanceStatus == "skipped",
                 context: routine.context,
                 entityId: routine.id,
                 assignedTo: routine.assignedTo.map { [$0] } ?? []

@@ -38,9 +38,11 @@ struct InboxView: View {
             }
 
             // Quick capture
-            VStack {
-                Spacer()
-                QuickCaptureBar(userId: auth.currentUser?.id ?? UUID())
+            if let userId = auth.currentUser?.id {
+                VStack {
+                    Spacer()
+                    QuickCaptureBar(userId: userId)
+                }
             }
         }
         .navigationTitle("Inbox (\(filteredTasks.count))")
@@ -83,11 +85,15 @@ struct InboxTaskRow: View {
     let userId: UUID
 
     @State private var showDetail = false
+    @State private var showWhenDialog = false
+    @State private var showDatePicker = false
     @Query private var familyMembers: [FamilyMember]
 
     private var assignedMemberIds: [UUID] {
         task.assignedToAll ?? (task.assignedTo.map { [$0] } ?? [])
     }
+
+    private var viewModel: TaskViewModel { TaskViewModel(modelContext: modelContext) }
 
     var body: some View {
         SlideRow(
@@ -96,10 +102,10 @@ struct InboxTaskRow: View {
             },
             actions: [
                 SlideAction(label: "Today", systemImage: "sun.max", tint: Self.todayAmber) {
-                    TaskViewModel(modelContext: modelContext).schedule(task, for: Date())
+                    viewModel.schedule(task, for: Calendar.current.startOfDay(for: Date()), isAllDay: true)
                 },
-                SlideAction(label: "Tomorrow", systemImage: "arrow.right", tint: .blue) {
-                    TaskViewModel(modelContext: modelContext).schedule(task, for: Date().addingDays(1))
+                SlideAction(label: "When", systemImage: "calendar", tint: .blue) {
+                    showWhenDialog = true
                 },
                 SlideAction(label: "More", systemImage: "ellipsis", tint: Self.neutralSlate) {
                     showDetail = true
@@ -107,6 +113,28 @@ struct InboxTaskRow: View {
             ]
         ) {
             rowContent
+        }
+        // Full When triage — mirrors the web WhenPicker's options.
+        .confirmationDialog("When", isPresented: $showWhenDialog, titleVisibility: .visible) {
+            Button("Tomorrow") {
+                viewModel.schedule(task, for: Calendar.current.startOfDay(for: Date().addingDays(1)), isAllDay: true)
+            }
+            Button("Next week") {
+                viewModel.moveToBucket(task, bucket: "week")
+            }
+            Button("Someday") {
+                viewModel.markSomeday(task)
+            }
+            Button("Pick a date…") {
+                showDatePicker = true
+            }
+            Button("Cancel", role: .cancel) {}
+        }
+        .sheet(isPresented: $showDatePicker) {
+            SchedulePickerSheet { date, isAllDay in
+                viewModel.schedule(task, for: date, isAllDay: isAllDay)
+            }
+            .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showDetail) {
             NavigationStack {
@@ -165,39 +193,51 @@ struct InboxTaskRow: View {
 
 // MARK: - Schedule Picker
 
+/// Date (+ optional time) picker used by task detail and inbox triage.
+/// Calls `onSet` with the chosen date and whether it's all-day.
 struct SchedulePickerSheet: View {
-    let task: SymphonyTask
-    let modelContext: ModelContext
+    var initialDate: Date = Date()
+    var initialAllDay: Bool = true
+    let onSet: (Date, Bool) -> Void
     @Environment(\.dismiss) private var dismiss
-    @State private var selectedDate = Date()
+    @State private var selectedDate: Date
+    @State private var isAllDay: Bool
+
+    init(initialDate: Date = Date(), initialAllDay: Bool = true, onSet: @escaping (Date, Bool) -> Void) {
+        self.initialDate = initialDate
+        self.initialAllDay = initialAllDay
+        self.onSet = onSet
+        self._selectedDate = State(initialValue: initialDate)
+        self._isAllDay = State(initialValue: initialAllDay)
+    }
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 16) {
-                // Quick options
-                HStack(spacing: 12) {
-                    quickOption("Today", date: Date())
-                    quickOption("Tomorrow", date: Date().addingDays(1))
-                    quickOption("Next Week", date: Date().addingDays(7).mondayOfWeek)
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
+            ScrollView {
+                VStack(spacing: 12) {
+                    DatePicker("Pick a date", selection: $selectedDate, displayedComponents: .date)
+                        .datePickerStyle(.graphical)
+                        .padding(.horizontal, 16)
 
-                Divider()
+                    Toggle("All day", isOn: $isAllDay)
+                        .font(.bodyMedium)
+                        .padding(.horizontal, 16)
 
-                DatePicker("Pick a date", selection: $selectedDate, displayedComponents: .date)
-                    .datePickerStyle(.graphical)
+                    if !isAllDay {
+                        DatePicker("Time", selection: $selectedDate, displayedComponents: .hourAndMinute)
+                            .font(.bodyMedium)
+                            .padding(.horizontal, 16)
+                    }
+
+                    Button("Schedule") {
+                        let date = isAllDay ? Calendar.current.startOfDay(for: selectedDate) : selectedDate
+                        onSet(date, isAllDay)
+                        dismiss()
+                    }
+                    .buttonStyle(.symphony)
                     .padding(.horizontal, 16)
-
-                Button("Schedule") {
-                    let vm = TaskViewModel(modelContext: modelContext)
-                    vm.schedule(task, for: selectedDate)
-                    dismiss()
+                    .padding(.bottom, 12)
                 }
-                .buttonStyle(.symphony)
-                .padding(.horizontal, 16)
-
-                Spacer()
             }
             .navigationTitle("Schedule")
             #if os(iOS)
@@ -209,23 +249,6 @@ struct SchedulePickerSheet: View {
                 }
             }
         }
-    }
-
-    private func quickOption(_ label: String, date: Date) -> some View {
-        Button {
-            let vm = TaskViewModel(modelContext: modelContext)
-            vm.schedule(task, for: date)
-            dismiss()
-        } label: {
-            Text(label)
-                .font(.bodySmallBold)
-                .foregroundStyle(Color.primaryTint)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(Color.primaryTint.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
-        .buttonStyle(.plain)
     }
 }
 

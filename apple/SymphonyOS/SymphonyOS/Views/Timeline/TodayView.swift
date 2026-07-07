@@ -89,9 +89,11 @@ struct TodayView: View {
             }
 
             // Quick capture bar
-            VStack {
-                Spacer()
-                QuickCaptureBar(userId: auth.currentUser?.id ?? UUID(), defaultDate: appState.selectedDate)
+            if let userId = auth.currentUser?.id {
+                VStack {
+                    Spacer()
+                    QuickCaptureBar(userId: userId, defaultDate: appState.selectedDate)
+                }
             }
         }
         #if os(iOS)
