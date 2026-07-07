@@ -178,6 +178,61 @@ describe('useSearch', () => {
     })
   })
 
+  describe('match tightness (fuzzy junk regression)', () => {
+    const noisyTasks = [
+      createMockTask({ id: 't-ped', title: "call the pediatrician about mia's dogworm" }),
+      createMockTask({ id: 't-tape', title: 'Remove insulation tape' }),
+      createMockTask({ id: 't-weed', title: 'Make it easy to weed' }),
+      createMockTask({ id: 't-claim', title: 'Review approved claim of $194.40 for medical expenses' }),
+      createMockTask({ id: 't-gate', title: "Talk to Campden's husband about a doggy gate again" }),
+    ]
+
+    it('"ped" matches only the pediatrician task, not character-soup neighbors', async () => {
+      const { result } = renderHook(() =>
+        useSearch({ tasks: noisyTasks, projects: [], contacts: [], routines: [] })
+      )
+
+      act(() => {
+        result.current.setQuery('ped')
+      })
+      await act(async () => {
+        vi.advanceTimersByTime(200)
+      })
+
+      expect(result.current.results.tasks.map((t) => t.id)).toEqual(['t-ped'])
+    })
+
+    it('still finds word-prefix and mid-word substring matches', async () => {
+      const { result } = renderHook(() =>
+        useSearch({ tasks: noisyTasks, projects: [], contacts: [], routines: [] })
+      )
+
+      act(() => {
+        result.current.setQuery('insul')
+      })
+      await act(async () => {
+        vi.advanceTimersByTime(200)
+      })
+
+      expect(result.current.results.tasks.map((t) => t.id)).toEqual(['t-tape'])
+    })
+
+    it('tolerates a mild typo', async () => {
+      const { result } = renderHook(() =>
+        useSearch({ tasks: noisyTasks, projects: [], contacts: [], routines: [] })
+      )
+
+      act(() => {
+        result.current.setQuery('pediatrcian')
+      })
+      await act(async () => {
+        vi.advanceTimersByTime(200)
+      })
+
+      expect(result.current.results.tasks.map((t) => t.id)).toContain('t-ped')
+    })
+  })
+
   describe('task search', () => {
     it('finds tasks by title', async () => {
       const tasks = [

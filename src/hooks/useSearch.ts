@@ -38,10 +38,16 @@ interface UseSearchProps {
   notes?: Note[]
 }
 
+// threshold 0.4 was loose enough that "ped" matched "Remove insulation tape"
+// (Bitap approximate matching), burying the real hit under dozens of junk rows
+// and making the group counts meaningless. 0.25 keeps prefix/substring matches
+// and mild typos while dropping character-soup matches; minMatchCharLength
+// stops single characters from matching everything.
 const FUSE_OPTIONS = {
-  threshold: 0.4,
+  threshold: 0.25,
   includeMatches: true,
   ignoreLocation: true,
+  minMatchCharLength: 2,
 }
 
 // Flatten tasks to include subtasks for searching
