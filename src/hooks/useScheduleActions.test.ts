@@ -362,7 +362,7 @@ describe('useScheduleActions', () => {
         await result.current.onCompleteRoutine('routine-1', true)
       })
 
-      expect(mocks.markDone).toHaveBeenCalledWith('routine', 'routine-1', viewedDate)
+      expect(mocks.markDone).toHaveBeenCalledWith('routine', 'routine-1', viewedDate, undefined)
     })
 
     it('calls undoDone when uncompleting', async () => {

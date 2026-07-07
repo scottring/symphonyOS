@@ -8,6 +8,8 @@ export interface CollectionDose {
   id: string
   time: string | null
   completed: boolean
+  /** Instance status 'skipped' — resolved for roll/anchor purposes but not counted as done. */
+  skipped?: boolean
 }
 
 /** A collection step (exercise) with its doses grouped, so the name shows once instead of once per dose. */

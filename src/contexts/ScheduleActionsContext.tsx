@@ -58,7 +58,7 @@ export interface ScheduleActionsValue {
   onAssignRoutineAll?: (routineId: string, memberIds: string[]) => void
 
   // Routine actions
-  onCompleteRoutine?: (routineId: string, completed: boolean) => void
+  onCompleteRoutine?: (routineId: string, completed: boolean, completedAt?: Date) => void
   onSkipRoutine?: (routineId: string) => void
   onPushRoutine?: (routineId: string, date: Date) => void
   onUpdateRoutine?: (id: string, updates: Partial<Routine>) => void

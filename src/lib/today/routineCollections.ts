@@ -50,27 +50,37 @@ export function buildCollectionItem(
 
   // One entry per exercise (step); its doses are grouped so the name shows once
   // instead of once per dose.
+  let resolved = 0
+
   const applicableSteps = collection.steps.filter(step => stepAppliesOnDate(step, viewedDate))
   for (const step of applicableSteps) {
     const doses: CollectionDose[] = []
     let stepDone = 0
     for (const dose of expandRoutineDoses(step)) {
       total += 1
-      const completed = routineStatusMap.get(routineStatusKey(step.id, dose.slotIndex))?.status === 'completed'
+      const status = routineStatusMap.get(routineStatusKey(step.id, dose.slotIndex))?.status
+      const completed = status === 'completed'
+      const skipped = status === 'skipped'
       if (completed) { done += 1; stepDone += 1 }
-      doses.push({ id: dose.slotId, time: dose.time, completed })
+      // Skipped doses are RESOLVED: they don't count toward "done" but they
+      // release the anchor, so the block rolls on to the next real dose
+      // instead of pinning at a slot you've explicitly let go of.
+      if (completed || skipped) resolved += 1
+      doses.push({ id: dose.slotId, time: dose.time, completed, skipped })
 
       if (dose.time && (!earliest || dose.time < earliest.time)) {
         earliest = { time: dose.time, stepId: step.id, stepName: step.name, doseSlot: dose.slotIndex }
       }
-      if (!completed && dose.time && (!nextUp || nextUp.time == null || dose.time < nextUp.time)) {
+      if (!completed && !skipped && dose.time && (!nextUp || nextUp.time == null || dose.time < nextUp.time)) {
         nextUp = { time: dose.time, stepId: step.id, stepName: step.name, doseSlot: dose.slotIndex }
       }
     }
     collectionSteps.push({ stepId: step.id, name: step.name, progress: { done: stepDone, total: doses.length }, doses })
   }
 
-  const allDone = total > 0 && done === total
+  // The day is finished when every dose is resolved (done or skipped), even
+  // if some were skipped — a skipped 7am shouldn't hold the whole block open.
+  const allDone = total > 0 && resolved === total
   const anchor = nextUp?.time ?? earliest?.time ?? null
   let startTime: Date | null = null
   if (anchor) {

@@ -182,7 +182,9 @@ export function useActionableInstances() {
   const markDone = useCallback(async (
     entityType: EntityType,
     entityId: string,
-    date: Date
+    date: Date,
+    /** When the item was actually done — defaults to now. Lets "I did the 7am dose at 8:15" record honestly. */
+    completedAt?: Date
   ): Promise<boolean> => {
     setIsLoading(true)
     setError(null)
@@ -200,7 +202,7 @@ export function useActionableInstances() {
         .from('actionable_instances')
         .update({
           status: 'completed' as ActionableStatus,
-          completed_at: new Date().toISOString(),
+          completed_at: (completedAt ?? new Date()).toISOString(),
         })
         .eq('id', instance.id)
 

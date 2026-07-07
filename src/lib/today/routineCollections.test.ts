@@ -79,6 +79,56 @@ describe('buildCollectionItem', () => {
     expect(item.collectionProgress).toEqual({ done: 1, total: 1 })
     expect(item.collectionNextUp).toBeUndefined()
   })
+  it('a skipped dose is resolved: anchor and next-up roll past it, but done count excludes it', () => {
+    const collection = {
+      ...r({ id: 'hep', name: 'Shoulder HEP' }),
+      steps: [
+        r({ id: 'chin', name: 'Chin Tuck', parent_routine_id: 'hep', times_per_day: ['07:00', '09:00'] }),
+      ],
+    }
+    // 7am skipped, 9am pending → the block anchors at 9am, not the skipped 7am
+    const status = new Map<string, ActionableInstance>([
+      ['chin#0', { entity_type: 'routine', entity_id: 'chin#0', status: 'skipped' } as ActionableInstance],
+    ])
+    const item = buildCollectionItem(collection as any, date, status)
+    expect(item.collectionNextUp?.time).toBe('09:00')
+    expect(item.startTime?.getHours()).toBe(9)
+    expect(item.collectionProgress).toEqual({ done: 0, total: 2 }) // skipped ≠ done
+    expect(item.collectionSteps?.[0].doses[0].skipped).toBe(true)
+    expect(item.collectionSteps?.[0].doses[0].completed).toBe(false)
+    expect(item.completed).toBe(false)
+  })
+  it('completing the 7am dose rolls the anchor to the 9am dose', () => {
+    const collection = {
+      ...r({ id: 'hep', name: 'Shoulder HEP' }),
+      steps: [
+        r({ id: 'chin', name: 'Chin Tuck', parent_routine_id: 'hep', times_per_day: ['07:00', '09:00'] }),
+      ],
+    }
+    const before = buildCollectionItem(collection as any, date, new Map())
+    expect(before.startTime?.getHours()).toBe(7)
+
+    const status = new Map<string, ActionableInstance>([
+      ['chin#0', { entity_type: 'routine', entity_id: 'chin#0', status: 'completed' } as ActionableInstance],
+    ])
+    const after = buildCollectionItem(collection as any, date, status)
+    expect(after.startTime?.getHours()).toBe(9)
+    expect(after.collectionNextUp?.time).toBe('09:00')
+  })
+  it('all doses resolved (mix of done and skipped) → collection completed', () => {
+    const collection = {
+      ...r({ id: 'c', name: 'C' }),
+      steps: [r({ id: 's', name: 'S', parent_routine_id: 'c', times_per_day: ['07:00', '09:00'] })],
+    }
+    const status = new Map<string, ActionableInstance>([
+      ['s#0', { entity_type: 'routine', entity_id: 's#0', status: 'skipped' } as ActionableInstance],
+      ['s#1', { entity_type: 'routine', entity_id: 's#1', status: 'completed' } as ActionableInstance],
+    ])
+    const item = buildCollectionItem(collection as any, date, status)
+    expect(item.completed).toBe(true)
+    expect(item.collectionProgress).toEqual({ done: 1, total: 2 })
+    expect(item.collectionNextUp).toBeUndefined()
+  })
   it('buildCollectionItem excludes steps whose day-override does not match the viewed date', () => {
     const viewed = new Date(2026, 0, 5) // Monday
     const key = weekdayKeyForDate(viewed)

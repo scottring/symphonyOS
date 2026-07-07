@@ -15,7 +15,7 @@ interface UseScheduleActionsDeps {
   deleteRoutine: (id: string) => Promise<unknown>
   updateEventAssignment: (eventId: string, memberId: string | null) => void
   updateEventAssignmentAll: (eventId: string, memberIds: string[]) => void
-  markDone: (entityType: 'routine' | 'calendar_event', entityId: string, date: Date) => Promise<boolean>
+  markDone: (entityType: 'routine' | 'calendar_event', entityId: string, date: Date, completedAt?: Date) => Promise<boolean>
   undoDone: (entityType: 'routine' | 'calendar_event', entityId: string, date: Date) => Promise<boolean>
   skip: (entityType: 'routine' | 'calendar_event', entityId: string, date: Date) => Promise<boolean>
   reschedule: (entityType: 'routine' | 'calendar_event', entityId: string, fromDate: Date, toDate: Date) => Promise<boolean>
@@ -87,13 +87,13 @@ export function useScheduleActions({
     updateRoutine(routineId, { assigned_to_all: memberIds, assigned_to: memberIds[0] ?? null })
   }, [updateRoutine])
 
-  const onCompleteRoutine = useCallback(async (routineId: string, completed: boolean) => {
+  const onCompleteRoutine = useCallback(async (routineId: string, completed: boolean, completedAt?: Date) => {
     const bareId = routineId.split('#')[0]
     const routine = allRoutines.find(r => r.id === bareId)
     const routineName = routine?.name || 'Routine'
 
     if (completed) {
-      await markDone('routine', routineId, viewedDate)
+      await markDone('routine', routineId, viewedDate, completedAt)
       pushAction(`Completed "${routineName}"`, async () => {
         await undoDone('routine', routineId, viewedDate)
         refreshDateInstances()

@@ -86,7 +86,7 @@ interface TodayViewProps {
   onOpenPlanToday?: () => void
   // Undo-wrapped handlers from HomeView
   onToggleTask: (taskId: string) => void
-  onCompleteRoutine?: (routineId: string, completed: boolean) => void
+  onCompleteRoutine?: (routineId: string, completed: boolean, completedAt?: Date) => void
   onCompleteEvent?: (eventId: string, completed: boolean) => void
   // Assignee filter (managed by HomeView) — multi-select union; [] = everyone
   selectedAssignees?: string[]
@@ -892,6 +892,16 @@ export function TodayView({
                                 const entityId = slot === null ? routineId : `${routineId}#${slot}`
                                 onCompleteRoutine(entityId, completed)
                               }}
+                              onSkipStep={onSkipRoutine ? (stepTimelineId) => {
+                                const { routineId, slot } = parseRoutineTimelineId(stepTimelineId)
+                                const entityId = slot === null ? routineId : `${routineId}#${slot}`
+                                onSkipRoutine(entityId)
+                              } : undefined}
+                              onCompleteStepAt={onCompleteRoutine ? (stepTimelineId, completedAt) => {
+                                const { routineId, slot } = parseRoutineTimelineId(stepTimelineId)
+                                const entityId = slot === null ? routineId : `${routineId}#${slot}`
+                                onCompleteRoutine(entityId, true, completedAt)
+                              } : undefined}
                             />
                           </div>
                         )
