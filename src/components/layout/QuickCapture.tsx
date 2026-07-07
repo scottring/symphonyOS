@@ -337,7 +337,7 @@ export function QuickCapture({
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="What's on your mind?"
+                  placeholder='Try "call the vet tomorrow 2pm"'
                   className="w-full pl-4 pr-14 py-3 rounded-xl border border-neutral-200 bg-neutral-50
                              text-neutral-800 placeholder:text-neutral-400 text-lg md:text-2xl font-display
                              focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -348,6 +348,16 @@ export function QuickCapture({
                   className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9"
                 />
               </div>
+
+              {/* Syntax teaching hint — shown until the parser has something to preview */}
+              {!showPreview && !title.trim() && (
+                <p className="text-xs text-neutral-400 px-1">
+                  Dates, times, and types are understood as you type — try
+                  {' '}<span className="text-neutral-500">"pay camp deposit friday"</span>,
+                  {' '}<span className="text-neutral-500">"event: dentist thu 2pm 45m"</span>, or
+                  {' '}<span className="text-neutral-500">"#porch buy lumber"</span>
+                </p>
+              )}
 
               {/* Preview card - only show if fields were parsed */}
               {showPreview && (
@@ -467,7 +477,15 @@ export function QuickCapture({
                              disabled:opacity-50 disabled:cursor-not-allowed
                              transition-colors"
                 >
-                  {effectiveParsed.isNote ? 'Save Note' : (showPreview ? 'Save with Above' : 'Add to My Inbox')}
+                  {effectiveParsed.isNote
+                    ? 'Save Note'
+                    : !showPreview
+                    ? 'Add to My Inbox'
+                    : effectiveParsed.category === 'event' && effectiveParsed.dueDate
+                    ? 'Create Event'
+                    : effectiveParsed.dueDate
+                    ? 'Schedule Task'
+                    : 'Save Task'}
                 </button>
               </div>
 

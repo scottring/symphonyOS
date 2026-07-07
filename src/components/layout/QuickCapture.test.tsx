@@ -19,24 +19,24 @@ describe('QuickCapture', () => {
 
       await user.click(screen.getByRole('button', { name: 'Quick add task' }))
 
-      expect(screen.getByPlaceholderText("What's on your mind?")).toBeInTheDocument()
+      expect(screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')).toBeInTheDocument()
     })
   })
 
   describe('Modal', () => {
     it('renders modal when isOpen=true', () => {
       render(<QuickCapture onAdd={vi.fn()} isOpen={true} showFab={false} />)
-      expect(screen.getByPlaceholderText("What's on your mind?")).toBeInTheDocument()
+      expect(screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')).toBeInTheDocument()
     })
 
     it('does not render modal when isOpen=false', () => {
       render(<QuickCapture onAdd={vi.fn()} isOpen={false} showFab={false} />)
-      expect(screen.queryByPlaceholderText("What's on your mind?")).not.toBeInTheDocument()
+      expect(screen.queryByPlaceholderText('Try "call the vet tomorrow 2pm"')).not.toBeInTheDocument()
     })
 
     it('input has large text styling', () => {
       render(<QuickCapture onAdd={vi.fn()} isOpen={true} showFab={false} />)
-      const input = screen.getByPlaceholderText("What's on your mind?")
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
       // Test for the classes we care about without being brittle
       expect(input.className).toMatch(/text-2xl|text-lg/)
       expect(input.className).toContain('font-display')
@@ -88,7 +88,7 @@ describe('QuickCapture', () => {
         <QuickCapture onAdd={vi.fn()} isOpen={true} showFab={false} onClose={onClose} />
       )
 
-      const input = screen.getByPlaceholderText("What's on your mind?")
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
       await user.type(input, '{Escape}')
 
       await waitFor(() => {
@@ -103,7 +103,7 @@ describe('QuickCapture', () => {
       )
 
       // Click the overlay (the outer div with bg-black/40)
-      const overlay = screen.getByPlaceholderText("What's on your mind?").closest('.bg-black\\/40')
+      const overlay = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"').closest('.bg-black\\/40')
       if (overlay) {
         await user.click(overlay)
         await waitFor(() => {
@@ -120,7 +120,7 @@ describe('QuickCapture', () => {
         <QuickCapture onAdd={onAdd} isOpen={true} showFab={false} />
       )
 
-      const input = screen.getByPlaceholderText("What's on your mind?")
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
       await user.type(input, 'My new task')
       await user.click(screen.getByRole('button', { name: 'Add to My Inbox' }))
 
@@ -139,7 +139,7 @@ describe('QuickCapture', () => {
         <QuickCapture onAdd={vi.fn()} isOpen={true} showFab={false} />
       )
 
-      const input = screen.getByPlaceholderText("What's on your mind?")
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
       await user.type(input, 'Some text')
 
       const saveButton = screen.getByRole('button', { name: 'Add to My Inbox' })
@@ -163,7 +163,7 @@ describe('QuickCapture', () => {
         <QuickCapture onAdd={onAdd} isOpen={true} showFab={false} />
       )
 
-      const input = screen.getByPlaceholderText("What's on your mind?")
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
       await user.type(input, '  My task  ')
       await user.click(screen.getByRole('button', { name: 'Add to My Inbox' }))
 
@@ -192,7 +192,7 @@ describe('QuickCapture', () => {
         />
       )
 
-      const input = screen.getByPlaceholderText("What's on your mind?")
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
       await user.type(input, 'buy milk tomorrow')
 
       // Preview should show parsed title
@@ -212,7 +212,7 @@ describe('QuickCapture', () => {
         />
       )
 
-      const input = screen.getByPlaceholderText("What's on your mind?")
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
       await user.type(input, 'book flights #montreal')
 
       // Preview should show project
@@ -230,14 +230,14 @@ describe('QuickCapture', () => {
         />
       )
 
-      const input = screen.getByPlaceholderText("What's on your mind?")
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
       await user.type(input, 'call @iris')
 
       // Preview should show contact
       expect(screen.getByText('Iris')).toBeInTheDocument()
     })
 
-    it('calls onAddRich with parsed data when Save with Above is clicked', async () => {
+    it('calls onAddRich with parsed data when the primary save button is clicked', async () => {
       const onAddRich = vi.fn()
       const { user } = render(
         <QuickCapture
@@ -250,9 +250,9 @@ describe('QuickCapture', () => {
         />
       )
 
-      const input = screen.getByPlaceholderText("What's on your mind?")
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
       await user.type(input, 'book flight #montreal tomorrow')
-      await user.click(screen.getByRole('button', { name: 'Save with Above' }))
+      await user.click(screen.getByRole('button', { name: 'Schedule Task' }))
 
       expect(onAddRich).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -274,12 +274,12 @@ describe('QuickCapture', () => {
         />
       )
 
-      const input = screen.getByPlaceholderText("What's on your mind?")
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
       await user.type(input, 'buy milk tomorrow')
 
       // Should show both buttons when parsing happens
       expect(screen.getByRole('button', { name: 'Add to My Inbox' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Save with Above' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Schedule Task' })).toBeInTheDocument()
     })
 
     it('calls onAdd with raw text when Add to My Inbox is clicked during parsing', async () => {
@@ -296,7 +296,7 @@ describe('QuickCapture', () => {
         />
       )
 
-      const input = screen.getByPlaceholderText("What's on your mind?")
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
       await user.type(input, 'buy milk tomorrow')
       await user.click(screen.getByRole('button', { name: 'Add to My Inbox' }))
 
@@ -316,7 +316,7 @@ describe('QuickCapture', () => {
         />
       )
 
-      const input = screen.getByPlaceholderText("What's on your mind?")
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
       await user.type(input, 'book flight #montreal')
 
       // Project should be shown

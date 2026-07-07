@@ -161,33 +161,6 @@
     "archived": false
   },
   {
-    "slug": "gw-director-sustainability",
-    "type": "task",
-    "domain": "job-search",
-    "status": "looking-at",
-    "company": "George Washington University",
-    "role": "Director, Office of Sustainability",
-    "comp_low": 105000,
-    "comp_high": 182000,
-    "location": "Washington, DC (Foggy Bottom)",
-    "remote": "hybrid",
-    "applied": null,
-    "next_step": "Submit application",
-    "next_step_due": "2026-05-12",
-    "created": "2026-03-06",
-    "tags": [
-      "high-priority"
-    ],
-    "linked": [
-      "[[resume-gw-sustainability]]",
-      "[[cover-letter-gw-sustainability]]"
-    ],
-    "filename": "apply-gw-director-sustainability.md",
-    "body": "\n# Apply for GW — Director, Office of Sustainability\n\n$105–182k. Hybrid Foggy Bottom DC. Cover letter and resume already drafted (March 6); submission has been delayed. Lane 1 fit (Director of Sustainability at a corporation/institution).\n\n## Steps\n\n- [x] Tailor resume → `[[resume-gw-sustainability]]`\n- [x] Draft cover letter → `[[cover-letter-gw-sustainability]]`\n- [ ] Confirm posting is still open\n- [ ] Submit application via GW careers portal\n- [ ] Follow up after 14 days if no response\n",
-    "isStalled": false,
-    "archived": true
-  },
-  {
     "slug": "new-balance-project-dev-lead",
     "type": "task",
     "domain": "job-search",

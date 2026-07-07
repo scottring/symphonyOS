@@ -231,6 +231,7 @@ function ShellLayoutInner({ children }: Props) {
           onSignOut={signOut}
           activeView={activeView}
           onViewChange={handleViewChange}
+          onOpenSearch={() => setSearchOpen(true)}
           inboxCount={inboxCount}
           pins={chrome.pins}
           entities={chrome.pinnedEntities}
