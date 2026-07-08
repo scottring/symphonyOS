@@ -5,6 +5,21 @@ import { WeeklyPlanningSession } from './WeeklyPlanningSession'
 import { writeHideRoutines } from '@/lib/hideRoutinesSignal'
 import type { Routine } from '@/types/actionable'
 
+// The session mirrors its concerns text to the shared planning_sessions row
+// (usePlanningSession hits auth + supabase) — mock it like CadenceSession.test.
+const patchNotes = vi.fn()
+vi.mock('@/hooks/usePlanningSession', () => ({
+  usePlanningSession: () => ({ notes: {}, patchNotes, loading: false }),
+}))
+
+// Tiptap doesn't mount in jsdom — stand in a plain textarea with the same
+// content/onChange contract so the concerns wiring is still exercised.
+vi.mock('@/components/notes/TiptapEditor', () => ({
+  TiptapEditor: ({ content, onChange, placeholder }: { content: string; onChange: (v: string) => void; placeholder?: string }) => (
+    <textarea value={content} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
+  ),
+}))
+
 const baseProps = {
   tasks: [], events: [], routines: [],
   onUpdateTask: vi.fn(), onPushTask: vi.fn(),
@@ -98,6 +113,16 @@ describe('WeeklyPlanningSession', () => {
     await user.click(screen.getByRole('button', { name: 'Next' })) // 4
     await user.click(screen.getByRole('button', { name: /finish/i }))
     expect(onSavePlanToVault).toHaveBeenCalled()
+  })
+
+  it('mirrors concerns text to the shared planning_sessions row as you type', async () => {
+    const { user } = render(<WeeklyPlanningSession {...baseProps} />)
+    await user.click(screen.getByRole('button', { name: 'Next' })) // 2
+    await user.click(screen.getByRole('button', { name: 'Next' })) // 3
+    await user.click(screen.getByRole('button', { name: 'Next' })) // 4
+    const editor = await screen.findByRole('textbox') // lazy Tiptap editor
+    await user.type(editor, 'camp forms')
+    expect(patchNotes).toHaveBeenCalledWith(expect.objectContaining({ concerns: expect.stringContaining('camp') }))
   })
 
   describe('routines this week (step 2)', () => {

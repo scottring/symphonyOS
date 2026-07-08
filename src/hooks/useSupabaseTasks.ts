@@ -303,6 +303,11 @@ export function useSupabaseTasks() {
     isAllDay?: boolean  // Whether the task is all-day (no specific time)
     parentTaskId?: string  // Link as follow-up to a parent task (for context lineage)
     phoneNumber?: string  // Tap-to-call number (e.g. resolved from a linked contact)
+    /** Create directly into a horizon pool (week/month/quarter/someday). Doing it
+     *  in the INSERT avoids the addTask-then-setBucket race: the follow-up write
+     *  can hit tasksRef before the temp→real id swap has rendered, and be
+     *  silently dropped ("Task not found"). Ignored when scheduledFor is set. */
+    bucket?: TaskBucket
   }
 
   const addTask = useCallback(async (
@@ -329,7 +334,7 @@ export function useSupabaseTasks() {
       id: tempId,
       title,
       completed: false,
-      bucket: scheduledFor ? 'timed' : 'inbox',
+      bucket: scheduledFor ? 'timed' : options?.bucket ?? 'inbox',
       createdAt: now,
       updatedAt: now,
       contactId,
@@ -356,7 +361,7 @@ export function useSupabaseTasks() {
         user_id: user.id,
         title,
         completed: false,
-        bucket: scheduledFor ? 'timed' : 'inbox',
+        bucket: scheduledFor ? 'timed' : options?.bucket ?? 'inbox',
         contact_id: contactId ?? null,
         project_id: projectId ?? null,
         scheduled_for: scheduledFor?.toISOString() ?? null,

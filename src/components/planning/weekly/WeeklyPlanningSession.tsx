@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { CalendarCheck, CalendarX } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { GoalAction } from '@/types/goal'
@@ -8,6 +8,7 @@ import type { UpdateRoutineInput } from '@/hooks/useRoutines'
 import { isEverydayRoutine, scheduleRoutineOnDate, matchesRecurrenceForDate } from '@/lib/routineUtils'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 import { isoWeekId } from './weeklyPlanning'
+import { usePlanningSession } from '@/hooks/usePlanningSession'
 import { StepWeekAhead } from './StepWeekAhead'
 import { StepBuildTodos } from './StepBuildTodos'
 import { StepSchedule } from './StepSchedule'
@@ -128,6 +129,23 @@ export function WeeklyPlanningSession({
   )
 
   const weekId = useMemo(() => isoWeekId(initialDate ?? new Date()), [initialDate])
+
+  // Mirror the concerns text to the shared planning_sessions row (like the
+  // monthly/seasonal/annual sessions do) so the ritual's substance is visible
+  // to the household, not only in the (Scott-only) vault note. The row also
+  // re-seeds a resumed session with what was already captured this week.
+  const { notes: sharedNotes, patchNotes, loading: sharedLoading } = usePlanningSession('weekly', weekId)
+  const seededConcerns = useRef(false)
+  useEffect(() => {
+    if (sharedLoading || seededConcerns.current) return
+    seededConcerns.current = true
+    if (sharedNotes.concerns) setConcerns((prev) => prev || (sharedNotes.concerns as string))
+  }, [sharedLoading, sharedNotes])
+  const handleConcernsChange = useCallback((v: string) => {
+    setConcerns(v)
+    patchNotes({ concerns: v })
+  }, [patchNotes])
+
   const priorities = useMemo(
     () => selectedIds.map(id => tasks.find(t => t.id === id)).filter(Boolean) as Task[],
     [selectedIds, tasks],
@@ -269,7 +287,7 @@ export function WeeklyPlanningSession({
             onPushTask={onPushTask}
           />
         )}
-        {step === 3 && <StepConcerns value={concerns} onChange={setConcerns} />}
+        {step === 3 && <StepConcerns value={concerns} onChange={handleConcernsChange} />}
       </div>
 
       <footer className="flex items-center justify-between px-6 py-4 border-t border-neutral-200/70">

@@ -28,6 +28,9 @@ interface CadenceSessionProps {
   title: string                     // "Plan the month"
   periodLabel: string               // "June 2026"
   tasks: Task[]
+  /** True while the host's task subscription is still loading — the review/pull
+   *  sections show a quiet placeholder instead of a false "nothing here". */
+  tasksLoading?: boolean
   /** Bucket pulled items land in (monthly→'month', seasonal→'quarter'); null for
    *  annual, which is goals-level and has no task bucket of its own. */
   thisBucket: 'month' | 'quarter' | null
@@ -44,6 +47,10 @@ interface CadenceSessionProps {
    *  ("Into week" for monthly), so reviewing actively builds the plan below. */
   onSetBucket?: (id: string, bucket: TaskBucket) => void
   onCompleteTask?: (id: string) => void
+  /** Capture something NEW into this horizon's pool mid-session (the notebook
+   *  moment: plans are born in the ritual, not only pulled down from above).
+   *  Rendered whenever `thisBucket` is set. */
+  onCreateTask?: (title: string) => void | Promise<void>
   /** Current-quarter goal actions to break into this horizon. Pulling one creates
    *  a LINKED task (carries the action's projectId so the why-chain resolves);
    *  the action persists — it's an umbrella that can spawn several chunks. */
@@ -60,9 +67,9 @@ interface CadenceSessionProps {
 const SECTION = 'text-[11px] uppercase tracking-wider text-neutral-400 mb-3'
 
 export function CadenceSession({
-  horizon, periodToken, title, periodLabel, tasks, thisBucket,
+  horizon, periodToken, title, periodLabel, tasks, tasksLoading, thisBucket,
   pullFromBucket, pullFromLabel, textFields, onPushTask, onClose, handDown,
-  onSetBucket, onCompleteTask, goalActions, onPullGoalAction,
+  onSetBucket, onCompleteTask, onCreateTask, goalActions, onPullGoalAction,
   financialLabel, onOpenGoals, links,
 }: CadenceSessionProps) {
   const { notes, patchNotes } = usePlanningSession(horizon, periodToken)
@@ -97,6 +104,15 @@ export function CadenceSession({
     setPicked(new Set())
   }, [picked, onPushTask, thisBucket])
 
+  // Mid-session capture — new commitments born in the conversation.
+  const [draft, setDraft] = useState('')
+  const submitDraft = useCallback(async () => {
+    const title = draft.trim()
+    if (!title || !onCreateTask) return
+    setDraft('')
+    await onCreateTask(title)
+  }, [draft, onCreateTask])
+
   return (
     <div className="fixed inset-0 z-50 bg-bg-base flex flex-col" role="dialog" aria-label={title}>
       <header className="flex items-center justify-between px-6 py-4 border-b border-neutral-200/70 shrink-0">
@@ -118,9 +134,11 @@ export function CadenceSession({
               below), defer to Someday, or mark done. */}
           {thisBucket && (
             <section>
-              <h2 className={SECTION}>In review — {inHorizon.length} open</h2>
+              <h2 className={SECTION}>In review{!tasksLoading && ` — ${inHorizon.length} open`}</h2>
               {inHorizon.length === 0 ? (
-                <p className="text-sm text-neutral-400">Nothing committed to {periodLabel.toLowerCase()} yet.</p>
+                <p className="text-sm text-neutral-400">
+                  {tasksLoading ? 'Gathering your plan…' : `Nothing committed to ${periodLabel.toLowerCase()} yet.`}
+                </p>
               ) : (
                 <ul className="space-y-2">
                   {inHorizon.map((t) => (
@@ -146,9 +164,9 @@ export function CadenceSession({
           {/* Plan — pull from the next-higher pool (the cascade). */}
           {pullFromBucket && (
             <section>
-              <h2 className={SECTION}>{pullFromLabel ?? 'Pull down'} ({pullPool.length})</h2>
+              <h2 className={SECTION}>{pullFromLabel ?? 'Pull down'}{!tasksLoading && ` (${pullPool.length})`}</h2>
               {pullPool.length === 0 ? (
-                <p className="text-sm text-neutral-400">Nothing to pull down.</p>
+                <p className="text-sm text-neutral-400">{tasksLoading ? 'Gathering your plan…' : 'Nothing to pull down.'}</p>
               ) : (
                 <>
                   <ul className="space-y-2">
@@ -179,6 +197,33 @@ export function CadenceSession({
                   </button>
                 </>
               )}
+            </section>
+          )}
+
+          {/* Capture — add something NEW to this horizon mid-session. Planning
+              conversations *produce* commitments; without this the session is a
+              dead end whenever the upstream pool is empty. */}
+          {thisBucket && onCreateTask && (
+            <section>
+              <h2 className={SECTION}>Add to {periodLabel.split(' ')[0]}</h2>
+              <div className="flex items-center gap-2 px-2 py-1.5 rounded-xl border border-neutral-200 bg-white focus-within:border-primary-400 transition-colors">
+                <button
+                  type="button"
+                  onClick={() => void submitDraft()}
+                  aria-label="Add to this plan"
+                  className="shrink-0 w-6 h-6 rounded-full bg-primary-600 text-white grid place-items-center hover:bg-primary-700 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+                <input
+                  type="text"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void submitDraft() }}
+                  placeholder={`Something new for ${periodLabel.split(' ')[0]}…`}
+                  className="flex-1 min-w-0 text-sm bg-transparent placeholder:text-neutral-400 focus:outline-none"
+                />
+              </div>
             </section>
           )}
 

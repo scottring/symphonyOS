@@ -9,7 +9,7 @@ import { SpecificDatePicker } from './SpecificDatePicker'
 export type TriageWhen =
   | 'today' | 'tonight' | 'tomorrow'
   | 'this-week' | 'next-week' | 'this-weekend' | 'next-weekend'
-  | 'this-month' | 'next-month'
+  | 'this-month' | 'next-month' | 'this-season'
   | 'someday'
 
 interface WhenOption { when: TriageWhen; label: string }
@@ -39,6 +39,7 @@ const GROUPS: WhenGroup[] = [
     label: 'Month', primary: 'this-month', options: [
       { when: 'this-month', label: 'This month' },
       { when: 'next-month', label: 'Next month' },
+      { when: 'this-season', label: 'This season' },
     ],
   },
   {

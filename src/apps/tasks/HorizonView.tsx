@@ -13,7 +13,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarRange, Target, Plus } from 'lucide-react';
+import { CalendarRange, Target, Plus, ChevronRight, FolderOpen } from 'lucide-react';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 import { useEventNotes } from '@/hooks/useEventNotes';
@@ -36,13 +36,59 @@ import { selectOverdue } from '@/lib/today/taskPools';
 import { selectHorizonPool, HORIZONS, type HorizonId } from '@/lib/today/horizons';
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter';
 import { useConvertTaskToProject } from '@/hooks/useConvertTaskToProject';
-import { getBaseDate, getThisEvening, getNextWeekend, getWeekendAfterNext, getNextMonday } from '@/lib/dateHelpers';
+import { applyTriageWhen } from '@/lib/triage/applyWhen';
+import { useGoalsContext } from '@/contexts/GoalsContext';
+import { periodLabel, periodProgress } from '@/lib/cadence/periods';
+import type { GoalAction } from '@/types/goal';
 import type { Task } from '@/types/task';
 
-// First day of next month at midnight (the "Next month" triage target).
-function firstOfNextMonth(): Date {
-  const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth() + 1, 1, 0, 0, 0, 0);
+// ── The cascade rail: the rhythm spine rendered as a walkable path, with the
+// current rung emphasized and live counts on the bucketed rungs. This is what
+// makes the year → season → month → week → today trickle-down *visible*. ──
+const RAIL_ORDER: HorizonId[] = ['year', 'season', 'month', 'week', 'today'];
+
+function CascadeRail({ current, counts, onGo }: {
+  current: HorizonId;
+  counts: Partial<Record<HorizonId, number>>;
+  onGo: (h: HorizonId) => void;
+}) {
+  return (
+    <nav aria-label="Planning cascade" className="flex items-center gap-1 flex-wrap">
+      {RAIL_ORDER.map((id, i) => {
+        const def = HORIZONS.find((h) => h.id === id);
+        if (!def) return null;
+        const isCurrent = id === current;
+        const count = counts[id];
+        const short = id === 'today' ? 'Today' : def.label.replace(/^This /, '');
+        return (
+          <span key={id} className="flex items-center gap-1">
+            {i > 0 && <ChevronRight className="w-3 h-3 text-neutral-300" aria-hidden />}
+            <button
+              type="button"
+              onClick={() => onGo(id)}
+              aria-current={isCurrent ? 'page' : undefined}
+              className={`text-xs px-2 py-1 rounded-md font-medium transition-colors ${
+                isCurrent
+                  ? 'bg-primary-600 text-white'
+                  : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'
+              }`}
+            >
+              {short}
+              {typeof count === 'number' && count > 0 && (
+                <span
+                  className={`ml-1.5 inline-block min-w-[16px] text-center text-[10px] leading-4 px-1 rounded-full ${
+                    isCurrent ? 'bg-white/25 text-white' : 'bg-neutral-200/70 text-neutral-500'
+                  }`}
+                >
+                  {count}
+                </span>
+              )}
+            </button>
+          </span>
+        );
+      })}
+    </nav>
+  );
 }
 
 interface HorizonViewProps {
@@ -93,6 +139,32 @@ export function HorizonView({ horizon }: HorizonViewProps) {
     [tasks, horizon, match],
   );
 
+  // Live counts for the cascade rail (bucketed rungs only — today and year
+  // have no bucket of their own).
+  const railCounts = useMemo(() => {
+    const counts: Partial<Record<HorizonId, number>> = {};
+    for (const h of HORIZONS) {
+      if (h.bucket && h.bucket !== 'timed') counts[h.id] = selectHorizonPool(tasks, h.id, match).length;
+    }
+    return counts;
+  }, [tasks, match]);
+
+  // Guiding goals — this season's goal actions (annual goals broken into
+  // quarterly moves), shown on the month/season rungs; the year rung shows the
+  // full goals-by-area picture.
+  const { areas, goals, getCurrentQuarter } = useGoalsContext();
+  const seasonGoalActions = useMemo(() => {
+    const q = getCurrentQuarter();
+    return goals
+      .filter((g) => g.status === 'active')
+      .flatMap((g) => g.actions.map((a) => ({ action: a, goal: g })))
+      .filter(({ action }) => action.quarter === q && !action.completed);
+  }, [goals, getCurrentQuarter]);
+
+  // Where this rung sits in the cascade + how far through its period we are.
+  const period = periodLabel(horizon);
+  const progress = periodProgress(horizon);
+
   // ── Tap-to-detail via the global DetailPanel (SelectionProvider). ──
   const handleSelect = useCallback(
     (taskId: string) => setSelection({ kind: 'task', id: taskId }),
@@ -124,13 +196,15 @@ export function HorizonView({ horizon }: HorizonViewProps) {
   const horizonBucket = def?.bucket && def.bucket !== 'timed' ? def.bucket : null;
   const onCreateTaskFromValue = useCallback(
     async (title: string) => {
-      const id = await addTask(title, undefined, undefined, undefined, {
+      // Bucket rides the INSERT — a follow-up setBucket can race tasksRef
+      // (temp→real id swap not yet rendered) and be silently dropped.
+      await addTask(title, undefined, undefined, undefined, {
         assignedTo: getCurrentUserMember()?.id,
         context: currentDomain !== 'universal' ? currentDomain : undefined,
+        bucket: horizonBucket ?? undefined,
       });
-      if (id && horizonBucket) await setBucket(id, horizonBucket);
     },
-    [addTask, getCurrentUserMember, currentDomain, horizonBucket, setBucket],
+    [addTask, getCurrentUserMember, currentDomain, horizonBucket],
   );
 
   // Inline add-a-task draft for the pool section.
@@ -141,6 +215,38 @@ export function HorizonView({ horizon }: HorizonViewProps) {
     setDraft('');
     await onCreateTaskFromValue(title);
   }, [draft, onCreateTaskFromValue]);
+
+  // Break a goal action into this horizon: create a linked task carrying the
+  // action's project (why-chain resolves through it); the action persists —
+  // it's an umbrella that can spawn several chunks over the season.
+  const pullGoalAction = useCallback(
+    async (action: GoalAction) => {
+      if (!horizonBucket) return;
+      await addTask(action.description, undefined, action.projectId, undefined, { bucket: horizonBucket });
+    },
+    [addTask, horizonBucket],
+  );
+
+  // Projects in motion — a month/season is mostly its projects, so the pool
+  // groups by project (biggest first); loose tasks follow.
+  const grouped = useMemo(() => {
+    const byProject = new Map<string, Task[]>();
+    const loose: Task[] = [];
+    for (const t of pool) {
+      const p = t.projectId ? projectsMap.get(t.projectId) : undefined;
+      if (p) {
+        const arr = byProject.get(p.id) ?? [];
+        arr.push(t);
+        byProject.set(p.id, arr);
+      } else {
+        loose.push(t);
+      }
+    }
+    const groups = [...byProject.entries()]
+      .map(([projectId, items]) => ({ project: projectsMap.get(projectId)!, items }))
+      .sort((a, b) => b.items.length - a.items.length);
+    return { groups, loose };
+  }, [pool, projectsMap]);
 
   // Create a new project from a row's inline picker and attach the task to it.
   const handleCreateProjectForTask = useCallback(
@@ -216,23 +322,11 @@ export function HorizonView({ horizon }: HorizonViewProps) {
     ],
   );
 
-  // ── Inline triage: route a row to a specific WHEN (reuses pushTask/setBucket).
-  // Dated whens become a scheduled date (pushTask handles bucket=timed + all-day
-  // inference — e.g. "Tonight" at 6pm is not all-day); pool whens set the bucket. ──
+  // ── Inline triage: route a row to a specific WHEN via the shared mapper
+  // (dated whens → pushTask, pool whens → setBucket), identical everywhere. ──
   const applyWhen = useCallback(
     (task: Task, when: TriageWhen) => {
-      switch (when) {
-        case 'today': pushTask(task.id, getBaseDate(0)); break;
-        case 'tonight': pushTask(task.id, getThisEvening()); break;
-        case 'tomorrow': pushTask(task.id, getBaseDate(1)); break;
-        case 'this-week': setBucket(task.id, 'week'); break;
-        case 'next-week': pushTask(task.id, getNextMonday()); break;
-        case 'this-weekend': pushTask(task.id, getNextWeekend()); break;
-        case 'next-weekend': pushTask(task.id, getWeekendAfterNext()); break;
-        case 'this-month': setBucket(task.id, 'month'); break;
-        case 'next-month': pushTask(task.id, firstOfNextMonth()); break;
-        case 'someday': setBucket(task.id, 'someday'); break;
-      }
+      applyTriageWhen(when, task.id, { onPushTask: pushTask, onSetBucket: setBucket });
     },
     [pushTask, setBucket],
   );
@@ -275,31 +369,125 @@ export function HorizonView({ horizon }: HorizonViewProps) {
     navigate(`/today?plan=${horizon}`);
   }, [horizon, navigate]);
 
-  // ── Year is a goals-level horizon — run the annual planning session, with a
-  // door into the full Goals feature for deeper goal-setting. ──
+  // ── Year: the top of the cascade. Annual goals live HERE, on the rung —
+  // grouped by life area, each showing its progress through this season's
+  // moves — with doors into the annual session and the Goals library. ──
   if (horizon === 'year') {
+    const activeGoals = goals.filter((g) => g.status === 'active');
+    const goalsByArea = areas
+      .map((area) => ({ area, items: activeGoals.filter((g) => g.areaId === area.id) }))
+      .filter(({ items }) => items.length > 0);
+    const orphanGoals = activeGoals.filter((g) => !areas.some((a) => a.id === g.areaId));
+
     return (
       <div className="h-full overflow-y-auto">
         <div className="max-w-[940px] w-full px-4 py-4 md:pl-10 md:pr-8 md:py-8">
-          <header className="mb-6">
-            <h1 className="font-display text-2xl font-semibold text-neutral-800">This Year</h1>
-            <p className="text-sm text-neutral-500 mt-1">The annual horizon — year in review, hopes &amp; fears, and your goals.</p>
-          </header>
-          <div className="card p-8 text-center">
-            <CalendarRange className="w-8 h-8 text-primary-400 mx-auto mb-4" />
-            <p className="font-display text-lg text-neutral-700 mb-2">Plan the year</p>
-            <p className="text-neutral-500 mb-6">
-              A reflective session — review the year, set macro hopes &amp; fears, and map the
-              annual calendar. Goals live in the Goals library for ongoing tracking.
-            </p>
-            <div className="flex items-center justify-center gap-3">
+          <header className="mb-4 flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-neutral-400">This Year</p>
+              <h1 className="font-display text-3xl font-semibold text-neutral-800 mt-0.5">{period}</h1>
+              {progress && (
+                <div className="mt-2 flex items-center gap-2 text-xs text-neutral-400">
+                  <span>Day {progress.day} of {progress.total}</span>
+                  <span className="h-1 w-24 rounded-full bg-neutral-200 overflow-hidden inline-block">
+                    <span
+                      className="block h-full bg-primary-400"
+                      style={{ width: `${Math.round((progress.day / progress.total) * 100)}%` }}
+                    />
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="shrink-0 flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => navigate('/today?plan=year')}
-                className="btn-primary inline-flex items-center gap-2"
+                className="inline-flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg transition-colors text-primary-700 bg-primary-50 hover:bg-primary-100"
               >
                 <CalendarRange className="w-4 h-4" /> Plan the year
               </button>
+            </div>
+          </header>
+
+          <div className="mb-8">
+            <CascadeRail current="year" counts={railCounts} onGo={(h) => navigate(`/${h}`)} />
+          </div>
+
+          {goalsByArea.length === 0 && orphanGoals.length === 0 ? (
+            <div className="card p-8 text-center">
+              <Target className="w-8 h-8 text-primary-400 mx-auto mb-4" />
+              <p className="font-display text-lg text-neutral-700 mb-2">{period} doesn't have goals yet</p>
+              <p className="text-neutral-500 mb-6">
+                Set the year's goals by life area — family, home, health, money. Each goal
+                breaks into seasonal moves that flow down this cascade to your months and weeks.
+              </p>
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => navigate('/goals')}
+                  className="btn-primary inline-flex items-center gap-2"
+                >
+                  <Target className="w-4 h-4" /> Set this year's goals
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/today?plan=year')}
+                  className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors"
+                >
+                  <CalendarRange className="w-4 h-4" /> Plan the year together
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {goalsByArea.map(({ area, items }) => (
+                <section key={area.id} className="mb-6">
+                  <h2 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">{area.name}</h2>
+                  <div className="space-y-2">
+                    {items.map((g) => {
+                      const done = g.actions.filter((a) => a.completed).length;
+                      return (
+                        <button
+                          key={g.id}
+                          type="button"
+                          onClick={() => navigate(`/goals/${g.id}`)}
+                          className="w-full flex items-center gap-3 rounded-xl border border-neutral-100 bg-white px-4 py-3 text-left hover:bg-neutral-50 transition-colors"
+                        >
+                          <Target className="w-4 h-4 text-primary-500 shrink-0" />
+                          <span className="flex-1 min-w-0">
+                            <span className="block text-sm font-medium text-neutral-800 truncate">{g.name}</span>
+                            {g.actions.length > 0 && (
+                              <span className="block text-xs text-neutral-400 mt-0.5">
+                                {done} of {g.actions.length} moves done
+                              </span>
+                            )}
+                          </span>
+                          <ChevronRight className="w-4 h-4 text-neutral-300 shrink-0" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
+              {orphanGoals.length > 0 && (
+                <section className="mb-6">
+                  <h2 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">Goals</h2>
+                  <div className="space-y-2">
+                    {orphanGoals.map((g) => (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => navigate(`/goals/${g.id}`)}
+                        className="w-full flex items-center gap-3 rounded-xl border border-neutral-100 bg-white px-4 py-3 text-left hover:bg-neutral-50 transition-colors"
+                      >
+                        <Target className="w-4 h-4 text-primary-500 shrink-0" />
+                        <span className="flex-1 min-w-0 text-sm font-medium text-neutral-800 truncate">{g.name}</span>
+                        <ChevronRight className="w-4 h-4 text-neutral-300 shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
               <button
                 type="button"
                 onClick={() => navigate('/goals')}
@@ -307,8 +495,8 @@ export function HorizonView({ horizon }: HorizonViewProps) {
               >
                 <Target className="w-4 h-4" /> Open Goals
               </button>
-            </div>
-          </div>
+            </>
+          )}
         </div>
       </div>
     );
@@ -320,33 +508,91 @@ export function HorizonView({ horizon }: HorizonViewProps) {
   // does (week/month/season/year).
   const planDisabled = horizon === 'someday';
 
+  const rungName = label.replace(/^This /, '').toLowerCase();
+  const isCascadeRung = horizon !== 'someday';
+
   return (
     <ScheduleActionsProvider value={scheduleActionsValue}>
       <div className="h-full overflow-y-auto">
         <div className="max-w-[940px] w-full px-4 py-4 md:pl-10 md:pr-8 md:py-8">
-          <header className="mb-6 flex items-start justify-between gap-4">
+          <header className="mb-4 flex items-start justify-between gap-4">
             <div>
-              <h1 className="font-display text-2xl font-semibold text-neutral-800">{label}</h1>
-              <p className="text-sm text-neutral-500 mt-1">
-                {total === 0
-                  ? 'Nothing here yet'
-                  : `${pool.length} in this horizon${carryOver.length > 0 ? ` · ${carryOver.length} carried over` : ''}`}
-              </p>
+              <p className="text-[11px] uppercase tracking-wider text-neutral-400">{label}</p>
+              <h1 className="font-display text-3xl font-semibold text-neutral-800 mt-0.5">
+                {period ?? label}
+              </h1>
+              {progress ? (
+                <div className="mt-2 flex items-center gap-2 text-xs text-neutral-400">
+                  <span>Day {progress.day} of {progress.total}</span>
+                  <span className="h-1 w-24 rounded-full bg-neutral-200 overflow-hidden inline-block">
+                    <span
+                      className="block h-full bg-primary-400"
+                      style={{ width: `${Math.round((progress.day / progress.total) * 100)}%` }}
+                    />
+                  </span>
+                  {total > 0 && (
+                    <span>
+                      · {pool.length} open{carryOver.length > 0 ? ` · ${carryOver.length} carried over` : ''}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-neutral-500 mt-1">
+                  {horizon === 'someday'
+                    ? 'Timeless — review during seasonal planning.'
+                    : total === 0 ? 'Nothing here yet' : `${pool.length} open`}
+                </p>
+              )}
             </div>
             {!planDisabled && (
               <button
                 type="button"
                 onClick={handlePlan}
-                title={`Plan the ${label.replace(/^This /, '').toLowerCase()}`}
+                title={`Plan the ${rungName}`}
                 className="shrink-0 inline-flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg transition-colors text-primary-700 bg-primary-50 hover:bg-primary-100"
               >
                 <CalendarRange className="w-4 h-4" />
-                Plan the {label.replace(/^This /, '').toLowerCase()}
+                Plan the {rungName}
               </button>
             )}
           </header>
 
-          {/* Carry-over — calm "carried over" framing, shown on every horizon. */}
+          {/* The cascade rail — where this rung sits in the year → today flow. */}
+          {isCascadeRung && (
+            <div className="mb-8">
+              <CascadeRail current={horizon} counts={railCounts} onGo={(h) => navigate(`/${h}`)} />
+            </div>
+          )}
+
+          {/* Guiding goals — this season's moves from your annual goals. Pull
+              one in to break it into this horizon's plan. */}
+          {(horizon === 'month' || horizon === 'season') && seasonGoalActions.length > 0 && (
+            <section className="mb-6">
+              <h2 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">
+                <Target className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
+                Guiding goals — {periodLabel('season')}
+              </h2>
+              <div className="space-y-2">
+                {seasonGoalActions.map(({ action, goal }) => (
+                  <div key={action.id} className="flex items-center gap-3 rounded-xl border border-primary-100 bg-primary-50/30 px-3 py-2">
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm text-neutral-800 truncate">{action.description}</span>
+                      <span className="block text-xs text-neutral-400 truncate">{goal.name}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void pullGoalAction(action)}
+                      className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-md bg-primary-600 text-white hover:bg-primary-700 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" /> Plan it
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Carry-over — calm "carried over" framing (week only). */}
           {carryOver.length > 0 && (
             <section className="mb-6">
               <h2 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">
@@ -356,18 +602,54 @@ export function HorizonView({ horizon }: HorizonViewProps) {
             </section>
           )}
 
-          {/* The horizon's scoped pool. */}
+          {/* Projects in motion — the pool grouped by project, loose tasks after. */}
+          {grouped.groups.map(({ project, items }) => (
+            <section key={project.id} className="mb-6">
+              <button
+                type="button"
+                onClick={() => navigate(`/projects/${project.id}`)}
+                className="group flex items-center gap-2 mb-3"
+              >
+                <FolderOpen className="w-3.5 h-3.5 text-neutral-400" />
+                <h2 className="font-display text-sm tracking-wide text-neutral-500 uppercase group-hover:text-primary-700 transition-colors">
+                  {project.name}
+                </h2>
+                <span className="text-xs text-neutral-400">({items.length})</span>
+                <ChevronRight className="w-3.5 h-3.5 text-neutral-300 group-hover:text-primary-500 transition-colors" />
+              </button>
+              <div className="space-y-2">{items.map(renderRow)}</div>
+            </section>
+          ))}
+
+          {/* The rest of the pool (loose tasks), or the empty invitation. */}
           <section>
-            <h2 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">
-              {label} ({pool.length})
-            </h2>
+            {(grouped.loose.length > 0 || pool.length === 0) && (
+              <h2 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">
+                {grouped.groups.length > 0 ? `More in ${rungName}` : label} ({grouped.groups.length > 0 ? grouped.loose.length : pool.length})
+              </h2>
+            )}
             {pool.length === 0 ? (
-              <div className="text-center py-12 text-neutral-400">
-                <p className="font-display text-lg text-neutral-600 mb-1">Nothing in {label.toLowerCase()}</p>
-                <p className="text-sm">Triage items here from your Inbox, or add one below.</p>
+              <div className="text-center py-10 text-neutral-400">
+                <p className="font-display text-lg text-neutral-600 mb-1">
+                  {period ? `Nothing planned for ${period.split(' ')[0]} yet` : `Nothing in ${label.toLowerCase()}`}
+                </p>
+                <p className="text-sm mb-4">
+                  {planDisabled
+                    ? 'Park timeless ideas here — they surface in seasonal planning.'
+                    : 'Plan it together, pull items down the cascade, or add one below.'}
+                </p>
+                {!planDisabled && (
+                  <button
+                    type="button"
+                    onClick={handlePlan}
+                    className="btn-primary inline-flex items-center gap-2"
+                  >
+                    <CalendarRange className="w-4 h-4" /> Plan the {rungName}
+                  </button>
+                )}
               </div>
             ) : (
-              <div className="space-y-2">{pool.map(renderRow)}</div>
+              <div className="space-y-2">{grouped.loose.map(renderRow)}</div>
             )}
 
             {/* Add a task directly into this horizon's pool. */}

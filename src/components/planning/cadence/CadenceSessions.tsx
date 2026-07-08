@@ -18,6 +18,8 @@ function seasonIndex(d: Date): number {
 
 interface BaseProps {
   tasks: Task[]
+  /** True while the host's task subscription is loading (quiet placeholders). */
+  tasksLoading?: boolean
   onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
   onClose: () => void
   /** Hand down to the next-lower session. */
@@ -25,6 +27,8 @@ interface BaseProps {
   /** Review-row triage — move an open item to another bucket / mark it done. */
   onSetBucket?: (id: string, bucket: TaskBucket) => void
   onCompleteTask?: (id: string) => void
+  /** Capture something new straight into this session's bucket. */
+  onCreateTask?: (title: string) => void | Promise<void>
   /** Current-quarter goal actions + a handler that breaks one into this horizon. */
   goalActions?: GoalAction[]
   onPullGoalAction?: (action: GoalAction) => void
@@ -34,7 +38,7 @@ interface BaseProps {
   links?: Array<{ label: string; onClick: () => void }>
 }
 
-export function MonthlyPlanningSession({ tasks, onPushTask, onClose, onHandDown, onSetBucket, onCompleteTask, goalActions, onPullGoalAction, links }: BaseProps) {
+export function MonthlyPlanningSession({ tasks, tasksLoading, onPushTask, onClose, onHandDown, onSetBucket, onCompleteTask, onCreateTask, goalActions, onPullGoalAction, links }: BaseProps) {
   const now = new Date()
   return (
     <CadenceSession
@@ -43,6 +47,7 @@ export function MonthlyPlanningSession({ tasks, onPushTask, onClose, onHandDown,
       title="Plan the month"
       periodLabel={`${MONTHS[now.getMonth()]} ${now.getFullYear()}`}
       tasks={tasks}
+      tasksLoading={tasksLoading}
       thisBucket="month"
       pullFromBucket="quarter"
       pullFromLabel="Pull from this season"
@@ -57,6 +62,7 @@ export function MonthlyPlanningSession({ tasks, onPushTask, onClose, onHandDown,
       handDown={onHandDown ? { label: 'Plan the week', onActivate: onHandDown } : undefined}
       onSetBucket={onSetBucket}
       onCompleteTask={onCompleteTask}
+      onCreateTask={onCreateTask}
       goalActions={goalActions}
       onPullGoalAction={onPullGoalAction}
       links={links}
@@ -65,7 +71,7 @@ export function MonthlyPlanningSession({ tasks, onPushTask, onClose, onHandDown,
   )
 }
 
-export function SeasonalPlanningSession({ tasks, onPushTask, onClose, onHandDown, onSetBucket, onCompleteTask, goalActions, onPullGoalAction }: BaseProps) {
+export function SeasonalPlanningSession({ tasks, tasksLoading, onPushTask, onClose, onHandDown, onSetBucket, onCompleteTask, onCreateTask, goalActions, onPullGoalAction }: BaseProps) {
   const now = new Date()
   const s = seasonIndex(now)
   return (
@@ -75,6 +81,7 @@ export function SeasonalPlanningSession({ tasks, onPushTask, onClose, onHandDown
       title="Plan the season"
       periodLabel={`${SEASONS[s]} ${now.getFullYear()}`}
       tasks={tasks}
+      tasksLoading={tasksLoading}
       thisBucket="quarter"
       pullFromBucket="someday"
       pullFromLabel="Pull from someday"
@@ -91,6 +98,7 @@ export function SeasonalPlanningSession({ tasks, onPushTask, onClose, onHandDown
       handDown={onHandDown ? { label: 'Plan the month', onActivate: onHandDown } : undefined}
       onSetBucket={onSetBucket}
       onCompleteTask={onCompleteTask}
+      onCreateTask={onCreateTask}
       goalActions={goalActions}
       onPullGoalAction={onPullGoalAction}
       financialLabel="Compare actual vs budget, update the plan, make a seasonal budget — in your finance tool"

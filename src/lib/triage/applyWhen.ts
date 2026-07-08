@@ -38,6 +38,7 @@ export function describeTriageWhen(when: TriageWhen): string {
     case 'next-weekend': return `Moved to next weekend · ${formatShortDate(getWeekendAfterNext())}`
     case 'this-month': return 'Moved to This Month'
     case 'next-month': return `Moved to next month · ${formatShortDate(firstOfNextMonth())}`
+    case 'this-season': return 'Moved to This Season'
     case 'someday': return 'Moved to Someday'
   }
 }
@@ -53,6 +54,7 @@ export function applyTriageWhen(when: TriageWhen, taskId: string, h: TriageHandl
     case 'next-weekend': h.onPushTask(taskId, getWeekendAfterNext()); break
     case 'this-month': h.onSetBucket(taskId, 'month'); break
     case 'next-month': h.onPushTask(taskId, firstOfNextMonth()); break
+    case 'this-season': h.onSetBucket(taskId, 'quarter'); break
     case 'someday': h.onSetBucket(taskId, 'someday'); break
   }
 }

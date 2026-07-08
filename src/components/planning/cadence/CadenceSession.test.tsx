@@ -123,6 +123,28 @@ describe('CadenceSession', () => {
     expect(screen.queryByText(/Pull/)).not.toBeInTheDocument()
   })
 
+  it('captures something new straight into the session bucket (Enter + button)', async () => {
+    const onCreateTask = vi.fn()
+    const { user } = render(
+      <CadenceSession {...monthlyProps} tasks={[]} onPushTask={vi.fn()} onClose={vi.fn()} onCreateTask={onCreateTask} />
+    )
+    const input = screen.getByPlaceholderText(/Something new for June/)
+    await user.type(input, 'Invite the neighbors over{Enter}')
+    expect(onCreateTask).toHaveBeenCalledWith('Invite the neighbors over')
+    expect(input).toHaveValue('')
+  })
+
+  it('hides the capture input when the session has no bucket (annual) or no handler', () => {
+    render(<CadenceSession {...monthlyProps} tasks={[]} onPushTask={vi.fn()} onClose={vi.fn()} />)
+    expect(screen.queryByPlaceholderText(/Something new/)).not.toBeInTheDocument()
+  })
+
+  it('shows a quiet loading placeholder instead of a false empty state', () => {
+    render(<CadenceSession {...monthlyProps} tasks={[]} tasksLoading onPushTask={vi.fn()} onClose={vi.fn()} />)
+    expect(screen.getAllByText('Gathering your plan…').length).toBeGreaterThan(0)
+    expect(screen.queryByText(/Nothing committed/)).not.toBeInTheDocument()
+  })
+
   it('annual goals link + custom financial copy', async () => {
     const onOpenGoals = vi.fn()
     const { user } = render(

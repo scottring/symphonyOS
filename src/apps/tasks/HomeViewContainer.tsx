@@ -438,13 +438,26 @@ export function HomeViewContainer() {
   // action persists — it's an umbrella that can spawn several chunks over the
   // quarter, so completing one chunk must NOT complete the action.
   const pullGoalActionToBucket = useCallback(async (action: GoalAction, bucket: 'week' | 'month' | 'quarter') => {
-    const id = await addTask(action.description, undefined, action.projectId);
-    if (id) await setBucket(id, bucket);
-  }, [addTask, setBucket]);
+    // Bucket rides the INSERT — a follow-up setBucket can race tasksRef and drop.
+    await addTask(action.description, undefined, action.projectId, undefined, { bucket });
+  }, [addTask]);
 
   const handleAddGoalActionToWeek = useCallback(
     (action: GoalAction) => pullGoalActionToBucket(action, 'week'),
     [pullGoalActionToBucket],
+  );
+
+  // Mid-session capture: create a task straight into a cadence session's bucket
+  // (the notebook moment — commitments born during the ritual, not pulled down).
+  const createTaskInBucket = useCallback(
+    async (title: string, bucket: 'month' | 'quarter') => {
+      await addTask(title, undefined, undefined, undefined, {
+        assignedTo: getCurrentUserMember()?.id,
+        context: currentDomain !== 'universal' ? currentDomain : undefined,
+        bucket,
+      });
+    },
+    [addTask, getCurrentUserMember, currentDomain],
   );
 
   // Bulk-select grouping (Today): wrap a mix of tasks/events/routines into a new
@@ -688,11 +701,13 @@ export function HomeViewContainer() {
         <Suspense fallback={<LoadingFallback />}>
           <MonthlyPlanningSession
             tasks={tasks}
+            tasksLoading={tasksLoading}
             onPushTask={pushTask}
             onClose={() => setMonthlyPlanningOpen(false)}
             onHandDown={() => { setMonthlyPlanningOpen(false); setWeeklyPlanningOpen(true); }}
             onSetBucket={setBucket}
             onCompleteTask={toggleTask}
+            onCreateTask={(title) => createTaskInBucket(title, 'month')}
             goalActions={currentQuarterGoalActions}
             onPullGoalAction={(a) => pullGoalActionToBucket(a, 'month')}
             links={[
@@ -706,11 +721,13 @@ export function HomeViewContainer() {
         <Suspense fallback={<LoadingFallback />}>
           <SeasonalPlanningSession
             tasks={tasks}
+            tasksLoading={tasksLoading}
             onPushTask={pushTask}
             onClose={() => setSeasonalPlanningOpen(false)}
             onHandDown={() => { setSeasonalPlanningOpen(false); setMonthlyPlanningOpen(true); }}
             onSetBucket={setBucket}
             onCompleteTask={toggleTask}
+            onCreateTask={(title) => createTaskInBucket(title, 'quarter')}
             goalActions={currentQuarterGoalActions}
             onPullGoalAction={(a) => pullGoalActionToBucket(a, 'quarter')}
           />
